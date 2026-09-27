@@ -22,10 +22,11 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply and without merge conflicts.
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
+- **Start a task in a chosen AI agent** (Claude Code, Codex) from the app, and **jump into** an already-started task's agent session ([D5](./decisions/0005-start-and-open-agent-sessions.md)).
 
 ## 3. Non-goals (for now)
 
-- Dispatching or running agents (glidebox tracks work; it does not start it). Possible later.
+- Orchestrating agents automatically (scheduling, auto-assigning, chaining agents). Glidebox starts an agent only when a person asks it to.
 - Replacing git, PRs or CI. Glidebox links to them.
 - Storing secrets, credentials or evidence logs. Cards link to evidence; they do not hold it.
 - Full project-management features (budgets, time sheets, resource leveling).
@@ -37,6 +38,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D1](./decisions/0001-database-source-of-truth.md) | **The database is the source of truth.** Agents write structured fields through the CLI/MCP; markdown is an optional export, not an input. A one-time importer brings in existing markdown boards. | **accepted 2026-09-27** |
 | [D2](./decisions/0002-burndown-counts-plus-sizes.md) | **Burndown uses task counts, plus optional sizes.** Every task counts as 1; a task may carry an optional size (points or days), and the chart can switch to size-weighted when sizes are present. | **accepted 2026-09-27** |
 | [D3](./decisions/0003-relationship-to-glidelines.md) | **Relationship to Glidelines.** Leaning: standalone product, reusing Glidelines ideas and code where it fits (same stack family; port the `tasklist.json` format and burndown/forecast logic from `glidepace-vibe-cc`, not fork the app). Options A–D are compared in the decision record. | **open — not decided** |
+| [D5](./decisions/0005-start-and-open-agent-sessions.md) | **Start and open agent sessions from glidebox**, through a local runner daemon (`gb runner`) on a person's machine or a vendor cloud session. | **requirement accepted 2026-09-27**; design proposed |
 | [D4](./decisions/0004-team-accounts-and-roles.md) | **Team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
 
 ## 5. Data model (first cut)
@@ -53,6 +55,8 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Approval** — task, exact operation requested, requester, decided by, decision, time.
 - **Event** (append-only) — every change of state, label, claim, size or scope, with actor and timestamp. **Burndown, timeline and "recently finished" are all computed from events**, never maintained by hand.
 - **Member** — person or agent in a project, with a role; **Invitation** — email, role, inviter, expiry, state.
+- **Runner** — a registered machine (local daemon) or cloud connection that can launch agents; owner, allowed projects/repos/members, liveness.
+- **Agent session** — agent (Claude / Codex), runner, task, session id, worktree, branch, resume command or URL, state (running / waiting for input / exited).
 - **Actor** — person or agent session (`codex/w09-help-contact`, `claude/task-w07-01-09-…`), provider, owning person.
 
 ## 6. Views
@@ -64,7 +68,8 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 5. **Burndown + forecast** — see §7.
 6. **Timeline** — gantt generated from claim and done events.
 7. **Task detail** — fields, links, approvals and event history.
-8. **Sessions** — which agent sessions hold which tasks right now (replaces the session registry).
+8. **Sessions** — which agent sessions hold which tasks right now, and whether they are alive (replaces the session registry).
+9. **Start in agent / Open session** — buttons on every task (see [D5](./decisions/0005-start-and-open-agent-sessions.md)).
 
 ## 7. Burndown and forecast
 
@@ -81,6 +86,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
   - `apps/web` — React + Vite + Tailwind web app (charts, lists, inbox)
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex
+  - `packages/runner` — local daemon (`gb runner`): receives start requests, creates worktrees, launches and resumes agents, reports session state
   - `packages/importer` — markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`)
   - `supabase/` — Postgres schema, RLS policies, SQL functions (atomic claim), migrations
 - **Backend:** Supabase — Postgres, Auth (team sign-in), Row Level Security per project and role, Realtime for live updates. Agents use scoped project tokens.
@@ -96,14 +102,16 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | M2 | Read-only web | Supabase schema + auth; web shows workstream lists, progress charts and burndown for the imported project |
 | M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |
 | M4 | Collaboration | Roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
-| M5 | Polish | Generated timeline, markdown export, size-weighted burndown, target dates |
+| M5 | Start and open agents | Research spike on each agent's launch/resume interfaces; local runner starts a task in Claude Code and in Codex, reports the session and claims the task; "Open session" works for local and cloud sessions |
+| M6 | Polish | Generated timeline, markdown export, size-weighted burndown, target dates |
 
 ## 10. Open questions
 
 1. Decide D3 (relationship to Glidelines; M1 does not depend on it) and confirm D4's role details and sign-in method.
 2. Hosting target and domain.
 3. Should the importer keep syncing from markdown during the transition, or run once and then switch the SSR project to glidebox?
-4. Languages for the UI (Glidelines supports en / ja / zh-CN / zh-TW).
+4. D5 open questions: which agent surfaces first; runners on whose machines; automatic worktree creation; model/effort per task.
+5. Languages for the UI (Glidelines supports en / ja / zh-CN / zh-TW).
 
 ## 11. References
 
