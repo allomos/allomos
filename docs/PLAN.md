@@ -37,7 +37,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D1](./decisions/0001-database-source-of-truth.md) | **The database is the source of truth.** Agents write structured fields through the CLI/MCP; markdown is an optional export, not an input. A one-time importer brings in existing markdown boards. | **accepted 2026-09-27** |
 | [D2](./decisions/0002-burndown-counts-plus-sizes.md) | **Burndown uses task counts, plus optional sizes.** Every task counts as 1; a task may carry an optional size (points or days), and the chart can switch to size-weighted when sizes are present. | **accepted 2026-09-27** |
 | [D3](./decisions/0003-relationship-to-glidelines.md) | **Relationship to Glidelines.** Leaning: standalone product, reusing Glidelines ideas and code where it fits (same stack family; port the `tasklist.json` format and burndown/forecast logic from `glidepace-vibe-cc`, not fork the app). Options A–D are compared in the decision record. | **open — not decided** |
-| [D4](./decisions/0004-team-accounts-and-roles.md) | **Team accounts with roles**: owner, approver, contributor, viewer, and agent (token-based, scoped to a project). Invite-only; no public sign-up. | proposed |
+| [D4](./decisions/0004-team-accounts-and-roles.md) | **Team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
 
 ## 5. Data model (first cut)
 
@@ -52,6 +52,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
   - narrative fields: outcome, done-when (markdown, short)
 - **Approval** — task, exact operation requested, requester, decided by, decision, time.
 - **Event** (append-only) — every change of state, label, claim, size or scope, with actor and timestamp. **Burndown, timeline and "recently finished" are all computed from events**, never maintained by hand.
+- **Member** — person or agent in a project, with a role; **Invitation** — email, role, inviter, expiry, state.
 - **Actor** — person or agent session (`codex/w09-help-contact`, `claude/task-w07-01-09-…`), provider, owning person.
 
 ## 6. Views
@@ -94,12 +95,12 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | M1 | Core + importer (local) | `packages/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
 | M2 | Read-only web | Supabase schema + auth; web shows workstream lists, progress charts and burndown for the imported project |
 | M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |
-| M4 | Collaboration | Invites and roles, realtime updates, "waiting on me" inbox with recorded approvals |
+| M4 | Collaboration | Roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
 | M5 | Polish | Generated timeline, markdown export, size-weighted burndown, target dates |
 
 ## 10. Open questions
 
-1. Decide D3 (relationship to Glidelines) and confirm D4. M1 does not depend on D3.
+1. Decide D3 (relationship to Glidelines; M1 does not depend on it) and confirm D4's role details and sign-in method.
 2. Hosting target and domain.
 3. Should the importer keep syncing from markdown during the transition, or run once and then switch the SSR project to glidebox?
 4. Languages for the UI (Glidelines supports en / ja / zh-CN / zh-TW).
