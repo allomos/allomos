@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+
+# Local environment and credentials — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local verification output
+.verification/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

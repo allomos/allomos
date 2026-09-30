@@ -1,0 +1,51 @@
+# Requirements
+
+A **contract**: what glidebox must do. Each requirement has an ID that cards and tests cite. The *why* and design are in [PLAN.md](./PLAN.md) and the [decisions](../decisions/README.md). Status: **accepted** = the owner asked for it or accepted it; **proposed** = recommended, awaiting the owner.
+
+## Visibility and progress
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R1 | Show every task's **state and progress**. | owner, 2026-09-27 | accepted |
+| R2 | Group tasks by **workstream**; tasks have hierarchical IDs (workstream → task → child). | owner, 2026-09-27 | accepted |
+| R3 | Present progress as **lists and charts** (per-workstream progress, state distribution, throughput). | owner, 2026-09-27 | accepted |
+| R4 | A **burndown chart** showing remaining work and total scope over time. | owner, 2026-09-27 | accepted |
+| R5 | **Estimate the project's finish date** from the burndown, shown as a range (50% / 85% confidence). | owner, 2026-09-27; [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
+| R6 | The burndown counts **tasks**; a task may carry an **optional size**, with a size-weighted view when sizes exist. | [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
+| R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
+
+## Source of truth and agents
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R10 | Glidebox's **database is the source of truth**; Markdown is an optional export. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R12 | **Claiming is atomic**: one task, one holder; no merge conflicts. | PLAN | proposed |
+| R13 | A configurable **label ladder** per project (default: implemented → locally verified → connected → deployed and verified). | PLAN | proposed |
+| R14 | **Waiting-on** is a structured field (owner check, approval, another task, external) with who and a note. | PLAN | proposed |
+| R15 | **Import** an existing Markdown board (first: the SSR migration board). | owner, 2026-09-27 | accepted |
+
+## Collaboration
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R20 | **Teammates collaborate online** with live updates. | owner, 2026-09-27 | accepted |
+| R21 | Glidebox has **roles**; what a member can do depends on the role. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
+| R22 | **An owner or admin adds a new member by email address**; no public sign-up. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
+| R23 | Role set: owner, admin, approver, contributor, viewer, agent; agents cannot approve. | [0004](../decisions/0004-team-accounts-and-roles.md) | proposed |
+| R24 | A **"waiting on me"** inbox of checks and approvals owed by the signed-in person, with approvals recorded. | PLAN | proposed |
+| R25 | Every change records **who** (person or agent session) and **when**. | PLAN | proposed |
+
+## Agent sessions
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R30 | **Start a task in a specified AI agent** (Claude Code, Codex) from the app. | owner, 2026-09-27; [0005](../decisions/0005-start-and-open-agent-sessions.md) | accepted |
+| R31 | **Jump into** an already-started task's session in that agent. | owner, 2026-09-27; [0005](../decisions/0005-start-and-open-agent-sessions.md) | accepted |
+| R32 | Show whether a task's agent session is **running, waiting for input or exited**. | [0005](../decisions/0005-start-and-open-agent-sessions.md) | proposed |
+| R33 | Only permitted members may start agents; runners accept only allowed projects, repositories and people; every start and open is recorded. | [0005](../decisions/0005-start-and-open-agent-sessions.md) | proposed |
+
+## Not yet decided
+
+UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).
