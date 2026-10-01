@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**The planning-document card is claimed to record the Git-like storage proposal; six cards are open; no application code exists yet.** Glidebox is in planning (milestone M0). The plan, requirements, decision records, and the agent workflow and handoff rules are drafted and wait for the owner's review ([`Task-W00-01`](./tasks/Task-W00-01-planning-docs.md)).
+**Nothing is claimed; six cards are open; no application code exists yet.** Glidebox is in planning (milestone M0). The plan, requirements, decision records, and the agent workflow and handoff rules are drafted and wait for the owner's review ([`Task-W00-01`](./tasks/Task-W00-01-planning-docs.md)).
 
 **What is next.** The owner reviews the documents and answers the questions below. The first code card, [`Task-W01-01`](./tasks/Task-W01-01-core-model.md) (core model, burndown and forecast), is safe under every option of the open Glidelines decision and can start once the owner reviews it. The research spike on how to launch and resume Claude Code and Codex sessions ([`Task-W07-01`](./tasks/Task-W07-01-agent-launch-research.md)) is independent and can run in parallel.
 
@@ -18,7 +18,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `codex/local-cloud-requirements` · `../glidebox-local-cloud` | `Task-W00-01` | 2026-10-01 | proposed local/cloud history and merge design |
 
 ## Waiting on the owner
 
@@ -31,7 +30,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Relationship to Glidelines: A extend · B standalone · C shared core · D Glidelines as a view | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-W00-03`](./tasks/Task-W00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
-| Local storage technology and packaging; whether to offer local/cloud transfer or synchronization | [0006](./decisions/0006-local-and-cloud-projects.md) | M2 storage and local app design |
+| Local storage technology and packaging; Git-like push/pull/merge proposal | [0006](./decisions/0006-local-and-cloud-projects.md), [0007](./decisions/0007-git-like-project-sync.md) | M2 storage and local app design |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | M2 deployment |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-milestones) | W02 |
 | UI languages (Glidelines has en / ja / zh-CN / zh-TW) | [REQUIREMENTS](./product/REQUIREMENTS.md) | W04 |
@@ -45,7 +44,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | State | Label | Session | Next dependency |
 |---|---|---|---|---|
-| [`Task-W00-01-planning-docs`](./tasks/Task-W00-01-planning-docs.md) | in progress | drafted | codex/local-cloud-requirements | record Git-like storage proposal |
+| [`Task-W00-01-planning-docs`](./tasks/Task-W00-01-planning-docs.md) | waiting | drafted | — | owner review of the documents |
 | [`Task-W00-02-github-remote`](./tasks/Task-W00-02-github-remote.md) | waiting | — | — | owner names/creates the repository and approves the push |
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |

@@ -44,7 +44,7 @@ Checked 2026-10-01.
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | **none** | Do not add or push until [`Task-W00-02`](./tasks/Task-W00-02-github-remote.md) is approved |
-| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirements and competitor research; no processes |
+| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirements, research and sync proposal; no processes |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls
@@ -66,7 +66,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 
 ## Do not assume
 
-- That a decision marked *Proposed* or *Open* is approved.
+- That a decision marked *Proposed* or *Open* is approved. [0007](./decisions/0007-git-like-project-sync.md) records the owner’s Git-like sync question as a proposal; it does not authorize implementation.
 - That the SSR board's current rules or counts match what [the analysis](./analysis/ssr-task-board.md) recorded — it is a dated snapshot.
 - That glidebox will extend the Glidelines repository — that is decision 0003, still open.
 - That a remote exists or a push landed — check `git remote -v` and the remote itself.

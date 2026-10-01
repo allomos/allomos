@@ -28,3 +28,5 @@
 - 2026-10-01 — Saved [competitor investigation](../research/competitor-investigation.md), including the requested feature-first matrix with Glidebox last, dated sources, unverified cells and local/cloud requirements. No fresh competitor tests or implementation were performed.
 
 - 2026-10-01 — Research documentation checks PASS: relative paths resolve, instruction consistency reviewed, `git diff --check` clean. Competitor runtime testing NOT RUN. Git-like synchronization raised by the owner afterward remains a design discussion, not an accepted implementation.
+
+- 2026-10-01 — Recorded [Git-like project synchronization proposal](../decisions/0007-git-like-project-sync.md) after the owner’s question. Push/pull, field conflicts, offline claim limitations and approval validation are proposals, not accepted implementation choices. Documentation link and whitespace checks PASS; prototype/runtime checks NOT RUN.
