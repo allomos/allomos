@@ -66,6 +66,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 
 ## Do not assume
 
+- Owner accepted the leader → Glidebox prompt → external AI → generated files → usable project workflow (R50–R51); read `product/AI-GENERATED-PROJECTS.md` before designing its schema/importer. Exact format and Git storage remain proposed.
 - Owner may sell services through Glidebox; competitor research includes preliminary reuse/license findings. No upstream base, pricing or source-license choice is approved.
 - Competitor research now includes a 2026-10-01 actual-Git follow-up; the main matrix now includes all 10 competitors and Glidebox; consult its Backlog.md and git-bug comparisons before prototyping equivalent storage.
 - That a decision marked *Proposed* or *Open* is approved. [0007](./decisions/0007-git-like-project-sync.md) records the owner’s Git-like sync question as a proposal; it now recommends actual Git and structured files as a candidate; 0001 remains accepted until explicitly superseded. It does not authorize implementation.

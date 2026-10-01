@@ -12,6 +12,7 @@
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
 | [product/REQUIREMENTS.md](./product/REQUIREMENTS.md) | Numbered requirements (R1…) cited by cards and tests | contract |
+| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Glidebox project; proposed validation/adoption rules | contract |
 | **workflow/** | | |
 | [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md) | Agent roles and effort, starting a session, handoff timing and contents, new-session rule, switching providers | contract |
 | [workflow/CARDS.md](./workflow/CARDS.md) | Workstreams, card IDs and template, states and labels, approvals, claiming protocol, Now rules | contract |

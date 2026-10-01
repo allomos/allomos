@@ -23,6 +23,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply and without merge conflicts.
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
+- **Generate project setup with an external AI agent:** a team leader supplies Glidebox’s prompt and team context; Glidebox reads/transforms the resulting project/task files ([feature contract](./AI-GENERATED-PROJECTS.md), R50–R51).
 - **Start a task in a chosen AI agent** (Claude Code, Codex) from the app, and **jump into** an already-started task's agent session ([D5](../decisions/0005-start-and-open-agent-sessions.md)).
 
 ## 3. Non-goals (for now)
@@ -72,6 +73,10 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 7. **Task detail** — fields, links, approvals and event history.
 8. **Sessions** — which agent sessions hold which tasks right now, and whether they are alive (replaces the session registry).
 9. **Start in agent / Open session** — buttons on every task (see [D5](../decisions/0005-start-and-open-agent-sessions.md)).
+
+### AI-generated project setup
+
+The leader gets a Glidebox prompt, asks their chosen external agent to generate a project bundle, then opens/imports it in Glidebox. Proposed flow: validate → preview → repair errors → accept locally → optionally publish after sign-in. The prompt/schema and adoption details are proposed in [AI-GENERATED-PROJECTS.md](./AI-GENERATED-PROJECTS.md). This path does not require the in-app agent runner or cloud access.
 
 ## 7. Burndown and forecast
 

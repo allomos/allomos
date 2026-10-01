@@ -57,6 +57,19 @@ Local tracking works offline. AI-provider calls and other external integrations 
 | R32 | Show whether a task's agent session is **running, waiting for input or exited**. | [0005](../decisions/0005-start-and-open-agent-sessions.md) | proposed |
 | R33 | Only permitted members may start agents; runners accept only allowed projects, repositories and people; every start and open is recorded. | [0005](../decisions/0005-start-and-open-agent-sessions.md) | proposed |
 
+## AI-generated project setup
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by Glidebox. | owner, 2026-10-01 | accepted |
+| R51 | Glidebox can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | accepted |
+| R52 | Supply a versioned generation prompt and file schema shared with the validator, with examples and explicit handling of unknown data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
+| R53 | Validate generated bundles and show an adoption/change preview with actionable errors before changing active project data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
+| R54 | Generated output cannot invent verified progress or authoritative approvals; missing completion history stays unknown. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
+| R55 | Re-importing a generated bundle does not duplicate tasks or silently overwrite existing edits; show changes/conflicts. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
+
+Workflow, storage boundaries and proposed acceptance examples: [AI-generated project setup](./AI-GENERATED-PROJECTS.md). Local use follows R40–R43; cloud publication remains an explicit signed-in action. The final file schema is not yet selected.
+
 ## Not yet decided
 
 UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).

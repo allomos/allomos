@@ -20,6 +20,7 @@ Glidebox's **database is the source of truth**. People and agents change tasks t
 - The database decision governs structured storage, not mandatory hosting. Each project has one authoritative database; local/cloud synchronization is not implied.
 - Agent instructions in projects (`AGENTS.md` / `CLAUDE.md`) must change from "edit TASK_BOARD.md" to "use `gb`".
 - Narrative detail (outcome, evidence, decisions) can still live in repo files; glidebox links to them.
+- [R50–R51](../product/REQUIREMENTS.md#ai-generated-project-setup), accepted 2026-10-01, add AI-generated project/task files as validated creation/import input. The statement that Markdown is not live input excludes hand-maintained prose status as the source of truth; it does not prohibit controlled generated-file import. Live storage remains governed by this decision until explicitly superseded.
 
 ## Alternatives considered
 

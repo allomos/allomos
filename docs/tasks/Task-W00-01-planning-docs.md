@@ -16,6 +16,8 @@
 
 | 2026-10-01 | Save the competitor investigation, feature matrix and sources in the repository | owner (chat) |
 
+| 2026-10-01 | Record the leader’s prompt → AI-generated project/task files → Glidebox use/transformation workflow | owner (chat) |
+
 ## Notes
 
 - 2026-09-27 — Plan, decisions 0001–0005, kickoff discussion and SSR board analysis written ([discussion](../discussions/2026-09-27-kickoff.md)).
@@ -38,3 +40,7 @@
 - 2026-10-01 — At the owner’s request, consolidated the original and Git-backed comparisons into one feature-first table: 10 competitors plus Glidebox last, with storage/sync/index rows and source register entries 16–20. Removed the duplicate follow-up table. PASS: column consistency, relative document paths and `git diff --check`; product tests NOT RUN.
 
 - 2026-10-01 — Recorded possible paid-service intent and preliminary reuse/license evidence in competitor research: Backlog.md MIT, veggiemonk/backlog Apache-2.0, git-bug GPLv3. Recommendation is bounded evaluation before selecting a fork. PASS: document link/whitespace checks; architecture, dependency audit and prototype NOT RUN.
+
+- 2026-10-01 — Added accepted R50–R51 and [AI-generated project setup contract](../product/AI-GENERATED-PROJECTS.md); R52–R55 and the validation/adoption flow remain proposed. Updated plan, index and 0001 import clarification without selecting Git storage or a file schema.
+
+- 2026-10-01 — Documentation checks PASS: relative Markdown paths, new requirement IDs/section anchors, instruction consistency and `git diff --check`. Runtime checks NOT RUN: documentation-only change. No generation prompt, parser or application feature implemented yet.
