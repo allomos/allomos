@@ -128,3 +128,23 @@ The products and storage features from this follow-up are incorporated in the [m
 ### Implication
 
 Actual Git-backed task storage is established prior art, not a unique product distinction. Test Backlog.md before building equivalent task-file and agent-access functionality; study git-bug for distributed history and derived indexes. No inspected source establishes the full Glidebox combination of verified-delivery gates, exact operation approvals, forecast dates, controlled cloud collaboration and session launch/resume. That is an evidence limit, not proof of a market gap. No local index upload policy was independently verified across these products.
+
+## Follow-up: starting from open source and selling a service
+
+Investigated 2026-10-01 after the owner said they may sell services through Glidebox. This records a possible commercial direction, not an approved pricing, source-license or upstream-base decision.
+
+**Recommendation:** evaluate Backlog.md first, with the option to reuse selected components or integrate through its CLI rather than immediately forking the full app. It matches task files, local UI and agent access, and its TypeScript/React toolchain is adjacent to Glidebox's proposed stack. A full fork is justified only if a bounded evaluation shows it saves substantial work while accommodating the event model, workstreams, verification gates, approvals and cloud permissions. File-format similarity alone is insufficient. No architectural or dependency/license audit has yet been performed.
+
+| Candidate | Verified top-level license | Implication for a possible paid Glidebox |
+|---|---|---|
+| Backlog.md / MrLesk | MIT | Allows use, modification, distribution, sublicensing and selling copies; preserve copyright and permission notices in copies/substantial portions. Does not itself require publishing Glidebox source. Dependencies and assets need their own review. |
+| backlog / veggiemonk | Apache-2.0 | Permissive commercial reuse; distribution has license/notice and change-marking obligations, including NOTICE handling where applicable. Technical reuse value remains untested. |
+| git-bug | GPLv3; README describes GPLv3-or-later | Commercial use is allowed. Distribution of a modified covered application brings corresponding-source and GPL obligations; whether a combined application is covered depends on integration. Server-only execution and distributing a local client are different cases. Prefer as reference unless choosing a compatible distribution model deliberately. |
+
+Sources: [Backlog.md license](https://github.com/MrLesk/Backlog.md/blob/main/LICENSE), [backlog license](https://github.com/veggiemonk/backlog/blob/main/LICENSE), [git-bug license](https://github.com/git-bug/git-bug/blob/trunk/LICENSE), [GNU license FAQ](https://www.gnu.org/licenses/gpl-faq.en.html), [Backlog.md package manifest](https://github.com/MrLesk/Backlog.md/blob/main/package.json). Checked 2026-10-01. These are preliminary license observations; exact reused versions, dependencies, assets and distribution need review before a release. Calling a GPL program separately is not an automatic exemption for a tightly coupled combined product.
+
+### Product and reuse boundaries to investigate
+
+A paid service could provide managed Git hosting, team administration, authenticated approvals, backups, hosted agent execution and support while local project data remains portable. Those are business hypotheses, not features proven worth paying for. Charging for service does not require closing the local client's source; keep both open-client/paid-cloud and proprietary-client options available until the owner decides.
+
+Suggested evaluation: pin a Backlog.md revision, use synthetic cards, check file identity and change history, test two independent clones with conflicting edits, inspect its programmatic boundaries, and map verification/approval fields without duplicating status. Report estimated work saved and the continuing cost of maintaining a fork. Compare this with a small Glidebox-owned Git/file core. No dependencies should be introduced or source copied merely on this recommendation.

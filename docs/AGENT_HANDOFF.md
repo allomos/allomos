@@ -66,6 +66,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 
 ## Do not assume
 
+- Owner may sell services through Glidebox; competitor research includes preliminary reuse/license findings. No upstream base, pricing or source-license choice is approved.
 - Competitor research now includes a 2026-10-01 actual-Git follow-up; the main matrix now includes all 10 competitors and Glidebox; consult its Backlog.md and git-bug comparisons before prototyping equivalent storage.
 - That a decision marked *Proposed* or *Open* is approved. [0007](./decisions/0007-git-like-project-sync.md) records the owner’s Git-like sync question as a proposal; it now recommends actual Git and structured files as a candidate; 0001 remains accepted until explicitly superseded. It does not authorize implementation.
 - That the SSR board's current rules or counts match what [the analysis](./analysis/ssr-task-board.md) recorded — it is a dated snapshot.
