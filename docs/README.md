@@ -18,6 +18,7 @@
 | [decisions/](./decisions/README.md) | One record per decision, with status (open / proposed / accepted) | decisions |
 | [discussions/](./discussions/) | Dated records of planning discussions with the owner | history |
 | [analysis/](./analysis/) | Analyses of reference material | analysis |
+| [research/competitor-investigation.md](./research/competitor-investigation.md) | Competitor feature matrix, sources, limitations and product hypotheses | evidence |
 | [REFERENCES.md](./REFERENCES.md) | External projects and files to learn from (read-only) | reference |
 | [GLOSSARY.md](./GLOSSARY.md) | Plain meanings of terms | reference |
 

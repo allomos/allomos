@@ -12,8 +12,9 @@
 |---|---|---|
 | 2026-09-27 | Plan and decision records; writing the discussion down as documents | owner (chat) |
 | 2026-09-30 | Writing and organizing all necessary documents; agent handoff rules modeled on the SSR project's `AGENT_HANDOFF.md` | owner (chat) |
-
 | 2026-10-01 | Record the owner’s requirement for purely local projects and optional signed-in cloud projects; update related planning documents locally | owner (chat) |
+
+| 2026-10-01 | Save the competitor investigation, feature matrix and sources in the repository | owner (chat) |
 
 ## Notes
 
@@ -23,3 +24,7 @@
 - 2026-10-01 — Added R40–R43 and [0006](../decisions/0006-local-and-cloud-projects.md); revised the plan and earlier database/account decisions so local tracking needs no cloud account or service. Storage technology, packaging and transfer/sync remain undecided.
 
 - 2026-10-01 — PASS: all relative Markdown link paths resolve; instruction consistency reviewed; `git diff --check` clean. Runtime checks NOT RUN: documentation only, no app implementation. The remaining planning review stays on the board.
+
+- 2026-10-01 — Saved [competitor investigation](../research/competitor-investigation.md), including the requested feature-first matrix with Glidebox last, dated sources, unverified cells and local/cloud requirements. No fresh competitor tests or implementation were performed.
+
+- 2026-10-01 — Research documentation checks PASS: relative paths resolve, instruction consistency reviewed, `git diff --check` clean. Competitor runtime testing NOT RUN. Git-like synchronization raised by the owner afterward remains a design discussion, not an accepted implementation.

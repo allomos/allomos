@@ -44,7 +44,7 @@ Checked 2026-10-01.
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | **none** | Do not add or push until [`Task-W00-02`](./tasks/Task-W00-02-github-remote.md) is approved |
-| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirement documentation; no processes |
+| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirements and competitor research; no processes |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls

@@ -116,3 +116,5 @@ Kept in one place: [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting
 ## 11. References
 
 [REFERENCES.md](../REFERENCES.md) — the SSR migration board and Glidelines, with the files that matter.
+
+Competitor evidence: [investigation and feature comparison](../research/competitor-investigation.md) (researched 2026-09-30; local/cloud requirement added 2026-10-01). Recommendations are hypotheses, not decisions.
