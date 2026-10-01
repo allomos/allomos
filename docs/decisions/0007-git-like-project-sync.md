@@ -10,11 +10,11 @@ The owner asked whether project/task storage could work like Git/GitHub: use a p
 
 ## Proposal
 
-Each project has a local database and versioned change history. It may have an explicitly connected cloud remote. The cloud stores the shared accepted history and enforces cloud permissions; local changes remain usable and visibly unpublished until pushed. Sign-in is required to connect to and access the remote, not to use an independent local project.
+Following the owner’s follow-up, the recommended candidate is an actual Git repository per project, containing schema-validated text files and versioned change history. It may have an explicitly connected cloud remote. The cloud stores the shared accepted history and enforces cloud permissions; local changes remain usable and visibly unpublished until pushed. Sign-in is required to connect to and access the remote, not to use an independent local project.
 
 - **Create locally:** initialize project data and history without an account.
 - **Connect/publish:** sign in, select or create an authorized cloud project, preview what will be shared, then publish explicitly.
-- **Clone:** sign in and download an authorized project and history to a local database.
+- **Clone:** sign in and clone an authorized project repository and history locally.
 - **Pull:** fetch remote changes and integrate them, resolving conflicts before advancing the local accepted view.
 - **Push:** submit local changes with their expected remote revision. The server validates identity, permissions and project rules. If the remote advanced, pull and merge before retrying.
 - **Merge:** reconcile changes from their common ancestor; record the resolution and both histories.
@@ -23,9 +23,27 @@ A project remains usable without internet after it is available locally. Offline
 
 ## History and persistence
 
-Proposed storage: a local database (SQLite is a candidate) and a hosted database (Postgres is a candidate). Versioned change records carry stable project/task IDs, revision parents, operations, actor identity and schema version. The database provides queries and local transactions; the history supplies synchronization and audit information. Avoid merging binary database files directly.
+Git stores the authoritative structured files and their revision history. A local or hosted database may index them for search, charts and UI performance, but it is rebuildable from a known Git revision and must not become an independently writable source of truth. GitHub could host a remote; Glidebox could also provide its own authenticated Git service. Git is the storage/transport tool, while GitHub is one hosting choice.
 
-Current database-source-of-truth decision [0001](./0001-database-source-of-truth.md) needs clarification if this is accepted: each replica is an authoritative view of its own revision, while the remote accepted revision is the shared publication point. No replica is assumed globally current while disconnected. Markdown remains an export.
+Illustrative layout (not a finalized schema):
+
+```text
+project-repo/
+  project.json
+  workstreams/<stable-id>.json
+  tasks/<stable-id>/task.json
+  tasks/<stable-id>/description.md
+  events/<unique-event-id>.json
+  approvals/<unique-approval-id>.json
+  .gitattributes
+  .gitignore
+```
+
+Use JSON for structured fields and Markdown for narrative text. Keep stable IDs in paths; task labels such as W07-01 and workstream membership are fields, so renaming or regrouping need not move files. Serialize consistently for readable diffs. Give events separate files to reduce concurrent appends to a shared log. Derived boards and chart data are not separately edited tracked state. Task snapshots and their transition events must be validated and committed together; merge resolutions must record reconciled transitions. Full snapshot/event consistency rules remain to be specified.
+
+Approvals in files are requests/records, not proof of an authenticated actor. Validate authority through the local trust model or authenticated remote acceptance. Keep runtime processes, session liveness, credentials and disposable indexes outside the tracked project content.
+
+This candidate would **supersede**, rather than merely clarify, the database-source-of-truth decision [0001](./0001-database-source-of-truth.md) if accepted. That accepted decision remains in force pending an explicit owner decision. Its original objection to manually maintained prose status still applies: files here would have a strict schema, one canonical task record, validation and generated views.
 
 Do not rewrite audit history in normal use. Preserve original actor/time metadata and record remote acceptance separately. Forecasts should distinguish local/unpublished work from accepted shared history and deduplicate changes by stable ID. Exact event-time rules, snapshots, migrations and history retention remain design questions.
 
@@ -54,10 +72,12 @@ An approval applies to an exact operation and relevant target/revision, rather t
 
 Start with one shared main history per project, local change recording, explicit push/pull and field-level conflict resolution. Autosave can record local changes without asking users to make a manual commit after every task edit. Offer human-readable differences such as “you marked this verified; Alex added a failing check.” Add branches and proposal/review flows only when a demonstrated workflow requires them.
 
-Actual Git with structured task files is another candidate. It offers established version transport and history, but task-aware merge, permissions, claims and approvals still need application logic. Compare this candidate with database-backed versioning before selecting an engine. No engine is selected here.
+The owner asked whether Git can be the foundation with structured folders and text files. It can supply version storage and push/pull transport, reducing the custom synchronization engine we would need to build. Glidebox still needs schema validation, task-aware merge, permissions, atomic local writes and claim/approval handling. Prototype those domain rules before accepting the storage architecture. A local runtime is needed to operate local Git and files; a hosted webpage alone does not establish that capability.
 
 ## Evidence and open questions
 
 [Git merge documentation](https://git-scm.com/docs/git-merge) describes merging divergent histories with common ancestry. [Git push documentation](https://git-scm.com/docs/git-push) documents remote reference updates and non-fast-forward restrictions. Consulted 2026-10-01. These establish the analogy, not the feasibility or correctness of this unimplemented proposal.
 
-Decide the user-visible synchronization model, actual Git versus database-backed history, local/cloud packaging, offline permissions, actor verification, forecast event times and conflict experience. Then prototype divergent edits, remote advancement during push, offline competing claims and stale approvals with synthetic data before selecting production storage.
+Decide whether to accept actual Git as the source of truth, the user-visible synchronization model, local/cloud packaging, offline permissions, actor verification, forecast event times and conflict experience. Then prototype divergent edits, remote advancement during push, offline competing claims and stale approvals with synthetic data before selecting production storage.
+
+[Git attributes documentation](https://git-scm.com/docs/gitattributes) supports custom merge drivers, but driver configuration must be installed on each relevant client/server; a tracked attributes file alone does not install the executable. Git line merging does not establish valid task semantics. Consulted 2026-10-01.

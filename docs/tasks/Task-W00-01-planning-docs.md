@@ -30,3 +30,5 @@
 - 2026-10-01 — Research documentation checks PASS: relative paths resolve, instruction consistency reviewed, `git diff --check` clean. Competitor runtime testing NOT RUN. Git-like synchronization raised by the owner afterward remains a design discussion, not an accepted implementation.
 
 - 2026-10-01 — Recorded [Git-like project synchronization proposal](../decisions/0007-git-like-project-sync.md) after the owner’s question. Push/pull, field conflicts, offline claim limitations and approval validation are proposals, not accepted implementation choices. Documentation link and whitespace checks PASS; prototype/runtime checks NOT RUN.
+
+- 2026-10-01 — Refined 0007 after the owner asked about actual Git with structured text folders: proposed Git as canonical storage, database as rebuildable index, stable-ID JSON/Markdown layout and domain-aware merge. 0001 remains accepted pending explicit supersession. Documentation checks PASS; prototype NOT RUN.
