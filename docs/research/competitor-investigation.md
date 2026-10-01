@@ -97,3 +97,32 @@ Sources were consulted during the 2026-09-30 investigation; saving this document
 13. [Plane MCP server](https://developers.plane.so/dev-tools/mcp-server) — tracker operations; search-extract evidence when direct retrieval failed.
 14. [Plane self-hosting](https://plane.so/self-hosted) — deployment choices; does not establish no-sign-in local use.
 15. [ActionableAgile: Monte Carlo — How Many](https://55degrees.atlassian.net/wiki/spaces/ActionableAgile/pages/2407399482) — simulation, historical throughput and probability outputs. This vendor documentation page is archived; current behavior needs a live check. [Vendor site](https://actionableagile.com/) provides product context.
+
+## Follow-up: actual Git-backed tasks and local indexes
+
+Investigated 2026-10-01 after the owner asked about actual Git with structured text files. These examples were missing from the initial product shortlist and materially strengthen the comparison. Evidence is maintainer documentation/source, not hands-on testing.
+
+| Feature | Backlog.md (MrLesk) | git-bug | backlog (veggiemonk) | Obsidian + Git plugin | **Glidebox proposal** |
+|---|---|---|---|---|---|
+| Canonical data as ordinary text files | ✓ Markdown task files | Different — Git-internal entities; no task files in working tree | ✓ Markdown with YAML metadata | ✓ Markdown notes | JSON task fields and Markdown narrative |
+| Work without a cloud account | ✓ Explicitly local-first | ✓ Offline repository workflow | ✓ Local repo files | Local file workflow | Required |
+| Git remote synchronization | Optional remote Git operations; exact conflict behavior untested | ✓ Dedicated issue push/pull commands | Tasks tracked through ordinary Git | ✓ Plugin commit/pull/push | Actual Git push/pull proposed |
+| Task board / interface | ✓ Local browser and terminal boards | ✓ CLI, terminal and local web UI | ✓ Task CLI; UI coverage not checked | Notes interface; task tracker comparison limited | Lists, boards and charts required/planned |
+| AI-agent CLI / MCP | ✓ Both | CLI and GraphQL; MCP not established | CLI; MCP not established | Not investigated | Both required |
+| Local derived index | Implementation not examined | ✓ Source exposes local storage and search-index interfaces | Not examined | Exact index implementation not examined | Rebuildable, untracked local index proposed |
+| Managed cloud collaboration with Glidebox-style roles | Not established | Public portal described as work in progress | Not established | Not established | Required for cloud projects |
+| Verified-delivery forecast and exact approval workflow | Full combination not established | Full combination not established | Full combination not established | Full combination not established | Required/proposed as defined in requirements |
+
+### Closest examples
+
+**Backlog.md by MrLesk** is the strongest match for visible task files plus a local interface for people and agents. Its README documents Markdown tasks, acceptance criteria, milestones/dependencies, a local browser board, CLI/MCP and account-free local use. Do not confuse it with the separate `backlogmd/backlogmd` specification project from the first search. [Maintainer README](https://github.com/MrLesk/Backlog.md/blob/main/README.md).
+
+**git-bug** is the stronger distributed-issue precedent: offline editing, Git remotes, issue push/pull and multiple interfaces. Its storage uses Git internals instead of adding ordinary files to the project. Its source exposes local storage under `.git/git-bug` and search-index operations. This supports the broad canonical-Git/local-index pattern; the exact index persistence, rebuild guarantees and transfer exclusions still need source inspection. [Maintainer repository](https://github.com/git-bug/git-bug), [storage/index interfaces](https://github.com/git-bug/git-bug/blob/trunk/repository/repo.go).
+
+**backlog by veggiemonk** documents task files with YAML metadata, hierarchical IDs, status and parent/assignee fields, tracked in Git. It is useful prior art for schema and file organization. [Maintainer repository](https://github.com/veggiemonk/backlog).
+
+**Obsidian with its community Git plugin** documents app-integrated commit/pull/push and history/diff views. It is relevant to hiding Git operations behind a familiar local-file interface, rather than a verified substitute for Glidebox's delivery tracking. [Plugin repository](https://github.com/tfney/obsidian-git).
+
+### Implication
+
+Actual Git-backed task storage is established prior art, not a unique product distinction. Test Backlog.md before building equivalent task-file and agent-access functionality; study git-bug for distributed history and derived indexes. No inspected source establishes the full Glidebox combination of verified-delivery gates, exact operation approvals, forecast dates, controlled cloud collaboration and session launch/resume. That is an evidence limit, not proof of a market gap. No local index upload policy was independently verified across these products.

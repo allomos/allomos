@@ -32,3 +32,5 @@
 - 2026-10-01 — Recorded [Git-like project synchronization proposal](../decisions/0007-git-like-project-sync.md) after the owner’s question. Push/pull, field conflicts, offline claim limitations and approval validation are proposals, not accepted implementation choices. Documentation link and whitespace checks PASS; prototype/runtime checks NOT RUN.
 
 - 2026-10-01 — Refined 0007 after the owner asked about actual Git with structured text folders: proposed Git as canonical storage, database as rebuildable index, stable-ID JSON/Markdown layout and domain-aware merge. 0001 remains accepted pending explicit supersession. Documentation checks PASS; prototype NOT RUN.
+
+- 2026-10-01 — Extended competitor evidence with actual Git-backed examples: MrLesk/Backlog.md, git-bug, veggiemonk/backlog and Obsidian Git. Maintainer sources checked, no tools installed or products tested. Relative links and whitespace checks PASS.
