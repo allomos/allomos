@@ -1,40 +1,45 @@
 # Competitor investigation
 
-Public-source research conducted 2026-09-30; saved 2026-10-01. Glidebox's column incorporates the owner's local/cloud requirement accepted 2026-10-01. This is research evidence and analysis, not an approval of a product direction or architecture.
+Public-source research conducted 2026-09-30 and extended 2026-10-01; comparison consolidated 2026-10-01. Glidebox's column incorporates the owner's local/cloud requirement accepted 2026-10-01. This is research evidence and analysis, not an approval of a product direction or architecture.
 
 ## Finding
 
 Glidebox overlaps substantially with existing project trackers and coding-agent workspaces. Boards, agent launches, collaboration and finish-date predictions are already available. Its most promising areas to validate are tracking verified delivery, recording exact decisions owed by people, and preserving task context across agent sessions.
 
-Vibe Kanban is the closest task-board comparison; Linear is the strongest broad substitute; Conductor is both a session-management competitor and a possible integration target. These rankings are judgments based on the documented features below, not hands-on results.
+For the original agent-workspace scope, Vibe Kanban is the closest task-board comparison; Linear is the strongest broad substitute; Conductor is both a session-management competitor and a possible integration target. These rankings are judgments based on the documented features below, not hands-on results. For the later Git-backed storage proposal, Backlog.md is the closest task-file comparison and git-bug the closest distributed-issue precedent.
 
 ## Method and limits
 
 The investigation compared official vendor documentation with Glidebox's [plan](../product/PLAN.md) and [requirements](../product/REQUIREMENTS.md). It did not install or operate competitors, create accounts, or test workflows. Some vendor pages could not be retrieved; the readable documentation index or search extracts supported only limited claims. Pricing, license terms, adoption, security guarantees and API suitability were not comprehensively investigated.
 
-**Legend:** ✓ = documented; **Partial** = related functionality documented but the full feature was not established; **?** = not established by this investigation, not evidence of absence. **Required** and **Proposed** describe Glidebox's planning commitments, not implemented capabilities. Source numbers link to the source register below.
+**Legend:** ✓ = documented; **Partial** = related functionality documented but the full feature was not established; **?** = not established by this investigation, not evidence of absence. **Required** and **Proposed** describe Glidebox's planning commitments, not implemented capabilities. Source numbers identify entries in the source register below. Glidebox's Git storage and indexing cells reflect proposal 0007, not an accepted storage architecture.
 
 ## Feature comparison
 
-| Feature | Vibe Kanban [1–3] | Conductor [4–7] | Linear [8–11] | GitHub Agent HQ [12] | Plane [13–14] | ActionableAgile [15] | **Glidebox** |
-|---|---|---|---|---|---|---|---|
-| Structured task tracking with lists or boards | ✓ Issues, boards, lists | Partial — workspaces linked to issues | ✓ Issues and projects | ✓ Existing GitHub issue workflow | ✓ Work items and projects | Analytics focus | **Required** |
-| Workstream grouping and task hierarchy | ? Exact mapping not checked | ? Exact mapping not checked | Partial — projects and sub-issues | ? Exact mapping not checked | Partial — projects; exact hierarchy not checked | ? | **Required** — workstreams and hierarchical IDs |
-| Online team collaboration | ✓ Live updates and invitations | ✓ Shared cloud workspaces | ✓ Team tracker | ✓ GitHub collaboration | ✓ Team project tracker | ? Task editing not checked | **Required** — cloud projects |
-| Agent-accessible MCP / API | MCP listed; tool coverage not checked | ✓ Workspace and session tools | ✓ Tracker MCP | Partial — agent issue workflow; external control API not checked | ✓ Work-item and project MCP | ? | **Required** — structured CLI/MCP updates |
-| Start work in Claude Code or Codex | ✓ Both integrations listed | ✓ Both supported | Partial — coding sessions; exact provider options not checked | ✓ Both documented | ? | ? | **Required** — both providers |
-| Return to existing agent work | ✓ Switch conversations | ✓ Sessions and workspace links | ✓ Active coding sessions | ✓ Session management | ? | ? | **Required** |
-| Session activity and attention states | ✓ Running, Idle, Needs Attention | ✓ Session status API/MCP | ✓ Coding-session status | ✓ Progress and logs | ? | ? | **Proposed** |
-| Project progress and scope charts | ? | ? | ✓ Scope and progress graph | ? Project analysis not checked | ? Relevant charts not checked | ✓ Flow analytics | **Required** — charts and burndown |
-| Project finish-date prediction | ? | ? | ✓ Historical velocity | ? | ? | ✓ Monte Carlo forecasting | **Required** — date range |
-| Probability-based throughput forecasting | ? | ? | Partial — velocity with date buffers | ? | ? | ✓ Simulation and probabilities | **Required** — 50% / 85% dates; simulation method proposed |
-| Separate implementation and verification gates | ? Dedicated ladder not established | Partial — tests, review, checks | Partial — workflow and review | Partial — review and checks | ? Dedicated ladder not established | ? | **Proposed** — configurable verification ladder |
-| Exact approvals and checks owed by a person | Partial — Needs Attention | Partial — agent permissions | Partial — priority inbox and conditional approvals | Partial — review workflow | ? | ? | **Proposed** — waiting-on-me inbox |
-| Enforced one-task / one-holder claiming | ? | ? Workspace isolation is not a claim guarantee | ? | ? | ? | ? | **Proposed** — atomic claim |
-| Task continuity across session changes | Partial — histories and shared files | Partial — workspace context and session records | Partial — issue context and sessions | Partial — issues, sessions, PRs | Partial — durable work-item context | ? | **Intended outcome** — task and event model |
-| Import the SSR Markdown board | ? Exact format not checked | ? | ? Exact format not checked | ? Exact format not checked | ? Exact format not checked | ? Exact format not checked | **Required** — dedicated importer |
-| Local project/task storage without cloud sign-in | ? End-to-end condition not checked | Partial — local workspaces and local session data; complete tracker not checked | ? | ? | Partial — self-hosting is documented; account-free local use not established | ? | **Required** — R40–R43 |
-| Optional cloud projects requiring sign-in | ✓ Cloud authentication documented in index | ✓ Cloud organizations and authenticated API | ✓ Cloud workspace and authenticated MCP | ✓ GitHub account workflow | ✓ Cloud and self-hosted options; exact mode selection not checked | ? | **Required** — R42 |
+| Feature | Vibe Kanban [1–3] | Conductor [4–7] | Linear [8–11] | GitHub Agent HQ [12] | Plane [13–14] | ActionableAgile [15] | Backlog.md / MrLesk [16] | git-bug [17–18] | backlog / veggiemonk [19] | Obsidian + Git [20] | **Glidebox** |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Structured task tracking with lists or boards | ✓ Issues, boards, lists | Partial — workspaces linked to issues | ✓ Issues and projects | ✓ Existing GitHub issue workflow | ✓ Work items and projects | Analytics focus | ✓ Browser and terminal boards | ✓ CLI, terminal, local web UI | Partial — task CLI | Partial — notes interface | **Required** |
+| Workstream grouping and task hierarchy | ? Exact mapping not checked | ? Exact mapping not checked | Partial — projects and sub-issues | ? Exact mapping not checked | Partial — projects; exact hierarchy not checked | ? | Partial — milestones and dependencies; exact mapping not checked | ? | ✓ Hierarchical task IDs and parent fields | ? | **Required** — workstreams and hierarchical IDs |
+| Online team collaboration | ✓ Live updates and invitations | ✓ Shared cloud workspaces | ✓ Team tracker | ✓ GitHub collaboration | ✓ Team project tracker | ? Task editing not checked | Partial — shared Git files; live hosted workflow not established | Partial — remote issue collaboration; public portal WIP | Partial — shared Git files | Partial — Git file sharing; managed team workflow not established | **Required** — cloud projects |
+| Agent-accessible MCP / API | MCP listed; tool coverage not checked | ✓ Workspace and session tools | ✓ Tracker MCP | Partial — agent issue workflow; external control API not checked | ✓ Work-item and project MCP | ? | ✓ CLI and MCP | ✓ CLI and GraphQL; MCP not established | ✓ CLI; MCP not established | ? | **Required** — structured CLI/MCP updates |
+| Start work in Claude Code or Codex | ✓ Both integrations listed | ✓ Both supported | Partial — coding sessions; exact provider options not checked | ✓ Both documented | ? | ? | ? | ? | ? | ? | **Required** — both providers |
+| Return to existing agent work | ✓ Switch conversations | ✓ Sessions and workspace links | ✓ Active coding sessions | ✓ Session management | ? | ? | ? | ? | ? | ? | **Required** |
+| Session activity and attention states | ✓ Running, Idle, Needs Attention | ✓ Session status API/MCP | ✓ Coding-session status | ✓ Progress and logs | ? | ? | ? | ? | ? | ? | **Proposed** |
+| Project progress and scope charts | ? | ? | ✓ Scope and progress graph | ? Project analysis not checked | ? Relevant charts not checked | ✓ Flow analytics | ? | ? | ? | ? | **Required** — charts and burndown |
+| Project finish-date prediction | ? | ? | ✓ Historical velocity | ? | ? | ✓ Monte Carlo forecasting | ? | ? | ? | ? | **Required** — date range |
+| Probability-based throughput forecasting | ? | ? | Partial — velocity with date buffers | ? | ? | ✓ Simulation and probabilities | ? | ? | ? | ? | **Required** — 50% / 85% dates; simulation method proposed |
+| Separate implementation and verification gates | ? Dedicated ladder not established | Partial — tests, review, checks | Partial — workflow and review | Partial — review and checks | ? Dedicated ladder not established | ? | ? | ? | ? | ? | **Proposed** — configurable verification ladder |
+| Exact approvals and checks owed by a person | Partial — Needs Attention | Partial — agent permissions | Partial — priority inbox and conditional approvals | Partial — review workflow | ? | ? | ? | ? | ? | ? | **Proposed** — waiting-on-me inbox |
+| Enforced one-task / one-holder claiming | ? | ? Workspace isolation is not a claim guarantee | ? | ? | ? | ? | ? | ? | ? | ? | **Proposed** — atomic claim |
+| Task continuity across session changes | Partial — histories and shared files | Partial — workspace context and session records | Partial — issue context and sessions | Partial — issues, sessions, PRs | Partial — durable work-item context | ? | Partial — durable task specs, plans and notes | Partial — durable issue history | Partial — durable task files | Partial — durable notes; agent-session continuity not checked | **Intended outcome** — task and event model |
+| Import the SSR Markdown board | ? Exact format not checked | ? | ? Exact format not checked | ? Exact format not checked | ? Exact format not checked | ? Exact format not checked | ? | ? | ? | ? | **Required** — dedicated importer |
+| Local project/task storage without cloud sign-in | ? End-to-end condition not checked | Partial — local workspaces and local session data; complete tracker not checked | ? | ? | Partial — self-hosting is documented; account-free local use not established | ? | ✓ Account-free local use | ✓ Offline repository workflow | ✓ Local repo files | ✓ Local-file workflow | **Required** — R40–R43 |
+| Optional cloud projects requiring sign-in | ✓ Cloud authentication documented in index | ✓ Cloud organizations and authenticated API | ✓ Cloud workspace and authenticated MCP | ✓ GitHub account workflow | ✓ Cloud and self-hosted options; exact mode selection not checked | ? | Partial — optional Git remote; managed cloud projects not established | Partial — remote authentication; managed cloud project mode not established | Partial — optional Git remote; managed cloud projects not established | Partial — authenticated Git remote; dedicated cloud task projects not established | **Required** — R42 |
+| Canonical data as ordinary text files | ? | ? | ? | ? | ? | ? | ✓ Markdown task files | Different — Git-internal entities | ✓ Markdown with YAML metadata | ✓ Markdown notes | **Proposed** — JSON fields and Markdown narrative |
+| Git-backed task / project synchronization | ? | ? | ? | ? | ? | ? | Partial — optional remote Git operations; conflict behavior not tested | ✓ Dedicated issue push/pull | ✓ Task files tracked through Git | ✓ Plugin commit/pull/push | **Proposed** — actual Git push/pull/merge |
+| Local derived search / chart index | ? | ? | ? | ? | ? | ? | ? Implementation not examined | ✓ Local storage and search-index interfaces; rebuild details not checked | ? | ? | **Proposed** — rebuildable local index |
+| Local indexing database excluded from synchronization | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | **Proposed** — local index not committed or pushed; cloud builds its own index |
+| Managed cloud roles alongside local Git workflow | ? | ? | ? | ? | ? | ? | ? | Partial — public portal WIP; role combination not established | ? | ? | Cloud roles **required**; Git integration **proposed** |
 
 ## Competitor implications
 
@@ -80,7 +85,7 @@ Retain the structured event history, waiting-on fields and verification ladder i
 
 ## Source register
 
-Sources were consulted during the 2026-09-30 investigation; saving this document does not represent a new live verification. Links can change.
+Sources 1–15 were consulted 2026-09-30; sources 16–20 were consulted 2026-10-01. Consolidating the comparison does not represent a new live verification. Links can change.
 
 1. [Vibe Kanban documentation index](https://vibekanban.com/docs/llms.txt) — agent integrations, cloud views, authentication, MCP and self-hosting pages; index-level evidence only where full pages were inaccessible.
 2. [Vibe Kanban sessions](https://vibekanban.com/docs/workspaces/sessions) — conversations, shared files, agent selection and session states.
@@ -98,20 +103,17 @@ Sources were consulted during the 2026-09-30 investigation; saving this document
 14. [Plane self-hosting](https://plane.so/self-hosted) — deployment choices; does not establish no-sign-in local use.
 15. [ActionableAgile: Monte Carlo — How Many](https://55degrees.atlassian.net/wiki/spaces/ActionableAgile/pages/2407399482) — simulation, historical throughput and probability outputs. This vendor documentation page is archived; current behavior needs a live check. [Vendor site](https://actionableagile.com/) provides product context.
 
+16. [Backlog.md maintainer README](https://github.com/MrLesk/Backlog.md/blob/main/README.md) — Markdown tasks, local boards, agent CLI/MCP and optional Git remotes.
+17. [git-bug maintainer repository](https://github.com/git-bug/git-bug) — distributed offline issues, internal Git storage, issue push/pull and interfaces.
+18. [git-bug storage/index interfaces](https://github.com/git-bug/git-bug/blob/trunk/repository/repo.go) — local storage and search-index operations; full rebuild/upload behavior not verified.
+19. [backlog by veggiemonk](https://github.com/veggiemonk/backlog) — Markdown/YAML task files, hierarchical IDs and Git workflow.
+20. [Obsidian Git plugin](https://github.com/tfney/obsidian-git) — commit/pull/push, history and diff interface for local notes.
+
 ## Follow-up: actual Git-backed tasks and local indexes
 
 Investigated 2026-10-01 after the owner asked about actual Git with structured text files. These examples were missing from the initial product shortlist and materially strengthen the comparison. Evidence is maintainer documentation/source, not hands-on testing.
 
-| Feature | Backlog.md (MrLesk) | git-bug | backlog (veggiemonk) | Obsidian + Git plugin | **Glidebox proposal** |
-|---|---|---|---|---|---|
-| Canonical data as ordinary text files | ✓ Markdown task files | Different — Git-internal entities; no task files in working tree | ✓ Markdown with YAML metadata | ✓ Markdown notes | JSON task fields and Markdown narrative |
-| Work without a cloud account | ✓ Explicitly local-first | ✓ Offline repository workflow | ✓ Local repo files | Local file workflow | Required |
-| Git remote synchronization | Optional remote Git operations; exact conflict behavior untested | ✓ Dedicated issue push/pull commands | Tasks tracked through ordinary Git | ✓ Plugin commit/pull/push | Actual Git push/pull proposed |
-| Task board / interface | ✓ Local browser and terminal boards | ✓ CLI, terminal and local web UI | ✓ Task CLI; UI coverage not checked | Notes interface; task tracker comparison limited | Lists, boards and charts required/planned |
-| AI-agent CLI / MCP | ✓ Both | CLI and GraphQL; MCP not established | CLI; MCP not established | Not investigated | Both required |
-| Local derived index | Implementation not examined | ✓ Source exposes local storage and search-index interfaces | Not examined | Exact index implementation not examined | Rebuildable, untracked local index proposed |
-| Managed cloud collaboration with Glidebox-style roles | Not established | Public portal described as work in progress | Not established | Not established | Required for cloud projects |
-| Verified-delivery forecast and exact approval workflow | Full combination not established | Full combination not established | Full combination not established | Full combination not established | Required/proposed as defined in requirements |
+The products and storage features from this follow-up are incorporated in the [main feature comparison](#feature-comparison); there is one comparison table.
 
 ### Closest examples
 

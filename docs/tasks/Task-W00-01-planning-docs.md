@@ -34,3 +34,5 @@
 - 2026-10-01 — Refined 0007 after the owner asked about actual Git with structured text folders: proposed Git as canonical storage, database as rebuildable index, stable-ID JSON/Markdown layout and domain-aware merge. 0001 remains accepted pending explicit supersession. Documentation checks PASS; prototype NOT RUN.
 
 - 2026-10-01 — Extended competitor evidence with actual Git-backed examples: MrLesk/Backlog.md, git-bug, veggiemonk/backlog and Obsidian Git. Maintainer sources checked, no tools installed or products tested. Relative links and whitespace checks PASS.
+
+- 2026-10-01 — At the owner’s request, consolidated the original and Git-backed comparisons into one feature-first table: 10 competitors plus Glidebox last, with storage/sync/index rows and source register entries 16–20. Removed the duplicate follow-up table. PASS: column consistency, relative document paths and `git diff --check`; product tests NOT RUN.
