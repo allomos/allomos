@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; six cards are open; no application code exists yet.** Glidebox is in planning (milestone M0). The plan, requirements, decision records, and the agent workflow and handoff rules are drafted and wait for the owner's review ([`Task-W00-01`](./tasks/Task-W00-01-planning-docs.md)).
+**The planning-document card is claimed to consolidate the competitor table; six cards are open; no application code exists yet.** Glidebox is in planning (milestone M0). The plan, requirements, decision records, and the agent workflow and handoff rules are drafted and wait for the owner's review ([`Task-W00-01`](./tasks/Task-W00-01-planning-docs.md)).
 
 **What is next.** The owner reviews the documents and answers the questions below. The first code card, [`Task-W01-01`](./tasks/Task-W01-01-core-model.md) (core model, burndown and forecast), is safe under every option of the open Glidelines decision and can start once the owner reviews it. The research spike on how to launch and resume Claude Code and Codex sessions ([`Task-W07-01`](./tasks/Task-W07-01-agent-launch-research.md)) is independent and can run in parallel.
 
@@ -18,6 +18,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
+| `codex/local-cloud-requirements` · `../glidebox-local-cloud` | `Task-W00-01` | 2026-10-01 | one combined competitor feature table |
 
 ## Waiting on the owner
 
@@ -44,7 +45,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | State | Label | Session | Next dependency |
 |---|---|---|---|---|
-| [`Task-W00-01-planning-docs`](./tasks/Task-W00-01-planning-docs.md) | waiting | drafted | — | owner review of the documents |
+| [`Task-W00-01-planning-docs`](./tasks/Task-W00-01-planning-docs.md) | in progress | drafted | codex/local-cloud-requirements | consolidate competitor table |
 | [`Task-W00-02-github-remote`](./tasks/Task-W00-02-github-remote.md) | waiting | — | — | owner names/creates the repository and approves the push |
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
