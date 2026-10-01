@@ -9,3 +9,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0003](./0003-relationship-to-glidelines.md) | Relationship to Glidelines (standalone vs. reuse/extend) | **Open** |
 | [0004](./0004-team-accounts-and-roles.md) | Team accounts and roles | Accepted in part 2026-09-27 (roles; owner/admin invite by email) |
 | [0005](./0005-start-and-open-agent-sessions.md) | Start a task in an AI agent, and jump into it, from glidebox | Requirement accepted 2026-09-27; design proposed |
+| [0006](./0006-local-and-cloud-projects.md) | Local-only projects without sign-in; optional cloud projects with sign-in | Requirement accepted 2026-10-01; implementation design open |

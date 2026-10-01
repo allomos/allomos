@@ -18,7 +18,8 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 - See every task's **state and progress**, **grouped by workstream**, as **lists and charts**.
 - A **burndown chart** with an **estimated finish date** (a range, not a single guess).
-- **Online collaboration**: teammates sign in, see live updates, and act on tasks.
+- **Purely local projects**: project and task information stays on the user’s machine; no sign-in or hosted service is required for tracking.
+- **Optional cloud projects**: users choose cloud storage and collaboration; teammates sign in, see live updates, and act on tasks.
 - **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply and without merge conflicts.
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
@@ -38,12 +39,13 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D1](../decisions/0001-database-source-of-truth.md) | **The database is the source of truth.** Agents write structured fields through the CLI/MCP; markdown is an optional export, not an input. A one-time importer brings in existing markdown boards. | **accepted 2026-09-27** |
 | [D2](../decisions/0002-burndown-counts-plus-sizes.md) | **Burndown uses task counts, plus optional sizes.** Every task counts as 1; a task may carry an optional size (points or days), and the chart can switch to size-weighted when sizes are present. | **accepted 2026-09-27** |
 | [D3](../decisions/0003-relationship-to-glidelines.md) | **Relationship to Glidelines.** Leaning: standalone product, reusing Glidelines ideas and code where it fits (same stack family; port the `tasklist.json` format and burndown/forecast logic from `glidepace-vibe-cc`, not fork the app). Options A–D are compared in the decision record. | **open — not decided** |
-| [D4](../decisions/0004-team-accounts-and-roles.md) | **Team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
+| [D4](../decisions/0004-team-accounts-and-roles.md) | **Cloud team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
 | [D5](../decisions/0005-start-and-open-agent-sessions.md) | **Start and open agent sessions from glidebox**, through a local runner daemon (`gb runner`) on a person's machine or a vendor cloud session. | **requirement accepted 2026-09-27**; design proposed |
+| [D6](../decisions/0006-local-and-cloud-projects.md) | **Local-only and optional cloud projects.** Local tracking stores data on the user’s machine without sign-in; cloud projects require sign-in. Storage technology and transfer/sync design remain open. | **requirement accepted 2026-10-01** |
 
 ## 5. Data model (first cut)
 
-- **Project** — name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
+- **Project** — storage mode (`local | cloud`), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
 - **Workstream** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high).
 - **Task** — hierarchical id (`W07-01-09`), title, workstream, parent, and:
   - `state`: `backlog | ready | in_progress | waiting | done | dropped`
@@ -89,7 +91,9 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
   - `packages/runner` — local daemon (`gb runner`): receives start requests, creates worktrees, launches and resumes agents, reports session state
   - `packages/importer` — markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`)
   - `supabase/` — Postgres schema, RLS policies, SQL functions (atomic claim), migrations
-- **Backend:** Supabase — Postgres, Auth (team sign-in), Row Level Security per project and role, Realtime for live updates. Agents use scoped project tokens.
+- **Storage modes:** local projects use a persistent database on the user’s machine; cloud projects use a hosted database and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. Local database technology and packaging remain open.
+- **Cloud backend (proposed):** Supabase — Postgres, Auth (cloud sign-in), Row Level Security per project and role, Realtime for live updates. Cloud agents use scoped project tokens; local agent access must work without a cloud token.
+- **Transfer and sync:** moving/copying a local project to the cloud, offline cloud edits, and two-way synchronization remain open; do not assume automatic uploads.
 - **Hosting:** to decide (Vercel or Cloudflare).
 - **Agent instructions:** a short `AGENTS.md` / `CLAUDE.md` snippet telling sessions to resume with `gb next` and report with `gb` instead of editing board markdown.
 
@@ -99,7 +103,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 |---|---|---|
 | M0 | Repo and plan | This plan agreed; repo pushed |
 | M1 | Core + importer (local) | `packages/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
-| M2 | Read-only web | Supabase schema + auth; web shows workstream lists, progress charts and burndown for the imported project |
+| M2 | Local and cloud read-only views | Local imported project persists and shows lists, charts and burndown without sign-in or hosted services; signed-in cloud projects show the same views through the proposed hosted backend |
 | M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |
 | M4 | Collaboration | Roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
 | M5 | Start and open agents | Research spike on each agent's launch/resume interfaces; local runner starts a task in Claude Code and in Codex, reports the session and claims the task; "Open session" works for local and cloud sessions |

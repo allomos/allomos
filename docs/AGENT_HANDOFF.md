@@ -1,6 +1,6 @@
 # AGENT_HANDOFF
 
-Updated: 2026-09-30
+Updated: 2026-10-01
 
 **What this file is:** restart mechanics for the next session — which worktree, which server, which pitfall. It is **not** status: status lives on [the board](./TASK_BOARD.md). Contents and timing rules: [workflow/AI-WORKFLOW.md § Handoff](./workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
 
@@ -38,13 +38,13 @@ One block per card in the board's Sessions table. None claimed.
 
 ## Live state
 
-Checked 2026-09-30.
+Checked 2026-10-01.
 
 | What | Where | Notes |
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | **none** | Do not add or push until [`Task-W00-02`](./tasks/Task-W00-02-github-remote.md) is approved |
-| Worktrees | none besides the main checkout | Sessions create their own (`git worktree add`) |
+| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirement documentation; no processes |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls
@@ -60,7 +60,7 @@ Lessons that change what you do.
 Decisions and boundaries the board does not carry. If a bullet contradicts the board, the board is right — correct the bullet.
 
 - **Git identity** (repo-local config, copied from `glidepace-vibe-cc`): `will.w.hui <willwhui@gmail.com>`. SSH to GitHub authenticates as **`wanghui2sea`**; the owner's other projects push to the `mypals-ml` organization.
-- **Accepted decisions:** [0001](./decisions/0001-database-source-of-truth.md) database is the source of truth; [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions (requirement). **Open:** [0003](./decisions/0003-relationship-to-glidelines.md) relationship to Glidelines.
+- **Accepted decisions:** [0001](./decisions/0001-database-source-of-truth.md) database is the source of truth; [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions (requirement). [0006](./decisions/0006-local-and-cloud-projects.md) local-only projects without sign-in and optional signed-in cloud projects (requirement; storage and sync design open). **Open:** [0003](./decisions/0003-relationship-to-glidelines.md) relationship to Glidelines.
 - **Until glidebox can track itself (M3)**, this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding).
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 

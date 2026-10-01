@@ -1,6 +1,6 @@
 # Glidebox
 
-An online, collaborative tracker for work done by AI coding agents (Claude Code, Codex) and people: task progress and state grouped by workstream, lists and charts, a burndown with a forecast finish date, team roles, and starting or opening an agent session for a task directly from the app.
+A tracker with local-only projects and optional signed-in cloud collaboration for work done by AI coding agents (Claude Code, Codex) and people: task progress and state grouped by workstream, lists and charts, a burndown with a forecast finish date, team roles, and starting or opening an agent session for a task directly from the app.
 
 **Status:** planning — no application code yet.
 

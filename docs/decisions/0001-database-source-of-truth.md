@@ -16,7 +16,8 @@ Glidebox's **database is the source of truth**. People and agents change tasks t
 
 - Burndown, timeline, "recently finished" and the session registry are computed from events; no one maintains them by hand.
 - Claims become atomic database operations; no git merge conflicts over who holds a card.
-- Agents need access to glidebox (network + a project token) to report status. Offline work needs a fallback (queue and replay, or report later).
+- Under [0006](./0006-local-and-cloud-projects.md), a local project’s database lives on the user’s machine; a cloud project’s database is hosted. Local agent status updates must not require cloud authentication or network access. Cloud agents need authorized access; offline cloud updates remain a separate, undecided design.
+- The database decision governs structured storage, not mandatory hosting. Each project has one authoritative database; local/cloud synchronization is not implied.
 - Agent instructions in projects (`AGENTS.md` / `CLAUDE.md`) must change from "edit TASK_BOARD.md" to "use `gb`".
 - Narrative detail (outcome, evidence, decisions) can still live in repo files; glidebox links to them.
 

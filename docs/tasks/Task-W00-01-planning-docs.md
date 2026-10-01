@@ -13,7 +13,13 @@
 | 2026-09-27 | Plan and decision records; writing the discussion down as documents | owner (chat) |
 | 2026-09-30 | Writing and organizing all necessary documents; agent handoff rules modeled on the SSR project's `AGENT_HANDOFF.md` | owner (chat) |
 
+| 2026-10-01 | Record the owner’s requirement for purely local projects and optional signed-in cloud projects; update related planning documents locally | owner (chat) |
+
 ## Notes
 
 - 2026-09-27 — Plan, decisions 0001–0005, kickoff discussion and SSR board analysis written ([discussion](../discussions/2026-09-27-kickoff.md)).
 - 2026-09-30 — Documents reorganized (`docs/product`, `docs/workflow`, `docs/tasks`); agent guide, board, handoff, requirements, glossary and references added ([discussion](../discussions/2026-09-30-docs-and-agent-workflow.md)).
+
+- 2026-10-01 — Added R40–R43 and [0006](../decisions/0006-local-and-cloud-projects.md); revised the plan and earlier database/account decisions so local tracking needs no cloud account or service. Storage technology, packaging and transfer/sync remain undecided.
+
+- 2026-10-01 — PASS: all relative Markdown link paths resolve; instruction consistency reviewed; `git diff --check` clean. Runtime checks NOT RUN: documentation only, no app implementation. The remaining planning review stays on the board.

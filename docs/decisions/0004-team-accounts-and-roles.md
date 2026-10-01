@@ -6,7 +6,7 @@
 
 ## Context
 
-The owner wants teammates to collaborate online. In the reference project the owner also plays a distinct role: checking results and granting exact approvals for external operations. Agent sessions (Claude, Codex) act on tasks too, but should not be able to approve their own operations.
+The owner wants teammates to collaborate online in cloud projects. [0006](./0006-local-and-cloud-projects.md) also requires local projects without sign-in; the account and email invitation flow here applies to cloud collaboration, not a prerequisite for local use. In the reference project the owner also plays a distinct role: checking results and granting exact approvals for external operations. Agent sessions (Claude, Codex) act on tasks too, but should not be able to approve their own operations.
 
 ## Decision (accepted 2026-09-27)
 

@@ -15,11 +15,22 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
 | R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
 
+## Local and cloud projects
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R40 | Users can create and use a purely local project, with project information, tasks and their event history stored on their machine. | owner, 2026-10-01 | accepted |
+| R41 | Local project tracking requires no sign-in, cloud account or connection to a Glidebox hosted service. | owner, 2026-10-01 | accepted |
+| R42 | Users may choose cloud projects; cloud project access requires sign-in. | owner, 2026-10-01 | accepted |
+| R43 | Local project data stays local unless the user explicitly chooses to transfer or share it. Automatic cloud upload is not part of local mode. | local-only requirement, 2026-10-01; [0006](../decisions/0006-local-and-cloud-projects.md) | accepted |
+
+Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
+
 ## Source of truth and agents
 
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R10 | Glidebox's **database is the source of truth**; Markdown is an optional export. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R10 | Each project's **database is the source of truth**: local for a local project, hosted for a cloud project; Markdown is an optional export. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
 | R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
 | R12 | **Claiming is atomic**: one task, one holder; no merge conflicts. | PLAN | proposed |
 | R13 | A configurable **label ladder** per project (default: implemented → locally verified → connected → deployed and verified). | PLAN | proposed |
@@ -30,11 +41,11 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R20 | **Teammates collaborate online** with live updates. | owner, 2026-09-27 | accepted |
+| R20 | **Teammates collaborate online** in cloud projects with live updates. | owner, 2026-09-27 | accepted |
 | R21 | Glidebox has **roles**; what a member can do depends on the role. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
-| R22 | **An owner or admin adds a new member by email address**; no public sign-up. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
+| R22 | For cloud projects, **an owner or admin adds a new member by email address**; no public sign-up for cloud membership. Local use requires no account. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
 | R23 | Role set: owner, admin, approver, contributor, viewer, agent; agents cannot approve. | [0004](../decisions/0004-team-accounts-and-roles.md) | proposed |
-| R24 | A **"waiting on me"** inbox of checks and approvals owed by the signed-in person, with approvals recorded. | PLAN | proposed |
+| R24 | A **"waiting on me"** inbox of checks and approvals owed by the current person (local identity or signed-in cloud member), with approvals recorded. | PLAN | proposed |
 | R25 | Every change records **who** (person or agent session) and **when**. | PLAN | proposed |
 
 ## Agent sessions

@@ -2,7 +2,7 @@
 
 Glidebox is developed by AI agents (Claude Code, Codex) working for the owner, **will.w.hui**. This file is the shared authority for every agent and is always loaded (Codex reads it directly; Claude Code imports it from `CLAUDE.md`). Keep it short: detail lives in the documents it links.
 
-**What glidebox is:** an online, collaborative tracker for tasks worked by AI agents and people — progress and state grouped by workstream, lists and charts, a burndown with a forecast finish date, roles and email invitations, and starting / opening agent sessions from the app. See [docs/product/PLAN.md](docs/product/PLAN.md) and [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
+**What glidebox is:** a tracker with local-only projects (no sign-in) and optional cloud projects (sign-in required) for tasks worked by AI agents and people — progress and state grouped by workstream, lists and charts, a burndown with a forecast finish date, roles and email invitations, and starting / opening agent sessions from the app. See [docs/product/PLAN.md](docs/product/PLAN.md) and [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
 
 ## Always-on boundaries
 
