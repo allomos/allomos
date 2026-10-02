@@ -70,6 +70,22 @@ Local tracking works offline. AI-provider calls and other external integrations 
 
 Workflow, storage boundaries and proposed acceptance examples: [AI-generated project setup](./AI-GENERATED-PROJECTS.md). Local use follows R40–R43; cloud publication remains an explicit signed-in action. The final file schema is not yet selected.
 
+## Human and agent interfaces
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R60 | The app is well structured to provide interfaces for both people and AI agents. | owner, 2026-10-03 | accepted |
+| R61 | Human UI supports desktop and mobile use; specific operating systems, packaging and release order remain undecided. | owner, 2026-10-03 | accepted |
+| R62 | Investigate and consider browser and human CLI interfaces alongside desktop/mobile; agent CLI/MCP remains required by R11. | owner, 2026-10-03 | accepted |
+| R63 | Graphical clients, CLI, MCP and imports use shared task commands/queries with consistent validation, permissions and event recording. | [interface contract](./INTERFACES.md) | proposed |
+| R64 | Agent interfaces expose discoverable capabilities, versioned structured inputs/results, bounded task context and actionable errors. | [interface contract](./INTERFACES.md) | proposed |
+| R65 | Mutations support stale-revision detection and safe retries; interrupted long operations can be resumed without duplicate effects. | [interface contract](./INTERFACES.md) | proposed |
+| R66 | Human review shows evidence and exact decision scope; responsible person, executing agent, verification and session state remain distinguishable. | [interface contract](./INTERFACES.md) | proposed |
+| R67 | Graphical interfaces adapt to screen size and input method, with accessible text/controls and alternatives to drag-only actions. | [interface contract](./INTERFACES.md) | proposed |
+| R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md) | proposed |
+
+Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared structure; [interface research](../research/interface-patterns.md) records primary sources, platform options and limitations. Detailed command/schema and packaging choices have not been accepted.
+
 ## Not yet decided
 
 UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).

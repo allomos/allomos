@@ -1,6 +1,6 @@
 # Competitor investigation
 
-Public-source research conducted 2026-09-30 and extended 2026-10-01; comparison consolidated 2026-10-01. Glidebox's column incorporates the owner's local/cloud requirement accepted 2026-10-01. This is research evidence and analysis, not an approval of a product direction or architecture.
+Public-source research conducted 2026-09-30 and extended 2026-10-01; comparison consolidated 2026-10-01. Selected interface evidence added 2026-10-03; this is not a fresh verification of every competitor. Glidebox's column incorporates the owner's local/cloud requirement accepted 2026-10-01. This is research evidence and analysis, not an approval of a product direction or architecture.
 
 ## Finding
 
@@ -19,6 +19,10 @@ The investigation compared official vendor documentation with Glidebox's [plan](
 | Feature | Vibe Kanban [1–3] | Conductor [4–7] | Linear [8–11] | GitHub Agent HQ [12] | Plane [13–14] | ActionableAgile [15] | Backlog.md / MrLesk [16] | git-bug [17–18] | backlog / veggiemonk [19] | Obsidian + Git [20] | **Glidebox** |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Structured task tracking with lists or boards | ✓ Issues, boards, lists | Partial — workspaces linked to issues | ✓ Issues and projects | ✓ Existing GitHub issue workflow | ✓ Work items and projects | Analytics focus | ✓ Browser and terminal boards | ✓ CLI, terminal, local web UI | Partial — task CLI | Partial — notes interface | **Required** |
+| Human installed desktop client | ? | ? Packaging not checked in this follow-up | ✓ macOS/Windows [21] | ? | ? | ? | ? Standalone desktop packaging not established | ? | ? | ? App platforms not checked here | Desktop use **required**; installed packaging **undecided** |
+| Human mobile interface | ? | ? | ✓ iOS/Android and mobile PWA [21] | ? | ? | ? | ? | ? | ? | ? Mobile Git behavior not checked | **Required** — mobile use; packaging open |
+| Human browser interface | ? | ? | ✓ Browser client [21] | Partial — GitHub issue workflow [12] | ? | ? | ✓ Local browser board [16] | ✓ Local web UI [17] | ? | ? | **Consider in design** — R62 |
+| Human task CLI | ? | ? | ? Official CLI not established | Partial — standard GitHub issue CLI [22]; Agent HQ controls not evaluated | ? | ? | ✓ CLI and terminal board [16] | ✓ CLI and terminal UI [17] | ✓ Task CLI [19] | ? | **Consider for humans** — R62; agent CLI required |
 | Workstream grouping and task hierarchy | ? Exact mapping not checked | ? Exact mapping not checked | Partial — projects and sub-issues | ? Exact mapping not checked | Partial — projects; exact hierarchy not checked | ? | Partial — milestones and dependencies; exact mapping not checked | ? | ✓ Hierarchical task IDs and parent fields | ? | **Required** — workstreams and hierarchical IDs |
 | Online team collaboration | ✓ Live updates and invitations | ✓ Shared cloud workspaces | ✓ Team tracker | ✓ GitHub collaboration | ✓ Team project tracker | ? Task editing not checked | Partial — shared Git files; live hosted workflow not established | Partial — remote issue collaboration; public portal WIP | Partial — shared Git files | Partial — Git file sharing; managed team workflow not established | **Required** — cloud projects |
 | Agent-accessible MCP / API | MCP listed; tool coverage not checked | ✓ Workspace and session tools | ✓ Tracker MCP | Partial — agent issue workflow; external control API not checked | ✓ Work-item and project MCP | ? | ✓ CLI and MCP | ✓ CLI and GraphQL; MCP not established | ✓ CLI; MCP not established | ? | **Required** — structured CLI/MCP updates |
@@ -45,7 +49,7 @@ The investigation compared official vendor documentation with Glidebox's [plan](
 
 ### Vibe Kanban
 
-Its documented session workflow has independently running conversations, agent selection, and an attention state for questions or approvals [1–2]. Team access includes email invitations and live updates; the documented roles are Admin and Member, with both able to manage tasks and projects [3]. This makes it the first product to test against Glidebox's proposed task and owner workflow. More granular roles could be useful, but that benefit is not yet validated.
+Its documented session workflow has independently running conversations, agent selection, and an attention state for questions or approvals [1–2]. Team access includes email invitations and live updates; the documented roles are Admin and Member, with both able to manage tasks and projects [3]. This makes its documented task/attention flow a useful comparison for Glidebox's proposed owner workflow. More granular roles could be useful, but that benefit is not yet validated.
 
 ### Linear
 
@@ -75,9 +79,9 @@ These are hypotheses, not confirmed gaps in competing products.
 
 ## Recommendation and next investigation
 
-Before implementation, test Vibe Kanban, Linear and Conductor using the same small set of SSR-style tasks: one ready task, one awaiting deployment approval, and one interrupted by a session change. Use synthetic task text or explicitly approved data; the SSR reference repository remains read-only.
+The owner clarified that installing or operating competitors is unnecessary for this investigation. Continue source-based comparison of Vibe Kanban, Linear and Conductor using the documented ready-task, exact-decision and session-resume flows. No competitor trial is a prerequisite for finishing this research.
 
-Check whether the owner can see what was verified and by whom, decide the exact next approval, and resume a task without reconstructing scattered messages. Compare forecast completion criteria and the amount of setup and manual bookkeeping. Add a separate local/cloud check: can tracking run with no cloud account or connection, where is data persisted, and does selecting cloud require explicit sign-in?
+Use sources to assess whether verification evidence, the next approval and session context are explicit. Keep unsupported claims unknown. Compare local storage/account requirements and forecast completion criteria without treating self-hosting or an offline cloud cache as account-free local use. Any later implementation checks belong on their own card; reference repositories remain read-only.
 
 A positioning hypothesis to test is: **Glidebox helps an owner see what people and AI agents have actually verified, what needs a human decision next, and when the remaining work is likely to finish.**
 
@@ -85,7 +89,7 @@ Retain the structured event history, waiting-on fields and verification ladder i
 
 ## Source register
 
-Sources 1–15 were consulted 2026-09-30; sources 16–20 were consulted 2026-10-01. Consolidating the comparison does not represent a new live verification. Links can change.
+Sources 1–15 were consulted 2026-09-30; sources 16–20 were consulted 2026-10-01; sources 21–22 were consulted 2026-10-03 for selected interface cells. Consolidating the comparison does not represent a new live verification. Links can change.
 
 1. [Vibe Kanban documentation index](https://vibekanban.com/docs/llms.txt) — agent integrations, cloud views, authentication, MCP and self-hosting pages; index-level evidence only where full pages were inaccessible.
 2. [Vibe Kanban sessions](https://vibekanban.com/docs/workspaces/sessions) — conversations, shared files, agent selection and session states.
@@ -108,6 +112,8 @@ Sources 1–15 were consulted 2026-09-30; sources 16–20 were consulted 2026-10
 18. [git-bug storage/index interfaces](https://github.com/git-bug/git-bug/blob/trunk/repository/repo.go) — local storage and search-index operations; full rebuild/upload behavior not verified.
 19. [backlog by veggiemonk](https://github.com/veggiemonk/backlog) — Markdown/YAML task files, hierarchical IDs and Git workflow.
 20. [Obsidian Git plugin](https://github.com/tfney/obsidian-git) — commit/pull/push, history and diff interface for local notes.
+21. [Linear clients](https://linear.app/docs/get-the-app) — desktop/browser/mobile availability, mobile navigation and offline limitations.
+22. [GitHub CLI issue list](https://cli.github.com/manual/gh_issue_list) — human issue CLI, structured output and browser handoff; does not establish Agent HQ control coverage.
 
 ## Follow-up: actual Git-backed tasks and local indexes
 
@@ -127,7 +133,7 @@ The products and storage features from this follow-up are incorporated in the [m
 
 ### Implication
 
-Actual Git-backed task storage is established prior art, not a unique product distinction. Test Backlog.md before building equivalent task-file and agent-access functionality; study git-bug for distributed history and derived indexes. No inspected source establishes the full Glidebox combination of verified-delivery gates, exact operation approvals, forecast dates, controlled cloud collaboration and session launch/resume. That is an evidence limit, not proof of a market gap. No local index upload policy was independently verified across these products.
+Actual Git-backed task storage is established prior art, not a unique product distinction. Study Backlog.md's documented task-file/agent boundaries and git-bug's distributed history/index design before duplicating them; hands-on competitor testing is not required for this investigation. No inspected source establishes the full Glidebox combination of verified-delivery gates, exact operation approvals, forecast dates, controlled cloud collaboration and session launch/resume. That is an evidence limit, not proof of a market gap. No local index upload policy was independently verified across these products.
 
 ## Follow-up: starting from open source and selling a service
 
@@ -147,4 +153,10 @@ Sources: [Backlog.md license](https://github.com/MrLesk/Backlog.md/blob/main/LIC
 
 A paid service could provide managed Git hosting, team administration, authenticated approvals, backups, hosted agent execution and support while local project data remains portable. Those are business hypotheses, not features proven worth paying for. Charging for service does not require closing the local client's source; keep both open-client/paid-cloud and proprietary-client options available until the owner decides.
 
-Suggested evaluation: pin a Backlog.md revision, use synthetic cards, check file identity and change history, test two independent clones with conflicting edits, inspect its programmatic boundaries, and map verification/approval fields without duplicating status. Report estimated work saved and the continuing cost of maintaining a fork. Compare this with a small Glidebox-owned Git/file core. No dependencies should be introduced or source copied merely on this recommendation.
+Suggested source evaluation: pin a Backlog.md revision, inspect file identity, change history, merge handling and programmatic boundaries, then map verification/approval fields without duplicating status. Installing competitors is unnecessary for the current research; any future prototype uses synthetic data on a separately authorized implementation card. Report estimated work saved and the continuing cost of maintaining a fork. Compare this with a small Glidebox-owned Git/file core. No dependencies should be introduced or source copied merely on this recommendation.
+
+## Follow-up: human and agent interfaces
+
+Investigated 2026-10-03. The main comparison now includes desktop, mobile, browser and human CLI rows, preserving feature-first columns and Glidebox last. New checks establish Linear's platform coverage and standard GitHub CLI behavior; other platform cells remain unknown unless earlier sources already support them. No complete platform audit of all ten competitors was performed.
+
+[Interface investigation](./interface-patterns.md) records official adaptive-layout guidance, agent tools/context/errors, human accountability, CLI/MCP and optional embedded UI. [Interface contract](../product/INTERFACES.md) records the accepted desktop/mobile scope and browser/human CLI consideration, with proposed shared task rules and local/cloud boundaries. These are documented requirements/recommendations, not shipped Glidebox features.

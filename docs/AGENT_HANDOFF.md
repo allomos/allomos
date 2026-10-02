@@ -1,6 +1,6 @@
 # AGENT_HANDOFF
 
-Updated: 2026-10-01
+Updated: 2026-10-03
 
 **What this file is:** restart mechanics for the next session — which worktree, which server, which pitfall. It is **not** status: status lives on [the board](./TASK_BOARD.md). Contents and timing rules: [workflow/AI-WORKFLOW.md § Handoff](./workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
 
@@ -38,13 +38,13 @@ One block per card in the board's Sessions table. None claimed.
 
 ## Live state
 
-Checked 2026-10-01.
+Checked 2026-10-03.
 
 | What | Where | Notes |
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | **none** | Do not add or push until [`Task-W00-02`](./tasks/Task-W00-02-github-remote.md) is approved |
-| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirements, research and sync proposal; no processes |
+| Worktrees | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Local/cloud requirements, research, sync proposal and interface documentation; no processes |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls
@@ -65,6 +65,8 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 
 ## Do not assume
+
+- Owner requested human/agent interface structure, desktop/mobile human UI and consideration of browser/human CLI (R60–R62). Read `product/INTERFACES.md` and `research/interface-patterns.md`; detailed shared-command, platform and packaging choices remain proposed. No hands-on competitor testing is required for the investigation.
 
 - Owner accepted the leader → Glidebox prompt → external AI → generated files → usable project workflow (R50–R51); read `product/AI-GENERATED-PROJECTS.md` before designing its schema/importer. Exact format and Git storage remain proposed.
 - Owner may sell services through Glidebox; competitor research includes preliminary reuse/license findings. No upstream base, pricing or source-license choice is approved.

@@ -13,10 +13,9 @@
 | 2026-09-27 | Plan and decision records; writing the discussion down as documents | owner (chat) |
 | 2026-09-30 | Writing and organizing all necessary documents; agent handoff rules modeled on the SSR project's `AGENT_HANDOFF.md` | owner (chat) |
 | 2026-10-01 | Record the owner’s requirement for purely local projects and optional signed-in cloud projects; update related planning documents locally | owner (chat) |
-
 | 2026-10-01 | Save the competitor investigation, feature matrix and sources in the repository | owner (chat) |
-
 | 2026-10-01 | Record the leader’s prompt → AI-generated project/task files → Glidebox use/transformation workflow | owner (chat) |
+| 2026-10-03 | Record well-structured human/agent interfaces; investigate internet patterns for agents and desktop/mobile/browser/human CLI; document the contents and results locally | owner (chat) |
 
 ## Notes
 
@@ -44,3 +43,7 @@
 - 2026-10-01 — Added accepted R50–R51 and [AI-generated project setup contract](../product/AI-GENERATED-PROJECTS.md); R52–R55 and the validation/adoption flow remain proposed. Updated plan, index and 0001 import clarification without selecting Git storage or a file schema.
 
 - 2026-10-01 — Documentation checks PASS: relative Markdown paths, new requirement IDs/section anchors, instruction consistency and `git diff --check`. Runtime checks NOT RUN: documentation-only change. No generation prompt, parser or application feature implemented yet.
+
+- 2026-10-03 — Added accepted R60–R62, [interface contract](../product/INTERFACES.md) and [public-source interface investigation](../research/interface-patterns.md). Desktop/mobile human use and browser/CLI consideration are recorded; shared commands, adaptive views, agent tool schemas/context/errors and retry/review rules are proposed (R63–R68). The plan and generated-file contract link the shared structure without selecting storage or packaging. Competitors were not installed or operated, as requested by the owner.
+
+- 2026-10-03 — Documentation checks PASS: 33 Markdown files, 254 relative link paths, 51 table column checks, selected section anchors, unique R60–R68 and the 26-feature competitor matrix with Glidebox last; instruction consistency reviewed; `git diff --check` clean. Runtime/prototype/accessibility tests NOT RUN: documentation-only research, no application code. Detailed design and packaging remain proposed.

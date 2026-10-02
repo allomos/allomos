@@ -13,6 +13,7 @@
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
 | [product/REQUIREMENTS.md](./product/REQUIREMENTS.md) | Numbered requirements (R1…) cited by cards and tests | contract |
 | [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Glidebox project; proposed validation/adoption rules | contract |
+| [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
 | [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md) | Agent roles and effort, starting a session, handoff timing and contents, new-session rule, switching providers | contract |
 | [workflow/CARDS.md](./workflow/CARDS.md) | Workstreams, card IDs and template, states and labels, approvals, claiming protocol, Now rules | contract |
@@ -20,6 +21,7 @@
 | [discussions/](./discussions/) | Dated records of planning discussions with the owner | history |
 | [analysis/](./analysis/) | Analyses of reference material | analysis |
 | [research/competitor-investigation.md](./research/competitor-investigation.md) | Competitor feature matrix, sources, limitations and product hypotheses | evidence |
+| [research/interface-patterns.md](./research/interface-patterns.md) | Internet evidence for human/agent interfaces, adaptive layouts, CLI/MCP, local access and platform packaging options | evidence |
 | [REFERENCES.md](./REFERENCES.md) | External projects and files to learn from (read-only) | reference |
 | [GLOSSARY.md](./GLOSSARY.md) | Plain meanings of terms | reference |
 

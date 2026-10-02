@@ -21,6 +21,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Purely local projects**: project and task information stays on the user’s machine; no sign-in or hosted service is required for tracking.
 - **Optional cloud projects**: users choose cloud storage and collaboration; teammates sign in, see live updates, and act on tasks.
 - **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply and without merge conflicts.
+- **Interfaces for people and agents**, with desktop/mobile human use and browser/human CLI considered in the design. Shared structure and platform patterns are documented in [INTERFACES.md](./INTERFACES.md) (R60–R68; detailed design proposed).
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
 - **Generate project setup with an external AI agent:** a team leader supplies Glidebox’s prompt and team context; Glidebox reads/transforms the resulting project/task files ([feature contract](./AI-GENERATED-PROJECTS.md), R50–R51).
@@ -78,6 +79,10 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 The leader gets a Glidebox prompt, asks their chosen external agent to generate a project bundle, then opens/imports it in Glidebox. Proposed flow: validate → preview → repair errors → accept locally → optionally publish after sign-in. The prompt/schema and adoption details are proposed in [AI-GENERATED-PROJECTS.md](./AI-GENERATED-PROJECTS.md). This path does not require the in-app agent runner or cloud access.
 
+### Human and agent interfaces
+
+Desktop/mobile human use is accepted; browser and human CLI must be considered. Proposed presentation: task list/detail and review panes on wide screens; My tasks, Waiting on me, quick capture and full-screen task detail on phones. CLI/MCP provide structured discovery, context and task operations for agents. All supported surfaces should use shared project rules and recorded history. [Interface contract](./INTERFACES.md) and [internet investigation](../research/interface-patterns.md) include platform tradeoffs, accessible interaction, agent tool patterns and the distinction between device-local and cloud access. Native packaging and release order remain open; this does not assume four independent apps.
+
 ## 7. Burndown and forecast
 
 - **Lines:** remaining tasks and total scope over time (scope growth is visible, not hidden); the size-weighted variant when sizes exist.
@@ -88,6 +93,7 @@ The leader gets a Glidebox prompt, asks their chosen external agent to generate 
 
 ## 8. Architecture (proposed)
 
+- **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `packages/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
 - **Monorepo** (pnpm, TypeScript):
   - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
   - `apps/web` — React + Vite + Tailwind web app (charts, lists, inbox)
@@ -123,3 +129,5 @@ Kept in one place: [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting
 [REFERENCES.md](../REFERENCES.md) — the SSR migration board and Glidelines, with the files that matter.
 
 Competitor evidence: [investigation and feature comparison](../research/competitor-investigation.md) (researched 2026-09-30; local/cloud requirement added 2026-10-01). Recommendations are hypotheses, not decisions.
+
+Interface evidence: [human and AI-agent investigation](../research/interface-patterns.md) (2026-10-03), covering desktop, mobile, browser, human CLI, MCP/tool design and optional embedded agent-host UI. Public-source research only; no hands-on competitor testing.

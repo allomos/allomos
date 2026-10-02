@@ -1,5 +1,7 @@
 # AI-generated project setup
 
+Related interface contract: [INTERFACES.md](./INTERFACES.md). Its proposed shared command/validation layer covers generated-file adoption as well as graphical, CLI and MCP task edits.
+
 A feature contract: accepted user workflow and proposed details, recorded 2026-10-01. Requirements [R50–R55](./REQUIREMENTS.md#ai-generated-project-setup) define the boundary. This document does not select storage technology or a final file schema.
 
 ## User outcome — accepted
