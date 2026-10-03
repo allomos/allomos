@@ -11,6 +11,8 @@ Updated: 2026-10-03
 3. This file: your block in [Active resume](#active-resume), then [Live state](#live-state) and [Pitfalls](#pitfalls).
 4. What [AGENTS.md § Read by activity](../AGENTS.md#read-by-activity) requires for your task.
 
+For the 2026-10-03 product/documentation handoff, read the compact [handoff discussion](./discussions/2026-10-03-agent-handoff.md) after the board. It summarizes completed planning work and points to the authoritative documents; it does not replace the board.
+
 ## How to update this file
 
 - **One block per claimed card** under Active resume, **replaced in place**, never appended; about 10 lines: checkout, approvals in force, uncommitted changes, running processes, unrecorded findings, the single next action.

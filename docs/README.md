@@ -29,6 +29,7 @@
 
 - [2026-09-27 — Kickoff](./discussions/2026-09-27-kickoff.md): problem, requirements, decisions 0001–0005
 - [2026-09-30 — Documents and agent workflow](./discussions/2026-09-30-docs-and-agent-workflow.md): documentation structure and handoff rules
+- [2026-10-03 — Agent handoff](./discussions/2026-10-03-agent-handoff.md): current product/documentation state, decisions and the next agent's starting point
 
 ## Rules for documents
 
