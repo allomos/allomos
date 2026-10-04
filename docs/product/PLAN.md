@@ -97,6 +97,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 - **Lines:** remaining tasks and total scope over time (scope growth is visible, not hidden); the size-weighted variant when sizes exist.
 - **Forecast by throughput:** sample the tasks finished per week over the last N weeks (default 4–6) and run a Monte Carlo simulation of the remaining count → finish dates at **50% / 85%** confidence, drawn as a cone.
+  - **Wording on screen:** always show the chance with the date, for example "50% chance of finishing by 12 Nov" and "85% chance by 26 Nov" (Chinese: "有五成把握在 11 月 12 日前完成"). Never show a bare "50%": readers took it for team efficiency (owner question, 2026-10-04).
 - **Forecast by estimate** (secondary): remaining size ÷ capacity, with remaining percentage by state (as in Glidelines: to do 100%, in progress 50%, waiting 20%).
 - **Missing history:** for imported tasks without completion dates, reuse Glidelines' reconstructed-band approach instead of inventing dates.
 - Optional target date line and "on track / at risk" indicator.
