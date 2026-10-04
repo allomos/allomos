@@ -44,7 +44,7 @@ Checked 2026-10-04.
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | **none** | Do not add or push until [`Task-W00-02`](./tasks/Task-W00-02-github-remote.md) is approved |
-| Unused worktree | `/Users/wanghui/coding/glidepace/glidebox-local-cloud`, branch `codex/local-cloud-requirements` | Left by the 10-01 to 10-03 Codex session. Clean, behind `main` (it stopped at commit 5369181), no card claimed. The agent's removal was blocked by the permission system. **Owner to remove:** `git worktree remove ../glidebox-local-cloud` then `git branch -d codex/local-cloud-requirements` |
+| Worktrees | none besides the main checkout | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls
