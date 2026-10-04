@@ -44,7 +44,7 @@ Six frameworks can do this. They differ mainly in:
 | **Run `git` / agent programs** | Yes: from Rust, or the shell plugin with permission scopes | Yes: Node `child_process` | Yes | Yes: Go `os/exec` | Yes: `os.execCommand`, limited API | Yes: Node |
 | **MCP server SDK** | Official Rust SDK (`rmcp`, MCP spec 2026-07-28) | Official TypeScript SDK | TypeScript SDK (via Node/Bun compatibility — untested) | Official Go SDK exists (not checked in detail) | Via an extension in another language | TypeScript SDK |
 | **Local HTTP/WebSocket server for companions** | Yes (Rust server libraries) | Yes (Node) | Yes | Yes (Go standard library) | Already runs one internally; customising is limited | Yes (Node) |
-| **Auto-update** | Official updater plugin; update files signed with **our own key** (always required, free); hosts on GitHub Releases or any static host | Built-in updater; free service `update.electronjs.org` needs a public GitHub repo **and a code-signed macOS app** | Built-in updater (details not checked) | No official updater in v2 (community options) | Built-in updater | Manual |
+| **Auto-update** | Official updater plugin; update files signed with **our own key** (always required, free); hosts on GitHub Releases or any static host | Built-in updater, but **on macOS any auto-update requires a code-signed app** ("Your application must be signed for automatic updates on macOS"); Windows needs no code signing; free service `update.electronjs.org` also needs a public GitHub repo | Built-in updater (details not checked) | No official updater in v2 (community options) | Built-in updater | Manual |
 | **Security model** | Capabilities/permissions: the interface can only call what is explicitly allowed; security audits for major/minor releases | Powerful but easy to misconfigure; must follow Electron's security checklist (context isolation, no Node in the renderer) | Not established by this research | Standard | Native API allow-list | Node available in pages by default (riskier) |
 | **Mobile apps** | iOS/Android supported (not needed: companions are web pages) | No | No | Experimental in v3 | No | No |
 
@@ -57,7 +57,7 @@ Six frameworks can do this. They differ mainly in:
   - Stable 2.x line with releases every few weeks: 2.11.6, 2.12.0 and 2.12.1 all came in September 2026.
   - A permission system that blocks risky actions unless allowed. This fits glidebox, whose companions can send actions.
   - An official Rust MCP SDK.
-  - An official updater that works with free hosting (GitHub Releases). It signs updates with our own key, so it is usable before we buy OS code signing.
+  - An official updater that works with free hosting (GitHub Releases). It signs updates with **our own free key**, which is separate from OS code signing. Its documentation does not require code signing for updates, so auto-update should work on unsigned builds. To be verified on a test build.
 - **Against:**
   - The native side is Rust. The owner has said that is fine.
   - Rendering differs slightly between Safari's engine (macOS) and Chromium (Windows). Our interface must work in Safari anyway, for iPhone companions.
@@ -73,7 +73,7 @@ Six frameworks can do this. They differ mainly in:
 - **Against:**
   - Large app (~100 MB+) and higher memory use.
   - Security is easy to get wrong; it needs careful configuration.
-  - The free update service needs a **signed** macOS app, which we will not have until the first public release.
+  - **Auto-update on macOS requires a code-signed app**, which we will not have until the first public release. Until then, Mac users would update by hand; Windows auto-update works.
 - **Fit:** covers every need. It costs size and memory, not capability.
 
 ### Electrobun 2 — promising but too young
@@ -112,6 +112,13 @@ Six frameworks can do this. They differ mainly in:
 - Bundles Chromium and Node like Electron, but has a smaller ecosystem and riskier defaults.
 - No reason to choose it over Electron.
 
+## Two kinds of signing (explained 2026-10-04)
+
+- **Code signing** (paid; Apple about US$99/year, Windows certificate usually paid) tells macOS/Windows who published the app. Without it, installing shows a security warning.
+- **Update signing** (free; a key pair we generate) lets the installed app check that an update really comes from us before installing it.
+- **Auto-update** means the installed app checks a small file we publish (e.g. on GitHub Releases), then downloads and installs newer versions itself.
+- With **Tauri**, auto-update uses update signing only, so it can work before we buy code signing (per its documentation; to verify). With **Electron**, macOS auto-update needs code signing; Windows does not.
+
 ## Recommendation
 
 1. **Tauri 2** (stable 2.x line), with a planned check of the Tauri 3 migration when 3.0 becomes stable.
@@ -128,7 +135,7 @@ Not recommended for glidebox now:
 ## Sources (read 2026-10-04)
 
 - GitHub API: stars, licences and releases for `electron/electron`, `tauri-apps/tauri`, `blackboardsh/electrobun`, `wailsapp/wails`, `neutralinojs/neutralinojs`, `nwjs/nw.js`.
-- Electron: [releases](https://releases.electronjs.org/), [timelines](https://www.electronjs.org/docs/latest/tutorial/electron-timelines), [updates](https://www.electronjs.org/docs/latest/tutorial/updates).
+- Electron: [releases](https://releases.electronjs.org/), [timelines](https://www.electronjs.org/docs/latest/tutorial/electron-timelines), [updates](https://www.electronjs.org/docs/latest/tutorial/updates), [autoUpdater API](https://www.electronjs.org/docs/latest/api/auto-updater).
 - Tauri: [what is Tauri](https://v2.tauri.app/start/), [updater plugin](https://v2.tauri.app/plugin/updater/), [shell plugin](https://v2.tauri.app/plugin/shell/), [release notes](https://v2.tauri.app/release/tauri/), [3.0.0-alpha.0](https://newreleases.io/project/github/tauri-apps/tauri/release/tauri-v3.0.0-alpha.0).
 - Electrobun: [compatibility](https://framework.blackboard.sh/electrobun/guides/compatability), [v2 changelog](https://framework.blackboard.sh/electrobun/guides/changelog/v2-x/), [Better Stack guide](https://betterstack.com/community/guides/scaling-nodejs/electrobun-desktop-apps-typescript/).
 - Wails: [v3 beta release](https://newreleases.io/project/github/wailsapp/wails/release/v3.0.0-beta.0).
