@@ -63,4 +63,4 @@ The agent raises this itself; the owner should not have to ask.
 
 ## After glidebox can track itself (dogfooding)
 
-Once glidebox can track itself (proposed from release v0.1, when the `gb` command exists — [PLAN § 9](../product/PLAN.md#9-roadmap--releases)), glidebox's own cards move from Markdown into glidebox, and this workflow changes: claims, labels and waiting-on are written with `gb` instead of editing the board. That switch is its own card and needs the owner's approval; until then, the Markdown board is authoritative.
+**Decided by the owner, 2026-10-04:** glidebox's own tasks are v0.1's first real project. When release v0.1 passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), glidebox's own cards move from Markdown into a data folder inside this repository. This workflow then changes: claims, labels and waiting-on are written with `gb` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Until then, the Markdown board is authoritative.**

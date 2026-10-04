@@ -105,6 +105,8 @@ The owner asked whether the milestones followed rapid iteration, and said every 
 
 Re-planned in [PLAN § 9](../product/PLAN.md#9-roadmap--releases), using the roadmap-update skill, as seven releases, each an installable, usable desktop app. The first code card is now the v0.1 walking skeleton [`Task-W04-01`](../tasks/Task-W04-01-walking-skeleton.md). This replaces the "proposed plan change" below.
 
+The owner then asked for a "what ships" column (apps, servers and so on) and said v0.1 is for **the current project's tasks**: glidebox tracks its own development from v0.1 (dogfooding).
+
 ## Proposed plan change to confirm (superseded by the release roadmap)
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.
