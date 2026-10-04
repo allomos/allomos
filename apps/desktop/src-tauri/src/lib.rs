@@ -1,0 +1,65 @@
+//! Glidebox desktop app: the Tauri window plus the commands the interface may call.
+//!
+//! The interface never calls these directly; it goes through its messenger module
+//! (`apps/web/src/messenger.ts`), so the same interface can later reach the desktop's
+//! local server from a browser without changes.
+
+use std::path::PathBuf;
+
+use glidebox_core::Loaded;
+use glidebox_store::{Inspection, create_starter, git_root, inspect, load};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct FolderInfo {
+    inspection: Inspection,
+    /// The Git repository the folder belongs to, if any (information only).
+    git_root: Option<PathBuf>,
+}
+
+#[derive(Serialize)]
+struct Opened {
+    root: PathBuf,
+    loaded: Loaded,
+}
+
+/// What is this folder? Changes nothing.
+#[tauri::command]
+fn inspect_folder(path: PathBuf) -> FolderInfo {
+    FolderInfo {
+        git_root: git_root(&path),
+        inspection: inspect(&path),
+    }
+}
+
+/// Load the task box at `root`.
+#[tauri::command]
+fn open_task_box(root: PathBuf) -> Opened {
+    Opened {
+        loaded: load(&root),
+        root,
+    }
+}
+
+/// Create a starter project at `root` (an empty folder, or a new `.glidebox/`), then load it.
+#[tauri::command]
+fn create_task_box(root: PathBuf, name: String) -> Result<Opened, String> {
+    create_starter(&root, &name).map_err(|e| format!("Could not create the task box: {e}"))?;
+    Ok(Opened {
+        loaded: load(&root),
+        root,
+    })
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            inspect_folder,
+            open_task_box,
+            create_task_box
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running glidebox");
+}

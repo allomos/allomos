@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Glidebox",
+  "version": "0.1.0",
+  "identifier": "com.glidepace.glidebox",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../web run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm --prefix ../web run build",
+    "frontendDist": "../../web/dist"
+  },
+  "app": {
+    "windows": [
+      { "title": "Glidebox", "width": 1100, "height": 720, "minWidth": 720, "minHeight": 480 }
+    ],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+  }
+}
