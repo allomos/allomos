@@ -48,10 +48,11 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D7](../decisions/0007-git-like-project-sync.md) | **Git-like project history and sync.** Actual Git with structured files as the source of truth, a rebuildable index, and push/pull/merge with a cloud copy. Would supersede D1 if accepted. | proposed — not approved |
 | [D8](../decisions/0008-build-our-own.md) | **Build our own.** No open-source tracker (e.g. Backlog.md) is used as a base or fork; they are references only. | **accepted 2026-10-04** |
 | [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
+| [D10](../decisions/0010-project-data-folder.md) | **User-chosen data folder.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
 
 ## 5. Data model (first cut)
 
-- **Project** — storage mode (`local | cloud`), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
+- **Project** — storage mode (`local | cloud`), data folder (local projects: any folder the user chooses, standalone or inside an existing project folder — [D10](../decisions/0010-project-data-folder.md)), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
 - **Workstream** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high).
 - **Task** — hierarchical id (`W07-01-09`), title, workstream, parent, and:
   - `state`: `backlog | ready | in_progress | waiting | done | dropped`
@@ -104,7 +105,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
   - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
   - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser companions
   - `apps/mobile` — mobile companion (native app or phone-friendly web: open, see [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
-  - `packages/local-store` — local project storage adapter (database per D1, or Git files if D7 is accepted)
+  - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); database file per D1, or Git-tracked files if D7 is accepted
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex
   - `packages/runner` — local daemon (`gb runner`): receives start requests, creates worktrees, launches and resumes agents, reports session state

@@ -8,11 +8,11 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; eight cards are open; no application code exists yet.** Glidebox is in planning (milestone M0).
+**Nothing is claimed; nine cards are open; no application code exists yet.** Glidebox is in planning (milestone M0).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-W00-07`](./tasks/Task-W00-07-open-source-base-decision.md)).
-- The product shape: a **desktop app as the hub**, with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)).
+- The product shape: a **desktop app as the hub**, with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Each project's data lives in a **folder the user chooses**, standalone or inside an existing project folder ([`W00-11`](./tasks/Task-W00-11-project-data-folder.md)).
 - Requirements for local and cloud projects, AI-generated project setup and interfaces are recorded ([`W00-04`](./tasks/Task-W00-04-local-and-cloud-requirements.md), [`W00-08`](./tasks/Task-W00-08-ai-generated-project-setup.md), [`W00-09`](./tasks/Task-W00-09-interface-requirements.md)).
 - The 2026-10-04 review has fixed the documents ([`Task-W00-10`](./tasks/Task-W00-10-docs-consistency-review.md)).
 
@@ -27,7 +27,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `main` — Claude Code docs session | [`Task-W00-11`](./tasks/Task-W00-11-project-data-folder.md) | 2026-10-04 | Owner reviews the data-folder requirement |
 
 ## Waiting on the owner
 
@@ -42,6 +41,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Storage:** keep a database as the source of truth (0001), or accept actual Git with structured files and push/pull/merge (0007)? | [0007](./decisions/0007-git-like-project-sync.md), [`Task-W00-06`](./tasks/Task-W00-06-git-sync-proposal.md) | local store design (W03), M2 |
 | **Desktop hub and companions:** may companions edit, or only view? Same network only, or also away from home (needs a relay — an external service)? How are phones and browsers paired and removed? What do they show when the desktop is off? Mobile as a native app or phone-friendly web? Which desktop systems first? Are cloud projects still needed now, given companions? | [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | W04, W10, M2–M2b |
+| **Data folder:** other kinds of location (synced folders, network or removable drives)? A database file or readable text files in the folder? Several projects in one repository? If `git` is not installed, ask the user to install it or bundle a copy? Should pull, status and diff also use the `git` command? | [0010](./decisions/0010-project-data-folder.md) | local store design (W03) |
 | **Milestone order:** confirm moving cloud projects from M2 to M4, so that M2 = desktop hub and M2b = companion viewing; confirm placing AI-generated setup (W09) with M2 | [PLAN § 9](./product/PLAN.md#9-milestones) | planning of M2 |
 | **Selling glidebox:** commercial model and source licence (open client with paid cloud, or proprietary) | [0008](./decisions/0008-build-our-own.md) | release, licensing of dependencies |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
@@ -63,7 +63,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W00-06-git-sync-proposal`](./tasks/Task-W00-06-git-sync-proposal.md) | waiting | drafted | — | owner decision on 0007 |
 | [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
-| [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | in progress | — | `main` — Claude Code docs session | recording in progress |
+| [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
 | [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | `Task-W01-01` model; owner card review |
 | [`Task-W07-01-agent-launch-research`](./tasks/Task-W07-01-agent-launch-research.md) | backlog | — | — | owner card review |

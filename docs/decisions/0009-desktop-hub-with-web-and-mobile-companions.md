@@ -22,6 +22,7 @@ The full product should be a desktop application. It provides a web program and 
   - the local CLI and MCP access for agents
 - **Web and mobile are companion clients.** They connect to a **running** desktop app and show its projects. Viewing at least covers **progress and status**: task states, workstream progress, charts and burndown, and what is waiting on whom.
 - The desktop app works on its own; companions are optional.
+- Each local project's data lives in a folder the user chooses ([0010](./0010-project-data-folder.md)).
 
 ## How this fits earlier decisions
 

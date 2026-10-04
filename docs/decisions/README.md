@@ -13,3 +13,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0007](./0007-git-like-project-sync.md) | Git-like local/cloud project history, push/pull and task-aware merge | Proposed 2026-10-01; not approved |
 | [0008](./0008-build-our-own.md) | Build glidebox ourselves, not on an open-source base | Accepted 2026-10-04 |
 | [0009](./0009-desktop-hub-with-web-and-mobile-companions.md) | The desktop app is the hub; web and mobile apps connect to it | Requirement accepted 2026-10-04; design open |
+| [0010](./0010-project-data-folder.md) | A project's data lives in a folder the user chooses (standalone or inside an existing project folder) | Requirement accepted 2026-10-04; details proposed |

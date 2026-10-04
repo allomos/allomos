@@ -34,6 +34,11 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R41 | Local project tracking requires no sign-in, cloud account or connection to a Glidebox hosted service. | owner, 2026-10-01 | accepted |
 | R42 | Users may choose cloud projects; cloud project access requires sign-in. | owner, 2026-10-01 | accepted |
 | R43 | Local project data stays local unless the user explicitly chooses to transfer or share it. Automatic cloud upload is not part of local mode. | local-only requirement, 2026-10-01; [0006](../decisions/0006-local-and-cloud-projects.md) | accepted |
+| R72 | In the desktop app, the user **chooses each project's data folder**; any writable folder is allowed. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
+| R73 | The data folder may be a **standalone folder** or a **subfolder of an existing project folder** (for example inside a code repository). | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
+| R74 | A data folder is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | proposed |
+| R75 | Inside an existing Git repository, glidebox **does not create a nested repository** and never commits or pushes on its own; one running desktop app writes to a folder at a time. | [0010](../decisions/0010-project-data-folder.md) | proposed |
+| R76 | **Commit and push run the `git` command** installed on the user's machine, so the user's Git configuration, credentials and repository hooks apply. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 
 Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
 

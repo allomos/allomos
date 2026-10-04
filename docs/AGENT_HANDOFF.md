@@ -34,15 +34,7 @@ Updated: 2026-10-04
 
 ## Active resume
 
-One block per card in the board's Sessions table.
-
-### Task-W00-11 — `main` (Claude Code docs session)
-- Checkout: `/Users/wanghui/coding/glidepace/glidebox` · branch `main` · pushed: no (no remote)
-- Approvals in force: record the owner's data-folder requirement (local docs only). Nothing external.
-- Uncommitted: decision 0010 and related edits, until the next commit
-- Running: none
-- Unrecorded findings: none
-- Next action: commit the record, then the owner reviews it
+One block per card in the board's Sessions table. None claimed.
 
 ## Live state
 
@@ -72,7 +64,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 - **Git identity** (repo-local config, copied from `glidepace-vibe-cc`): `will.w.hui <willwhui@gmail.com>`. SSH to GitHub authenticates as **`wanghui2sea`**; the owner's other projects push to the `mypals-ml` organization.
 - **Decisions:**
   - Accepted: [0001](./decisions/0001-database-source-of-truth.md) database is the source of truth; [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0008](./decisions/0008-build-our-own.md) **build our own**, no open-source base.
-  - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**, with web and mobile companions viewing progress and status.
+  - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**, with web and mobile companions viewing progress and status; [0010](./decisions/0010-project-data-folder.md) **user-chosen data folder**, standalone or inside an existing project folder.
   - Open: [0003](./decisions/0003-relationship-to-glidelines.md) reuse of the owner's Glidelines code.
   - Proposed: [0007](./decisions/0007-git-like-project-sync.md) Git storage and sync.
 - **Commercial intent:** the owner may sell glidebox as a service (2026-10-01). Model and source licence are undecided (board).

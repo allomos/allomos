@@ -39,3 +39,4 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Three-way merge** | Combining two edited versions by comparing both with the version they started from. |
 | **Fork** | Copying another project's code to build on it. Ruled out for glidebox by [0008](./decisions/0008-build-our-own.md). |
 | **OPFS** | Origin private file system: browser storage that belongs to one website, is hidden from the user's folders, and is lost when site data is cleared. |
+| **Data folder** | The folder that holds one local project's data, chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). |

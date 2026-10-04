@@ -49,6 +49,12 @@ All 50 external links were checked; the other 49 work. Internal links, anchors, 
 
 **Not done:** removing the unused worktree `glidebox-local-cloud` was blocked by the permission system. It is listed for the owner in the handoff.
 
+## Later the same day: project data folder
+
+The owner added: in the desktop application, the data source folder should be able to be set to **any folder**, including **a standalone folder** and **a subfolder of an existing project folder**. Recorded as R72–R73 (accepted) and R74–R75 (proposed) in [0010](../decisions/0010-project-data-folder.md), card [`W00-11`](../tasks/Task-W00-11-project-data-folder.md). The owner's sentence ended with a comma, so the record asks whether more kinds of location were meant.
+
+The owner then added that **commit and push are performed by calling `git` commands**. This is recorded as R76 (accepted): glidebox runs the user's installed `git`, so the user's own settings, credentials and hooks apply.
+
 ## Proposed plan change to confirm
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

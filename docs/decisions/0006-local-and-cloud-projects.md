@@ -24,6 +24,8 @@ The owner requires Glidebox to run purely locally, keeping project and task info
 
 ## Design questions still open
 
+*Update 2026-10-04:* a local project's data lives in a folder the user chooses, standalone or inside an existing project folder ([0010](./0010-project-data-folder.md)).
+
 - Local database technology, runtime and app packaging.
 - How users select and manage local and cloud projects.
 - Whether and how to move or copy projects between modes.
