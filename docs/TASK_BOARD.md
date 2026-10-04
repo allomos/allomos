@@ -43,7 +43,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | **Selling glidebox:** commercial model and source licence (open client with paid cloud, or proprietary) | [0008](./decisions/0008-build-our-own.md) | release, licensing of dependencies |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
-| Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 6 (W02) |
+| Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
 | UI languages (Glidelines has en / ja / zh-CN / zh-TW) | [REQUIREMENTS](./product/REQUIREMENTS.md) | W04 |
 | Review the first code card [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) (Iteration 1 walking skeleton: macOS Tauri app opens a task box and shows its tasks) | the card | first code |
 
@@ -62,8 +62,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-13-iterative-release-roadmap`](./tasks/Task-A00-13-iterative-release-roadmap.md) | waiting | drafted | — | owner confirms the release roadmap |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | backlog | — | — | owner card review (first Iteration 1 card) |
-| [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 4 (burndown and forecast) |
-| [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 6 |
+| [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
+| [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |
 | [`Task-A03-01-agent-launch-research`](./tasks/Task-A03-01-agent-launch-research.md) | backlog | — | — | owner card review |
 

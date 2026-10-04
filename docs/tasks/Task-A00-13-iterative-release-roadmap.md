@@ -15,6 +15,8 @@
 
 ## Notes
 
+- 2026-10-04 — Owner: MCP moved from Iteration 7 to **Iteration 3** (right after Windows); Progress view, Burndown, Git panel and SSR import each moved one later (4–7). Task box default `.glidebox/`; Windows checks on a workmate's machine.
+
 - 2026-10-04 — Owner: in-app task creation and editing moved to Iteration 2; Iteration 1's app is view-only, and tasks change through the CLI. Owner asked how workstreams relate to iterations: recorded as proposals R89–R90 (two independent axes; renameable terms).
 
 - 2026-10-04 — At the owner's request, made iterations smaller: Iteration 1 split into macOS (1) and macOS + Windows (2); the other releases split into one visible capability each, giving **15 iterations** (v0.1 … v0.14, v1.0). The owner also named the folder **task box** (R87) and the command **`glidebox`** with alias `gb` (R88).

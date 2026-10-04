@@ -129,11 +129,11 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 |---|---|---|---|---|---|
 | **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
 | **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`glidebox` / `gb` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes | R81, R85 (released together from here on), R1–R2 (editing in the app) |
-| **Next** | **3** | **v0.3 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
-| **Next** | **4** | **v0.4 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
-| **Next** | **5** | **v0.5 — Git in the app** | The owner **commits and pushes task changes** without leaving glidebox | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
-| **Later** | **6** | **v0.6 — Import the SSR board** | The owner tracks the **SSR migration** in glidebox | SSR importer (in the app and `gb import`) with a reconciliation report | R15 |
-| **Later** | **7** | **v0.7 — MCP for agents** | Claude Code and Codex use glidebox through **MCP tools**, not only shell commands | **MCP server** (`gb mcp`, started by the agent on the same computer); safe retries and stale-edit checks | R11 (MCP), R63–R65 |
+| **Next** | **3** | **v0.3 — MCP for agents** | Claude Code and Codex use glidebox through **MCP tools**, not only shell commands | **MCP server** (`gb mcp`, started by the agent on the same computer); safe retries and stale-edit checks | R11 (MCP), R63–R65 |
+| **Next** | **4** | **v0.4 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
+| **Next** | **5** | **v0.5 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
+| **Later** | **6** | **v0.6 — Git in the app** | The owner **commits and pushes task changes** without leaving glidebox | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
+| **Later** | **7** | **v0.7 — Import the SSR board** | The owner tracks the **SSR migration** in glidebox | SSR importer (in the app and `gb import`) with a reconciliation report | R15 |
 | **Later** | **8** | **v0.8 — Start and open agents** | The owner **starts a task in Claude Code or Codex from glidebox and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
 | **Later** | **9** | **v0.9 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by email and long code (free email service, needs approval); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
 | **Later** | **10** | **v0.10 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
@@ -160,11 +160,11 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
    - `git diff` shows readable changes;
    - glidebox's own cards now live in its task box, and agents use `gb` instead of `TASK_BOARD.md`.
 2. The same checks pass on Windows; one pipeline builds both systems; on both systems, a task created and edited in the app appears in `gb list` and in `git diff` as readable changes.
-3. Progress bars, state chart and throughput match a known test project; "waiting on me" lists exactly the owner's items.
-4. The burndown and the finish-date range show for glidebox's own project; the calculations are checked with fixed test data.
-5. Committing from the app runs the user's own `git`, including hooks; a refused commit shows the hook's message.
-6. The SSR board imports with every card accounted for in the reconciliation report.
-7. Claude Code and Codex each claim and update a task through MCP; repeating a request does not repeat its effect.
+3. Claude Code and Codex each claim and update a task through MCP; repeating a request does not repeat its effect.
+4. Progress bars, state chart and throughput match a known test project; "waiting on me" lists exactly the owner's items.
+5. The burndown and the finish-date range show for glidebox's own project; the calculations are checked with fixed test data.
+6. Committing from the app runs the user's own `git`, including hooks; a refused commit shows the hook's message.
+7. The SSR board imports with every card accounted for in the reconciliation report.
 8. From the app, start one task in Claude Code and one in Codex; the status shows; "Open session" jumps in.
 9. A phone on the same network pairs by email code and shows progress; with the desktop app closed it shows the "start the desktop app" message.
 10. A phone away from home approves a waiting item; the desktop applies and records it.
@@ -177,7 +177,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 **Rules for the roadmap**
 
 - **Only "Now" is committed.** "Next" and "Later" are direction and may be reordered after each release, based on what using it teaches. Reordering is the owner's decision.
-- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from glidebox itself once Iteration 4 exists.
+- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from glidebox itself once Iteration 5 exists.
 - **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
 - **Dependencies to watch:**
   - Iteration 2's exit check runs on **a workmate's Windows machine** (owner, 2026-10-04). The agent prepares an unsigned Windows build and a short step-by-step check list. The workmate installs it, runs the checks and reports the results, which are recorded on the card. Expect a Windows security warning on install, because builds are unsigned until Iteration 15.
