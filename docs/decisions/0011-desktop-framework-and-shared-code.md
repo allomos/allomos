@@ -39,7 +39,7 @@ Glidebox's screens are written **once**, as a web interface. The desktop app sho
 
 These change the comparison: Electron's main advantage (one language) no longer weighs much.
 
-Options that let the desktop window reuse the web interface, checked 2026-10-04:
+Options that let the desktop window reuse the web interface, checked 2026-10-04. **Detailed comparison:** [research/desktop-frameworks.md](../research/desktop-frameworks.md). It covers six frameworks, adding Neutralinojs and NW.js, and finds two things not in this summary: **Electrobun has no Intel Mac build**, and **Tauri 3 is in alpha** (we would build on stable 2.x).
 
 | | Native side | App size | Web engine in the window | Maturity (checked 2026-10-04) |
 |---|---|---|---|---|

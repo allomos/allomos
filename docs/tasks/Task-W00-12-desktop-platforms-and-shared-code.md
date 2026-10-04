@@ -15,4 +15,6 @@
 
 ## Notes
 
+- 2026-10-04 — At the owner's request, wrote a [detailed comparison](../research/desktop-frameworks.md) of Tauri 2, Electron, Electrobun 2, Wails 2, Neutralinojs and NW.js from current sources. The recommendation stays Tauri 2. New findings: Electrobun has no Intel Mac build; Tauri 3 is in alpha.
+
 - 2026-10-04 — Owner: a second language is not a problem; release macOS and Windows together; unsigned builds until the first public release (R85). Compared four frameworks from current sources; the recommendation changed from Electron to **Tauri 2**. If chosen, `Task-W01-01` would be written in Rust.
