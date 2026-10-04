@@ -1,0 +1,434 @@
+<title>Glidebox Road Show</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a stack of 16:9 "approach chart" slides on a sky ground; a burndown drawn as a glide path is the recurring motif. Present mode shows one slide at a time. */
+:root{
+  --sky:#E9EFF5;        /* page ground */
+  --paper:#FBFCFE;      /* slide surface */
+  --ink:#12223A;        /* text */
+  --muted:#55667C;      /* secondary text */
+  --line:#CFD9E4;       /* rules, grid */
+  --amber:#D7891C;      /* accent marks: glide path, runway lights */
+  --amber-ink:#8F5306;  /* accent text on light */
+  --teal:#1C7479;       /* "verified" */
+  --cone:rgba(215,137,28,.16);
+  --shadow:0 1px 2px rgba(18,34,58,.06),0 8px 28px rgba(18,34,58,.07);
+  --display:"Big Shoulders Display","Arial Narrow","Roboto Condensed",sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --sky:#0A1320;--paper:#101C2D;--ink:#E5EDF6;--muted:#93A5BA;--line:#22344A;
+    --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--cone:rgba(240,166,58,.18);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --sky:#0A1320;--paper:#101C2D;--ink:#E5EDF6;--muted:#93A5BA;--line:#22344A;
+  --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--cone:rgba(240,166,58,.18);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--sky);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;padding-inline:16px;padding-block:24px 64px}
+h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.005em;line-height:.95;text-wrap:balance;margin:0}
+p{margin:0}
+.mono{font-family:var(--mono)}
+
+/* top bar */
+.bar{max-width:1120px;margin:0 auto 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+.brand svg{width:28px;height:28px}
+.bar-note{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+.btn{font:500 14px/1 var(--body);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:10px 16px;cursor:pointer}
+.btn:hover{border-color:var(--amber)}
+.btn:focus-visible,.nav button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+/* deck */
+.deck{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.slide{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:clamp(22px,4.2vw,56px);display:flex;flex-direction:column;gap:clamp(16px,2.4vw,28px);overflow:hidden;min-width:0}
+@media (min-width:900px){.slide{aspect-ratio:16/9}}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-ink)}
+.slide h2{font-size:clamp(34px,5.2vw,64px)}
+.lede{font-size:clamp(16px,1.7vw,20px);color:var(--muted);max-width:60ch}
+.foot{margin-top:auto;display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:clamp(18px,3vw,40px);align-items:start}
+.cols > *{min-width:0}
+
+/* hero */
+.hero{justify-content:space-between}
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:clamp(20px,3vw,48px);align-items:center}
+.hero-grid > *{min-width:0}
+.hero h1{font-size:clamp(52px,8.6vw,112px);text-transform:uppercase}
+.hero h1 em{font-style:normal;color:var(--amber)}
+.hero .lede{margin-top:16px}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.pill{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--ink)}
+.pill.free{border-color:var(--teal);color:var(--teal)}
+
+/* glide path chart */
+.chart{width:100%;height:auto;display:block}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{fill:var(--muted);font:500 11px var(--mono)}
+.chart .actual{fill:none;stroke:var(--ink);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.chart .cone{fill:var(--cone);stroke:none}
+.chart .fc{fill:none;stroke:var(--amber);stroke-width:2;stroke-dasharray:6 6}
+.chart .runway{stroke:var(--ink);stroke-width:4}
+.chart .light{fill:var(--amber)}
+.chart .lbl{fill:var(--amber-ink);font:600 12px var(--mono)}
+.chart .now{fill:var(--paper);stroke:var(--ink);stroke-width:2.5}
+.chart .ttl{fill:var(--muted);font:600 11px var(--body);letter-spacing:.04em}
+.chart .cap{fill:var(--muted);font:400 11px var(--body)}
+
+/* problem */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.fact{border-top:2px solid var(--ink);padding-top:12px}
+.fact b{display:block;font-family:var(--display);font-size:clamp(36px,4.6vw,56px);line-height:1;font-variant-numeric:tabular-nums}
+.fact span{color:var(--muted);font-size:15px}
+.quote{font-family:var(--display);font-weight:600;font-size:clamp(22px,2.6vw,32px);line-height:1.15;border-left:3px solid var(--amber);padding-left:16px;max-width:30ch}
+
+/* pillar lists */
+.ticks{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.ticks li{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.ticks li::before{content:"";width:10px;height:10px;margin-top:7px;border-radius:2px;background:var(--amber);transform:rotate(45deg)}
+.ticks b{font-weight:600}
+
+/* terminal */
+.term{background:var(--ink);color:var(--paper);border-radius:10px;padding:16px 18px;font:400 13px/1.7 var(--mono);overflow-x:auto;white-space:pre}
+.term .c{opacity:.55}
+.term .ok{color:var(--amber)}
+.tiny{font-size:12px;color:var(--muted)}
+
+/* ladder */
+.ladder{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.rung{border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;line-height:1.3}
+.rung i{display:block;font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:4px}
+.rung.done{border-color:var(--teal);color:var(--teal)}
+@media (max-width:520px){.ladder{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* devices */
+.devices{display:grid;grid-template-columns:1.6fr 1fr .62fr;gap:14px;align-items:end}
+.dev{border:2px solid var(--ink);border-radius:12px;padding:12px;display:grid;gap:8px;background:var(--paper)}
+.dev .t{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.bars{display:grid;gap:6px}
+.bars div{height:8px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.bars div::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--teal)}
+.dev.phone{border-radius:18px;aspect-ratio:9/16;max-width:100%}
+.ask{border:1px solid var(--amber);border-radius:8px;padding:8px;font-size:12px;line-height:1.3}
+.ask b{display:block;color:var(--amber-ink);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+
+/* team */
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.node{border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px;background:var(--paper)}
+.node b{display:block;font-family:var(--display);font-size:20px;line-height:1.1}
+.arrow{font-family:var(--mono);color:var(--amber-ink)}
+
+/* pricing */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}
+.plan{border:1px solid var(--line);border-radius:12px;padding:clamp(18px,2.4vw,28px);display:flex;flex-direction:column;gap:14px;min-width:0}
+.plan.local{border:2px solid var(--teal)}
+.plan h3{font-size:clamp(28px,3.4vw,40px)}
+.price{font-family:var(--display);font-weight:800;font-size:clamp(44px,6vw,72px);line-height:1}
+.plan.local .price{color:var(--teal)}
+.plan .sub{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+
+/* roadmap */
+.route{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}
+.leg{border-top:3px solid var(--line);padding-top:12px;display:grid;gap:6px;align-content:start}
+.leg.now{border-top-color:var(--amber)}
+.leg h3{font-size:26px}
+.leg .when{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.leg ol{margin:0;padding-left:0;list-style:none;display:grid;gap:4px;font-size:14px}
+.leg li{display:grid;grid-template-columns:30px 1fr;gap:6px}
+.leg li span{font-family:var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* close */
+.close h2{font-size:clamp(44px,7vw,92px);text-transform:uppercase}
+.close h2 em{font-style:normal;color:var(--amber)}
+
+/* present mode */
+.nav{display:none}
+body.presenting{padding:0;overflow:hidden}
+body.presenting .bar{display:none}
+body.presenting .deck{position:fixed;inset:0;max-width:none;margin:0;display:grid;place-items:center;background:var(--sky);padding:env(safe-area-inset-top,0px) 16px env(safe-area-inset-bottom,0px)}
+body.presenting .slide{display:none;width:min(100%,calc((100vh - 80px) * 16 / 9));max-height:calc(100vh - 80px);aspect-ratio:16/9}
+body.presenting .slide.active{display:flex}
+body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);gap:8px;align-items:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.nav button{font:500 13px var(--body);background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer}
+@media (max-width:899px){body.presenting .slide{aspect-ratio:auto;width:100%;max-height:calc(100vh - 80px);overflow:auto}}
+@media (prefers-reduced-motion:no-preference){
+  .chart .actual{stroke-dasharray:700;stroke-dashoffset:0;animation:draw 1.6s ease-out both}
+  @keyframes draw{from{stroke-dashoffset:700}to{stroke-dashoffset:0}}
+}
+</style>
+
+<header class="bar">
+  <div class="brand">
+    <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="6" width="24" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5 11 L13 16 L23 21" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/></svg>
+    Glidebox
+  </div>
+  <span class="bar-note">ROAD SHOW · OCTOBER 2026 · IN DEVELOPMENT</span>
+  <button class="btn" id="present-btn" type="button">Present ▸</button>
+</header>
+
+<main class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide hero" aria-label="Glidebox">
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Project tracking for vibe coding</p>
+        <h1>Land every <em>vibe-coded</em> project.</h1>
+        <p class="lede">Your AI agents write the code. Glidebox keeps the project on course: what's done, what's verified, what needs you, and when it will land.</p>
+        <div class="pill-row">
+          <span class="pill free">Local app · free</span>
+          <span class="pill">macOS · Windows</span>
+          <span class="pill">Claude Code · Codex</span>
+          <span class="pill">Cloud · optional, paid</span>
+        </div>
+      </div>
+      <figure style="margin:0">
+        <svg class="chart" viewBox="-28 0 588 318" role="img" aria-labelledby="gp-t">
+          <title id="gp-t">Burndown drawn as a glide path: 60 tasks remaining at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.</title>
+          <text class="ttl" transform="translate(-14,150) rotate(-90)" text-anchor="middle">Tasks left</text>
+          <text class="ttl" x="280" y="312" text-anchor="middle">Time (weeks)</text>
+          <line class="grid" x1="40" y1="40" x2="520" y2="40"/>
+          <line class="grid" x1="40" y1="150" x2="520" y2="150"/>
+          <text class="axis" x="30" y="44" text-anchor="end">60</text>
+          <text class="axis" x="30" y="154" text-anchor="end">30</text>
+          <text class="axis" x="30" y="264" text-anchor="end">0</text>
+          <polygon class="cone" points="220,135.3 430,260 490,260"/>
+          <polyline class="fc" points="220,135.3 460,260"/>
+          <polyline class="fc" points="220,135.3 490,260"/>
+          <polyline class="actual" points="40,40.0 70,51.0 100,69.3 130,80.3 160,102.3 190,120.7 220,135.3"/>
+          <circle class="now" cx="220" cy="135.3" r="6"/>
+          <line class="runway" x1="400" y1="260" x2="520" y2="260"/>
+          <text class="cap" x="394" y="256" text-anchor="end">0 left = done</text>
+          <line class="grid" x1="40" y1="260" x2="400" y2="260"/>
+          <circle class="light" cx="460" cy="260" r="5"/>
+          <circle class="light" cx="490" cy="260" r="5"/>
+          <text class="lbl" x="460" y="282" text-anchor="middle">50% likely · wk 14</text>
+          <text class="lbl" x="482" y="298" text-anchor="middle">85% likely · wk 15</text>
+          <text class="axis" x="40" y="284" text-anchor="middle">wk 0</text>
+          <text class="axis" x="220" y="284" text-anchor="middle">today · wk 6</text>
+          <text class="cap" x="228" y="122">34 tasks left</text>
+        </svg>
+        <figcaption class="tiny">Illustration: remaining tasks over time. From the team's real pace, there is a 50% chance of finishing by week 14 and an 85% chance by week 15. More certainty means a later date.</figcaption>
+      </figure>
+    </div>
+    <div class="foot"><span>Glidebox</span><span>01 / 09</span></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide" aria-label="The problem">
+    <p class="eyebrow">The problem</p>
+    <h2>Your agents are coding. Nobody can see the project.</h2>
+    <p class="lede">Vibe coding is fast until the work spreads over terminals, branches and chats. Status lives in hand-kept Markdown, copied from file to file, and the owner becomes the bottleneck no one can see.</p>
+    <div class="facts">
+      <div class="fact"><b>6</b><span>places one card's status was copied by hand</span></div>
+      <div class="fact"><b>3</b><span>agent sessions claiming cards at once, by merge conflict</span></div>
+      <div class="fact"><b>185&nbsp;KB</b><span>of handoff notes agents re-read to resume</span></div>
+      <div class="fact"><b>0</b><span>answers to "when will it be done?"</span></div>
+    </div>
+    <div class="foot"><span>From one real multi-agent migration project, Sept 2026</span><span>02 / 09</span></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide" aria-label="Manage your project while vibe coding">
+    <p class="eyebrow">01 · Manage your project while vibe coding</p>
+    <h2>The board your agents keep up to date.</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>A task box in your repo.</b> Tasks live as readable files in <span class="mono">.glidebox/</span>, versioned by your own Git.</span></li>
+        <li><span><b>Agents report as they work.</b> Claude Code and Codex claim, update and finish tasks through the <span class="mono">glidebox</span> command and MCP.</span></li>
+        <li><span><b>Progress you can trust.</b> Each task climbs proven steps, and only you mark it done.</span></li>
+        <li><span><b>A finish date, honestly.</b> From your team's real pace: the date you have a 50% chance of hitting, and the date you have an 85% chance of hitting.</span></li>
+        <li><span><b>Start or reopen an agent</b> on any task, straight from the app.</span></li>
+      </ul>
+      <div style="display:grid;gap:14px;min-width:0">
+        <div class="term" aria-label="Example commands"><span class="c"># an agent picks up work</span>
+gb next
+<span class="ok">A01-03</span>  Sign-in page   ready
+gb claim A01-03
+gb label A01-03 "locally verified"
+gb wait A01-03 --on owner "check on phone"</div>
+        <div class="ladder" aria-label="Verification steps">
+          <div class="rung done"><i>1</i>Implemented</div>
+          <div class="rung done"><i>2</i>Locally verified</div>
+          <div class="rung"><i>3</i>Deployed and verified</div>
+          <div class="rung"><i>4</i>Owner verified</div>
+        </div>
+        <p class="tiny">Commands are illustrative; names may change before release.</p>
+      </div>
+    </div>
+    <div class="foot"><span>Local · no account needed</span><span>03 / 09</span></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide" aria-label="Work anytime">
+    <p class="eyebrow">02 · Work anytime</p>
+    <h2>Your desk, your browser, your pocket.</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>The desktop app is the hub.</b> All features, your data on your machine, works offline.</span></li>
+        <li><span><b>Check progress from a browser or phone</b>, at home or away, connected to your running desktop.</span></li>
+        <li><span><b>Approve from anywhere.</b> "Waiting on me" shows exactly what needs your decision, with the evidence.</span></li>
+        <li><span><b>Simple, safe pairing.</b> Enter your email; the desktop approves and sends a one-time code.</span></li>
+      </ul>
+      <div class="devices" aria-hidden="true">
+        <div class="dev"><span class="t">Desktop</span>
+          <div class="bars"><div style="--w:92%"></div><div style="--w:61%"></div><div style="--w:38%"></div><div style="--w:12%"></div></div>
+        </div>
+        <div class="dev"><span class="t">Browser</span>
+          <div class="bars"><div style="--w:92%"></div><div style="--w:61%"></div></div>
+        </div>
+        <div class="dev phone"><span class="t">Phone</span>
+          <div class="ask"><b>Waiting on you</b>Approve deploy of A01-03?</div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Desktop for macOS and Windows · companions in any browser</span><span>04 / 09</span></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide" aria-label="Teammates cooperate">
+    <p class="eyebrow">03 · Teammates cooperate</p>
+    <h2>One project, many people, many agents.</h2>
+    <p class="lede">Put a project in the cloud when you're ready to share it. Invite teammates by email, give each a role, and see every change live. Concurrent edits merge like Git, and real conflicts are shown, not lost.</p>
+    <div class="flow" aria-label="How a team works together">
+      <div class="node"><b>Owner</b>invites by email</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>Teammates</b>contributor · approver · viewer</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>Their agents</b>claim one task each</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>Everyone</b>sees the same board, live</div>
+    </div>
+    <div class="foot"><span>Cloud projects · optional</span><span>05 / 09</span></div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide" aria-label="Pricing">
+    <p class="eyebrow">Pricing</p>
+    <h2>Free on your machine. Pay only for the cloud.</h2>
+    <div class="plans">
+      <div class="plan local">
+        <h3>Local app</h3>
+        <div class="price">Free</div>
+        <p class="sub">NO ACCOUNT · NO CARD · NO TRIAL CLOCK</p>
+        <ul class="ticks">
+          <li><span>Desktop app for macOS and Windows</span></li>
+          <li><span>Local projects in your own repositories</span></li>
+          <li><span>Agents via command line and MCP</span></li>
+          <li><span>Burndown, forecast, and phone and browser companions at home</span></li>
+        </ul>
+      </div>
+      <div class="plan">
+        <h3>Cloud</h3>
+        <div class="price">Optional</div>
+        <p class="sub">ONLY IF YOU WANT IT · PRICING TO BE ANNOUNCED</p>
+        <ul class="ticks">
+          <li><span>Cloud copy of a project, on any computer</span></li>
+          <li><span>Team sign-in, email invitations and roles</span></li>
+          <li><span>Live collaboration and merged edits</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Your data stays local unless you choose to share it</span><span>06 / 09</span></div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide" aria-label="How it works">
+    <p class="eyebrow">How it works</p>
+    <h2>Plain files, real Git, one hub.</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>Task box:</b> readable JSON and Markdown in <span class="mono">.glidebox/</span>, inside your repository.</span></li>
+        <li><span><b>Your Git:</b> commit, push and pull run your own <span class="mono">git</span>, with your keys and hooks.</span></li>
+        <li><span><b>One set of rules:</b> the app, the command line and MCP all go through the same checks and history.</span></li>
+      </ul>
+      <div class="flow" style="flex-direction:column;align-items:stretch">
+        <div class="node"><b>Agents</b>Claude Code · Codex → <span class="mono">gb</span> / MCP</div>
+        <span class="arrow" style="text-align:center">↓</span>
+        <div class="node" style="border-color:var(--amber)"><b>Glidebox desktop</b>rules · forecast · local server</div>
+        <span class="arrow" style="text-align:center">↓ ↑</span>
+        <div class="node"><b>.glidebox/ in your repo</b>files tracked by Git · optional cloud copy</div>
+      </div>
+    </div>
+    <div class="foot"><span>Local-first architecture</span><span>07 / 09</span></div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide" aria-label="Roadmap">
+    <p class="eyebrow">Roadmap · 15 small releases, each one usable</p>
+    <h2>Shipping in small, usable steps.</h2>
+    <div class="route">
+      <div class="leg now"><span class="when">Now</span><h3>Track</h3>
+        <ol><li><span>v0.1</span>macOS local tracker</li></ol></div>
+      <div class="leg"><span class="when">Next</span><h3>Grow</h3>
+        <ol><li><span>v0.2</span>Windows + editing</li><li><span>v0.3</span>MCP for agents</li><li><span>v0.4</span>Progress view</li><li><span>v0.5</span>Burndown and forecast</li></ol></div>
+      <div class="leg"><span class="when">Later</span><h3>Reach</h3>
+        <ol><li><span>v0.8</span>Start and open agents</li><li><span>v0.9</span>Phone at home</li><li><span>v0.10</span>Phone anywhere</li><li><span>v0.11</span>AI-generated projects</li></ol></div>
+      <div class="leg"><span class="when">Then</span><h3>Team</h3>
+        <ol><li><span>v0.13</span>Cloud copy</li><li><span>v0.14</span>Teams</li><li><span>v1.0</span>Public release</li></ol></div>
+    </div>
+    <div class="foot"><span>Selected releases shown · glidebox tracks its own development from v0.1</span><span>08 / 09</span></div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide close" aria-label="Closing">
+    <p class="eyebrow">Glidebox</p>
+    <h2>Your agents code.<br><em>You land the project.</em></h2>
+    <p class="lede">Manage your project while vibe coding. Work from anywhere. Bring your team. Free on your machine; pay only if you want the cloud.</p>
+    <div class="pill-row">
+      <span class="pill free">Local app · free</span>
+      <span class="pill">Early development · first release: macOS</span>
+    </div>
+    <div class="foot"><span>Glidebox · October 2026</span><span>09 / 09</span></div>
+  </section>
+
+  <nav class="nav" aria-label="Slide controls">
+    <button type="button" id="prev">◂ Prev</button>
+    <span id="count">1 / 9</span>
+    <button type="button" id="next">Next ▸</button>
+    <button type="button" id="exit">Exit</button>
+  </nav>
+</main>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var i=0, body=document.body, count=document.getElementById('count');
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('active',k===i)});
+    count.textContent=(i+1)+' / '+slides.length;
+  }
+  function start(){
+    body.classList.add('presenting'); show(i);
+    var el=document.documentElement;
+    if(el.requestFullscreen){el.requestFullscreen().catch(function(){});}
+  }
+  function stop(){
+    body.classList.remove('presenting');
+    if(document.fullscreenElement&&document.exitFullscreen){document.exitFullscreen().catch(function(){});}
+    slides[i].scrollIntoView({block:'start'});
+  }
+  document.getElementById('present-btn').addEventListener('click',start);
+  document.getElementById('prev').addEventListener('click',function(){show(i-1)});
+  document.getElementById('next').addEventListener('click',function(){show(i+1)});
+  document.getElementById('exit').addEventListener('click',stop);
+    document.addEventListener('keydown',function(e){
+    if(!body.classList.contains('presenting')){ if(e.key==='p'||e.key==='P'){start();} return; }
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();show(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1);}
+    else if(e.key==='Home'){show(0);} else if(e.key==='End'){show(slides.length-1);}
+    else if(e.key==='Escape'){stop();}
+  });
+  var x0=null;
+  document.addEventListener('touchstart',function(e){if(body.classList.contains('presenting'))x0=e.touches[0].clientX},{passive:true});
+  document.addEventListener('touchend',function(e){if(x0===null)return;var dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>50)show(i+(dx<0?1:-1));x0=null},{passive:true});
+})();
+</script>

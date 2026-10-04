@@ -14,3 +14,5 @@
 | 2026-10-04 | Copy the sources into the repository and record both addresses | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — Published both decks. The owner asked what the 50% and 85% labels meant, so they now state the chance with the date. Axis titles were added. The forecast weeks were recomputed by simulation (14 and 15; the first draft's 11 and 13 did not match the chart's own data). The Tauri line was removed from slide 7, and the Chinese text was rewritten to read naturally. Sources copied to `docs/pitch/`.

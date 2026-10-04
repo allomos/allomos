@@ -1,0 +1,425 @@
+<title>Glidebox 路演</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: a stack of 16:9 "approach chart" slides on a sky ground; a burndown drawn as a glide path is the recurring motif. Present mode shows one slide at a time. */
+:root{
+  --sky:#E9EFF5;        /* page ground */
+  --paper:#FBFCFE;      /* slide surface */
+  --ink:#12223A;        /* text */
+  --muted:#55667C;      /* secondary text */
+  --line:#CFD9E4;       /* rules, grid */
+  --amber:#D7891C;      /* accent marks: glide path, runway lights */
+  --amber-ink:#8F5306;  /* accent text on light */
+  --teal:#1C7479;       /* "verified" */
+  --cone:rgba(215,137,28,.16);
+  --shadow:0 1px 2px rgba(18,34,58,.06),0 8px 28px rgba(18,34,58,.07);
+  --display:"Big Shoulders Display","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --body:"IBM Plex Sans","Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --sky:#0A1320;--paper:#101C2D;--ink:#E5EDF6;--muted:#93A5BA;--line:#22344A;
+    --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--cone:rgba(240,166,58,.18);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --sky:#0A1320;--paper:#101C2D;--ink:#E5EDF6;--muted:#93A5BA;--line:#22344A;
+  --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--cone:rgba(240,166,58,.18);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--sky);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.7;padding-inline:16px;padding-block:24px 64px}
+h1,h2,h3{font-family:var(--display);font-weight:900;letter-spacing:.01em;line-height:1.18;text-wrap:balance;margin:0}
+p{margin:0}
+.mono{font-family:var(--mono)}
+
+/* top bar */
+.bar{max-width:1120px;margin:0 auto 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+.brand svg{width:28px;height:28px}
+.bar-note{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+.btn{font:500 14px/1 var(--body);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:10px 16px;cursor:pointer}
+.btn:hover{border-color:var(--amber)}
+.btn:focus-visible,.nav button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+/* deck */
+.deck{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.slide{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:clamp(22px,4.2vw,56px);display:flex;flex-direction:column;gap:clamp(16px,2.4vw,28px);overflow:hidden;min-width:0}
+@media (min-width:900px){.slide{aspect-ratio:16/9}}
+.eyebrow{font-family:var(--mono),var(--body);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-ink)}
+.slide h2{font-size:clamp(30px,4.4vw,54px)}
+.lede{font-size:clamp(16px,1.7vw,20px);color:var(--muted);max-width:60ch}
+.foot{margin-top:auto;display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:clamp(18px,3vw,40px);align-items:start}
+.cols > *{min-width:0}
+
+/* hero */
+.hero{justify-content:space-between}
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:clamp(20px,3vw,48px);align-items:center}
+.hero-grid > *{min-width:0}
+.hero h1{font-size:clamp(44px,6.6vw,88px)}
+.hero h1 em{font-style:normal;color:var(--amber)}
+.hero .lede{margin-top:16px}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.pill{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--ink)}
+.pill.free{border-color:var(--teal);color:var(--teal)}
+
+/* glide path chart */
+.chart{width:100%;height:auto;display:block}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{fill:var(--muted);font:500 11px var(--mono)}
+.chart .actual{fill:none;stroke:var(--ink);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.chart .cone{fill:var(--cone);stroke:none}
+.chart .fc{fill:none;stroke:var(--amber);stroke-width:2;stroke-dasharray:6 6}
+.chart .runway{stroke:var(--ink);stroke-width:4}
+.chart .light{fill:var(--amber)}
+.chart .lbl{fill:var(--amber-ink);font:600 12px var(--mono)}
+.chart .now{fill:var(--paper);stroke:var(--ink);stroke-width:2.5}
+.chart .ttl{fill:var(--muted);font:600 11px var(--body);letter-spacing:.04em}
+.chart .cap{fill:var(--muted);font:400 11px var(--body)}
+
+/* problem */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.fact{border-top:2px solid var(--ink);padding-top:12px}
+.fact b{display:block;font-family:var(--display);font-size:clamp(36px,4.6vw,56px);line-height:1;font-variant-numeric:tabular-nums}
+.fact span{color:var(--muted);font-size:15px}
+.quote{font-family:var(--display);font-weight:700;font-size:clamp(22px,2.6vw,32px);line-height:1.15;border-left:3px solid var(--amber);padding-left:16px;max-width:30ch}
+
+/* pillar lists */
+.ticks{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.ticks li{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.ticks li::before{content:"";width:10px;height:10px;margin-top:7px;border-radius:2px;background:var(--amber);transform:rotate(45deg)}
+.ticks b{font-weight:600}
+
+/* terminal */
+.term{background:var(--ink);color:var(--paper);border-radius:10px;padding:16px 18px;font:400 13px/1.7 var(--mono);overflow-x:auto;white-space:pre}
+.term .c{opacity:.55}
+.term .ok{color:var(--amber)}
+.tiny{font-size:12px;color:var(--muted)}
+
+/* ladder */
+.ladder{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.rung{border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;line-height:1.3}
+.rung i{display:block;font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:4px}
+.rung.done{border-color:var(--teal);color:var(--teal)}
+@media (max-width:520px){.ladder{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* devices */
+.devices{display:grid;grid-template-columns:1.6fr 1fr .62fr;gap:14px;align-items:end}
+.dev{border:2px solid var(--ink);border-radius:12px;padding:12px;display:grid;gap:8px;background:var(--paper)}
+.dev .t{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.bars{display:grid;gap:6px}
+.bars div{height:8px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.bars div::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--teal)}
+.dev.phone{border-radius:18px;aspect-ratio:9/16;max-width:100%}
+.ask{border:1px solid var(--amber);border-radius:8px;padding:8px;font-size:12px;line-height:1.3}
+.ask b{display:block;color:var(--amber-ink);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+
+/* team */
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.node{border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px;background:var(--paper)}
+.node b{display:block;font-family:var(--display);font-size:20px;line-height:1.1}
+.arrow{font-family:var(--mono);color:var(--amber-ink)}
+
+/* pricing */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}
+.plan{border:1px solid var(--line);border-radius:12px;padding:clamp(18px,2.4vw,28px);display:flex;flex-direction:column;gap:14px;min-width:0}
+.plan.local{border:2px solid var(--teal)}
+.plan h3{font-size:clamp(28px,3.4vw,40px)}
+.price{font-family:var(--display);font-weight:800;font-size:clamp(44px,6vw,72px);line-height:1}
+.plan.local .price{color:var(--teal)}
+.plan .sub{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+
+/* roadmap */
+.route{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}
+.leg{border-top:3px solid var(--line);padding-top:12px;display:grid;gap:6px;align-content:start}
+.leg.now{border-top-color:var(--amber)}
+.leg h3{font-size:26px}
+.leg .when{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.leg ol{margin:0;padding-left:0;list-style:none;display:grid;gap:4px;font-size:14px}
+.leg li{display:grid;grid-template-columns:30px 1fr;gap:6px}
+.leg li span{font-family:var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* close */
+.close h2{font-size:clamp(38px,5.8vw,76px)}
+.close h2 em{font-style:normal;color:var(--amber)}
+
+/* present mode */
+.nav{display:none}
+body.presenting{padding:0;overflow:hidden}
+body.presenting .bar{display:none}
+body.presenting .deck{position:fixed;inset:0;max-width:none;margin:0;display:grid;place-items:center;background:var(--sky);padding:env(safe-area-inset-top,0px) 16px env(safe-area-inset-bottom,0px)}
+body.presenting .slide{display:none;width:min(100%,calc((100vh - 80px) * 16 / 9));max-height:calc(100vh - 80px);aspect-ratio:16/9}
+body.presenting .slide.active{display:flex}
+body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);gap:8px;align-items:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.nav button{font:500 13px var(--body);background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer}
+@media (max-width:899px){body.presenting .slide{aspect-ratio:auto;width:100%;max-height:calc(100vh - 80px);overflow:auto}}
+@media (prefers-reduced-motion:no-preference){
+  .chart .actual{stroke-dasharray:700;stroke-dashoffset:0;animation:draw 1.6s ease-out both}
+  @keyframes draw{from{stroke-dashoffset:700}to{stroke-dashoffset:0}}
+}
+</style>
+
+<header class="bar">
+  <div class="brand">
+    <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="6" width="24" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5 11 L13 16 L23 21" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/></svg>
+    Glidebox
+  </div>
+  <span class="bar-note">路演 · 2026 年 10 月 · 开发中</span>
+  <button class="btn" id="present-btn" type="button">演示 ▸</button>
+</header>
+
+<main class="deck" id="deck" lang="zh-CN">
+
+  <section class="slide hero" aria-label="Glidebox">
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">专为 Vibe Coding 打造的项目管理工具</p>
+        <h1>让每个 <em>Vibe Coding</em> 项目都稳稳落地</h1>
+        <p class="lede">代码交给 AI 来写，进度交给 Glidebox。做完了什么、验证了什么、哪些事在等你拍板、大概什么时候能交付，一目了然。</p>
+        <div class="pill-row">
+          <span class="pill free">本地应用免费</span>
+          <span class="pill">macOS · Windows</span>
+          <span class="pill">Claude Code · Codex</span>
+          <span class="pill">云端服务按需付费</span>
+        </div>
+      </div>
+      <figure style="margin:0">
+        <svg class="chart" viewBox="-28 0 588 318" role="img" aria-labelledby="gp-t">
+          <title id="gp-t">把燃尽图画成滑翔进近路线：第 0 周剩余 60 个任务，第 6 周剩余 34 个；第 14 周前完成的把握约五成，第 15 周前约八成五。</title>
+          <text class="ttl" transform="translate(-14,150) rotate(-90)" text-anchor="middle">剩余任务数</text>
+          <text class="ttl" x="280" y="312" text-anchor="middle">时间（周）</text>
+          <line class="grid" x1="40" y1="40" x2="520" y2="40"/>
+          <line class="grid" x1="40" y1="150" x2="520" y2="150"/>
+          <text class="axis" x="30" y="44" text-anchor="end">60</text>
+          <text class="axis" x="30" y="154" text-anchor="end">30</text>
+          <text class="axis" x="30" y="264" text-anchor="end">0</text>
+          <polygon class="cone" points="220,135.3 430,260 490,260"/>
+          <polyline class="fc" points="220,135.3 460,260"/>
+          <polyline class="fc" points="220,135.3 490,260"/>
+          <polyline class="actual" points="40,40.0 70,51.0 100,69.3 130,80.3 160,102.3 190,120.7 220,135.3"/>
+          <circle class="now" cx="220" cy="135.3" r="6"/>
+          <line class="runway" x1="400" y1="260" x2="520" y2="260"/>
+          <text class="cap" x="394" y="256" text-anchor="end">剩 0 个 = 完成</text>
+          <line class="grid" x1="40" y1="260" x2="400" y2="260"/>
+          <circle class="light" cx="460" cy="260" r="5"/>
+          <circle class="light" cx="490" cy="260" r="5"/>
+          <text class="lbl" x="460" y="282" text-anchor="middle">五成把握 · 第14周</text>
+          <text class="lbl" x="482" y="298" text-anchor="middle">八成五把握 · 第15周</text>
+          <text class="axis" x="40" y="284" text-anchor="middle">第0周</text>
+          <text class="axis" x="220" y="284" text-anchor="middle">今天 · 第6周</text>
+          <text class="cap" x="228" y="122">剩余 34 个任务</text>
+        </svg>
+        <figcaption class="tiny">示意：剩余任务逐周减少。按团队过去的真实速度推算：第 14 周前完成的把握约五成，第 15 周前约八成五。要的把握越大，日期越靠后。</figcaption>
+      </figure>
+    </div>
+    <div class="foot"><span>Glidebox</span><span>01 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="问题">
+    <p class="eyebrow">痛点</p>
+    <h2>AI 在拼命写代码，项目却越来越看不清</h2>
+    <p class="lede">Vibe Coding 起步很快，可工作很快就散落在各个终端、分支和对话里。进度靠手写的 Markdown 维护，同一条信息要在好几个文件里来回复制；所有决定都卡在负责人身上，却没有人看得到。</p>
+    <div class="facts">
+      <div class="fact"><b>6</b><span>个地方要手工同步同一张任务卡的状态</span></div>
+      <div class="fact"><b>3</b><span>个智能体同时抢任务，最后靠 Git 合并冲突来裁决</span></div>
+      <div class="fact"><b>185&nbsp;KB</b><span>的交接笔记，智能体每次接手都得从头读一遍</span></div>
+      <div class="fact"><b>0</b><span>人能回答“到底什么时候能做完？”</span></div>
+    </div>
+    <div class="foot"><span>数据取自一个真实的多智能体迁移项目（2026 年 9 月）</span><span>02 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="一边 Vibe Coding，一边管好项目">
+    <p class="eyebrow">01 · 一边 Vibe Coding，一边管好项目</p>
+    <h2>看板由智能体自己来更新</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>任务箱就放在你的代码仓库里。</b>任务是 <span class="mono">.glidebox/</span> 下的普通文本文件，用你自己的 Git 管理版本。</span></li>
+        <li><span><b>智能体干活时顺手汇报。</b>Claude Code 和 Codex 通过 <span class="mono">glidebox</span> 命令或 MCP 认领任务、更新进度、标记完成。</span></li>
+        <li><span><b>进度经得起推敲。</b>每个任务都要一级一级通过验证，最后由你亲自确认完成。</span></li>
+        <li><span><b>交付日期有据可依。</b>燃尽图按团队的真实速度给出两个日期：有五成把握的，和有八成五把握的。</span></li>
+        <li><span><b>一键启动智能体。</b>在应用里就能为任意任务开启智能体，或回到之前的会话。</span></li>
+      </ul>
+      <div style="display:grid;gap:14px;min-width:0">
+        <div class="term" aria-label="命令示例"><span class="c"># 智能体领取下一项工作</span>
+gb next
+<span class="ok">A01-03</span>  Sign-in page   ready
+gb claim A01-03
+gb label A01-03 "locally verified"
+gb wait A01-03 --on owner "check on phone"</div>
+        <div class="ladder" aria-label="验证阶梯">
+          <div class="rung done"><i>1</i>已实现</div>
+          <div class="rung done"><i>2</i>本地已验证</div>
+          <div class="rung"><i>3</i>已部署并验证</div>
+          <div class="rung"><i>4</i>负责人已确认</div>
+        </div>
+        <p class="tiny">命令仅作示意，正式版本中可能会调整。</p>
+      </div>
+    </div>
+    <div class="foot"><span>本地运行 · 不用注册账号</span><span>03 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="随时随地工作">
+    <p class="eyebrow">02 · 随时随地工作</p>
+    <h2>电脑前、浏览器里、手机上，进度随时掌握</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>桌面应用是核心。</b>功能最全，数据存在自己电脑上，断网也能用。</span></li>
+        <li><span><b>浏览器、手机随时查看。</b>不论在家还是在外，都能连上正在运行的桌面应用。</span></li>
+        <li><span><b>审批不必守在电脑前。</b>“等我处理”把需要你拍板的事项连同依据一起列出来。</span></li>
+        <li><span><b>配对简单又安全。</b>输入邮箱，桌面端同意后会发来一次性验证码。</span></li>
+      </ul>
+      <div class="devices" aria-hidden="true">
+        <div class="dev"><span class="t">桌面</span>
+          <div class="bars"><div style="--w:92%"></div><div style="--w:61%"></div><div style="--w:38%"></div><div style="--w:12%"></div></div>
+        </div>
+        <div class="dev"><span class="t">浏览器</span>
+          <div class="bars"><div style="--w:92%"></div><div style="--w:61%"></div></div>
+        </div>
+        <div class="dev phone"><span class="t">手机</span>
+          <div class="ask"><b>等你处理</b>要批准部署 A01-03 吗？</div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>桌面端支持 macOS 和 Windows · 浏览器打开即用</span><span>04 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="团队协作">
+    <p class="eyebrow">03 · 团队协作</p>
+    <h2>一个项目，几位队友，一群智能体</h2>
+    <p class="lede">需要多人协作时，把项目放上云端：用邮箱邀请队友，给每人分配角色，所有改动实时同步。大家同时修改时会像 Git 一样自动合并，真正冲突的地方会清楚标出来，不会悄悄丢失。</p>
+    <div class="flow" aria-label="团队如何协作">
+      <div class="node"><b>负责人</b>用邮箱发出邀请</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>队友</b>贡献者 · 审批人 · 只读成员</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>各自的智能体</b>一次只认领一个任务</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>所有人</b>看到同一块实时看板</div>
+    </div>
+    <div class="foot"><span>云端项目 · 按需开启</span><span>05 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="价格">
+    <p class="eyebrow">价格</p>
+    <h2>本地免费用，用云端才收费</h2>
+    <div class="plans">
+      <div class="plan local">
+        <h3>本地应用</h3>
+        <div class="price">免费</div>
+        <p class="sub">不用注册 · 不用绑卡 · 没有试用期限</p>
+        <ul class="ticks">
+          <li><span>macOS 和 Windows 桌面应用</span></li>
+          <li><span>项目就放在你自己的代码仓库里</span></li>
+          <li><span>智能体通过命令行和 MCP 接入</span></li>
+          <li><span>燃尽图、完成预测，在家可用手机和浏览器查看</span></li>
+        </ul>
+      </div>
+      <div class="plan">
+        <h3>云端</h3>
+        <div class="price">按需</div>
+        <p class="sub">需要时再开通 · 价格待定</p>
+        <ul class="ticks">
+          <li><span>项目存一份到云端，换台电脑也能接着用</span></li>
+          <li><span>团队登录、邮箱邀请和角色权限</span></li>
+          <li><span>实时协作，修改自动合并</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>除非你主动分享，数据只留在你的电脑上</span><span>06 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="工作原理">
+    <p class="eyebrow">工作原理</p>
+    <h2>普通文件 + 真正的 Git + 一个核心应用</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>任务箱：</b>仓库里 <span class="mono">.glidebox/</span> 目录下可以直接阅读的 JSON 和 Markdown 文件。</span></li>
+        <li><span><b>用你自己的 Git：</b>提交、推送、拉取都调用本机的 <span class="mono">git</span>，沿用你的密钥和钩子。</span></li>
+        <li><span><b>一套规则管到底：</b>应用、命令行和 MCP 走同一套校验，留下同一份历史。</span></li>
+      </ul>
+      <div class="flow" style="flex-direction:column;align-items:stretch">
+        <div class="node"><b>智能体</b>Claude Code · Codex → <span class="mono">gb</span> / MCP</div>
+        <span class="arrow" style="text-align:center">↓</span>
+        <div class="node" style="border-color:var(--amber)"><b>Glidebox 桌面应用</b>规则 · 预测 · 本地服务</div>
+        <span class="arrow" style="text-align:center">↓ ↑</span>
+        <div class="node"><b>仓库里的 .glidebox/</b>由 Git 管理的文件 · 可选云端副本</div>
+      </div>
+    </div>
+    <div class="foot"><span>本地优先的架构</span><span>07 / 09</span></div>
+  </section>
+
+  <section class="slide" aria-label="路线图">
+    <p class="eyebrow">路线图 · 拆成 15 个小版本，每一版都能用</p>
+    <h2>小步快跑，每一步都能用</h2>
+    <div class="route">
+      <div class="leg now"><span class="when">现在</span><h3>起步</h3>
+        <ol><li><span>v0.1</span>macOS 本地任务跟踪</li></ol></div>
+      <div class="leg"><span class="when">接下来</span><h3>成长</h3>
+        <ol><li><span>v0.2</span>Windows 版 + 应用内编辑</li><li><span>v0.3</span>智能体专用的 MCP</li><li><span>v0.4</span>进度视图</li><li><span>v0.5</span>燃尽图与完成预测</li></ol></div>
+      <div class="leg"><span class="when">之后</span><h3>延伸</h3>
+        <ol><li><span>v0.8</span>从应用里启动智能体</li><li><span>v0.9</span>在家用手机查看</li><li><span>v0.10</span>出门在外也能用手机</li><li><span>v0.11</span>让 AI 生成整个项目</li></ol></div>
+      <div class="leg"><span class="when">最后</span><h3>团队</h3>
+        <ol><li><span>v0.13</span>云端存储</li><li><span>v0.14</span>团队协作</li><li><span>v1.0</span>正式发布</li></ol></div>
+    </div>
+    <div class="foot"><span>仅列出部分版本 · 从 v0.1 开始，Glidebox 就用自己来管理自己的开发</span><span>08 / 09</span></div>
+  </section>
+
+  <section class="slide close" aria-label="结尾">
+    <p class="eyebrow">Glidebox</p>
+    <h2>智能体写代码，<br><em>你来掌控落地。</em></h2>
+    <p class="lede">一边 Vibe Coding 一边管好项目，随时随地掌握进度，带着团队一起干。本地免费使用，需要云端时再付费。</p>
+    <div class="pill-row">
+      <span class="pill free">本地应用免费</span>
+      <span class="pill">早期开发中 · 首个版本支持 macOS</span>
+    </div>
+    <div class="foot"><span>Glidebox · 2026 年 10 月</span><span>09 / 09</span></div>
+  </section>
+
+  <nav class="nav" aria-label="幻灯片控制">
+    <button type="button" id="prev">◂ 上一页</button>
+    <span id="count">1 / 9</span>
+    <button type="button" id="next">下一页 ▸</button>
+    <button type="button" id="exit">退出</button>
+  </nav>
+</main>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var i=0, body=document.body, count=document.getElementById('count');
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('active',k===i)});
+    count.textContent=(i+1)+' / '+slides.length;
+  }
+  function start(){
+    body.classList.add('presenting'); show(i);
+    var el=document.documentElement;
+    if(el.requestFullscreen){el.requestFullscreen().catch(function(){});}
+  }
+  function stop(){
+    body.classList.remove('presenting');
+    if(document.fullscreenElement&&document.exitFullscreen){document.exitFullscreen().catch(function(){});}
+    slides[i].scrollIntoView({block:'start'});
+  }
+  document.getElementById('present-btn').addEventListener('click',start);
+  document.getElementById('prev').addEventListener('click',function(){show(i-1)});
+  document.getElementById('next').addEventListener('click',function(){show(i+1)});
+  document.getElementById('exit').addEventListener('click',stop);
+    document.addEventListener('keydown',function(e){
+    if(!body.classList.contains('presenting')){ if(e.key==='p'||e.key==='P'){start();} return; }
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();show(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1);}
+    else if(e.key==='Home'){show(0);} else if(e.key==='End'){show(slides.length-1);}
+    else if(e.key==='Escape'){stop();}
+  });
+  var x0=null;
+  document.addEventListener('touchstart',function(e){if(body.classList.contains('presenting'))x0=e.touches[0].clientX},{passive:true});
+  document.addEventListener('touchend',function(e){if(x0===null)return;var dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>50)show(i+(dx<0?1:-1));x0=null},{passive:true});
+})();
+</script>

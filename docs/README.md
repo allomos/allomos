@@ -23,6 +23,7 @@
 | [research/competitor-investigation.md](./research/competitor-investigation.md) | Competitor feature matrix, sources, limitations and product hypotheses | evidence |
 | [research/interface-patterns.md](./research/interface-patterns.md) | Internet evidence for human/agent interfaces, adaptive layouts, CLI/MCP, local access and platform packaging options | evidence |
 | [research/desktop-frameworks.md](./research/desktop-frameworks.md) | Detailed comparison of six desktop frameworks for decision 0011 (2026-10-04) | evidence |
+| [pitch/](./pitch/README.md) | Road show deck in English and Chinese: sources and published addresses | pitch |
 | [REFERENCES.md](./REFERENCES.md) | External projects and files to learn from (read-only) | reference |
 | [GLOSSARY.md](./GLOSSARY.md) | Plain meanings of terms | reference |
 
@@ -36,6 +37,6 @@
 
 ## Rules for documents
 
-- A new file only for a **contract**, **evidence**, a **decision record** or a **discussion record** ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes on the board.
+- A new file only for a **contract**, **evidence**, a **decision record**, a **discussion record**, or material the owner asks for, such as the [road show deck](./pitch/README.md) ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes on the board.
 - Supersede by editing the stale line in place; do not add a companion document.
 - Evidence of what actually ran goes under `docs/research/` or `docs/evidence/`, linked from the card.

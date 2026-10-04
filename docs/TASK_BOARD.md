@@ -29,7 +29,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `main` — Claude Code docs session | [`Task-A00-16`](./tasks/Task-A00-16-road-show-deck.md) | 2026-10-04 | Deck sources saved in the repo |
 
 ## Waiting on the owner
 
@@ -62,7 +61,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A00-16-road-show-deck`](./tasks/Task-A00-16-road-show-deck.md) | in progress | — | `main` — Claude Code docs session | saving sources |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | backlog | — | — | owner card review (first Iteration 1 card) |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
@@ -74,6 +72,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Card | Label | When |
 |---|---|---|
 | [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox`, pushed by the owner | 2026-10-04 |
+| [`Task-A00-16-road-show-deck`](./tasks/Task-A00-16-road-show-deck.md) | done — English and Chinese decks published; addresses in [pitch/](./pitch/README.md) | 2026-10-04 |
 | [`Task-A00-13-iterative-release-roadmap`](./tasks/Task-A00-13-iterative-release-roadmap.md) | owner confirmed — 15 iterations, each a usable release | 2026-10-04 |
 | [`Task-A00-12-desktop-platforms-and-shared-code`](./tasks/Task-A00-12-desktop-platforms-and-shared-code.md) | owner accepted — Tauri 2, macOS + Windows, one interface code base | 2026-10-04 |
 | [`Task-A00-06-git-sync-proposal`](./tasks/Task-A00-06-git-sync-proposal.md) | owner accepted — Git text files are the source of truth | 2026-10-04 |
