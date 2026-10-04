@@ -15,6 +15,8 @@
 
 ## Notes
 
+- 2026-10-04 — Owner: in-app task creation and editing moved to Iteration 2; Iteration 1's app is view-only, and tasks change through the CLI. Owner asked how workstreams relate to iterations: recorded as proposals R89–R90 (two independent axes; renameable terms).
+
 - 2026-10-04 — At the owner's request, made iterations smaller: Iteration 1 split into macOS (1) and macOS + Windows (2); the other releases split into one visible capability each, giving **15 iterations** (v0.1 … v0.14, v1.0). The owner also named the folder **task box** (R87) and the command **`glidebox`** with alias `gb` (R88).
 
 - 2026-10-04 — Owner: v0.1 tracks **glidebox's own tasks** (dogfooding accepted). Recorded in PLAN § 9, AI-WORKFLOW and `Task-W04-01`. Added the "what ships" column at the owner's request.

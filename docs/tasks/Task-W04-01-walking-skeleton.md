@@ -33,7 +33,6 @@
 ## Notes
 
 - Next Iteration 1 cards, written when this one is done:
-  - creating and editing tasks in the app, with every change recorded as an event;
   - the `glidebox` command (alias `gb`, R88) for agents (`gb init` to create the task box; add, list, show, claim, label, wait, done, release);
   - moving glidebox's own cards from Markdown into a task box in this repository (dogfooding, decided 2026-10-04), and switching the agent workflow to `gb`;
-  - the Iteration 1 exit check on macOS. Windows follows in Iteration 2.
+  - the Iteration 1 exit check on macOS. Windows, and creating and editing tasks in the app, follow in Iteration 2.

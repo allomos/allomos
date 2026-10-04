@@ -14,6 +14,8 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R6 | The burndown counts **tasks**; a task may carry an **optional size**, with a size-weighted view when sizes exist. | [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
 | R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md), kept by [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
+| R89 | Tasks can be organised along **two independent axes**: **workstream** (what area of work it belongs to) and **iteration** (in which time-box or release it is planned). Iteration is optional. Progress, burndown and forecast can be shown per workstream, per iteration, or for the whole project. | owner question, 2026-10-04 | proposed |
+| R90 | Each project can **rename these terms** to the words its team already uses (for example workstream → epic or area; iteration → sprint, milestone or release). Glidebox's screens and command messages then use those words. | owner question, 2026-10-04 | proposed |
 
 ## Source of truth and agents
 

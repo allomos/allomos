@@ -55,7 +55,8 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 ## 5. Data model (first cut)
 
 - **Project** — storage mode (`local | cloud`), task box (local projects: any folder the user chooses, standalone or inside an existing project folder — [D10](../decisions/0010-project-data-folder.md)), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
-- **Workstream** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high).
+- **Workstream** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high). *What area of work* a task belongs to; stable for the life of the project.
+- **Iteration** (proposed, R89) — `id`, title, order, optional start/end dates and the release it produces. *When* a task is planned; optional. A task has one workstream and at most one iteration. The words "workstream" and "iteration" can be renamed per project (R90).
 - **Task** — hierarchical id (`W07-01-09`), title, workstream, parent, and:
   - `state`: `backlog | ready | in_progress | waiting | done | dropped`
   - `label`: current step on the project's ladder
@@ -126,8 +127,8 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 | Phase | # | Release | Usable for | What ships (products and contents) | Requirements |
 |---|---|---|---|---|---|
-| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by workstream with state, label, holder, waiting-on and next dependency, create and edit tasks, every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88 |
-| **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well | **Windows desktop app** and **`glidebox` / `gb` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) | R81, R85 (released together from here on) |
+| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by workstream with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88 |
+| **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`glidebox` / `gb` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes | R81, R85 (released together from here on), R1–R2 (editing in the app) |
 | **Next** | **3** | **v0.3 — Progress view** | The owner sees **how far each workstream has got** and **what is waiting on them** | Desktop app: per-workstream progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local) |
 | **Next** | **4** | **v0.4 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
 | **Next** | **5** | **v0.5 — Git in the app** | The owner **commits and pushes task changes** without leaving glidebox | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
@@ -154,11 +155,11 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 1. On a Mac:
    - create the task box in a new folder, and inside a Git repository;
-   - add workstreams and tasks in the app;
+   - add workstreams and tasks with the CLI (`gb add …`), and see them in the app;
    - a real Claude Code session claims and finishes a task with `gb`, and the app shows it;
    - `git diff` shows readable changes;
    - glidebox's own cards now live in its task box, and agents use `gb` instead of `TASK_BOARD.md`.
-2. The same checks pass on Windows; one pipeline builds both systems.
+2. The same checks pass on Windows; one pipeline builds both systems; on both systems, a task created and edited in the app appears in `gb list` and in `git diff` as readable changes.
 3. Progress bars, state chart and throughput match a known test project; "waiting on me" lists exactly the owner's items.
 4. The burndown and the finish-date range show for glidebox's own project; the calculations are checked with fixed test data.
 5. Committing from the app runs the user's own `git`, including hooks; a refused commit shows the hook's message.

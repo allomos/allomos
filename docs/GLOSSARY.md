@@ -8,7 +8,7 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Session** | One running conversation of an agent, usually in its own git worktree and branch (e.g. `claude/w01-core-model-3f2a`). |
 | **Worktree** | A separate working folder of the same git repository, checked out on its own branch, so several sessions can work at once without disturbing each other. |
 | **Card / task** | One unit of work with one observable outcome. In this repo a card is a file in `docs/tasks/`; in the product it is a task record. |
-| **Workstream** | A group of related tasks (e.g. W01 core model). Tasks are shown and counted per workstream. |
+| **Workstream** | *What* area of work a task belongs to (e.g. W01 core model). Stable for the life of the project; tasks are shown and counted per workstream. Other tools call this an epic, area, component, track or theme. |
 | **State** | Where a task is in its life: backlog, ready, in progress, waiting, done, dropped. |
 | **Label** | The last *proven* step of a task's progress, from a fixed ladder (e.g. implemented → locally verified → deployed and verified → owner verified). The only allowed progress claim. |
 | **Claim** | A session or person taking a task, so no one else works on it at the same time. |
@@ -42,4 +42,4 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Task box** | Our name for the folder that holds one project's tasks and history (R87), chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). Proposed default inside a repository: `.glidebox/`, created by `gb init`. |
 | **Electron / Tauri / Electrobun / Wails** | Frameworks for building desktop apps from a web interface. Their native sides are TypeScript (Electron, Electrobun), Rust (Tauri) or Go (Wails). See [0011](./decisions/0011-desktop-framework-and-shared-code.md). |
 | **Code signing** | A digital signature that lets macOS and Windows confirm who published an app, so it installs without security warnings. Usually paid. |
-| **Iteration** | One round of building that ends in a usable release: Iteration 1 = v0.1 (macOS) … Iteration 14 = v0.14, Iteration 15 = v1.0 ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). |
+| **Iteration** | *When* work is planned: one round of building that ends in a usable release. A task has one workstream and is planned into one iteration. Other tools call this a sprint, cycle, milestone or release. Glidebox's own: Iteration 1 = v0.1 (macOS) … Iteration 14 = v0.14, Iteration 15 = v1.0 ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). |
