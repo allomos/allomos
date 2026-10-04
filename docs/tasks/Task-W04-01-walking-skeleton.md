@@ -4,7 +4,7 @@
 
 - **Outcome.** The owner installs a development build of glidebox on macOS or Windows, picks a data folder (a new standalone folder, or a subfolder of an existing Git repository), and sees the tasks stored there, grouped by workstream, with each task's state. If the folder is empty, glidebox creates a small starter project in it. This is the thinnest end-to-end version: the interface, the Rust rules and the files all connected.
 - **Decisive unknowns** (the worker finds out):
-  - The first, minimal file layout for a project. It follows [0007](../decisions/0007-git-like-project-sync.md): `project.json`, `workstreams/<id>.json`, `tasks/<id>/task.json` and `description.md`. The worker writes it down as the first version of the file contract.
+  - The first, minimal file layout for a project. Use the proposed default folder name `.glidebox/` inside a repository ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), unless the owner chooses another. It follows [0007](../decisions/0007-git-like-project-sync.md): `project.json`, `workstreams/<id>.json`, `tasks/<id>/task.json` and `description.md`. The worker writes it down as the first version of the file contract.
   - How the TypeScript interface talks to the Rust side inside the Tauri window, so that the same interface code can later talk to the desktop's local server from a browser (proposal in [0011](../decisions/0011-desktop-framework-and-shared-code.md)).
   - The pinned versions of the toolchain: Rust, Tauri 2.x, Node and the web build tools.
 - **Files owned.**
@@ -34,6 +34,6 @@
 
 - Next v0.1 cards, written when this one is done:
   - creating and editing tasks in the app, with every change recorded as an event;
-  - the `gb` command for agents (list, show, claim, label, wait, done, release);
+  - the `gb` command for agents (`gb init` to create the tasks folder; add, list, show, claim, label, wait, done, release);
   - moving glidebox's own cards from Markdown into a data folder in this repository (dogfooding, decided 2026-10-04), and switching the agent workflow to `gb`;
   - the v0.1 exit check on both systems.

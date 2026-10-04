@@ -39,6 +39,7 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Three-way merge** | Combining two edited versions by comparing both with the version they started from. |
 | **Fork** | Copying another project's code to build on it. Ruled out for glidebox by [0008](./decisions/0008-build-our-own.md). |
 | **OPFS** | Origin private file system: browser storage that belongs to one website, is hidden from the user's folders, and is lost when site data is cleared. |
-| **Data folder** | The folder that holds one local project's data, chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). |
+| **Data folder** | The folder that holds one local project's data, chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). Proposed default inside a repository: `.glidebox/`, created by `gb init`. |
 | **Electron / Tauri / Electrobun / Wails** | Frameworks for building desktop apps from a web interface. Their native sides are TypeScript (Electron, Electrobun), Rust (Tauri) or Go (Wails). See [0011](./decisions/0011-desktop-framework-and-shared-code.md). |
 | **Code signing** | A digital signature that lets macOS and Windows confirm who published an app, so it installs without security warnings. Usually paid. |
+| **Iteration** | One round of building that ends in a usable release: Iteration 1 = v0.1 … Iteration 7 = v1.0 ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). |

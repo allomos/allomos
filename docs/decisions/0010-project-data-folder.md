@@ -41,6 +41,8 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 ## Proposed detail (not yet confirmed)
 
+- **Default name inside a repository: `.glidebox/`** at the repository root, like `.github/` or `.vscode/`. `gb init` creates it there unless told otherwise; any other folder can still be chosen (R72).
+
 - **Folder gone or moved.** The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
 
 ## How this fits earlier decisions
