@@ -1,6 +1,6 @@
 # Task-W01-01-core-model
 
-*Part of release **v0.2 — Progress and forecast** ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)). Re-scoped 2026-10-04: the basic model types are created by [`Task-W04-01`](./Task-W04-01-walking-skeleton.md) in v0.1; this card adds burndown and forecast and shows them in the app, so that its result is usable, not only a library.*
+*Part of **Iteration 4 — v0.4 Burndown and forecast** ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)). Re-scoped 2026-10-04: the basic model types are created by [`Task-W04-01`](./Task-W04-01-walking-skeleton.md) in Iteration 1; this card adds burndown and forecast and shows them in the app, so that its result is usable, not only a library.*
 
 - **Outcome.** The owner opens a project in the desktop app and sees per-workstream progress, a burndown (remaining tasks and total scope over time) and a finish-date range at 50% and 85% confidence. The calculations live in `crates/core` (Rust), the one authority for project rules ([0011](../decisions/0011-desktop-framework-and-shared-code.md)).
 - **Decisive unknowns.**

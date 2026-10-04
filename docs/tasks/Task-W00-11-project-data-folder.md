@@ -1,6 +1,6 @@
 # Task-W00-11-project-data-folder
 
-- **Outcome.** The owner's requirement is recorded: in the desktop app, a project's data folder can be any folder the user picks, including a standalone folder or a subfolder of an existing project folder. Related documents agree with it.
+- **Outcome.** The owner's requirement is recorded: in the desktop app, a project's task box can be any folder the user picks, including a standalone folder or a subfolder of an existing project folder. Related documents agree with it.
 - **Decisive unknowns.** None for the record. The design questions it raises go to the owner (see [0010](../decisions/0010-project-data-folder.md)).
 - **Files owned.** [decisions/0010](../decisions/0010-project-data-folder.md), [REQUIREMENTS R72–R76](../product/REQUIREMENTS.md#local-and-cloud-projects), related edits to PLAN, 0006, 0007, 0009, GLOSSARY, the board and the handoff.
 - **External operations.** None.

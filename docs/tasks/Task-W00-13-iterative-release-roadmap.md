@@ -15,6 +15,8 @@
 
 ## Notes
 
+- 2026-10-04 — At the owner's request, made iterations smaller: Iteration 1 split into macOS (1) and macOS + Windows (2); the other releases split into one visible capability each, giving **15 iterations** (v0.1 … v0.14, v1.0). The owner also named the folder **task box** (R87) and the command **`glidebox`** with alias `gb` (R88).
+
 - 2026-10-04 — Owner: v0.1 tracks **glidebox's own tasks** (dogfooding accepted). Recorded in PLAN § 9, AI-WORKFLOW and `Task-W04-01`. Added the "what ships" column at the owner's request.
 
 - 2026-10-04 — Re-planned with the `roadmap-update` skill as Now / Next / Later releases: v0.1 local tracker → v0.2 progress and forecast → v0.3 agents first-class → v0.4 on the go → v0.5 new projects in minutes → v0.6 team in the cloud → v1.0 public release.

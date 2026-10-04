@@ -12,6 +12,10 @@ In the desktop app, you decide **where each project's data is stored**. It can b
 
 Glidebox does not force all projects into one hidden app-data location.
 
+## Name: "task box" (owner, 2026-10-04)
+
+We call a project's folder the **task box** — in the documents, the app's screens and the messages of the `glidebox` command. On disk its proposed default name inside a repository is `.glidebox/`.
+
 ## Owner's statement (2026-10-04)
 
 > In the desktop application, the data source folder should be able to be specified to any folder, which includes an independent folder, a subfolder of an existing project folder,
@@ -20,7 +24,7 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 ## Decision
 
-- When creating or opening a local project, the user **chooses its data folder**. Any folder they can write to is allowed.
+- When creating or opening a local project, the user **chooses its task box**. Any folder they can write to is allowed.
 - Supported locations include a **standalone folder** and a **subfolder of an existing project folder**, such as a code repository.
 - The desktop app keeps a list of the projects it knows and their folders. Opening a folder that already holds glidebox data opens that project.
 - **Commit and push run the real `git` command** (owner, 2026-10-04). When glidebox commits or pushes a project's data, it calls the `git` program installed on the user's machine. It does not reimplement Git or use a separate Git library for these actions. In plain words: it does exactly what typing `git commit` / `git push` in a terminal would do. That means:

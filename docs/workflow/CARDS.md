@@ -4,19 +4,19 @@ A **contract** for how work is recorded on glidebox while the board is Markdown.
 
 ## Workstreams
 
-| ID | Workstream | Releases ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)) |
+| ID | Workstream | Iterations ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)) |
 |---|---|---|
 | W00 | Planning, docs, decisions and research | all |
-| W01 | Core model, burndown and forecast (`crates/core`, Rust) | v0.1 (model, events), v0.2 (burndown, forecast) |
-| W02 | Importer (Markdown boards and generated bundles → glidebox) | v0.2 (SSR board), v0.5 (generated bundles) |
-| W03 | Storage and backend: local store, cloud schema, auth, realtime | v0.1 (local store), v0.6 (cloud) |
-| W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | v0.1 onwards |
-| W05 | Agent write path: CLI and MCP | v0.1 (`gb` CLI), v0.3 (MCP) |
-| W06 | Collaboration: roles, invitations, inbox, approvals | v0.2 (waiting on me), v0.6 (team) |
-| W07 | Agent runner: start and open agent sessions | v0.3 |
-| W08 | Polish: timeline, export, signing, auto-update | v0.5, v1.0 |
-| W09 | AI-generated project setup: prompt, schema, validation, adoption | v0.5 |
-| W10 | Companions and other interfaces: web and phone companions, pairing, remote access | v0.4 |
+| W01 | Core model, burndown and forecast (`crates/core`, Rust) | 1 (model, events), 4 (burndown, forecast) |
+| W02 | Importer (Markdown boards and generated bundles → glidebox) | 6 (SSR board), 11 (generated bundles) |
+| W03 | Storage and backend: local store, cloud schema, auth, realtime | 1 (local store), 13–14 (cloud) |
+| W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | 1 onwards |
+| W05 | Agent write path: CLI and MCP | 1 (`glidebox` / `gb` CLI), 7 (MCP) |
+| W06 | Collaboration: roles, invitations, inbox, approvals | 3 (waiting on me), 14 (team) |
+| W07 | Agent runner: start and open agent sessions | 8 |
+| W08 | Polish: timeline, export, signing, auto-update | 5 (Git panel), 12 (timeline, export), 15 (signing, auto-update) |
+| W09 | AI-generated project setup: prompt, schema, validation, adoption | 11 |
+| W10 | Companions and other interfaces: web and phone companions, pairing, remote access | 9–10 |
 
 Add a workstream by editing this table and the board's card index in the same commit.
 

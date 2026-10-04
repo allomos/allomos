@@ -1,6 +1,6 @@
 # Task-W00-12-desktop-platforms-and-shared-code
 
-- **Outcome.** The owner's requirements are recorded: the desktop app ships for **macOS and Windows**, and the desktop and browser apps **share the same interface source code**. Only the desktop adds native parts: Git, agent operations, MCP, the data folder, and the other necessary pieces. The framework choice is written up for the owner to decide.
+- **Outcome.** The owner's requirements are recorded: the desktop app ships for **macOS and Windows**, and the desktop and browser apps **share the same interface source code**. Only the desktop adds native parts: Git, agent operations, MCP, the task box, and the other necessary pieces. The framework choice is written up for the owner to decide.
 - **Decisive unknowns.** The owner's choice of desktop framework: Electron (recommended) or Tauri.
 - **Files owned.** [decisions/0011](../decisions/0011-desktop-framework-and-shared-code.md), REQUIREMENTS R81–R82, related edits to 0009, PLAN, the board and the discussion record.
 - **External operations.** None.

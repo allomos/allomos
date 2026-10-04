@@ -8,12 +8,12 @@
 
 The owner asked whether glidebox projects could work like code in Git: edit a project on your own machine, then **push** your changes to a shared cloud copy, **pull** other people's changes, and **merge** when you both changed the same thing. Glidebox does that with real Git, storing each task as small readable text files. A database is only a fast index rebuilt from those files. **The owner approved this on 2026-10-04**, and it replaces decision 0001 (the database is the source of truth). Since [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), the desktop app is the hub, which would own the local Git copy.
 
-*Update 2026-10-04:* [0010](./0010-project-data-folder.md) lets a project's data folder sit inside an existing code repository. That repository's Git versions the task files, rather than glidebox creating a nested repository. Commit and push must run the user's installed `git` command (R76), not a separate Git implementation.
+*Update 2026-10-04:* [0010](./0010-project-data-folder.md) lets a project's task box sit inside an existing code repository. That repository's Git versions the task files, rather than glidebox creating a nested repository. Commit and push must run the user's installed `git` command (R76), not a separate Git implementation.
 
 ## Decision (owner, 2026-10-04)
 
-- **A project's data is readable text files** in its data folder ([0010](./0010-project-data-folder.md)): JSON for structured fields, Markdown for narrative text, one canonical record per task. **Git is the source of truth** and holds their history.
-- **Any database is only an index**: a cache kept outside the data folder, used for search, charts and speed, and rebuilt from the files at any time. It is never edited on its own.
+- **A project's data is readable text files** in its task box ([0010](./0010-project-data-folder.md)): JSON for structured fields, Markdown for narrative text, one canonical record per task. **Git is the source of truth** and holds their history.
+- **Any database is only an index**: a cache kept outside the task box, used for search, charts and speed, and rebuilt from the files at any time. It is never edited on its own.
 - **All Git actions run the user's `git` command** (R76). Glidebox never commits or pushes unless the user asks (R75).
 - **Accepted here:** this storage foundation. **Still proposals:** the file layout, the push/pull/merge experience, the merge rules, offline claims and approvals, and the cloud remote (sections below). They are to be prototyped with synthetic data in implementation cards, and the owner reviews them there.
 - This **supersedes [0001](./0001-database-source-of-truth.md)**. 0001's goals still hold: structured fields, one home for status, events recorded for every change, and no hand-maintained prose status.

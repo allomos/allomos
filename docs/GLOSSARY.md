@@ -30,7 +30,7 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Desktop hub** | The glidebox desktop app: it has every feature, stores local projects, and serves the companions ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). |
 | **Companion** | The web or mobile app that connects to a running desktop hub to view its projects, including progress and status. |
 | **Pairing** | Allowing a specific phone or browser to connect to your desktop hub: the companion gives an email and alias, the desktop user approves, and a long code sent by email grants access. |
-| **CLI** | Command-line interface: commands typed in a terminal, used by people, scripts and agents. |
+| **CLI** | Command-line interface: commands typed in a terminal, used by people, scripts and agents. Glidebox's is the **`glidebox`** command, short alias **`gb`** (R88); for example `gb init` sets up a task box. |
 | **MCP** | Model Context Protocol: a standard way for AI agents to discover and call a program's tools. |
 | **Command / query** | A *command* asks to change something; a *query* only reads. All interfaces use the same commands and queries. |
 | **Revision** | A version number of a task. An update says which revision it was based on, so stale edits are caught instead of silently overwriting newer ones. |
@@ -39,7 +39,7 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Three-way merge** | Combining two edited versions by comparing both with the version they started from. |
 | **Fork** | Copying another project's code to build on it. Ruled out for glidebox by [0008](./decisions/0008-build-our-own.md). |
 | **OPFS** | Origin private file system: browser storage that belongs to one website, is hidden from the user's folders, and is lost when site data is cleared. |
-| **Data folder** | The folder that holds one local project's data, chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). Proposed default inside a repository: `.glidebox/`, created by `gb init`. |
+| **Task box** | Our name for the folder that holds one project's tasks and history (R87), chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). Proposed default inside a repository: `.glidebox/`, created by `gb init`. |
 | **Electron / Tauri / Electrobun / Wails** | Frameworks for building desktop apps from a web interface. Their native sides are TypeScript (Electron, Electrobun), Rust (Tauri) or Go (Wails). See [0011](./decisions/0011-desktop-framework-and-shared-code.md). |
 | **Code signing** | A digital signature that lets macOS and Windows confirm who published an app, so it installs without security warnings. Usually paid. |
-| **Iteration** | One round of building that ends in a usable release: Iteration 1 = v0.1 … Iteration 7 = v1.0 ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). |
+| **Iteration** | One round of building that ends in a usable release: Iteration 1 = v0.1 (macOS) … Iteration 14 = v0.14, Iteration 15 = v1.0 ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). |
