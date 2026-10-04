@@ -21,7 +21,15 @@ The full product should be a desktop application. It provides a web program and 
   - starting and opening agent sessions
   - the local CLI and MCP access for agents
 - **Web and mobile are companion clients.** They connect to a **running** desktop app and show its projects. Viewing at least covers **progress and status**: task states, workstream progress, charts and burndown, and what is waiting on whom.
-- **The mobile companion is an installed native app** (owner, 2026-10-04), installed from the App Store / Google Play. It is not only a phone-friendly web page. The web companion remains for browsers.
+- **The mobile companion's form is unconfirmed.** The owner first chose an installed native app, then answered "use this" to a phone-friendly web page (both 2026-10-04). It stays open until the owner confirms one.
+- **Companions can also act, through the desktop app** (owner, 2026-10-04). For example, they can mark a check done or approve something. A companion never changes project data itself: it sends the request to the desktop app, which checks it, applies it and records who did it. The desktop app stays the only authority.
+- **Companions work from outside the home or office network** (owner, 2026-10-04). The connection method must be **free or very cheap**. Any relay or tunnel service is an external operation and needs the owner's approval before it is set up.
+- **Pairing by email and code** (owner, 2026-10-04). A new phone or browser gets access like this:
+  1. The companion user enters a **valid email address** and an **alias** (a display name).
+  2. The desktop app user sees the request and **approves the email address**.
+  3. The desktop app sends a **long verification code** to that email address.
+  4. The companion user enters the code and gets access.
+- **Cloud projects are still needed** (owner, 2026-10-04). Companions do not replace R42.
 - The desktop app works on its own; companions are optional.
 - Each local project's data lives in a folder the user chooses ([0010](./0010-project-data-folder.md)).
 
@@ -33,13 +41,20 @@ The full product should be a desktop application. It provides a web program and 
 
 ## Open questions (owner)
 
-1. **View only, or also act?** May companions also change things (for example mark a check done, approve, add a task), or only view? The owner named viewing, including progress, as the core.
-2. **Where companions connect from:** the same home or office network only, or also away from home? Away-from-home access needs a relay or tunnel, which is a hosted service and an external operation.
-3. **Pairing and security:** how a phone or browser is allowed in (for example by scanning a QR code shown on the desktop), and how access is removed again.
-4. **When the desktop app is off:** should companions show nothing, or the last data they saw (read-only)?
-5. **Cloud projects (R42):** are they still needed, or does desktop-to-companion connection replace them for now? Today they remain an accepted requirement, so this record does not drop them.
-6. ~~Form of the mobile app~~ — **decided 2026-10-04: installed native app.** Still open: iOS, Android or both first, and the framework (for example a cross-platform framework, or fully native).
-7. **Which desktop systems first:** macOS only, or also Windows and Linux?
+Answered 2026-10-04: companions can act (through the desktop app); access from outside, free or very cheap; pairing by email and code; cloud projects still needed.
+
+1. **Mobile form:** installed native app, or a phone-friendly web page? The two answers on 2026-10-04 differ.
+2. **When the desktop app is off:** should companions show nothing, or the last data they saw (read-only)?
+3. **Which desktop systems first:** macOS only, or also Windows and Linux?
+4. **How to reach the desktop from outside cheaply:** to be researched. Candidates have free tiers, for example a tunnel service, a private network service, or a small relay. Each is an external service needing approval.
+5. **How the desktop app sends the code email:** for example through the desktop user's own email account (no extra cost), or through a mail-sending service. Sending email is an external operation.
+
+### Proposed pairing details (to confirm)
+
+- The code is long and random, works **once**, and expires after a short time (for example 15 minutes).
+- Each paired device is listed in the desktop app with its alias and email. The desktop user can **remove** a device at any time, which ends its access immediately.
+- The desktop app records every pairing, removal and companion action as events.
+- Traffic between companion and desktop is encrypted.
 
 ## Consequences
 

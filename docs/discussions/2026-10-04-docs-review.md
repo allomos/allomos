@@ -59,6 +59,22 @@ The owner then added that **commit and push are performed by calling `git` comma
 
 Asked whether the mobile companion should be an installed app or a phone-friendly web page, the owner chose an **installed native app**. Recorded in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) and R70.
 
+## Owner answers to the open questions
+
+| Question | Answer | Recorded in |
+|---|---|---|
+| May companions act, not only view? | Yes, for example mark a check done or approve — **by notifying/controlling the desktop app** | R77, 0009 |
+| Same network only, or from outside? | **From outside**; needs a **free or very cheap** solution | R78, 0009, card [`W10-01`](../tasks/Task-W10-01-remote-access-research.md) |
+| How is a phone or browser allowed in? | The companion gives a valid email and an alias; the desktop user approves the email; the desktop app sends a long verification code to it; the code gives access | R79, 0009 |
+| Mobile: installed app or phone-friendly web page? | "Use this" (the phone-friendly web page) — **conflicts** with the earlier answer "installed native app", so it is left open to confirm | 0009 question 1 |
+| Are cloud projects still needed? | Yes | 0009 |
+| Folder self-contained; no nested repository; no commit/push unless asked; one writer at a time | Yes to all four | R74–R75, 0010 |
+| Other kinds of location? | No | 0010 |
+| Several projects in one repository? | Not in scope | 0010, PLAN non-goals |
+| Ask the user to install `git` if it is missing? | Yes | R76, 0010 |
+| Pull, status and diff also via the `git` command? | Yes | R76, 0010 |
+| Database file or text files in the folder? | The owner did not understand the question; it was re-explained in plain words, with text files recommended. Awaiting an answer | 0010 question 1 |
+
 ## Proposed plan change to confirm
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

@@ -36,9 +36,9 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R43 | Local project data stays local unless the user explicitly chooses to transfer or share it. Automatic cloud upload is not part of local mode. | local-only requirement, 2026-10-01; [0006](../decisions/0006-local-and-cloud-projects.md) | accepted |
 | R72 | In the desktop app, the user **chooses each project's data folder**; any writable folder is allowed. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 | R73 | The data folder may be a **standalone folder** or a **subfolder of an existing project folder** (for example inside a code repository). | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
-| R74 | A data folder is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | proposed |
-| R75 | Inside an existing Git repository, glidebox **does not create a nested repository** and never commits or pushes on its own; one running desktop app writes to a folder at a time. | [0010](../decisions/0010-project-data-folder.md) | proposed |
-| R76 | **Commit and push run the `git` command** installed on the user's machine, so the user's Git configuration, credentials and repository hooks apply. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
+| R74 | A data folder is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
+| R75 | Inside an existing Git repository, glidebox **does not create a nested repository** and never commits or pushes on its own; one running desktop app writes to a folder at a time. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
+| R76 | **All Git actions run the `git` command** installed on the user's machine (commit, push, pull, status, diff), so the user's Git configuration, credentials and repository hooks apply. If `git` is missing, the app asks the user to install it. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 
 Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
 
@@ -89,11 +89,15 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R67 | Graphical interfaces adapt to screen size and input method, with accessible text/controls and alternatives to drag-only actions. | [interface contract](./INTERFACES.md) | proposed |
 | R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md) | proposed |
 | R69 | The **desktop application provides the complete feature set** and is the hub for local projects, agents and companions. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
-| R70 | **Web and mobile apps are companions** that connect to a running desktop application. The mobile companion is an **installed native app** (decided 2026-10-04). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
-| R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, workstream progress, charts and burndown, waiting-on). Whether they may also change things is open. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R70 | **Web and mobile apps are companions** that connect to a running desktop application. Mobile form (native app or phone-friendly web page) to be confirmed. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, workstream progress, charts and burndown, waiting-on). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R77 | Companions can also **act** (for example mark a check done, approve). Each action is a request **sent to the desktop app**, which checks it, applies it and records who did it. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R78 | Companions can connect **from outside** the local network, using a **free or very cheap** method. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R79 | **Pairing:** the companion user gives a valid email address and an alias; the desktop user approves the email; the desktop app sends a long verification code to that email; the code grants access. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R80 | Pairing codes are single-use and short-lived; the desktop user can remove a paired device at any time; pairing and companion actions are recorded. | [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | proposed |
 
 Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared structure; [interface research](../research/interface-patterns.md) records primary sources, platform options and limitations. Detailed command/schema and packaging choices have not been accepted.
 
 ## Not yet decided
 
-Companion editing rights, remote access, pairing and mobile form ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).
+Mobile companion form, remote-access method and code-email sending ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).

@@ -14,3 +14,5 @@
 | 2026-10-04 | "The commit and push action should be performed by calling git commands" | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — The owner confirmed R74–R75. All Git actions use the `git` command, and the app asks the user to install `git` if it is missing. No other kinds of location; several projects in one repository are out of scope. Still open: a database file or text files in the folder.

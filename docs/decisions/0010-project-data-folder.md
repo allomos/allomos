@@ -2,7 +2,7 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Requirement accepted; design open** | 2026-10-04 | 2026-10-04 (requirement) | will.w.hui |
+| **Requirement and details accepted; storage format open** | 2026-10-04 | 2026-10-04 (requirement) | will.w.hui |
 
 ## In plain words
 
@@ -28,11 +28,19 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
   - the repository's hooks run (for example a pre-commit check), and a refusal from a hook is shown to the user, not bypassed;
   - the resulting history is ordinary Git history that any Git tool can read.
 
-## Proposed details (not yet confirmed)
+## Confirmed details (owner, 2026-10-04)
 
-- **Self-contained folder.** Everything that defines the project lives in its folder, so moving or copying the folder moves the project. Caches and indexes that can be rebuilt sit outside it, or are clearly marked so version control ignores them.
-- **Inside a Git repository** (for example, a subfolder of a code repo): glidebox does not create a second repository nested inside. The project's files are versioned by the existing repository. Glidebox never commits or pushes by itself unless the user asks. This fits [0007](./0007-git-like-project-sync.md) (Git storage), if that is accepted.
-- **One writer at a time.** Two running desktop apps on the same folder must not corrupt it. The second one opens it read-only, or is refused, until the design says otherwise.
+- **Self-contained folder.** Everything that defines the project lives in its folder, so moving or copying the folder moves the project. Caches and indexes that can be rebuilt are kept outside it.
+- **Inside a Git repository** (for example, a subfolder of a code repo): glidebox uses that repository's Git and does not create a second repository nested inside.
+- **Glidebox never commits or pushes unless the user asks.**
+- **One writer at a time.** Only one running desktop app writes to a folder at a time. A second one opens it read-only, or is refused.
+- **All Git actions use the `git` command**, not only commit and push: pull, status and diff too.
+- **If `git` is not installed**, the desktop app asks the user to install it. Projects stay usable without Git actions until then.
+- **Only standalone folders and subfolders of an existing project folder** are in scope. No special handling is planned for synced folders (Dropbox, iCloud), network drives or removable disks.
+- **One glidebox project per repository.** Several glidebox projects in different subfolders of one code repository are **out of scope**.
+
+## Proposed detail (not yet confirmed)
+
 - **Folder gone or moved.** The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
 
 ## How this fits earlier decisions
@@ -43,9 +51,6 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 ## Open questions (owner)
 
-1. **Other locations?** The owner's sentence ended with a comma. Are there more cases, for example a folder synced by Dropbox or iCloud, a network drive, or a removable disk?
-2. **What goes in the folder:** a single database file (0001) or readable text files (0007)?
-3. **Several projects in one repository:** may one code repository hold more than one glidebox project, in different subfolders?
-4. **Sync tools:** if the folder is inside Dropbox or iCloud, should glidebox warn about edits from two machines at once?
-5. **Git not installed:** if the `git` program is missing, should the desktop app ask the user to install it, or carry its own copy? Until decided: show a clear message, and keep the project fully usable without commit/push.
-6. **Other Git actions:** do pull, status and diff also go through the `git` command? (Recommended, for the same reasons.)
+Answered 2026-10-04: no other kinds of location; one project per repository; ask the user to install `git`; all Git actions use the `git` command.
+
+1. **What goes in the folder:** one database file (0001), or readable text files tracked by Git (0007)? Explained in plain words to the owner on 2026-10-04; recommended: text files.

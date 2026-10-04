@@ -34,6 +34,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - Replacing git, PRs or CI. Glidebox links to them.
 - Storing secrets, credentials or evidence logs. Cards link to evidence; they do not hold it.
 - Full project-management features (budgets, time sheets, resource leveling).
+- Several glidebox projects inside one code repository ([D10](../decisions/0010-project-data-folder.md)); special handling for synced folders, network drives or removable disks.
 
 ## 4. Decisions
 
@@ -104,7 +105,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
   - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
   - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
   - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser companions
-  - `apps/mobile` — mobile companion, an installed native app ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); platforms and framework open
+  - `apps/mobile` — mobile companion; native app or phone-friendly web page still to be confirmed ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
   - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); database file per D1, or Git-tracked files if D7 is accepted
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex
@@ -124,7 +125,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 | M0 | Repo and plan | This plan agreed; repo pushed |
 | M1 | Core + importer (local) | `packages/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
 | M2 | Desktop hub, read-only | The desktop app stores an imported local project and shows lists, charts and burndown, without sign-in or hosted services |
-| M2b | Companion viewing | A browser and a phone, paired with the running desktop app, show its progress and status (R70–R71) |
+| M2b | Companions | A browser and a phone, paired by email and code (R79), reach the running desktop app from outside the local network (R78), show its progress and status (R71), and send actions such as approvals to it (R77) |
 | M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |
 | M4 | Cloud projects and collaboration | Signed-in cloud projects with the same views; roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
 | M5 | Start and open agents | Research spike on each agent's launch/resume interfaces; local runner starts a task in Claude Code and in Codex, reports the session and claims the task; "Open session" works for local and cloud sessions |

@@ -29,7 +29,7 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Cloud project** | A project stored on a hosted service, which needs sign-in; used for team collaboration. |
 | **Desktop hub** | The glidebox desktop app: it has every feature, stores local projects, and serves the companions ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). |
 | **Companion** | The web or mobile app that connects to a running desktop hub to view its projects, including progress and status. |
-| **Pairing** | Allowing a specific phone or browser to connect to your desktop hub, for example by scanning a code shown on the desktop. |
+| **Pairing** | Allowing a specific phone or browser to connect to your desktop hub: the companion gives an email and alias, the desktop user approves, and a long code sent by email grants access. |
 | **CLI** | Command-line interface: commands typed in a terminal, used by people, scripts and agents. |
 | **MCP** | Model Context Protocol: a standard way for AI agents to discover and call a program's tools. |
 | **Command / query** | A *command* asks to change something; a *query* only reads. All interfaces use the same commands and queries. |
