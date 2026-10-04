@@ -18,6 +18,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
+| `main` — Claude Code docs-review session | [`Task-W00-10`](./tasks/Task-W00-10-docs-consistency-review.md) | 2026-10-04 | Owner reviews the corrected documents |
 
 ## Waiting on the owner
 
@@ -50,6 +51,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
 | [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | `Task-W01-01` model; owner card review |
+| [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | in progress | — | `main` — Claude Code docs-review session | fixes in progress |
 | [`Task-W07-01-agent-launch-research`](./tasks/Task-W07-01-agent-launch-research.md) | backlog | — | — | owner card review |
 
 ### Recently finished
