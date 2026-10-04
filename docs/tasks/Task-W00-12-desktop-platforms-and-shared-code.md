@@ -11,5 +11,8 @@
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-04 | "Desktop app and browser app share the same source code, except the desktop app has special native code for git, agent operation, MCP and other necessary parts. Desktop app for macOS and Windows." | owner (chat) |
+| 2026-10-04 | Release together; unsigned until first public release; a second language is acceptable | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — Owner: a second language is not a problem; release macOS and Windows together; unsigned builds until the first public release (R85). Compared four frameworks from current sources; the recommendation changed from Electron to **Tauri 2**. If chosen, `Task-W01-01` would be written in Rust.

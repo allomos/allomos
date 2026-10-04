@@ -32,22 +32,50 @@ Glidebox's screens are written **once**, as a web interface. The desktop app sho
 
 ## Framework — owner to choose
 
-| | **Electron** (recommended) | **Tauri** |
-|---|---|---|
-| Native side written in | TypeScript, the **same language** as everything else | Rust (a second language), or a bundled Node helper program |
-| Running `git`, agents, MCP | Built into Node.js; official TypeScript MCP SDK | Possible, but the logic is split across Rust and TypeScript, or needs the helper |
-| App size | Large (~100 MB+): ships its own browser engine | Small (a few MB): uses the system's web view |
-| Same look on macOS and Windows | Yes: the same engine everywhere | Mostly: macOS and Windows web views differ slightly |
-| macOS + Windows | Yes | Yes |
+**Owner input, 2026-10-04:**
+- Using a second programming language is **not a problem** (the code is written by agents).
+- macOS and Windows ship **together**.
+- **Unsigned builds** are used until the first public release.
 
-**Recommendation: Electron.** One language from interface to native code means the CLI, MCP server and desktop app share code directly, and agents work in one toolchain. The cost is a larger download and more memory.
+These change the comparison: Electron's main advantage (one language) no longer weighs much.
+
+Options that let the desktop window reuse the web interface, checked 2026-10-04:
+
+| | Native side | App size | Web engine in the window | Maturity (checked 2026-10-04) |
+|---|---|---|---|---|
+| **Tauri 2** (recommended) | Rust | Small (a few MB) | System web view: Safari's engine on macOS, Edge WebView2 (Chromium) on Windows | Stable; v2.11.5 released 2026-07-01; active |
+| **Electron** | TypeScript (Node.js) | Large (~100 MB+) | Its own bundled Chromium, identical everywhere | Very mature; new major version every 8 weeks, latest three supported; latest v44.5.1 (2026-09-29); governed by the OpenJS Foundation |
+| **Electrobun** | TypeScript (Bun) + Zig | Small (~12–14 MB) | System web view | Newest: v1.0 released February 2026; young ecosystem, rough edges reported |
+| **Wails** | Go | Small | System web view | v2 stable; v3 still in beta |
+
+**Is Electron still maintained? Is there a replacement?** Electron is very actively maintained. It is not being replaced; many large apps still ship on it. The newer "lighter Electron" options are Tauri (mature, Rust) and Electrobun (TypeScript, but only since Feb 2026).
+
+**Recommendation now: Tauri 2.**
+- **Small and light.** The app is a few MB and uses less memory than Electron.
+- **Different web engines aren't extra work here.** The companions already run in phone and desktop browsers, including Safari on iPhone. The interface must work in several engines anyway, so the desktop window using the system engine adds no new testing.
+- **Its native-side libraries cover what we need:** running `git` and agent programs as child processes, and an **official Rust MCP SDK** (`rmcp`, implementing the MCP 2026-07-28 specification).
+- **Stable and actively released.** Electrobun is promising but too young to be the core of the product.
+
+**Effect on the code layout if Tauri is chosen:**
+- The **project rules** live in the desktop app's Rust side, as the one authority. That covers the model, validation, events, burndown and forecast, and Git storage.
+- The CLI and MCP server use that same Rust code.
+- The TypeScript web interface only displays results and sends requests.
+- `Task-W01-01` (core model) would then be written in Rust instead of TypeScript.
 
 ## Costs to know
 
-- **Code signing:** for users to install without security warnings, apps must be signed. macOS needs an Apple Developer account (about US$99 per year) for signing and Apple's notarization check. Windows needs a code-signing certificate, which is usually paid. Unsigned development builds work but show warnings. Buying either is an external operation that needs the owner's approval.
+- **Code signing:** decided 2026-10-04 — **unsigned builds until the first public release**. Unsigned builds work, but macOS and Windows show security warnings when installing. Before the first public release, signing must be bought: an Apple Developer account (about US$99 per year) and a Windows code-signing certificate, usually paid. That purchase is an external operation needing the owner's approval.
 
 ## Open questions (owner)
 
-1. **Framework:** Electron (recommended) or Tauri?
-2. **Release order:** macOS and Windows together, or one first?
-3. **Signing:** buy signing for public releases now, or use unsigned builds until the first release?
+1. **Framework:** Tauri 2 (recommended now), Electron, Electrobun or Wails?
+2. ~~Release order~~ — **decided 2026-10-04: macOS and Windows together.**
+3. ~~Signing~~ — **decided 2026-10-04: unsigned builds until the first public release.**
+
+## Sources (read 2026-10-04)
+
+- [Electron releases](https://releases.electronjs.org/) and [Electron timelines](https://www.electronjs.org/docs/latest/tutorial/electron-timelines)
+- [Tauri 2 release notes](https://v2.tauri.app/release/tauri/)
+- [Electrobun guide (Better Stack)](https://betterstack.com/community/guides/scaling-nodejs/electrobun-desktop-apps-typescript/)
+- [Wails v3 beta release](https://newreleases.io/project/github/wailsapp/wails/release/v3.0.0-beta.0)
+- [Official Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk)
