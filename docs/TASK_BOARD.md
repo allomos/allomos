@@ -28,6 +28,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
+| `main` — Claude Code docs session | [`Task-W00-06`](./tasks/Task-W00-06-git-sync-proposal.md) | 2026-10-04 | Owner reviews the accepted storage decision |
 
 ## Waiting on the owner
 
@@ -61,7 +62,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-01-planning-docs`](./tasks/Task-W00-01-planning-docs.md) | waiting | drafted | — | owner review of the documents |
 | [`Task-W00-02-github-remote`](./tasks/Task-W00-02-github-remote.md) | waiting | — | — | owner names/creates the repository and approves the push |
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
-| [`Task-W00-06-git-sync-proposal`](./tasks/Task-W00-06-git-sync-proposal.md) | waiting | drafted | — | owner decision on 0007 |
+| [`Task-W00-06-git-sync-proposal`](./tasks/Task-W00-06-git-sync-proposal.md) | in progress | drafted | `main` — Claude Code docs session | recording the owner's approval |
 | [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
