@@ -107,6 +107,12 @@ Re-planned in [PLAN § 9](../product/PLAN.md#9-roadmap--releases), using the roa
 
 The owner then asked for a "what ships" column (apps, servers and so on) and said v0.1 is for **the current project's tasks**: glidebox tracks its own development from v0.1 (dogfooding).
 
+## Naming and testing
+
+- The task box's default name on disk is **`.glidebox/`**.
+- Iteration 2's Windows checks run on **a workmate's Windows machine**.
+- Workstreams were renamed to **areas** grouped by capability (A00–A07), and R89–R90 were accepted.
+
 ## Proposed plan change to confirm (superseded by the release roadmap)
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

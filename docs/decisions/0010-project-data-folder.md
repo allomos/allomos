@@ -14,7 +14,7 @@ Glidebox does not force all projects into one hidden app-data location.
 
 ## Name: "task box" (owner, 2026-10-04)
 
-We call a project's folder the **task box** — in the documents, the app's screens and the messages of the `glidebox` command. On disk its proposed default name inside a repository is `.glidebox/`.
+We call a project's folder the **task box** — in the documents, the app's screens and the messages of the `glidebox` command. **On disk, its default name inside a repository is `.glidebox/`** (owner, 2026-10-04), at the repository root like `.github/` or `.vscode/`. `gb init` creates it there unless told otherwise; any other folder can still be chosen (R72).
 
 ## Owner's statement (2026-10-04)
 
@@ -45,7 +45,6 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 ## Proposed detail (not yet confirmed)
 
-- **Default name inside a repository: `.glidebox/`** at the repository root, like `.github/` or `.vscode/`. `gb init` creates it there unless told otherwise; any other folder can still be chosen (R72).
 
 - **Folder gone or moved.** The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
 

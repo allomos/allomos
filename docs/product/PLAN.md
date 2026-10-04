@@ -147,7 +147,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 - **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `gb init` in a repository; this creates the task box with a starter project. It then adds areas and tasks one by one with `gb` commands. The desktop app can also create the folder.
 - **From Iteration 11 (v0.11).** An agent generates a **whole project at once** from glidebox's prompt, and glidebox validates and previews it before adopting it (R50–R55).
 
-**Task box name (proposed, owner to confirm):** `.glidebox/` at the root of the repository, like `.github/` or `.vscode/`: one recognisable place, out of the way of the code. `gb init` uses it by default. Any other folder can still be chosen (R72).
+**Task box name on disk (owner, 2026-10-04):** `.glidebox/` at the root of the repository, like `.github/` or `.vscode/`. `gb init` uses it by default; any other folder can still be chosen (R72).
 
 **Every release** follows R60: one shared set of rules and commands serves people and agents alike.
 
@@ -180,7 +180,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 - **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from glidebox itself once Iteration 4 exists.
 - **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
 - **Dependencies to watch:**
-  - Iteration 2 needs a **Windows machine** for its exit check (owner to confirm one is available).
+  - Iteration 2's exit check runs on **a workmate's Windows machine** (owner, 2026-10-04). The agent prepares an unsigned Windows build and a short step-by-step check list. The workmate installs it, runs the checks and reports the results, which are recorded on the card. Expect a Windows security warning on install, because builds are unsigned until Iteration 15.
   - Iteration 8 needs the agent launch research ([`A03-01`](../tasks/Task-A03-01-agent-launch-research.md)).
   - Iterations 9–10 need the remote-access and email research ([`A04-01`](../tasks/Task-A04-01-remote-access-research.md)), and owner approval to create the email-service (9) and tunnel (10) accounts.
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.

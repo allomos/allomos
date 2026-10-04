@@ -41,7 +41,7 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R74 | A task box is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
 | R75 | Inside an existing Git repository, glidebox **does not create a nested repository** and never commits or pushes on its own; one running desktop app writes to a folder at a time. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
 | R76 | **All Git actions run the `git` command** installed on the user's machine (commit, push, pull, status, diff), so the user's Git configuration, credentials and repository hooks apply. If `git` is missing, the app asks the user to install it. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
-| R87 | A project's folder is called the **task box** everywhere: documents, screens and command messages. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
+| R87 | A project's folder is called the **task box** everywhere: documents, screens and command messages. Its default name on disk inside a repository is **`.glidebox/`**. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 | R88 | The command-line program is called **`glidebox`**, with **`gb`** as a short alias. | owner, 2026-10-04 | accepted |
 
 Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
