@@ -21,6 +21,8 @@ All rules below are **proposed**, except where they restate these accepted requi
 
 Keep project/task behavior in one shared application layer. Desktop, mobile, browser, CLI, MCP and generated-file import translate their inputs into the same commands and queries. A **command** requests a change; a **query** reads information. The shared layer validates changes, checks the actor's permissions and records the resulting history. Presentation code formats that result for a person or an agent.
 
+*Superseded in detail: the current picture, with the desktop hub, Tauri, the task box and iteration numbers, is in [PLAN § 8 — At a glance](./PLAN.md#at-a-glance-updated-2026-10-04). The diagram below keeps the original logical layering.*
+
 ```mermaid
 flowchart TD
     D[Desktop UI] --> A[Shared commands and queries]

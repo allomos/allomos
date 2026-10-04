@@ -104,6 +104,37 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 ## 8. Architecture (proposed)
 
+### At a glance (updated 2026-10-04)
+
+```mermaid
+flowchart TD
+    UI["Shared web interface<br/>TypeScript + React<br/>one source code"]
+    UI --> DW["Desktop window<br/>Tauri · macOS + Windows<br/>Iteration 1–2"]
+    UI --> BC["Browser companion<br/>Iteration 9–10"]
+    UI --> PC["Phone companion<br/>phone-friendly web page<br/>Iteration 9–10"]
+    DW -- requests --> HUB
+    BC -- "requests (paired)" --> HUB
+    PC -- "requests (paired)" --> HUB
+    HUB["Glidebox desktop app · the one authority (Rust)<br/>project rules · validation · events · burndown and forecast"]
+    HUB --> TB[("Task box .glidebox/<br/>files tracked by Git<br/>Iteration 1")]
+    HUB --> GIT["Runs your git<br/>commit · push · pull<br/>Iteration 6"]
+    HUB --> MCP["MCP server for agents<br/>Iteration 3"]
+    HUB --> RUN["Start / open Claude Code and Codex<br/>Iteration 8"]
+    HUB --> SRV["Local server + pairing emails<br/>Iteration 9–10"]
+    CLI["glidebox / gb command (Rust)<br/>same rules"] --> TB
+    TB -. "optional cloud copy" .-> CLOUD["Cloud service · optional, paid<br/>Iteration 13–14"]
+```
+
+- **One interface code base** runs in the desktop window, a browser and a phone ([D11](../decisions/0011-desktop-framework-and-shared-code.md), [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). It only displays results and sends requests.
+- **The desktop app is the one authority.** Its Rust code checks every change, records it as an event, and owns the native parts. Companions' actions, such as approvals, are requests that the desktop app checks and applies (R77).
+- **The `gb` command** uses the same Rust rules on the same task box.
+
+**Open points:**
+1. **How the interface reaches the Rust side inside the desktop window.** The proposal is the same kind of connection a browser will later use, so the interface never changes. Iteration 1 has no local server yet (it arrives in Iteration 9), so [`Task-A01-01`](../tasks/Task-A01-01-walking-skeleton.md) picks a first connection that can switch over later without rewriting the interface.
+2. **Two writers on one task box.** In Iteration 1, both the desktop app and `gb` can change the same `.glidebox/`. "One writer at a time" (R75) needs a mechanism, for example a lock file or `gb` passing changes through the running desktop app. The `gb` command card decides this.
+
+### Details
+
 - **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `crates/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
 - **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: **Tauri 2** (owner, 2026-10-04); macOS and Windows released together; unsigned builds until the first public release.
 - **Monorepo — Rust workspace + TypeScript interface** ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Proposed layout; the first code card confirms it:

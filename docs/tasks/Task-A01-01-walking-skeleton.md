@@ -49,6 +49,6 @@
 ## Notes
 
 - Next Iteration 1 cards, written when this one is done:
-  - the `glidebox` command (alias `gb`, R88) for agents (`gb init` to create the task box; add, list, show, claim, label, wait, done, release);
+  - the `glidebox` command (alias `gb`, R88) for agents. It must decide how `gb` and the running desktop app avoid writing the same task box at once (R75; [PLAN § 8 open point 2](../product/PLAN.md#at-a-glance-updated-2026-10-04)). Commands: `gb init` to create the task box; add, list, show, claim, label, wait, done, release);
   - moving glidebox's own cards from Markdown into a task box in this repository (dogfooding, decided 2026-10-04), and switching the agent workflow to `gb`;
   - the Iteration 1 exit check on macOS. Windows, and creating and editing tasks in the app, follow in Iteration 2.
