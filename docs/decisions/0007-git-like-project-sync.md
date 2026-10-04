@@ -4,6 +4,10 @@
 |---|---|---|---|
 | **Proposed** | 2026-10-01 | — | will.w.hui |
 
+## In plain words
+
+The owner asked whether glidebox projects could work like code in Git: edit a project on your own machine, then **push** your changes to a shared cloud copy, **pull** other people's changes, and **merge** when you both changed the same thing. This record proposes doing that with real Git, storing each task as small text files. A database would then only be a fast index rebuilt from those files. It is **only a proposal**. If accepted, it replaces decision 0001 (the database is the source of truth). Since [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), the desktop app is the hub, which would own the local Git copy.
+
 ## Context
 
 The owner asked whether project/task storage could work like Git/GitHub: use a project locally, then push, pull and merge with a cloud copy. Local-only use and optional signed-in cloud access are already accepted in [0006](./0006-local-and-cloud-projects.md). This record proposes a design; it does not approve storage technology, implementation or hosted resources.

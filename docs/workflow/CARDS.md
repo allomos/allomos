@@ -6,15 +6,17 @@ A **contract** for how work is recorded on glidebox while the board is Markdown.
 
 | ID | Workstream | Milestone |
 |---|---|---|
-| W00 | Planning, docs and workflow | M0 |
+| W00 | Planning, docs, decisions and research | M0 |
 | W01 | Core model, burndown and forecast (`packages/core`) | M1 |
 | W02 | Importer (Markdown boards → glidebox) | M1 |
-| W03 | Backend: schema, auth, RLS, realtime | M2 |
-| W04 | Web app: lists, charts, burndown | M2 |
+| W03 | Storage and backend: local store, cloud schema, auth, RLS, realtime | M2, M4 |
+| W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | M2 |
 | W05 | Agent write path: CLI and MCP | M3 |
 | W06 | Collaboration: roles, invitations, inbox, approvals | M4 |
 | W07 | Agent runner: start and open agent sessions | M5 |
 | W08 | Polish: timeline, export, size-weighted burndown | M6 |
+| W09 | AI-generated project setup: prompt, schema, validation, adoption | proposed with M2 |
+| W10 | Companions and other interfaces: web and mobile companions, pairing, human CLI | M2b |
 
 Add a workstream by editing this table and the board's card index in the same commit.
 

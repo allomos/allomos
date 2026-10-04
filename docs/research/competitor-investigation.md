@@ -111,7 +111,7 @@ Sources 1–15 were consulted 2026-09-30; sources 16–20 were consulted 2026-10
 17. [git-bug maintainer repository](https://github.com/git-bug/git-bug) — distributed offline issues, internal Git storage, issue push/pull and interfaces.
 18. [git-bug storage/index interfaces](https://github.com/git-bug/git-bug/blob/trunk/repository/repo.go) — local storage and search-index operations; full rebuild/upload behavior not verified.
 19. [backlog by veggiemonk](https://github.com/veggiemonk/backlog) — Markdown/YAML task files, hierarchical IDs and Git workflow.
-20. [Obsidian Git plugin](https://github.com/tfney/obsidian-git) — commit/pull/push, history and diff interface for local notes.
+20. [Obsidian Git plugin](https://github.com/Vinzent03/obsidian-git) — commit/pull/push, history and diff interface for local notes. Corrected 2026-10-04: the link previously pointed to `tfney/obsidian-git`, an unrelated copy with no stars, rather than the maintainer's repository.
 21. [Linear clients](https://linear.app/docs/get-the-app) — desktop/browser/mobile availability, mobile navigation and offline limitations.
 22. [GitHub CLI issue list](https://cli.github.com/manual/gh_issue_list) — human issue CLI, structured output and browser handoff; does not establish Agent HQ control coverage.
 
@@ -129,7 +129,7 @@ The products and storage features from this follow-up are incorporated in the [m
 
 **backlog by veggiemonk** documents task files with YAML metadata, hierarchical IDs, status and parent/assignee fields, tracked in Git. It is useful prior art for schema and file organization. [Maintainer repository](https://github.com/veggiemonk/backlog).
 
-**Obsidian with its community Git plugin** documents app-integrated commit/pull/push and history/diff views. It is relevant to hiding Git operations behind a familiar local-file interface, rather than a verified substitute for Glidebox's delivery tracking. [Plugin repository](https://github.com/tfney/obsidian-git).
+**Obsidian with its community Git plugin** documents app-integrated commit/pull/push and history/diff views. It is relevant to hiding Git operations behind a familiar local-file interface, rather than a verified substitute for Glidebox's delivery tracking. [Plugin repository](https://github.com/Vinzent03/obsidian-git).
 
 ### Implication
 
@@ -139,7 +139,9 @@ Actual Git-backed task storage is established prior art, not a unique product di
 
 Investigated 2026-10-01 after the owner said they may sell services through Glidebox. This records a possible commercial direction, not an approved pricing, source-license or upstream-base decision.
 
-**Recommendation:** evaluate Backlog.md first, with the option to reuse selected components or integrate through its CLI rather than immediately forking the full app. It matches task files, local UI and agent access, and its TypeScript/React toolchain is adjacent to Glidebox's proposed stack. A full fork is justified only if a bounded evaluation shows it saves substantial work while accommodating the event model, workstreams, verification gates, approvals and cloud permissions. File-format similarity alone is insufficient. No architectural or dependency/license audit has yet been performed.
+> **Superseded by the owner's decision, 2026-10-04:** build glidebox ourselves, not on an open-source base ([0008](../decisions/0008-build-our-own.md)). Backlog.md and the others remain design references only. The recommendation below is kept as the research record.
+
+**Recommendation (superseded):** evaluate Backlog.md first, with the option to reuse selected components or integrate through its CLI rather than immediately forking the full app. It matches task files, local UI and agent access, and its TypeScript/React toolchain is adjacent to Glidebox's proposed stack. A full fork is justified only if a bounded evaluation shows it saves substantial work while accommodating the event model, workstreams, verification gates, approvals and cloud permissions. File-format similarity alone is insufficient. No architectural or dependency/license audit has yet been performed.
 
 | Candidate | Verified top-level license | Implication for a possible paid Glidebox |
 |---|---|---|

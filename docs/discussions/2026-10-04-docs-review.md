@@ -1,0 +1,54 @@
+# 2026-10-04 — Documentation review and new decisions
+
+Participants: will.w.hui (owner), Claude (Claude Code session).
+
+## Request
+
+The owner asked Claude to read and review everything another agent had written between 2026-10-01 and 10-03, and report problems. The owner then asked for the problems to be fixed, and made two decisions.
+
+## Review findings (summary)
+
+1. The planning card `Task-W00-01` had become a catch-all: claimed 10 times for 6 different outcomes, owning "everything under `docs/`", with a 6.5 KB work log.
+2. The competitor research recommended evaluating an open-source base (Backlog.md), but nothing put that choice before the owner. The possible plan to sell glidebox was recorded only in research and handoff notes.
+3. Contradictions:
+   - "atomic claims, no merge conflicts" (R12, plan) against tentative offline claims (0007, interfaces);
+   - agent-start permissions by role (0005) against local projects with no accounts (0006);
+   - the plan's architecture had no local storage;
+   - R50–R51 and R60–R62 had no milestone or workstream.
+4. A second restart document (the 2026-10-03 "handoff" discussion) duplicated the handoff file and board. "Do not assume" in the handoff had become a notes log.
+5. The board's Now section was unchanged since 09-30. The worktree `glidebox-local-cloud` was left unused.
+6. The owner requests of 10-01 to 10-03 had no discussion record.
+7. Smaller points:
+   - one wrong source link (Obsidian Git pointed to an unrelated copy);
+   - glossary missing the new terms;
+   - dense jargon in the new contracts;
+   - commits that don't say which agent made them;
+   - requirement sections out of order.
+
+All 50 external links were checked; the other 49 work. Internal links, anchors, tables and whitespace were clean.
+
+## Owner decisions
+
+| Decision | Record |
+|---|---|
+| **Build our own**: do not start from an open-source tracker; read others only as references | [0008](../decisions/0008-build-our-own.md) |
+| **Desktop app as the hub**: the complete product is a desktop application; web and mobile programs are companions that connect to the running desktop app and can view it, including progress and status | [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md), R69–R71 |
+
+## Changes made
+
+- **Cards:** split the planning card into its own cards (`W00-04` to `W00-09`) and opened `W00-10` for this review.
+- **Contradictions resolved:**
+  - R12 revised;
+  - 0005 gained a local-projects section;
+  - the plan gained the desktop hub, local store, companions and milestones M2/M2b/M4;
+  - workstreams W03/W04 renamed, W09/W10 added.
+- **Plain summaries** added at the top of INTERFACES, 0007 and AI-GENERATED-PROJECTS.
+- **Records:** the glossary extended; the source link fixed; the 10-03 handoff record reduced; the 10-01 to 10-03 requests reconstructed.
+- **Rules:** AGENTS.md gained "one card per outcome" and "say who made each commit".
+- **Board and handoff** rewritten to current state.
+
+**Not done:** removing the unused worktree `glidebox-local-cloud` was blocked by the permission system. It is listed for the owner in the handoff.
+
+## Proposed plan change to confirm
+
+Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

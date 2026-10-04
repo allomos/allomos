@@ -22,6 +22,8 @@ Glidebox needs (see [PLAN.md](../product/PLAN.md)): a database as source of trut
 
 ## Options
 
+> **Third-party bases are ruled out.** On 2026-10-04 the owner decided to build glidebox ourselves rather than start from an open-source tracker such as Backlog.md ([0008](./0008-build-our-own.md)). This record is only about reusing the owner's **own** Glidelines code.
+
 ### A. Extend Glidelines — grow the `/task-files` workspace into glidebox
 
 Add persistence (Supabase tables), accounts, agent API and forecasting to the existing app.
@@ -69,4 +71,4 @@ Glidebox is standalone and owns the data; Glidelines later gains a "glidebox pro
 
 ## Current leaning (not a decision)
 
-B now, with the option to move the ported core into a shared package (C) if Glidelines keeps evolving its task-file workspace; D as a possible later integration. **Until this is decided, work on M1 (the pure `packages/core` model, importer, burndown and forecast) is valid under B, C and D**, so it need not wait.
+This is still open after [0008](./0008-build-our-own.md). B now, with the option to move the ported core into a shared package (C) if Glidelines keeps evolving its task-file workspace; D as a possible later integration. **Until this is decided, work on M1 (the pure `packages/core` model, importer, burndown and forecast) is valid under B, C and D**, so it need not wait.

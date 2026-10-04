@@ -2,7 +2,7 @@
 
 Glidebox is developed by AI agents (Claude Code, Codex) working for the owner, **will.w.hui**. This file is the shared authority for every agent and is always loaded (Codex reads it directly; Claude Code imports it from `CLAUDE.md`). Keep it short: detail lives in the documents it links.
 
-**What glidebox is:** a tracker with local-only projects (no sign-in) and optional cloud projects (sign-in required) for tasks worked by AI agents and people — progress and state grouped by workstream, lists and charts, a burndown with a forecast finish date, roles and email invitations, and starting / opening agent sessions from the app. See [docs/product/PLAN.md](docs/product/PLAN.md) and [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
+**What glidebox is:** a desktop app (the hub, with every feature) plus web and mobile companions that connect to it, built as our own code ([0008](docs/decisions/0008-build-our-own.md), [0009](docs/decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). It is a tracker with local-only projects (no sign-in) and optional cloud projects (sign-in required) for tasks worked by AI agents and people — progress and state grouped by workstream, lists and charts, a burndown with a forecast finish date, roles and email invitations, and starting / opening agent sessions from the app. See [docs/product/PLAN.md](docs/product/PLAN.md) and [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
 
 ## Always-on boundaries
 
@@ -33,8 +33,10 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 3. **Status has one home: the card's row on the board.** Card files hold detail, never a second copy of state. Do not restate status anywhere else.
 4. **Labels are the only progress claims:** implemented → locally verified → deployed and verified → owner verified (Done). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
-6. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes on the board; supersede stale lines by editing them in place.
-7. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
+6. **One card per outcome, including research and decision records.** Do not keep adding unrelated work to an existing card; open a new card, so each piece can be finished and reviewed on its own.
+7. **Say who made each commit.** End every commit message with a line naming the agent, for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`, so history shows which agent and session did the work.
+8. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes on the board; supersede stale lines by editing them in place.
+9. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
 ## Handoff — write it continuously
 

@@ -44,11 +44,15 @@ A person may register several runners (laptop, desktop, a shared build machine).
 
 The runner reports liveness (running / waiting for input / exited) so the task view can show whether its agent is still working. This also covers the reference project's "session registry".
 
+## Local projects (added 2026-10-04)
+
+Under [0006](./0006-local-and-cloud-projects.md), a local project has no accounts, so the role rules below apply to **cloud projects**. In a local project, the person using the desktop app ([0009](./0009-desktop-hub-with-web-and-mobile-companions.md)) is the authority on that machine. The desktop app is also the natural home of the local runner. Two things remain open: how a local project records who did what, and whether a paired companion may start agents.
+
 ## Security
 
 Starting an agent runs code on a machine, so:
 
-- Only **owner / admin / contributor** may start agents; **agents cannot start agents** (at least initially). Viewers cannot.
+- In cloud projects, only **owner / admin / contributor** may start agents; **agents cannot start agents** (at least initially). Viewers cannot.
 - A runner accepts requests only for projects and repositories its machine owner has allowed, and only from members that owner allows (default: only the machine owner).
 - The runner never receives secrets from glidebox; it uses the credentials already on that machine.
 - Every start and every open is recorded as an event (who, which runner, which agent, which task).

@@ -1,5 +1,7 @@
 # Human and AI-agent interfaces
 
+**In plain words:** people and AI agents both use glidebox, so every way in follows the same rules: the desktop app, the web and mobile companions, the command line (CLI) and the agent tool protocol (MCP). Each change goes through one shared set of operations that checks permissions and records history. The **desktop app is the hub** with all features; web and mobile companions connect to it to view progress and status ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Everything below marked *proposed* still needs the owner's review.
+
 A **contract** for interface scope, with proposed design rules to review before implementation. Created 2026-10-03 from the owner's request; evidence and source links live in [the interface investigation](../research/interface-patterns.md). Requirement IDs: [R60–R68](./REQUIREMENTS.md#human-and-agent-interfaces).
 
 A **CLI** is a command-line interface used from a terminal by people, scripts and agents.
@@ -7,7 +9,8 @@ A **CLI** is a command-line interface used from a terminal by people, scripts an
 ## Accepted scope
 
 - Glidebox must be well structured for both humans and AI agents (R60).
-- Human interfaces include desktop and mobile; browser and human CLI interfaces must also be considered in the design (R61–R62). Specific operating systems, native packaging, release order and complete feature coverage per client are not selected.
+- Human interfaces include desktop and mobile; browser and human CLI interfaces must also be considered in the design (R61–R62).
+- **The desktop app provides the complete feature set; web and mobile apps are companions that connect to the running desktop app and view its projects, including progress and status** (R69–R71, accepted 2026-10-04). Operating systems, the mobile form, whether companions may edit, and release order are not selected.
 - Agents already require structured task updates through CLI and MCP (R11). MCP is a protocol through which compatible agent clients discover and call tools.
 - Local project tracking stores project/task information on the user's device without sign-in or a Glidebox hosted service (R40–R43). Cloud projects require sign-in (R42). A client cannot silently publish local data to provide cross-device access.
 - The leader can use Glidebox's prompt with an external agent to produce files that Glidebox reads/transforms (R50–R51); see [AI-generated projects](./AI-GENERATED-PROJECTS.md).

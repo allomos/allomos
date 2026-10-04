@@ -1,5 +1,7 @@
 # AI-generated project setup
 
+**In plain words:** a team leader copies a prompt from glidebox and gives it, with their goals, to any AI agent. The agent writes the project's workstreams and tasks as files. Glidebox checks the files, shows what it will create, and turns them into a working project. The workflow is accepted (R50–R51); the exact file format and checks are proposed.
+
 Related interface contract: [INTERFACES.md](./INTERFACES.md). Its proposed shared command/validation layer covers generated-file adoption as well as graphical, CLI and MCP task edits.
 
 A feature contract: accepted user workflow and proposed details, recorded 2026-10-01. Requirements [R50–R55](./REQUIREMENTS.md#ai-generated-project-setup) define the boundary. This document does not select storage technology or a final file schema.

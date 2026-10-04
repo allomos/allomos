@@ -15,6 +15,17 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
 | R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
 
+## Source of truth and agents
+
+| ID | Requirement | Source | Status |
+|---|---|---|---|
+| R10 | Each project's **database is the source of truth**: local for a local project, hosted for a cloud project; Markdown is an optional export. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R12 | **Claiming is exclusive**: one task, one holder. A claim is atomic within one project authority (a local project's desktop app, or the cloud service for a connected cloud project). A claim made while disconnected from that authority is only tentative and is shown as such ([0007](../decisions/0007-git-like-project-sync.md)). | PLAN; revised 2026-10-04 | proposed |
+| R13 | A configurable **label ladder** per project (default: implemented → locally verified → connected → deployed and verified). | PLAN | proposed |
+| R14 | **Waiting-on** is a structured field (owner check, approval, another task, external) with who and a note. | PLAN | proposed |
+| R15 | **Import** an existing Markdown board (first: the SSR migration board). | owner, 2026-09-27 | accepted |
+
 ## Local and cloud projects
 
 | ID | Requirement | Source | Status |
@@ -25,17 +36,6 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R43 | Local project data stays local unless the user explicitly chooses to transfer or share it. Automatic cloud upload is not part of local mode. | local-only requirement, 2026-10-01; [0006](../decisions/0006-local-and-cloud-projects.md) | accepted |
 
 Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
-
-## Source of truth and agents
-
-| ID | Requirement | Source | Status |
-|---|---|---|---|
-| R10 | Each project's **database is the source of truth**: local for a local project, hosted for a cloud project; Markdown is an optional export. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
-| R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
-| R12 | **Claiming is atomic**: one task, one holder; no merge conflicts. | PLAN | proposed |
-| R13 | A configurable **label ladder** per project (default: implemented → locally verified → connected → deployed and verified). | PLAN | proposed |
-| R14 | **Waiting-on** is a structured field (owner check, approval, another task, external) with who and a note. | PLAN | proposed |
-| R15 | **Import** an existing Markdown board (first: the SSR migration board). | owner, 2026-09-27 | accepted |
 
 ## Collaboration
 
@@ -75,7 +75,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | ID | Requirement | Source | Status |
 |---|---|---|---|
 | R60 | The app is well structured to provide interfaces for both people and AI agents. | owner, 2026-10-03 | accepted |
-| R61 | Human UI supports desktop and mobile use; specific operating systems, packaging and release order remain undecided. | owner, 2026-10-03 | accepted |
+| R61 | Human UI supports desktop and mobile use. Packaging is set by R69–R71; operating systems and release order remain undecided. | owner, 2026-10-03; updated 2026-10-04 | accepted |
 | R62 | Investigate and consider browser and human CLI interfaces alongside desktop/mobile; agent CLI/MCP remains required by R11. | owner, 2026-10-03 | accepted |
 | R63 | Graphical clients, CLI, MCP and imports use shared task commands/queries with consistent validation, permissions and event recording. | [interface contract](./INTERFACES.md) | proposed |
 | R64 | Agent interfaces expose discoverable capabilities, versioned structured inputs/results, bounded task context and actionable errors. | [interface contract](./INTERFACES.md) | proposed |
@@ -83,9 +83,12 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R66 | Human review shows evidence and exact decision scope; responsible person, executing agent, verification and session state remain distinguishable. | [interface contract](./INTERFACES.md) | proposed |
 | R67 | Graphical interfaces adapt to screen size and input method, with accessible text/controls and alternatives to drag-only actions. | [interface contract](./INTERFACES.md) | proposed |
 | R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md) | proposed |
+| R69 | The **desktop application provides the complete feature set** and is the hub for local projects, agents and companions. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R70 | **Web and mobile apps are companions** that connect to a running desktop application. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, workstream progress, charts and burndown, waiting-on). Whether they may also change things is open. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 
 Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared structure; [interface research](../research/interface-patterns.md) records primary sources, platform options and limitations. Detailed command/schema and packaging choices have not been accepted.
 
 ## Not yet decided
 
-UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).
+Companion editing rights, remote access, pairing and mobile form ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).

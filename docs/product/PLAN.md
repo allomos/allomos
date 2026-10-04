@@ -1,6 +1,6 @@
 # Glidebox — plan
 
-> Status: **draft, 2026-09-27.** Decisions marked *proposed* are recommendations awaiting the owner's confirmation. Full records: [decisions/](../decisions/README.md); requirements: [REQUIREMENTS.md](./REQUIREMENTS.md); discussions: [2026-09-27 kickoff](../discussions/2026-09-27-kickoff.md), [2026-09-30 docs and agent workflow](../discussions/2026-09-30-docs-and-agent-workflow.md). Glidebox is developed by AI agents following [AGENTS.md](../../AGENTS.md).
+> Status: **draft, first written 2026-09-27, last revised 2026-10-04.** Decisions marked *proposed* are recommendations awaiting the owner's confirmation. Full records: [decisions/](../decisions/README.md); requirements: [REQUIREMENTS.md](./REQUIREMENTS.md); discussions: [all records](../README.md#discussions). Glidebox is developed by AI agents following [AGENTS.md](../../AGENTS.md).
 
 ## 1. Problem
 
@@ -20,7 +20,8 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - A **burndown chart** with an **estimated finish date** (a range, not a single guess).
 - **Purely local projects**: project and task information stays on the user’s machine; no sign-in or hosted service is required for tracking.
 - **Optional cloud projects**: users choose cloud storage and collaboration; teammates sign in, see live updates, and act on tasks.
-- **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply and without merge conflicts.
+- **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply, with one holder per task (R12).
+- **A desktop app as the hub**, with the full feature set. Web and mobile companion apps connect to the running desktop app to view projects, including progress and status ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md), R69–R71).
 - **Interfaces for people and agents**, with desktop/mobile human use and browser/human CLI considered in the design. Shared structure and platform patterns are documented in [INTERFACES.md](./INTERFACES.md) (R60–R68; detailed design proposed).
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
@@ -44,6 +45,9 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D4](../decisions/0004-team-accounts-and-roles.md) | **Cloud team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
 | [D5](../decisions/0005-start-and-open-agent-sessions.md) | **Start and open agent sessions from glidebox**, through a local runner daemon (`gb runner`) on a person's machine or a vendor cloud session. | **requirement accepted 2026-09-27**; design proposed |
 | [D6](../decisions/0006-local-and-cloud-projects.md) | **Local-only and optional cloud projects.** Local tracking stores data on the user’s machine without sign-in; cloud projects require sign-in. Storage technology and transfer/sync design remain open. | **requirement accepted 2026-10-01** |
+| [D7](../decisions/0007-git-like-project-sync.md) | **Git-like project history and sync.** Actual Git with structured files as the source of truth, a rebuildable index, and push/pull/merge with a cloud copy. Would supersede D1 if accepted. | proposed — not approved |
+| [D8](../decisions/0008-build-our-own.md) | **Build our own.** No open-source tracker (e.g. Backlog.md) is used as a base or fork; they are references only. | **accepted 2026-10-04** |
+| [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
 
 ## 5. Data model (first cut)
 
@@ -81,7 +85,7 @@ The leader gets a Glidebox prompt, asks their chosen external agent to generate 
 
 ### Human and agent interfaces
 
-Desktop/mobile human use is accepted; browser and human CLI must be considered. Proposed presentation: task list/detail and review panes on wide screens; My tasks, Waiting on me, quick capture and full-screen task detail on phones. CLI/MCP provide structured discovery, context and task operations for agents. All supported surfaces should use shared project rules and recorded history. [Interface contract](./INTERFACES.md) and [internet investigation](../research/interface-patterns.md) include platform tradeoffs, accessible interaction, agent tool patterns and the distinction between device-local and cloud access. Native packaging and release order remain open; this does not assume four independent apps.
+Desktop/mobile human use is accepted; browser and human CLI must be considered. Proposed presentation: task list/detail and review panes on wide screens; My tasks, Waiting on me, quick capture and full-screen task detail on phones. CLI/MCP provide structured discovery, context and task operations for agents. All supported surfaces should use shared project rules and recorded history. [Interface contract](./INTERFACES.md) and [internet investigation](../research/interface-patterns.md) include platform tradeoffs, accessible interaction, agent tool patterns and the distinction between device-local and cloud access. Packaging direction is now set by [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md): a desktop hub with web and mobile companions. Operating systems, the mobile form and release order remain open.
 
 ## 7. Burndown and forecast
 
@@ -94,9 +98,13 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 ## 8. Architecture (proposed)
 
 - **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `packages/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
+- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. The desktop framework (e.g. a web UI in a native shell), pairing and network security are open.
 - **Monorepo** (pnpm, TypeScript):
   - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
-  - `apps/web` — React + Vite + Tailwind web app (charts, lists, inbox)
+  - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
+  - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser companions
+  - `apps/mobile` — mobile companion (native app or phone-friendly web: open, see [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
+  - `packages/local-store` — local project storage adapter (database per D1, or Git files if D7 is accepted)
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex
   - `packages/runner` — local daemon (`gb runner`): receives start requests, creates worktrees, launches and resumes agents, reports session state
@@ -114,11 +122,14 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 |---|---|---|
 | M0 | Repo and plan | This plan agreed; repo pushed |
 | M1 | Core + importer (local) | `packages/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
-| M2 | Local and cloud read-only views | Local imported project persists and shows lists, charts and burndown without sign-in or hosted services; signed-in cloud projects show the same views through the proposed hosted backend |
+| M2 | Desktop hub, read-only | The desktop app stores an imported local project and shows lists, charts and burndown, without sign-in or hosted services |
+| M2b | Companion viewing | A browser and a phone, paired with the running desktop app, show its progress and status (R70–R71) |
 | M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |
-| M4 | Collaboration | Roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
+| M4 | Cloud projects and collaboration | Signed-in cloud projects with the same views; roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
 | M5 | Start and open agents | Research spike on each agent's launch/resume interfaces; local runner starts a task in Claude Code and in Codex, reports the session and claims the task; "Open session" works for local and cloud sessions |
 | M6 | Polish | Generated timeline, markdown export, size-weighted burndown, target dates |
+
+**Not yet placed (owner to confirm):** AI-generated project setup (R50–R51, workstream W09) — proposed with M2, because it reuses the importer's validation. Human CLI and other interface work (R60–R62, workstream W10) — alongside M2–M3.
 
 ## 10. Open questions
 
