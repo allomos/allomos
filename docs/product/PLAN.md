@@ -18,6 +18,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 - See every task's **state and progress**, **grouped by area**, as **lists and charts**.
 - A **burndown chart** with an **estimated finish date** (a range, not a single guess).
+- **A free local app** ([D12](../decisions/0012-free-local-app-paid-cloud.md)): developers and team leaders can use the desktop app on their own computer free of charge, with no account; paying is optional and only for cloud features.
 - **Purely local projects**: project and task information stays on the user’s machine; no sign-in or hosted service is required for tracking.
 - **Optional cloud projects**: users choose cloud storage and collaboration; teammates sign in, see live updates, and act on tasks.
 - **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply, with one holder per task (R12).
@@ -51,6 +52,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
 | [D10](../decisions/0010-project-data-folder.md) | **User-chosen task box.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
 | [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: **Tauri 2**. | **accepted 2026-10-04** |
+| [D12](../decisions/0012-free-local-app-paid-cloud.md) | **Free local app; payment only for the cloud.** | **accepted 2026-10-04**; paid features and source licence open |
 
 ## 5. Data model (first cut)
 
@@ -127,7 +129,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 | Phase | # | Release | Usable for | What ships (products and contents) | Requirements |
 |---|---|---|---|---|---|
-| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
+| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R91, R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
 | **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`glidebox` / `gb` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes | R81, R85 (released together from here on), R1–R2 (editing in the app) |
 | **Next** | **3** | **v0.3 — MCP for agents** | Claude Code and Codex use glidebox through **MCP tools**, not only shell commands | **MCP server** (`gb mcp`, started by the agent on the same computer); safe retries and stale-edit checks | R11 (MCP), R63–R65 |
 | **Next** | **4** | **v0.4 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
@@ -139,7 +141,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 | **Later** | **10** | **v0.10 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
 | **Later** | **11** | **v0.11 — New projects in minutes** | A team leader **sets up a new project with any AI agent** | **Generation kit** (prompt, file schema, examples); desktop app validates, previews and adopts generated projects | R50–R55 |
 | **Later** | **12** | **v0.12 — Timeline and export** | The owner sees a **timeline** and can **share a Markdown report** | Desktop app: timeline (gantt) generated from events; Markdown export | R8 |
-| **Later** | **13** | **v0.13 — Cloud copy** | The owner **keeps a project in the cloud and works on it from two computers** | **Cloud service**, the first hosted server: sign-in, publish, clone, push and pull a project; **cloud web app** (the same web interface) | R42–R43 |
+| **Later** | **13** | **v0.13 — Cloud copy** | The owner **keeps a project in the cloud and works on it from two computers** | **Cloud service**, the first hosted server: sign-in, publish, clone, push and pull a project; **cloud web app** (the same web interface) | R42–R43, R92 (first paid features) |
 | **Later** | **14** | **v0.14 — Team** | A team **works on one project together online** | Cloud service: owner/admin invitations by email, roles, live updates, merging concurrent edits, atomic cloud claims | R12 (cloud), R20–R23 |
 | **Later** | **15** | **v1.0 — Public release** | Anyone can **download and install** glidebox | **Signed installers** (macOS `.dmg`, Windows installer), **auto-update feed** (GitHub Releases), download page and user guide, UI languages | R85 (signing), R61 |
 
@@ -185,6 +187,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
   - Iterations 9–10 need the remote-access and email research ([`A04-01`](../tasks/Task-A04-01-remote-access-research.md)), and owner approval to create the email-service (9) and tunnel (10) accounts.
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
+  - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 9–10 choose services that use the user's own account or a free tier.
 - **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **glidebox itself**. When Iteration 1 passes its exit check, glidebox's own cards move from Markdown into a task box inside this repository, and the agents building glidebox track their work in it from then on ([AI-WORKFLOW § dogfooding](../workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding)). This is the first real test of every release.
 
 ## 10. Open questions

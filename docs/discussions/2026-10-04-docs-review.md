@@ -113,6 +113,10 @@ The owner then asked for a "what ships" column (apps, servers and so on) and sai
 - Iteration 2's Windows checks run on **a workmate's Windows machine**.
 - Workstreams were renamed to **areas** grouped by capability (A00–A07), and R89–R90 were accepted.
 
+## Is the project worth doing? Business model
+
+Before approving the first code card, the owner asked whether the project is worth doing. Claude gave the case for and against, and recommended a time-boxed Iteration 1 with stop criteria. The owner then set the direction: **developers and team leaders can use the local app free, if they don't want to pay — which is also the owner's own wish.** Recorded as [0012](../decisions/0012-free-local-app-paid-cloud.md) and R91–R93.
+
 ## Proposed plan change to confirm (superseded by the release roadmap)
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

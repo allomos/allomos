@@ -8,10 +8,11 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; ten cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
+**Nothing is claimed; eleven cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
+- **The local app is free**; payment is only for cloud features ([0012](./decisions/0012-free-local-app-paid-cloud.md)).
 - The product shape: a **desktop app for macOS and Windows as the hub**, built with **Tauri 2** and sharing one interface code base with the browser and phone ([`A00-12`](./tasks/Task-A00-12-desktop-platforms-and-shared-code.md)), with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Each project's data lives in a **folder the user chooses**, standalone or inside an existing project folder ([`A00-11`](./tasks/Task-A00-11-project-data-folder.md)), as **readable text files tracked by Git** ([`A00-06`](./tasks/Task-A00-06-git-sync-proposal.md)).
 - Requirements for local and cloud projects, AI-generated project setup and interfaces are recorded ([`A00-04`](./tasks/Task-A00-04-local-and-cloud-requirements.md), [`A00-08`](./tasks/Task-A00-08-ai-generated-project-setup.md), [`A00-09`](./tasks/Task-A00-09-interface-requirements.md)).
 - The 2026-10-04 review has fixed the documents ([`Task-A00-10`](./tasks/Task-A00-10-docs-consistency-review.md)).
@@ -28,7 +29,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `main` — Claude Code docs session | [`Task-A00-15`](./tasks/Task-A00-15-free-local-app.md) | 2026-10-04 | Owner reviews the free-local-app decision |
 
 ## Waiting on the owner
 
@@ -40,7 +40,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Reuse of the owner's own Glidelines code: A extend · B standalone · C shared core · D Glidelines as a view (open-source bases are ruled out by 0008) | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-A00-03`](./tasks/Task-A00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
-| **Selling glidebox:** commercial model and source licence (open client with paid cloud, or proprietary) | [0008](./decisions/0008-build-our-own.md) | release, licensing of dependencies |
+| **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
@@ -60,7 +60,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-10-docs-consistency-review`](./tasks/Task-A00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
-| [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | in progress | — | `main` — Claude Code docs session | recording in progress |
+| [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | backlog | — | — | owner card review (first Iteration 1 card) |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |

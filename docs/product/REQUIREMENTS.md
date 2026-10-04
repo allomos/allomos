@@ -36,6 +36,9 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R41 | Local project tracking requires no sign-in, cloud account or connection to a Glidebox hosted service. | owner, 2026-10-01 | accepted |
 | R42 | Users may choose cloud projects; cloud project access requires sign-in. | owner, 2026-10-01 | accepted |
 | R43 | Local project data stays local unless the user explicitly chooses to transfer or share it. Automatic cloud upload is not part of local mode. | local-only requirement, 2026-10-01; [0006](../decisions/0006-local-and-cloud-projects.md) | accepted |
+| R91 | The **local desktop app is free of charge** for developers and team leaders, with no account or payment needed. | owner, 2026-10-04; [0012](../decisions/0012-free-local-app-paid-cloud.md) | accepted |
+| R92 | **Payment is optional and only for cloud features** (cloud copies, team sign-in, invitations, roles, live collaboration). | owner, 2026-10-04; [0012](../decisions/0012-free-local-app-paid-cloud.md) | accepted |
+| R93 | Features in the free app that depend on a hosted service use the user's own account or a provider's free tier, so free users cost (almost) nothing to serve; otherwise the feature is paid. | [0012](../decisions/0012-free-local-app-paid-cloud.md) | proposed |
 | R72 | In the desktop app, the user **chooses each project's task box**; any writable folder is allowed. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 | R73 | The task box may be a **standalone folder** or a **subfolder of an existing project folder** (for example inside a code repository). | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 | R74 | A task box is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |

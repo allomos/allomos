@@ -19,9 +19,9 @@ The [competitor investigation](../research/competitor-investigation.md) found th
 
 ## Consequences
 
-- [`Task-A02-01`](../tasks/Task-A02-01-burndown-and-forecast.md), our own core model with burndown and forecast, remains the first code card.
+- We write our own code from the first code card, [`Task-A01-01`](../tasks/Task-A01-01-walking-skeleton.md).
 - Copying source from these projects requires a new owner decision and a licence review. The GPL (git-bug) in particular has obligations that apply when distributing.
 - Ordinary third-party libraries (for example a chart library or a Git library) are still allowed. Each is chosen and pinned in the card that introduces it, with its licence noted.
 - **Not decided by this record:**
   - Reuse of the owner's own Glidelines code: [0003](./0003-relationship-to-glidelines.md), still open.
-  - Whether glidebox is sold, and under which source licence: on the board's "Waiting on the owner" list.
+  - The business model: decided in [0012](./0012-free-local-app-paid-cloud.md) (free local app, paid cloud). The source licence is still open.
