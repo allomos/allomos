@@ -104,8 +104,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 - **Monorepo** (pnpm, TypeScript):
   - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
   - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
-  - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser companions
-  - `apps/mobile` — mobile companion; native app or phone-friendly web page still to be confirmed ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
+  - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser and phone companions; the phone companion is a phone-friendly layout of this web UI ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
   - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); Git-tracked JSON/Markdown files per D7, plus a rebuildable index kept outside the folder
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex

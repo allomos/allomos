@@ -57,7 +57,7 @@ The owner then added that **commit and push are performed by calling `git` comma
 
 ## Mobile companion form
 
-Asked whether the mobile companion should be an installed app or a phone-friendly web page, the owner chose an **installed native app**. Recorded in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) and R70.
+Asked whether the mobile companion should be an installed app or a phone-friendly web page, the owner chose an **installed native app**. Recorded in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) and R70. **Later reversed by the owner:** the mobile companion is a phone-friendly web page (see the table below).
 
 ## Owner answers to the open questions
 
@@ -66,7 +66,7 @@ Asked whether the mobile companion should be an installed app or a phone-friendl
 | May companions act, not only view? | Yes, for example mark a check done or approve — **by notifying/controlling the desktop app** | R77, 0009 |
 | Same network only, or from outside? | **From outside**; needs a **free or very cheap** solution | R78, 0009, card [`W10-01`](../tasks/Task-W10-01-remote-access-research.md) |
 | How is a phone or browser allowed in? | The companion gives a valid email and an alias; the desktop user approves the email; the desktop app sends a long verification code to it; the code gives access | R79, 0009 |
-| Mobile: installed app or phone-friendly web page? | "Use this" (the phone-friendly web page) — **conflicts** with the earlier answer "installed native app", so it is left open to confirm | 0009 question 1 |
+| Mobile: installed app or phone-friendly web page? | First "installed native app", then "use this" for the web page; asked again, the owner **confirmed the phone-friendly web page** | 0009, R70 |
 | Are cloud projects still needed? | Yes | 0009 |
 | Folder self-contained; no nested repository; no commit/push unless asked; one writer at a time | Yes to all four | R74–R75, 0010 |
 | Other kinds of location? | No | 0010 |
@@ -74,6 +74,10 @@ Asked whether the mobile companion should be an installed app or a phone-friendl
 | Ask the user to install `git` if it is missing? | Yes | R76, 0010 |
 | Pull, status and diff also via the `git` command? | Yes | R76, 0010 |
 | Database file or text files in the folder? | After a plain-words explanation: **approved text files tracked by Git** (option B) | [0007](../decisions/0007-git-like-project-sync.md) accepted, 0001 superseded, R10 |
+
+## Repository settings
+
+The owner created `mypals-ml/glidebox` on GitHub and pushed. The owner briefly asked for the local Git user name `willwhui`, then chose to keep `will.w.hui`. The owner decided that **agents push after every commit** (AGENTS.md).
 
 ## Proposed plan change to confirm
 

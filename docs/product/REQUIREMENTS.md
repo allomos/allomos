@@ -89,7 +89,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R67 | Graphical interfaces adapt to screen size and input method, with accessible text/controls and alternatives to drag-only actions. | [interface contract](./INTERFACES.md) | proposed |
 | R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md) | proposed |
 | R69 | The **desktop application provides the complete feature set** and is the hub for local projects, agents and companions. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
-| R70 | **Web and mobile apps are companions** that connect to a running desktop application. Mobile form (native app or phone-friendly web page) to be confirmed. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R70 | **Web and mobile apps are companions** that connect to a running desktop application. The mobile companion is a **phone-friendly web page** served by the desktop app (decided 2026-10-04). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, workstream progress, charts and burndown, waiting-on). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R77 | Companions can also **act** (for example mark a check done, approve). Each action is a request **sent to the desktop app**, which checks it, applies it and records who did it. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R78 | Companions can connect **from outside** the local network, using a **free or very cheap** method. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
@@ -100,4 +100,4 @@ Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared
 
 ## Not yet decided
 
-Mobile companion form, remote-access method and code-email sending ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).
+Remote-access method and code-email sending ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).

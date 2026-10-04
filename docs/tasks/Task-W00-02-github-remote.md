@@ -13,4 +13,4 @@
 
 ## Notes
 
-- 2026-10-04 — The owner created `mypals-ml/glidebox` and pushed `main` (HTTPS remote `origin`). At the owner's request, the repo-local `user.name` is now `willwhui`. Check: `git status -sb` showed `main...origin/main` in sync at `9955e37`.
+- 2026-10-04 — The owner created `mypals-ml/glidebox` and pushed `main` (HTTPS remote `origin`). At the owner's request, the repo-local `user.name` was briefly set to `willwhui`, then set back to `will.w.hui`. The owner also decided that agents push after every commit. Check: `git status -sb` showed `main...origin/main` in sync at `9955e37`.

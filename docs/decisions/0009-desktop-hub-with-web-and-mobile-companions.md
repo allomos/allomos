@@ -21,7 +21,7 @@ The full product should be a desktop application. It provides a web program and 
   - starting and opening agent sessions
   - the local CLI and MCP access for agents
 - **Web and mobile are companion clients.** They connect to a **running** desktop app and show its projects. Viewing at least covers **progress and status**: task states, workstream progress, charts and burndown, and what is waiting on whom.
-- **The mobile companion's form is unconfirmed.** The owner first chose an installed native app, then answered "use this" to a phone-friendly web page (both 2026-10-04). It stays open until the owner confirms one.
+- **The mobile companion is a phone-friendly web page** (owner, confirmed 2026-10-04). It is served by the desktop app and opened in the phone's browser; there is no app-store app for now. (Earlier the same day the owner had picked an installed native app; the owner then confirmed the web page.)
 - **Companions can also act, through the desktop app** (owner, 2026-10-04). For example, they can mark a check done or approve something. A companion never changes project data itself: it sends the request to the desktop app, which checks it, applies it and records who did it. The desktop app stays the only authority.
 - **Companions work from outside the home or office network** (owner, 2026-10-04). The connection method must be **free or very cheap**. Any relay or tunnel service is an external operation and needs the owner's approval before it is set up.
 - **Pairing by email and code** (owner, 2026-10-04). A new phone or browser gets access like this:
@@ -43,7 +43,7 @@ The full product should be a desktop application. It provides a web program and 
 
 Answered 2026-10-04: companions can act (through the desktop app); access from outside, free or very cheap; pairing by email and code; cloud projects still needed.
 
-1. **Mobile form:** installed native app, or a phone-friendly web page? The two answers on 2026-10-04 differ.
+1. ~~Mobile form~~ — **decided 2026-10-04: a phone-friendly web page.**
 2. **When the desktop app is off:** should companions show nothing, or the last data they saw (read-only)?
 3. **Which desktop systems first:** macOS only, or also Windows and Linux?
 4. **How to reach the desktop from outside cheaply:** to be researched. Candidates have free tiers, for example a tunnel service, a private network service, or a small relay. Each is an external service needing approval.

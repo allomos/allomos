@@ -47,7 +47,7 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on glidebox. [
 The agent raises this itself; the owner should not have to ask.
 
 - Remind the owner when context is **about 70% used** (Claude Code: `get_usage` → `context.percentUsed`; automatic summarising near the limit loses detail), or once past **half** at a natural break (card or task finished, waiting on the owner, nothing running, everything committed), or before a large new card when context is already heavy.
-- **How:** update your handoff block and the board, commit (push only if a remote exists and the owner has asked for pushes), then tell the owner briefly: why now, that the handoff is committed, what is still running — and give the exact prompt for the new session, e.g.:
+- **How:** update your handoff block and the board, commit and push (agents push after every commit — [AGENTS.md § Working procedure](../../AGENTS.md#working-procedure)), then tell the owner briefly: why now, that the handoff is committed, what is still running — and give the exact prompt for the new session, e.g.:
 
   > Read AGENTS.md, then docs/TASK_BOARD.md and your card, then docs/AGENT_HANDOFF.md (Active resume for `<card>`, Live state, Pitfalls), and continue with `<card>`: `<next action>`.
 
