@@ -2,7 +2,7 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Requirements accepted; framework proposed** | 2026-10-04 | 2026-10-04 (requirements) | will.w.hui |
+| **Accepted** — framework: Tauri 2 | 2026-10-04 | 2026-10-04 | will.w.hui |
 
 ## In plain words
 
@@ -26,11 +26,13 @@ Glidebox's screens are written **once**, as a web interface. The desktop app sho
 
 ## Proposed design (to confirm)
 
-- **The interface always talks to the desktop app's local server**, also inside the desktop window. So the same interface code runs unchanged in the desktop window, a browser and a phone. The only difference is which actions the server allows for that connection.
+- **The interface always talks to the desktop app's local server** (inside the Tauri window too, over the same local connection), also inside the desktop window. So the same interface code runs unchanged in the desktop window, a browser and a phone. The only difference is which actions the server allows for that connection.
 - The server tells the interface which **capabilities** a connection has. Desktop-only actions are shown as "send to desktop" (for example an approval, R77), or hidden, on companions.
-- **Shared TypeScript packages:** `packages/core` (model, burndown, forecast), the shared commands, and the interface. The CLI, MCP server and desktop app reuse the same commands, so a change made from any of them follows the same rules.
+- **Shared code:** the Rust crates (`crates/core`, `crates/store`, …) hold the project rules and commands; the CLI, MCP server and desktop app reuse them, so a change made from any of them follows the same rules. The TypeScript interface (`apps/web`) is shared by the desktop window, browser and phone.
 
-## Framework — owner to choose
+## Framework — decided: Tauri 2
+
+**The owner chose Tauri 2 on 2026-10-04.** We build on the stable 2.x line and review a move to Tauri 3 once 3.0 is stable. The project rules are written in Rust inside the desktop app; the CLI and MCP server reuse them; the web interface stays TypeScript. The analysis that led here follows.
 
 **Owner input, 2026-10-04:**
 - Using a second programming language is **not a problem** (the code is written by agents).
@@ -68,7 +70,7 @@ Options that let the desktop window reuse the web interface, checked 2026-10-04.
 
 ## Open questions (owner)
 
-1. **Framework:** Tauri 2 (recommended now), Electron, Electrobun or Wails?
+1. ~~Framework~~ — **decided 2026-10-04: Tauri 2.**
 2. ~~Release order~~ — **decided 2026-10-04: macOS and Windows together.**
 3. ~~Signing~~ — **decided 2026-10-04: unsigned builds until the first public release.**
 

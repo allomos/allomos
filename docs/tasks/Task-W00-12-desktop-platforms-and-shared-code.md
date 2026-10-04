@@ -11,9 +11,12 @@
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-04 | "Desktop app and browser app share the same source code, except the desktop app has special native code for git, agent operation, MCP and other necessary parts. Desktop app for macOS and Windows." | owner (chat) |
+| 2026-10-04 | Framework: Tauri 2 | owner (chat) |
 | 2026-10-04 | Release together; unsigned until first public release; a second language is acceptable | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — **Owner chose Tauri 2.** 0011 accepted; R86 added; PLAN architecture rewritten (Rust crates and TypeScript interface); `Task-W01-01` rewritten for Rust.
 
 - 2026-10-04 — At the owner's request, wrote a [detailed comparison](../research/desktop-frameworks.md) of Tauri 2, Electron, Electrobun 2, Wails 2, Neutralinojs and NW.js from current sources. The recommendation stays Tauri 2. New findings: Electrobun has no Intel Mac build; Tauri 3 is in alpha.
 

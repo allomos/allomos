@@ -95,6 +95,10 @@ The owner decided the code is sent by email through a free email-sending service
 
 The owner asked whether there are more framework options, and whether Electron is still maintained or replaced. The owner also said a second language is not a problem for agent-written code, chose to release macOS and Windows together, and chose unsigned builds until the first public release (R85). Four options were compared from current sources in [0011](../decisions/0011-desktop-framework-and-shared-code.md); the recommendation is now **Tauri 2**.
 
+## Framework chosen
+
+After the detailed comparison ([research](../research/desktop-frameworks.md)) and an explanation of code signing versus update signing, the owner chose **Tauri 2**. Recorded as R86 in [0011](../decisions/0011-desktop-framework-and-shared-code.md). The first code card `Task-W01-01` is now a Rust card.
+
 ## Proposed plan change to confirm
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

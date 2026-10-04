@@ -100,6 +100,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R83 | When the desktop app is not running, a companion tells the user to **start the desktop app on their computer**; **refreshing reconnects automatically** once it runs. No stale data is shown meanwhile. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R84 | The pairing code email is sent through a **free email-sending service**. Its access key is never committed or embedded in the shipped app. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R85 | macOS and Windows versions are **released together**; builds stay **unsigned until the first public release**. | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
+| R86 | The desktop app is built with **Tauri 2** (stable 2.x line); project rules live in Rust and are reused by the CLI and MCP server; the interface is TypeScript. | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
 
 Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared structure; [interface research](../research/interface-patterns.md) records primary sources, platform options and limitations. Detailed command/schema and packaging choices have not been accepted.
 

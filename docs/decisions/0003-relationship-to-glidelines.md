@@ -71,4 +71,4 @@ Glidebox is standalone and owns the data; Glidelines later gains a "glidebox pro
 
 ## Current leaning (not a decision)
 
-This is still open after [0008](./0008-build-our-own.md). B now, with the option to move the ported core into a shared package (C) if Glidelines keeps evolving its task-file workspace; D as a possible later integration. **Until this is decided, work on M1 (the pure `packages/core` model, importer, burndown and forecast) is valid under B, C and D**, so it need not wait.
+This is still open after [0008](./0008-build-our-own.md). *Update 2026-10-04:* with Tauri 2 chosen ([0011](./0011-desktop-framework-and-shared-code.md)), project rules are written in Rust, so Glidelines' TypeScript burndown and forecast code can only be reused as ideas. Its React chart components could still be reused in the TypeScript interface. B now, with the option to move the ported core into a shared package (C) if Glidelines keeps evolving its task-file workspace; D as a possible later integration. **Until this is decided, work on M1 (the pure `crates/core` model, importer, burndown and forecast) is valid under B, C and D**, so it need not wait.

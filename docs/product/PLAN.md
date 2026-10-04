@@ -50,7 +50,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D8](../decisions/0008-build-our-own.md) | **Build our own.** No open-source tracker (e.g. Backlog.md) is used as a base or fork; they are references only. | **accepted 2026-10-04** |
 | [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
 | [D10](../decisions/0010-project-data-folder.md) | **User-chosen data folder.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
-| [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: Tauri 2 recommended. | **requirements accepted 2026-10-04**; framework proposed |
+| [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: **Tauri 2**. | **accepted 2026-10-04** |
 
 ## 5. Data model (first cut)
 
@@ -100,19 +100,19 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 ## 8. Architecture (proposed)
 
-- **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `packages/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
-- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: Tauri 2 recommended (owner to choose); macOS and Windows released together; unsigned builds until the first public release.
-- **Monorepo** (pnpm, TypeScript):
-  - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
-  - `apps/desktop` — the desktop hub for macOS and Windows: native shell (Tauri 2 recommended), local store, Git, agent runner, MCP, local server for companions
-  - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser and phone companions; the phone companion is a phone-friendly layout of this web UI ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
-  - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); Git-tracked JSON/Markdown files per D7, plus a rebuildable index kept outside the folder
-  - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
-  - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex
-  - `packages/runner` — local daemon (`gb runner`): receives start requests, creates worktrees, launches and resumes agents, reports session state
-  - `packages/importer` — markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`)
+- **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `crates/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
+- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: **Tauri 2** (owner, 2026-10-04); macOS and Windows released together; unsigned builds until the first public release.
+- **Monorepo — Rust workspace + TypeScript interface** ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Proposed layout; the first code card confirms it:
+  - `crates/core` — Rust: domain model, validation, events, burndown and forecast (pure, unit-tested; the one authority for project rules)
+  - `crates/store` — Rust: reads and writes the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)) as Git-tracked JSON/Markdown files (D7); runs the `git` command; keeps the rebuildable index outside the folder
+  - `crates/cli` — Rust: the `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
+  - `crates/mcp` — Rust: MCP server (official `rmcp` SDK) exposing the same operations to Claude Code and Codex
+  - `crates/runner` — Rust: starts and resumes agents, creates worktrees, reports session state
+  - `crates/importer` — Rust: Markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`) and AI-generated bundles
+  - `apps/desktop` — Tauri 2 app for macOS and Windows: wraps the crates above, hosts the local server for companions, shows `apps/web` in its window
+  - `apps/web` — TypeScript + React + Vite + Tailwind interface (charts, lists, inbox); runs in the desktop window and is served to browser and phone companions; displays results and sends requests, holds no project rules
   - `supabase/` — cloud side (proposed): sign-in, roles, atomic claims and the cloud project index; how it hosts the Git remote is open under D7
-- **Storage modes ([D7](../decisions/0007-git-like-project-sync.md)):** local projects are Git-tracked text files in a user-chosen data folder, with a rebuildable index outside it. Cloud projects are a hosted copy (a Git remote with server-side permission checks) and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. Local database technology and packaging remain open.
+- **Storage modes ([D7](../decisions/0007-git-like-project-sync.md)):** local projects are Git-tracked text files in a user-chosen data folder, with a rebuildable index outside it. Cloud projects are a hosted copy (a Git remote with server-side permission checks) and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. The index technology remains open.
 - **Cloud backend (proposed):** Supabase — Postgres, Auth (cloud sign-in), Row Level Security per project and role, Realtime for live updates. Cloud agents use scoped project tokens; local agent access must work without a cloud token.
 - **Transfer and sync:** moving/copying a local project to the cloud, offline cloud edits, and two-way synchronization remain open; do not assume automatic uploads.
 - **Hosting:** to decide (Vercel or Cloudflare).
@@ -123,7 +123,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 | # | Milestone | Done when |
 |---|---|---|
 | M0 | Repo and plan | This plan agreed; repo pushed |
-| M1 | Core + importer (local) | `packages/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
+| M1 | Core + importer (local) | `crates/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
 | M2 | Desktop hub, read-only | The desktop app stores an imported local project and shows lists, charts and burndown, without sign-in or hosted services |
 | M2b | Companions | A browser and a phone, paired by email and code (R79), reach the running desktop app from outside the local network (R78), show its progress and status (R71), and send actions such as approvals to it (R77) |
 | M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |

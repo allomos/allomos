@@ -7,7 +7,7 @@ A **contract** for how work is recorded on glidebox while the board is Markdown.
 | ID | Workstream | Milestone |
 |---|---|---|
 | W00 | Planning, docs, decisions and research | M0 |
-| W01 | Core model, burndown and forecast (`packages/core`) | M1 |
+| W01 | Core model, burndown and forecast (`crates/core`, Rust) | M1 |
 | W02 | Importer (Markdown boards → glidebox) | M1 |
 | W03 | Storage and backend: local store, cloud schema, auth, RLS, realtime | M2, M4 |
 | W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | M2 |
