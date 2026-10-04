@@ -121,7 +121,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 ## 9. Roadmap — releases
 
-**Rapid iteration (owner, 2026-10-04).** Iterations are numbered 1–15; each ends in a release (v0.1 … v0.14, then v1.0). Glidebox grows from a small prototype. **Every release is a usable product**: an installable desktop app (macOS and Windows; unsigned builds until v1.0) that someone can use for real work, and that the next release extends. Each release is built as thin end-to-end slices: interface → Rust rules → files in the task box. No release is "only a library" or "only a backend". Agents and the owner use each release on real projects (glidebox itself, the SSR migration) before the next one starts, and what they learn can reorder the later releases.
+**Rapid iteration (owner, 2026-10-04; the 15 iterations confirmed the same day).** Iterations are numbered 1–15; each ends in a release (v0.1 … v0.14, then v1.0). Glidebox grows from a small prototype. **Every release is a usable product**: an installable desktop app (macOS and Windows; unsigned builds until v1.0) that someone can use for real work, and that the next release extends. Each release is built as thin end-to-end slices: interface → Rust rules → files in the task box. No release is "only a library" or "only a backend". Agents and the owner use each release on real projects (glidebox itself, the SSR migration) before the next one starts, and what they learn can reorder the later releases.
 
 **Now / Next / Later** — iterations kept small (owner, 2026-10-04): each adds one visible capability to an app that already works.
 

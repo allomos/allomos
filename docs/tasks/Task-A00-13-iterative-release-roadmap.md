@@ -11,6 +11,7 @@
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-04 | Re-plan milestones in a rapid-iteration pattern: start from a small prototype; every milestone produces a usable product | owner (chat) |
+| 2026-10-04 | Confirmed the 15 iterations as they stand | owner (chat) |
 | 2026-10-04 | v0.1 is used for the current project's (glidebox's) own tasks | owner (chat) |
 
 ## Notes

@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; eleven cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
+**Nothing is claimed; ten cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -39,7 +39,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Reuse of the owner's own Glidelines code: A extend · B standalone · C shared core · D Glidelines as a view (open-source bases are ruled out by 0008) | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-A00-03`](./tasks/Task-A00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
-| **Release roadmap:** confirm the 15 small iterations (v0.1 macOS → v0.2 + Windows → … → v1.0), each a usable release, and what goes into Iteration 1. | [PLAN § 9](./product/PLAN.md#9-roadmap--releases), [`Task-A00-13`](./tasks/Task-A00-13-iterative-release-roadmap.md) | starting v0.1 |
 | **Selling glidebox:** commercial model and source licence (open client with paid cloud, or proprietary) | [0008](./decisions/0008-build-our-own.md) | release, licensing of dependencies |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
@@ -59,7 +58,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-03-glidelines-relationship`](./tasks/Task-A00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-A00-10-docs-consistency-review`](./tasks/Task-A00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
-| [`Task-A00-13-iterative-release-roadmap`](./tasks/Task-A00-13-iterative-release-roadmap.md) | waiting | drafted | — | owner confirms the release roadmap |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | backlog | — | — | owner card review (first Iteration 1 card) |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
@@ -72,6 +70,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Card | Label | When |
 |---|---|---|
 | [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox`, pushed by the owner | 2026-10-04 |
+| [`Task-A00-13-iterative-release-roadmap`](./tasks/Task-A00-13-iterative-release-roadmap.md) | owner confirmed — 15 iterations, each a usable release | 2026-10-04 |
 | [`Task-A00-12-desktop-platforms-and-shared-code`](./tasks/Task-A00-12-desktop-platforms-and-shared-code.md) | owner accepted — Tauri 2, macOS + Windows, one interface code base | 2026-10-04 |
 | [`Task-A00-06-git-sync-proposal`](./tasks/Task-A00-06-git-sync-proposal.md) | owner accepted — Git text files are the source of truth | 2026-10-04 |
 | [`Task-A00-07-open-source-base-decision`](./tasks/Task-A00-07-open-source-base-decision.md) | owner accepted — build our own | 2026-10-04 |
