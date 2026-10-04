@@ -8,11 +8,11 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; eight cards are open; no application code exists yet.** Glidebox is in planning (milestone M0).
+**Nothing is claimed; nine cards are open; no application code exists yet.** Glidebox is in planning (milestone M0).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-W00-07`](./tasks/Task-W00-07-open-source-base-decision.md)).
-- The product shape: a **desktop app as the hub**, with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Each project's data lives in a **folder the user chooses**, standalone or inside an existing project folder ([`W00-11`](./tasks/Task-W00-11-project-data-folder.md)), as **readable text files tracked by Git** ([`W00-06`](./tasks/Task-W00-06-git-sync-proposal.md)).
+- The product shape: a **desktop app for macOS and Windows as the hub**, sharing one interface code base with the browser and phone ([`W00-12`](./tasks/Task-W00-12-desktop-platforms-and-shared-code.md)), with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Each project's data lives in a **folder the user chooses**, standalone or inside an existing project folder ([`W00-11`](./tasks/Task-W00-11-project-data-folder.md)), as **readable text files tracked by Git** ([`W00-06`](./tasks/Task-W00-06-git-sync-proposal.md)).
 - Requirements for local and cloud projects, AI-generated project setup and interfaces are recorded ([`W00-04`](./tasks/Task-W00-04-local-and-cloud-requirements.md), [`W00-08`](./tasks/Task-W00-08-ai-generated-project-setup.md), [`W00-09`](./tasks/Task-W00-09-interface-requirements.md)).
 - The 2026-10-04 review has fixed the documents ([`Task-W00-10`](./tasks/Task-W00-10-docs-consistency-review.md)).
 
@@ -28,7 +28,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `main` — Claude Code docs session | [`Task-W00-12`](./tasks/Task-W00-12-desktop-platforms-and-shared-code.md) | 2026-10-04 | Owner chooses the desktop framework |
 
 ## Waiting on the owner
 
@@ -40,7 +39,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Reuse of the owner's own Glidelines code: A extend · B standalone · C shared core · D Glidelines as a view (open-source bases are ruled out by 0008) | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-W00-03`](./tasks/Task-W00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
-| **Desktop hub and companions:** what do companions show when the desktop is off? Which desktop systems first? How should the desktop app send the code email? | [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | W04, W10, M2–M2b |
+| **Desktop hub and companions:** what do companions show when the desktop is off? How should the desktop app send the code email? | [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | W04, W10, M2–M2b |
+| **Desktop framework:** Electron (recommended: one language everywhere, larger app) or Tauri (smaller app, native side in Rust)? macOS and Windows together, or one first? Buy code signing now or later (Apple about US$99/year; Windows certificate usually paid)? | [0011](./decisions/0011-desktop-framework-and-shared-code.md) | `apps/desktop` (W04) |
 | **Milestone order:** confirm moving cloud projects from M2 to M4, so that M2 = desktop hub and M2b = companion viewing; confirm placing AI-generated setup (W09) with M2 | [PLAN § 9](./product/PLAN.md#9-milestones) | planning of M2 |
 | **Selling glidebox:** commercial model and source licence (open client with paid cloud, or proprietary) | [0008](./decisions/0008-build-our-own.md) | release, licensing of dependencies |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
@@ -61,7 +61,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
-| [`Task-W00-12-desktop-platforms-and-shared-code`](./tasks/Task-W00-12-desktop-platforms-and-shared-code.md) | in progress | — | `main` — Claude Code docs session | recording in progress |
+| [`Task-W00-12-desktop-platforms-and-shared-code`](./tasks/Task-W00-12-desktop-platforms-and-shared-code.md) | waiting | drafted | — | owner chooses the desktop framework (0011) |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
 | [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | `Task-W01-01` model; owner card review |
 | [`Task-W10-01-remote-access-research`](./tasks/Task-W10-01-remote-access-research.md) | backlog | — | — | owner card review |

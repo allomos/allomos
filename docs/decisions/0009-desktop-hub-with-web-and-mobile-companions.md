@@ -45,7 +45,7 @@ Answered 2026-10-04: companions can act (through the desktop app); access from o
 
 1. ~~Mobile form~~ — **decided 2026-10-04: a phone-friendly web page.**
 2. **When the desktop app is off:** should companions show nothing, or the last data they saw (read-only)?
-3. **Which desktop systems first:** macOS only, or also Windows and Linux?
+3. ~~Which desktop systems~~ — **decided 2026-10-04: macOS and Windows** ([0011](./0011-desktop-framework-and-shared-code.md)).
 4. **How to reach the desktop from outside cheaply:** to be researched. Candidates have free tiers, for example a tunnel service, a private network service, or a small relay. Each is an external service needing approval.
 5. **How the desktop app sends the code email:** for example through the desktop user's own email account (no extra cost), or through a mail-sending service. Sending email is an external operation.
 

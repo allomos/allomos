@@ -50,6 +50,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D8](../decisions/0008-build-our-own.md) | **Build our own.** No open-source tracker (e.g. Backlog.md) is used as a base or fork; they are references only. | **accepted 2026-10-04** |
 | [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
 | [D10](../decisions/0010-project-data-folder.md) | **User-chosen data folder.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
+| [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: Electron recommended. | **requirements accepted 2026-10-04**; framework proposed |
 
 ## 5. Data model (first cut)
 
@@ -100,10 +101,10 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 ## 8. Architecture (proposed)
 
 - **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `packages/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
-- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. The desktop framework (e.g. a web UI in a native shell), pairing and network security are open.
+- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: Electron recommended, owner to choose.
 - **Monorepo** (pnpm, TypeScript):
   - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
-  - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
+  - `apps/desktop` — the desktop hub for macOS and Windows: native shell (Electron recommended), local store, Git, agent runner, MCP, local server for companions
   - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser and phone companions; the phone companion is a phone-friendly layout of this web UI ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
   - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); Git-tracked JSON/Markdown files per D7, plus a rebuildable index kept outside the folder
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)

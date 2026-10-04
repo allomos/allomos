@@ -40,3 +40,5 @@ Plain meanings of the words used in glidebox's documents and product.
 | **Fork** | Copying another project's code to build on it. Ruled out for glidebox by [0008](./decisions/0008-build-our-own.md). |
 | **OPFS** | Origin private file system: browser storage that belongs to one website, is hidden from the user's folders, and is lost when site data is cleared. |
 | **Data folder** | The folder that holds one local project's data, chosen by the user: a standalone folder or a subfolder of an existing project folder ([0010](./decisions/0010-project-data-folder.md)). |
+| **Electron / Tauri** | Two frameworks for building desktop apps from a web interface. Electron's native side is TypeScript (larger app); Tauri's is Rust (smaller app). See [0011](./decisions/0011-desktop-framework-and-shared-code.md). |
+| **Code signing** | A digital signature that lets macOS and Windows confirm who published an app, so it installs without security warnings. Usually paid. |

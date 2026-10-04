@@ -80,7 +80,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | ID | Requirement | Source | Status |
 |---|---|---|---|
 | R60 | The app is well structured to provide interfaces for both people and AI agents. | owner, 2026-10-03 | accepted |
-| R61 | Human UI supports desktop and mobile use. Packaging is set by R69–R71; operating systems and release order remain undecided. | owner, 2026-10-03; updated 2026-10-04 | accepted |
+| R61 | Human UI supports desktop and mobile use. Packaging is set by R69–R71; desktop systems by R81; release order remains undecided. | owner, 2026-10-03; updated 2026-10-04 | accepted |
 | R62 | Investigate and consider browser and human CLI interfaces alongside desktop/mobile; agent CLI/MCP remains required by R11. | owner, 2026-10-03 | accepted |
 | R63 | Graphical clients, CLI, MCP and imports use shared task commands/queries with consistent validation, permissions and event recording. | [interface contract](./INTERFACES.md) | proposed |
 | R64 | Agent interfaces expose discoverable capabilities, versioned structured inputs/results, bounded task context and actionable errors. | [interface contract](./INTERFACES.md) | proposed |
@@ -95,6 +95,8 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R78 | Companions can connect **from outside** the local network, using a **free or very cheap** method. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R79 | **Pairing:** the companion user gives a valid email address and an alias; the desktop user approves the email; the desktop app sends a long verification code to that email; the code grants access. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R80 | Pairing codes are single-use and short-lived; the desktop user can remove a paired device at any time; pairing and companion actions are recorded. | [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | proposed |
+| R81 | The desktop app ships for **macOS and Windows**. | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
+| R82 | The desktop window, browser companion and phone companion **share one interface source code**; only the desktop app adds native parts (Git, agent operations, MCP, data folder, local server and other OS needs). | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
 
 Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared structure; [interface research](../research/interface-patterns.md) records primary sources, platform options and limitations. Detailed command/schema and packaging choices have not been accepted.
 
