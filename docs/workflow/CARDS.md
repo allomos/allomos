@@ -84,6 +84,14 @@ One card is worked by exactly one session at a time. The board, not memory or ch
 ```markdown
 # Task-A00-00-short-description
 
+*Card type: coding / research / decision / docs.*
+
+## What gets built (plain words)
+
+A short table or list: each piece, what it is in everyday words, and where it lives. What the owner can do or see at the end.
+
+## Details for the worker
+
 - **Outcome.** One or two plain sentences: what a person or agent can do when this is done.
 - **Decisive unknowns.** Facts to find out (not design), each with who can answer.
 - **Files owned.** Paths this card creates or changes; shared files named explicitly.

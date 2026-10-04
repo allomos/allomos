@@ -1,6 +1,22 @@
 # Task-A01-01-walking-skeleton
 
-*First card of **Iteration 1 — v0.1 macOS local tracker** ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)).*
+*First card of **Iteration 1 — v0.1 macOS local tracker** ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)). This is a **coding** card: it produces runnable software.*
+
+## What gets built (plain words)
+
+| Piece | What it is | Where |
+|---|---|---|
+| Core rules (Rust) | What a project, an area and a task are, and the checks that say whether their files are valid | `crates/core` |
+| Task box reader (Rust) | Opens a task box folder, reads its files, or creates a small starter project in an empty folder | `crates/store` |
+| Desktop app | The macOS app you start; a Tauri 2 window that hosts the interface and talks to the Rust code | `apps/desktop` |
+| Interface | A folder picker, and a list of the task box's tasks grouped by area, showing each task's state | `apps/web` |
+| File format v1 | A short contract describing the files inside `.glidebox/`, so agents and later code write them correctly | `docs/product/FILE-FORMAT.md` |
+| Coding rules v1 | A short contract for how code in this repository is written and tested | `docs/workflow/CODING_RULES.md` |
+| Tests | Automatic checks of the rules and the reader; must pass before the card is done | inside each piece |
+
+**What you can do at the end:** start glidebox on your Mac, pick a folder, and see its tasks grouped by area. It is view-only: creating and editing tasks come later (the `gb` command next, in-app editing in Iteration 2).
+
+## Details for the worker
 
 - **Outcome.** The owner installs a development build of glidebox on **macOS**, picks a task box (a new standalone folder, or a subfolder of an existing Git repository), and sees the tasks stored there, grouped by area, with each task's state. If the folder is empty, glidebox creates a small starter project in it. This is the thinnest end-to-end version: the interface, the Rust rules and the files all connected.
 - **Decisive unknowns** (the worker finds out):
