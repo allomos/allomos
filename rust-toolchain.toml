@@ -1,0 +1,5 @@
+# Rust 1.85 is the version installed on the owner's Mac (Homebrew). Tauri is pinned to 2.11.x,
+# the last line that supports it. Moving to a newer Rust is a deliberate change on its own card.
+[toolchain]
+channel = "1.85.1"
+components = ["rustfmt", "clippy"]

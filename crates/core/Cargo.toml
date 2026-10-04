@@ -1,0 +1,12 @@
+[package]
+name = "glidebox-core"
+description = "Glidebox project rules: what a project, an area and a task are, and how their files are checked."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

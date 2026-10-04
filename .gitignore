@@ -19,3 +19,9 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# Agent worktrees
+.claude/worktrees/
+
+# Rust and Tauri build output
+target/
