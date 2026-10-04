@@ -36,13 +36,13 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
-### Task-W00-10 — `main` (Claude Code docs-review session)
+### Task-W00-11 — `main` (Claude Code docs session)
 - Checkout: `/Users/wanghui/coding/glidepace/glidebox` · branch `main` · pushed: no (no remote)
-- Approvals in force: fix the 2026-10-04 review findings and record "build our own" and the desktop hub (local docs only). Nothing external.
-- Uncommitted: none after the review commit
+- Approvals in force: record the owner's data-folder requirement (local docs only). Nothing external.
+- Uncommitted: decision 0010 and related edits, until the next commit
 - Running: none
-- Unrecorded findings: none — see [the review record](./discussions/2026-10-04-docs-review.md)
-- Next action: the owner reviews the corrected documents; then release the card and delete this block
+- Unrecorded findings: none
+- Next action: commit the record, then the owner reviews it
 
 ## Live state
 

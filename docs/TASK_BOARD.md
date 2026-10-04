@@ -27,7 +27,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `main` — Claude Code docs-review session | [`Task-W00-10`](./tasks/Task-W00-10-docs-consistency-review.md) | 2026-10-04 | Owner reviews the corrected documents |
+| `main` — Claude Code docs session | [`Task-W00-11`](./tasks/Task-W00-11-project-data-folder.md) | 2026-10-04 | Owner reviews the data-folder requirement |
 
 ## Waiting on the owner
 
@@ -62,7 +62,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-02-github-remote`](./tasks/Task-W00-02-github-remote.md) | waiting | — | — | owner names/creates the repository and approves the push |
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W00-06-git-sync-proposal`](./tasks/Task-W00-06-git-sync-proposal.md) | waiting | drafted | — | owner decision on 0007 |
-| [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | `main` — Claude Code docs-review session | owner review of the corrected documents |
+| [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
+| [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | in progress | — | `main` — Claude Code docs session | recording in progress |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
 | [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | `Task-W01-01` model; owner card review |
 | [`Task-W07-01-agent-launch-research`](./tasks/Task-W07-01-agent-launch-research.md) | backlog | — | — | owner card review |
