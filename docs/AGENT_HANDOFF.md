@@ -63,17 +63,18 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 
 - **Git identity** (repo-local config, copied from `glidepace-vibe-cc`): `will.w.hui <willwhui@gmail.com>`. SSH to GitHub authenticates as **`wanghui2sea`**; the owner's other projects push to the `mypals-ml` organization.
 - **Decisions:**
-  - Accepted: [0001](./decisions/0001-database-source-of-truth.md) database is the source of truth; [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0008](./decisions/0008-build-our-own.md) **build our own**, no open-source base.
+  - Accepted: [0007](./decisions/0007-git-like-project-sync.md) **readable text files tracked by Git are the source of truth** (supersedes [0001](./decisions/0001-database-source-of-truth.md)); [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0008](./decisions/0008-build-our-own.md) **build our own**, no open-source base.
   - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**. Web and mobile companions view progress and status and act through the desktop app. They connect from outside at free or very low cost, and pair by email and code. Cloud projects are still needed. [0010](./decisions/0010-project-data-folder.md) **user-chosen data folder**, standalone or inside an existing project folder. It is self-contained, uses the host repository's Git, and allows one writer. Every Git action runs the `git` command.
   - Open: [0003](./decisions/0003-relationship-to-glidelines.md) reuse of the owner's Glidelines code.
-  - Proposed: [0007](./decisions/0007-git-like-project-sync.md) Git storage and sync.
+  - Proposed: 0007's sync and merge details (layout, push/pull experience, merge rules, offline claims).
 - **Commercial intent:** the owner may sell glidebox as a service (2026-10-01). Model and source licence are undecided (board).
 - **Until glidebox can track itself (M3)**, this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding).
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 
 ## Do not assume
 
-- That a decision marked *Proposed* or *Open* is approved — in particular 0007 (Git storage) and 0003 (Glidelines reuse). 0001 stays in force until explicitly superseded.
+- That a decision marked *Proposed* or *Open* is approved — in particular 0003 (Glidelines reuse) and 0007's sync and merge details. Only 0007's storage foundation is accepted.
+- That a database is a source of truth — any database is a rebuildable index outside the data folder (0007).
 - That companions change project data directly — they send requests to the desktop app, which is the only authority (R77).
 - That the mobile companion's form is settled — the owner gave two different answers on 2026-10-04.
 - That an open-source tracker may be forked or its code copied — 0008 rules that out.

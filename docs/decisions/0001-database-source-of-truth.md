@@ -2,7 +2,9 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Accepted** | 2026-09-27 | 2026-09-27 | will.w.hui |
+| **Superseded** by [0007](./0007-git-like-project-sync.md) on 2026-10-04 | 2026-09-27 | 2026-09-27 | will.w.hui |
+
+> **Superseded 2026-10-04.** The owner approved storing each project as readable text files tracked by Git ([0007](./0007-git-like-project-sync.md)); a database is now only a rebuildable index. What still holds from this record: status is structured fields, not prose; it has one home; every change is recorded as an event; and agents write it through the CLI/MCP. Hand-maintained Markdown boards are still only an import source.
 
 ## Context
 

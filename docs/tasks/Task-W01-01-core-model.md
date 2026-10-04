@@ -4,7 +4,7 @@
 - **Decisive unknowns.**
   - Toolchain: proposed TypeScript, pnpm workspaces, Vitest; Node version to pin (owner reviews with the card).
   - How much of Glidelines' `burndown.ts` and forecast code to port vs. rewrite (worker reads the files named in [REFERENCES.md](../REFERENCES.md); safe under every option of [0003](../decisions/0003-relationship-to-glidelines.md)).
-  - Keep the model independent of storage: it must work whether projects end up in a database (0001) or in Git files (0007), and inside the desktop hub (0009). It holds no storage or network code (worker; check with the owner if this proves impossible).
+  - Keep the model free of storage and network code. Since 2026-10-04, projects are Git-tracked JSON/Markdown files ([0007](../decisions/0007-git-like-project-sync.md)), so the model's records and events should map one-to-one to those files. Reading and writing files belongs to `packages/local-store`, not here.
   - Default throughput window (4–6 weeks) and simulation count (worker proposes; owner confirms with the result).
 - **Files owned.** `package.json`, `pnpm-workspace.yaml`, `tsconfig*.json`, `packages/core/**`, `docs/workflow/CODING_RULES.md` (created here: the first coding rules), this card.
 - **External operations.** None (installing npm packages locally is local work).

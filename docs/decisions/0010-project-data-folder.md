@@ -2,7 +2,7 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Requirement and details accepted; storage format open** | 2026-10-04 | 2026-10-04 (requirement) | will.w.hui |
+| **Accepted** | 2026-10-04 | 2026-10-04 (requirement) | will.w.hui |
 
 ## In plain words
 
@@ -46,11 +46,11 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 ## How this fits earlier decisions
 
 - [0006](./0006-local-and-cloud-projects.md): this is where a local project's data lives. It stays on the user's machine and never uploads by itself.
-- [0001](./0001-database-source-of-truth.md) and [0007](./0007-git-like-project-sync.md): the folder works with either storage choice. Under 0001 it holds a database file (for example SQLite). Under 0007 it holds structured text files tracked by Git. A subfolder inside a code repository suits 0007 especially well: task history is reviewed and versioned together with the code. **This leans towards 0007 but does not decide it.**
+- [0001](./0001-database-source-of-truth.md) and [0007](./0007-git-like-project-sync.md): the folder works with either storage choice. **Decided 2026-10-04: the folder holds readable text files tracked by Git (0007), not a database file (0001).** This suits a subfolder inside a code repository especially well: task history is reviewed and versioned together with the code.
 - [0009](./0009-desktop-hub-with-web-and-mobile-companions.md): the desktop hub opens projects from their folders. Companions see the projects through the desktop app, never the folders directly.
 
 ## Open questions (owner)
 
 Answered 2026-10-04: no other kinds of location; one project per repository; ask the user to install `git`; all Git actions use the `git` command.
 
-1. **What goes in the folder:** one database file (0001), or readable text files tracked by Git (0007)? Explained in plain words to the owner on 2026-10-04; recommended: text files.
+~~What goes in the folder~~ — **decided 2026-10-04: readable text files tracked by Git** ([0007](./0007-git-like-project-sync.md)). No questions remain open on this record.

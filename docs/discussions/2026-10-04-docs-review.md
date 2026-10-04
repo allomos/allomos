@@ -73,7 +73,7 @@ Asked whether the mobile companion should be an installed app or a phone-friendl
 | Several projects in one repository? | Not in scope | 0010, PLAN non-goals |
 | Ask the user to install `git` if it is missing? | Yes | R76, 0010 |
 | Pull, status and diff also via the `git` command? | Yes | R76, 0010 |
-| Database file or text files in the folder? | The owner did not understand the question; it was re-explained in plain words, with text files recommended. Awaiting an answer | 0010 question 1 |
+| Database file or text files in the folder? | After a plain-words explanation: **approved text files tracked by Git** (option B) | [0007](../decisions/0007-git-like-project-sync.md) accepted, 0001 superseded, R10 |
 
 ## Proposed plan change to confirm
 

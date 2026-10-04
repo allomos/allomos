@@ -2,13 +2,21 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Proposed** | 2026-10-01 | — | will.w.hui |
+| **Accepted** — Git with readable text files is the source of truth; sync and merge details are proposals to prototype | 2026-10-01 | 2026-10-04 | will.w.hui |
 
 ## In plain words
 
-The owner asked whether glidebox projects could work like code in Git: edit a project on your own machine, then **push** your changes to a shared cloud copy, **pull** other people's changes, and **merge** when you both changed the same thing. This record proposes doing that with real Git, storing each task as small text files. A database would then only be a fast index rebuilt from those files. It is **only a proposal**. If accepted, it replaces decision 0001 (the database is the source of truth). Since [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), the desktop app is the hub, which would own the local Git copy.
+The owner asked whether glidebox projects could work like code in Git: edit a project on your own machine, then **push** your changes to a shared cloud copy, **pull** other people's changes, and **merge** when you both changed the same thing. Glidebox does that with real Git, storing each task as small readable text files. A database is only a fast index rebuilt from those files. **The owner approved this on 2026-10-04**, and it replaces decision 0001 (the database is the source of truth). Since [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), the desktop app is the hub, which would own the local Git copy.
 
-*Update 2026-10-04:* [0010](./0010-project-data-folder.md) lets a project's data folder sit inside an existing code repository. If this proposal is accepted, that repository's Git would version the task files, rather than glidebox creating a nested repository. Commit and push must run the user's installed `git` command (R76), not a separate Git implementation.
+*Update 2026-10-04:* [0010](./0010-project-data-folder.md) lets a project's data folder sit inside an existing code repository. That repository's Git versions the task files, rather than glidebox creating a nested repository. Commit and push must run the user's installed `git` command (R76), not a separate Git implementation.
+
+## Decision (owner, 2026-10-04)
+
+- **A project's data is readable text files** in its data folder ([0010](./0010-project-data-folder.md)): JSON for structured fields, Markdown for narrative text, one canonical record per task. **Git is the source of truth** and holds their history.
+- **Any database is only an index**: a cache kept outside the data folder, used for search, charts and speed, and rebuilt from the files at any time. It is never edited on its own.
+- **All Git actions run the user's `git` command** (R76). Glidebox never commits or pushes unless the user asks (R75).
+- **Accepted here:** this storage foundation. **Still proposals:** the file layout, the push/pull/merge experience, the merge rules, offline claims and approvals, and the cloud remote (sections below). They are to be prototyped with synthetic data in implementation cards, and the owner reviews them there.
+- This **supersedes [0001](./0001-database-source-of-truth.md)**. 0001's goals still hold: structured fields, one home for status, events recorded for every change, and no hand-maintained prose status.
 
 ## Context
 
@@ -49,7 +57,7 @@ Use JSON for structured fields and Markdown for narrative text. Keep stable IDs 
 
 Approvals in files are requests/records, not proof of an authenticated actor. Validate authority through the local trust model or authenticated remote acceptance. Keep runtime processes, session liveness, credentials and disposable indexes outside the tracked project content.
 
-This candidate would **supersede**, rather than merely clarify, the database-source-of-truth decision [0001](./0001-database-source-of-truth.md) if accepted. That accepted decision remains in force pending an explicit owner decision. Its original objection to manually maintained prose status still applies: files here would have a strict schema, one canonical task record, validation and generated views.
+This decision **supersedes** the database-source-of-truth decision [0001](./0001-database-source-of-truth.md) (owner, 2026-10-04). 0001's original objection to manually maintained prose status still applies: files here would have a strict schema, one canonical task record, validation and generated views.
 
 Do not rewrite audit history in normal use. Preserve original actor/time metadata and record remote acceptance separately. Forecasts should distinguish local/unpublished work from accepted shared history and deduplicate changes by stable ID. Exact event-time rules, snapshots, migrations and history retention remain design questions.
 
@@ -78,12 +86,12 @@ An approval applies to an exact operation and relevant target/revision, rather t
 
 Start with one shared main history per project, local change recording, explicit push/pull and field-level conflict resolution. Autosave can record local changes without asking users to make a manual commit after every task edit. Offer human-readable differences such as “you marked this verified; Alex added a failing check.” Add branches and proposal/review flows only when a demonstrated workflow requires them.
 
-The owner asked whether Git can be the foundation with structured folders and text files. It can supply version storage and push/pull transport, reducing the custom synchronization engine we would need to build. Glidebox still needs schema validation, task-aware merge, permissions, atomic local writes and claim/approval handling. Prototype those domain rules before accepting the storage architecture. A local runtime is needed to operate local Git and files; a hosted webpage alone does not establish that capability.
+The owner asked whether Git can be the foundation with structured folders and text files. It can supply version storage and push/pull transport, reducing the custom synchronization engine we would need to build. Glidebox still needs schema validation, task-aware merge, permissions, atomic local writes and claim/approval handling. Prototype those domain rules first, in the implementation cards. A local runtime is needed to operate local Git and files; a hosted webpage alone does not establish that capability.
 
 ## Evidence and open questions
 
 [Git merge documentation](https://git-scm.com/docs/git-merge) describes merging divergent histories with common ancestry. [Git push documentation](https://git-scm.com/docs/git-push) documents remote reference updates and non-fast-forward restrictions. Consulted 2026-10-01. These establish the analogy, not the feasibility or correctness of this unimplemented proposal.
 
-Decide whether to accept actual Git as the source of truth, the user-visible synchronization model, local/cloud packaging, offline permissions, actor verification, forecast event times and conflict experience. Then prototype divergent edits, remote advancement during push, offline competing claims and stale approvals with synthetic data before selecting production storage.
+Git as the source of truth was accepted on 2026-10-04. Still to decide: the user-visible synchronization model, local/cloud packaging, offline permissions, actor verification, forecast event times and conflict experience. Then prototype divergent edits, remote advancement during push, offline competing claims and stale approvals with synthetic data before selecting production storage.
 
 [Git attributes documentation](https://git-scm.com/docs/gitattributes) supports custom merge drivers, but driver configuration must be installed on each relevant client/server; a tracked attributes file alone does not install the executable. Git line merging does not establish valid task semantics. Consulted 2026-10-01.

@@ -30,7 +30,7 @@ The production generation prompt must follow a versioned schema shared with the 
 
 The prompt must instruct agents to distinguish known information from assumptions and leave unavailable dates or estimates unknown. It must not ask an agent to invent completed work, verification evidence, historical events or approvals. A new plan starts with unperformed work; when converting existing records, preserve provided history and identify missing history so forecasting does not treat fabricated dates as observations.
 
-JSON fields with Markdown descriptions in structured folders are an illustrative candidate under [0007](../decisions/0007-git-like-project-sync.md), not yet a finalized interchange format. An agent should generate exactly the supported contract once it exists; accepting arbitrary prose and guessing task state is not the proposed normal path.
+JSON fields with Markdown descriptions in structured folders are the accepted storage direction ([0007](../decisions/0007-git-like-project-sync.md)); the exact schema is not yet finalized. An agent should generate exactly the supported contract once it exists; accepting arbitrary prose and guessing task state is not the proposed normal path.
 
 ## Validation and adoption rules — proposed
 
@@ -55,4 +55,4 @@ These are proposed checks, not results that have run:
 
 This is a new project-creation/import path, distinct from [R15's SSR board import](./REQUIREMENTS.md#source-of-truth-and-agents). It can reuse model validation and conversion utilities but does not expand the current SSR importer card automatically. It also does not require implementing [R30's agent launch](./REQUIREMENTS.md#agent-sessions) first: an external agent can generate the bundle.
 
-[0001](../decisions/0001-database-source-of-truth.md) still governs live storage until superseded. Generated files can be validated input without becoming an uncontrolled second source of live status. If [0007](../decisions/0007-git-like-project-sync.md) is accepted, native structured files can instead be canonical Git content.
+Live storage follows [0007](../decisions/0007-git-like-project-sync.md), accepted 2026-10-04: a valid generated bundle in the native format can become the project's canonical Git-tracked files after validation and preview. Invalid or foreign formats are converted or rejected, never adopted as-is.

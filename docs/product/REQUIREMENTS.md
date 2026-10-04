@@ -12,15 +12,15 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R4 | A **burndown chart** showing remaining work and total scope over time. | owner, 2026-09-27 | accepted |
 | R5 | **Estimate the project's finish date** from the burndown, shown as a range (50% / 85% confidence). | owner, 2026-09-27; [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
 | R6 | The burndown counts **tasks**; a task may carry an **optional size**, with a size-weighted view when sizes exist. | [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
-| R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md), kept by [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
 
 ## Source of truth and agents
 
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R10 | Each project's **database is the source of truth**: local for a local project, hosted for a cloud project; Markdown is an optional export. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
-| R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md) | accepted |
+| R10 | Each project's **source of truth is readable text files tracked by Git** (JSON fields, Markdown narrative) in its data folder; any database is a rebuildable index. Hand-maintained Markdown boards are only an import source. | owner, 2026-10-04; [0007](../decisions/0007-git-like-project-sync.md) | accepted |
+| R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md), kept by [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R12 | **Claiming is exclusive**: one task, one holder. A claim is atomic within one project authority (a local project's desktop app, or the cloud service for a connected cloud project). A claim made while disconnected from that authority is only tentative and is shown as such ([0007](../decisions/0007-git-like-project-sync.md)). | PLAN; revised 2026-10-04 | proposed |
 | R13 | A configurable **label ladder** per project (default: implemented → locally verified → connected → deployed and verified). | PLAN | proposed |
 | R14 | **Waiting-on** is a structured field (owner check, approval, another task, external) with who and a note. | PLAN | proposed |

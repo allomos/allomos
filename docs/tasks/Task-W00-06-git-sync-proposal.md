@@ -13,7 +13,10 @@
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-01 | Write the Git-like synchronization proposal after the owner's question | owner (chat) |
+| 2026-10-04 | Approve option B: readable text files tracked by Git as the source of truth (accept 0007, supersede 0001) | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — **Owner approved.** 0007 is now Accepted (storage foundation) and 0001 is Superseded. R10, PLAN, 0003, 0006, 0010, INTERFACES, AI-GENERATED-PROJECTS and `Task-W01-01` were updated. Sync and merge details remain proposals, to be prototyped in implementation cards.
 
 - 2026-10-01 — First proposal, then refined after the owner asked about actual Git with structured text folders. It proposes Git as the canonical storage and the database as a rebuildable index, with stable-ID JSON/Markdown files and task-aware merge. It is not accepted; 0001 stays in force.

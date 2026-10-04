@@ -38,7 +38,7 @@ This is logical separation, not a mandate for a network server, always-running d
 
 Human and agent workflows share business meaning, but can have different permissions and presentation. An agent may request an approval while a permitted person records the decision. A hidden UI button or a tool annotation cannot enforce that distinction; the shared authority must check it.
 
-Storage follows accepted [0001](../decisions/0001-database-source-of-truth.md) until explicitly superseded. The actual-Git candidate [0007](../decisions/0007-git-like-project-sync.md) would use canonical structured files and derived indexes. Both candidates can use this interface separation. Under a file-based candidate, externally edited files also need validation and reconciliation before being treated as valid task state; arbitrary file edits cannot bypass approval authority.
+Storage follows [0007](../decisions/0007-git-like-project-sync.md), accepted 2026-10-04: canonical structured text files tracked by Git, with derived indexes. Under file-based storage, externally edited files also need validation and reconciliation before being treated as valid task state; arbitrary file edits cannot bypass approval authority.
 
 ## Human surfaces
 

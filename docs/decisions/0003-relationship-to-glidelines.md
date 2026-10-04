@@ -18,7 +18,7 @@ Inside it there is already a separate, relevant feature:
 - **An SSR migration converter** (`docs/task-files/convert-ssr-plan.py`) and a reviewed snapshot (`docs/task-files/examples/ssr-migration.tasklist.json`, 44 tasks / 16 workstreams, as of 2026-09-08). The converter is specific to that board and refuses to run once the board's text changes.
 - **An estimate-based forecast** for GitHub projects (`src/lib/forecastDashboardUtils.ts`, `forecastAssumptionsConfig.ts`): capacity days per week, workers, remaining-percentage by status.
 
-Glidebox needs (see [PLAN.md](../product/PLAN.md)): a database as source of truth ([0001](./0001-database-source-of-truth.md)), team accounts and roles, realtime collaboration, agent write access through a CLI/MCP, an event log, and a throughput-based burndown forecast.
+Glidebox needs (see [PLAN.md](../product/PLAN.md)): Git-tracked text files as source of truth ([0007](./0007-git-like-project-sync.md), which replaced the database decision 0001 on 2026-10-04), team accounts and roles, realtime collaboration, agent write access through a CLI/MCP, an event log, and a throughput-based burndown forecast.
 
 ## Options
 

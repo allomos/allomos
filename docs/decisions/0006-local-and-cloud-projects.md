@@ -13,7 +13,7 @@ The owner requires Glidebox to run purely locally, keeping project and task info
 - Local projects store project information, tasks and event history locally and support tracking without sign-in, a cloud account or a Glidebox hosted service.
 - Cloud projects are optional and require sign-in; the existing cloud collaboration and invitation requirements apply there.
 - Local data stays local unless the user explicitly chooses to transfer or share it.
-- Each project’s database remains its source of truth under [0001](./0001-database-source-of-truth.md). Local mode does not restore Markdown as the live database.
+- Each project's source of truth is its Git-tracked text files under [0007](./0007-git-like-project-sync.md), which superseded 0001 on 2026-10-04. Hand-maintained Markdown boards are still not live input.
 
 ## Consequences
 

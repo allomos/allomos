@@ -40,13 +40,13 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 | # | Decision | Status |
 |---|---|---|
-| [D1](../decisions/0001-database-source-of-truth.md) | **The database is the source of truth.** Agents write structured fields through the CLI/MCP; markdown is an optional export, not an input. A one-time importer brings in existing markdown boards. | **accepted 2026-09-27** |
+| [D1](../decisions/0001-database-source-of-truth.md) | ~~The database is the source of truth.~~ Agents write structured fields through the CLI/MCP; hand-maintained markdown boards come in through an importer. | **superseded by D7, 2026-10-04** |
 | [D2](../decisions/0002-burndown-counts-plus-sizes.md) | **Burndown uses task counts, plus optional sizes.** Every task counts as 1; a task may carry an optional size (points or days), and the chart can switch to size-weighted when sizes are present. | **accepted 2026-09-27** |
 | [D3](../decisions/0003-relationship-to-glidelines.md) | **Relationship to Glidelines.** Leaning: standalone product, reusing Glidelines ideas and code where it fits (same stack family; port the `tasklist.json` format and burndown/forecast logic from `glidepace-vibe-cc`, not fork the app). Options A–D are compared in the decision record. | **open — not decided** |
 | [D4](../decisions/0004-team-accounts-and-roles.md) | **Cloud team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
 | [D5](../decisions/0005-start-and-open-agent-sessions.md) | **Start and open agent sessions from glidebox**, through a local runner daemon (`gb runner`) on a person's machine or a vendor cloud session. | **requirement accepted 2026-09-27**; design proposed |
 | [D6](../decisions/0006-local-and-cloud-projects.md) | **Local-only and optional cloud projects.** Local tracking stores data on the user’s machine without sign-in; cloud projects require sign-in. Storage technology and transfer/sync design remain open. | **requirement accepted 2026-10-01** |
-| [D7](../decisions/0007-git-like-project-sync.md) | **Git-like project history and sync.** Actual Git with structured files as the source of truth, a rebuildable index, and push/pull/merge with a cloud copy. Would supersede D1 if accepted. | proposed — not approved |
+| [D7](../decisions/0007-git-like-project-sync.md) | **Git with readable text files is the source of truth.** JSON fields and Markdown narrative in the data folder; a database is only a rebuildable index; push/pull/merge with a cloud copy. | **accepted 2026-10-04**; sync and merge details proposed |
 | [D8](../decisions/0008-build-our-own.md) | **Build our own.** No open-source tracker (e.g. Backlog.md) is used as a base or fork; they are references only. | **accepted 2026-10-04** |
 | [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
 | [D10](../decisions/0010-project-data-folder.md) | **User-chosen data folder.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
@@ -106,13 +106,13 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
   - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
   - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser companions
   - `apps/mobile` — mobile companion; native app or phone-friendly web page still to be confirmed ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
-  - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); database file per D1, or Git-tracked files if D7 is accepted
+  - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); Git-tracked JSON/Markdown files per D7, plus a rebuildable index kept outside the folder
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex
   - `packages/runner` — local daemon (`gb runner`): receives start requests, creates worktrees, launches and resumes agents, reports session state
   - `packages/importer` — markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`)
-  - `supabase/` — Postgres schema, RLS policies, SQL functions (atomic claim), migrations
-- **Storage modes:** local projects use a persistent database on the user’s machine; cloud projects use a hosted database and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. Local database technology and packaging remain open.
+  - `supabase/` — cloud side (proposed): sign-in, roles, atomic claims and the cloud project index; how it hosts the Git remote is open under D7
+- **Storage modes ([D7](../decisions/0007-git-like-project-sync.md)):** local projects are Git-tracked text files in a user-chosen data folder, with a rebuildable index outside it. Cloud projects are a hosted copy (a Git remote with server-side permission checks) and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. Local database technology and packaging remain open.
 - **Cloud backend (proposed):** Supabase — Postgres, Auth (cloud sign-in), Row Level Security per project and role, Realtime for live updates. Cloud agents use scoped project tokens; local agent access must work without a cloud token.
 - **Transfer and sync:** moving/copying a local project to the cloud, offline cloud edits, and two-way synchronization remain open; do not assume automatic uploads.
 - **Hosting:** to decide (Vercel or Cloudflare).
