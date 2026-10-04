@@ -34,7 +34,15 @@ Updated: 2026-10-04
 
 ## Active resume
 
-One block per card in the board's Sessions table. None claimed.
+One block per card in the board's Sessions table.
+
+### Task-A01-01 — `claude/a01-01-walking-skeleton`
+- Checkout: `/Users/wanghui/coding/glidepace/glidebox/.claude/worktrees/a01-01` · branch `claude/a01-01-walking-skeleton` · pushed: claim only
+- Approvals in force: all local work for this card (owner, 2026-10-04). NOT: signing, publishing, hosted services
+- Uncommitted: none
+- Running: none
+- Unrecorded findings: Rust 1.85.1 via Homebrew (no rustup); Node 22.14; npm (no pnpm); full Xcode present
+- Next action: create the worktree, scaffold the Cargo workspace, `crates/core`, `crates/store`
 
 ## Live state
 

@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; eleven cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
+**One card is claimed; eleven cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -29,6 +29,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
+| `claude/a01-01-walking-skeleton` | [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) | 2026-10-04 | Owner starts the macOS dev build and sees a task box's tasks by area |
 
 ## Waiting on the owner
 
@@ -45,7 +46,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
 | UI languages (Glidelines has en / ja / zh-CN / zh-TW) | [REQUIREMENTS](./product/REQUIREMENTS.md) | W04 |
-| Review the first code card [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) (Iteration 1 walking skeleton: macOS Tauri app opens a task box and shows its tasks) | the card | first code |
 
 ## Cards
 
@@ -61,7 +61,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | backlog | — | — | owner card review (first Iteration 1 card) |
+| [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | in progress | — | `claude/a01-01-walking-skeleton` | build the walking skeleton |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |

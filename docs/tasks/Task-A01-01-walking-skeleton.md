@@ -45,6 +45,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-04 | Card approved: all local work (source, tests, docs, commits, pushes; installing toolchains and packages locally). No external operations. | owner (chat) |
 
 ## Notes
 
