@@ -43,7 +43,7 @@ Checked 2026-10-04.
 | What | Where | Notes |
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
-| Git remote | **none** | Do not add or push until [`Task-W00-02`](./tasks/Task-W00-02-github-remote.md) is approved |
+| Git remote | `origin` = `https://github.com/mypals-ml/glidebox.git` (added by the owner, 2026-10-04) | Push only when the owner asks ([AI-WORKFLOW](./workflow/AI-WORKFLOW.md#when-to-start-a-new-session)); confirm with `git status -sb` that a push landed |
 | Worktrees | none besides the main checkout | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 
@@ -61,7 +61,7 @@ Lessons that change what you do.
 
 Decisions and boundaries the board does not carry. If a bullet contradicts the board, the board is right — correct the bullet.
 
-- **Git identity** (repo-local config, copied from `glidepace-vibe-cc`): `will.w.hui <willwhui@gmail.com>`. SSH to GitHub authenticates as **`wanghui2sea`**; the owner's other projects push to the `mypals-ml` organization.
+- **Git identity** (repo-local config): `willwhui <willwhui@gmail.com>`, set by the owner's request on 2026-10-04 (earlier commits say `will.w.hui`). The remote uses HTTPS. SSH to GitHub authenticates as `wanghui2sea`.
 - **Decisions:**
   - Accepted: [0007](./decisions/0007-git-like-project-sync.md) **readable text files tracked by Git are the source of truth** (supersedes [0001](./decisions/0001-database-source-of-truth.md)); [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0008](./decisions/0008-build-our-own.md) **build our own**, no open-source base.
   - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**. Web and mobile companions view progress and status and act through the desktop app. They connect from outside at free or very low cost, and pair by email and code. Cloud projects are still needed. [0010](./decisions/0010-project-data-folder.md) **user-chosen data folder**, standalone or inside an existing project folder. It is self-contained, uses the host repository's Git, and allows one writer. Every Git action runs the `git` command.
