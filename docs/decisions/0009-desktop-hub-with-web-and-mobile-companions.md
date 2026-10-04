@@ -21,6 +21,7 @@ The full product should be a desktop application. It provides a web program and 
   - starting and opening agent sessions
   - the local CLI and MCP access for agents
 - **Web and mobile are companion clients.** They connect to a **running** desktop app and show its projects. Viewing at least covers **progress and status**: task states, workstream progress, charts and burndown, and what is waiting on whom.
+- **The mobile companion is an installed native app** (owner, 2026-10-04), installed from the App Store / Google Play. It is not only a phone-friendly web page. The web companion remains for browsers.
 - The desktop app works on its own; companions are optional.
 - Each local project's data lives in a folder the user chooses ([0010](./0010-project-data-folder.md)).
 
@@ -37,7 +38,7 @@ The full product should be a desktop application. It provides a web program and 
 3. **Pairing and security:** how a phone or browser is allowed in (for example by scanning a QR code shown on the desktop), and how access is removed again.
 4. **When the desktop app is off:** should companions show nothing, or the last data they saw (read-only)?
 5. **Cloud projects (R42):** are they still needed, or does desktop-to-companion connection replace them for now? Today they remain an accepted requirement, so this record does not drop them.
-6. **Form of the mobile app:** an installed native app, or a phone-friendly web page served by the desktop app?
+6. ~~Form of the mobile app~~ — **decided 2026-10-04: installed native app.** Still open: iOS, Android or both first, and the framework (for example a cross-platform framework, or fully native).
 7. **Which desktop systems first:** macOS only, or also Windows and Linux?
 
 ## Consequences

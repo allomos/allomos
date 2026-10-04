@@ -10,8 +10,11 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-04 | Mobile companion is an installed native app (answer to 0009 Q6) | owner (chat) |
 | 2026-10-04 | Fix the review findings; record the decision to build our own instead of starting from an open-source base | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — The owner answered 0009 question 6: the mobile companion is an **installed native app**. Recorded in 0009, R70, PLAN and the board.
 
 - 2026-10-04 — Review findings: [discussion record](../discussions/2026-10-04-docs-review.md).

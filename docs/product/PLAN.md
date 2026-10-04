@@ -104,7 +104,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
   - `packages/core` — domain model, validation, burndown and forecast (pure, unit-tested; shared by all others)
   - `apps/desktop` — the desktop hub: native shell, local store, local server for companions
   - `apps/web` — React + Vite + Tailwind UI (charts, lists, inbox), used inside the desktop app and served to browser companions
-  - `apps/mobile` — mobile companion (native app or phone-friendly web: open, see [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md))
+  - `apps/mobile` — mobile companion, an installed native app ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); platforms and framework open
   - `packages/local-store` — local project storage adapter, reading and writing the project's user-chosen data folder ([D10](../decisions/0010-project-data-folder.md)); database file per D1, or Git-tracked files if D7 is accepted
   - `packages/cli` — `gb` command for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `packages/mcp` — MCP server exposing the same operations to Claude Code and Codex

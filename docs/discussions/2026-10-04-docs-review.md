@@ -55,6 +55,10 @@ The owner added: in the desktop application, the data source folder should be ab
 
 The owner then added that **commit and push are performed by calling `git` commands**. This is recorded as R76 (accepted): glidebox runs the user's installed `git`, so the user's own settings, credentials and hooks apply.
 
+## Mobile companion form
+
+Asked whether the mobile companion should be an installed app or a phone-friendly web page, the owner chose an **installed native app**. Recorded in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) and R70.
+
 ## Proposed plan change to confirm
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.
