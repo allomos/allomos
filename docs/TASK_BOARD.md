@@ -28,6 +28,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
+| `main` — Claude Code docs session | [`Task-W00-14`](./tasks/Task-W00-14-areas-and-naming.md) | 2026-10-04 | Owner reviews the new areas |
 
 ## Waiting on the owner
 
@@ -61,6 +62,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-W00-13-iterative-release-roadmap`](./tasks/Task-W00-13-iterative-release-roadmap.md) | waiting | drafted | — | owner confirms the release roadmap |
+| [`Task-W00-14-areas-and-naming`](./tasks/Task-W00-14-areas-and-naming.md) | in progress | — | `main` — Claude Code docs session | renaming in progress |
 | [`Task-W04-01-walking-skeleton`](./tasks/Task-W04-01-walking-skeleton.md) | backlog | — | — | owner card review (first Iteration 1 card) |
 | [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | Iteration 4 (burndown and forecast) |
 | [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | Iteration 6 |
