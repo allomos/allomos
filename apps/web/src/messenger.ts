@@ -9,6 +9,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo, Opened } from "./types";
 
 export interface Messenger {
+  /** A folder given when glidebox was started, if any. */
+  startupFolder(): Promise<string | null>;
   /** Ask the user to pick a folder. Returns null if they cancel. */
   pickFolder(): Promise<string | null>;
   inspectFolder(path: string): Promise<FolderInfo>;
@@ -17,6 +19,7 @@ export interface Messenger {
 }
 
 export const desktopMessenger: Messenger = {
+  startupFolder: () => invoke<string | null>("startup_folder"),
   async pickFolder() {
     const picked = await open({ directory: true, multiple: false, title: "Choose a folder for the task box" });
     return typeof picked === "string" ? picked : null;

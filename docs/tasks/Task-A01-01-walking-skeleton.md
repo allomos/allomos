@@ -49,6 +49,13 @@
 
 ## Notes
 
+- 2026-10-04 — **Built.** Rust workspace (`crates/core`, `crates/store`); Tauri 2.11.6 desktop app; React interface talking to Rust only through `apps/web/src/messenger.ts` (point 1 of [PLAN § 8](../product/PLAN.md#at-a-glance-updated-2026-10-04)). Added start-up folder support (`glidebox <folder>` or `GLIDEBOX_OPEN`). Wrote [FILE-FORMAT.md](../product/FILE-FORMAT.md) and [CODING_RULES.md](../workflow/CODING_RULES.md).
+  - **Versions:** Rust 1.85.1 is what is installed (Homebrew). Tauri 2.12 needs Rust 1.90, so Tauri is pinned to 2.11.x and the JavaScript packages match it (`@tauri-apps/api` 2.11.1, `plugin-dialog` 2.7.3, CLI 2.11.5).
+  - **Checks PASS:** `cargo fmt --check`; `cargo clippy --workspace --all-targets -D warnings`; `cargo test --workspace` (13 tests: core 7, store 6); web `typecheck` and `build`; `tauri build --debug --bundles app`.
+  - **Real entry path:** the app was started on an empty folder. The interface called Rust, which created the starter project files (`project.json`, `areas/`, `tasks/`).
+  - **NOT RUN by the agent:** looking at the window. The owner declined screen access, so the visual check is the owner's.
+  - **Bug found and fixed:** the starter writer wrote the description into `task.json`. The reader rejected it, which the test caught.
+
 - Next Iteration 1 cards, written when this one is done:
   - the `glidebox` command (alias `gb`, R88) for agents. It must decide how `gb` and the running desktop app avoid writing the same task box at once (R75; [PLAN § 8 open point 2](../product/PLAN.md#at-a-glance-updated-2026-10-04)). Commands: `gb init` to create the task box; add, list, show, claim, label, wait, done, release);
   - moving glidebox's own cards from Markdown into a task box in this repository (dogfooding, decided 2026-10-04), and switching the agent workflow to `gb`;

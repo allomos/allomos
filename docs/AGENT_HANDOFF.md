@@ -37,13 +37,13 @@ Updated: 2026-10-04
 One block per card in the board's Sessions table.
 
 ### Task-A01-01 — `claude/a01-01-walking-skeleton`
-- Checkout: `/Users/wanghui/coding/glidepace/glidebox/.claude/worktrees/a01-01` · branch `claude/a01-01-walking-skeleton` · pushed: yes (branch)
+- Checkout: `/Users/wanghui/coding/glidepace/glidebox/.claude/worktrees/a01-01` · branch `claude/a01-01-walking-skeleton` · pushed: yes
 - Approvals in force: all local work for this card (owner, 2026-10-04). NOT: signing, publishing, hosted services
-- Uncommitted: none
-- Running: none
-- Unrecorded findings: Rust 1.85.1 via Homebrew (no rustup) → Tauri pinned to 2.11.x (2.12 needs Rust 1.90); Node 22.14; npm used (no pnpm); full Xcode present
-- Done so far: Cargo workspace; `crates/core` (model + validation, 7 tests) and `crates/store` (inspect/load/create starter, 6 tests) pass test, clippy, fmt
-- Next action: Tauri 2 app in `apps/desktop/src-tauri` + `apps/web` (Vite/React) with the messenger module
+- Uncommitted: none after this commit
+- Running: `Glidebox.app` (debug bundle, `target/debug/bundle/macos/`) opened on the scratch folder `…/scratchpad/a01-01-check/empty-folder`, for the owner's check; safe to quit. Restart: `open -n target/debug/bundle/macos/Glidebox.app --args <folder>`
+- Test folders: `…/scratchpad/a01-01-check/{empty-folder,demo-repo,broken-box}` (session scratchpad, temporary)
+- Unrecorded findings: none (see card notes)
+- Next action: owner check → merge branch into `main`, mark Done; then write the `gb` command card
 
 ## Live state
 

@@ -29,7 +29,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a01-01-walking-skeleton` | [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) | 2026-10-04 | Owner starts the macOS dev build and sees a task box's tasks by area |
+| `claude/a01-01-walking-skeleton` | [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) | 2026-10-04 | Owner checks the running app: starter project, repo folder, broken file |
 
 ## Waiting on the owner
 
@@ -37,6 +37,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Question or approval | Record | Unblocks |
 |---|---|---|
+| **Check the first app** (steps in the session report): starter project shown by area; a repo folder offers `.glidebox/`; a broken file shows a clear problem | [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) | Done for A01-01; next card (`gb` command) |
 | Review and accept the planning documents and agent workflow, as corrected on 10-04 | [`Task-A00-01`](./tasks/Task-A00-01-planning-docs.md), [`Task-A00-10`](./tasks/Task-A00-10-docs-consistency-review.md) | everything |
 | Reuse of the owner's own Glidelines code: A extend · B standalone · C shared core · D Glidelines as a view (open-source bases are ruled out by 0008) | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-A00-03`](./tasks/Task-A00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
@@ -61,7 +62,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | in progress | — | `claude/a01-01-walking-skeleton` | build the walking skeleton |
+| [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | waiting | locally verified | `claude/a01-01-walking-skeleton` | owner checks the app on the Mac |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |

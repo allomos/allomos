@@ -61,15 +61,20 @@ export function App({ messenger }: { messenger: Messenger }) {
     [messenger, show],
   );
 
+  // On start: a folder given on the command line wins; otherwise reopen the last one.
   useEffect(() => {
-    let last: string | null = null;
-    try {
-      last = localStorage.getItem(LAST_ROOT_KEY);
-    } catch {
-      last = null;
-    }
-    if (last) void openFolder(last);
-  }, [openFolder]);
+    void (async () => {
+      let start = await messenger.startupFolder().catch(() => null);
+      if (!start) {
+        try {
+          start = localStorage.getItem(LAST_ROOT_KEY);
+        } catch {
+          start = null;
+        }
+      }
+      if (start) await openFolder(start);
+    })();
+  }, [messenger, openFolder]);
 
   const choose = async () => {
     const path = await messenger.pickFolder();

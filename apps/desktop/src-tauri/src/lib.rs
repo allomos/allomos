@@ -23,6 +23,16 @@ struct Opened {
     loaded: Loaded,
 }
 
+/// A folder given at start-up: the first command-line argument, or `GLIDEBOX_OPEN`.
+/// Lets `glidebox ~/my-project` open that folder directly.
+#[tauri::command]
+fn startup_folder() -> Option<PathBuf> {
+    std::env::var_os("GLIDEBOX_OPEN")
+        .map(PathBuf::from)
+        .or_else(|| std::env::args_os().nth(1).map(PathBuf::from))
+        .filter(|p| p.is_dir())
+}
+
 /// What is this folder? Changes nothing.
 #[tauri::command]
 fn inspect_folder(path: PathBuf) -> FolderInfo {
@@ -56,6 +66,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            startup_folder,
             inspect_folder,
             open_task_box,
             create_task_box
