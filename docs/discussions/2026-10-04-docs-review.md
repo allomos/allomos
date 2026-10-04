@@ -87,6 +87,10 @@ The owner asked whether the desktop app and the browser app can share the same s
 
 The owner decided: tell the user to run the desktop app on a computer, and refresh to reconnect automatically. Recorded as R83 in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md).
 
+## Pairing code email
+
+The owner decided the code is sent by email through a free email-sending service. Recorded as R84 in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md); the service choice was added to research card [`W10-01`](../tasks/Task-W10-01-remote-access-research.md).
+
 ## Proposed plan change to confirm
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

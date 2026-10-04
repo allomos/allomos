@@ -16,6 +16,8 @@
 
 ## Notes
 
+- 2026-10-04 — Owner answered 0009 question 5: the pairing code is sent through a free email-sending service (R84).
+
 - 2026-10-04 — Owner answered 0009 question 2: when the desktop app is off, companions tell the user to start it, and refreshing reconnects (R83).
 
 - 2026-10-04 — The owner confirmed the mobile companion is a **phone-friendly web page**, replacing the earlier native-app answer. Recorded in 0009, R70, PLAN and the board.
