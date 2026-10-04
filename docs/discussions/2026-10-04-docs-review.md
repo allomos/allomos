@@ -83,6 +83,10 @@ The owner created `mypals-ml/glidebox` on GitHub and pushed. The owner briefly a
 
 The owner asked whether the desktop app and the browser app can share the same source code, with only the desktop adding native code for Git, agent operations, MCP and other necessary parts, and asked for macOS and Windows versions. Answer: yes. The interface is written once, and only the desktop adds native parts. Recorded as R81–R82 in [0011](../decisions/0011-desktop-framework-and-shared-code.md). Electron is recommended over Tauri for one language throughout; the owner is to choose. Code-signing costs were noted.
 
+## Companions when the desktop is off
+
+The owner decided: tell the user to run the desktop app on a computer, and refresh to reconnect automatically. Recorded as R83 in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md).
+
 ## Proposed plan change to confirm
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

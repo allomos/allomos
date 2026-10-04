@@ -97,6 +97,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R80 | Pairing codes are single-use and short-lived; the desktop user can remove a paired device at any time; pairing and companion actions are recorded. | [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | proposed |
 | R81 | The desktop app ships for **macOS and Windows**. | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
 | R82 | The desktop window, browser companion and phone companion **share one interface source code**; only the desktop app adds native parts (Git, agent operations, MCP, data folder, local server and other OS needs). | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
+| R83 | When the desktop app is not running, a companion tells the user to **start the desktop app on their computer**; **refreshing reconnects automatically** once it runs. No stale data is shown meanwhile. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 
 Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared structure; [interface research](../research/interface-patterns.md) records primary sources, platform options and limitations. Detailed command/schema and packaging choices have not been accepted.
 

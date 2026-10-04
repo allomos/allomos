@@ -30,6 +30,8 @@ The full product should be a desktop application. It provides a web program and 
   3. The desktop app sends a **long verification code** to that email address.
   4. The companion user enters the code and gets access.
 - **Cloud projects are still needed** (owner, 2026-10-04). Companions do not replace R42.
+- **When the desktop app is off** (owner, 2026-10-04), a companion shows a message telling the user to start the glidebox desktop app on their computer. Refreshing the page reconnects automatically once the desktop app is running again. Companions do not show old, possibly stale data in the meantime.
+  - *Proposed addition:* the page also retries quietly in the background, so it often reconnects without a manual refresh.
 - The desktop app works on its own; companions are optional.
 - Each local project's data lives in a folder the user chooses ([0010](./0010-project-data-folder.md)).
 
@@ -44,7 +46,7 @@ The full product should be a desktop application. It provides a web program and 
 Answered 2026-10-04: companions can act (through the desktop app); access from outside, free or very cheap; pairing by email and code; cloud projects still needed.
 
 1. ~~Mobile form~~ — **decided 2026-10-04: a phone-friendly web page.**
-2. **When the desktop app is off:** should companions show nothing, or the last data they saw (read-only)?
+2. ~~When the desktop app is off~~ — **decided 2026-10-04:** tell the user to start the desktop app; refreshing reconnects automatically.
 3. ~~Which desktop systems~~ — **decided 2026-10-04: macOS and Windows** ([0011](./0011-desktop-framework-and-shared-code.md)).
 4. **How to reach the desktop from outside cheaply:** to be researched. Candidates have free tiers, for example a tunnel service, a private network service, or a small relay. Each is an external service needing approval.
 5. **How the desktop app sends the code email:** for example through the desktop user's own email account (no extra cost), or through a mail-sending service. Sending email is an external operation.

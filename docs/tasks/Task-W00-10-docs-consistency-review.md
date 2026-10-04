@@ -16,6 +16,8 @@
 
 ## Notes
 
+- 2026-10-04 — Owner answered 0009 question 2: when the desktop app is off, companions tell the user to start it, and refreshing reconnects (R83).
+
 - 2026-10-04 — The owner confirmed the mobile companion is a **phone-friendly web page**, replacing the earlier native-app answer. Recorded in 0009, R70, PLAN and the board.
 
 - 2026-10-04 — The owner answered most 0009 questions: companions may act through the desktop app; access from outside, free or very cheap; pairing by email and code; cloud projects still needed. The mobile form got two different answers and stays open. See [the discussion](../discussions/2026-10-04-docs-review.md#owner-answers-to-the-open-questions).
