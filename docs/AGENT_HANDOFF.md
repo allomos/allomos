@@ -68,7 +68,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
   - Open: [0003](./decisions/0003-relationship-to-glidelines.md) reuse of the owner's Glidelines code.
   - Proposed: 0007's sync and merge details (layout, push/pull experience, merge rules, offline claims).
 - **Commercial intent:** the owner may sell glidebox as a service (2026-10-01). Model and source licence are undecided (board).
-- **Until glidebox can track itself (M3)**, this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding).
+- **Until glidebox can track itself** (proposed from v0.1, owner to approve), this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding).
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 
 ## Do not assume

@@ -99,6 +99,12 @@ The owner asked whether there are more framework options, and whether Electron i
 
 After the detailed comparison ([research](../research/desktop-frameworks.md)) and an explanation of code signing versus update signing, the owner chose **Tauri 2**. Recorded as R86 in [0011](../decisions/0011-desktop-framework-and-shared-code.md). The first code card `Task-W01-01` is now a Rust card.
 
-## Proposed plan change to confirm
+## Iterative release roadmap
+
+The owner asked whether the milestones followed rapid iteration, and said every milestone must produce a usable product, growing from a small prototype. They did not: the old milestones were layered (M1 a library, M2 view-only, editing only from M3).
+
+Re-planned in [PLAN § 9](../product/PLAN.md#9-roadmap--releases), using the roadmap-update skill, as seven releases, each an installable, usable desktop app. The first code card is now the v0.1 walking skeleton [`Task-W04-01`](../tasks/Task-W04-01-walking-skeleton.md). This replaces the "proposed plan change" below.
+
+## Proposed plan change to confirm (superseded by the release roadmap)
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

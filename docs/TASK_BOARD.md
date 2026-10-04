@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; eight cards are open; no application code exists yet.** Glidebox is in planning (milestone M0).
+**Nothing is claimed; ten cards are open; no application code exists yet.** Glidebox is in planning; the first release, **v0.1 — Local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-W00-07`](./tasks/Task-W00-07-open-source-base-decision.md)).
@@ -19,7 +19,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 **What is next.**
 - The owner reviews the documents and answers the questions below.
 - The research card [`Task-W10-01`](./tasks/Task-W10-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
-- The first code card, [`Task-W01-01`](./tasks/Task-W01-01-core-model.md) (core model, burndown and forecast, now in Rust), works under every open option and can start once the owner reviews it.
+- The first code card, [`Task-W04-01`](./tasks/Task-W04-01-walking-skeleton.md), is the v0.1 **walking skeleton**: the desktop app opens a data folder and shows its tasks. It can start once the owner reviews it.
 - The research card [`Task-W07-01`](./tasks/Task-W07-01-agent-launch-research.md) is independent and can run in parallel.
 
 ## Sessions
@@ -28,7 +28,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `main` — Claude Code docs session | [`Task-W00-13`](./tasks/Task-W00-13-iterative-release-roadmap.md) | 2026-10-04 | Owner reviews the release roadmap |
 
 ## Waiting on the owner
 
@@ -40,13 +39,13 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Reuse of the owner's own Glidelines code: A extend · B standalone · C shared core · D Glidelines as a view (open-source bases are ruled out by 0008) | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-W00-03`](./tasks/Task-W00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
-| **Milestone order:** confirm moving cloud projects from M2 to M4, so that M2 = desktop hub and M2b = companion viewing; confirm placing AI-generated setup (W09) with M2 | [PLAN § 9](./product/PLAN.md#9-milestones) | planning of M2 |
+| **Release roadmap:** confirm the release order v0.1 → v1.0, with every release usable, and what goes into v0.1. Is a Windows machine available for testing v0.1? Should glidebox's own cards move into glidebox from v0.1 (dogfooding)? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases), [`Task-W00-13`](./tasks/Task-W00-13-iterative-release-roadmap.md) | starting v0.1 |
 | **Selling glidebox:** commercial model and source licence (open client with paid cloud, or proprietary) | [0008](./decisions/0008-build-our-own.md) | release, licensing of dependencies |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
-| Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | M2 deployment |
-| Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-milestones) | W02 |
+| Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | v0.6 |
+| Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | v0.2 (W02) |
 | UI languages (Glidelines has en / ja / zh-CN / zh-TW) | [REQUIREMENTS](./product/REQUIREMENTS.md) | W04 |
-| Review card [`Task-W01-01`](./tasks/Task-W01-01-core-model.md) (Rust `crates/core`, pinned toolchain) | the card | first code |
+| Review the first code card [`Task-W04-01`](./tasks/Task-W04-01-walking-skeleton.md) (v0.1 walking skeleton: Tauri app opens a data folder and shows its tasks) | the card | first code |
 
 ## Cards
 
@@ -60,9 +59,10 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-W00-03-glidelines-relationship`](./tasks/Task-W00-03-glidelines-relationship.md) | waiting | drafted | — | owner decision on 0003 |
 | [`Task-W00-10-docs-consistency-review`](./tasks/Task-W00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-W00-11-project-data-folder`](./tasks/Task-W00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
-| [`Task-W00-13-iterative-release-roadmap`](./tasks/Task-W00-13-iterative-release-roadmap.md) | in progress | — | `main` — Claude Code docs session | re-planning in progress |
-| [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | owner card review |
-| [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | `Task-W01-01` model; owner card review |
+| [`Task-W00-13-iterative-release-roadmap`](./tasks/Task-W00-13-iterative-release-roadmap.md) | waiting | drafted | — | owner confirms the release roadmap |
+| [`Task-W04-01-walking-skeleton`](./tasks/Task-W04-01-walking-skeleton.md) | backlog | — | — | owner card review (first v0.1 card) |
+| [`Task-W01-01-core-model`](./tasks/Task-W01-01-core-model.md) | backlog | — | — | v0.2; after v0.1 |
+| [`Task-W02-01-ssr-board-import`](./tasks/Task-W02-01-ssr-board-import.md) | backlog | — | — | v0.2; after v0.1 |
 | [`Task-W10-01-remote-access-research`](./tasks/Task-W10-01-remote-access-research.md) | backlog | — | — | owner card review |
 | [`Task-W07-01-agent-launch-research`](./tasks/Task-W07-01-agent-launch-research.md) | backlog | — | — | owner card review |
 
@@ -81,7 +81,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 ### Roadmap — not yet carded
 
-Milestones M2–M6 in [PLAN § 9](./product/PLAN.md#9-milestones), by workstream in [CARDS.md § Workstreams](./workflow/CARDS.md#workstreams). These include:
+Releases v0.1–v1.0 in [PLAN § 9](./product/PLAN.md#9-roadmap--releases), by workstream in [CARDS.md § Workstreams](./workflow/CARDS.md#workstreams). These include:
 - the desktop hub (W04);
 - companion viewing (W10, R69–R71);
 - AI-generated project setup (W09, R50–R55);

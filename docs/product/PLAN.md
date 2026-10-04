@@ -118,20 +118,69 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 - **Hosting:** to decide (Vercel or Cloudflare).
 - **Agent instructions:** a short `AGENTS.md` / `CLAUDE.md` snippet telling sessions to resume with `gb next` and report with `gb` instead of editing board markdown.
 
-## 9. Milestones
+## 9. Roadmap — releases
 
-| # | Milestone | Done when |
-|---|---|---|
-| M0 | Repo and plan | This plan agreed; repo pushed |
-| M1 | Core + importer (local) | `crates/core` model, burndown and forecast tested; the SSR board imports with every card, workstream and label accounted for |
-| M2 | Desktop hub, read-only | The desktop app stores an imported local project and shows lists, charts and burndown, without sign-in or hosted services |
-| M2b | Companions | A browser and a phone, paired by email and code (R79), reach the running desktop app from outside the local network (R78), show its progress and status (R71), and send actions such as approvals to it (R77) |
-| M3 | Agent write path | CLI + MCP: claim / label / wait / done / release, with atomic claims and an event log; one real Claude and one Codex session use it |
-| M4 | Cloud projects and collaboration | Signed-in cloud projects with the same views; roles, owner/admin invites by email, realtime updates, "waiting on me" inbox with recorded approvals |
-| M5 | Start and open agents | Research spike on each agent's launch/resume interfaces; local runner starts a task in Claude Code and in Codex, reports the session and claims the task; "Open session" works for local and cloud sessions |
-| M6 | Polish | Generated timeline, markdown export, size-weighted burndown, target dates |
+**Rapid iteration (owner, 2026-10-04).** Glidebox grows from a small prototype. **Every release is a usable product**: an installable desktop app (macOS and Windows; unsigned builds until v1.0) that someone can use for real work, and that the next release extends. Each release is built as thin end-to-end slices: interface → Rust rules → files in the data folder. No release is "only a library" or "only a backend". Agents and the owner use each release on real projects (glidebox itself, the SSR migration) before the next one starts, and what they learn can reorder the later releases.
 
-**Not yet placed (owner to confirm):** AI-generated project setup (R50–R51, workstream W09) — proposed with M2, because it reuses the importer's validation. Human CLI and other interface work (R60–R62, workstream W10) — alongside M2–M3.
+**Now / Next / Later**
+
+| | Release | Usable for | Main contents | Requirements |
+|---|---|---|---|---|
+| **Now** | **v0.1 — Local tracker** (prototype) | The owner tracks one project's tasks on their own computer, and AI agents update them from the terminal | Desktop app opens or creates a data folder (standalone or inside a repo); tasks grouped by workstream with state, label, holder, waiting-on and next dependency; create and edit tasks; every change recorded as an event in Git-tracked JSON/Markdown files; a `gb` command that agents use to list, claim, update, finish and release tasks | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R69, R72–R75, R81–R82, R86, R62 (human CLI: `gb` serves people too) |
+| **Next** | **v0.2 — Progress and forecast** | The owner sees how far along a project is and **when it will likely finish**, on a real imported project | Per-workstream progress, state and throughput charts; burndown (counts, optional sizes) with a 50% / 85% finish-date range; "waiting on me" list; one-time import of the SSR board; Git panel (status, diff, commit, push through the `git` command; asks to install `git` if missing); app refreshes when agents change files | R3–R6, R15, R24 (local), R76 |
+| **Next** | **v0.3 — Agents first-class** | The owner **starts a task in Claude Code or Codex from glidebox, and jumps back into it** | MCP server; "Start in agent" and "Open session" on every task; session status (running / waiting for input / exited); safe retries and stale-edit checks | R11 (MCP), R30–R33, R63–R66 |
+| **Later** | **v0.4 — On the go** | The owner checks progress and **approves things from a phone or another computer**, also away from home | The desktop app serves the same interface to browsers and phones; pairing by email and long code; free or very cheap remote access; companions send actions to the desktop; "start the desktop app" message when it is off | R70–R71, R77–R80, R83–R84, R67–R68, R62 (browser) |
+| **Later** | **v0.5 — New projects in minutes** | A team leader **sets up a new project with any AI agent** using glidebox's prompt | Generation prompt and file schema; validate, preview, repair, adopt; timeline view; Markdown export | R50–R55, R8 |
+| **Later** | **v0.6 — Team in the cloud** | A team **works on one project together online** | Cloud projects with sign-in; owner/admin invites by email; roles; publish, push, pull and merge with the cloud copy; live updates | R20–R23, R42–R43, R12 (cloud) |
+| **Later** | **v1.0 — Public release** | Anyone can **download and install** glidebox | Code signing for macOS and Windows; auto-update; installer and first-run guide; UI languages | R85 (signing), R61 |
+
+**Every release** follows R60: one shared set of rules and commands serves people and agents alike.
+
+**Exit check for each release** (how we know it is usable):
+
+- **v0.1:** on both macOS and Windows:
+  - create a project in a new folder and in a subfolder of a Git repository;
+  - add workstreams and tasks in the app;
+  - a real Claude Code session claims and finishes a task with `gb`, and the app shows it;
+  - `git diff` of the data folder shows readable changes.
+- **v0.2:**
+  - the SSR board imports with a reconciliation report (every card accounted for);
+  - the burndown and a finish-date range show for it;
+  - committing from the app runs the user's own `git`, including hooks.
+- **v0.3:**
+  - from the app, start one task in Claude Code and one in Codex;
+  - each claims its task through MCP;
+  - the app shows their session status;
+  - "Open session" jumps into each.
+- **v0.4:**
+  - a phone outside the home network pairs by email code;
+  - it sees the burndown and approves a waiting item;
+  - the desktop applies the approval and records it;
+  - with the desktop app closed, the phone shows the "start the desktop app" message.
+- **v0.5:**
+  - an agent generates a project from glidebox's prompt;
+  - glidebox validates, previews and adopts it;
+  - a broken bundle gets actionable errors and changes nothing.
+- **v0.6:**
+  - the owner publishes a local project;
+  - a teammate invited by email signs in and edits;
+  - conflicting edits are merged, or the user is asked.
+- **v1.0:**
+  - signed installers;
+  - auto-update from one version to the next on both systems.
+
+**Rules for the roadmap**
+
+- **Only "Now" is committed.** "Next" and "Later" are direction and may be reordered after each release, based on what using it teaches. Reordering is the owner's decision.
+- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from glidebox itself once v0.2 exists.
+- **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
+- **Dependencies to watch:**
+  - v0.1 needs a **Windows machine** for the exit check (owner to confirm one is available).
+  - v0.3 needs the agent launch research ([`W07-01`](../tasks/Task-W07-01-agent-launch-research.md)).
+  - v0.4 needs the remote-access and email research ([`W10-01`](../tasks/Task-W10-01-remote-access-research.md)), and owner approval to create the email-service and tunnel accounts.
+  - v0.6 needs the cloud hosting choice and approval for hosted resources.
+  - v1.0 needs the code-signing purchase.
+- **Dogfooding (proposal):** from v0.1, glidebox's own cards could move from Markdown into glidebox, so the agents building it also use it daily. This changes the agent workflow ([AI-WORKFLOW § dogfooding](../workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding)) and needs the owner's approval.
 
 ## 10. Open questions
 

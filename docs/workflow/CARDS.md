@@ -4,19 +4,19 @@ A **contract** for how work is recorded on glidebox while the board is Markdown.
 
 ## Workstreams
 
-| ID | Workstream | Milestone |
+| ID | Workstream | Releases ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)) |
 |---|---|---|
-| W00 | Planning, docs, decisions and research | M0 |
-| W01 | Core model, burndown and forecast (`crates/core`, Rust) | M1 |
-| W02 | Importer (Markdown boards → glidebox) | M1 |
-| W03 | Storage and backend: local store, cloud schema, auth, RLS, realtime | M2, M4 |
-| W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | M2 |
-| W05 | Agent write path: CLI and MCP | M3 |
-| W06 | Collaboration: roles, invitations, inbox, approvals | M4 |
-| W07 | Agent runner: start and open agent sessions | M5 |
-| W08 | Polish: timeline, export, size-weighted burndown | M6 |
-| W09 | AI-generated project setup: prompt, schema, validation, adoption | proposed with M2 |
-| W10 | Companions and other interfaces: web and mobile companions, pairing, human CLI | M2b |
+| W00 | Planning, docs, decisions and research | all |
+| W01 | Core model, burndown and forecast (`crates/core`, Rust) | v0.1 (model, events), v0.2 (burndown, forecast) |
+| W02 | Importer (Markdown boards and generated bundles → glidebox) | v0.2 (SSR board), v0.5 (generated bundles) |
+| W03 | Storage and backend: local store, cloud schema, auth, realtime | v0.1 (local store), v0.6 (cloud) |
+| W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | v0.1 onwards |
+| W05 | Agent write path: CLI and MCP | v0.1 (`gb` CLI), v0.3 (MCP) |
+| W06 | Collaboration: roles, invitations, inbox, approvals | v0.2 (waiting on me), v0.6 (team) |
+| W07 | Agent runner: start and open agent sessions | v0.3 |
+| W08 | Polish: timeline, export, signing, auto-update | v0.5, v1.0 |
+| W09 | AI-generated project setup: prompt, schema, validation, adoption | v0.5 |
+| W10 | Companions and other interfaces: web and phone companions, pairing, remote access | v0.4 |
 
 Add a workstream by editing this table and the board's card index in the same commit.
 

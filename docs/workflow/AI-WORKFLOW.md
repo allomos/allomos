@@ -63,4 +63,4 @@ The agent raises this itself; the owner should not have to ask.
 
 ## After glidebox can track itself (dogfooding)
 
-Once milestone M3 (agent write path) works, glidebox's own cards move from Markdown into glidebox, and this workflow changes: claims, labels and waiting-on are written with `gb` instead of editing the board. That switch is its own card and needs the owner's approval; until then, the Markdown board is authoritative.
+Once glidebox can track itself (proposed from release v0.1, when the `gb` command exists — [PLAN § 9](../product/PLAN.md#9-roadmap--releases)), glidebox's own cards move from Markdown into glidebox, and this workflow changes: claims, labels and waiting-on are written with `gb` instead of editing the board. That switch is its own card and needs the owner's approval; until then, the Markdown board is authoritative.

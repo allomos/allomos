@@ -13,3 +13,9 @@
 | 2026-10-04 | Re-plan milestones in a rapid-iteration pattern: start from a small prototype; every milestone produces a usable product | owner (chat) |
 
 ## Notes
+
+- 2026-10-04 — Re-planned with the `roadmap-update` skill as Now / Next / Later releases: v0.1 local tracker → v0.2 progress and forecast → v0.3 agents first-class → v0.4 on the go → v0.5 new projects in minutes → v0.6 team in the cloud → v1.0 public release.
+  - Each release has a "usable for" sentence, its requirements and an exit check.
+  - A coverage check found every requirement in a release; R60 applies to all.
+  - Opened the first v0.1 card [`Task-W04-01`](./Task-W04-01-walking-skeleton.md) (walking skeleton) and moved `Task-W01-01` to v0.2, so that no release is "only a library".
+  - The old milestones were layered: M1 was a library and an importer, and nothing could be edited until M3.

@@ -64,4 +64,4 @@ Answered 2026-10-04: companions can act (through the desktop app); access from o
 
 - The architecture gains a **desktop app** that contains the local store, the shared commands and a **local server** for companions, plus the CLI, MCP and runner.
 - Security of the local server becomes a core design item: pairing, encryption on the network, and limiting what each companion may do.
-- Milestones need a desktop-shell step and a companion-viewer step (see [PLAN § 9](../product/PLAN.md#9-milestones)).
+- Milestones need a desktop-shell step and a companion-viewer step (release v0.4 in [PLAN § 9](../product/PLAN.md#9-roadmap--releases)).
