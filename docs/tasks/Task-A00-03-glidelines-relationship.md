@@ -1,4 +1,4 @@
-# Task-W00-03-glidelines-relationship
+# Task-A00-03-glidelines-relationship
 
 - **Outcome.** The owner decides whether glidebox is standalone, extends Glidelines, shares a core library with it, or later feeds Glidelines as a view — so agents know which repository and stack to build the app in.
 - **Decisive unknowns.** The four questions in [decision 0003 § Questions that would settle it](../decisions/0003-relationship-to-glidelines.md#questions-that-would-settle-it) (owner).

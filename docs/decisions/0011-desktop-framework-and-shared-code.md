@@ -62,7 +62,7 @@ Options that let the desktop window reuse the web interface, checked 2026-10-04.
 - The **project rules** live in the desktop app's Rust side, as the one authority. That covers the model, validation, events, burndown and forecast, and Git storage.
 - The CLI and MCP server use that same Rust code.
 - The TypeScript web interface only displays results and sends requests.
-- `Task-W01-01` (core model) would then be written in Rust instead of TypeScript.
+- `Task-A02-01` (core model) would then be written in Rust instead of TypeScript.
 
 ## Costs to know
 

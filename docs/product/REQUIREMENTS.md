@@ -7,15 +7,15 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | ID | Requirement | Source | Status |
 |---|---|---|---|
 | R1 | Show every task's **state and progress**. | owner, 2026-09-27 | accepted |
-| R2 | Group tasks by **workstream**; tasks have hierarchical IDs (workstream → task → child). | owner, 2026-09-27 | accepted |
-| R3 | Present progress as **lists and charts** (per-workstream progress, state distribution, throughput). | owner, 2026-09-27 | accepted |
+| R2 | Group tasks by **area**; tasks have hierarchical IDs (area → task → child). | owner, 2026-09-27 | accepted |
+| R3 | Present progress as **lists and charts** (per-area progress, state distribution, throughput). | owner, 2026-09-27 | accepted |
 | R4 | A **burndown chart** showing remaining work and total scope over time. | owner, 2026-09-27 | accepted |
 | R5 | **Estimate the project's finish date** from the burndown, shown as a range (50% / 85% confidence). | owner, 2026-09-27; [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
 | R6 | The burndown counts **tasks**; a task may carry an **optional size**, with a size-weighted view when sizes exist. | [0002](../decisions/0002-burndown-counts-plus-sizes.md) | accepted |
 | R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md), kept by [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
-| R89 | Tasks can be organised along **two independent axes**: **workstream** (what area of work it belongs to) and **iteration** (in which time-box or release it is planned). Iteration is optional. Progress, burndown and forecast can be shown per workstream, per iteration, or for the whole project. | owner question, 2026-10-04 | proposed |
-| R90 | Each project can **rename these terms** to the words its team already uses (for example workstream → epic or area; iteration → sprint, milestone or release). Glidebox's screens and command messages then use those words. | owner question, 2026-10-04 | proposed |
+| R89 | Tasks are organised along **two independent axes**: **area** (*what* part of the product it belongs to) and **iteration** (*when* it is planned: a time-box ending in a release). Iteration is optional. Progress, burndown and forecast can be shown per area, per iteration, or for the whole project. | owner, 2026-10-04 | accepted |
+| R90 | Each project can **rename these terms** to the words its team already uses (for example area → epic or workstream; iteration → sprint, milestone or release). Glidebox's screens and command messages then use those words. Defaults: **Area** and **Iteration**. | owner, 2026-10-04 | accepted |
 
 ## Source of truth and agents
 
@@ -94,7 +94,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md) | proposed |
 | R69 | The **desktop application provides the complete feature set** and is the hub for local projects, agents and companions. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R70 | **Web and mobile apps are companions** that connect to a running desktop application. The mobile companion is a **phone-friendly web page** served by the desktop app (decided 2026-10-04). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
-| R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, workstream progress, charts and burndown, waiting-on). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
+| R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, area progress, charts and burndown, waiting-on). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R77 | Companions can also **act** (for example mark a check done, approve). Each action is a request **sent to the desktop app**, which checks it, applies it and records who did it. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R78 | Companions can connect **from outside** the local network, using a **free or very cheap** method. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R79 | **Pairing:** the companion user gives a valid email address and an alias; the desktop user approves the email; the desktop app sends a long verification code to that email; the code grants access. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |

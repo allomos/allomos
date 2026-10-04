@@ -44,7 +44,7 @@ Illustrative layout (not a finalized schema):
 ```text
 project-repo/
   project.json
-  workstreams/<stable-id>.json
+  areas/<stable-id>.json
   tasks/<stable-id>/task.json
   tasks/<stable-id>/description.md
   events/<unique-event-id>.json
@@ -53,7 +53,7 @@ project-repo/
   .gitignore
 ```
 
-Use JSON for structured fields and Markdown for narrative text. Keep stable IDs in paths; task labels such as W07-01 and workstream membership are fields, so renaming or regrouping need not move files. Serialize consistently for readable diffs. Give events separate files to reduce concurrent appends to a shared log. Derived boards and chart data are not separately edited tracked state. Task snapshots and their transition events must be validated and committed together; merge resolutions must record reconciled transitions. Full snapshot/event consistency rules remain to be specified.
+Use JSON for structured fields and Markdown for narrative text. Keep stable IDs in paths; task labels such as A01-01 and area membership are fields, so renaming or regrouping need not move files. Serialize consistently for readable diffs. Give events separate files to reduce concurrent appends to a shared log. Derived boards and chart data are not separately edited tracked state. Task snapshots and their transition events must be validated and committed together; merge resolutions must record reconciled transitions. Full snapshot/event consistency rules remain to be specified.
 
 Approvals in files are requests/records, not proof of an authenticated actor. Validate authority through the local trust model or authenticated remote acceptance. Keep runtime processes, session liveness, credentials and disposable indexes outside the tracked project content.
 

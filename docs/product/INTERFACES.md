@@ -44,7 +44,7 @@ Storage follows [0007](../decisions/0007-git-like-project-sync.md), accepted 202
 
 | Surface | Main workflows to design | Presentation and behavior — proposed |
 |---|---|---|
-| Desktop | Planning, editing, importing, reviewing evidence, charts, local projects and agent-session control. | Sidebar → workstream/task list → detail; resizable panes, command palette and keyboard shortcuts with visible alternatives. Keep the current project and its storage location clear. |
+| Desktop | Planning, editing, importing, reviewing evidence, charts, local projects and agent-session control. | Sidebar → area/task list → detail; resizable panes, command palette and keyboard shortcuts with visible alternatives. Keep the current project and its storage location clear. |
 | Mobile | My tasks, Waiting on me, quick capture, search, progress checks and task edits. | One main pane on narrow screens; suitable navigation and back behavior; readable evidence and exact operation before a decision. Tablets can use additional panes. Charts offer summaries and data views. |
 | Browser | Shared project links, collaboration and the same task/review workflow at different screen sizes. | Responsive layouts, deep task links, browser back/forward and keyboard conventions. Distinguish a signed-in cloud view from a browser-local project or a local companion connection. |
 | Human CLI | Fast reads/updates, filtering, repeated operations, import/export and optional GUI handoff. | Readable output and examples; explicit project identity/location; predictable help and errors; structured output as an option. Interactive shortcuts remain optional. |

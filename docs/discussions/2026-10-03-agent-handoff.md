@@ -12,7 +12,7 @@ The session wrote a restart snapshot in this file. On 2026-10-04 its contents we
 
 - **Restart mechanics** (checkout, worktrees, boundaries) → [AGENT_HANDOFF.md](../AGENT_HANDOFF.md).
 - **Status and next step** → [the board](../TASK_BOARD.md).
-- **The list of recent work worth reading** → the cards [`W00-04`](../tasks/Task-W00-04-local-and-cloud-requirements.md) to [`W00-09`](../tasks/Task-W00-09-interface-requirements.md) and [REQUIREMENTS](../product/REQUIREMENTS.md).
+- **The list of recent work worth reading** → the cards [`A00-04`](../tasks/Task-A00-04-local-and-cloud-requirements.md) to [`A00-09`](../tasks/Task-A00-09-interface-requirements.md) and [REQUIREMENTS](../product/REQUIREMENTS.md).
 
 ## Lesson
 

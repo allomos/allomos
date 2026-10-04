@@ -1,4 +1,4 @@
-# Task-W10-01-remote-access-research
+# Task-A04-01-remote-access-research
 
 - **Outcome.** The owner can choose how web and mobile companions reach the desktop app from outside the local network (R78) at no or very low cost. The choice is based on a written comparison of options: their cost, setup effort, security and limits.
 - **Decisive unknowns** (worker finds out from official documentation):

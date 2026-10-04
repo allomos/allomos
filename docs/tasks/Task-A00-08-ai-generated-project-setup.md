@@ -1,6 +1,6 @@
-# Task-W00-08-ai-generated-project-setup
+# Task-A00-08-ai-generated-project-setup
 
-*Split out of `Task-W00-01` on 2026-10-04; the work was done on 2026-10-01.*
+*Split out of `Task-A00-01` on 2026-10-04; the work was done on 2026-10-01.*
 
 - **Outcome.** The owner's workflow is recorded. A team leader takes a prompt that glidebox provides and gives it to any AI agent; the agent generates project and task files; glidebox turns those files into a usable project.
 - **Decisive unknowns.** None for the record. The file schema, validation and adoption details are proposed (R52–R55) and will need their own implementation card.

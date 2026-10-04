@@ -1,4 +1,4 @@
-# Task-W00-02-github-remote
+# Task-A00-02-github-remote
 
 - **Outcome.** The repository is on GitHub, so sessions on any machine and teammates can pull, push and review.
 - **Decisive unknowns.** Repository owner and name — e.g. `mypals-ml/glidebox` (owner). Visibility: private or public (owner). Which account pushes: SSH currently authenticates as `wanghui2sea` (owner).

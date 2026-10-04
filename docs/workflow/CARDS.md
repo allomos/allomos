@@ -2,29 +2,41 @@
 
 A **contract** for how work is recorded on glidebox while the board is Markdown. [TASK_BOARD.md](../TASK_BOARD.md) is the index; each card's detail is its own file in [docs/tasks/](../tasks/).
 
-## Workstreams
+## Areas
 
-| ID | Workstream | Iterations ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)) |
-|---|---|---|
-| W00 | Planning, docs, decisions and research | all |
-| W01 | Core model, burndown and forecast (`crates/core`, Rust) | 1 (model, events), 4 (burndown, forecast) |
-| W02 | Importer (Markdown boards and generated bundles → glidebox) | 6 (SSR board), 11 (generated bundles) |
-| W03 | Storage and backend: local store, cloud schema, auth, realtime | 1 (local store), 13–14 (cloud) |
-| W04 | Desktop hub and UI: lists, charts, burndown; local server for companions | 1 onwards |
-| W05 | Agent write path: CLI and MCP | 1 (`glidebox` / `gb` CLI), 7 (MCP) |
-| W06 | Collaboration: roles, invitations, inbox, approvals | 3 (waiting on me), 14 (team) |
-| W07 | Agent runner: start and open agent sessions | 8 |
-| W08 | Polish: timeline, export, signing, auto-update | 5 (Git panel), 12 (timeline, export), 15 (signing, auto-update) |
-| W09 | AI-generated project setup: prompt, schema, validation, adoption | 11 |
-| W10 | Companions and other interfaces: web and phone companions, pairing, remote access | 9–10 |
+An **area** is *what part of the product* a card belongs to. Areas are named after what users can do, not after technical layers (owner, 2026-10-04). An **iteration** is *when* a card is planned ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)). Every card has exactly one area.
 
-Add a workstream by editing this table and the board's card index in the same commit.
+| ID | Area | What users can do | Iterations |
+|---|---|---|---|
+| A00 | Planning | Read the plan, requirements, decisions and research | all |
+| A01 | Tracking | Keep tasks in a task box, view and edit them, use the `glidebox` / `gb` command, commit and push from the app | 1, 2, 5 |
+| A02 | Progress & forecast | See progress, what waits on them, burndown, finish-date forecast, timeline; export a report | 3, 4, 12 |
+| A03 | Agents | Let Claude Code and Codex work through MCP; start and open agent sessions from the app | 7, 8 |
+| A04 | Companions | View progress and approve from a browser or phone, at home or away | 9, 10 |
+| A05 | Project setup & import | Import the SSR board; set up a project with an AI agent | 6, 11 |
+| A06 | Cloud & team | Keep a project in the cloud; invite teammates with roles | 13, 14 |
+| A07 | Platform & release | Use glidebox on Windows as well as macOS; install signed builds that update themselves | 2, 15 |
+
+A card that touches several layers (for example interface, Rust rules and files) still has **one** area: the capability it delivers.
+
+Add an area by editing this table and the board in the same commit.
+
+**Renamed 2026-10-04.** Until then, "workstream" (W00–W10, grouped by technical layer) was used:
+
+| Old card ID | New card ID |
+|---|---|
+| `Task-W00-01` … `Task-W00-14` | `Task-A00-01` … `Task-A00-14` (same numbers) |
+| `Task-W04-01-walking-skeleton` | `Task-A01-01-walking-skeleton` |
+| `Task-W01-01-core-model` | `Task-A02-01-burndown-and-forecast` |
+| `Task-W07-01-agent-launch-research` | `Task-A03-01-agent-launch-research` |
+| `Task-W10-01-remote-access-research` | `Task-A04-01-remote-access-research` |
+| `Task-W02-01-ssr-board-import` | `Task-A05-01-ssr-board-import` |
 
 ## Card IDs and files
 
-- **ID:** `Task-W{2-digit workstream}-{2-digit task}-{short-description}`, e.g. `Task-W01-01-core-model`. A child extends its parent with another two-digit number: `Task-W01-01-02-forecast-monte-carlo`.
+- **ID:** `Task-A{2-digit area}-{2-digit task}-{short-description}`, e.g. `Task-A02-01-burndown-and-forecast`. A child extends its parent with another two-digit number: `Task-A02-01-02-forecast-monte-carlo`.
 - **One card = one observable outcome** — a sentence about what a person (or agent) can do afterwards, not a layer or component. Split by user-visible step, never by layer. If more than about four documents must be read before the first line of code, split.
-- **File:** `docs/tasks/Task-W…-….md`, created from [the template](#card-template). The file never moves; only its board row changes.
+- **File:** `docs/tasks/Task-A…-….md`, created from [the template](#card-template). The file never moves; only its board row changes.
 
 ## Where status lives
 
@@ -70,7 +82,7 @@ One card is worked by exactly one session at a time. The board, not memory or ch
 ## Card template
 
 ```markdown
-# Task-W00-00-short-description
+# Task-A00-00-short-description
 
 - **Outcome.** One or two plain sentences: what a person or agent can do when this is done.
 - **Decisive unknowns.** Facts to find out (not design), each with who can answer.

@@ -20,7 +20,7 @@ The full product should be a desktop application. It provides a web program and 
   - importing projects
   - starting and opening agent sessions
   - the local CLI and MCP access for agents
-- **Web and mobile are companion clients.** They connect to a **running** desktop app and show its projects. Viewing at least covers **progress and status**: task states, workstream progress, charts and burndown, and what is waiting on whom.
+- **Web and mobile are companion clients.** They connect to a **running** desktop app and show its projects. Viewing at least covers **progress and status**: task states, area progress, charts and burndown, and what is waiting on whom.
 - **The mobile companion is a phone-friendly web page** (owner, confirmed 2026-10-04). It is served by the desktop app and opened in the phone's browser; there is no app-store app for now. (Earlier the same day the owner had picked an installed native app; the owner then confirmed the web page.)
 - **Companions can also act, through the desktop app** (owner, 2026-10-04). For example, they can mark a check done or approve something. A companion never changes project data itself: it sends the request to the desktop app, which checks it, applies it and records who did it. The desktop app stays the only authority.
 - **Companions work from outside the home or office network** (owner, 2026-10-04). The connection method must be **free or very cheap**. Any relay or tunnel service is an external operation and needs the owner's approval before it is set up.
@@ -32,7 +32,7 @@ The full product should be a desktop application. It provides a web program and 
 - **Cloud projects are still needed** (owner, 2026-10-04). Companions do not replace R42.
 - **When the desktop app is off** (owner, 2026-10-04), a companion shows a message telling the user to start the glidebox desktop app on their computer. Refreshing the page reconnects automatically once the desktop app is running again. Companions do not show old, possibly stale data in the meantime.
   - *Proposed addition:* the page also retries quietly in the background, so it often reconnects without a manual refresh.
-- **The pairing code is sent by email through a free email-sending service** (owner, 2026-10-04). Which service is chosen by the research in [`Task-W10-01`](../tasks/Task-W10-01-remote-access-research.md). Creating the service account and its access key is an external operation needing the owner's approval. The key is a secret: never committed, and never shipped inside the app where anyone could extract and misuse it.
+- **The pairing code is sent by email through a free email-sending service** (owner, 2026-10-04). Which service is chosen by the research in [`Task-A04-01`](../tasks/Task-A04-01-remote-access-research.md). Creating the service account and its access key is an external operation needing the owner's approval. The key is a secret: never committed, and never shipped inside the app where anyone could extract and misuse it.
   - *Open design point:* where the key lives — in a small glidebox-run helper that sends on the desktop app's behalf, or a key each user sets up in their own desktop app. The research card compares them.
 - The desktop app works on its own; companions are optional.
 - Each local project's data lives in a folder the user chooses ([0010](./0010-project-data-folder.md)).

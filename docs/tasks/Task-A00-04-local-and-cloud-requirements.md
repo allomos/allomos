@@ -1,6 +1,6 @@
-# Task-W00-04-local-and-cloud-requirements
+# Task-A00-04-local-and-cloud-requirements
 
-*Split out of `Task-W00-01` on 2026-10-04; the work was done on 2026-10-01.*
+*Split out of `Task-A00-01` on 2026-10-04; the work was done on 2026-10-01.*
 
 - **Outcome.** The owner's requirement is recorded: glidebox works on purely local projects with no sign-in, and offers optional cloud projects that do require sign-in. Earlier documents no longer assume that every project lives in a hosted database.
 - **Decisive unknowns.** None for the record itself. The storage technology, packaging and moving projects between modes are left open in [0006](../decisions/0006-local-and-cloud-projects.md).

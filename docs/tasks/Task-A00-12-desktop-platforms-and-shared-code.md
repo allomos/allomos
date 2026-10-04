@@ -1,4 +1,4 @@
-# Task-W00-12-desktop-platforms-and-shared-code
+# Task-A00-12-desktop-platforms-and-shared-code
 
 - **Outcome.** The owner's requirements are recorded: the desktop app ships for **macOS and Windows**, and the desktop and browser apps **share the same interface source code**. Only the desktop adds native parts: Git, agent operations, MCP, the task box, and the other necessary pieces. The framework choice is written up for the owner to decide.
 - **Decisive unknowns.** The owner's choice of desktop framework: Electron (recommended) or Tauri.
@@ -16,8 +16,8 @@
 
 ## Notes
 
-- 2026-10-04 — **Owner chose Tauri 2.** 0011 accepted; R86 added; PLAN architecture rewritten (Rust crates and TypeScript interface); `Task-W01-01` rewritten for Rust.
+- 2026-10-04 — **Owner chose Tauri 2.** 0011 accepted; R86 added; PLAN architecture rewritten (Rust crates and TypeScript interface); `Task-A02-01` rewritten for Rust.
 
 - 2026-10-04 — At the owner's request, wrote a [detailed comparison](../research/desktop-frameworks.md) of Tauri 2, Electron, Electrobun 2, Wails 2, Neutralinojs and NW.js from current sources. The recommendation stays Tauri 2. New findings: Electrobun has no Intel Mac build; Tauri 3 is in alpha.
 
-- 2026-10-04 — Owner: a second language is not a problem; release macOS and Windows together; unsigned builds until the first public release (R85). Compared four frameworks from current sources; the recommendation changed from Electron to **Tauri 2**. If chosen, `Task-W01-01` would be written in Rust.
+- 2026-10-04 — Owner: a second language is not a problem; release macOS and Windows together; unsigned builds until the first public release (R85). Compared four frameworks from current sources; the recommendation changed from Electron to **Tauri 2**. If chosen, `Task-A02-01` would be written in Rust.

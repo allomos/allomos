@@ -130,7 +130,7 @@ Not recommended for glidebox now:
 - **Neutralinojs**: limited native side.
 - **NW.js**: no advantage over Electron.
 
-**If Tauri is chosen:** the project rules are written in Rust inside the desktop app, and the CLI and MCP server reuse them. The web interface stays TypeScript. `Task-W01-01` would be written in Rust.
+**If Tauri is chosen:** the project rules are written in Rust inside the desktop app, and the CLI and MCP server reuse them. The web interface stays TypeScript. `Task-A02-01` would be written in Rust.
 
 ## Sources (read 2026-10-04)
 

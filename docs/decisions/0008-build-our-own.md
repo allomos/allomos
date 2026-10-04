@@ -19,7 +19,7 @@ The [competitor investigation](../research/competitor-investigation.md) found th
 
 ## Consequences
 
-- [`Task-W01-01`](../tasks/Task-W01-01-core-model.md), our own core model with burndown and forecast, remains the first code card.
+- [`Task-A02-01`](../tasks/Task-A02-01-burndown-and-forecast.md), our own core model with burndown and forecast, remains the first code card.
 - Copying source from these projects requires a new owner decision and a licence review. The GPL (git-bug) in particular has obligations that apply when distributing.
 - Ordinary third-party libraries (for example a chart library or a Git library) are still allowed. Each is chosen and pinned in the card that introduces it, with its licence noted.
 - **Not decided by this record:**

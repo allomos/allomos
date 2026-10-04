@@ -1,4 +1,4 @@
-# Task-W07-01-agent-launch-research
+# Task-A03-01-agent-launch-research
 
 - **Outcome.** The owner and the W07 worker know, from vendor documentation and local trials, exactly how glidebox can **start** a task in Claude Code and in Codex and later **jump into** that session — for each surface (CLI, desktop app, cloud/web) — so the runner design in [decision 0005](../decisions/0005-start-and-open-agent-sessions.md) can be confirmed or corrected.
 - **Decisive unknowns** (worker finds out, from official docs and trying the installed tools):

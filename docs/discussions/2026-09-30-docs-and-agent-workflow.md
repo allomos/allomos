@@ -37,9 +37,9 @@ Documents were grouped by kind: `docs/product/` (plan, requirements), `docs/work
 
 ## First cards
 
-`Task-W00-01` planning docs (drafted, awaiting owner review), `Task-W00-02` GitHub remote, `Task-W00-03` Glidelines relationship, `Task-W01-01` core model / burndown / forecast, `Task-W02-01` SSR board import, `Task-W07-01` agent launch/resume research. See [the board](../TASK_BOARD.md).
+`Task-A00-01` planning docs (drafted, awaiting owner review), `Task-A00-02` GitHub remote, `Task-A00-03` Glidelines relationship, `Task-A02-01` core model / burndown / forecast, `Task-A05-01` SSR board import, `Task-A03-01` agent launch/resume research. See [the board](../TASK_BOARD.md).
 
 ## Outcomes
 
 - The owner's requirement that **agents develop glidebox** is recorded in [AGENTS.md](../../AGENTS.md) and the workflow contracts.
-- Everything else awaits the owner's review ([`Task-W00-01`](../tasks/Task-W00-01-planning-docs.md)).
+- Everything else awaits the owner's review ([`Task-A00-01`](../tasks/Task-A00-01-planning-docs.md)).

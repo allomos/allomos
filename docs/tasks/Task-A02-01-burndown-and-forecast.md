@@ -1,8 +1,8 @@
-# Task-W01-01-core-model
+# Task-A02-01-burndown-and-forecast
 
-*Part of **Iteration 4 — v0.4 Burndown and forecast** ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)). Re-scoped 2026-10-04: the basic model types are created by [`Task-W04-01`](./Task-W04-01-walking-skeleton.md) in Iteration 1; this card adds burndown and forecast and shows them in the app, so that its result is usable, not only a library.*
+*Part of **Iteration 4 — v0.4 Burndown and forecast** ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)). Re-scoped 2026-10-04: the basic model types are created by [`Task-A01-01`](./Task-A01-01-walking-skeleton.md) in Iteration 1; this card adds burndown and forecast and shows them in the app, so that its result is usable, not only a library.*
 
-- **Outcome.** The owner opens a project in the desktop app and sees per-workstream progress, a burndown (remaining tasks and total scope over time) and a finish-date range at 50% and 85% confidence. The calculations live in `crates/core` (Rust), the one authority for project rules ([0011](../decisions/0011-desktop-framework-and-shared-code.md)).
+- **Outcome.** The owner opens a project in the desktop app and sees per-area progress, a burndown (remaining tasks and total scope over time) and a finish-date range at 50% and 85% confidence. The calculations live in `crates/core` (Rust), the one authority for project rules ([0011](../decisions/0011-desktop-framework-and-shared-code.md)).
 - **Decisive unknowns.**
   - What to learn from Glidelines' `burndown.ts` and forecast code (TypeScript) when writing the Rust version. The worker reads the files named in [REFERENCES.md](../REFERENCES.md); 0003 (reuse of Glidelines) remains open, but porting ideas to Rust is safe under every option.
   - Keep the model free of storage and network code. Since 2026-10-04, projects are Git-tracked JSON/Markdown files ([0007](../decisions/0007-git-like-project-sync.md)), so the model's records and events should map one-to-one to those files. Reading and writing files belongs to `crates/store`, not here.

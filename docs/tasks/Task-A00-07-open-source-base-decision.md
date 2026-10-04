@@ -1,4 +1,4 @@
-# Task-W00-07-open-source-base-decision
+# Task-A00-07-open-source-base-decision
 
 *Opened 2026-10-04 to record the decision.*
 

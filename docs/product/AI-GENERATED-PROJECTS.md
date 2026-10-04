@@ -1,6 +1,6 @@
 # AI-generated project setup
 
-**In plain words:** a team leader copies a prompt from glidebox and gives it, with their goals, to any AI agent. The agent writes the project's workstreams and tasks as files. Glidebox checks the files, shows what it will create, and turns them into a working project. The workflow is accepted (R50–R51); the exact file format and checks are proposed.
+**In plain words:** a team leader copies a prompt from glidebox and gives it, with their goals, to any AI agent. The agent writes the project's areas and tasks as files. Glidebox checks the files, shows what it will create, and turns them into a working project. The workflow is accepted (R50–R51); the exact file format and checks are proposed.
 
 Related interface contract: [INTERFACES.md](./INTERFACES.md). Its proposed shared command/validation layer covers generated-file adoption as well as graphical, CLI and MCP task edits.
 
@@ -8,7 +8,7 @@ A feature contract: accepted user workflow and proposed details, recorded 2026-1
 
 ## User outcome — accepted
 
-A team leader copies a prompt supplied by Glidebox, adds the team's goals and relevant context, and gives it to an AI agent. The agent generates project/task data and files. Glidebox reads or transforms that output into a usable project with workstreams, tasks, dependencies and the existing lists/charts.
+A team leader copies a prompt supplied by Glidebox, adds the team's goals and relevant context, and gives it to an AI agent. The agent generates project/task data and files. Glidebox reads or transforms that output into a usable project with areas, tasks, dependencies and the existing lists/charts.
 
 The team leader can use an external agent they already have. Generating a project is separate from starting an implementation agent session inside Glidebox. Using the generated output locally must not require a Glidebox account; publishing to a cloud project requires sign-in and an explicit user choice under [0006](../decisions/0006-local-and-cloud-projects.md).
 
@@ -17,7 +17,7 @@ The team leader can use an external agent they already have. Generating a projec
 1. **Get the prompt.** Glidebox supplies a reusable generation prompt with the supported format version, field definitions, folder/file examples and instructions for unknown information. The leader adds goals, scope and source material.
 2. **Generate files externally.** The chosen agent produces the documented data bundle. It can ask the leader to clarify missing context. The output is project data, not a generated indexing database.
 3. **Open or import in Glidebox.** The leader selects the output folder or supported input files. The transport and exact interface are still to be designed.
-4. **Validate and preview.** Glidebox checks the files and shows the proposed project, workstreams, tasks and dependencies. Errors identify the file/field and what needs correcting. Supported older formats may be converted explicitly; unsupported formats are reported.
+4. **Validate and preview.** Glidebox checks the files and shows the proposed project, areas, tasks and dependencies. Errors identify the file/field and what needs correcting. Supported older formats may be converted explicitly; unsupported formats are reported.
 5. **Repair if necessary.** The leader can give the error report to the agent to correct the output, then validate again.
 6. **Accept the project.** After review, Glidebox adopts or transforms the data through the selected storage adapter and builds its views/index. In the proposed Git design, valid native files become tracked project files; the index is derived and stays outside the synchronized content.
 7. **Share when chosen.** The project can remain local. Publishing is a separate authenticated cloud action; importing files does not publish them.
@@ -26,7 +26,7 @@ These steps are a proposed user experience, not approval of UI controls or stora
 
 ## Prompt and file contract to implement
 
-The production generation prompt must follow a versioned schema shared with the validator. Include a schema/format version, stable project/workstream/task identifiers, allowed states and labels, parent and dependency references, outcome and acceptance criteria, and optional estimates/evidence references. Exact field names, file extension choices and migration policy remain design work.
+The production generation prompt must follow a versioned schema shared with the validator. Include a schema/format version, stable project/area/task identifiers, allowed states and labels, parent and dependency references, outcome and acceptance criteria, and optional estimates/evidence references. Exact field names, file extension choices and migration policy remain design work.
 
 The prompt must instruct agents to distinguish known information from assumptions and leave unavailable dates or estimates unknown. It must not ask an agent to invent completed work, verification evidence, historical events or approvals. A new plan starts with unperformed work; when converting existing records, preserve provided history and identify missing history so forecasting does not treat fabricated dates as observations.
 
@@ -45,7 +45,7 @@ JSON fields with Markdown descriptions in structured folders are the accepted st
 
 These are proposed checks, not results that have run:
 
-- A synthetic generated bundle becomes a local project with all workstreams/tasks accounted for, correct dependencies and working lists/charts, without sign-in.
+- A synthetic generated bundle becomes a local project with all areas/tasks accounted for, correct dependencies and working lists/charts, without sign-in.
 - Duplicate IDs, missing dependency targets and cycles produce actionable errors without changing the active project.
 - Missing completion history remains unknown; a finish-date forecast reports insufficient history rather than inventing throughput.
 - Re-import previews changes without duplicate tasks or silent overwrite of local edits.

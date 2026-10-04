@@ -6,7 +6,7 @@
 
 Work is carried out by several AI coding sessions (Claude Code, Codex) in parallel worktrees, plus the owner and teammates. Today the state of that work lives in hand-maintained markdown (reference: the Joyns SSR migration `TASK_BOARD.md` + `workstreams/` card files). That approach has these costs:
 
-1. **Status is duplicated** across the card file, card index, Now, Timeline gantt, recently-finished table and workstream table — agents must keep six copies in sync, and they drift.
+1. **Status is duplicated** across the card file, card index, Now, Timeline gantt, recently-finished table and area table — agents must keep six copies in sync, and they drift.
 2. **Status is prose.** Labels such as "locally verified; owner verified, Done (test Worker not redeployed)" cannot be counted, filtered or charted.
 3. **The owner is the bottleneck but has no queue.** Most open cards wait on an owner check or an exact approval; that is scattered across "Next dependency" cells.
 4. **Claiming is manual.** Sessions claim cards by committing to a registry and resolving merge conflicts.
@@ -16,7 +16,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 ## 2. Goals
 
-- See every task's **state and progress**, **grouped by workstream**, as **lists and charts**.
+- See every task's **state and progress**, **grouped by area**, as **lists and charts**.
 - A **burndown chart** with an **estimated finish date** (a range, not a single guess).
 - **Purely local projects**: project and task information stays on the user’s machine; no sign-in or hosted service is required for tracking.
 - **Optional cloud projects**: users choose cloud storage and collaboration; teammates sign in, see live updates, and act on tasks.
@@ -55,9 +55,9 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 ## 5. Data model (first cut)
 
 - **Project** — storage mode (`local | cloud`), task box (local projects: any folder the user chooses, standalone or inside an existing project folder — [D10](../decisions/0010-project-data-folder.md)), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
-- **Workstream** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high). *What area of work* a task belongs to; stable for the life of the project.
-- **Iteration** (proposed, R89) — `id`, title, order, optional start/end dates and the release it produces. *When* a task is planned; optional. A task has one workstream and at most one iteration. The words "workstream" and "iteration" can be renamed per project (R90).
-- **Task** — hierarchical id (`W07-01-09`), title, workstream, parent, and:
+- **Area** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high). *What area of work* a task belongs to; stable for the life of the project.
+- **Iteration** (R89) — `id`, title, order, optional start/end dates and the release it produces. *When* a task is planned; optional. A task has one area and at most one iteration. The words "area" and "iteration" can be renamed per project (R90).
+- **Task** — hierarchical id (`A01-01-02`), title, area, parent, and:
   - `state`: `backlog | ready | in_progress | waiting | done | dropped`
   - `label`: current step on the project's ladder
   - `claimed_by`: one actor (agent session or person), with claim time
@@ -73,10 +73,10 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 ## 6. Views
 
-1. **Workstream list** — tasks grouped by workstream, with state, label, claim and waiting-on; filters by state, actor and waiting-on.
+1. **Area list** — tasks grouped by area, with state, label, claim and waiting-on; filters by state, actor and waiting-on.
 2. **Board** — columns by state (or by label).
 3. **Waiting on me** — every check/approval owed by the signed-in person; one click to approve, reject or mark checked.
-4. **Progress charts** — per-workstream done/open bars, state distribution, throughput per week.
+4. **Progress charts** — per-area done/open bars, state distribution, throughput per week.
 5. **Burndown + forecast** — see §7.
 6. **Timeline** — gantt generated from claim and done events.
 7. **Task detail** — fields, links, approvals and event history.
@@ -109,7 +109,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
   - `crates/cli` — Rust: the `glidebox` command (alias `gb`, R88) for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
   - `crates/mcp` — Rust: MCP server (official `rmcp` SDK) exposing the same operations to Claude Code and Codex
   - `crates/runner` — Rust: starts and resumes agents, creates worktrees, reports session state
-  - `crates/importer` — Rust: Markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`) and AI-generated bundles
+  - `crates/importer` — Rust: Markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`; SSR workstreams become areas) and AI-generated bundles
   - `apps/desktop` — Tauri 2 app for macOS and Windows: wraps the crates above, hosts the local server for companions, shows `apps/web` in its window
   - `apps/web` — TypeScript + React + Vite + Tailwind interface (charts, lists, inbox); runs in the desktop window and is served to browser and phone companions; displays results and sends requests, holds no project rules
   - `supabase/` — cloud side (proposed): sign-in, roles, atomic claims and the cloud project index; how it hosts the Git remote is open under D7
@@ -127,9 +127,9 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 | Phase | # | Release | Usable for | What ships (products and contents) | Requirements |
 |---|---|---|---|---|---|
-| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by workstream with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (if accepted: optional iteration field) |
+| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
 | **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`glidebox` / `gb` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes | R81, R85 (released together from here on), R1–R2 (editing in the app) |
-| **Next** | **3** | **v0.3 — Progress view** | The owner sees **how far each workstream has got** and **what is waiting on them** | Desktop app: per-workstream progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (if accepted: views per iteration, renamed terms) |
+| **Next** | **3** | **v0.3 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
 | **Next** | **4** | **v0.4 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
 | **Next** | **5** | **v0.5 — Git in the app** | The owner **commits and pushes task changes** without leaving glidebox | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
 | **Later** | **6** | **v0.6 — Import the SSR board** | The owner tracks the **SSR migration** in glidebox | SSR importer (in the app and `gb import`) with a reconciliation report | R15 |
@@ -144,7 +144,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 | **Later** | **15** | **v1.0 — Public release** | Anyone can **download and install** glidebox | **Signed installers** (macOS `.dmg`, Windows installer), **auto-update feed** (GitHub Releases), download page and user guide, UI languages | R85 (signing), R61 |
 
 **When can an agent set up a project's task box?** (`gb init` = "set up glidebox here", like `git init`)
-- **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `gb init` in a repository; this creates the task box with a starter project. It then adds workstreams and tasks one by one with `gb` commands. The desktop app can also create the folder.
+- **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `gb init` in a repository; this creates the task box with a starter project. It then adds areas and tasks one by one with `gb` commands. The desktop app can also create the folder.
 - **From Iteration 11 (v0.11).** An agent generates a **whole project at once** from glidebox's prompt, and glidebox validates and previews it before adopting it (R50–R55).
 
 **Task box name (proposed, owner to confirm):** `.glidebox/` at the root of the repository, like `.github/` or `.vscode/`: one recognisable place, out of the way of the code. `gb init` uses it by default. Any other folder can still be chosen (R72).
@@ -155,7 +155,7 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 
 1. On a Mac:
    - create the task box in a new folder, and inside a Git repository;
-   - add workstreams and tasks with the CLI (`gb add …`), and see them in the app;
+   - add areas and tasks with the CLI (`gb add …`), and see them in the app;
    - a real Claude Code session claims and finishes a task with `gb`, and the app shows it;
    - `git diff` shows readable changes;
    - glidebox's own cards now live in its task box, and agents use `gb` instead of `TASK_BOARD.md`.
@@ -181,8 +181,8 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 - **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
 - **Dependencies to watch:**
   - Iteration 2 needs a **Windows machine** for its exit check (owner to confirm one is available).
-  - Iteration 8 needs the agent launch research ([`W07-01`](../tasks/Task-W07-01-agent-launch-research.md)).
-  - Iterations 9–10 need the remote-access and email research ([`W10-01`](../tasks/Task-W10-01-remote-access-research.md)), and owner approval to create the email-service (9) and tunnel (10) accounts.
+  - Iteration 8 needs the agent launch research ([`A03-01`](../tasks/Task-A03-01-agent-launch-research.md)).
+  - Iterations 9–10 need the remote-access and email research ([`A04-01`](../tasks/Task-A04-01-remote-access-research.md)), and owner approval to create the email-service (9) and tunnel (10) accounts.
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
 - **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **glidebox itself**. When Iteration 1 passes its exit check, glidebox's own cards move from Markdown into a task box inside this repository, and the agents building glidebox track their work in it from then on ([AI-WORKFLOW § dogfooding](../workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding)). This is the first real test of every release.

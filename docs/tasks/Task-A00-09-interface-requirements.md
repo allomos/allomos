@@ -1,6 +1,6 @@
-# Task-W00-09-interface-requirements
+# Task-A00-09-interface-requirements
 
-*Split out of `Task-W00-01` on 2026-10-04; the work was done on 2026-10-03.*
+*Split out of `Task-A00-01` on 2026-10-04; the work was done on 2026-10-03.*
 
 - **Outcome.** The owner's interface requirements are recorded: glidebox is well structured for both people and AI agents, people can use it on desktop and mobile, and browser and human command-line use are considered. Public sources were researched to back the proposed design.
 - **Decisive unknowns.** None for the record. Platforms, packaging and release order are on the board's "Waiting on the owner" list.
