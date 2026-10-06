@@ -1,7 +1,9 @@
 {
   "area": "A01",
-  "holder": "claude/a01-run",
+  "handoff_note": "Agent checks pass; owner's look at the message is left (see the card's Result).",
   "id": "A01-04",
-  "state": "in_progress",
-  "title": "Startup folder argument"
+  "label": "locally verified",
+  "state": "waiting",
+  "title": "Startup folder argument",
+  "waiting_on": "owner checks the two start-up commands in the app"
 }
