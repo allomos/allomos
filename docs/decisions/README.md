@@ -17,3 +17,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0011](./0011-desktop-framework-and-shared-code.md) | Desktop for macOS and Windows; one shared interface code base; desktop framework: Tauri 2 | Accepted 2026-10-04 |
 | [0012](./0012-free-local-app-paid-cloud.md) | The local app is free; payment only for the cloud | Accepted 2026-10-04; paid features and licence open |
 | [0013](./0013-product-name-fliphopper.md) | The product is called FlipHopper; a project's data is its seabag, always in `.fliphopper/seabag/` | Accepted 2026-10-06 |
+| [0014](./0014-main-purpose-and-three-sets.md) | Main purpose: switch between AI agents and teammates; three sets (main, AI skills, progress management) | Accepted 2026-10-06; contents of sets 2–3 proposed |

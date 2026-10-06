@@ -46,7 +46,7 @@ The owner chose **three sets: the main set, AI skills, and progress management**
 
 ## Questions for the owner
 
-1. Is the main purpose right as written: **carrying a project across AI agents and agent accounts**, including handing it to another person?
+1. ~~Main purpose~~ Answered 2026-10-06: switching between AI agents and teammates, as discussed for the name.
 2. ~~Groups~~ Answered 2026-10-06: three sets — main, AI skills, progress management.
 3. Is "AI skills" content written by us (guides, checklists) inside the app, or links to outside material?
 4. Should the remaining-quota idea be researched now (a research card), or only mentioned as "later"?
@@ -71,8 +71,10 @@ The owner chose **three sets: the main set, AI skills, and progress management**
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-06 | Main set serves switching between AI agents and teammates; the deck's content is organized by the three sets | owner (chat) |
 | 2026-10-06 | Change the deck's main topic to keeping project tasks between AI agent accounts, with other features grouped (first ideas: AI skills, progress management), organized more carefully | owner (chat) |
 
 ## Notes
 
 - 2026-10-06 — Card written by the agent with a proposed structure. The owner answered question 2 (three sets); working together placed in the main set by the agent. Waiting on answers 1, 3, 4, 5 and review of the sets' contents.
+- 2026-10-06 — Claimed. The owner answered question 1 (switching between AI agents and teammates) and asked for the deck to follow the three sets. Done: [0014](../decisions/0014-main-purpose-and-three-sets.md); README, `AGENTS.md`, PLAN § 1 and [pitch/README.md](../pitch/README.md) lead with the main purpose; both decks rewritten as ten slides (hero and hop diagram, problem, the three sets, switch agents, switch teammates, AI skills, progress management, pricing, roadmap tagged by set, close) and republished to the same addresses (version 2). Questions 3–5 are still open; until answered, the deck marks set 2 as being designed, the quota idea is left out, and the plan's order is unchanged. Waiting on the owner's review of the decks.

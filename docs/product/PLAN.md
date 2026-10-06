@@ -4,6 +4,8 @@
 
 ## 1. Problem
 
+**Main purpose (owner, 2026-10-06, [0014](../decisions/0014-main-purpose-and-three-sets.md)):** FlipHopper lets a project switch between AI agents (and their accounts) and between teammates without losing anything. AI skills and progress management are the two other sets of features. The problems below are the costs of switching today.
+
 Work is carried out by several AI coding sessions (Claude Code, Codex) in parallel worktrees, plus the owner and teammates. Today the state of that work lives in hand-maintained markdown (reference: the Joyns SSR migration `TASK_BOARD.md` + `workstreams/` card files). That approach has these costs:
 
 1. **Status is duplicated** across the card file, card index, Now, Timeline gantt, recently-finished table and area table — agents must keep six copies in sync, and they drift.

@@ -36,6 +36,14 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
+### Task-A00-18 — claude/a00-18-positioning
+- Checkout: worktree `.claude/worktrees/a00-18`, branch `claude/a00-18-positioning` · pushed: yes · not merged.
+- Approvals in force: the card (owner, 2026-10-06), including republishing the two decks to their current addresses.
+- Done: decision 0014; README, AGENTS.md, PLAN § 1, pitch README; both decks rebuilt around the three sets and republished (version 2 at both addresses in `docs/pitch/README.md`).
+- Uncommitted: none · Running: none
+- Next: owner reviews the decks and answers questions 3–5 on the card; then adjust, republish to the same addresses, and merge into `main`.
+- Resume prompt: "Resume Task-A00-18 in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-18. Read AGENTS.md, the board, the card docs/tasks/Task-A00-18-positioning-and-deck.md and your block in docs/AGENT_HANDOFF.md."
+
 ## Live state
 
 Checked 2026-10-06.
@@ -67,6 +75,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
   - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**. Web and mobile companions view progress and status and act through the desktop app. They connect from outside at free or very low cost, and pair by email and code. Cloud projects are still needed. [0010](./decisions/0010-project-data-folder.md) **user-chosen seabag**, standalone or inside an existing project folder. It is self-contained, uses the host repository's Git, and allows one writer. Every Git action runs the `git` command. Seabag default on disk: `.fliphopper/seabag/`. Iteration 2's Windows checks run on a workmate's machine. [0011](./decisions/0011-desktop-framework-and-shared-code.md) desktop for **macOS and Windows**; desktop window, browser and phone share **one interface code base** built with **Tauri 2** (project rules in Rust crates; interface TypeScript). Released together, unsigned until the first public release.
   - Open: [0003](./decisions/0003-relationship-to-glidelines.md) reuse of the owner's Glidelines code.
   - Proposed: 0007's sync and merge details (layout, push/pull experience, merge rules, offline claims).
+- **Main purpose** ([0014](./decisions/0014-main-purpose-and-three-sets.md), 2026-10-06): switch between AI agents and teammates and keep the project; sets 2 and 3 are AI skills and progress management.
 - **Name** ([0013](./decisions/0013-product-name-fliphopper.md), 2026-10-06): the product is **FlipHopper** (`fliphopper`, command `fh`); a project's data is its **seabag**, always in `.fliphopper/seabag/`. Dated history keeps "glidebox".
 - **Business model** ([0012](./decisions/0012-free-local-app-paid-cloud.md), 2026-10-04): the local app is free, with no account; payment is only for cloud features. Free users must cost (almost) nothing to serve. The source licence is undecided.
 - **Until FlipHopper can track itself** (from the end of Iteration 1, decided by the owner 2026-10-04), this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-fliphopper-can-track-itself-dogfooding).

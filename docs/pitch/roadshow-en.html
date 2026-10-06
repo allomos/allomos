@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a stack of 16:9 "approach chart" slides on a sky ground; a burndown drawn as a glide path is the recurring motif. Present mode shows one slide at a time. */
+/* Layout: a stack of 16:9 slides on a sky ground, organized as three sets: the main set (switch, amber), AI skills (teal) and progress management (blue). A hop arc between agents and people is the recurring motif. Present mode shows one slide at a time. */
 :root{
   --sky:#E9EFF5;        /* page ground */
   --paper:#FBFCFE;      /* slide surface */
@@ -12,7 +12,8 @@
   --line:#CFD9E4;       /* rules, grid */
   --amber:#D7891C;      /* accent marks: glide path, runway lights */
   --amber-ink:#8F5306;  /* accent text on light */
-  --teal:#1C7479;       /* "verified" */
+  --teal:#1C7479;       /* "verified"; set 2, AI skills */
+  --blue:#2D5A96;       /* set 3, progress management */
   --cone:rgba(215,137,28,.16);
   --shadow:0 1px 2px rgba(18,34,58,.06),0 8px 28px rgba(18,34,58,.07);
   --display:"Big Shoulders Display","Arial Narrow","Roboto Condensed",sans-serif;
@@ -22,13 +23,13 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --sky:#0A1320;--paper:#101C2D;--ink:#E5EDF6;--muted:#93A5BA;--line:#22344A;
-    --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--cone:rgba(240,166,58,.18);
+    --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--blue:#86ABE3;--cone:rgba(240,166,58,.18);
     --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --sky:#0A1320;--paper:#101C2D;--ink:#E5EDF6;--muted:#93A5BA;--line:#22344A;
-  --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--cone:rgba(240,166,58,.18);
+  --amber:#F0A63A;--amber-ink:#F4BC63;--teal:#55B8BE;--blue:#86ABE3;--cone:rgba(240,166,58,.18);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -162,11 +163,48 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
   .chart .actual{stroke-dasharray:700;stroke-dashoffset:0;animation:draw 1.6s ease-out both}
   @keyframes draw{from{stroke-dashoffset:700}to{stroke-dashoffset:0}}
 }
+
+/* three sets */
+.sets{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:clamp(16px,2.4vw,32px)}
+.set{border-top:4px solid var(--c,var(--amber));padding-top:14px;display:grid;gap:8px;align-content:start;min-width:0}
+.set .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--c,var(--amber-ink))}
+.set h3{font-size:clamp(28px,3.2vw,40px)}
+.set p{color:var(--muted);font-size:15px}
+.set ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.set.main{--c:var(--amber-ink)}
+.set.main{border-top-color:var(--amber)}
+.set.skills{--c:var(--teal)}
+.set.progress{--c:var(--blue)}
+.eyebrow.skills{color:var(--teal)}
+.eyebrow.progress{color:var(--blue)}
+.ticks.skills li::before{background:var(--teal)}
+.ticks.progress li::before{background:var(--blue)}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid currentColor;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:2px;white-space:nowrap}
+.tag.main{color:var(--amber-ink)}.tag.skills{color:var(--teal)}.tag.progress{color:var(--blue)}
+
+/* hop diagram */
+.hop .who{fill:var(--paper);stroke:var(--ink);stroke-width:2}
+.hop .who.person{stroke:var(--teal)}
+.hop .name{fill:var(--ink);font:700 15px var(--body)}
+.hop .sub{fill:var(--muted);font:400 11px var(--mono)}
+.hop .arc{fill:none;stroke:var(--amber);stroke-width:2.5;stroke-dasharray:7 6;stroke-linecap:round}
+.hop .head{fill:var(--amber)}
+.hop .why{fill:var(--amber-ink);font:600 11px var(--mono)}
+.hop .tie{stroke:var(--line);stroke-width:1.5}
+.hop .bag{fill:var(--cone);stroke:var(--amber);stroke-width:2}
+.hop .bagt{fill:var(--ink);font:700 15px var(--body)}
+.hop .bagp{fill:var(--muted);font:500 11px var(--mono)}
+.hop .cord{fill:none;stroke:var(--amber);stroke-width:2;stroke-linecap:round}
+
+/* small cards for a hand-over */
+.handover{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px}
+.handover div{border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;line-height:1.35}
+.handover b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 </style>
 
 <header class="bar">
   <div class="brand">
-    <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="6" width="24" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5 11 L13 16 L23 21" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/></svg>
+    <svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="5" cy="21" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="23" cy="21" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M7 17 Q14 1 21 17" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="4 3"/></svg>
     FlipHopper
   </div>
   <span class="bar-note">ROAD SHOW · OCTOBER 2026 · IN DEVELOPMENT</span>
@@ -179,9 +217,9 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
   <section class="slide hero" aria-label="FlipHopper">
     <div class="hero-grid">
       <div>
-        <p class="eyebrow">Project tracking for vibe coding</p>
-        <h1>Land every <em>vibe-coded</em> project.</h1>
-        <p class="lede">Your AI agents write the code. FlipHopper keeps the project on course: what's done, what's verified, what needs you, and when it will land.</p>
+        <p class="eyebrow">Hop between AI agents and teammates</p>
+        <h1 style="font-size:clamp(38px,5vw,66px)">Switch agents. Switch teammates. <em>Keep the project.</em></h1>
+        <p class="lede">When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its seabag: plain files in your own repository.</p>
         <div class="pill-row">
           <span class="pill free">Local app · free</span>
           <span class="pill">macOS · Windows</span>
@@ -190,6 +228,155 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
         </div>
       </div>
       <figure style="margin:0">
+        <svg class="hop" viewBox="0 0 560 330" role="img" aria-labelledby="hop-t" style="width:100%;height:auto;display:block">
+          <title id="hop-t">A task hops from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same seabag in the repository.</title>
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <path class="arc" d="M120,92 Q187,14 250,92" marker-end="url(#ah)"/>
+          <path class="arc" d="M310,92 Q373,14 440,92" marker-end="url(#ah)"/>
+          <text class="why" x="185" y="40" text-anchor="middle">quota used up</text>
+          <text class="why" x="375" y="40" text-anchor="middle">hand-off</text>
+          <line class="tie" x1="95" y1="148" x2="222" y2="222"/>
+          <line class="tie" x1="280" y1="148" x2="280" y2="212"/>
+          <line class="tie" x1="465" y1="148" x2="338" y2="222"/>
+          <rect class="who" x="20" y="96" width="150" height="52" rx="10"/>
+          <rect class="who" x="205" y="96" width="150" height="52" rx="10"/>
+          <rect class="who person" x="390" y="96" width="150" height="52" rx="10"/>
+          <text class="name" x="95" y="119" text-anchor="middle">Claude Code</text>
+          <text class="sub" x="95" y="137" text-anchor="middle">account 1</text>
+          <text class="name" x="280" y="119" text-anchor="middle">Codex</text>
+          <text class="sub" x="280" y="137" text-anchor="middle">account 2</text>
+          <text class="name" x="465" y="119" text-anchor="middle">Teammate</text>
+          <text class="sub" x="465" y="137" text-anchor="middle">and their agents</text>
+          <path class="bag" d="M196,236 Q196,222 212,222 L348,222 Q364,222 364,236 L356,298 Q354,312 340,312 L220,312 Q206,312 204,298 Z"/>
+          <path class="cord" d="M212,222 Q280,200 348,222"/>
+          <text class="bagt" x="280" y="258" text-anchor="middle">Seabag</text>
+          <text class="bagp" x="280" y="280" text-anchor="middle">.fliphopper/seabag/</text>
+          <text class="bagp" x="280" y="297" text-anchor="middle">in your repository</text>
+        </svg>
+      </figure>
+    </div>
+    <div class="foot"><span>FlipHopper</span><span>01 / 10</span></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide" aria-label="The problem">
+    <p class="eyebrow">The problem</p>
+    <h2>Every switch loses the thread.</h2>
+    <p class="lede">Vibe coding runs on many sessions: Claude Code, Codex, several accounts, several people. A quota can end a session without warning, and the next one starts cold. The project's state lives in hand-kept Markdown and in people's heads.</p>
+    <div class="facts">
+      <div class="fact"><b>185&nbsp;KB</b><span>of handoff notes each new session re-reads to resume</span></div>
+      <div class="fact"><b>6</b><span>places one card's status was copied by hand</span></div>
+      <div class="fact"><b>3</b><span>sessions claiming cards at once, settled by merge conflict</span></div>
+      <div class="fact"><b>0</b><span>answers to "when will it be done?"</span></div>
+    </div>
+    <div class="foot"><span>From one real multi-agent migration project, Sept 2026</span><span>02 / 10</span></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide" aria-label="Three sets">
+    <p class="eyebrow">What FlipHopper does</p>
+    <h2>One main job. Two that make it better.</h2>
+    <div class="sets">
+      <div class="set main"><span class="k">Main set</span><h3>Switch</h3>
+        <p>Hop between AI agents and teammates without losing the project.</p>
+        <ul><li>A seabag in your repository</li><li>The same commands for every agent</li><li>Handoff and resume in one step</li><li>Hand the project to a teammate</li></ul></div>
+      <div class="set skills"><span class="k">Set 2</span><h3>AI skills</h3>
+        <p>Get better at working with AI agents.</p>
+        <ul><li>Learn each agent</li><li>Switch cleanly</li><li>Run the vibe-coding process</li><li>Improve the results</li></ul></div>
+      <div class="set progress"><span class="k">Set 3</span><h3>Progress management</h3>
+        <p>See where the project stands and when it will land.</p>
+        <ul><li>Progress by area</li><li>What waits on you</li><li>Burndown and finish date</li><li>Desktop, browser and phone</li></ul></div>
+    </div>
+    <div class="foot"><span>All three sets work on the same seabag</span><span>03 / 10</span></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide" aria-label="Switch between AI agents">
+    <p class="eyebrow">Main set · Switch between AI agents</p>
+    <h2>Claude runs out. Codex picks up.</h2>
+    <div class="cols">
+      <ul class="ticks">
+        <li><span><b>A seabag in your repo.</b> Tasks, proven steps and handoff notes live as readable files in <span class="mono">.fliphopper/seabag/</span>, versioned by your own Git, not inside one agent's memory or one account.</span></li>
+        <li><span><b>The same commands for every agent.</b> Claude Code, Codex and others claim, update and release tasks through the <span class="mono">fliphopper</span> command and MCP.</span></li>
+        <li><span><b>Resume in one step.</b> A new session asks for the next task and gets its step and the last handoff note.</span></li>
+        <li><span><b>Start or reopen a session</b> in the agent you choose, straight from the task.</span></li>
+      </ul>
+      <div style="display:grid;gap:14px;min-width:0">
+        <div class="term" aria-label="Example commands"><span class="c"># Claude Code · account 1 · quota nearly used</span>
+fh label A01-03 "implemented"
+fh release A01-03 --note "form done; tests next"
+
+<span class="c"># Codex · account 2 · a minute later</span>
+fh next
+<span class="ok">A01-03</span>  Sign-in page  ready · note: tests next
+fh claim A01-03</div>
+        <p class="tiny">Commands are illustrative; names may change before release.</p>
+      </div>
+    </div>
+    <div class="foot"><span>Main set · local, no account needed</span><span>04 / 10</span></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide" aria-label="Switch between teammates">
+    <p class="eyebrow">Main set · Switch between teammates</p>
+    <h2>Hand over the project, not a pile of notes.</h2>
+    <p class="lede">The same seabag carries the work from you to a teammate and back. Each of you keeps your own agents, and everyone sees the same tasks.</p>
+    <div class="flow" aria-label="How a project passes between people">
+      <div class="node"><b>You</b>hand over a task</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>Teammate</b>contributor · approver · viewer</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>Their agents</b>claim one task each</div>
+      <span class="arrow">→</span>
+      <div class="node"><b>You</b>approve and mark done</div>
+    </div>
+    <div class="handover" aria-label="What moves with each task">
+      <div><b>Who holds it</b>a person or an agent session</div>
+      <div><b>Proven step</b>implemented … owner verified</div>
+      <div><b>Waiting on</b>the one thing that blocks it</div>
+      <div><b>Handoff note</b>where to pick up</div>
+    </div>
+    <p class="tiny">In a shared repository the seabag travels with Git at no cost. A cloud project adds live sharing, email invitations and roles.</p>
+    <div class="foot"><span>Main set · cloud projects optional</span><span>05 / 10</span></div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide" aria-label="AI skills">
+    <p class="eyebrow skills">Set 2 · AI skills</p>
+    <h2>Get better at working with agents.</h2>
+    <div class="cols">
+      <ul class="ticks skills">
+        <li><span><b>Learn each agent.</b> What Claude Code and Codex are each good at, and how to set one up for your project.</span></li>
+        <li><span><b>Switch cleanly.</b> What to hand over when a task moves to another agent or account.</span></li>
+        <li><span><b>Run the vibe-coding process.</b> One task per outcome, a working copy per session, proven steps, and your approval before anything leaves your machine.</span></li>
+        <li><span><b>Improve the results.</b> Choose the model and effort for each task, and get a second look at risky changes.</span></li>
+      </ul>
+      <div style="display:grid;gap:14px;min-width:0">
+        <div class="ladder" aria-label="Proven steps">
+          <div class="rung done"><i>1</i>Implemented</div>
+          <div class="rung done"><i>2</i>Locally verified</div>
+          <div class="rung"><i>3</i>Deployed and verified</div>
+          <div class="rung"><i>4</i>Owner verified</div>
+        </div>
+        <div class="node"><b>AI-generated project setup</b>An agent drafts a whole project; FlipHopper checks and previews it before you adopt it.</div>
+        <p class="tiny">Set 2 is being designed; its contents may change.</p>
+      </div>
+    </div>
+    <div class="foot"><span>Set 2 · AI skills</span><span>06 / 10</span></div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide" aria-label="Progress management">
+    <p class="eyebrow progress">Set 3 · Progress management</p>
+    <h2>Know where it stands and when it lands.</h2>
+    <div class="cols">
+      <ul class="ticks progress">
+        <li><span><b>Progress by area</b>, with each task's proven step.</span></li>
+        <li><span><b>Waiting on you.</b> The decisions only you can make, with the evidence.</span></li>
+        <li><span><b>A finish date, honestly.</b> From your real pace: the date you have a 50% chance of hitting, and the date you have an 85% chance of hitting.</span></li>
+        <li><span><b>Anywhere.</b> At your desk, in a browser or on your phone, connected to your desktop app.</span></li>
+      </ul>
+      <figure style="margin:0;min-width:0">
         <svg class="chart" viewBox="-28 0 588 318" role="img" aria-labelledby="gp-t">
           <title id="gp-t">Burndown drawn as a glide path: 60 tasks remaining at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.</title>
           <text class="ttl" transform="translate(-14,150) rotate(-90)" text-anchor="middle">Tasks left</text>
@@ -216,98 +403,10 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
         </svg>
       </figure>
     </div>
-    <div class="foot"><span>FlipHopper</span><span>01 / 09</span></div>
+    <div class="foot"><span>Set 3 · progress management</span><span>07 / 10</span></div>
   </section>
 
-  <!-- 2 -->
-  <section class="slide" aria-label="The problem">
-    <p class="eyebrow">The problem</p>
-    <h2>Your agents are coding. Nobody can see the project.</h2>
-    <p class="lede">Vibe coding is fast until the work spreads over terminals, branches and chats. Status lives in hand-kept Markdown, copied from file to file, and the owner becomes the bottleneck no one can see.</p>
-    <div class="facts">
-      <div class="fact"><b>6</b><span>places one card's status was copied by hand</span></div>
-      <div class="fact"><b>3</b><span>agent sessions claiming cards at once, by merge conflict</span></div>
-      <div class="fact"><b>185&nbsp;KB</b><span>of handoff notes agents re-read to resume</span></div>
-      <div class="fact"><b>0</b><span>answers to "when will it be done?"</span></div>
-    </div>
-    <div class="foot"><span>From one real multi-agent migration project, Sept 2026</span><span>02 / 09</span></div>
-  </section>
-
-  <!-- 3 -->
-  <section class="slide" aria-label="Manage your project while vibe coding">
-    <p class="eyebrow">01 · Manage your project while vibe coding</p>
-    <h2>The board your agents keep up to date.</h2>
-    <div class="cols">
-      <ul class="ticks">
-        <li><span><b>A seabag in your repo.</b> Tasks live as readable files in <span class="mono">.fliphopper/seabag/</span>, versioned by your own Git.</span></li>
-        <li><span><b>Agents report as they work.</b> Claude Code and Codex claim, update and finish tasks through the <span class="mono">fliphopper</span> command and MCP.</span></li>
-        <li><span><b>Progress you can trust.</b> Each task climbs proven steps, and only you mark it done.</span></li>
-        <li><span><b>A finish date, honestly.</b> From your team's real pace: the date you have a 50% chance of hitting, and the date you have an 85% chance of hitting.</span></li>
-        <li><span><b>Start or reopen an agent</b> on any task, straight from the app.</span></li>
-      </ul>
-      <div style="display:grid;gap:14px;min-width:0">
-        <div class="term" aria-label="Example commands"><span class="c"># an agent picks up work</span>
-fh next
-<span class="ok">A01-03</span>  Sign-in page   ready
-fh claim A01-03
-fh label A01-03 "locally verified"
-fh wait A01-03 --on owner "check on phone"</div>
-        <div class="ladder" aria-label="Verification steps">
-          <div class="rung done"><i>1</i>Implemented</div>
-          <div class="rung done"><i>2</i>Locally verified</div>
-          <div class="rung"><i>3</i>Deployed and verified</div>
-          <div class="rung"><i>4</i>Owner verified</div>
-        </div>
-        <p class="tiny">Commands are illustrative; names may change before release.</p>
-      </div>
-    </div>
-    <div class="foot"><span>Local · no account needed</span><span>03 / 09</span></div>
-  </section>
-
-  <!-- 4 -->
-  <section class="slide" aria-label="Work anytime">
-    <p class="eyebrow">02 · Work anytime</p>
-    <h2>Your desk, your browser, your pocket.</h2>
-    <div class="cols">
-      <ul class="ticks">
-        <li><span><b>The desktop app is the hub.</b> All features, your data on your machine, works offline.</span></li>
-        <li><span><b>Check progress from a browser or phone</b>, at home or away, connected to your running desktop.</span></li>
-        <li><span><b>Approve from anywhere.</b> "Waiting on me" shows exactly what needs your decision, with the evidence.</span></li>
-        <li><span><b>Simple, safe pairing.</b> Enter your email; the desktop approves and sends a one-time code.</span></li>
-      </ul>
-      <div class="devices" aria-hidden="true">
-        <div class="dev"><span class="t">Desktop</span>
-          <div class="bars"><div style="--w:92%"></div><div style="--w:61%"></div><div style="--w:38%"></div><div style="--w:12%"></div></div>
-        </div>
-        <div class="dev"><span class="t">Browser</span>
-          <div class="bars"><div style="--w:92%"></div><div style="--w:61%"></div></div>
-        </div>
-        <div class="dev phone"><span class="t">Phone</span>
-          <div class="ask"><b>Waiting on you</b>Approve deploy of A01-03?</div>
-        </div>
-      </div>
-    </div>
-    <div class="foot"><span>Desktop for macOS and Windows · companions in any browser</span><span>04 / 09</span></div>
-  </section>
-
-  <!-- 5 -->
-  <section class="slide" aria-label="Teammates cooperate">
-    <p class="eyebrow">03 · Teammates cooperate</p>
-    <h2>One project, many people, many agents.</h2>
-    <p class="lede">Put a project in the cloud when you're ready to share it. Invite teammates by email, give each a role, and see every change live. Concurrent edits merge like Git, and real conflicts are shown, not lost.</p>
-    <div class="flow" aria-label="How a team works together">
-      <div class="node"><b>Owner</b>invites by email</div>
-      <span class="arrow">→</span>
-      <div class="node"><b>Teammates</b>contributor · approver · viewer</div>
-      <span class="arrow">→</span>
-      <div class="node"><b>Their agents</b>claim one task each</div>
-      <span class="arrow">→</span>
-      <div class="node"><b>Everyone</b>sees the same board, live</div>
-    </div>
-    <div class="foot"><span>Cloud projects · optional</span><span>05 / 09</span></div>
-  </section>
-
-  <!-- 6 -->
+  <!-- 8 -->
   <section class="slide" aria-label="Pricing">
     <p class="eyebrow">Pricing</p>
     <h2>Free on your machine. Pay only for the cloud.</h2>
@@ -317,10 +416,10 @@ fh wait A01-03 --on owner "check on phone"</div>
         <div class="price">Free</div>
         <p class="sub">NO ACCOUNT · NO CARD · NO TRIAL CLOCK</p>
         <ul class="ticks">
+          <li><span>Switch between AI agents and accounts, by command line and MCP</span></li>
           <li><span>Desktop app for macOS and Windows</span></li>
           <li><span>Local projects in your own repositories</span></li>
-          <li><span>Agents via command line and MCP</span></li>
-          <li><span>Burndown, forecast, and phone and browser companions at home</span></li>
+          <li><span>Burndown, forecast, and phone and browser at home</span></li>
         </ul>
       </div>
       <div class="plan">
@@ -328,68 +427,47 @@ fh wait A01-03 --on owner "check on phone"</div>
         <div class="price">Optional</div>
         <p class="sub">ONLY IF YOU WANT IT · PRICING TO BE ANNOUNCED</p>
         <ul class="ticks">
-          <li><span>Cloud copy of a project, on any computer</span></li>
+          <li><span>Switch between teammates live: a cloud copy on any computer</span></li>
           <li><span>Team sign-in, email invitations and roles</span></li>
           <li><span>Live collaboration and merged edits</span></li>
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Your data stays local unless you choose to share it</span><span>06 / 09</span></div>
+    <div class="foot"><span>Your data stays local unless you choose to share it</span><span>08 / 10</span></div>
   </section>
 
-  <!-- 7 -->
-  <section class="slide" aria-label="How it works">
-    <p class="eyebrow">How it works</p>
-    <h2>Plain files, real Git, one hub.</h2>
-    <div class="cols">
-      <ul class="ticks">
-        <li><span><b>Seabag:</b> readable JSON and Markdown in <span class="mono">.fliphopper/seabag/</span>, inside your repository.</span></li>
-        <li><span><b>Your Git:</b> commit, push and pull run your own <span class="mono">git</span>, with your keys and hooks.</span></li>
-        <li><span><b>One set of rules:</b> the app, the command line and MCP all go through the same checks and history.</span></li>
-      </ul>
-      <div class="flow" style="flex-direction:column;align-items:stretch">
-        <div class="node"><b>Agents</b>Claude Code · Codex → <span class="mono">fh</span> / MCP</div>
-        <span class="arrow" style="text-align:center">↓</span>
-        <div class="node" style="border-color:var(--amber)"><b>FlipHopper desktop</b>rules · forecast · local server</div>
-        <span class="arrow" style="text-align:center">↓ ↑</span>
-        <div class="node"><b>.fliphopper/seabag/ in your repo</b>files tracked by Git · optional cloud copy</div>
-      </div>
-    </div>
-    <div class="foot"><span>Local-first architecture</span><span>07 / 09</span></div>
-  </section>
-
-  <!-- 8 -->
+  <!-- 9 -->
   <section class="slide" aria-label="Roadmap">
     <p class="eyebrow">Roadmap · 15 small releases, each one usable</p>
     <h2>Shipping in small, usable steps.</h2>
     <div class="route">
       <div class="leg now"><span class="when">Now</span><h3>Track</h3>
-        <ol><li><span>v0.1</span>macOS local tracker</li></ol></div>
+        <ol><li><span>v0.1</span><em style="font-style:normal">macOS local tracker <i class="tag main">switch</i></em></li></ol></div>
       <div class="leg"><span class="when">Next</span><h3>Grow</h3>
-        <ol><li><span>v0.2</span>Windows + editing</li><li><span>v0.3</span>MCP for agents</li><li><span>v0.4</span>Progress view</li><li><span>v0.5</span>Burndown and forecast</li></ol></div>
+        <ol><li><span>v0.2</span><em style="font-style:normal">Windows + editing <i class="tag main">switch</i></em></li><li><span>v0.3</span><em style="font-style:normal">MCP for agents <i class="tag main">switch</i></em></li><li><span>v0.4</span><em style="font-style:normal">Progress view <i class="tag progress">progress</i></em></li><li><span>v0.5</span><em style="font-style:normal">Burndown and forecast <i class="tag progress">progress</i></em></li></ol></div>
       <div class="leg"><span class="when">Later</span><h3>Reach</h3>
-        <ol><li><span>v0.8</span>Start and open agents</li><li><span>v0.9</span>Phone at home</li><li><span>v0.10</span>Phone anywhere</li><li><span>v0.11</span>AI-generated projects</li></ol></div>
+        <ol><li><span>v0.8</span><em style="font-style:normal">Start and open agents <i class="tag main">switch</i></em></li><li><span>v0.9</span><em style="font-style:normal">Phone at home <i class="tag progress">progress</i></em></li><li><span>v0.10</span><em style="font-style:normal">Phone anywhere <i class="tag progress">progress</i></em></li><li><span>v0.11</span><em style="font-style:normal">AI-generated projects <i class="tag skills">skills</i></em></li></ol></div>
       <div class="leg"><span class="when">Then</span><h3>Team</h3>
-        <ol><li><span>v0.13</span>Cloud copy</li><li><span>v0.14</span>Teams</li><li><span>v1.0</span>Public release</li></ol></div>
+        <ol><li><span>v0.13</span><em style="font-style:normal">Cloud copy <i class="tag main">switch</i></em></li><li><span>v0.14</span><em style="font-style:normal">Teams <i class="tag main">switch</i></em></li><li><span>v1.0</span><em style="font-style:normal">Public release</em></li></ol></div>
     </div>
-    <div class="foot"><span>Selected releases shown · FlipHopper tracks its own development from v0.1</span><span>08 / 09</span></div>
+    <div class="foot"><span>Selected releases · tags show the set · FlipHopper tracks its own development from v0.1</span><span>09 / 10</span></div>
   </section>
 
-  <!-- 9 -->
+  <!-- 10 -->
   <section class="slide close" aria-label="Closing">
     <p class="eyebrow">FlipHopper</p>
-    <h2>Your agents code.<br><em>You land the project.</em></h2>
-    <p class="lede">Manage your project while vibe coding. Work from anywhere. Bring your team. Free on your machine; pay only if you want the cloud.</p>
+    <h2>Switch agents. Switch teammates.<br><em>Keep the project.</em></h2>
+    <p class="lede">The main set moves your project between AI agents and people. AI skills and progress management work on the same seabag. Free on your machine; pay only if you want the cloud.</p>
     <div class="pill-row">
       <span class="pill free">Local app · free</span>
       <span class="pill">Early development · first release: macOS</span>
     </div>
-    <div class="foot"><span>FlipHopper · October 2026</span><span>09 / 09</span></div>
+    <div class="foot"><span>FlipHopper · October 2026</span><span>10 / 10</span></div>
   </section>
 
   <nav class="nav" aria-label="Slide controls">
     <button type="button" id="prev">◂ Prev</button>
-    <span id="count">1 / 9</span>
+    <span id="count">1 / 10</span>
     <button type="button" id="next">Next ▸</button>
     <button type="button" id="exit">Exit</button>
   </nav>

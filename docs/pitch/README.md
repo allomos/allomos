@@ -1,6 +1,6 @@
 # Road show deck / 路演幻灯片
 
-A nine-slide pitch deck for FlipHopper, in English and Simplified Chinese. It covers four messages: manage your project while vibe coding; work anytime; teammates cooperate; the local app is free, and people pay only for the cloud. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)); renamed to FlipHopper and published at new addresses 2026-10-06 ([`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md)), because the first addresses were not reachable from the publishing session's account. A new main message is planned in [`Task-A00-18`](../tasks/Task-A00-18-positioning-and-deck.md).
+A ten-slide pitch deck for FlipHopper, in English and Simplified Chinese, organized by the three sets of [0014](../decisions/0014-main-purpose-and-three-sets.md): the main set (switch between AI agents and teammates and keep the project), AI skills, and progress management; then pricing (the local app is free, people pay only for the cloud) and the roadmap. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)); renamed to FlipHopper and published at new addresses 2026-10-06 ([`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md)), because the first addresses were not reachable from the publishing session's account. A new main message is planned in [`Task-A00-18`](../tasks/Task-A00-18-positioning-and-deck.md).
 
 | Version | Published address (private claude.ai Artifact) | Source in this repo |
 |---|---|---|
@@ -20,6 +20,6 @@ A nine-slide pitch deck for FlipHopper, in English and Simplified Chinese. It co
 
 ## Rules for the content
 
-- **Claim only what is decided.** The cloud price says "to be announced". Free phone access is promised **at home** only, until remote access is decided ([0012](../decisions/0012-free-local-app-paid-cloud.md)). The product is marked as early development.
+- **Claim only what is decided.** The cloud price says "to be announced". Free phone access is promised **at home** only, until remote access is decided ([0012](../decisions/0012-free-local-app-paid-cloud.md)). The product is marked as early development. Set 2 (AI skills) is marked as being designed until its contents are decided ([0014](../decisions/0014-main-purpose-and-three-sets.md)).
 - **Charts are drawn to scale from their own numbers.** The burndown example uses weekly throughput 3, 5, 3, 6, 5, 4 with 34 tasks left. A 10,000-run simulation gives a 50% chance of finishing by week 14 and an 85% chance by week 15. If the example data changes, recompute these weeks.
 - **Forecast labels state the chance together with the date**, never a bare percentage ([PLAN § 7](../product/PLAN.md#7-burndown-and-forecast)).
