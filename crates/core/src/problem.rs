@@ -92,6 +92,8 @@ problems! {
     NotASeabag { path } => "not_a_seabag", "{path} is not a seabag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
+    /// FlipHopper was started with a folder that does not exist or is not a folder.
+    StartupNotAFolder { path } => "startup_not_a_folder", "FlipHopper was started with {path}, which is not a folder, so nothing was opened.";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

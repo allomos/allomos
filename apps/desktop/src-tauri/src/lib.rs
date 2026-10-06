@@ -4,6 +4,7 @@
 //! (`apps/web/src/messenger.ts`), so the same interface can later reach the desktop's
 //! local server from a browser without changes.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -28,14 +29,49 @@ struct Opened {
     readme_added: bool,
 }
 
-/// A folder given at start-up: the first command-line argument, or `FLIPHOPPER_OPEN`.
-/// Lets `fliphopper ~/my-project` open that folder directly.
+/// The folder named on the command line: the first argument that is not an option.
+/// macOS options such as `-AppleLanguages (ja)` or `-NSDocumentRevisionsDebugMode YES` take
+/// the next argument as their value, so it is skipped too. `-psn_…` (older macOS, from Finder)
+/// and other options stand alone. `args` includes the program name, which is skipped.
+fn folder_argument(args: impl IntoIterator<Item = OsString>) -> Option<PathBuf> {
+    let mut args = args.into_iter().skip(1);
+    while let Some(arg) = args.next() {
+        let text = arg.to_string_lossy();
+        let Some(option) = text.strip_prefix('-') else {
+            return Some(PathBuf::from(arg));
+        };
+        let takes_value =
+            !option.starts_with("psn_") && option.starts_with(|c: char| c.is_ascii_uppercase());
+        if takes_value {
+            args.next();
+        }
+    }
+    None
+}
+
+/// The folder to open at start-up: `FLIPHOPPER_OPEN` if set, else the command line's folder.
+/// A folder that was given but is not one is reported, never silently replaced.
+fn choose_startup_folder(
+    env: Option<OsString>,
+    args: impl IntoIterator<Item = OsString>,
+) -> Result<Option<PathBuf>, Problem> {
+    let Some(given) = env.map(PathBuf::from).or_else(|| folder_argument(args)) else {
+        return Ok(None);
+    };
+    if given.is_dir() {
+        Ok(Some(std::path::absolute(&given).unwrap_or(given)))
+    } else {
+        Err(Problem::StartupNotAFolder {
+            path: given.display().to_string(),
+        })
+    }
+}
+
+/// A folder given at start-up, so `fliphopper ~/my-project` and
+/// `open FlipHopper.app --args ~/my-project` open that folder directly.
 #[tauri::command]
-fn startup_folder() -> Option<PathBuf> {
-    std::env::var_os("FLIPHOPPER_OPEN")
-        .map(PathBuf::from)
-        .or_else(|| std::env::args_os().nth(1).map(PathBuf::from))
-        .filter(|p| p.is_dir())
+fn startup_folder() -> Result<Option<PathBuf>, Problem> {
+    choose_startup_folder(std::env::var_os("FLIPHOPPER_OPEN"), std::env::args_os())
 }
 
 /// What is this folder? Changes nothing.
@@ -155,6 +191,59 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn args(list: &[&str]) -> Vec<OsString> {
+        std::iter::once("fliphopper")
+            .chain(list.iter().copied())
+            .map(OsString::from)
+            .collect()
+    }
+
+    #[test]
+    fn startup_folder_skips_options() {
+        let dir = std::env::temp_dir().join(format!("fliphopper-start-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let d = dir.to_str().unwrap();
+        let missing = dir.join("no-such-folder");
+        let m = missing.to_str().unwrap();
+        let found = |a: &[&str]| choose_startup_folder(None, args(a));
+
+        // The folder alone.
+        assert_eq!(found(&[d]), Ok(Some(dir.clone())));
+        // An option with a value, a lone option and an old Finder argument before the folder.
+        assert_eq!(
+            found(&["-AppleLanguages", "(ja)", d]),
+            Ok(Some(dir.clone()))
+        );
+        assert_eq!(
+            found(&[
+                "-psn_0_12345",
+                "-NSDocumentRevisionsDebugMode",
+                "YES",
+                "-v",
+                d
+            ]),
+            Ok(Some(dir.clone()))
+        );
+        // An option before a folder that does not exist: reported, not replaced.
+        assert_eq!(
+            found(&["-AppleLanguages", "(ja)", m]),
+            Err(Problem::StartupNotAFolder { path: m.into() })
+        );
+        // No arguments, or only options: nothing given.
+        assert_eq!(found(&[]), Ok(None));
+        assert_eq!(found(&["-AppleLanguages", "(ja)"]), Ok(None));
+        // FLIPHOPPER_OPEN wins over arguments, and is checked the same way.
+        assert_eq!(
+            choose_startup_folder(Some(dir.clone().into()), args(&[m])),
+            Ok(Some(dir.clone()))
+        );
+        assert_eq!(
+            choose_startup_folder(Some(missing.clone().into()), args(&[d])),
+            Err(Problem::StartupNotAFolder { path: m.into() })
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn file_manager_opens_only_a_seabag() {

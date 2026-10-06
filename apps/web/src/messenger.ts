@@ -9,7 +9,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo, Opened } from "./types";
 
 export interface Messenger {
-  /** A folder given when FlipHopper was started, if any. */
+  /** A folder given when FlipHopper was started, if any. Rejects with a Problem when the given path is not a folder. */
   startupFolder(): Promise<string | null>;
   /** The computer's preferred languages, most preferred first. */
   systemLanguages(): Promise<string[]>;

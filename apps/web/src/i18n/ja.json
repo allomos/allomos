@@ -70,5 +70,6 @@
   "problem.took_over": "タスク {id} を {previous} から引き継ぎました。",
   "problem.bad_usage": "{detail}",
   "problem.not_a_seabag": "{path} はシーバッグのフォルダーではありません。",
-  "problem.open_failed": "{path} をファイルマネージャーで開けません：{detail}。"
+  "problem.open_failed": "{path} をファイルマネージャーで開けません：{detail}。",
+  "problem.startup_not_a_folder": "FlipHopper は {path} を指定して起動されましたが、フォルダーではないため、何も開きませんでした。"
 }

@@ -70,5 +70,6 @@
   "problem.took_over": "已从 {previous} 接手任务 {id}。",
   "problem.bad_usage": "{detail}",
   "problem.not_a_seabag": "{path} 不是水手袋文件夹。",
-  "problem.open_failed": "无法在文件管理器中打开 {path}：{detail}。"
+  "problem.open_failed": "无法在文件管理器中打开 {path}：{detail}。",
+  "problem.startup_not_a_folder": "FlipHopper 启动时指定了 {path}，但它不是文件夹，因此没有打开任何内容。"
 }

@@ -36,3 +36,23 @@ FlipHopper can be started with a folder to open, for example `fliphopper ~/my-pr
 ## Notes
 
 - 2026-10-06 — Card written by the agent for the owner's review. Found while checking A01-02: `open Glidebox.app --args -AppleLanguages '(ja)' <folder>` reopened the previous folder instead of `<folder>`.
+- 2026-10-06 — Worked in the owner-approved card run (`claude/a01-run`).
+
+## Result (2026-10-06)
+
+**In plain words.** The app now takes the first argument that is not an option as the folder to open. A macOS option written as `-Name value` (such as `-AppleLanguages (ja)`) is skipped together with its value; other options are skipped alone. When the folder given does not exist or is not a folder, the window says so, naming the path, instead of quietly reopening the last folder. `FLIPHOPPER_OPEN` still wins over arguments, and is checked the same way.
+
+- **Decisive unknowns answered.**
+  - *What macOS adds:* nothing. Started with `open -n FlipHopper.app` (no arguments) the program gets only its own name; with `--args -AppleLanguages '(ja)' <folder>` it gets exactly those three (seen with `ps`, macOS 26). `-psn_…`, which older macOS added from Finder, is still skipped.
+  - *Does `fh` start the app?* No; `fh` never starts it, so A01-03 needs no note.
+- **Where:** `folder_argument` and `choose_startup_folder` in `apps/desktop/src-tauri/src/lib.rs`; a new code `startup_not_a_folder` in `crates/core/src/problem.rs` with words in three languages; `App.tsx` shows it; the start-up line in [CODING_RULES.md](../workflow/CODING_RULES.md).
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (new test: folder alone; option with value; `-psn_`, `-NS… YES`, `-v`; missing folder after an option; none; only options; `FLIPHOPPER_OPEN` set, both ways) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (73 texts, 34 codes) | PASS |
+| Before the fix, built app: `open -n FlipHopper.app --args -AppleLanguages '(ja)' <empty folder>` | the folder stayed empty (the bug) |
+| After the fix, the same command | PASS: the folder was opened and filled (seabag and Japanese README) |
+| `open FlipHopper.app --args ~/no-such-folder` shows the message | unit-tested; on screen not seen by the agent (no screen access) — owner check |
+
+**Owner check:** `open <FlipHopper.app> --args -AppleLanguages '(ja)' ~/some-folder` opens that folder in Japanese; `open <FlipHopper.app> --args ~/no-such-folder` shows a message naming that path.
