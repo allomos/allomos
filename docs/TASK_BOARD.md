@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**Nothing is claimed; ten cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Its first card is done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md), owner verified 2026-10-06).
+**Nothing is claimed; twelve cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Its first card is done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md), owner verified 2026-10-06).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -20,8 +20,9 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 **What is next.**
 - The owner reviews the documents and answers the questions below.
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
-- **UI languages decided** (owner, 2026-10-06): English, Simplified Chinese and Japanese (R94). The agent prepares a small Iteration 1 card for it, before the interface grows.
-- The next Iteration 1 card is the **`glidebox` / `gb` command**: agents create the task box, then add, claim, update and finish tasks. It must also decide how `gb` and the running app avoid writing the same task box at once. The agent prepares the card for the owner's review.
+- Two Iteration 1 cards wait for the owner's review:
+  - **UI languages** in English, Simplified Chinese and Japanese (R94), with a check that catches missing translations ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)).
+  - The **`glidebox` / `gb` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). It also proposes how `gb` and the running app take turns writing a task box; the recommendation is a short lock for each change.
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
 ## Sessions
@@ -42,6 +43,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
+| Review the two Iteration 1 cards. For `gb`: how writers take turns (A short lock per change, recommended · B one holder while open · C through the app), what `gb init` creates, what `gb done` requires. For languages: the starter project's language | [`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md), [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md) | Iteration 1 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
@@ -60,6 +62,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
+| [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | backlog | — | — | owner card review |
+| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | backlog | — | — | owner card review, including how writers take turns |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |
