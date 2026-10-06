@@ -12,7 +12,9 @@ use std::time::Duration;
 use clap::{Parser, Subcommand, error::ErrorKind};
 use fliphopper_core::ops::{self, Outcome};
 use fliphopper_core::{Issue, Problem, Seabag, State, Task};
-use fliphopper_store::{DEFAULT_DIR, Lock, find_seabag, git_root, id_from_name, init, load};
+use fliphopper_store::{
+    DEFAULT_DIR, Lock, find_seabag, git_root, id_from_name, init_with_labels, load,
+};
 use serde_json::{Value, json};
 
 /// The version of the `--json` output. A new field is an addition; anything else changes it.
@@ -60,6 +62,13 @@ enum Command {
         /// The project's name. Default: the folder's name.
         #[arg(long)]
         name: Option<String>,
+        /// The project's ID. Default: made from the folder's name.
+        #[arg(long)]
+        id: Option<String>,
+        /// The label ladder, lowest step first, separated by commas.
+        /// Default: implemented, locally verified, deployed and verified, owner verified.
+        #[arg(long, value_name = "A,B,…")]
+        labels: Option<String>,
     },
     /// Add an area or a task.
     #[command(subcommand)]
@@ -99,6 +108,12 @@ enum Command {
         #[arg(long, value_name = "TEXT")]
         note: Option<String>,
     },
+    /// Set the task's next dependency (the one thing needed for its next label); no text clears it.
+    Needs { id: String, text: Option<String> },
+    /// Mark an unheld backlog or waiting task ready (for example, the owner approved it).
+    Ready { id: String },
+    /// Drop a task: it will not be done.
+    Drop { id: String },
     /// Show the first ready task that no one holds.
     Next,
 }
@@ -132,6 +147,9 @@ impl Command {
             Command::Wait { .. } => "wait",
             Command::Done { .. } => "done",
             Command::Release { .. } => "release",
+            Command::Needs { .. } => "needs",
+            Command::Ready { .. } => "ready",
+            Command::Drop { .. } => "drop",
             Command::Next => "next",
         }
     }
@@ -318,7 +336,7 @@ fn task_line(t: &Task) -> String {
 fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     let me = cli.holder.as_deref();
     match &cli.command {
-        Command::Init { name } => {
+        Command::Init { name, id, labels } => {
             let root = match &cli.seabag {
                 Some(p) => cwd.join(p),
                 None => git_root(cwd)
@@ -332,7 +350,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "project".to_string());
             let name = name.clone().unwrap_or_else(|| folder.clone());
-            let root = init(&root, &id_from_name(&folder), &name)?;
+            let id = id.clone().unwrap_or_else(|| id_from_name(&folder));
+            let labels = match labels {
+                Some(list) => list
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|l| !l.is_empty())
+                    .map(String::from)
+                    .collect(),
+                None => fliphopper_core::default_labels(),
+            };
+            let root = init_with_labels(&root, &id, &name, labels)?;
             let text = format!("Created an empty seabag at {}\n", root.display());
             Ok(Done::new(json!({ "seabag": root }), text))
         }
@@ -457,6 +485,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
         Command::Done { id } => change(cli, cwd, |bag| ops::finish(bag, id, me)),
+        Command::Needs { id, text } => {
+            change(cli, cwd, |bag| ops::set_next(bag, id, me, text.as_deref()))
+        }
+        Command::Ready { id } => change(cli, cwd, |bag| ops::make_ready(bag, id, me)),
+        Command::Drop { id } => change(cli, cwd, |bag| ops::drop_task(bag, id, me)),
         Command::Release { id, note } => {
             change(cli, cwd, |bag| ops::release(bag, id, me, note.as_deref()))
         }

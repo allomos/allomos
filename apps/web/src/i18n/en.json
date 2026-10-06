@@ -71,5 +71,6 @@
   "problem.bad_usage": "{detail}",
   "problem.not_a_seabag": "{path} is not a seabag folder.",
   "problem.open_failed": "Could not open {path} in the file manager: {detail}.",
-  "problem.startup_not_a_folder": "FlipHopper was started with {path}, which is not a folder, so nothing was opened."
+  "problem.startup_not_a_folder": "FlipHopper was started with {path}, which is not a folder, so nothing was opened.",
+  "problem.cannot_make_ready": "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready."
 }

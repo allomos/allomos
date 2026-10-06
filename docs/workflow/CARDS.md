@@ -44,7 +44,7 @@ Add an area by editing this table and the board in the same commit.
 
 - **Change status only with `fh`, only on `main`.** Card branches hold an old copy of the seabag; never change it there. From a card's worktree, point `fh` at the main checkout: `export FLIPHOPPER_SEABAG=<main checkout>` (for example `/Users/wanghui/coding/glidepace/fliphopper`). Then commit only the seabag change on `main` (`git -C <main checkout> commit .fliphopper -m "fh: label A01-05 locally verified"`) and push it.
 - **Who you are:** `export FLIPHOPPER_HOLDER=<your branch>` (for example `claude/a01-05-readme`), or `--as <branch>` on each command.
-- **Next dependency:** for a waiting task it is its *waiting on*; for a held task it is in your handoff block; for a backlog task it is in its `description.md` until `fh` can set the field.
+- **Next dependency:** `fh needs <ID> "<the one thing needed for the next label>"`. For a waiting task, its *waiting on* says it.
 - **Seeing status:** `fh list` (all, by area), `fh list --state in_progress` (who holds what — this replaces the old Sessions table), `fh list --state done`, `fh show <ID>`, `fh next`. The app shows the same when it opens this repository.
 
 ## States and labels
@@ -77,7 +77,7 @@ One card is worked by exactly one session at a time. The seabag on `main`, not m
 6. **Finish** after the owner's check: `fh label <ID> "owner verified"`, `fh done <ID>`, `fh release <ID>`; commit with the merge of the card's branch.
 7. **Release** a card you stop short of Done: `fh release <ID> --note "<what the next session needs>"`, remove your handoff block, commit and push.
 8. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
-9. **A new card:** write its file in `docs/tasks/`, then `fh add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../docs/tasks/<file>)"` on `main`; it starts in `backlog`. When the owner approves it, move it to `ready` with `fh claim` then `fh release`.
+9. **A new card:** write its file in `docs/tasks/`, then `fh add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../docs/tasks/<file>)"` on `main`; it starts in `backlog`. When the owner approves it: `fh ready <ID>`. A card that will not be done: `fh drop <ID>`.
 10. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
 
 ## Now — rules

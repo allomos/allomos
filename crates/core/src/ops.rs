@@ -221,6 +221,48 @@ pub fn release(
     Ok(Outcome::plain(task))
 }
 
+/// Set the task's next dependency: the one thing needed for its next label. `None` (or empty
+/// text) clears it.
+pub fn set_next(
+    seabag: &Seabag,
+    id: &str,
+    me: Option<&str>,
+    text: Option<&str>,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(seabag, id)?;
+    check_holder(&task, me)?;
+    check_open(&task, &[State::Dropped])?;
+    task.next_dependency = non_empty(text);
+    Ok(Outcome::plain(task))
+}
+
+/// Mark an unheld `backlog` or `waiting` task `ready` (for example, the owner approved it).
+/// Its *waiting on* is cleared.
+pub fn make_ready(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(seabag, id)?;
+    check_holder(&task, me)?;
+    if task.holder.is_some() || !matches!(task.state, State::Backlog | State::Waiting) {
+        return Err(Problem::CannotMakeReady {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    task.state = State::Ready;
+    task.waiting_on = None;
+    Ok(Outcome::plain(task))
+}
+
+/// Drop the task: it will not be done. Its holder and *waiting on* are cleared.
+pub fn drop_task(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(seabag, id)?;
+    check_holder(&task, me)?;
+    check_open(&task, &[State::Done, State::Dropped])?;
+    task.state = State::Dropped;
+    task.holder = None;
+    task.waiting_on = None;
+    Ok(Outcome::plain(task))
+}
+
 /// The first task that is `ready` and held by no one: by area order, then area ID, then task ID.
 pub fn next(seabag: &Seabag) -> Option<&Task> {
     let area_rank = |area: &str| {
@@ -354,6 +396,84 @@ mod tests {
                 id: "A01-01".into(),
                 state: "done".into()
             })
+        );
+    }
+
+    #[test]
+    fn needs_ready_and_drop() {
+        let mut s = bag();
+        // Next dependency: set by anyone on an unheld task, cleared by empty text.
+        let t = set_next(&s, "A01-01", None, Some(" owner review "))
+            .unwrap()
+            .task;
+        assert_eq!(t.next_dependency.as_deref(), Some("owner review"));
+        put!(s, t);
+        assert_eq!(
+            set_next(&s, "A01-01", None, Some(""))
+                .unwrap()
+                .task
+                .next_dependency,
+            None
+        );
+        assert_eq!(
+            set_next(&s, "A01-01", None, None)
+                .unwrap()
+                .task
+                .next_dependency,
+            None
+        );
+
+        // Ready: from backlog, and from waiting (clearing waiting on).
+        let r = make_ready(&s, "A01-01", None).unwrap().task;
+        assert_eq!(r.state, State::Ready);
+        put!(s, r);
+        assert_eq!(
+            make_ready(&s, "A01-01", None),
+            Err(Problem::CannotMakeReady {
+                id: "A01-01".into(),
+                state: "ready".into()
+            })
+        );
+        put!(s, claim(&s, "A01-02", Some("a"), false).unwrap().task);
+        put!(s, wait(&s, "A01-02", Some("a"), "owner").unwrap().task);
+        // Held by someone else: refused as held; held by me: refused, release first.
+        assert!(matches!(
+            make_ready(&s, "A01-02", Some("b")),
+            Err(Problem::TaskHeld { .. })
+        ));
+        assert!(matches!(
+            make_ready(&s, "A01-02", Some("a")),
+            Err(Problem::CannotMakeReady { .. })
+        ));
+        put!(s, release(&s, "A01-02", Some("a"), None).unwrap().task);
+        let r = make_ready(&s, "A01-02", None).unwrap().task;
+        assert_eq!((r.state, r.waiting_on.clone()), (State::Ready, None));
+        put!(s, r);
+
+        // Drop: clears holder and waiting on; done or dropped tasks are closed.
+        put!(s, claim(&s, "A02-01", Some("a"), false).unwrap().task);
+        assert!(matches!(
+            drop_task(&s, "A02-01", Some("b")),
+            Err(Problem::TaskHeld { .. })
+        ));
+        let d = drop_task(&s, "A02-01", Some("a")).unwrap().task;
+        assert_eq!((d.state, d.holder.clone()), (State::Dropped, None));
+        put!(s, d);
+        assert!(matches!(
+            drop_task(&s, "A02-01", None),
+            Err(Problem::TaskClosed { .. })
+        ));
+        assert!(matches!(
+            set_next(&s, "A02-01", None, Some("x")),
+            Err(Problem::TaskClosed { .. })
+        ));
+        assert!(matches!(
+            make_ready(&s, "A02-01", None),
+            Err(Problem::CannotMakeReady { .. })
+        ));
+        assert_eq!(
+            set_next(&s, "Z", None, None).map(|_| ()),
+            Err(Problem::TaskNotFound { id: "Z".into() })
         );
     }
 

@@ -71,5 +71,6 @@
   "problem.bad_usage": "{detail}",
   "problem.not_a_seabag": "{path} はシーバッグのフォルダーではありません。",
   "problem.open_failed": "{path} をファイルマネージャーで開けません：{detail}。",
-  "problem.startup_not_a_folder": "FlipHopper は {path} を指定して起動されましたが、フォルダーではないため、何も開きませんでした。"
+  "problem.startup_not_a_folder": "FlipHopper は {path} を指定して起動されましたが、フォルダーではないため、何も開きませんでした。",
+  "problem.cannot_make_ready": "タスク {id} は {state} です。誰も持っていない backlog か waiting のタスクだけを ready にできます。"
 }
