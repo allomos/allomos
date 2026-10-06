@@ -760,6 +760,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "fliphopper-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "fliphopper-desktop"
+version = "0.1.0"
+dependencies = [
+ "fliphopper-core",
+ "fliphopper-store",
+ "serde",
+ "serde_json",
+ "sys-locale",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+]
+
+[[package]]
+name = "fliphopper-store"
+version = "0.1.0"
+dependencies = [
+ "fliphopper-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1087,37 +1118,6 @@ checksum = "063ce2eb6a8d0ea93d2bf8ba1957e78dbab6be1c2220dd3daca57d5a9d869898"
 dependencies = [
  "libc",
  "system-deps",
-]
-
-[[package]]
-name = "glidebox-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "glidebox-desktop"
-version = "0.1.0"
-dependencies = [
- "glidebox-core",
- "glidebox-store",
- "serde",
- "serde_json",
- "sys-locale",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
-]
-
-[[package]]
-name = "glidebox-store"
-version = "0.1.0"
-dependencies = [
- "glidebox-core",
- "serde",
- "serde_json",
 ]
 
 [[package]]

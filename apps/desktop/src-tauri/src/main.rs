@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    glidebox_desktop_lib::run()
+    fliphopper_desktop_lib::run()
 }

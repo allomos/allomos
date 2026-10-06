@@ -24,7 +24,7 @@ const MESSAGES: Record<Language, Record<Key, string>> = { en, "zh-CN": zhCN, ja 
 /** Each language's name in that language, so anyone can find their own. */
 export const LANGUAGE_NAMES: Record<Language, string> = { en: "English", "zh-CN": "简体中文", ja: "日本語" };
 
-/** The first of the computer's preferred languages that glidebox speaks; English otherwise. */
+/** The first of the computer's preferred languages that FlipHopper speaks; English otherwise. */
 export function pickLanguage(preferred: readonly string[]): Language {
   for (const tag of preferred) {
     const t = tag.toLowerCase();
@@ -40,7 +40,7 @@ function fill(text: string, params: Params = {}): string {
   return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in params ? String(params[name]) : whole));
 }
 
-const CHOICE_KEY = "glidebox.language";
+const CHOICE_KEY = "fliphopper.language";
 
 function readChoice(): Language | null {
   try {

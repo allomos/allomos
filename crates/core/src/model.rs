@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`).
-pub const FORMAT: &str = "glidebox/1";
+pub const FORMAT: &str = "fliphopper/1";
 
-/// A project: one task box.
+/// A project: one seabag.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Project {
@@ -94,9 +94,9 @@ pub struct Task {
     pub description: String,
 }
 
-/// A whole task box after loading: the project, its areas and tasks.
+/// A whole seabag after loading: the project, its areas and tasks.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct TaskBox {
+pub struct Seabag {
     pub project: Project,
     pub areas: Vec<Area>,
     pub tasks: Vec<Task>,

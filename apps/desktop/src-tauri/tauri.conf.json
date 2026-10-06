@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Glidebox",
+  "productName": "FlipHopper",
   "version": "0.1.0",
-  "identifier": "com.glidepace.glidebox",
+  "identifier": "io.fliphopper",
   "build": {
     "beforeDevCommand": "npm --prefix ../web run dev",
     "devUrl": "http://localhost:1420",
@@ -11,7 +11,7 @@
   },
   "app": {
     "windows": [
-      { "title": "Glidebox", "width": 1100, "height": 720, "minWidth": 720, "minHeight": 480 }
+      { "title": "FlipHopper", "width": 1100, "height": 720, "minWidth": 720, "minHeight": 480 }
     ],
     "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" }
   },

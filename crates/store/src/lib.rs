@@ -1,34 +1,38 @@
-//! Reads and creates task boxes on disk.
+//! Reads and creates seabags on disk.
 //!
-//! A *task box* is a folder holding `project.json`, `areas/<id>.json` and
+//! A *seabag* is a folder holding `project.json`, `areas/<id>.json` and
 //! `tasks/<id>/task.json` (+ `description.md`). See `docs/product/FILE-FORMAT.md`.
-//! This crate never runs `git`: a task box inside a repository is versioned by that
+//! This crate never runs `git`: a seabag inside a repository is versioned by that
 //! repository, and nothing here creates a nested one.
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use glidebox_core::{
-    Area, FORMAT, Issue, Loaded, Problem, Project, Task, TaskBox, parse_area, parse_project,
-    parse_task, validate_task_box,
+use fliphopper_core::{
+    Area, FORMAT, Issue, Loaded, Problem, Project, Seabag, Task, parse_area, parse_project,
+    parse_task, validate_seabag,
 };
 use serde::Serialize;
 
-/// Default name of a task box inside an existing folder or repository.
-pub const DEFAULT_DIR: &str = ".glidebox";
+/// Where a project's seabag lives inside the folder the user picked.
+/// Always used for a new seabag, also in an empty folder, so every tool looks in one place.
+pub const DEFAULT_DIR: &str = ".fliphopper/seabag";
 const PROJECT_FILE: &str = "project.json";
 
 /// What a folder the user picked turns out to be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Inspection {
-    /// The folder is a task box, or contains one in `.glidebox/`.
+    /// The folder is a seabag, or contains one in `.fliphopper/seabag/`.
     Found { root: PathBuf },
-    /// The folder is empty: a starter project can be created right here.
-    Empty { folder: PathBuf },
-    /// The folder has other content but no task box: one can be created in `.glidebox/`.
-    NoTaskBox {
+    /// The folder is empty: a starter seabag can be created in its `.fliphopper/seabag/`.
+    Empty {
+        folder: PathBuf,
+        suggested_root: PathBuf,
+    },
+    /// The folder has other content but no seabag: one can be created in `.fliphopper/seabag/`.
+    NoSeabag {
         folder: PathBuf,
         suggested_root: PathBuf,
     },
@@ -58,9 +62,10 @@ pub fn inspect(folder: &Path) -> Inspection {
     if is_empty {
         Inspection::Empty {
             folder: folder.to_path_buf(),
+            suggested_root: nested,
         }
     } else {
-        Inspection::NoTaskBox {
+        Inspection::NoSeabag {
             folder: folder.to_path_buf(),
             suggested_root: nested,
         }
@@ -107,7 +112,7 @@ fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
     v
 }
 
-/// Load a task box. Valid parts are returned even when other files have problems,
+/// Load a seabag. Valid parts are returned even when other files have problems,
 /// so the user sees their tasks plus a list of what to fix.
 pub fn load(root: &Path) -> Loaded {
     let mut issues = Vec::new();
@@ -124,7 +129,7 @@ pub fn load(root: &Path) -> Loaded {
     };
     let Some(project) = project else {
         return Loaded {
-            task_box: None,
+            seabag: None,
             issues,
         };
     };
@@ -166,12 +171,12 @@ pub fn load(root: &Path) -> Loaded {
         }
     }
 
-    issues.extend(validate_task_box(&project, &areas, &tasks));
+    issues.extend(validate_seabag(&project, &areas, &tasks));
     let mut areas: Vec<Area> = areas.into_iter().map(|(_, a)| a).collect();
     areas.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
     let tasks = tasks.into_iter().map(|(_, t)| t).collect();
     Loaded {
-        task_box: Some(TaskBox {
+        seabag: Some(Seabag {
             project,
             areas,
             tasks,
@@ -214,7 +219,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         format: FORMAT.to_string(),
         id: "project".to_string(),
         name: name.to_string(),
-        labels: glidebox_core::default_labels(),
+        labels: fliphopper_core::default_labels(),
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -231,25 +236,25 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     let tasks = [
         (
             "A01-01",
-            "Open this task box in glidebox",
+            "Open this seabag in FlipHopper",
             "A01",
-            glidebox_core::State::Done,
+            fliphopper_core::State::Done,
             Some("owner verified"),
-            "You picked a folder and glidebox created this starter project in it.\n",
+            "You picked a folder and FlipHopper created this starter project in it.\n",
         ),
         (
             "A01-02",
             "Rename the areas and tasks to your project's",
             "A01",
-            glidebox_core::State::Ready,
+            fliphopper_core::State::Ready,
             None,
-            "Edit the files in this folder, or use the `gb` command once it is available.\n",
+            "Edit the files in this folder, or use the `fh` command once it is available.\n",
         ),
         (
             "A02-01",
             "Describe the first outcome you want",
             "A02",
-            glidebox_core::State::Backlog,
+            fliphopper_core::State::Backlog,
             None,
             "One sentence about what a person can do when this task is done.\n",
         ),
@@ -283,25 +288,31 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = std::env::temp_dir().join(format!("glidebox-test-{name}-{n}"));
+        let p = std::env::temp_dir().join(format!("fliphopper-test-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
     }
 
     #[test]
-    fn empty_folder_becomes_starter_project() {
+    fn empty_folder_gets_starter_seabag_in_default_dir() {
         let dir = tmp("empty");
+        let root = dir.join(".fliphopper/seabag");
         assert_eq!(
             inspect(&dir),
             Inspection::Empty {
-                folder: dir.clone()
+                folder: dir.clone(),
+                suggested_root: root.clone()
             }
         );
-        create_starter(&dir, "Demo").unwrap();
-        assert_eq!(inspect(&dir), Inspection::Found { root: dir.clone() });
-        let loaded = load(&dir);
+        create_starter(&root, "Demo").unwrap();
+        assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
+        let loaded = load(&root);
+        assert_eq!(
+            loaded.seabag.as_ref().unwrap().project.format,
+            "fliphopper/1"
+        );
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-        let tb = loaded.task_box.unwrap();
+        let tb = loaded.seabag.unwrap();
         assert_eq!(tb.project.name, "Demo");
         assert_eq!(tb.areas.len(), 2);
         assert_eq!(tb.tasks.len(), 3);
@@ -310,19 +321,19 @@ mod tests {
     }
 
     #[test]
-    fn repo_folder_gets_nested_task_box_without_nested_git() {
+    fn repo_folder_gets_nested_seabag_without_nested_git() {
         let repo = tmp("repo");
         fs::create_dir(repo.join(".git")).unwrap();
         fs::write(repo.join("README.md"), "code").unwrap();
-        let Inspection::NoTaskBox { suggested_root, .. } = inspect(&repo) else {
-            panic!("expected NoTaskBox")
+        let Inspection::NoSeabag { suggested_root, .. } = inspect(&repo) else {
+            panic!("expected NoSeabag")
         };
-        assert_eq!(suggested_root, repo.join(".glidebox"));
+        assert_eq!(suggested_root, repo.join(".fliphopper/seabag"));
         create_starter(&suggested_root, "Repo").unwrap();
         assert_eq!(
             inspect(&repo),
             Inspection::Found {
-                root: repo.join(".glidebox")
+                root: repo.join(".fliphopper/seabag")
             }
         );
         assert!(!suggested_root.join(".git").exists());
@@ -355,7 +366,7 @@ mod tests {
         assert_eq!(loaded.issues.len(), 1);
         assert_eq!(loaded.issues[0].file, "tasks/A01-02/task.json");
         assert_eq!(loaded.issues[0].field.as_deref(), Some("title"));
-        assert_eq!(loaded.task_box.unwrap().tasks.len(), 2);
+        assert_eq!(loaded.seabag.unwrap().tasks.len(), 2);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -363,7 +374,7 @@ mod tests {
     fn missing_project_file_is_an_issue_not_a_crash() {
         let dir = tmp("noproject");
         let loaded = load(&dir);
-        assert!(loaded.task_box.is_none());
+        assert!(loaded.seabag.is_none());
         assert_eq!(loaded.issues[0].file, "project.json");
         fs::remove_dir_all(dir).unwrap();
     }

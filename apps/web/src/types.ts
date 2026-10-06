@@ -44,14 +44,14 @@ export interface Issue {
 }
 
 export interface Loaded {
-  task_box: { project: Project; areas: Area[]; tasks: Task[] } | null;
+  seabag: { project: Project; areas: Area[]; tasks: Task[] } | null;
   issues: Issue[];
 }
 
 export type Inspection =
   | { kind: "found"; root: string }
-  | { kind: "empty"; folder: string }
-  | { kind: "no_task_box"; folder: string; suggested_root: string }
+  | { kind: "empty"; folder: string; suggested_root: string }
+  | { kind: "no_seabag"; folder: string; suggested_root: string }
   | { kind: "not_a_folder"; path: string };
 
 export interface FolderInfo {

@@ -1,8 +1,8 @@
-//! Problem codes: everything glidebox's Rust side can report to a person.
+//! Problem codes: everything FlipHopper's Rust side can report to a person.
 //!
 //! Rust never sends sentences to the interface. It sends a code plus its details
 //! (`params`), and the interface words the code in the chosen language (R94). Each code
-//! also has one English wording here, for logs and for the `gb` command.
+//! also has one English wording here, for logs and for the `fh` command.
 //!
 //! The list is declared once, through `problems!`, so a new code is always part of
 //! [`Problem::CODES`]; a test writes that list to `apps/web/src/i18n/codes.json`, where
@@ -53,12 +53,12 @@ macro_rules! problems {
 
 problems! {
     /// The file is not valid JSON, or a value has the wrong type. `detail` is the parser's own text.
-    NotJson { detail } => "not_json", "This file could not be read as JSON for glidebox: {detail}.";
+    NotJson { detail } => "not_json", "This file could not be read as JSON for FlipHopper: {detail}.";
     FieldMissing => "field_missing", "This required field is missing.";
-    FieldUnknown => "field_unknown", "Glidebox does not know this field. Check its spelling, or remove it.";
+    FieldUnknown => "field_unknown", "FlipHopper does not know this field. Check its spelling, or remove it.";
     InvalidChoice { value, allowed } => "invalid_choice", "{value} is not a valid value here. Use one of: {allowed}.";
     InvalidId { id } => "invalid_id", "\"{id}\" is not a valid ID. Use 1–64 letters, digits, '-' or '_'.";
-    WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of glidebox reads only \"{expected}\".";
+    WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of FlipHopper reads only \"{expected}\".";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     AreaNameMissing => "area_name_missing", "The area needs a name.";
@@ -71,9 +71,9 @@ problems! {
     /// The file exists but could not be read. `detail` is the system's own text.
     ReadFailed { detail } => "read_failed", "Could not read this file: {detail}.";
     TaskFileMissing => "task_file_missing", "This task folder has no task.json.";
-    /// Creating a task box was refused because the folder already has files in it.
-    FolderNotEmpty { path } => "folder_not_empty", "{path} is not empty, so no task box was created there.";
-    CreateFailed { path, detail } => "create_failed", "Could not create the task box in {path}: {detail}.";
+    /// Creating a seabag was refused because the folder already has files in it.
+    FolderNotEmpty { path } => "folder_not_empty", "{path} is not empty, so no seabag was created there.";
+    CreateFailed { path, detail } => "create_failed", "Could not create the seabag in {path}: {detail}.";
 }
 
 impl std::fmt::Display for Problem {
@@ -112,7 +112,7 @@ mod tests {
     }
 
     /// The interface's translation check reads this file. Rewrite it with
-    /// `GLIDEBOX_WRITE_CODES=1 cargo test -p glidebox-core`.
+    /// `FLIPHOPPER_WRITE_CODES=1 cargo test -p fliphopper-core`.
     #[test]
     fn codes_file_is_up_to_date() {
         let path = concat!(
@@ -125,14 +125,14 @@ mod tests {
         }
         let mut want = serde_json::to_string_pretty(&map).unwrap();
         want.push('\n');
-        if std::env::var_os("GLIDEBOX_WRITE_CODES").is_some() {
+        if std::env::var_os("FLIPHOPPER_WRITE_CODES").is_some() {
             std::fs::write(path, &want).unwrap();
         }
         let have = std::fs::read_to_string(path).unwrap_or_default();
         assert!(
             have == want,
             "apps/web/src/i18n/codes.json is out of date. Run \
-             `GLIDEBOX_WRITE_CODES=1 cargo test -p glidebox-core`, then add words for any new \
+             `FLIPHOPPER_WRITE_CODES=1 cargo test -p fliphopper-core`, then add words for any new \
              code to every language file."
         );
     }

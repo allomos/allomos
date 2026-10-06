@@ -1,4 +1,4 @@
-//! Glidebox desktop app: the Tauri window plus the commands the interface may call.
+//! FlipHopper desktop app: the Tauri window plus the commands the interface may call.
 //!
 //! The interface never calls these directly; it goes through its messenger module
 //! (`apps/web/src/messenger.ts`), so the same interface can later reach the desktop's
@@ -6,8 +6,8 @@
 
 use std::path::PathBuf;
 
-use glidebox_core::{Loaded, Problem};
-use glidebox_store::{Inspection, create_starter, git_root, inspect, load};
+use fliphopper_core::{Loaded, Problem};
+use fliphopper_store::{Inspection, create_starter, git_root, inspect, load};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -23,11 +23,11 @@ struct Opened {
     loaded: Loaded,
 }
 
-/// A folder given at start-up: the first command-line argument, or `GLIDEBOX_OPEN`.
-/// Lets `glidebox ~/my-project` open that folder directly.
+/// A folder given at start-up: the first command-line argument, or `FLIPHOPPER_OPEN`.
+/// Lets `fliphopper ~/my-project` open that folder directly.
 #[tauri::command]
 fn startup_folder() -> Option<PathBuf> {
-    std::env::var_os("GLIDEBOX_OPEN")
+    std::env::var_os("FLIPHOPPER_OPEN")
         .map(PathBuf::from)
         .or_else(|| std::env::args_os().nth(1).map(PathBuf::from))
         .filter(|p| p.is_dir())
@@ -42,18 +42,18 @@ fn inspect_folder(path: PathBuf) -> FolderInfo {
     }
 }
 
-/// Load the task box at `root`.
+/// Load the seabag at `root`.
 #[tauri::command]
-fn open_task_box(root: PathBuf) -> Opened {
+fn open_seabag(root: PathBuf) -> Opened {
     Opened {
         loaded: load(&root),
         root,
     }
 }
 
-/// Create a starter project at `root` (an empty folder, or a new `.glidebox/`), then load it.
+/// Create a starter seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
 #[tauri::command]
-fn create_task_box(root: PathBuf, name: String) -> Result<Opened, Problem> {
+fn create_seabag(root: PathBuf, name: String) -> Result<Opened, Problem> {
     create_starter(&root, &name).map_err(|e| {
         let path = root.display().to_string();
         if e.kind() == std::io::ErrorKind::AlreadyExists {
@@ -86,10 +86,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             startup_folder,
             inspect_folder,
-            open_task_box,
-            create_task_box,
+            open_seabag,
+            create_seabag,
             system_languages
         ])
         .run(tauri::generate_context!())
-        .expect("error while running glidebox");
+        .expect("error while running FlipHopper");
 }

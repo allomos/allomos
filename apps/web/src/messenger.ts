@@ -1,4 +1,4 @@
-// The messenger: the only place the interface talks to glidebox's Rust side.
+// The messenger: the only place the interface talks to FlipHopper's Rust side.
 //
 // Inside the desktop window it uses Tauri's built-in channel. When phone and browser
 // companions arrive (Iteration 9), a second implementation will talk to the desktop's
@@ -9,16 +9,16 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo, Opened } from "./types";
 
 export interface Messenger {
-  /** A folder given when glidebox was started, if any. */
+  /** A folder given when FlipHopper was started, if any. */
   startupFolder(): Promise<string | null>;
   /** The computer's preferred languages, most preferred first. */
   systemLanguages(): Promise<string[]>;
   /** Ask the user to pick a folder. Returns null if they cancel. */
   pickFolder(title: string): Promise<string | null>;
   inspectFolder(path: string): Promise<FolderInfo>;
-  openTaskBox(root: string): Promise<Opened>;
-  /** Rejects with a Problem (see types.ts) when the task box cannot be created. */
-  createTaskBox(root: string, name: string): Promise<Opened>;
+  openSeabag(root: string): Promise<Opened>;
+  /** Rejects with a Problem (see types.ts) when the seabag cannot be created. */
+  createSeabag(root: string, name: string): Promise<Opened>;
 }
 
 export const desktopMessenger: Messenger = {
@@ -29,6 +29,6 @@ export const desktopMessenger: Messenger = {
     return typeof picked === "string" ? picked : null;
   },
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
-  openTaskBox: (root) => invoke<Opened>("open_task_box", { root }),
-  createTaskBox: (root, name) => invoke<Opened>("create_task_box", { root, name }),
+  openSeabag: (root) => invoke<Opened>("open_seabag", { root }),
+  createSeabag: (root, name) => invoke<Opened>("create_seabag", { root, name }),
 };

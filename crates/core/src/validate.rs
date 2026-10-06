@@ -3,13 +3,13 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::model::{Area, FORMAT, Project, State, Task, TaskBox};
+use crate::model::{Area, FORMAT, Project, Seabag, State, Task};
 use crate::problem::Problem;
 
-/// One problem found in a task box, tied to the file (and field, when known) that caused it.
+/// One problem found in a seabag, tied to the file (and field, when known) that caused it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Issue {
-    /// Path of the file, relative to the task box root.
+    /// Path of the file, relative to the seabag root.
     pub file: String,
     pub field: Option<String>,
     /// What is wrong, as a code the interface words in the chosen language.
@@ -29,7 +29,7 @@ impl Issue {
 /// The result of loading: what could be read, plus every problem found.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Loaded {
-    pub task_box: Option<TaskBox>,
+    pub seabag: Option<Seabag>,
     pub issues: Vec<Issue>,
 }
 
@@ -155,7 +155,7 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
 
 /// Cross-file checks: unique IDs, every task's area exists, labels are on the project's ladder,
 /// and a waiting task says what it waits on.
-pub fn validate_task_box(
+pub fn validate_seabag(
     project: &Project,
     areas: &[(String, Area)],
     tasks: &[(String, Task)],
@@ -225,7 +225,7 @@ pub fn validate_task_box(
 mod tests {
     use super::*;
 
-    const PROJECT: &str = r#"{"format":"glidebox/1","id":"demo","name":"Demo"}"#;
+    const PROJECT: &str = r#"{"format":"fliphopper/1","id":"demo","name":"Demo"}"#;
 
     fn project() -> Project {
         parse_project("project.json", PROJECT).unwrap()
@@ -240,7 +240,7 @@ mod tests {
     fn wrong_format_is_reported_on_its_field() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"glidebox/9","id":"d","name":"D"}"#,
+            r#"{"format":"fliphopper/9","id":"d","name":"D"}"#,
         )
         .unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("format"));
@@ -317,7 +317,7 @@ mod tests {
                 .unwrap(),
             ),
         ];
-        let issues = validate_task_box(&project(), &areas, &tasks);
+        let issues = validate_seabag(&project(), &areas, &tasks);
         let fields: Vec<_> = issues
             .iter()
             .map(|i| (i.file.as_str(), i.field.as_deref().unwrap()))
@@ -335,8 +335,8 @@ mod tests {
             parse_area("a", r#"{"id":"A1","name":"Tracking"}"#).unwrap(),
         )];
         let tasks = vec![("t".to_string(), parse_task("t", r#"{"id":"T1","title":"x","area":"A1","state":"in_progress","label":"implemented"}"#).unwrap())];
-        assert!(validate_task_box(&project(), &areas, &tasks).is_empty());
-        let _ = TaskBox {
+        assert!(validate_seabag(&project(), &areas, &tasks).is_empty());
+        let _ = Seabag {
             project: project(),
             areas: vec![],
             tasks: vec![],

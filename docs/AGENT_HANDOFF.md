@@ -37,12 +37,12 @@ Updated: 2026-10-04
 One block per card in the board's Sessions table.
 
 ### Task-A00-17 — claude/a00-17-rename
-- Checkout: main checkout, branch `main` · pushed: yes. **Moving** from `/Users/wanghui/coding/glidepace/glidebox` to `/Users/wanghui/coding/glidepace/fliphopper` (step 3).
-- Approvals in force: the card and its external operations, for the name FlipHopper (owner confirmed the GitHub target). Pitch decks (step 5) not touched yet.
-- Done: step 1 name check, name FlipHopper chosen; step 2 repository renamed to `mypals-ml/fliphopper`, `origin` updated, `AGENTS.md` push address fixed. Agent memory copied to `~/.claude/projects/-Users-wanghui-coding-glidepace-fliphopper/memory/`.
+- Checkout: worktree `.claude/worktrees/a00-17`, branch `claude/a00-17-rename` · pushed: yes. Folder move (step 3) done: the main checkout is `/Users/wanghui/coding/glidepace/fliphopper`.
+- Approvals in force: the card and its external operations, for the name FlipHopper. Pitch decks (step 5) not touched yet.
+- Done: steps 1–3; step 4 code part: crates `fliphopper-*`, `TaskBox` → `Seabag`, format `fliphopper/1`, `FLIPHOPPER_OPEN`, app ID `io.fliphopper`, texts in en/zh-CN/ja (水手袋, シーバッグ), and answer 8 (a new seabag always goes in `.fliphopper/seabag/`, also in an empty folder). All six card checks PASS.
 - Uncommitted: none · Running: none
-- Next: in the new folder, confirm `git status -sb` and `git remote -v`; then create the worktree `.claude/worktrees/a00-17` on branch `claude/a00-17-rename` and do step 4 (the rename in the repository), following the card.
-- Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Steps 1–3 are done; start step 4 in a new worktree."
+- Next: step 4 documents part — decision record 0013, FILE-FORMAT, GLOSSARY, 0010, REQUIREMENTS R88, A01-03 card, AGENTS/CLAUDE/README and current docs; dated history keeps "glidebox".
+- Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-17. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Continue step 4 (documents)."
 
 ## Live state
 

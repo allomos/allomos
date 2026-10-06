@@ -5,12 +5,13 @@ import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Area, Issue, Opened, Problem, Task } from "./types";
 
-const LAST_ROOT_KEY = "glidebox.lastRoot";
+const LAST_ROOT_KEY = "fliphopper.lastRoot";
 
 function folderName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
-  const last = parts[parts.length - 1] ?? "Project";
-  return last === ".glidebox" ? parts[parts.length - 2] ?? "Project" : last;
+  // The project is named after the picked folder, not the `.fliphopper/seabag` inside it.
+  if (parts.at(-1) === "seabag" && parts.at(-2) === ".fliphopper") parts.splice(-2);
+  return parts.at(-1) ?? "Project";
 }
 
 type Pending = { folder: string; suggestedRoot: string; gitRoot: string | null };
@@ -49,10 +50,10 @@ export function App({ messenger }: { messenger: Messenger }) {
         const info = await messenger.inspectFolder(path);
         const i = info.inspection;
         if (i.kind === "found") {
-          show(await messenger.openTaskBox(i.root), null);
+          show(await messenger.openSeabag(i.root), null);
         } else if (i.kind === "empty") {
-          show(await messenger.createTaskBox(i.folder, folderName(i.folder)), { key: "notice.created_here" });
-        } else if (i.kind === "no_task_box") {
+          show(await messenger.createSeabag(i.suggested_root, folderName(i.folder)), { key: "notice.created_here" });
+        } else if (i.kind === "no_seabag") {
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
         } else {
           setError({ key: "error.not_a_folder", params: { path: i.path } });
@@ -88,7 +89,7 @@ export function App({ messenger }: { messenger: Messenger }) {
     if (!pending) return;
     try {
       show(
-        await messenger.createTaskBox(pending.suggestedRoot, folderName(pending.folder)),
+        await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder)),
         { key: "notice.created_nested" },
       );
     } catch (e) {
@@ -99,16 +100,16 @@ export function App({ messenger }: { messenger: Messenger }) {
   return (
     <div className="app">
       <header className="top">
-        <div className="brand" aria-label="Glidebox">
+        <div className="brand" aria-label="FlipHopper">
           <svg viewBox="0 0 28 28" aria-hidden="true">
             <rect x="2" y="6" width="24" height="18" rx="3" />
             <path d="M5 11 L13 16 L23 21" />
           </svg>
-          <span>Glidebox</span>
+          <span>FlipHopper</span>
         </div>
-        {opened?.loaded.task_box && (
+        {opened?.loaded.seabag && (
           <div className="where">
-            <strong>{opened.loaded.task_box.project.name}</strong>
+            <strong>{opened.loaded.seabag.project.name}</strong>
             <code title={opened.root}>{opened.root}</code>
           </div>
         )}
@@ -140,7 +141,7 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {!opened && !pending && <Welcome onChoose={choose} />}
 
-        {opened && <TaskBoxView opened={opened} />}
+        {opened && <SeabagView opened={opened} />}
       </main>
     </div>
   );
@@ -172,7 +173,7 @@ function Welcome({ onChoose }: { onChoose: () => void }) {
   return (
     <section className="welcome">
       <h1>{t("welcome.title")}</h1>
-      <p>{rich("welcome.body", { dir: <code>.glidebox/</code> })}</p>
+      <p>{rich("welcome.body", { dir: <code>.fliphopper/seabag/</code> })}</p>
       <button type="button" className="primary" onClick={onChoose}>
         {t("top.choose_folder")}
       </button>
@@ -180,9 +181,9 @@ function Welcome({ onChoose }: { onChoose: () => void }) {
   );
 }
 
-function TaskBoxView({ opened }: { opened: Opened }) {
+function SeabagView({ opened }: { opened: Opened }) {
   const { t } = useI18n();
-  const { task_box: box, issues } = opened.loaded;
+  const { seabag: box, issues } = opened.loaded;
   return (
     <>
       {issues.length > 0 && <Issues issues={issues} />}
