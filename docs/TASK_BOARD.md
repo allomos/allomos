@@ -43,7 +43,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
-| Approve the two Iteration 1 cards (the design questions were answered on 2026-10-06). For languages: who checks that the Chinese and Japanese texts read naturally | [`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md), [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md) | Iteration 1 |
+| Approve the two Iteration 1 cards (all design questions were answered on 2026-10-06) | [`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md), [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md) | Iteration 1 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
@@ -62,7 +62,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | backlog | — | — | owner approves the card and says who checks the translations |
+| [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | backlog | — | — | owner approves the card |
 | [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | backlog | — | — | owner approves the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |

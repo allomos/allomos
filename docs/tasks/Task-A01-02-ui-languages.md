@@ -39,12 +39,12 @@
   - No interface text remains written directly in `App.tsx` or `messenger.ts`. The worker shows this with a search, recorded on the card.
   - With the Mac set to Chinese, the app starts in Chinese; set to Japanese, in Japanese; set to anything else, in English. A chosen language survives a restart.
   - A broken file's problem shows in each language and still names the file and field.
-  - The owner sees the app in Chinese and Japanese and judges the wording.
+  - The owner sees the app in Chinese and Japanese and checks that the wording reads naturally.
 
 ## Owner answers (2026-10-06)
 
 1. **The starter project's sample areas and tasks stay in English.** They become the user's own data, not interface text.
-2. **Still open: who checks that the Chinese and Japanese texts read naturally.** The agent writes both translations; someone who reads each language should look at them once.
+2. **The owner checks the Chinese and Japanese wording** at the visual check; the agent writes both translations, and the card records anything the owner changes.
 
 ## Approvals
 
