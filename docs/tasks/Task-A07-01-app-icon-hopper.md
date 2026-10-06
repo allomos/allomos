@@ -31,13 +31,29 @@ The FlipHopper app gets a new icon: **a person hopping with a seabag over the sh
 
 ## What was built (2026-10-06)
 
-**In plain words.** The app icon is now the hopper, a person hopping with a seabag, on a light tile in the deck's colours. The mark at the top left of the window is the same figure. In dark mode it switches to light lines.
+**In plain words.** The owner tried the first hopper drawing in the Dock and asked for something more abstract and artistic. After several rounds of sketches the owner chose **layout Y2 with colours D4**. Two pairs of balls cross on a sand tile:
+- **Jade, side to side:** a ring on the left marks where a ball was, and a solid ball on the right marks where it arrived. This is hopping between AI agents.
+- **Terracotta, up and down:** the same, for hopping between teammates.
+- **Mustard spark:** the jump itself, in the middle.
 
-- **Two drawings**, both kept next to the icons so the set can be rebuilt:
-  - [`source.svg`](../../apps/desktop/src-tauri/icons/source.svg) is the full mark with its dashed hop lines, used from 48 px up.
-  - [`source-small.svg`](../../apps/desktop/src-tauri/icons/source-small.svg) is for 16–32 px, where the dashes turned into grey noise. It drops them and draws the figure larger and bolder.
-- **How the files were made**, with no new package: `rsvg-convert` (already installed with Homebrew) turned each drawing into PNGs. `npx tauri icon` made the full set from the large one. The 32 px PNG, the macOS `.icns` file (via `iconutil`) and the Windows `.ico` file (via ImageMagick) then got the small drawing at 16–32 px. Tauri's Android and iOS icons were removed, because the project has no phone app yet.
-- **Why development mode shows no icon:** `npm … run dev` runs the bare program without an app bundle, so macOS has no icon to show there. Only the built `FlipHopper.app` shows one.
+All colours are flat; the owner asked for no gradients. The mark at the top left of the window is the same drawing, and it keeps these colours in light and dark mode.
+
+**How the design was chosen** (owner, 2026-10-06; sketches kept outside the repository):
+1. The hopper figure (built, then judged too plain).
+2. Abstract directions A, B and C. B was chosen.
+3. B as brush strokes, then as a jump with the feet together.
+4. "Two balls side by side that feel like 瞬移 (teleporting)", with no gradients.
+5. Eight bolder options for small sizes (V1–V8). V5 and V7 were taken further.
+6. "Four balls, a pair side by side and a pair stacked" (X1–X4, Y1–Y4). Y2 was chosen.
+7. Thirty-three colour schemes. D4 was chosen.
+
+**Files:**
+- [`icons/source.svg`](../../apps/desktop/src-tauri/icons/source.svg) is the drawing used from 48 px up.
+- [`icons/source-small.svg`](../../apps/desktop/src-tauri/icons/source-small.svg) is used at 16–32 px, with bigger balls, thicker rings and a bigger spark, so the small icon stays clear.
+- [`apps/desktop/scripts/make-icons.sh`](../../apps/desktop/scripts/make-icons.sh) rebuilds every icon file from those two drawings. It uses `rsvg-convert`, ImageMagick, `iconutil` and `tauri icon`, and adds nothing to the project's packages.
+- The decks still use the old hopper drawing ([`hopper-mark.svg`](../pitch/hopper-mark.svg)); updating them is not part of this card.
+
+**Why development mode shows no icon:** `npm … run dev` runs the bare program without an app bundle, so macOS has no icon to show there. Only the built `FlipHopper.app` shows one.
 
 **Checks (2026-10-06):**
 
@@ -45,9 +61,10 @@ The FlipHopper app gets a new icon: **a person hopping with a seabag over the sh
 |---|---|
 | `cargo fmt --check`, clippy, `cargo test --workspace` (36) | PASS |
 | `npm --prefix apps/web run typecheck` / `build` / `check:i18n` | PASS |
-| Icons looked at by the agent at 256, 32 and 16 px; the window mark rendered in light and dark | PASS |
+| `.icns` looked at by the agent at 256, 32 and 16 px | PASS |
 | `tauri build --debug --bundles app`: the bundle's `icon.icns` is the new file | PASS |
-| Dock, Finder and the window in the running app | owner check (the agent cannot see the screen) |
+| Owner check of the first (hopper) icon in the Dock, Finder and window | PASS (owner, 2026-10-06), then redesigned |
+| Owner check of the Y2/D4 icon in the Dock, Finder and window | waiting |
 
 ## Notes
 

@@ -58,9 +58,13 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .02em; }
 .brand svg { width: 24px; height: 24px; }
-.brand path { fill: none; stroke: var(--ink); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
-.brand path.bag { fill: var(--accent); stroke-width: 3; }
-.brand .head { fill: var(--ink); }
+/* The mark keeps the icon's own colours in light and dark mode. */
+.brand .jade { fill: #2a9d8f; }
+.brand .terracotta { fill: #e76f51; }
+.brand .spark { fill: #e9c46a; }
+.brand .ring { fill: none; stroke-width: 66; }
+.brand .ring.jade { stroke: #2a9d8f; }
+.brand .ring.terracotta { stroke: #e76f51; }
 .where { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.link { align-self: start; border: none; background: none; padding: 0; color: var(--accent); font-size: 0.85em; cursor: pointer; }

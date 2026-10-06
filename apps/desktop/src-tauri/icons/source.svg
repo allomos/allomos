@@ -1,19 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>FlipHopper app icon: a person hopping with a seabag, on a tile</title>
-  <!-- macOS icon grid: an 824 px tile centred on the 1024 px canvas. -->
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="#FBF5EA"/>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="#12223A" stroke-opacity="0.08" stroke-width="4"/>
-  <!-- The mark from docs/pitch/hopper-mark.svg (64 units), scaled ×9.5 and centred. -->
-  <g transform="translate(208 196) scale(9.5)">
-    <path d="M3 61 Q7 48 15 46" fill="none" stroke="#D7891C" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 5"/>
-    <path d="M44 61 L60 61" stroke="#D7891C" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 5"/>
-    <path d="M33 13 C25 8 13 11 8 19 C3 27 6 34 13 33 C20 32 28 25 33 17 Z" fill="#D7891C" stroke="#12223A" stroke-width="2.4" stroke-linejoin="round"/>
-    <path d="M30 13 Q34 9 37 12" fill="none" stroke="#12223A" stroke-width="2.4" stroke-linecap="round"/>
-    <circle cx="41" cy="11" r="5" fill="#12223A"/>
-    <path d="M39 19 L33 37" fill="none" stroke="#12223A" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M38 21 L33 15" fill="none" stroke="#12223A" stroke-width="3.6" stroke-linecap="round"/>
-    <path d="M38 23 L46 29 L52 25" fill="none" stroke="#12223A" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M33 37 L42 42 L40 51" fill="none" stroke="#12223A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M33 37 L25 43 L16 45" fill="none" stroke="#12223A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <title>FlipHopper app icon: two hops through one point</title>
+  <!-- Owner's choice: layout Y2, colours D4 (2026-10-06). A ring is where a ball was, a solid
+       ball is where it arrived, the spark is the jump. Jade hops side to side (between agents),
+       terracotta hops up and down (between teammates). Flat colours only.
+       macOS grid: an 824 px tile on 1024 px. Small sizes use source-small.svg. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#FDF6EC"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="#000" stroke-opacity="0.08" stroke-width="6"/>
+  <circle cx="272" cy="512" r="99" fill="none" stroke="#2A9D8F" stroke-width="38"/>
+  <circle cx="752" cy="512" r="118" fill="#2A9D8F"/>
+  <circle cx="512" cy="272" r="99" fill="none" stroke="#E76F51" stroke-width="38"/>
+  <circle cx="512" cy="752" r="118" fill="#E76F51"/>
+  <path d="M512 412 L542 482 L612 512 L542 542 L512 612 L482 542 L412 512 L482 482 Z" fill="#E9C46A"/>
 </svg>

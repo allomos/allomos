@@ -1,15 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>FlipHopper app icon for 16–32 px: the hopper without hop lines, larger and bolder</title>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="#FBF5EA"/>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="#12223A" stroke-opacity="0.15" stroke-width="16"/>
-  <!-- The mark without its dashed hop lines (x 5–53, y 5–52), scaled ×13.5 and centred. -->
-  <g transform="translate(116 152) scale(13.5)">
-    <path d="M33 13 C25 8 13 11 8 19 C3 27 6 34 13 33 C20 32 28 25 33 17 Z" fill="#D7891C" stroke="#12223A" stroke-width="3" stroke-linejoin="round"/>
-    <circle cx="41" cy="11" r="5.5" fill="#12223A"/>
-    <path d="M39 19 L33 37" fill="none" stroke="#12223A" stroke-width="5.5" stroke-linecap="round"/>
-    <path d="M38 21 L33 15" fill="none" stroke="#12223A" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M38 23 L46 29 L52 25" fill="none" stroke="#12223A" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M33 37 L42 42 L40 51" fill="none" stroke="#12223A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M33 37 L25 43 L16 45" fill="none" stroke="#12223A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <title>FlipHopper app icon for 16–32 px: bigger balls, thicker rings, a bigger spark</title>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#FDF6EC"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="#000" stroke-opacity="0.15" stroke-width="16"/>
+  <circle cx="265" cy="512" r="105" fill="none" stroke="#2A9D8F" stroke-width="66"/>
+  <circle cx="759" cy="512" r="138" fill="#2A9D8F"/>
+  <circle cx="512" cy="265" r="105" fill="none" stroke="#E76F51" stroke-width="66"/>
+  <circle cx="512" cy="759" r="138" fill="#E76F51"/>
+  <path d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" fill="#E9C46A"/>
 </svg>

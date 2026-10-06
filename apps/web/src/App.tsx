@@ -137,15 +137,14 @@ export function App({ messenger }: { messenger: Messenger }) {
     <div className="app">
       <header className="top">
         <div className="brand" aria-label="FlipHopper">
-          {/* The hopper: a person hopping with a seabag (docs/pitch/hopper-mark.svg, small-size form). */}
-          <svg viewBox="2 4 54 50" aria-hidden="true">
-            <path className="bag" d="M33 13 C25 8 13 11 8 19 C3 27 6 34 13 33 C20 32 28 25 33 17 Z" />
-            <circle className="head" cx="41" cy="11" r="5.5" />
-            <path d="M39 19 L33 37" strokeWidth="5.5" />
-            <path d="M38 21 L33 15" />
-            <path d="M38 23 L46 29 L52 25" />
-            <path d="M33 37 L42 42 L40 51" strokeWidth="5" />
-            <path d="M33 37 L25 43 L16 45" strokeWidth="5" />
+          {/* The FlipHopper mark (owner's choice: layout Y2, colours D4): a ring where a ball was, a solid ball where it
+              arrived, a spark for the jump. Same drawing as the app icon's small form. */}
+          <svg viewBox="100 100 824 824" aria-hidden="true">
+            <circle className="ring jade" cx="265" cy="512" r="105" />
+            <circle className="jade" cx="759" cy="512" r="138" />
+            <circle className="ring terracotta" cx="512" cy="265" r="105" />
+            <circle className="terracotta" cx="512" cy="759" r="138" />
+            <path className="spark" d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" />
           </svg>
           <span>FlipHopper</span>
         </div>
