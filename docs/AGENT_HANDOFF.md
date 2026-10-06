@@ -39,9 +39,9 @@ One block per card in the board's Sessions table.
 ### Task-A00-18 — claude/a00-18-positioning
 - Checkout: worktree `.claude/worktrees/a00-18`, branch `claude/a00-18-positioning` · pushed: yes · not merged.
 - Approvals in force: the card (owner, 2026-10-06), including republishing the two decks to their current addresses.
-- Done: decision 0014; README, AGENTS.md, PLAN § 1, pitch README; both decks rebuilt around the three sets and republished (version 2 at both addresses in `docs/pitch/README.md`).
+- Done: decision 0014; README, AGENTS.md, PLAN § 1, pitch README; both decks rebuilt around the three sets, new seabag drawing and hopper mark, republished (version 3). Owner answered all five questions; A01-03 gained handoff note and `fh next`; new cards A03-02 (quota idea, parked) and A07-01 (app icon).
 - Uncommitted: none · Running: none
-- Next: owner reviews the decks and answers questions 3–5 on the card; then adjust, republish to the same addresses, and merge into `main`.
+- Next: owner reviews the decks (version 3); then merge into `main`. Deck sources were assembled from parts; edit the HTML files directly from now on.
 - Resume prompt: "Resume Task-A00-18 in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-18. Read AGENTS.md, the board, the card docs/tasks/Task-A00-18-positioning-and-deck.md and your block in docs/AGENT_HANDOFF.md."
 
 ## Live state

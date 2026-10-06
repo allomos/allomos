@@ -50,7 +50,7 @@ The owner chose **three sets: the main set, AI skills, and progress management**
 2. ~~Groups~~ Answered 2026-10-06: three sets — main, AI skills, progress management.
 3. ~~AI-skills content~~ Answered 2026-10-06: keep "being designed" for now; decide later.
 4. ~~Quota idea~~ Answered 2026-10-06: not sure yet; recorded as the parked card [`Task-A03-02`](./Task-A03-02-account-quota-idea.md).
-5. Does the new purpose also change the plan's order ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), for example handoff and resume earlier, or only the message?
+5. ~~Plan order~~ Answered 2026-10-06: the order of releases stays; a handoff note (`fh release --note`) and `fh next` are added to [`Task-A01-03`](./Task-A01-03-gb-command.md), so switching agents works from the first release.
 
 ## What gets built (after the owner answers)
 
@@ -78,3 +78,4 @@ The owner chose **three sets: the main set, AI skills, and progress management**
 
 - 2026-10-06 — Card written by the agent with a proposed structure. The owner answered question 2 (three sets); working together placed in the main set by the agent. Waiting on answers 1, 3, 4, 5 and review of the sets' contents.
 - 2026-10-06 — Claimed. The owner answered question 1 (switching between AI agents and teammates) and asked for the deck to follow the three sets. Done: [0014](../decisions/0014-main-purpose-and-three-sets.md); README, `AGENTS.md`, PLAN § 1 and [pitch/README.md](../pitch/README.md) lead with the main purpose; both decks rewritten as ten slides (hero and hop diagram, problem, the three sets, switch agents, switch teammates, AI skills, progress management, pricing, roadmap tagged by set, close) and republished to the same addresses (version 2). Questions 3–5 are still open; until answered, the deck marks set 2 as being designed, the quota idea is left out, and the plan's order is unchanged. Waiting on the owner's review of the decks.
+- 2026-10-06 — Owner answers: keep "being designed" for AI skills; quota idea parked as [`Task-A03-02`](./Task-A03-02-account-quota-idea.md); plan order kept, handoff note and `fh next` added to A01-03. Owner asked for a seabag that looks like a seabag on the first slide and a mark of a person hopping with it: both drawn ([hopper-mark.svg](../pitch/hopper-mark.svg)), decks republished (version 3). Putting the mark on the app itself is [`Task-A07-01`](./Task-A07-01-app-icon-hopper.md).

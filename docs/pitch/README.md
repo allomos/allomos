@@ -7,6 +7,8 @@ A ten-slide pitch deck for FlipHopper, in English and Simplified Chinese, organi
 | English | https://claude.ai/artifact/MGmzN64hzvRqWAMmvt1qyU | [roadshow-en.html](./roadshow-en.html) |
 | 中文 | https://claude.ai/artifact/XVe1UxXRUVt7WytcDgcABU | [roadshow-zh.html](./roadshow-zh.html) |
 
+The mark in the top bar, a person hopping with a seabag, is also kept as [hopper-mark.svg](./hopper-mark.svg); the app icon follows it ([`Task-A07-01`](../tasks/Task-A07-01-app-icon-hopper.md)).
+
 ## Using it
 
 - Open an address in any browser. Click **Present ▸** (中文版：**演示 ▸**) or press **P** for full-screen slides. Use the arrow keys or swipe to move, and **Esc** to exit.

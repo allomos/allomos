@@ -43,12 +43,13 @@ The names and options below are a proposal for the owner's review. The worker wr
 | `fh add area <id> <name>` | Adds an area. |
 | `fh add task <id> --area <id> --title <text> [--description <text>]` | Adds a task in `backlog`. Its description goes into `description.md`. |
 | `fh list [--area <id>] [--state <state>] [--mine]` | Lists tasks grouped by area: ID, state, label, holder and title. |
-| `fh show <id>` | One task in full: the fields, then the description. |
+| `fh show <id>` | One task in full: the fields (including the handoff note), then the description. |
 | `fh claim <id>` | Sets you as the holder and the state to `in_progress`. It refuses when someone else holds the task, naming them. |
 | `fh label <id> <label>` | Sets the label. It must be a step on the project's ladder. |
 | `fh wait <id> --on <text>` | Sets the state to `waiting` and records what it waits on. |
 | `fh done <id>` | Sets the state to `done`. It warns, without refusing, when the label is not the top step of the ladder (owner, 2026-10-06). |
-| `fh release <id>` | Clears the holder. A task `in_progress` goes back to `ready`. |
+| `fh release <id> [--note <text>]` | Clears the holder. A task `in_progress` goes back to `ready`. `--note` leaves a short **handoff note** for whoever picks the task up next (owner, 2026-10-06). |
+| `fh next` | Shows the first task that is `ready` and held by no one (by area, then ID), with its handoff note, so a new agent or account resumes in one step (owner, 2026-10-06). |
 
 Shared behaviour:
 - **Finding the seabag:** `--seabag <path>`, else the `FLIPHOPPER_SEABAG` environment variable, else search upward from the current folder for `.fliphopper/seabag/`, the same way Git finds its repository.
@@ -92,7 +93,9 @@ Shared behaviour:
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-06 | Card approved: all local work (source, tests, docs, commits, pushes; installing pinned packages locally). No external operations. | owner (chat) |
+| 2026-10-06 | Add a handoff note (`fh release --note`, a new optional task field recorded in FILE-FORMAT) and `fh next`, so switching agents works from the first release ([`Task-A00-18`](./Task-A00-18-positioning-and-deck.md), [0014](../decisions/0014-main-purpose-and-three-sets.md)) | owner (chat) |
 
 ## Notes
 
 - 2026-10-06 — Card written by the agent for the owner's review.
+- 2026-10-06 — Scope added by the owner (accepting the A00-18 recommendation): handoff note on release, shown by `fh next` and `fh show`; `fh next` added. The note is a new optional field in `task.json`; the worker records it in [FILE-FORMAT.md](../product/FILE-FORMAT.md) with the other contracts.

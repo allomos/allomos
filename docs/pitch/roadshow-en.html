@@ -200,11 +200,16 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 .handover{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px}
 .handover div{border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;line-height:1.35}
 .handover b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.hop .toggle{fill:var(--amber)}
+.hop .seam{fill:none;stroke:var(--amber);stroke-width:1.2;stroke-dasharray:3 4}
+.hop .stencil{fill:var(--amber-ink);font:700 14px var(--mono);letter-spacing:.14em}
+.hop .sub2{fill:var(--muted)}
+.brand svg{width:34px;height:34px}
 </style>
 
 <header class="bar">
   <div class="brand">
-    <svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="5" cy="21" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="23" cy="21" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M7 17 Q14 1 21 17" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="4 3"/></svg>
+    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M3 61 Q7 48 15 46" fill="none" stroke="var(--amber)" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 5"/><path d="M44 61 L60 61" stroke="var(--amber)" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 5"/><path d="M33 13 C25 8 13 11 8 19 C3 27 6 34 13 33 C20 32 28 25 33 17 Z" fill="var(--amber)" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M30 13 Q34 9 37 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="41" cy="11" r="5" fill="currentColor"/><path d="M39 19 L33 37" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/><path d="M38 21 L33 15" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><path d="M38 23 L46 29 L52 25" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M33 37 L42 42 L40 51" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M33 37 L25 43 L16 45" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
     FlipHopper
   </div>
   <span class="bar-note">ROAD SHOW · OCTOBER 2026 · IN DEVELOPMENT</span>
@@ -235,9 +240,9 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
           <path class="arc" d="M310,92 Q373,14 440,92" marker-end="url(#ah)"/>
           <text class="why" x="185" y="40" text-anchor="middle">quota used up</text>
           <text class="why" x="375" y="40" text-anchor="middle">hand-off</text>
-          <line class="tie" x1="95" y1="148" x2="222" y2="222"/>
-          <line class="tie" x1="280" y1="148" x2="280" y2="212"/>
-          <line class="tie" x1="465" y1="148" x2="338" y2="222"/>
+          <line class="tie" x1="95" y1="148" x2="246" y2="242"/>
+          <line class="tie" x1="280" y1="148" x2="280" y2="188"/>
+          <line class="tie" x1="465" y1="148" x2="314" y2="242"/>
           <rect class="who" x="20" y="96" width="150" height="52" rx="10"/>
           <rect class="who" x="205" y="96" width="150" height="52" rx="10"/>
           <rect class="who person" x="390" y="96" width="150" height="52" rx="10"/>
@@ -247,11 +252,16 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
           <text class="sub" x="280" y="137" text-anchor="middle">account 2</text>
           <text class="name" x="465" y="119" text-anchor="middle">Teammate</text>
           <text class="sub" x="465" y="137" text-anchor="middle">and their agents</text>
-          <path class="bag" d="M196,236 Q196,222 212,222 L348,222 Q364,222 364,236 L356,298 Q354,312 340,312 L220,312 Q206,312 204,298 Z"/>
-          <path class="cord" d="M212,222 Q280,200 348,222"/>
-          <text class="bagt" x="280" y="258" text-anchor="middle">Seabag</text>
-          <text class="bagp" x="280" y="280" text-anchor="middle">.fliphopper/seabag/</text>
-          <text class="bagp" x="280" y="297" text-anchor="middle">in your repository</text>
+          <path class="bag" d="M246,226 Q240,262 241,300 C241,320 319,320 319,300 Q320,262 314,226 Q300,218 292,207 L268,207 Q260,218 246,226 Z"/>
+          <path class="bag" d="M268,207 Q260,192 273,190 Q280,197 287,190 Q300,192 292,207 Z"/>
+          <path class="seam" d="M241,300 C241,310 319,310 319,300"/>
+          <path class="cord" d="M252,224 C246,252 246,282 252,310"/>
+          <path class="cord" d="M265,208 Q280,214 295,208"/>
+          <path class="cord" d="M293,210 Q301,220 298,231"/>
+          <rect class="toggle" x="294" y="230" width="8" height="12" rx="3"/>
+          <text class="stencil" x="283" y="268" text-anchor="middle">SEABAG</text>
+          <text class="bagp" x="330" y="268">.fliphopper/seabag/</text>
+          <text class="bagp sub2" x="330" y="285">in your repository</text>
         </svg>
       </figure>
     </div>
