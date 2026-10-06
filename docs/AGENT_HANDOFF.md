@@ -2,12 +2,12 @@
 
 Updated: 2026-10-04
 
-**What this file is:** restart mechanics for the next session — which worktree, which server, which pitfall. It is **not** status: status lives on [the board](./TASK_BOARD.md). Contents and timing rules: [workflow/AI-WORKFLOW.md § Handoff](./workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
+**What this file is:** restart mechanics for the next session — which worktree, which server, which pitfall. It is **not** status: status lives in the seabag (`fh list`; [CARDS.md § Where status lives](./workflow/CARDS.md#where-status-lives)). Contents and timing rules: [workflow/AI-WORKFLOW.md § Handoff](./workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
 
 ## Read order to resume
 
 1. [AGENTS.md](../AGENTS.md) (loaded automatically).
-2. [Board](./TASK_BOARD.md): Now → Sessions → Waiting on the owner → your card file.
+2. [Board](./TASK_BOARD.md): Now → Waiting on the owner; then `fh list --state in_progress` → your card file.
 3. This file: your block in [Active resume](#active-resume), then [Live state](#live-state) and [Pitfalls](#pitfalls).
 4. What [AGENTS.md § Read by activity](../AGENTS.md#read-by-activity) requires for your task.
 
@@ -34,7 +34,7 @@ Updated: 2026-10-04
 
 ## Active resume
 
-One block per card in the board's Sessions table.
+One block per card that `fh list --state in_progress` shows held.
 
 ## Live state
 
@@ -54,12 +54,12 @@ Lessons that change what you do.
 - **Reference projects are read-only** and some live outside this repo ([REFERENCES.md](./REFERENCES.md)). The SSR project changes daily; re-read a file before quoting a count or rule from it, and cite the date read.
 - **The SSR board's rules evolved on 2026-09-28:** status now lives only on each card and the board is generated (`check-board.mjs`, pre-commit hook). Earlier notes in [analysis/ssr-task-board.md](./analysis/ssr-task-board.md) describe the 2026-09-27 state.
 - **Do not grow one card into a catch-all.** On 10-01 to 10-03, six different outcomes were added to `Task-A00-01`; on 10-04 they had to be split back out. Open a new card for each outcome ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)).
-- **A handoff updates this file and the board** — never a new "handoff" document.
+- **A handoff updates this file and the seabag (with `fh`)** — never a new "handoff" document.
 - **zsh expands a word starting with `=`** (e.g. `echo =====`) as a command lookup and fails; quote such strings in shell commands.
 
 ## Current truth
 
-Decisions and boundaries the board does not carry. If a bullet contradicts the board, the board is right — correct the bullet.
+Decisions and boundaries the board does not carry. If a bullet contradicts the seabag or the board, they are right — correct the bullet.
 
 - **Git identity** (repo-local config): `will.w.hui <willwhui@gmail.com>`. On 2026-10-04 the owner briefly asked for `willwhui`, then chose to keep `will.w.hui`. The remote uses HTTPS. SSH to GitHub authenticates as `wanghui2sea`.
 - **Decisions:**
@@ -69,7 +69,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 - **Main purpose** ([0014](./decisions/0014-main-purpose-and-three-sets.md), 2026-10-06): switch between AI agents and teammates and keep the project; sets 2 and 3 are AI skills and progress management.
 - **Name** ([0013](./decisions/0013-product-name-fliphopper.md), 2026-10-06): the product is **FlipHopper** (`fliphopper`, command `fh`); a project's data is its **seabag**, always in `.fliphopper/seabag/`. Dated history keeps "glidebox".
 - **Business model** ([0012](./decisions/0012-free-local-app-paid-cloud.md), 2026-10-04): the local app is free, with no account; payment is only for cloud features. Free users must cost (almost) nothing to serve. The source licence is undecided.
-- **Until FlipHopper can track itself** (from the end of Iteration 1, decided by the owner 2026-10-04), this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-fliphopper-can-track-itself-dogfooding).
+- **FlipHopper tracks itself** (since 2026-10-06, [`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md)): card status is in `.fliphopper/seabag/` on `main`, changed only with `fh` against the main checkout. `fh` must be on your PATH: `cargo install --path crates/cli` from any checkout. See [CARDS.md § Where status lives](./workflow/CARDS.md#where-status-lives).
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 
 ## Do not assume

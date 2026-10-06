@@ -6,6 +6,6 @@
 
 - Product plan: [docs/product/PLAN.md](docs/product/PLAN.md)
 - Requirements: [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md)
-- What is being worked on: [docs/TASK_BOARD.md](docs/TASK_BOARD.md)
+- What is being worked on: `fh list` in this folder, or open it in the FlipHopper app; Now and the owner's questions: [docs/TASK_BOARD.md](docs/TASK_BOARD.md)
 - All documentation: [docs/README.md](docs/README.md)
 - Agents start at [AGENTS.md](AGENTS.md).

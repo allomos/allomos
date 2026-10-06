@@ -43,3 +43,24 @@ Today FlipHopper's own work is tracked by hand in [TASK_BOARD.md](../TASK_BOARD.
 
 - 2026-10-06 — Card written by the agent for the owner's review. The v0.1 exit check also asks for a real Claude Code session to claim and finish a task with `fh` while the app shows it; the first card worked after this move does that naturally.
 - 2026-10-06 — **Owner answered the four unknowns: the recommendations, as listed under Approvals.** On the board, the owner added: *in the end TASK_BOARD.md should be gone, or generated from FlipHopper every time*. So the trimmed board is a stopgap; a later card (likely with the Markdown export, Iteration 12, or earlier if Now and owner questions get a seabag home) removes or generates it. Card is ready.
+
+## Result (2026-10-06)
+
+**In plain words.** FlipHopper now tracks its own work. This repository has a seabag with eight areas and all 32 cards, each with the state, label and holder the board had. A script did the move through `fh`, and checked afterwards that every card matches. The board page now keeps only Now and the owner's questions; the rules in AGENTS.md, CARDS.md, AI-WORKFLOW and the handoff say to change status with `fh`, on `main` only.
+
+- **How status changes now:** run `fh` against the main checkout's seabag (`FLIPHOPPER_SEABAG=<main checkout>`), commit only that change on `main`, push. Card branches carry an old copy of the seabag and never change it, so merging a card branch never undoes a status change.
+- **Two things `fh` cannot do yet**, worked around and recorded here (a follow-up card adds them):
+  - set the project ID and the label ladder: the script wrote both into `project.json` (`fliphopper`; `drafted` … `owner verified`);
+  - set a task's *next dependency*: for waiting tasks it is their *waiting on*; for backlog and ready tasks the board's text went into `description.md`.
+- **Mapping:** finished cards labelled owner verified / accepted / confirmed / decided → `owner verified`; three finished cards whose board text named no owner check (A00-02, A00-05, A00-16) → `done` without a label. Every task's `description.md` links to its card file.
+- **Script:** [scripts/move-board-to-seabag.py](../../scripts/move-board-to-seabag.py) (`--check` compares only).
+
+| Check | Result |
+|---|---|
+| `move-board-to-seabag.py --check` against the board before it was trimmed | PASS: 32 board cards, 0 differences |
+| `fh list --json` | PASS: no `issues`; `fh next` → A00-19 |
+| Demo `fh claim` → `label implemented` → `release --note` on A01-05, then `git diff` | PASS: one `task.json` changes, two readable added lines; demo reverted |
+| `cargo test --workspace`, `git diff --check`, relative links | PASS |
+| Built app (`tauri build --debug`) opened on this repository | Built and started; **not seen by the agent** (no screen access) — owner check |
+
+**Owner check:** open this repository's folder (`/Users/wanghui/coding/glidepace/fliphopper`) in FlipHopper. Expected: areas A00–A07 (A06 empty), 32 cards, open ones with their labels; A01-07 shows as waiting on this check.
