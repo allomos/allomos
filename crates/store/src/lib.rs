@@ -6,8 +6,12 @@
 //! repository, and nothing here creates a nested one.
 
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
+
+use fs4::{FileExt, TryLockError};
 
 use fliphopper_core::{
     Area, FORMAT, Issue, Loaded, Problem, Project, Seabag, Task, parse_area, parse_project,
@@ -19,6 +23,12 @@ use serde::Serialize;
 /// Always used for a new seabag, also in an empty folder, so every tool looks in one place.
 pub const DEFAULT_DIR: &str = ".fliphopper/seabag";
 const PROJECT_FILE: &str = "project.json";
+/// The file every writer locks for the length of one change. Never committed.
+pub const LOCK_FILE: &str = ".lock";
+/// Prefix of the temporary files and folders a writer renames into place.
+const TMP_PREFIX: &str = ".tmp-";
+/// Written into every new seabag, so Git never sees FlipHopper's working files.
+const GITIGNORE: &str = "# FlipHopper's own working files. Never commit them.\n.lock\n.tmp-*\n";
 
 /// What a folder the user picked turns out to be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -103,10 +113,21 @@ fn read(root: &Path, path: &Path, issues: &mut Vec<Issue>) -> Option<String> {
     }
 }
 
-/// Sorted entries of a folder; a missing folder is simply empty.
+fn hidden(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with('.'))
+}
+
+/// Sorted entries of a folder, without hidden ones (the lock file and a writer's
+/// temporary files); a missing folder is simply empty.
 fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
     let mut v: Vec<PathBuf> = fs::read_dir(dir)
-        .map(|it| it.filter_map(|e| e.ok().map(|e| e.path())).collect())
+        .map(|it| {
+            it.filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| !hidden(p))
+                .collect()
+        })
         .unwrap_or_default();
     v.sort();
     v
@@ -215,6 +236,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         ));
     }
     fs::create_dir_all(root)?;
+    fs::write(root.join(".gitignore"), GITIGNORE)?;
     let project = Project {
         format: FORMAT.to_string(),
         id: "project".to_string(),
@@ -270,12 +292,271 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             holder: None,
             waiting_on: None,
             next_dependency: None,
+            handoff_note: None,
             description: String::new(),
         };
         write_json(&dir.join("task.json"), &task_file_json(&task))?;
         fs::write(dir.join("description.md"), description)?;
     }
     Ok(root.to_path_buf())
+}
+
+/// Find the seabag for `start`: the nearest `.fliphopper/seabag/` at or above it,
+/// the way Git finds its repository.
+pub fn find_seabag(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .map(|p| p.join(DEFAULT_DIR))
+        .find(|p| p.join(PROJECT_FILE).is_file())
+}
+
+/// A project ID made from a folder name: letters, digits, `-` and `_` kept, anything else
+/// turned into `-`, at most 64 characters; `project` when nothing usable is left.
+pub fn id_from_name(name: &str) -> String {
+    let id: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .take(64)
+        .collect();
+    let id = id.trim_matches('-').to_string();
+    if id.is_empty() {
+        "project".to_string()
+    } else {
+        id
+    }
+}
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// A name for a temporary file or folder next to `dir`'s contents, unique to this process.
+fn tmp_path(dir: &Path, what: &str) -> PathBuf {
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    dir.join(format!("{TMP_PREFIX}{}-{n}-{what}", std::process::id()))
+}
+
+fn write_failed(path: &Path, e: impl std::fmt::Display) -> Problem {
+    Problem::WriteFailed {
+        path: path.display().to_string(),
+        detail: e.to_string(),
+    }
+}
+
+fn json_text<T: Serialize>(value: &T) -> String {
+    let mut text = serde_json::to_string_pretty(value).expect("seabag values always serialize");
+    text.push('\n');
+    text
+}
+
+/// Write `path` whole: the text goes to a temporary file in the same folder, is flushed to
+/// disk, and is then renamed over `path`. A reader sees either the old file or the new one,
+/// never a part-written one.
+fn write_atomic(path: &Path, text: &str) -> Result<(), Problem> {
+    let dir = path.parent().expect("seabag files are inside a folder");
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let tmp = tmp_path(dir, name);
+    let result = (|| {
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(text.as_bytes())?;
+        f.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    result.map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        write_failed(path, e)
+    })
+}
+
+/// Fill a new folder with files, then rename it to `target` in one step, so a reader never
+/// sees it half-made. Refused when `target` already exists.
+fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Problem> {
+    let parent = target.parent().expect("a target has a parent");
+    let name = target.file_name().and_then(|n| n.to_str()).unwrap_or("dir");
+    let tmp = tmp_path(parent, name);
+    let result = (|| {
+        fs::create_dir_all(&tmp)?;
+        for (rel_path, text) in files {
+            let path = tmp.join(rel_path);
+            if let Some(dir) = path.parent() {
+                fs::create_dir_all(dir)?;
+            }
+            let mut f = fs::File::create(&path)?;
+            f.write_all(text.as_bytes())?;
+            f.sync_all()?;
+        }
+        if target.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "already exists",
+            ));
+        }
+        fs::rename(&tmp, target)
+    })();
+    result.map_err(|e| {
+        let _ = fs::remove_dir_all(&tmp);
+        write_failed(target, e)
+    })
+}
+
+/// Create an empty seabag at `root` (normally `<repository>/.fliphopper/seabag/`): `project.json`,
+/// empty `areas/` and `tasks/`, and a `.gitignore` for the lock. Refused when `root` exists.
+/// Never creates a Git repository.
+pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
+    if root.exists() {
+        return Err(Problem::SeabagExists {
+            path: root.display().to_string(),
+        });
+    }
+    let project = Project {
+        format: FORMAT.to_string(),
+        id: id.to_string(),
+        name: name.to_string(),
+        labels: fliphopper_core::default_labels(),
+    };
+    // Checked like any project file, so `init` never writes one that `load` refuses.
+    let text = json_text(&project);
+    if let Err(issues) = parse_project(PROJECT_FILE, &text) {
+        return Err(issues[0].problem.clone());
+    }
+    let parent = root.parent().expect("a seabag root has a parent");
+    fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
+    create_dir_atomic(
+        root,
+        &[
+            (PROJECT_FILE, text),
+            (".gitignore", GITIGNORE.to_string()),
+            ("areas/.keep", String::new()),
+            ("tasks/.keep", String::new()),
+        ],
+    )
+    .map_err(|p| match p {
+        Problem::WriteFailed { .. } if root.exists() => Problem::SeabagExists {
+            path: root.display().to_string(),
+        },
+        p => p,
+    })?;
+    Ok(root.to_path_buf())
+}
+
+/// The seabag's lock, held for one change: load, check the rules, write, then drop it.
+/// Every write goes through a `Lock`, so two FlipHopper writers never change the seabag at
+/// the same moment. The operating system releases the lock if the process dies.
+pub struct Lock {
+    root: PathBuf,
+    _file: fs::File,
+}
+
+impl Lock {
+    /// Take the lock, waiting up to `wait` for another writer to finish.
+    pub fn acquire(root: &Path, wait: Duration) -> Result<Lock, Problem> {
+        if !root.join(PROJECT_FILE).is_file() {
+            return Err(Problem::SeabagNotFound {
+                path: root.display().to_string(),
+            });
+        }
+        let path = root.join(LOCK_FILE);
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+            .map_err(|e| write_failed(&path, e))?;
+        let start = Instant::now();
+        loop {
+            match FileExt::try_lock(&file) {
+                Ok(()) => {
+                    return Ok(Lock {
+                        root: root.to_path_buf(),
+                        _file: file,
+                    });
+                }
+                Err(TryLockError::WouldBlock) if start.elapsed() < wait => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(TryLockError::WouldBlock) => {
+                    return Err(Problem::SeabagBusy {
+                        path: root.display().to_string(),
+                    });
+                }
+                Err(TryLockError::Error(e)) => return Err(write_failed(&path, e)),
+            }
+        }
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Load the seabag while holding the lock, so what is read is what the change builds on.
+    pub fn load(&self) -> Loaded {
+        load(&self.root)
+    }
+
+    /// Write a new area file. Refused when the file already exists.
+    pub fn create_area(&self, area: &Area) -> Result<(), Problem> {
+        let dir = self.root.join("areas");
+        fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
+        let path = dir.join(format!("{}.json", area.id));
+        if path.exists() {
+            return Err(Problem::DuplicateAreaId {
+                id: area.id.clone(),
+            });
+        }
+        write_atomic(&path, &json_text(area))
+    }
+
+    /// Write a new task folder: `task.json`, plus `description.md` when there is a description.
+    pub fn create_task(&self, task: &Task) -> Result<(), Problem> {
+        let dir = self.root.join("tasks");
+        fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
+        let target = dir.join(&task.id);
+        if target.exists() {
+            return Err(Problem::DuplicateTaskId {
+                id: task.id.clone(),
+            });
+        }
+        let mut files = vec![("task.json", json_text(&task_file_json(task)))];
+        if !task.description.is_empty() {
+            files.push(("description.md", task.description.clone()));
+        }
+        create_dir_atomic(&target, &files)
+    }
+
+    /// Rewrite an existing task's `task.json`. Its description is left as it is.
+    pub fn save_task(&self, task: &Task) -> Result<(), Problem> {
+        let path = self.root.join("tasks").join(&task.id).join("task.json");
+        write_atomic(&path, &json_text(&task_file_json(task)))
+    }
+}
+
+/// A fingerprint of the seabag's files (names, sizes and change times). It changes when any
+/// file is written, so a window can reload only when something changed.
+pub fn stamp(root: &Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    let mut add = |p: &Path| {
+        if let Ok(m) = fs::metadata(p) {
+            p.hash(&mut h);
+            m.len().hash(&mut h);
+            m.modified().ok().hash(&mut h);
+        }
+    };
+    add(&root.join(PROJECT_FILE));
+    for p in sorted_entries(&root.join("areas")) {
+        add(&p);
+    }
+    for dir in sorted_entries(&root.join("tasks")) {
+        add(&dir);
+        for p in sorted_entries(&dir) {
+            add(&p);
+        }
+    }
+    h.finish()
 }
 
 #[cfg(test)]
@@ -383,5 +664,112 @@ mod tests {
     fn not_a_folder() {
         let p = tmp("nf").join("missing");
         assert!(matches!(inspect(&p), Inspection::NotAFolder { .. }));
+    }
+
+    #[test]
+    fn init_makes_an_empty_seabag_found_from_below() {
+        let repo = tmp("init");
+        let root = repo.join(DEFAULT_DIR);
+        init(&root, &id_from_name("my repo!"), "My repo").unwrap();
+        assert_eq!(
+            init(&root, "x", "X"),
+            Err(Problem::SeabagExists {
+                path: root.display().to_string()
+            })
+        );
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let bag = loaded.seabag.unwrap();
+        assert_eq!(bag.project.id, "my-repo");
+        assert!(bag.areas.is_empty() && bag.tasks.is_empty());
+        assert!(
+            fs::read_to_string(root.join(".gitignore"))
+                .unwrap()
+                .contains(".lock")
+        );
+        let deep = repo.join("src/a/b");
+        fs::create_dir_all(&deep).unwrap();
+        assert_eq!(find_seabag(&deep), Some(root.clone()));
+        assert_eq!(find_seabag(&std::env::temp_dir()), None);
+        // No temporary folder is left next to the seabag.
+        let left: Vec<_> = fs::read_dir(repo.join(".fliphopper")).unwrap().collect();
+        assert_eq!(left.len(), 1);
+        fs::remove_dir_all(repo).unwrap();
+    }
+
+    #[test]
+    fn id_from_name_keeps_ids_valid() {
+        assert_eq!(id_from_name("fliphopper"), "fliphopper");
+        assert_eq!(id_from_name("我的"), "project");
+        assert_eq!(id_from_name(&"a".repeat(80)).len(), 64);
+    }
+
+    #[test]
+    fn writes_go_through_the_lock() {
+        let dir = tmp("lock");
+        let root = dir.join(DEFAULT_DIR);
+        assert!(matches!(
+            Lock::acquire(&root, Duration::ZERO),
+            Err(Problem::SeabagNotFound { .. })
+        ));
+        init(&root, "p", "P").unwrap();
+        let before = stamp(&root);
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        // A second writer waits, then gives up while the first holds the lock.
+        assert!(matches!(
+            Lock::acquire(&root, Duration::from_millis(20)),
+            Err(Problem::SeabagBusy { .. })
+        ));
+        let bag = lock.load().seabag.unwrap();
+        let area = fliphopper_core::ops::new_area(&bag, "A01", "First").unwrap();
+        lock.create_area(&area).unwrap();
+        assert!(matches!(
+            lock.create_area(&area),
+            Err(Problem::DuplicateAreaId { .. })
+        ));
+        let bag = lock.load().seabag.unwrap();
+        let task =
+            fliphopper_core::ops::new_task(&bag, "A01-01", "A01", "Do it", Some("Why")).unwrap();
+        lock.create_task(&task).unwrap();
+        assert!(matches!(
+            lock.create_task(&task),
+            Err(Problem::DuplicateTaskId { .. })
+        ));
+        let bag = lock.load().seabag.unwrap();
+        let claimed = fliphopper_core::ops::claim(&bag, "A01-01", Some("me"), false)
+            .unwrap()
+            .task;
+        lock.save_task(&claimed).unwrap();
+        drop(lock);
+        assert!(Lock::acquire(&root, Duration::ZERO).is_ok());
+
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let t = &loaded.seabag.unwrap().tasks[0];
+        assert_eq!(t.holder.as_deref(), Some("me"));
+        assert_eq!(t.description, "Why\n");
+        let json = fs::read_to_string(root.join("tasks/A01-01/task.json")).unwrap();
+        assert!(!json.contains("null") && !json.contains("description"));
+        assert_ne!(stamp(&root), before);
+        // Only the lock and the seabag's own files: no temporary files left behind.
+        let hidden: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .filter(|n| n.starts_with(TMP_PREFIX))
+            .collect();
+        assert!(hidden.is_empty(), "{hidden:?}");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn hidden_entries_are_not_tasks() {
+        let dir = tmp("hidden");
+        init(&dir.join("s"), "p", "P").unwrap();
+        let root = dir.join("s");
+        fs::create_dir_all(root.join("tasks/.tmp-1-0-X")).unwrap();
+        fs::write(root.join("areas/.tmp-1-1-A.json"), "{").unwrap();
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        fs::remove_dir_all(dir).unwrap();
     }
 }

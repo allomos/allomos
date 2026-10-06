@@ -42,8 +42,8 @@ One block per card in the board's Sessions table.
 - **Card and approval limits:** [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md). Local work only (source, tests, docs, commits, pushes, pinned packages). No external operations.
 - **Uncommitted:** none.
 - **Running:** nothing.
-- **Findings not yet on the card:** none.
-- **Next action:** read CODING_RULES, FILE-FORMAT and `crates/core` / `crates/store`; resolve the lock crate (Rust 1.85 lacks `File::lock`) and start `crates/cli` with `fh init`.
+- **Findings not yet on the card:** lock crate `fs4` =1.1.0 (MIT/Apache-2.0, MSRV 1.75, mirrors std `File::try_lock`); `clap` =4.6.7 (MSRV 1.85). Done so far: `crates/core/src/ops.rs` (task changes), new problem codes (words in the three languages still to add), store `init` / `find_seabag` / `Lock` / atomic writes / `stamp`.
+- **Next action:** write `crates/cli` (lib + `fliphopper` and `fh` bins), then its tests and the race test.
 
 ## Live state
 

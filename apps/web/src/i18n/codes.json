@@ -1,5 +1,8 @@
 {
   "area_name_missing": [],
+  "bad_usage": [
+    "detail"
+  ],
   "create_failed": [
     "path",
     "detail"
@@ -15,12 +18,17 @@
   "folder_not_empty": [
     "path"
   ],
+  "holder_missing": [],
   "invalid_choice": [
     "value",
     "allowed"
   ],
   "invalid_id": [
     "id"
+  ],
+  "label_below_top": [
+    "label",
+    "top"
   ],
   "label_not_on_ladder": [
     "label",
@@ -34,12 +42,44 @@
   "read_failed": [
     "detail"
   ],
+  "seabag_busy": [
+    "path"
+  ],
+  "seabag_exists": [
+    "path"
+  ],
+  "seabag_not_found": [
+    "path"
+  ],
+  "seabag_unreadable": [
+    "path",
+    "detail"
+  ],
+  "task_closed": [
+    "id",
+    "state"
+  ],
   "task_file_missing": [],
+  "task_held": [
+    "id",
+    "holder"
+  ],
+  "task_not_found": [
+    "id"
+  ],
   "task_title_missing": [],
+  "took_over": [
+    "id",
+    "previous"
+  ],
   "unknown_area": [
     "area"
   ],
   "waiting_on_missing": [],
+  "write_failed": [
+    "path",
+    "detail"
+  ],
   "wrong_format": [
     "expected",
     "found"

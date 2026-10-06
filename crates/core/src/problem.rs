@@ -74,6 +74,23 @@ problems! {
     /// Creating a seabag was refused because the folder already has files in it.
     FolderNotEmpty { path } => "folder_not_empty", "{path} is not empty, so no seabag was created there.";
     CreateFailed { path, detail } => "create_failed", "Could not create the seabag in {path}: {detail}.";
+    SeabagNotFound { path } => "seabag_not_found", "No seabag was found at or above {path}. Run `fh init` first, or pass --seabag <path>.";
+    SeabagExists { path } => "seabag_exists", "A seabag already exists at {path}.";
+    /// The seabag's project file could not be read. `detail` says why.
+    SeabagUnreadable { path, detail } => "seabag_unreadable", "The seabag at {path} could not be read: {detail}";
+    /// Another FlipHopper writer held the seabag's lock for too long.
+    SeabagBusy { path } => "seabag_busy", "Another FlipHopper writer is changing the seabag at {path}. Try again in a moment.";
+    WriteFailed { path, detail } => "write_failed", "Could not write {path}: {detail}.";
+    TaskNotFound { id } => "task_not_found", "There is no task \"{id}\".";
+    HolderMissing => "holder_missing", "Say who you are with --as <name> or the FLIPHOPPER_HOLDER environment variable.";
+    TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
+    TaskClosed { id, state } => "task_closed", "Task {id} is {state}, so it cannot be changed this way.";
+    /// A warning: the task was finished below the top step of the ladder.
+    LabelBelowTop { label, top } => "label_below_top", "Finished with the label \"{label}\", below the top step \"{top}\".";
+    /// A warning: the task was taken over from another holder.
+    TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
+    /// The command was used wrongly. `detail` is the parser's own text.
+    BadUsage { detail } => "bad_usage", "{detail}";
 }
 
 impl std::fmt::Display for Problem {

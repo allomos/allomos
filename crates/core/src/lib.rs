@@ -5,6 +5,7 @@
 //! file contents, and get back typed values plus a list of [`Issue`]s.
 
 mod model;
+pub mod ops;
 mod problem;
 mod validate;
 

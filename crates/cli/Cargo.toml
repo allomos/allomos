@@ -1,0 +1,11 @@
+[package]
+name = "fliphopper-cli"
+description = "The fliphopper / fh command: agents and people work a seabag's tasks from a terminal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+clap = { version = "=4.6.7", features = ["derive"] }

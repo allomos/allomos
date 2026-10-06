@@ -90,6 +90,9 @@ pub struct Task {
     pub waiting_on: Option<String>,
     #[serde(default)]
     pub next_dependency: Option<String>,
+    /// A short note left on release for whoever picks the task up next.
+    #[serde(default)]
+    pub handoff_note: Option<String>,
     #[serde(default, skip_deserializing)]
     pub description: String,
 }
