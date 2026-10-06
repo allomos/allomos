@@ -41,10 +41,10 @@
   - A broken file's problem shows in each language and still names the file and field.
   - The owner sees the app in Chinese and Japanese and judges the wording.
 
-## Owner questions at review
+## Owner answers (2026-10-06)
 
-1. **The starter project's sample areas and tasks** (written into files when an empty folder is chosen). Recommendation: they stay in English for now, because they become the user's own data and are not interface text. Alternatively, write them in the chosen language.
-2. **Who checks the Japanese wording?** The agent writes it. Recommendation: the owner reads it at the visual check, and the card records anything changed.
+1. **The starter project's sample areas and tasks stay in English.** They become the user's own data, not interface text.
+2. **Still open: who checks that the Chinese and Japanese texts read naturally.** The agent writes both translations; someone who reads each language should look at them once.
 
 ## Approvals
 

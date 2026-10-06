@@ -14,7 +14,7 @@
 
 **What you can do at the end:** in any repository, an agent runs `gb init`, adds areas and tasks, claims one, moves its label up, parks it as waiting, and finishes or releases it. Several agents can do this at the same time, each in its own terminal. If the glidebox app is open on that task box, the window follows along.
 
-## How `gb` and the app take turns (decision for the owner)
+## How `gb` and the app take turns (owner chose A, 2026-10-06)
 
 In Iteration 1 the desktop app only **reads** a task box; it writes only when it creates a starter project. Editing in the app arrives in Iteration 2. So today the real risks are:
 
@@ -29,7 +29,7 @@ The answer must still work when the app starts writing in Iteration 2, and `gb` 
 | B. One holder while open | Whoever opens the task box for writing holds a lock until it closes. | Very simple. | The app being open would block every agent. Agents would block each other for a whole session. This defeats R11. |
 | C. Send changes through the app | When the app runs, `gb` sends each change to it; when it does not, `gb` writes itself. | One writer at all times while the app runs. | Needs a local connection to the app, which arrives only in Iteration 9. There would be two code paths to test, and the two-agents race still needs A when the app is closed. |
 
-**Recommendation: A.** Option A also keeps R75's "one running desktop app writes to a folder at a time": a second desktop app on the same folder is a separate check, added when the app starts editing (Iteration 2).
+**Chosen: A** (owner, 2026-10-06). Option A also keeps R75's "one running desktop app writes to a folder at a time": a second desktop app on the same folder is a separate check, added when the app starts editing (Iteration 2).
 
 ## Proposed commands
 
@@ -45,7 +45,7 @@ The names and options below are a proposal for the owner's review. The worker wr
 | `gb claim <id>` | Sets you as the holder and the state to `in_progress`. It refuses when someone else holds the task, naming them. |
 | `gb label <id> <label>` | Sets the label. It must be a step on the project's ladder. |
 | `gb wait <id> --on <text>` | Sets the state to `waiting` and records what it waits on. |
-| `gb done <id>` | Sets the state to `done`. It warns, without refusing, when the label is not the top step of the ladder (see owner question 3). |
+| `gb done <id>` | Sets the state to `done`. It warns, without refusing, when the label is not the top step of the ladder (owner, 2026-10-06). |
 | `gb release <id>` | Clears the holder. A task `in_progress` goes back to `ready`. |
 
 Shared behaviour:
@@ -78,12 +78,12 @@ Shared behaviour:
   - **End to end, recorded on the card:** a fresh temporary Git repository; `gb init`; add two areas and three tasks; claim, label, wait, done and release; `gb list` and `gb show` match the files; `git status` shows only the task box's text files and no lock file; the desktop app, opened on that folder, follows the changes without reopening.
   - The owner runs a few commands and watches the app follow.
 
-## Owner questions at review
+## Owner answers (2026-10-06)
 
-1. **How writers take turns:** option A (recommended), B or C, above.
-2. **What `gb init` creates.** Recommendation: an empty project with no sample tasks, because agents add their own and there is no delete command yet. The app keeps its sample starter project for an empty folder.
-3. **What `gb done` requires.** Recommendation: it warns but allows finishing below the top label. On this project the workflow already says "Done" means owner verified, and other projects may use other ladders. The alternative is to refuse unless the task is at the top step.
-4. **Delete and edit commands** (rename a task, change its area, remove it) are not in this card. Recommendation: add them with in-app editing in Iteration 2, together with the history of changes.
+1. **How writers take turns: option A**, a short lock for each change.
+2. **`gb init` creates an empty project** with no sample tasks. The app keeps its sample starter project for an empty folder.
+3. **`gb done` warns but allows** finishing below the top label.
+4. **Delete and edit commands wait for Iteration 2**, together with in-app editing and the history of changes.
 
 ## Approvals
 
