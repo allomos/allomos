@@ -1,7 +1,9 @@
 {
   "area": "A01",
-  "holder": "claude/a01-run",
+  "handoff_note": "Done by the agent; only the owner's look in the app is left (see the card's Result).",
   "id": "A01-07",
-  "state": "in_progress",
-  "title": "Own cards in seabag"
+  "label": "implemented",
+  "state": "waiting",
+  "title": "Own cards in seabag",
+  "waiting_on": "owner opens this repository in the app and sees all 32 cards by area"
 }
