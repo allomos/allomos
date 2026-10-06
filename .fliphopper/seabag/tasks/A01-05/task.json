@@ -1,6 +1,7 @@
 {
   "area": "A01",
+  "holder": "claude/a01-run",
   "id": "A01-05",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Readme in new folder"
 }
