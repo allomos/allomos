@@ -89,6 +89,7 @@ Shared behaviour:
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-06 | Card approved: all local work (source, tests, docs, commits, pushes; installing pinned packages locally). No external operations. | owner (chat) |
 
 ## Notes
 
