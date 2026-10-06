@@ -100,7 +100,7 @@ npm --prefix apps/desktop install
 npm --prefix apps/desktop run dev
 ```
 
-`npm --prefix apps/desktop run dev` starts the interface and the desktop window together and reloads on changes. To open a folder directly, pass it at start-up: `FLIPHOPPER_OPEN=/path/to/folder npm --prefix apps/desktop run dev`, or `open FlipHopper.app --args /path/to/folder` for a built app.
+`npm --prefix apps/desktop run dev` starts the interface and the desktop window together and reloads on changes. To open a folder directly, pass it at start-up: `FLIPHOPPER_OPEN=/path/to/folder npm --prefix apps/desktop run dev`, or `open FlipHopper.app --args /path/to/folder` for a built app. The folder is the first argument that is not an option; macOS options such as `-AppleLanguages '(ja)'` may come first. A given path that is not a folder is reported in the window instead of reopening the last folder ([`Task-A01-04`](../tasks/Task-A01-04-startup-folder-argument.md)).
 
 While a seabag is open, the window checks about once a second whether its files changed (a fingerprint of names, sizes and change times, `seabag_stamp`) and reloads when they did, so changes made with `fh` show without reopening the folder. Polling was chosen over a folder watcher because it needs no new package or thread, and inside the desktop app it is a cheap local call. **Companions are different:** over the network, the desktop app pushes a change notice to them; they never ask on a timer (owner, 2026-10-06).
 

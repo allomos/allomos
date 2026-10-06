@@ -62,6 +62,9 @@
     "path",
     "detail"
   ],
+  "startup_not_a_folder": [
+    "path"
+  ],
   "task_closed": [
     "id",
     "state"

@@ -108,7 +108,14 @@ export function App({ messenger }: { messenger: Messenger }) {
   // On start: a folder given on the command line wins; otherwise reopen the last one.
   useEffect(() => {
     void (async () => {
-      let start = await messenger.startupFolder().catch(() => null);
+      let start: string | null;
+      try {
+        start = await messenger.startupFolder();
+      } catch (e) {
+        // A folder was given but is not one: say so instead of reopening the last folder.
+        setError(errorNote(e));
+        return;
+      }
       if (!start) {
         try {
           start = localStorage.getItem(LAST_ROOT_KEY);
