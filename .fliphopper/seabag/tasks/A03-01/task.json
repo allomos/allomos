@@ -1,7 +1,7 @@
 {
   "area": "A03",
+  "holder": "claude/a01-run",
   "id": "A03-01",
-  "next_dependency": "owner card review",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Agent launch research"
 }
