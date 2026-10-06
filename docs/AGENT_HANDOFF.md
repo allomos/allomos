@@ -39,9 +39,9 @@ One block per card in the board's Sessions table.
 ### Task-A00-17 — claude/a00-17-rename
 - Checkout: worktree `.claude/worktrees/a00-17`, branch `claude/a00-17-rename` · pushed: yes. Not merged into `main` yet.
 - Approvals in force: the card and its external operations, for the name FlipHopper (includes updating the published pitch decks).
-- Done: steps 1–4; step 5 sources. Step 4: code, seabag, texts in three languages, documents, decision 0013; all six card checks, links and `git diff --check` PASS (evidence on the card).
+- Done: steps 1–4 and 6; step 5 sources. Step 4: code, seabag, texts in three languages, documents, decision 0013; all six card checks, links and `git diff --check` PASS (evidence on the card).
 - Uncommitted: none · Running: none
-- Next: step 5 is blocked — deck sources renamed and committed, but `Artifact read` finds neither published address (wrong account?). Owner chooses: republish from the owning account, or approve new addresses (then update `docs/pitch/README.md`). Meanwhile: build the app for the owner's check (step 6), then merge into `main`.
+- Next: step 5 is blocked — deck sources renamed and committed, but `Artifact read` finds neither published address (wrong account?). Owner chooses: republish from the owning account, or approve new addresses (then update `docs/pitch/README.md`). Step 6 passed (owner, 2026-10-06). Then merge into `main`. The owner's README idea is card A01-05, not this one.
 - Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-17. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Continue with step 5 (pitch decks)."
 
 ## Live state

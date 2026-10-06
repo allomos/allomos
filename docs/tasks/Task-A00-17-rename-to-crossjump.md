@@ -73,6 +73,7 @@ The owner wants to rename the product from **Glidebox** to **FlipHopper**. The n
 - 2026-10-06 — Step 3 done: the owner moved the local folder to `…/glidepace/fliphopper`; work continues in the worktree `.claude/worktrees/a00-17`.
 - 2026-10-06 — Step 4 done (agent): code, data folder, interface texts and documents renamed; decision record [0013](../decisions/0013-product-name-fliphopper.md). Answer 8 built: the app now creates a new seabag in `.fliphopper/seabag/` also inside an empty folder (test `empty_folder_gets_starter_seabag_in_default_dir`). In the `fh` card, `--box` / `GLIDEBOX_BOX` became `--seabag` / `FLIPHOPPER_SEABAG` to match the new word. Checks: see [Step 4 evidence](#step-4-evidence-2026-10-06).
 - 2026-10-06 — Step 5, part 1: both deck sources in `docs/pitch/` renamed (FlipHopper, seabag / 水手袋, `.fliphopper/seabag/`, `fh`) and checked in a browser. **Republishing is blocked:** this session's claude.ai account cannot find either published address in `docs/pitch/README.md` ("artifact not found"; its artifact list is empty), so they were probably published from another account or organization. Waiting on the owner: republish from the account that owns them, or approve new addresses.
+- 2026-10-06 — Step 6: the owner checked the built app and passed all four points: the name FlipHopper; a new seabag in `.fliphopper/seabag/` in an empty folder; the question before creating one in a folder with other files; the three languages with 水手袋 and シーバッグ. The owner also asked for a README in a folder that looks empty; that is a new outcome, so it went to [`Task-A01-05`](./Task-A01-05-readme-in-new-folder.md).
 
 ## Name check (2026-10-06, agent)
 
@@ -126,7 +127,7 @@ Sources: [Sidehopper, Metroid Wiki](https://metroid.fandom.com/wiki/Sidehopper),
 | `git diff --check` | PASS |
 | Built app (`npx --prefix apps/desktop tauri build --debug --bundles app`) | PASS: `target/debug/bundle/macos/FlipHopper.app` in the worktree, bundle name FlipHopper, ID `io.fliphopper` |
 | Built app started on an empty folder (`open -n FlipHopper.app --args <empty folder>`) | PASS: created `.fliphopper/seabag/` with `project.json` (`"format": "fliphopper/1"`, project named after the folder), 2 areas, 3 tasks |
-| Window title, "seabag" wording and all three languages on screen | NOT RUN by the agent: owner check (step 6) |
+| Window title, "seabag" wording and all three languages on screen | PASS: owner checked, 2026-10-06 |
 
 **Where "glidebox" remains (any case), and why** — the rule is in [0013 § Where the old name stays](../decisions/0013-product-name-fliphopper.md#where-the-old-name-stays):
 
