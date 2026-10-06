@@ -64,8 +64,9 @@ All colours are flat; the owner asked for no gradients. The mark at the top left
 | `.icns` looked at by the agent at 256, 32 and 16 px | PASS |
 | `tauri build --debug --bundles app`: the bundle's `icon.icns` is the new file | PASS |
 | Owner check of the first (hopper) icon in the Dock, Finder and window | PASS (owner, 2026-10-06), then redesigned |
-| Owner check of the Y2/D4 icon in the Dock, Finder and window | waiting |
+| Owner check of the Y2/D4 icon in the Dock, Finder and window | **PASS** (owner, 2026-10-06) |
 
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the owner's request. The mark was drawn and used in the decks under A00-18; applying it to the app is this card.
+- 2026-10-06 — Owner verified the Y2/D4 icon; merged into `main`. **Done.** Later sketches (V5 with a star in the centre, S1–S8) were drawn but not chosen.

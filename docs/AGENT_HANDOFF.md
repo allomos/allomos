@@ -36,12 +36,6 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
-### Task-A07-01 — `claude/a07-01-icon`
-
-- **Checkout:** worktree `.claude/worktrees/a07-01-icon`, branch `claude/a07-01-icon`; all work committed and pushed.
-- **Built app:** `.claude/worktrees/a07-01-icon/target/debug/bundle/macos/FlipHopper.app`, opened for the owner's check.
-- **Next action:** the owner looks at the Y2/D4 icon in the Dock, Finder and the window. Then merge into `main` and mark the card Done. Icons are rebuilt with `bash apps/desktop/scripts/make-icons.sh`.
-
 ## Live state
 
 Checked 2026-10-06.
