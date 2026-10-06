@@ -11,6 +11,8 @@ A seabag is an ordinary folder of small text files. There is one file for the pr
 - **Always `.fliphopper/seabag/`** at the root of the folder the user picks: a code repository, a folder with other files, or an empty folder ([0013](../decisions/0013-product-name-fliphopper.md)). `.fliphopper/` leaves room for other FlipHopper files later.
 - A folder that already holds `project.json` directly is opened as a seabag as it is; FlipHopper never creates one there.
 
+- **`README-fliphopper.md`** next to `.fliphopper/`: when the app creates a seabag in a folder that **looks empty** (no entries, or only hidden ones such as `.DS_Store` or `.git`), it also writes this short introduction in the interface's language, so the folder does not look empty to a person. It is written only there, never over an existing file, and never named `README.md`. It is not part of the seabag; the user may edit or delete it ([`Task-A01-05`](../tasks/Task-A01-05-readme-in-new-folder.md)).
+
 FlipHopper never creates a Git repository inside a seabag; the surrounding repository versions it.
 
 ## Layout

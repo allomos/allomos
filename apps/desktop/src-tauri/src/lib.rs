@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use fliphopper_core::{Loaded, Problem};
-use fliphopper_store::{Inspection, create_starter, git_root, inspect, load, stamp};
+use fliphopper_store::{
+    Inspection, add_readme_if_empty, create_starter, git_root, inspect, load, picked_folder, stamp,
+};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -22,6 +24,8 @@ struct FolderInfo {
 struct Opened {
     root: PathBuf,
     loaded: Loaded,
+    /// A `README-fliphopper.md` was just written next to `.fliphopper/`.
+    readme_added: bool,
 }
 
 /// A folder given at start-up: the first command-line argument, or `FLIPHOPPER_OPEN`.
@@ -49,6 +53,7 @@ fn open_seabag(root: PathBuf) -> Opened {
     Opened {
         loaded: load(&root),
         root,
+        readme_added: false,
     }
 }
 
@@ -61,8 +66,10 @@ fn seabag_stamp(root: PathBuf) -> String {
 }
 
 /// Create a starter seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
+/// When the picked folder looks empty, also write `README-fliphopper.md` there, in the
+/// interface's `language`; a README that cannot be written does not undo the seabag.
 #[tauri::command]
-fn create_seabag(root: PathBuf, name: String) -> Result<Opened, Problem> {
+fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
     create_starter(&root, &name).map_err(|e| {
         let path = root.display().to_string();
         if e.kind() == std::io::ErrorKind::AlreadyExists {
@@ -74,9 +81,13 @@ fn create_seabag(root: PathBuf, name: String) -> Result<Opened, Problem> {
             }
         }
     })?;
+    let readme_added = picked_folder(&root)
+        .map(|folder| add_readme_if_empty(folder, &language).unwrap_or(false))
+        .unwrap_or(false);
     Ok(Opened {
         loaded: load(&root),
         root,
+        readme_added,
     })
 }
 

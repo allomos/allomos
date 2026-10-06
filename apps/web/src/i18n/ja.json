@@ -8,6 +8,7 @@
   "language.label": "言語",
   "language.system": "システムに合わせる",
   "notice.created_here": "この空のフォルダーの .fliphopper/seabag/ に、シーバッグとスタータープロジェクトを作成しました。",
+  "notice.created_here_readme": "この空のフォルダーの .fliphopper/seabag/ に、シーバッグとスタータープロジェクトを作成し、フォルダーの説明として README-fliphopper.md を追加しました。",
   "notice.created_nested": ".fliphopper/seabag/ に、シーバッグとスタータープロジェクトを作成しました。",
   "error.not_a_folder": "{path} はフォルダーではありません。",
   "error.unexpected": "問題が発生しました：{detail}",

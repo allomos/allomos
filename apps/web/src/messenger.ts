@@ -21,8 +21,11 @@ export interface Messenger {
   seabagStamp(root: string): Promise<string>;
   /** Show the seabag's folder in Finder or Explorer. Rejects with a Problem on failure. */
   showInFileManager(root: string): Promise<void>;
-  /** Rejects with a Problem (see types.ts) when the seabag cannot be created. */
-  createSeabag(root: string, name: string): Promise<Opened>;
+  /**
+   * Rejects with a Problem (see types.ts) when the seabag cannot be created. In a folder that
+   * looks empty it also writes README-fliphopper.md in `language` (`readme_added` says so).
+   */
+  createSeabag(root: string, name: string, language: string): Promise<Opened>;
 }
 
 export const desktopMessenger: Messenger = {
@@ -36,5 +39,5 @@ export const desktopMessenger: Messenger = {
   openSeabag: (root) => invoke<Opened>("open_seabag", { root }),
   seabagStamp: (root) => invoke<string>("seabag_stamp", { root }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
-  createSeabag: (root, name) => invoke<Opened>("create_seabag", { root, name }),
+  createSeabag: (root, name, language) => invoke<Opened>("create_seabag", { root, name, language }),
 };

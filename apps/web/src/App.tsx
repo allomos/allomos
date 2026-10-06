@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import type { Messenger } from "./messenger";
@@ -33,7 +33,10 @@ function errorNote(e: unknown): Note {
 }
 
 export function App({ messenger }: { messenger: Messenger }) {
-  const { t, rich, problem } = useI18n();
+  const { t, rich, problem, language } = useI18n();
+  // Read when a seabag is created (for its README), without reopening the folder when it changes.
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const [opened, setOpened] = useState<Opened | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [notice, setNotice] = useState<Note | null>(null);
@@ -61,7 +64,8 @@ export function App({ messenger }: { messenger: Messenger }) {
         if (i.kind === "found") {
           show(await messenger.openSeabag(i.root), null);
         } else if (i.kind === "empty") {
-          show(await messenger.createSeabag(i.suggested_root, folderName(i.folder)), { key: "notice.created_here" });
+          const o = await messenger.createSeabag(i.suggested_root, folderName(i.folder), languageRef.current);
+          show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
         } else if (i.kind === "no_seabag") {
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
         } else {
@@ -124,10 +128,9 @@ export function App({ messenger }: { messenger: Messenger }) {
   const createNested = async () => {
     if (!pending) return;
     try {
-      show(
-        await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder)),
-        { key: "notice.created_nested" },
-      );
+      show(await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder), language), {
+        key: "notice.created_nested",
+      });
     } catch (e) {
       setError(errorNote(e));
     }

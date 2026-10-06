@@ -38,3 +38,23 @@ When FlipHopper creates a seabag in a folder that has **no visible files or fold
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the owner's request. Not started: one card per session; it follows A00-17.
+- 2026-10-06 — Worked in the owner-approved card run (`claude/a01-run`).
+
+## Result (2026-10-06)
+
+**In plain words.** A folder now counts as empty when it holds nothing or only hidden entries (`.DS_Store`, `.git`, `.fliphopper`), so such a folder gets its seabag straight away instead of a question. When the app creates a seabag in a folder like that, it also writes `README-fliphopper.md` there, in the language the app is showing, and the "created" notice mentions it. A folder with any visible file gets no README, and an existing README is never overwritten. A README that cannot be written does not undo the seabag.
+
+- **Where:** `looks_empty`, `add_readme_if_empty`, `readme_text` and `picked_folder` in `crates/store`; `create_seabag` takes the interface language and returns `readme_added`; one new text, `notice.created_here_readme`, in three languages; the rule in [FILE-FORMAT.md](../product/FILE-FORMAT.md#where-the-seabag-is).
+- **Decisive unknown answered by the default:** a folder holding only `.git` (a fresh repository) gets the README straight away.
+- **Choice made in the code:** the README is written only by the app, not by `fh init` (the card's files did not include the command).
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (store: 14 tests, 4 new) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (72 texts, 33 codes) | PASS |
+| Built app, started on an empty folder | PASS: `.fliphopper/` and `README-fliphopper.md` (Japanese, the system language) |
+| Built app, folder with only `.DS_Store` | PASS: the same, without asking |
+| Built app, folder with `main.rs` | PASS: asks first as before; no README |
+| The notice's wording on screen | not seen by the agent (no screen access) — owner check |
+
+**Owner check:** in the app, choose a new empty folder. Expected: the seabag opens, the notice mentions `README-fliphopper.md`, and Finder shows that file in the app's language. Choose a code repository: no README.

@@ -63,4 +63,6 @@ export interface FolderInfo {
 export interface Opened {
   root: string;
   loaded: Loaded;
+  /** README-fliphopper.md was just written next to .fliphopper/ (only when creating). */
+  readme_added: boolean;
 }
