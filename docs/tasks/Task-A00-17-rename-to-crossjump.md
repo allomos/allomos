@@ -66,3 +66,23 @@ The owner wants to rename the product from **Glidebox** to **CrossJump**. The na
 
 - 2026-10-06 — Card written by the agent for the owner's review.
 - 2026-10-06 — Owner answered and approved; "seabag" chosen for the data (over belongings, bindle, kitbag, dunnage).
+- 2026-10-06 — Claimed; step 1 (name check) done, waiting for the owner to confirm the name. Findings below.
+
+## Name check (2026-10-06, agent)
+
+**In plain words:** the name is free where it matters most for us: no software package, no developer tool, and no registered trademark turned up. "CrossJump" is used by a few **game makers**, so app-store and web searches for the word will show games next to ours. "CrossJumper" turned up nothing at all.
+
+| Where | CrossJump | CrossJumper |
+|---|---|---|
+| crates.io (Rust packages) | free (`crossjump`, `crossjump-core`) | free |
+| npm (JavaScript packages) | free | free |
+| GitHub account name | taken: user `Crossjump`, created 2024, 1 empty-looking repository, inactive since 2024-08. Only matters if we want `github.com/crossjump`; the repository would be `mypals-ml/crossjump`. | free |
+| `.io` domain (matches app ID `io.crossjump`) | **`crossjump.io` not registered** | `crossjumper.io` not registered |
+| `.com` domain | `crossjump.com` registered since 2006, parked for sale at HugeDomains | `crossjumper.com` not registered |
+| Products and companies | **CrossJump Studio**, a mobile-game studio in Lahore founded 2022, with games on the App Store and Google Play and the site `crossjump.studio`; **CrossJump Games**, a Roblox group (about 124,000 members); **Crossjump**, a small horror game on itch.io. All games; none is a productivity or developer tool. | nothing found |
+| Registered trademarks (web search of USPTO / Justia listings) | none found | none found |
+| Other meaning | "cross-jumping", a compiler optimization (GCC `-fcrossjumping`) | — |
+
+**Limits of this check:** this is a web and registry search, not a legal trademark search. Trademark databases were only reached through search engines, and only US results were available. Before selling under the name, a proper search in the owner's markets (Japan, China, US) is advised.
+
+Sources: [CrossJump Studio on the App Store](https://apps.apple.com/lr/developer/crossjump-studio/id1681824296), [on Google Play](https://play.google.com/store/apps/developer?id=CROSSJUMP+STUDIO&hl=en&gl=US), [crossjump.studio](https://crossjump.studio/), [LinkedIn](https://pk.linkedin.com/company/cross-jump), [CrossJump Games on Roblox](https://www.roblox.com/communities/51713578/CrossJump-Games#!/about), [Crossjump on itch.io](https://jackthecatgaming.itch.io/crossjump); crates.io, npm and GitHub APIs, `whois` and `dig` run by the agent.
