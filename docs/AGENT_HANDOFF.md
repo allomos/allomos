@@ -36,14 +36,6 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
-### Task-A00-17 — claude/a00-17-rename
-- Checkout: worktree `.claude/worktrees/a00-17`, branch `claude/a00-17-rename` · pushed: yes. Not merged into `main` yet.
-- Approvals in force: the card and its external operations, for the name FlipHopper (includes updating the published pitch decks).
-- Done: steps 1–4 and 6; step 5 sources. Step 4: code, seabag, texts in three languages, documents, decision 0013; all six card checks, links and `git diff --check` PASS (evidence on the card).
-- Uncommitted: none · Running: none
-- Next: step 5 is blocked — deck sources renamed and committed, but `Artifact read` finds neither published address (wrong account?). Owner chooses: republish from the owning account, or approve new addresses (then update `docs/pitch/README.md`). Step 6 passed (owner, 2026-10-06). Then merge into `main`. The owner's README idea is card A01-05, not this one.
-- Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-17. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Continue with step 5 (pitch decks)."
-
 ## Live state
 
 Checked 2026-10-06.
@@ -52,7 +44,7 @@ Checked 2026-10-06.
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/fliphopper` (was `…/glidebox` until 2026-10-06), branch `main` | Holds the merged app code (A01-01, A01-02); no dependencies installed and nothing built here (build in a card's worktree) |
 | Git remote | `origin` = `https://github.com/mypals-ml/fliphopper.git` (repository renamed from `glidebox` 2026-10-06, A00-17; GitHub redirects the old address) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
-| Worktrees | none besides the main checkout (`a01-01` and `a01-02` removed after merging, 2026-10-06; their branches remain on GitHub) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
+| Worktrees | none besides the main checkout (`a01-01`, `a01-02` and `a00-17` removed after merging, 2026-10-06; their branches remain on GitHub) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls

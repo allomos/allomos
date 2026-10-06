@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
+**No card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
 
 **Where the product stands.**
 - The owner has decided to **build FlipHopper ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -22,7 +22,9 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - The next approved Iteration 1 card is ready to claim (owner, 2026-10-06):
   - The **`fliphopper` / `fh` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). `fh` and the running app take turns writing a seabag with a short lock for each change (owner, 2026-10-06).
-- **Rename to FlipHopper** is under way: a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data becomes a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md)). It runs before A01-03, so the command is built once as `fliphopper` / `fh`.
+- **Renamed to FlipHopper** (done 2026-10-06): a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data is a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md), [0013](./decisions/0013-product-name-fliphopper.md)).
+- **New main message**, waiting on the owner: FlipHopper keeps a project going across AI agents and agent accounts; other features in two more sets, AI skills and progress management ([`Task-A00-18`](./tasks/Task-A00-18-positioning-and-deck.md)).
+- Ready: when FlipHopper fills a folder that looks empty, it adds `README-fliphopper.md` ([`Task-A01-05`](./tasks/Task-A01-05-readme-in-new-folder.md)).
 - A small fix, waiting for the owner's review: starting FlipHopper with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
@@ -32,7 +34,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a00-17-rename` (worktree `.claude/worktrees/a00-17`) | [`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md) | 2026-10-06 | step 5 pitch decks |
 
 ## Waiting on the owner
 
@@ -64,7 +65,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
 | [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it (recommended after A00-17, the rename) |
-| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | owner: the published decks are not visible to this session's account; republish them, or approve new addresses (step 5). The built app passed the owner's check (step 6). |
+| [`Task-A00-18-positioning-and-deck`](./tasks/Task-A00-18-positioning-and-deck.md) | waiting | drafted | — | owner answers the card's questions and reviews the three sets |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
@@ -76,6 +77,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | Label | When |
 |---|---|---|
+| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | **owner verified — Done**: the product is FlipHopper; the app makes a seabag in `.fliphopper/seabag/` and says so in three languages; decks republished at new addresses | 2026-10-06 |
 | [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | **owner verified — Done**: the app speaks English, Simplified Chinese and Japanese, follows the computer's language, and keeps a chosen one | 2026-10-06 |
 | [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox` (renamed `mypals-ml/fliphopper` 2026-10-06), pushed by the owner | 2026-10-04 |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | **owner verified — Done**: the macOS app opens a task box and shows its tasks by area | 2026-10-06 |

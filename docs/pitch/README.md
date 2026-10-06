@@ -1,11 +1,11 @@
 # Road show deck / 路演幻灯片
 
-A nine-slide pitch deck for FlipHopper, in English and Simplified Chinese. It covers four messages: manage your project while vibe coding; work anytime; teammates cooperate; the local app is free, and people pay only for the cloud. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)).
+A nine-slide pitch deck for FlipHopper, in English and Simplified Chinese. It covers four messages: manage your project while vibe coding; work anytime; teammates cooperate; the local app is free, and people pay only for the cloud. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)); renamed to FlipHopper and published at new addresses 2026-10-06 ([`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md)), because the first addresses were not reachable from the publishing session's account. A new main message is planned in [`Task-A00-18`](../tasks/Task-A00-18-positioning-and-deck.md).
 
 | Version | Published address (private claude.ai Artifact) | Source in this repo |
 |---|---|---|
-| English | https://claude.ai/artifact/7vW8C5xNAqJGW9sLf26hAW | [roadshow-en.html](./roadshow-en.html) |
-| 中文 | https://claude.ai/artifact/XWsYFzucFMs2vQqNtixwV8 | [roadshow-zh.html](./roadshow-zh.html) |
+| English | https://claude.ai/artifact/MGmzN64hzvRqWAMmvt1qyU | [roadshow-en.html](./roadshow-en.html) |
+| 中文 | https://claude.ai/artifact/XVe1UxXRUVt7WytcDgcABU | [roadshow-zh.html](./roadshow-zh.html) |
 
 ## Using it
 
