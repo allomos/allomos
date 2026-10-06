@@ -1,7 +1,9 @@
 {
   "area": "A01",
-  "holder": "claude/a01-run",
+  "handoff_note": "All checks pass; this repository's next dependencies now use fh needs.",
   "id": "A01-08",
-  "state": "in_progress",
-  "title": "fh fills the gaps found in the move"
+  "label": "locally verified",
+  "state": "waiting",
+  "title": "fh fills the gaps found in the move",
+  "waiting_on": "owner reviews the new fh commands (card Result)"
 }

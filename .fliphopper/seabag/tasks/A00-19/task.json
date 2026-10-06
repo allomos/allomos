@@ -1,6 +1,7 @@
 {
   "area": "A00",
   "id": "A00-19",
+  "next_dependency": "a session claims it; the republish needs the owner's approval",
   "state": "ready",
   "title": "Decks new mark"
 }

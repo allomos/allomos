@@ -1,6 +1,7 @@
 {
   "area": "A04",
   "id": "A04-01",
+  "next_dependency": "owner card review",
   "state": "backlog",
   "title": "Remote access research"
 }
