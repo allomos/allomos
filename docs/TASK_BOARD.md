@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; thirteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
+**One card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
 
 **Where the product stands.**
 - The owner has decided to **build FlipHopper ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
