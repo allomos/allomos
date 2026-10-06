@@ -37,7 +37,9 @@ Today FlipHopper's own work is tracked by hand in [TASK_BOARD.md](../TASK_BOARD.
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-06 | Write a card for moving FlipHopper's own cards into a seabag | owner (chat) |
+| 2026-10-06 | Card reviewed; all four recommended answers accepted (one combined label ladder with `owner accepted` → `owner verified`; TASK_BOARD.md keeps only Now and Waiting on the owner *for now*; holder = session branch name; finished cards move in as `done` *for now*) | owner (chat) |
 
 ## Notes
 
 - 2026-10-06 — Card written by the agent for the owner's review. The v0.1 exit check also asks for a real Claude Code session to claim and finish a task with `fh` while the app shows it; the first card worked after this move does that naturally.
+- 2026-10-06 — **Owner answered the four unknowns: the recommendations, as listed under Approvals.** On the board, the owner added: *in the end TASK_BOARD.md should be gone, or generated from FlipHopper every time*. So the trimmed board is a stopgap; a later card (likely with the Markdown export, Iteration 12, or earlier if Now and owner questions get a seabag home) removes or generates it. Card is ready.

@@ -8,6 +8,7 @@ FlipHopper can be started with a folder to open, for example `fliphopper ~/my-pr
 
 | Piece | What it is | Where |
 |---|---|---|
+| 2026-10-06 | Card reviewed; go ahead | owner (chat) |
 | Finding the folder | Take the first argument that is not an option (does not start with `-`), and skip the value that follows a macOS option such as `-AppleLanguages (ja)` or `-NSDocumentRevisionsDebugMode YES`. `FLIPHOPPER_OPEN` still wins over arguments. | `apps/desktop/src-tauri/src/lib.rs` (`startup_folder`) |
 | Saying when the folder is wrong | When a folder was given but does not exist or is not a folder, the window says so (naming the path) instead of silently opening the last folder. The text goes into all three language files, following the [interface-language rules](../workflow/CODING_RULES.md#interface-languages). | `startup_folder`, `crates/core/src/problem.rs` (one new code), `apps/web/src/App.tsx`, `apps/web/src/i18n/*` |
 | Tests | Small Rust tests of the argument rule with made-up argument lists. | `apps/desktop/src-tauri` |

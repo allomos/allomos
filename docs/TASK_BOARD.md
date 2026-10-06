@@ -28,8 +28,8 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - **New main message** ([0014](./decisions/0014-main-purpose-and-three-sets.md)): switch between AI agents and teammates and keep the project; AI skills and progress management are the two other sets. Owner accepted the rewritten decks (done 2026-10-06) ([`Task-A00-18`](./tasks/Task-A00-18-positioning-and-deck.md)).
 - Ready: the road show decks get the app's new mark ([`Task-A00-19`](./tasks/Task-A00-19-decks-new-mark.md)).
 - Ready: when FlipHopper fills a folder that looks empty, it adds `README-fliphopper.md` ([`Task-A01-05`](./tasks/Task-A01-05-readme-in-new-folder.md)).
-- Waiting for the owner's review: FlipHopper's own cards move into this repository's seabag, and agents use `fh` instead of this board, the last piece of the v0.1 exit check ([`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md)).
-- A small fix, waiting for the owner's review: starting FlipHopper with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
+- Ready: FlipHopper's own cards move into this repository's seabag, and agents use `fh` instead of this board, the last piece of the v0.1 exit check ([`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md)).
+- Ready, a small fix: starting FlipHopper with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
 ## Sessions
@@ -66,8 +66,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
 | [`Task-A00-19-decks-new-mark`](./tasks/Task-A00-19-decks-new-mark.md) | ready | — | — | a session claims it; the republish needs the owner's approval |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
-| [`Task-A01-07-own-cards-in-seabag`](./tasks/Task-A01-07-own-cards-in-seabag.md) | waiting | drafted | — | owner reviews the card and its four unknowns |
-| [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
+| [`Task-A01-07-own-cards-in-seabag`](./tasks/Task-A01-07-own-cards-in-seabag.md) | ready | — | — | a session claims it (best when no other card is claimed, since it moves the board) |
+| [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | ready | — | — | a session claims it |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |
