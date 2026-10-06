@@ -4,6 +4,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::model::{Area, FORMAT, Project, State, Task, TaskBox};
+use crate::problem::Problem;
 
 /// One problem found in a task box, tied to the file (and field, when known) that caused it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -11,16 +12,16 @@ pub struct Issue {
     /// Path of the file, relative to the task box root.
     pub file: String,
     pub field: Option<String>,
-    /// Plain-language explanation of what is wrong and how to fix it.
-    pub message: String,
+    /// What is wrong, as a code the interface words in the chosen language.
+    pub problem: Problem,
 }
 
 impl Issue {
-    fn new(file: &str, field: Option<&str>, message: impl Into<String>) -> Self {
+    pub fn new(file: &str, field: Option<&str>, problem: Problem) -> Self {
         Issue {
             file: file.to_string(),
             field: field.map(String::from),
-            message: message.into(),
+            problem,
         }
     }
 }
@@ -53,14 +54,14 @@ fn parse<T: DeserializeOwned>(file: &str, text: &str) -> Result<T, Issue> {
             if let Some(value) = map.get(*field) {
                 let ok = value.as_str().is_some_and(|v| allowed.contains(&v));
                 if !ok {
-                    return Err(Issue {
-                        file: file.to_string(),
-                        field: Some((*field).to_string()),
-                        message: format!(
-                            "{value} is not a valid {field}. Use one of: {}.",
-                            allowed.join(", ")
-                        ),
-                    });
+                    return Err(Issue::new(
+                        file,
+                        Some(field),
+                        Problem::InvalidChoice {
+                            value: value.to_string(),
+                            allowed: allowed.join(", "),
+                        },
+                    ));
                 }
             }
         }
@@ -69,13 +70,15 @@ fn parse<T: DeserializeOwned>(file: &str, text: &str) -> Result<T, Issue> {
         let msg = e.to_string();
         // Only "missing field `x`" and "unknown field `x`" name a field; other messages
         // (for example a wrong value type) do not, so no field is guessed for them.
-        let field = (msg.starts_with("missing field") || msg.starts_with("unknown field"))
-            .then(|| msg.split('`').nth(1).map(String::from))
-            .flatten();
-        Issue {
-            file: file.to_string(),
-            field,
-            message: format!("This file could not be read as JSON for glidebox: {msg}."),
+        let named = msg.split('`').nth(1);
+        match (
+            msg.starts_with("missing field"),
+            msg.starts_with("unknown field"),
+            named,
+        ) {
+            (true, _, Some(f)) => Issue::new(file, Some(f), Problem::FieldMissing),
+            (_, true, Some(f)) => Issue::new(file, Some(f), Problem::FieldUnknown),
+            _ => Issue::new(file, None, Problem::NotJson { detail: msg }),
         }
     })
 }
@@ -90,7 +93,7 @@ fn check_id(file: &str, field: &str, id: &str, issues: &mut Vec<Issue>) {
         issues.push(Issue::new(
             file,
             Some(field),
-            format!("\"{id}\" is not a valid ID. Use 1–64 letters, digits, '-' or '_'."),
+            Problem::InvalidId { id: id.to_string() },
         ));
     }
 }
@@ -102,19 +105,18 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
         issues.push(Issue::new(
             file,
             Some("format"),
-            format!("Expected \"{FORMAT}\" but found \"{}\". This version of glidebox reads only \"{FORMAT}\".", project.format),
+            Problem::WrongFormat {
+                expected: FORMAT.to_string(),
+                found: project.format.clone(),
+            },
         ));
     }
     check_id(file, "id", &project.id, &mut issues);
     if project.name.trim().is_empty() {
-        issues.push(Issue::new(file, Some("name"), "The project needs a name."));
+        issues.push(Issue::new(file, Some("name"), Problem::ProjectNameMissing));
     }
     if project.labels.is_empty() {
-        issues.push(Issue::new(
-            file,
-            Some("labels"),
-            "The label ladder needs at least one step.",
-        ));
+        issues.push(Issue::new(file, Some("labels"), Problem::LadderEmpty));
     }
     if issues.is_empty() {
         Ok(project)
@@ -128,7 +130,7 @@ pub fn parse_area(file: &str, text: &str) -> Result<Area, Vec<Issue>> {
     let mut issues = Vec::new();
     check_id(file, "id", &area.id, &mut issues);
     if area.name.trim().is_empty() {
-        issues.push(Issue::new(file, Some("name"), "The area needs a name."));
+        issues.push(Issue::new(file, Some("name"), Problem::AreaNameMissing));
     }
     if issues.is_empty() {
         Ok(area)
@@ -142,7 +144,7 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
     let mut issues = Vec::new();
     check_id(file, "id", &task.id, &mut issues);
     if task.title.trim().is_empty() {
-        issues.push(Issue::new(file, Some("title"), "The task needs a title."));
+        issues.push(Issue::new(file, Some("title"), Problem::TaskTitleMissing));
     }
     if issues.is_empty() {
         Ok(task)
@@ -165,7 +167,9 @@ pub fn validate_task_box(
             issues.push(Issue::new(
                 file,
                 Some("id"),
-                format!("Another area already uses the ID \"{}\".", area.id),
+                Problem::DuplicateAreaId {
+                    id: area.id.clone(),
+                },
             ));
         }
     }
@@ -175,17 +179,18 @@ pub fn validate_task_box(
             issues.push(Issue::new(
                 file,
                 Some("id"),
-                format!("Another task already uses the ID \"{}\".", task.id),
+                Problem::DuplicateTaskId {
+                    id: task.id.clone(),
+                },
             ));
         }
         if !area_ids.contains(task.area.as_str()) {
             issues.push(Issue::new(
                 file,
                 Some("area"),
-                format!(
-                    "The area \"{}\" does not exist. Add areas/{}.json or use an existing area ID.",
-                    task.area, task.area
-                ),
+                Problem::UnknownArea {
+                    area: task.area.clone(),
+                },
             ));
         }
         if let Some(label) = &task.label {
@@ -193,10 +198,10 @@ pub fn validate_task_box(
                 issues.push(Issue::new(
                     file,
                     Some("label"),
-                    format!(
-                        "\"{label}\" is not a step of this project's ladder ({}).",
-                        project.labels.join(" → ")
-                    ),
+                    Problem::LabelNotOnLadder {
+                        label: label.clone(),
+                        ladder: project.labels.join(" → "),
+                    },
                 ));
             }
         }
@@ -209,7 +214,7 @@ pub fn validate_task_box(
             issues.push(Issue::new(
                 file,
                 Some("waiting_on"),
-                "A waiting task must say what it is waiting on.",
+                Problem::WaitingOnMissing,
             ));
         }
     }
@@ -250,6 +255,7 @@ mod tests {
         .unwrap_err();
         assert_eq!(err[0].file, "tasks/T1/task.json");
         assert_eq!(err[0].field.as_deref(), Some("title"));
+        assert_eq!(err[0].problem, Problem::FieldMissing);
     }
 
     #[test]
@@ -260,14 +266,25 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("state"));
-        assert!(err[0].message.contains("\"finished\" is not a valid state"));
-        assert!(err[0].message.contains("in_progress"));
+        let Problem::InvalidChoice { value, allowed } = &err[0].problem else {
+            panic!("expected invalid_choice, got {:?}", err[0].problem)
+        };
+        assert_eq!(value, "\"finished\"");
+        assert!(allowed.contains("in_progress"));
     }
 
     #[test]
     fn wrong_type_does_not_guess_a_field() {
         let err = parse_area("a.json", r#"{"id":"A1","name":"X","order":"first"}"#).unwrap_err();
         assert_eq!(err[0].field, None);
+        assert_eq!(err[0].problem.code(), "not_json");
+    }
+
+    #[test]
+    fn unknown_field_names_the_field() {
+        let err = parse_area("a.json", r#"{"id":"A1","name":"X","colour":"red"}"#).unwrap_err();
+        assert_eq!(err[0].field.as_deref(), Some("colour"));
+        assert_eq!(err[0].problem, Problem::FieldUnknown);
     }
 
     #[test]

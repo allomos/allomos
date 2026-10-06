@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use glidebox_core::Loaded;
+use glidebox_core::{Loaded, Problem};
 use glidebox_store::{Inspection, create_starter, git_root, inspect, load};
 use serde::Serialize;
 
@@ -53,12 +53,30 @@ fn open_task_box(root: PathBuf) -> Opened {
 
 /// Create a starter project at `root` (an empty folder, or a new `.glidebox/`), then load it.
 #[tauri::command]
-fn create_task_box(root: PathBuf, name: String) -> Result<Opened, String> {
-    create_starter(&root, &name).map_err(|e| format!("Could not create the task box: {e}"))?;
+fn create_task_box(root: PathBuf, name: String) -> Result<Opened, Problem> {
+    create_starter(&root, &name).map_err(|e| {
+        let path = root.display().to_string();
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            Problem::FolderNotEmpty { path }
+        } else {
+            Problem::CreateFailed {
+                path,
+                detail: e.to_string(),
+            }
+        }
+    })?;
     Ok(Opened {
         loaded: load(&root),
         root,
     })
+}
+
+/// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).
+/// Read from the operating system: inside the macOS app window, `navigator.language` is
+/// not a reliable guide to the system's language.
+#[tauri::command]
+fn system_languages() -> Vec<String> {
+    sys_locale::get_locales().collect()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -69,7 +87,8 @@ pub fn run() {
             startup_folder,
             inspect_folder,
             open_task_box,
-            create_task_box
+            create_task_box,
+            system_languages
         ])
         .run(tauri::generate_context!())
         .expect("error while running glidebox");

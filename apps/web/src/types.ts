@@ -27,10 +27,20 @@ export interface Task {
   description: string;
 }
 
+/** A problem from Rust: a code the interface words in the chosen language (see i18n/codes.json). */
+export interface Problem {
+  code: string;
+  params?: Record<string, string>;
+}
+
+export function isProblem(v: unknown): v is Problem {
+  return typeof v === "object" && v !== null && typeof (v as Problem).code === "string";
+}
+
 export interface Issue {
   file: string;
   field: string | null;
-  message: string;
+  problem: Problem;
 }
 
 export interface Loaded {

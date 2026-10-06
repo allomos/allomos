@@ -10,8 +10,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use glidebox_core::{
-    Area, FORMAT, Issue, Loaded, Project, Task, TaskBox, parse_area, parse_project, parse_task,
-    validate_task_box,
+    Area, FORMAT, Issue, Loaded, Problem, Project, Task, TaskBox, parse_area, parse_project,
+    parse_task, validate_task_box,
 };
 use serde::Serialize;
 
@@ -86,11 +86,13 @@ fn read(root: &Path, path: &Path, issues: &mut Vec<Issue>) -> Option<String> {
     match fs::read_to_string(path) {
         Ok(text) => Some(text),
         Err(e) => {
-            issues.push(Issue {
-                file: rel(root, path),
-                field: None,
-                message: format!("Could not read this file: {e}."),
-            });
+            issues.push(Issue::new(
+                &rel(root, path),
+                None,
+                Problem::ReadFailed {
+                    detail: e.to_string(),
+                },
+            ));
             None
         }
     }
@@ -149,11 +151,7 @@ pub fn load(root: &Path) -> Loaded {
         let path = dir.join("task.json");
         let file = rel(root, &path);
         if !path.is_file() {
-            issues.push(Issue {
-                file,
-                field: None,
-                message: "This task folder has no task.json.".into(),
-            });
+            issues.push(Issue::new(&file, None, Problem::TaskFileMissing));
             continue;
         }
         if let Some(text) = read(root, &path, &mut issues) {

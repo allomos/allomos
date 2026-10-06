@@ -1,0 +1,47 @@
+{
+  "area_name_missing": [],
+  "create_failed": [
+    "path",
+    "detail"
+  ],
+  "duplicate_area_id": [
+    "id"
+  ],
+  "duplicate_task_id": [
+    "id"
+  ],
+  "field_missing": [],
+  "field_unknown": [],
+  "folder_not_empty": [
+    "path"
+  ],
+  "invalid_choice": [
+    "value",
+    "allowed"
+  ],
+  "invalid_id": [
+    "id"
+  ],
+  "label_not_on_ladder": [
+    "label",
+    "ladder"
+  ],
+  "ladder_empty": [],
+  "not_json": [
+    "detail"
+  ],
+  "project_name_missing": [],
+  "read_failed": [
+    "detail"
+  ],
+  "task_file_missing": [],
+  "task_title_missing": [],
+  "unknown_area": [
+    "area"
+  ],
+  "waiting_on_missing": [],
+  "wrong_format": [
+    "expected",
+    "found"
+  ]
+}

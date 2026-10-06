@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
+import type { Language, Message } from "./i18n";
 import type { Messenger } from "./messenger";
-import type { Area, Issue, Opened, State, Task } from "./types";
-
-const STATE_TEXT: Record<State, string> = {
-  backlog: "Backlog",
-  ready: "Ready",
-  in_progress: "In progress",
-  waiting: "Waiting",
-  done: "Done",
-  dropped: "Dropped",
-};
+import { isProblem } from "./types";
+import type { Area, Issue, Opened, Problem, Task } from "./types";
 
 const LAST_ROOT_KEY = "glidebox.lastRoot";
 
@@ -21,13 +15,22 @@ function folderName(path: string): string {
 
 type Pending = { folder: string; suggestedRoot: string; gitRoot: string | null };
 
+/** A banner's text: an interface message, or a problem sent by Rust. */
+type Note = Message | { problem: Problem };
+
+function errorNote(e: unknown): Note {
+  return isProblem(e) ? { problem: e } : { key: "error.unexpected", params: { detail: String(e) } };
+}
+
 export function App({ messenger }: { messenger: Messenger }) {
+  const { t, rich, problem } = useI18n();
   const [opened, setOpened] = useState<Opened | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Note | null>(null);
+  const [error, setError] = useState<Note | null>(null);
+  const noteText = (n: Note) => ("problem" in n ? problem(n.problem) : t(n.key, n.params));
 
-  const show = useCallback((o: Opened, message: string | null) => {
+  const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
     setPending(null);
     setNotice(message);
@@ -48,14 +51,14 @@ export function App({ messenger }: { messenger: Messenger }) {
         if (i.kind === "found") {
           show(await messenger.openTaskBox(i.root), null);
         } else if (i.kind === "empty") {
-          show(await messenger.createTaskBox(i.folder, folderName(i.folder)), "Created a starter project in this empty folder.");
+          show(await messenger.createTaskBox(i.folder, folderName(i.folder)), { key: "notice.created_here" });
         } else if (i.kind === "no_task_box") {
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
         } else {
-          setError(`${i.path} is not a folder.`);
+          setError({ key: "error.not_a_folder", params: { path: i.path } });
         }
       } catch (e) {
-        setError(String(e));
+        setError(errorNote(e));
       }
     },
     [messenger, show],
@@ -77,7 +80,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   }, [messenger, openFolder]);
 
   const choose = async () => {
-    const path = await messenger.pickFolder();
+    const path = await messenger.pickFolder(t("picker.title"));
     if (path) await openFolder(path);
   };
 
@@ -86,10 +89,10 @@ export function App({ messenger }: { messenger: Messenger }) {
     try {
       show(
         await messenger.createTaskBox(pending.suggestedRoot, folderName(pending.folder)),
-        "Created a task box in .glidebox/ with a starter project.",
+        { key: "notice.created_nested" },
       );
     } catch (e) {
-      setError(String(e));
+      setError(errorNote(e));
     }
   };
 
@@ -109,33 +112,27 @@ export function App({ messenger }: { messenger: Messenger }) {
             <code title={opened.root}>{opened.root}</code>
           </div>
         )}
+        <LanguagePicker />
         <button type="button" className="primary" onClick={choose}>
-          {opened ? "Open another folder…" : "Choose a folder…"}
+          {opened ? t("top.open_another") : t("top.choose_folder")}
         </button>
       </header>
 
       <main className="main">
-        {error && <p className="banner error">{error}</p>}
-        {notice && <p className="banner ok">{notice}</p>}
+        {error && <p className="banner error">{noteText(error)}</p>}
+        {notice && <p className="banner ok">{noteText(notice)}</p>}
 
         {pending && (
           <section className="card">
-            <h2>No task box in this folder yet</h2>
-            <p>
-              <code>{pending.folder}</code> has other files but no glidebox task box.
-            </p>
-            {pending.gitRoot && (
-              <p className="muted">
-                It is inside the Git repository <code>{pending.gitRoot}</code>. Your task files will be versioned by that
-                repository; glidebox does not create a second one and does not run Git.
-              </p>
-            )}
+            <h2>{t("pending.title")}</h2>
+            <p>{rich("pending.body", { folder: <code>{pending.folder}</code> })}</p>
+            {pending.gitRoot && <p className="muted">{rich("pending.git", { repo: <code>{pending.gitRoot}</code> })}</p>}
             <div className="row">
               <button type="button" className="primary" onClick={createNested}>
-                Create task box in .glidebox/
+                {t("pending.create")}
               </button>
               <button type="button" onClick={() => setPending(null)}>
-                Cancel
+                {t("pending.cancel")}
               </button>
             </div>
           </section>
@@ -149,23 +146,42 @@ export function App({ messenger }: { messenger: Messenger }) {
   );
 }
 
+function LanguagePicker() {
+  const { t, choice, setChoice } = useI18n();
+  return (
+    <label className="language">
+      <span className="visually-hidden">{t("language.label")}</span>
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="7.5" />
+        <path d="M2.5 10h15M10 2.5c2.2 2.3 2.2 12.7 0 15M10 2.5c-2.2 2.3-2.2 12.7 0 15" />
+      </svg>
+      <select value={choice ?? ""} onChange={(e) => setChoice((e.target.value || null) as Language | null)}>
+        <option value="">{t("language.system")}</option>
+        {LANGUAGES.map((l) => (
+          <option key={l} value={l} lang={l}>
+            {LANGUAGE_NAMES[l]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Welcome({ onChoose }: { onChoose: () => void }) {
+  const { t, rich } = useI18n();
   return (
     <section className="welcome">
-      <h1>Your project's tasks, in a folder you choose.</h1>
-      <p>
-        Pick a folder. If it already holds a task box, glidebox shows its tasks grouped by area. If the folder is empty,
-        glidebox creates a small starter project in it. In a folder with other files, such as a code repository,
-        glidebox offers to create the task box in <code>.glidebox/</code>.
-      </p>
+      <h1>{t("welcome.title")}</h1>
+      <p>{rich("welcome.body", { dir: <code>.glidebox/</code> })}</p>
       <button type="button" className="primary" onClick={onChoose}>
-        Choose a folder…
+        {t("top.choose_folder")}
       </button>
     </section>
   );
 }
 
 function TaskBoxView({ opened }: { opened: Opened }) {
+  const { t } = useI18n();
   const { task_box: box, issues } = opened.loaded;
   return (
     <>
@@ -177,38 +193,32 @@ function TaskBoxView({ opened }: { opened: Opened }) {
           ))}
           {box.tasks.some((t) => !box.areas.find((a) => a.id === t.area)) && (
             <AreaSection
-              area={{ id: "?", name: "Tasks with an unknown area", order: 9999 }}
+              area={{ id: "?", name: t("box.unknown_area"), order: 9999 }}
               tasks={box.tasks.filter((t) => !box.areas.find((a) => a.id === t.area))}
             />
           )}
           {box.areas.length === 0 && box.tasks.length === 0 && (
-            <p className="muted">This task box has no areas or tasks yet.</p>
+            <p className="muted">{t("box.empty")}</p>
           )}
         </div>
       ) : (
-        <p className="muted">The project file could not be read, so no tasks are shown. Fix the problem above.</p>
+        <p className="muted">{t("box.no_project")}</p>
       )}
     </>
   );
 }
 
 function Issues({ issues }: { issues: Issue[] }) {
+  const { t, rich, problem } = useI18n();
   return (
-    <section className="issues" aria-label="Problems in this task box">
-      <h2>
-        {issues.length} {issues.length === 1 ? "problem" : "problems"} in this task box
-      </h2>
+    <section className="issues" aria-label={t("issues.label")}>
+      <h2>{issues.length === 1 ? t("issues.title_one") : t("issues.title_other", { count: issues.length })}</h2>
       <ul>
         {issues.map((i, n) => (
           <li key={n}>
             <code>{i.file}</code>
-            {i.field && (
-              <>
-                {" "}
-                · field <code>{i.field}</code>
-              </>
-            )}
-            <span>{i.message}</span>
+            {i.field && <> · {rich("issues.field", { field: <code>{i.field}</code> })}</>}
+            <span>{problem(i.problem)}</span>
           </li>
         ))}
       </ul>
@@ -217,6 +227,7 @@ function Issues({ issues }: { issues: Issue[] }) {
 }
 
 function AreaSection({ area, tasks }: { area: Area; tasks: Task[] }) {
+  const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   return (
@@ -225,26 +236,24 @@ function AreaSection({ area, tasks }: { area: Area; tasks: Task[] }) {
         <h2>
           <span className="id">{area.id}</span> {area.name}
         </h2>
-        <span className="count">
-          {done} of {tasks.length} done
-        </span>
-        <div className="meter" role="img" aria-label={`${pct}% done`}>
+        <span className="count">{t("area.count", { done, total: tasks.length })}</span>
+        <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
       </header>
       {tasks.length === 0 ? (
-        <p className="muted small">No tasks in this area.</p>
+        <p className="muted small">{t("area.no_tasks")}</p>
       ) : (
         <ul className="tasks">
-          {tasks.map((t) => (
-            <li key={t.id} className="task">
-              <span className="id">{t.id}</span>
-              <span className="title">{t.title}</span>
-              <span className={`state s-${t.state}`}>{STATE_TEXT[t.state]}</span>
+          {tasks.map((task) => (
+            <li key={task.id} className="task">
+              <span className="id">{task.id}</span>
+              <span className="title">{task.title}</span>
+              <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
               <span className="meta">
-                {t.label && <span className="label">{t.label}</span>}
-                {t.holder && <span>held by {t.holder}</span>}
-                {t.waiting_on && <span>waiting on {t.waiting_on}</span>}
+                {task.label && <span className="label">{task.label}</span>}
+                {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
+                {task.waiting_on && <span>{t("task.waiting_on", { what: task.waiting_on })}</span>}
               </span>
             </li>
           ))}

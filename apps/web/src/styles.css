@@ -17,6 +17,10 @@
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
 }
+/* Chinese and Japanese share characters drawn differently; name each language's own fonts. */
+:root:lang(zh-CN) { --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif; }
+:root:lang(ja) { --font: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0b1420;
@@ -58,7 +62,10 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .brand path { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; }
 .where { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.top .primary { margin-left: auto; }
+.top .language { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.language svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+.language select { font: 13px var(--font); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .main { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 
 .banner { margin: 0; padding: 10px 14px; border-radius: 8px; }
