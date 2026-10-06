@@ -17,3 +17,14 @@
 | 2026-10-06 | "find some easy task to do for the next 6 hrs … find them and do them" — the agent picked this card (public documentation only, as written) | owner (chat) |
 
 ## Notes
+- 2026-10-07 — Done in the card run (`claude/a01-run`). Public documentation only; no accounts, installs or emails.
+
+## Result (2026-10-07)
+
+**In plain words.** [remote-access.md](../research/remote-access.md) compares six ways for companions to reach the desktop from outside (Tailscale private network, Tailscale Funnel, Cloudflare Tunnel, Cloudflare Quick Tunnel, ngrok, a FlipHopper-run relay) and four ways to send the pairing email. Recommendation for the owner: the user's own free **Tailscale** account (private network first, Funnel as fallback) as the free path; a **FlipHopper relay** with end-to-end encryption later as a paid option; and **one FlipHopper-run email helper** (Cloudflare Workers calling Resend), because every email service needs a verified domain. 0009's open questions 4 and 5 point to it; they stay the owner's to decide.
+
+| Check | Result |
+|---|---|
+| At least three options, each with cost and free-tier limits, setup, security, fit with R77–R79, sources and date read | PASS: six transport options, four email options; 12 sources read 2026-10-07 (three secondary, marked) |
+| Ends with a recommendation | PASS |
+| `git diff --check`, relative links | PASS |
