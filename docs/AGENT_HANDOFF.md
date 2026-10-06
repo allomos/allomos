@@ -38,13 +38,13 @@ One block per card in the board's Sessions table. None claimed.
 
 ## Live state
 
-Checked 2026-10-04.
+Checked 2026-10-06.
 
 | What | Where | Notes |
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | `origin` = `https://github.com/mypals-ml/glidebox.git` (added by the owner, 2026-10-04) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
-| Worktrees | `.claude/worktrees/a01-01` and `.claude/worktrees/a01-02` (branches `claude/a01-01-walking-skeleton` and `claude/a01-02-ui-languages`, both merged into `main` 2026-10-06; each holds a built `Glidebox.app` under `target/`; safe to remove) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
+| Worktrees | none besides the main checkout (`a01-01` and `a01-02` removed after merging, 2026-10-06; their branches remain on GitHub) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls

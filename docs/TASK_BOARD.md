@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**No card is claimed; twelve cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
+**No card is claimed; thirteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -22,6 +22,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - The next approved Iteration 1 card is ready to claim (owner, 2026-10-06):
   - The **`glidebox` / `gb` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). `gb` and the running app take turns writing a task box with a short lock for each change (owner, 2026-10-06).
+- **Rename to CrossJump**, waiting for the owner's answers: the product's new name says that a person or project can jump between AI agents and be handed between people ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md)). Recommended before A01-03, so the command is built once under its final name.
 - A small fix, waiting for the owner's review: starting glidebox with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
@@ -45,6 +46,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
+| Rename to CrossJump: command short name (`cj`?), data folder and format tag, app ID, which old documents keep the old name, order before A01-03; GitHub repository and local folder rename | [`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md) | the rename; A01-03's command name |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
 
 ## Cards
@@ -61,7 +63,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it |
+| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it (recommended after A00-17, the rename) |
+| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | waiting | drafted | — | owner answers the card's questions |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
