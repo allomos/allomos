@@ -30,9 +30,8 @@ The owner wants to rename the product from **Glidebox** to **CrossJump**. The na
 | 4 | App ID | **`io.crossjump`** (not `com.glidepace.crossjump`). |
 | 5 | Old documents | Current documents change; dated history keeps "glidebox", with a note in the decision record. (Recommendation, accepted with the approval.) |
 | 6 | Order | Before A01-03. (Recommendation, accepted with the approval.) |
-| 7 | Backup name | If the name check finds CrossJump unusable: **CrossJumper**. The owner wrote "crossjumpper"; the spelling is confirmed with the owner at the name check. |
-
-Still to settle at the start (the worker proposes, the owner confirms): when the user picks an **empty** folder for a new seabag, does the folder itself become the seabag (today's behaviour), or does it also get `.crossjump/seabag/` inside it? *Recommended: the same `.crossjump/seabag/` everywhere, so there is one rule to remember.*
+| 7 | Backup name | If the name check finds CrossJump unusable: **CrossJumper** (one p; owner confirmed). |
+| 8 | Where a new seabag goes | **Always `.crossjump/seabag/`**, also when the user picks an empty folder, so agents, `cj` and the app look in one place only. This replaces today's rule that an empty folder becomes the task box itself ([FILE-FORMAT.md](../product/FILE-FORMAT.md) and [0010](../decisions/0010-project-data-folder.md) are updated to match). |
 
 ## Order of work (when the owner says start)
 
@@ -61,7 +60,7 @@ Still to settle at the start (the worker proposes, the owner confirms): when the
 
 | Date | What was approved | By |
 |---|---|---|
-| 2026-10-06 | Card approved with the answers above, including the external operations: rename the GitHub repository and update `origin`, rename the local folder, update the published pitch decks. **Work starts only when the owner says start**, beginning with the name check. | owner (chat) |
+| 2026-10-06 | Card approved with the answers above, including the external operations (answers 7 and 8 confirmed the same day): rename the GitHub repository and update `origin`, rename the local folder, update the published pitch decks. **Work starts only when the owner says start**, beginning with the name check. | owner (chat) |
 
 ## Notes
 
