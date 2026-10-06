@@ -8,6 +8,7 @@
   "language.label": "Language",
   "language.system": "Same as computer",
   "notice.created_here": "Created a seabag with a starter project in .fliphopper/seabag/ inside this empty folder.",
+  "notice.created_here_readme": "Created a seabag with a starter project in .fliphopper/seabag/ inside this empty folder, and README-fliphopper.md to say what the folder is.",
   "notice.created_nested": "Created a seabag with a starter project in .fliphopper/seabag/.",
   "error.not_a_folder": "{path} is not a folder.",
   "error.unexpected": "Something went wrong: {detail}",
