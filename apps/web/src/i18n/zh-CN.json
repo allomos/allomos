@@ -27,6 +27,7 @@
   "area.no_tasks": "此领域中没有任务。",
   "task.held_by": "由 {holder} 负责",
   "task.waiting_on": "等待：{what}",
+  "task.handoff_note": "交接说明：{note}",
   "state.backlog": "待办",
   "state.ready": "就绪",
   "state.in_progress": "进行中",
@@ -51,5 +52,17 @@
   "problem.read_failed": "无法读取此文件：{detail}。",
   "problem.task_file_missing": "此任务文件夹中没有 task.json。",
   "problem.folder_not_empty": "{path} 不是空的，因此没有在那里创建水手袋。",
-  "problem.create_failed": "无法在 {path} 中创建水手袋：{detail}。"
+  "problem.create_failed": "无法在 {path} 中创建水手袋：{detail}。",
+  "problem.seabag_not_found": "在 {path} 及其上级文件夹中没有找到水手袋。请先运行 `fh init`，或用 --seabag <path> 指定。",
+  "problem.seabag_exists": "{path} 中已经有一个水手袋。",
+  "problem.seabag_unreadable": "无法读取 {path} 中的水手袋：{detail}",
+  "problem.seabag_busy": "另一个 FlipHopper 写入者正在修改 {path} 中的水手袋。请稍后再试。",
+  "problem.write_failed": "无法写入 {path}：{detail}。",
+  "problem.task_not_found": "没有任务“{id}”。",
+  "problem.holder_missing": "请用 --as <name> 或环境变量 FLIPHOPPER_HOLDER 说明你是谁。",
+  "problem.task_held": "任务 {id} 由 {holder} 担当。",
+  "problem.task_closed": "任务 {id} 的状态是 {state}，不能这样修改。",
+  "problem.label_below_top": "完成时的标签是“{label}”，低于最高一级“{top}”。",
+  "problem.took_over": "已从 {previous} 接手任务 {id}。",
+  "problem.bad_usage": "{detail}"
 }

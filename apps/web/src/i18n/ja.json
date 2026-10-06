@@ -27,6 +27,7 @@
   "area.no_tasks": "このエリアにはタスクがありません。",
   "task.held_by": "担当：{holder}",
   "task.waiting_on": "待ち：{what}",
+  "task.handoff_note": "引き継ぎメモ：{note}",
   "state.backlog": "バックログ",
   "state.ready": "準備完了",
   "state.in_progress": "進行中",
@@ -51,5 +52,17 @@
   "problem.read_failed": "このファイルを読み込めません：{detail}。",
   "problem.task_file_missing": "このタスクのフォルダーに task.json がありません。",
   "problem.folder_not_empty": "{path} は空ではないため、シーバッグを作成しませんでした。",
-  "problem.create_failed": "{path} にシーバッグを作成できません：{detail}。"
+  "problem.create_failed": "{path} にシーバッグを作成できません：{detail}。",
+  "problem.seabag_not_found": "{path} とその上のフォルダーにシーバッグが見つかりません。先に `fh init` を実行するか、--seabag <path> を指定してください。",
+  "problem.seabag_exists": "{path} にはすでにシーバッグがあります。",
+  "problem.seabag_unreadable": "{path} のシーバッグを読み込めません：{detail}",
+  "problem.seabag_busy": "別の FlipHopper の書き込みが {path} のシーバッグを変更中です。少し待ってからもう一度試してください。",
+  "problem.write_failed": "{path} に書き込めません：{detail}。",
+  "problem.task_not_found": "タスク「{id}」はありません。",
+  "problem.holder_missing": "--as <name> または環境変数 FLIPHOPPER_HOLDER で、あなたが誰かを指定してください。",
+  "problem.task_held": "タスク {id} の担当は {holder} です。",
+  "problem.task_closed": "タスク {id} は {state} のため、この方法では変更できません。",
+  "problem.label_below_top": "ラベル「{label}」のまま完了しました。最上位の段階は「{top}」です。",
+  "problem.took_over": "タスク {id} を {previous} から引き継ぎました。",
+  "problem.bad_usage": "{detail}"
 }

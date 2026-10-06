@@ -6,6 +6,8 @@ import { isProblem } from "./types";
 import type { Area, Issue, Opened, Problem, Task } from "./types";
 
 const LAST_ROOT_KEY = "fliphopper.lastRoot";
+/** How often the window checks whether the seabag's files changed, for example through `fh`. */
+const FOLLOW_MS = 1000;
 
 function folderName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -64,6 +66,33 @@ export function App({ messenger }: { messenger: Messenger }) {
     },
     [messenger, show],
   );
+
+  // Follow changes made outside the window (by `fh` or by hand): reload when the files change.
+  const root = opened?.root;
+  useEffect(() => {
+    if (!root) return;
+    let last: string | null = null;
+    let busy = false;
+    const check = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const now = await messenger.seabagStamp(root);
+        if (last !== null && now !== last) {
+          const fresh = await messenger.openSeabag(root);
+          setOpened((o) => (o?.root === root ? fresh : o));
+        }
+        last = now;
+      } catch {
+        /* the folder may be gone for a moment; try again next time */
+      } finally {
+        busy = false;
+      }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), FOLLOW_MS);
+    return () => window.clearInterval(timer);
+  }, [messenger, root]);
 
   // On start: a folder given on the command line wins; otherwise reopen the last one.
   useEffect(() => {
@@ -255,6 +284,7 @@ function AreaSection({ area, tasks }: { area: Area; tasks: Task[] }) {
                 {task.label && <span className="label">{task.label}</span>}
                 {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
                 {task.waiting_on && <span>{t("task.waiting_on", { what: task.waiting_on })}</span>}
+                {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
               </span>
             </li>
           ))}

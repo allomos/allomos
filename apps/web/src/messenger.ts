@@ -17,6 +17,8 @@ export interface Messenger {
   pickFolder(title: string): Promise<string | null>;
   inspectFolder(path: string): Promise<FolderInfo>;
   openSeabag(root: string): Promise<Opened>;
+  /** A fingerprint of the seabag's files; it changes whenever a file is written. */
+  seabagStamp(root: string): Promise<string>;
   /** Rejects with a Problem (see types.ts) when the seabag cannot be created. */
   createSeabag(root: string, name: string): Promise<Opened>;
 }
@@ -30,5 +32,6 @@ export const desktopMessenger: Messenger = {
   },
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
   openSeabag: (root) => invoke<Opened>("open_seabag", { root }),
+  seabagStamp: (root) => invoke<string>("seabag_stamp", { root }),
   createSeabag: (root, name) => invoke<Opened>("create_seabag", { root, name }),
 };

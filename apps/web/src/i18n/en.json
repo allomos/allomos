@@ -27,6 +27,7 @@
   "area.no_tasks": "No tasks in this area.",
   "task.held_by": "held by {holder}",
   "task.waiting_on": "waiting on {what}",
+  "task.handoff_note": "handoff note: {note}",
   "state.backlog": "Backlog",
   "state.ready": "Ready",
   "state.in_progress": "In progress",
@@ -51,5 +52,17 @@
   "problem.read_failed": "Could not read this file: {detail}.",
   "problem.task_file_missing": "This task folder has no task.json.",
   "problem.folder_not_empty": "{path} is not empty, so no seabag was created there.",
-  "problem.create_failed": "Could not create the seabag in {path}: {detail}."
+  "problem.create_failed": "Could not create the seabag in {path}: {detail}.",
+  "problem.seabag_not_found": "No seabag was found at or above {path}. Run `fh init` first, or pass --seabag <path>.",
+  "problem.seabag_exists": "A seabag already exists at {path}.",
+  "problem.seabag_unreadable": "The seabag at {path} could not be read: {detail}",
+  "problem.seabag_busy": "Another FlipHopper writer is changing the seabag at {path}. Try again in a moment.",
+  "problem.write_failed": "Could not write {path}: {detail}.",
+  "problem.task_not_found": "There is no task \"{id}\".",
+  "problem.holder_missing": "Say who you are with --as <name> or the FLIPHOPPER_HOLDER environment variable.",
+  "problem.task_held": "Task {id} is held by {holder}.",
+  "problem.task_closed": "Task {id} is {state}, so it cannot be changed this way.",
+  "problem.label_below_top": "Finished with the label \"{label}\", below the top step \"{top}\".",
+  "problem.took_over": "Took task {id} over from {previous}.",
+  "problem.bad_usage": "{detail}"
 }

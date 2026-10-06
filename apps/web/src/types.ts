@@ -24,6 +24,7 @@ export interface Task {
   holder: string | null;
   waiting_on: string | null;
   next_dependency: string | null;
+  handoff_note: string | null;
   description: string;
 }
 

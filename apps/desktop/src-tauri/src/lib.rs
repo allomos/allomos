@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use fliphopper_core::{Loaded, Problem};
-use fliphopper_store::{Inspection, create_starter, git_root, inspect, load};
+use fliphopper_store::{Inspection, create_starter, git_root, inspect, load, stamp};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -51,6 +51,14 @@ fn open_seabag(root: PathBuf) -> Opened {
     }
 }
 
+/// A fingerprint of the seabag's files. The window asks for it about once a second and
+/// reloads when it changes, so changes made by `fh` show without reopening the folder.
+/// Sent as text: a 64-bit number does not fit a JavaScript number.
+#[tauri::command]
+fn seabag_stamp(root: PathBuf) -> String {
+    stamp(&root).to_string()
+}
+
 /// Create a starter seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
 #[tauri::command]
 fn create_seabag(root: PathBuf, name: String) -> Result<Opened, Problem> {
@@ -87,6 +95,7 @@ pub fn run() {
             startup_folder,
             inspect_folder,
             open_seabag,
+            seabag_stamp,
             create_seabag,
             system_languages
         ])
