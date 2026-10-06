@@ -68,7 +68,8 @@ One card is worked by exactly one session at a time. The board, not memory or ch
 3. **A card claimed by another session is read-only to you.** If it holds a stale fact, correct only that fact and leave the Session untouched.
 4. **Two claims at once:** the second to land gets a merge conflict on that row — keep whichever landed first and claim a different card.
 5. **Release** a card you stop short of Done: clear its Session to `—`, remove your Sessions row and your handoff block, and set State/Next dependency so the next session knows what it is picking up.
-6. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
+6. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
+7. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
 
 ## Now — rules
 

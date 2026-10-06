@@ -14,3 +14,9 @@ glidebox-core = { path = "crates/core" }
 glidebox-store = { path = "crates/store" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Development builds keep only file and line numbers for crash reports, not full
+# debugger information: smaller target/ folders and faster linking. See
+# docs/workflow/CODING_RULES.md § Build output.
+[profile.dev]
+debug = "line-tables-only"
