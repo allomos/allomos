@@ -23,7 +23,7 @@ Plain meanings of the words used in FlipHopper's documents and product.
 | **Runner** | A small FlipHopper program on a person's machine that can start and reopen agent sessions when asked from the app. |
 | **Handoff** | The short notes a session leaves so the next session can continue: checkout, uncommitted work, running processes, next action. Lives in `docs/AGENT_HANDOFF.md`. |
 | **Owner** | will.w.hui — decides, approves, and verifies finished work. Also the top project role in the product. |
-| **Glidelines** | The owner's earlier Gantt dashboard app (`glidepace-vibe-cc`), with a task-file format and burndown code FlipHopper may reuse. |
+| **Glidelines** | The owner's earlier Gantt dashboard app (`glidepace-vibe-cc`), with a task-file format and burndown code. FlipHopper is a separate product that learns from its ideas ([0003](./decisions/0003-relationship-to-glidelines.md)). |
 | **SSR board** | The owner's Joyns SSR migration task board — the real multi-agent project that motivated FlipHopper. |
 | **Local project** | A project stored only on the user's machine, used without signing in ([0006](./decisions/0006-local-and-cloud-projects.md)). |
 | **Cloud project** | A project stored on a hosted service, which needs sign-in; used for team collaboration. |

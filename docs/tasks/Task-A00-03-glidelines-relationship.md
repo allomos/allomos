@@ -10,7 +10,9 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-06 | "FlipHopper is a new standalone product" — option B | owner (chat) |
 
 ## Notes
 
 - 2026-09-27 — Owner: "not decided yet"; options written down.
+- 2026-10-06 — **Owner decided: standalone (B).** 0003 is Accepted; PLAN D3, REFERENCES, GLOSSARY, 0008, the handoff and `Task-A02-01` now say so.

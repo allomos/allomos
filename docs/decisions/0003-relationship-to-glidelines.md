@@ -2,7 +2,16 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Open — not decided** | 2026-09-27 | — | will.w.hui |
+| **Accepted — B, standalone** | 2026-09-27 | 2026-10-06 | will.w.hui |
+
+## Decision
+
+**FlipHopper is a new standalone product** (owner, 2026-10-06: "FlipHopper is a new standalone product"). This is option B.
+
+- FlipHopper lives in its own repository (this one) with its own stack (Tauri 2, Rust, React; [0011](./0011-desktop-framework-and-shared-code.md)) and its own file format ([FILE-FORMAT.md](../product/FILE-FORMAT.md)). It does not extend Glidelines, and the two products share no library (not A or C).
+- Glidelines stays a **read-only reference** ([REFERENCES.md](../REFERENCES.md)): its burndown, forecast and chart ideas may be learned from and rewritten here; nothing in Glidelines is changed.
+- Glidelines' `tasklist.json` is not FlipHopper's storage; it may become an import or export format later, if a card asks for it.
+- Option D (Glidelines later showing a FlipHopper project) is not planned; it would need a new decision.
 
 ## Question
 
@@ -69,6 +78,6 @@ FlipHopper is standalone and owns the data; Glidelines later gains a "FlipHopper
 3. Is there a **stack preference** for server-side work (Vite + serverless functions like Glidelines, or Next.js, or another)?
 4. How much weight does **time to first screen** carry compared with a clean model?
 
-## Current leaning (not a decision)
+## Leaning before the decision
 
 This is still open after [0008](./0008-build-our-own.md). *Update 2026-10-04:* with Tauri 2 chosen ([0011](./0011-desktop-framework-and-shared-code.md)), project rules are written in Rust, so Glidelines' TypeScript burndown and forecast code can only be reused as ideas. Its React chart components could still be reused in the TypeScript interface. B now, with the option to move the ported core into a shared package (C) if Glidelines keeps evolving its task-file workspace; D as a possible later integration. **Until this is decided, work on the core model, importer, burndown and forecast is valid under B, C and D**, so it need not wait.

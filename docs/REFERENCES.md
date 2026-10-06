@@ -31,4 +31,4 @@ Analysis: [analysis/ssr-task-board.md](./analysis/ssr-task-board.md).
 | `src/lib/forecastDashboardUtils.ts`, `src/lib/forecastAssumptionsConfig.ts`, `src/components/Dashboard/Views/ForecastDashboard.tsx` | Estimate-based forecast: capacity, workers, remaining percentage by status. |
 | `docs/task-files/convert-ssr-plan.py`, `docs/task-files/examples/ssr-migration.tasklist.json` | One-shot converter and snapshot of the SSR board (2026-09-08). Private project content: do not copy its text into FlipHopper fixtures. |
 
-Relationship: [decision 0003](./decisions/0003-relationship-to-glidelines.md) (open).
+Relationship: [decision 0003](./decisions/0003-relationship-to-glidelines.md) — FlipHopper is standalone; Glidelines is read here for ideas only.
