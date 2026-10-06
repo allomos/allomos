@@ -22,7 +22,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - The next approved Iteration 1 card is ready to claim (owner, 2026-10-06):
   - The **`glidebox` / `gb` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). `gb` and the running app take turns writing a task box with a short lock for each change (owner, 2026-10-06).
-- **Rename to CrossJump** is approved and starts when the owner says so: a person or project can jump between AI agents and be handed between people; a project's data becomes a **seabag** in `.crossjump/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md)). It runs before A01-03, so the command is built once as `crossjump` / `cj`.
+- **Rename to FlipHopper** is under way: a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data becomes a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md)). It runs before A01-03, so the command is built once as `fliphopper` / `fh`.
 - A small fix, waiting for the owner's review: starting glidebox with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
@@ -32,7 +32,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a00-17-rename` (main checkout until the folder move; then a worktree) | [`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md) | 2026-10-06 | the owner confirms the name |
+| `claude/a00-17-rename` (main checkout until the folder move; then a worktree) | [`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md) | 2026-10-06 | GitHub repository renamed to fliphopper |
 
 ## Waiting on the owner
 
@@ -64,7 +64,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
 | [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it (recommended after A00-17, the rename) |
-| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | the owner confirms the name after the name check |
+| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | the owner confirms step 2 (GitHub repository → `mypals-ml/fliphopper`) |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |

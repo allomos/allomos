@@ -41,7 +41,7 @@ One block per card in the board's Sessions table.
 - Approvals in force: the card and its external operations (GitHub rename, local folder rename, pitch decks), in the card's order; nothing external done yet.
 - Uncommitted: none · Running: none
 - Done: step 1, name check (findings on the card).
-- Next: the owner confirms CrossJump (or CrossJumper); then step 2, rename the GitHub repository and update `origin`.
+- Name chosen: **FlipHopper** (card § Name decision). Next: step 2, rename the GitHub repository to `mypals-ml/fliphopper` and update `origin` (owner confirming the new target).
 
 ## Live state
 
