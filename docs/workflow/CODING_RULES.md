@@ -8,6 +8,7 @@ A **contract** for code in this repository. Created by [`Task-A01-01`](../tasks/
 |---|---|---|
 | `crates/core` | Project rules: model and validation. **No disk, network or UI code.** | Rust |
 | `crates/store` | Reading and writing seabags on disk. Never runs `git` by itself. | Rust |
+| `crates/cli` | The `fliphopper` / `fh` command: reads options, calls the crates, prints results. **No rules of its own.** | Rust |
 | `apps/desktop/src-tauri` | The Tauri desktop app: thin commands that call the crates. | Rust |
 | `apps/web` | The interface. Talks to Rust **only through `src/messenger.ts`**. | TypeScript + React |
 
@@ -18,6 +19,7 @@ Project rules live in Rust. The interface displays results and sends requests; i
 - **Rust 1.85.1**, pinned in `rust-toolchain.toml`. **Tauri 2.11.x**: Tauri 2.12 needs Rust 1.90, so moving up is its own card.
 - Cargo uses resolver 3 with `rust-version = "1.85"`, so dependencies are chosen to fit that Rust. `Cargo.lock` is committed.
 - JavaScript packages are pinned to exact versions. `@tauri-apps/api` must match the Tauri crate's minor version (2.11), and plugin packages must match their crates. npm is used; there is no pnpm.
+- **Command and locking packages** ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md)): `clap` =4.6.7 (MIT or Apache-2.0; needs Rust 1.85) reads `fh`'s options; `fs4` =1.1.0 (MIT or Apache-2.0; needs Rust 1.75) gives the file lock that Rust's own `File::lock` gives from 1.89. Switch to `File::lock` when Rust moves up.
 - Never upgrade a dependency on the side. Upgrade it on purpose, in a card, with its licence noted.
 
 ## Checks before a commit
@@ -63,6 +65,33 @@ Rust puts everything it builds in `target/`, one per worktree. A Tauri app's `ta
 - **Remove a worktree when its card is merged.** This deletes its `target/` with it. See [CARDS.md § Claiming protocol](./CARDS.md#claiming-protocol).
 - Do not build in the main checkout; build in your card's worktree.
 
+## The `fh` command
+
+A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md)). `fliphopper` and `fh` are the same program.
+
+| Command | What it does |
+|---|---|
+| `fh init [--name <name>]` | Creates an empty seabag in `.fliphopper/seabag/` at the root of the current Git repository, or of the current folder outside Git. Refused (`seabag_exists`) when one is there. Never creates a Git repository. |
+| `fh add area <id> <name>` | Adds an area, ordered after the existing ones. |
+| `fh add task <id> --area <id> --title <text> [--description <text>]` | Adds a task in `backlog`; the description goes into `description.md`. |
+| `fh list [--area <id>] [--state <state>] [--mine]` | Tasks grouped by area: ID, state, label, holder, title. |
+| `fh show <id>` | One task's fields, including its handoff note, then its description. |
+| `fh claim <id> [--take]` | You hold the task; state becomes `in_progress`. Refused (`task_held`) when someone else holds it, unless `--take`, which takes it over with a `took_over` warning (for an agent whose quota ran out). Refused (`task_closed`) when done or dropped. |
+| `fh label <id> <label>` | Sets the label; it must be on the project's ladder. |
+| `fh wait <id> --on <text>` | State `waiting`, with what it waits on. |
+| `fh done <id>` | State `done`. Warns (`label_below_top`) without refusing when the label is below the top step. |
+| `fh release <id> [--note <text>]` | Clears the holder; `in_progress` goes back to `ready`. The note replaces the task's handoff note. |
+| `fh next` | The first `ready` task no one holds (by area order, then ID), with its handoff note. |
+
+- **Holder rules.** `label`, `wait`, `done` and `release` are refused (`task_held`) on a task someone else holds; an unheld task may be changed by anyone.
+- **Finding the seabag:** `--seabag <path>` (the seabag itself or a folder holding `.fliphopper/seabag/`), else `FLIPHOPPER_SEABAG`, else the nearest `.fliphopper/seabag/` at or above the current folder.
+- **Who you are:** `--as <name>`, else `FLIPHOPPER_HOLDER`. `claim` and `list --mine` refuse without one (`holder_missing`).
+- **`--json`** prints exactly one line on standard output and nothing on the error stream: `{"schema":"fh/1","ok":true,"command":…,"seabag":…,"task"|"area"|"areas":…,"warnings":[…],"issues":[…]}`, or `{"schema":"fh/1","ok":false,"command":…,"error":{"code","params","message"}}`. Problems use the codes in `crates/core/src/problem.rs`; `issues` lists problems found in the seabag's files. A new field is an addition; any other change makes it `fh/2`.
+- **Exit codes:** `0` done · `1` refused by a rule · `2` wrong usage (`bad_usage`) · `3` the seabag is busy or could not be read or written.
+- **Never waits for typed input.** Messages are English (Iteration 1); their codes are worded in all three interface languages.
+- `FLIPHOPPER_LOCK_WAIT_MS` changes how long a writer waits for the lock (default 5000); tests use it.
+- **Install on this Mac:** `cargo install --path crates/cli` puts `fliphopper` and `fh` in `~/.cargo/bin`. Bundling with the app is a later card.
+
 ## Running the app
 
 ```bash
@@ -72,5 +101,7 @@ npm --prefix apps/desktop run dev
 ```
 
 `npm --prefix apps/desktop run dev` starts the interface and the desktop window together and reloads on changes. To open a folder directly, pass it at start-up: `FLIPHOPPER_OPEN=/path/to/folder npm --prefix apps/desktop run dev`, or `open FlipHopper.app --args /path/to/folder` for a built app.
+
+While a seabag is open, the window checks about once a second whether its files changed (a fingerprint of names, sizes and change times, `seabag_stamp`) and reloads when they did, so changes made with `fh` show without reopening the folder. Polling was chosen over a folder watcher: no new package or thread, and the same request will serve the companions later.
 
 To build a local, unsigned app: `npx --prefix apps/desktop tauri build --debug --bundles app`. The result is `target/debug/bundle/macos/FlipHopper.app`.

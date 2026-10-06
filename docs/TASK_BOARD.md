@@ -34,7 +34,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a01-03-fh` (`.claude/worktrees/a01-03-fh`) | [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md) | 2026-10-06 | `fh init` creates a seabag in a fresh repository |
+| `claude/a01-03-fh` (`.claude/worktrees/a01-03-fh`) | [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md) | 2026-10-06 | owner watches the app follow `fh` changes |
 
 ## Waiting on the owner
 
@@ -65,7 +65,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | in progress | — | `claude/a01-03-fh` | `fh` command, locking and app reload built and tested |
+| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | waiting | locally verified (the window following `fh` not seen by the agent) | `claude/a01-03-fh` | owner runs a few `fh` commands and watches the app follow |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
 | [`Task-A07-01-app-icon-hopper`](./tasks/Task-A07-01-app-icon-hopper.md) | ready | — | — | a session claims it |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |

@@ -95,7 +95,37 @@ Shared behaviour:
 | 2026-10-06 | Card approved: all local work (source, tests, docs, commits, pushes; installing pinned packages locally). No external operations. | owner (chat) |
 | 2026-10-06 | Add a handoff note (`fh release --note`, a new optional task field recorded in FILE-FORMAT) and `fh next`, so switching agents works from the first release ([`Task-A00-18`](./Task-A00-18-positioning-and-deck.md), [0014](../decisions/0014-main-purpose-and-three-sets.md)) | owner (chat) |
 
+## What was built (2026-10-06)
+
+**In plain words.** Agents now have a `fh` command (also `fliphopper`). It creates a seabag, adds areas and tasks, and moves a task from claim to done. Each change takes a short lock, so when two agents claim the same task at the same moment, only one gets it. Files are written whole and then swapped in, so the app never reads half a file. The app checks about once a second whether the files changed, and reloads when they did. A released task can carry a **handoff note**, which `fh next` and `fh show` print and the app shows.
+
+**Decisions taken inside the card** (contracts in [FILE-FORMAT § Writing rules](../product/FILE-FORMAT.md#writing-rules-how-writers-take-turns) and [CODING_RULES § The `fh` command](../workflow/CODING_RULES.md#the-fh-command)):
+- **The lock:** `fs4` =1.1.0 (MIT or Apache-2.0). It locks `.fliphopper/seabag/.lock`, which the seabag's own `.gitignore` keeps out of Git. A writer waits up to 5 s, then exits with code 3.
+- **How the app learns about changes:** it asks for a fingerprint of the files once a second, instead of using a folder watcher. This needs no new package, and companions can use the same request later.
+- **Swapping in a new file is safe on macOS:** a reader that already opened the old file keeps reading the old file whole, and the race test's reader never saw a broken file. Windows is still to check in Iteration 2.
+- **Added beyond the proposal:** `fh claim --take` takes over a task someone else holds and prints a `took_over` warning. Without it, an agent whose quota ran out would block the task. Other agents may not change a held task (`task_held`). A release replaces the handoff note, or removes it when no note is given.
+- **Installing:** run `cargo install --path crates/cli`.
+
+**Checks (2026-10-06):**
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check` | PASS |
+| `cargo clippy --workspace --all-targets -- -D warnings` | PASS |
+| `cargo test --workspace`: 16 tests for the rules (`core`), 10 for reading and writing (`store`), 9 that run `fh` as a real program (`cli`) | PASS (35) |
+| Race test: 30 rounds of 4 agents claiming the same task at once, while another thread keeps reading the seabag; run 4 times | PASS: exactly 1 winner each round, the losers get `task_held` with exit 1, no broken file, no leftover temporary files |
+| `npm --prefix apps/web run typecheck` / `build` / `check:i18n` (66 texts, 31 codes) | PASS |
+| End to end (below) | PASS for `fh` and the files; the window following the changes is **NOT RUN by the agent** (access to the window was declined) |
+
+**End to end, 2026-10-06**, in a fresh Git repository (`scratchpad/e2e-repo`) with the desktop app open on it:
+1. `fh init --name "E2E demo"`, two areas, three tasks.
+2. `agent-a` claims A01-01 and labels it `implemented`. `agent-b` tries to claim it: `task_held`, exit 1.
+3. `agent-a` parks A01-01 as waiting on "owner review". `agent-b` claims A01-02, then releases it with the note "list works; sorting left". `fh next` shows A01-02 with that note.
+4. `agent-a` finishes A01-01: done, with the `label_below_top` warning.
+5. `fh list` and `task.json` match. `git status` shows only the seabag's text files (`.gitignore`, `.keep`, JSON, `description.md`) and no `.lock`.
+
 ## Notes
 
 - 2026-10-06 — Card written by the agent for the owner's review.
+- 2026-10-06 — Built by `claude/a01-03-fh`; see "What was built" above.
 - 2026-10-06 — Scope added by the owner (accepting the A00-18 recommendation): handoff note on release, shown by `fh next` and `fh show`; `fh next` added. The note is a new optional field in `task.json`; the worker records it in [FILE-FORMAT.md](../product/FILE-FORMAT.md) with the other contracts.

@@ -17,6 +17,8 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 
 ```text
 .fliphopper/seabag/
+  .gitignore        keeps .lock and temporary files out of Git
+  .lock             FlipHopper's writing lock (never committed)
   project.json
   areas/
     A01.json
@@ -31,6 +33,7 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 ```
 
 - File and folder names use the item's ID.
+- Names starting with `.` are not items: readers skip them. `fh init` writes empty `areas/.keep` and `tasks/.keep` so the folders survive a Git clone.
 - Files are UTF-8 JSON, pretty-printed with a final newline, so that diffs stay readable.
 
 ## `project.json`
@@ -62,12 +65,23 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 | `holder` | no | Who holds the task: a person or an agent session. |
 | `waiting_on` | no | What blocks the next step, in plain words. **Required when `state` is `waiting`.** |
 | `next_dependency` | no | The single thing needed for the next label. |
+| `handoff_note` | no | A short note left by the last holder on release (`fh release --note`) for whoever picks the task up next. Each release replaces it, or removes it when no note is given. |
 
 Empty optional fields are left out rather than written as `null`. **Unknown fields are refused**, so mistyped names are caught.
 
 ## `tasks/<id>/description.md`
 
 Free Markdown: the task's outcome and details. Optional; it is not stored inside `task.json`.
+
+## Writing rules (how writers take turns)
+
+Owner's choice A, 2026-10-06 ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md)).
+
+- **One short lock per change.** Every FlipHopper writer (`fh` now, the app when it starts editing) takes an exclusive operating-system lock on `.lock` for one change only: read the seabag, check the rules, write, let go. A second writer waits up to 5 seconds, then gives up with `seabag_busy`. The operating system drops the lock if the process dies, so a crash never leaves the seabag locked.
+- **Whole files only.** A file is written to a temporary `.tmp-…` file in the same folder, flushed to disk, then renamed over the old one; a new task folder is filled under a temporary name and renamed into place. A reader sees the old file or the new one, never half of one. On macOS a reader that already opened the old file keeps reading the old file whole. (Windows is checked when the app starts writing, Iteration 2.)
+- **Readers need no lock.** The app and `fh list` / `show` / `next` read without waiting.
+- **`.gitignore`** in the seabag lists `.lock` and `.tmp-*`. `fh init` and the app's starter project both write it.
+- The lock only orders FlipHopper's own writers; a person editing a file by hand is not blocked. The checks below still catch a bad file.
 
 ## Checks FlipHopper makes
 
