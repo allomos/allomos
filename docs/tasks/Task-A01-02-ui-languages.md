@@ -55,3 +55,30 @@
 ## Notes
 
 - 2026-10-06 — Card written by the agent for the owner's review.
+- 2026-10-06 — Built and locally verified by the agent. The first session stopped at its usage limit before committing; a second session resumed the same worktree and finished it.
+
+## Evidence (2026-10-06, agent)
+
+**How it works, in plain words.** Every text the interface shows now lives in three language files (`apps/web/src/i18n/en.json`, `zh-CN.json`, `ja.json`), 53 texts each. Rust no longer sends English sentences: a problem is a **code** plus details (19 codes, listed once in `crates/core/src/problem.rs`), and the interface words it. The computer's language is read in Rust with `sys-locale` =0.3.2 (MIT or Apache-2.0); the user's choice is stored in the window's storage. The text rules are in [CODING_RULES.md § Interface languages](../workflow/CODING_RULES.md#interface-languages).
+
+**Decisive unknowns, answered.**
+- Computer's language: `sys-locale` returns `["ja-JP", "en-JP", "zh-Hant-JP", "zh-Hans-JP"]` on the owner's Mac (system language Japanese), matching `defaults read -g AppleLanguages`. The window's own `navigator.language` was not needed and was not tested separately.
+- Check without a new tool: a plain Node script, `npm --prefix apps/web run check:i18n`. No new npm package.
+- Rust codes reach the check through `apps/web/src/i18n/codes.json`, kept current by the test `codes_file_is_up_to_date`.
+- Non-problem errors: creating a task box now returns the codes `folder_not_empty` or `create_failed`.
+
+**Checks (all PASS):** `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (18 tests), `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run build`, `npm --prefix apps/web run check:i18n` ("53 texts in en, zh-CN and ja; 19 Rust codes").
+
+**The check catches mistakes** (shown, then undone):
+- Removing `pending.cancel` from `ja` and dropping `{total}` from `area.count`: `check:i18n` exits 1 with `ja: missing "pending.cancel"` and `ja: "area.count" uses {done} but English uses {done,total}`; `typecheck` exits 2.
+- Adding a Rust code `demo_only` without words: `cargo test` fails with "codes.json is out of date"; after rewriting the file, `check:i18n` exits 1 with `en: Rust code "demo_only" has no words`.
+
+**No text written in the code:** a search of `App.tsx` and `messenger.ts` for text between tags, sentence-like strings and literal `title` / `aria-label` / `placeholder` values finds only `aria-label="Glidebox"`, the product name.
+
+**In the built app** (`target/debug/bundle/macos/Glidebox.app`, a synthetic task box with one task given the state `doing`; language set for one launch with `-AppleLanguages`, the Mac's own setting unchanged):
+- Japanese: the window, state names and the problem (「"finished" は有効な値ではありません…」) are in Japanese, still naming `tasks/A01-02/task.json` and field `state`.
+- Simplified Chinese: 「此任务盒中有 1 个问题」, 「"doing" 不是有效的值。请使用以下之一…」, file and field named.
+- French (not one of the three): English.
+- **NOT RUN:** choosing a language in the window and restarting. Left for the owner's check.
+
+**Found on the way (not part of this card):** the app reads only its *first* start-up argument as the folder, so an argument placed before the folder makes it ignore the folder and reopen the last one.

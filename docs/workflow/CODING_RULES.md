@@ -30,6 +30,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 npm --prefix apps/web run typecheck
 npm --prefix apps/web run build
+npm --prefix apps/web run check:i18n
 ```
 
 All must pass. Report anything not run as NOT RUN.
@@ -40,6 +41,16 @@ All must pass. Report anything not run as NOT RUN.
 - **Never overwrite user content.** Creating a task box into a non-empty folder is refused. Writing files keeps the format in [FILE-FORMAT.md](../product/FILE-FORMAT.md).
 - **Tests use temporary folders and synthetic data only**, never the owner's real projects.
 - **Keep interface text short and plain**, and keep its terms consistent with the [glossary](../GLOSSARY.md): task box, area, state, label.
+
+## Interface languages
+
+The interface speaks English, Simplified Chinese and Japanese (R94). English is the reference.
+
+- **No interface text in the code.** Every text the interface shows is a key in `apps/web/src/i18n/en.json`, `zh-CN.json` and `ja.json`, shown with `t()` (or `rich()` when a placeholder holds an element). The user's own data, file paths and field names are not translated.
+- **Write English first, and add Chinese and Japanese in the same edit.** Keep each text short and plain, and keep the same `{placeholders}` in every language.
+- **Rust sends codes, not sentences.** A problem is a `Problem` in `crates/core/src/problem.rs`: a code, its details, and one English wording for logs and `gb`. After adding or changing a code, run `GLIDEBOX_WRITE_CODES=1 cargo test -p glidebox-core` to update `apps/web/src/i18n/codes.json`, then add `problem.<code>` to every language file.
+- **The checks catch slips:** `typecheck` fails when a language file misses a key; `check:i18n` also fails on extra or empty texts, different placeholders, and Rust codes without words; `cargo test` fails when `codes.json` is out of date.
+- The computer's language is read in Rust (`sys-locale` 0.3.2, MIT or Apache-2.0), so it does not depend on what the macOS window reports. The user's own choice is kept in the window's storage.
 - **Formatting:** `cargo fmt` defaults for Rust; two-space indentation and double quotes for TypeScript.
 
 ## Running the app

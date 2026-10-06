@@ -37,12 +37,12 @@ Updated: 2026-10-04
 One block per card in the board's Sessions table.
 
 ### Task-A01-02 — claude/a01-02-ui-languages
-- Checkout: `.claude/worktrees/a01-02` · branch `claude/a01-02-ui-languages` · pushed: yes (work in progress)
+- Checkout: `.claude/worktrees/a01-02` · branch `claude/a01-02-ui-languages` · pushed: yes
 - Approvals in force: all local work on the card (owner, 2026-10-06). No external operations.
 - Uncommitted: none
-- Running: none
-- Built so far: problem codes in Rust (`crates/core/src/problem.rs`, test keeps `apps/web/src/i18n/codes.json` current); en / zh-CN / ja language files; `check:i18n` script; language picker; `system_languages` command (`sys-locale` =0.3.2).
-- Next: record the check-catches-mistakes demo on the card; coding rule in `docs/workflow/CODING_RULES.md`; build and run the app in zh-CN and ja; the owner checks the wording.
+- Running: none (the stale A01-01 test window was stopped)
+- State: locally verified; evidence on the card. Built app: `target/debug/bundle/macos/Glidebox.app` in this worktree.
+- Next: the owner checks the wording and the language choice surviving a restart; then merge into `main`.
 
 ## Live state
 
