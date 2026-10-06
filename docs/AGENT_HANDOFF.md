@@ -36,6 +36,15 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
+### Task-A01-03 — `claude/a01-03-fh`
+
+- **Checkout:** worktree `.claude/worktrees/a01-03-fh`, branch `claude/a01-03-fh`, from `main` at `875f9a8` (the claim commit); pushed.
+- **Card and approval limits:** [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md). Local work only (source, tests, docs, commits, pushes, pinned packages). No external operations.
+- **Uncommitted:** none.
+- **Running:** nothing.
+- **Findings not yet on the card:** none.
+- **Next action:** read CODING_RULES, FILE-FORMAT and `crates/core` / `crates/store`; resolve the lock crate (Rust 1.85 lacks `File::lock`) and start `crates/cli` with `fh init`.
+
 ## Live state
 
 Checked 2026-10-06.
