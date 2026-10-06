@@ -57,9 +57,10 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
   border-bottom: 1px solid var(--line); background: var(--surface);
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .02em; }
-.brand svg { width: 22px; height: 22px; }
-.brand rect { fill: none; stroke: var(--ink); stroke-width: 2.2; }
-.brand path { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; }
+.brand svg { width: 24px; height: 24px; }
+.brand path { fill: none; stroke: var(--ink); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.brand path.bag { fill: var(--accent); stroke-width: 3; }
+.brand .head { fill: var(--ink); }
 .where { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.link { align-self: start; border: none; background: none; padding: 0; color: var(--accent); font-size: 0.85em; cursor: pointer; }

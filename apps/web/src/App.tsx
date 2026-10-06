@@ -137,9 +137,15 @@ export function App({ messenger }: { messenger: Messenger }) {
     <div className="app">
       <header className="top">
         <div className="brand" aria-label="FlipHopper">
-          <svg viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="2" y="6" width="24" height="18" rx="3" />
-            <path d="M5 11 L13 16 L23 21" />
+          {/* The hopper: a person hopping with a seabag (docs/pitch/hopper-mark.svg, small-size form). */}
+          <svg viewBox="2 4 54 50" aria-hidden="true">
+            <path className="bag" d="M33 13 C25 8 13 11 8 19 C3 27 6 34 13 33 C20 32 28 25 33 17 Z" />
+            <circle className="head" cx="41" cy="11" r="5.5" />
+            <path d="M39 19 L33 37" strokeWidth="5.5" />
+            <path d="M38 21 L33 15" />
+            <path d="M38 23 L46 29 L52 25" />
+            <path d="M33 37 L42 42 L40 51" strokeWidth="5" />
+            <path d="M33 37 L25 43 L16 45" strokeWidth="5" />
           </svg>
           <span>FlipHopper</span>
         </div>
