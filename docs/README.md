@@ -24,6 +24,7 @@
 | [research/interface-patterns.md](./research/interface-patterns.md) | Internet evidence for human/agent interfaces, adaptive layouts, CLI/MCP, local access and platform packaging options | evidence |
 | [research/desktop-frameworks.md](./research/desktop-frameworks.md) | Detailed comparison of six desktop frameworks for decision 0011 (2026-10-04) | evidence |
 | [research/remote-access.md](./research/remote-access.md) | How companions reach the desktop from outside, and which service sends the pairing email (2026-10-07) | evidence |
+| [research/agent-launch-and-resume.md](./research/agent-launch-and-resume.md) | How FlipHopper can start Claude Code and Codex sessions and reopen them, per surface (2026-10-07) | evidence |
 | [pitch/](./pitch/README.md) | Road show deck in English and Chinese: sources and published addresses | pitch |
 | [REFERENCES.md](./REFERENCES.md) | External projects and files to learn from (read-only) | reference |
 | [GLOSSARY.md](./GLOSSARY.md) | Plain meanings of terms | reference |

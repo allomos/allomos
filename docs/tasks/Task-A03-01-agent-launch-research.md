@@ -16,3 +16,17 @@
 |---|---|---|
 
 ## Notes
+- 2026-10-07 — Done in the card run (`claude/a01-run`) from vendor documentation and the installed tools' `--help`. No agent was started: running even a short prompt uses the owner's plan, so the "verified locally" marks cover only what the help output shows.
+
+## Result (2026-10-07)
+
+**In plain words.** [agent-launch-and-resume.md](../research/agent-launch-and-resume.md) gives, for Claude Code and Codex and for each surface (terminal, desktop app, cloud), how FlipHopper can start a task, where the session ID comes from, how to reopen it, whether there is a link to it, and whether cloud sessions can be created. Both agents can be started by another program and report an ID that can be reopened later, so "Start in agent" and "Open session" need no screen automation. Decision 0005's unknowns are updated to match.
+
+- **Found on the way:** the Homebrew Codex CLI on this Mac (0.130.0) does not run; its platform binary is missing. Claude Code is 2.1.191, older than some documented features (`--cloud`, resuming from another folder).
+
+| Check | Result |
+|---|---|
+| Per agent and surface: launch, resume, session-ID source, link support, cloud creation, each marked verified locally / documented only / not available, with sources and dates | PASS: Claude Code 7 rows, Codex 5 rows; 9 sources read 2026-10-07 (one secondary, marked) |
+| Decision 0005 "Unknowns" updated | PASS |
+| Local trials | partly: `--help` only (no prompts sent); Codex could not run — listed under "To check before building" |
+| `git diff --check`, relative links | PASS |

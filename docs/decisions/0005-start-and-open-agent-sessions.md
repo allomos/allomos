@@ -60,10 +60,14 @@ Starting an agent runs code on a machine, so:
 
 ## Unknowns to verify before building (research spike)
 
-- The exact, supported ways to **launch and resume** each agent non-interactively and to obtain a **session id**: Claude Code (CLI, desktop app, web) and Codex (CLI, desktop / IDE, cloud).
-- Whether each agent's desktop app or web version offers a **link or URL** to open a specific session.
-- Whether each vendor offers an interface to **create cloud sessions** programmatically, and its authentication and cost model.
-- How to open a terminal/app window reliably on macOS (and later Windows/Linux) from a background daemon.
+*Researched 2026-10-07* ([agent-launch-and-resume.md](../research/agent-launch-and-resume.md), from vendor documentation and the installed tools' help; no agent was run):
+
+- **Launch and session ID — answered.** Claude Code: `claude -p … --output-format json` (`session_id`), or `claude --bg` for a background session listed by `claude agents --json`. Codex: `codex exec --json -C <folder>` (`thread_id` in the first event).
+- **Resume — answered.** `claude --resume <id>` / `claude attach <id>`; `codex resume <id>` / `codex exec resume <id>`.
+- **Link to a session — partly.** Codex desktop: `codex://threads/<id>`. Claude: cloud sessions have a `claude.ai/code/<id>` address; a link to an existing *local* Code session in the desktop app is not documented. `claude-cli://open?cwd=…&q=…` opens a *new* terminal session.
+- **Create cloud sessions — answered.** `claude --cloud "<task>"` and `codex cloud exec --env <id> "<task>"`, both with the user's own sign-in and plan; no separate API needed.
+- **Open a window from a background program — answered for Claude** (the `claude-cli://` handler picks the terminal); for Codex, the `codex://` link opens the app, and a terminal needs FlipHopper's own launcher.
+- **Still to check by running:** the Codex rows (the local Codex install is broken), and Claude features newer than the installed 2.1.191 (`--cloud`, cross-folder `--resume`).
 
 ## Open questions for the owner
 
