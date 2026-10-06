@@ -43,7 +43,7 @@ One block per card in the board's Sessions table.
 - **Uncommitted:** none.
 - **Running:** nothing.
 - **Findings not yet on the card:** lock crate `fs4` =1.1.0 (MIT/Apache-2.0, MSRV 1.75, mirrors std `File::try_lock`); `clap` =4.6.7 (MSRV 1.85). Done so far: `crates/core/src/ops.rs` (task changes), new problem codes (words in the three languages still to add), store `init` / `find_seabag` / `Lock` / atomic writes / `stamp`.
-- **Next action:** write `crates/cli` (lib + `fliphopper` and `fh` bins), then its tests and the race test.
+- **Next action:** app follows changes (poll `stamp` from the window), translations for the new codes, contracts in FILE-FORMAT and CODING_RULES, end-to-end record on the card. `crates/cli` and its 9 tests (race test included) pass.
 
 ## Live state
 

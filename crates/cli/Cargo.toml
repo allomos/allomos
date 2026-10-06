@@ -7,5 +7,22 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# One program under two names: `fliphopper` and the short `fh` (R88).
+[[bin]]
+name = "fliphopper"
+path = "src/bin/fliphopper.rs"
+
+[[bin]]
+name = "fh"
+path = "src/bin/fh.rs"
+
 [dependencies]
-clap = { version = "=4.6.7", features = ["derive"] }
+clap = { version = "=4.6.7", features = ["derive", "env"] }
+fliphopper-core.workspace = true
+fliphopper-store.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+fliphopper-core.workspace = true
+fliphopper-store.workspace = true

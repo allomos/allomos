@@ -870,6 +870,10 @@ name = "fliphopper-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "fliphopper-core",
+ "fliphopper-store",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
