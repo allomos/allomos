@@ -115,7 +115,8 @@ Shared behaviour:
 | `cargo test --workspace`: 16 tests for the rules (`core`), 10 for reading and writing (`store`), 9 that run `fh` as a real program (`cli`) | PASS (35) |
 | Race test: 30 rounds of 4 agents claiming the same task at once, while another thread keeps reading the seabag; run 4 times | PASS: exactly 1 winner each round, the losers get `task_held` with exit 1, no broken file, no leftover temporary files |
 | `npm --prefix apps/web run typecheck` / `build` / `check:i18n` (66 texts, 31 codes) | PASS |
-| End to end (below) | PASS for `fh` and the files; the window following the changes is **NOT RUN by the agent** (access to the window was declined) |
+| End to end (below) | PASS for `fh` and the files. The agent did not see the window (access was declined); the owner checked it |
+| **Owner check**: the window follows `fh` | **PASS** (owner, 2026-10-06): a claim of A02-01 showed "held by owner", and a release showed Ready with "handoff note: second try", without reopening the folder |
 
 **End to end, 2026-10-06**, in a fresh Git repository (`scratchpad/e2e-repo`) with the desktop app open on it:
 1. `fh init --name "E2E demo"`, two areas, three tasks.
@@ -128,4 +129,5 @@ Shared behaviour:
 
 - 2026-10-06 — Card written by the agent for the owner's review.
 - 2026-10-06 — Built by `claude/a01-03-fh`; see "What was built" above.
+- 2026-10-06 — Owner verified; merged into `main`. **Done.**
 - 2026-10-06 — Scope added by the owner (accepting the A00-18 recommendation): handoff note on release, shown by `fh next` and `fh show`; `fh next` added. The note is a new optional field in `task.json`; the worker records it in [FILE-FORMAT.md](../product/FILE-FORMAT.md) with the other contracts.

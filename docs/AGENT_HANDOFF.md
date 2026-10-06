@@ -36,15 +36,6 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
-### Task-A01-03 — `claude/a01-03-fh`
-
-- **Checkout:** worktree `.claude/worktrees/a01-03-fh`, branch `claude/a01-03-fh`; all work committed and pushed.
-- **Card and approval limits:** [`Task-A01-03`](./tasks/Task-A01-03-gb-command.md). Local work only. No external operations.
-- **Uncommitted:** none.
-- **Running:** the desktop app in dev mode, opened on the end-to-end repository: `FLIPHOPPER_OPEN=<scratchpad>/e2e-repo npm --prefix apps/desktop run dev` (port 1420). Stop it with Ctrl-C in its terminal, or by quitting the FlipHopper window.
-- **Findings:** recorded on the card ("What was built").
-- **Next action:** the owner checks that the window follows `fh` changes. Then merge `claude/a01-03-fh` into `main` and mark the card Done.
-
 ## Live state
 
 Checked 2026-10-06.
