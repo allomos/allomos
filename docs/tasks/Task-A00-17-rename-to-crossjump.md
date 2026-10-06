@@ -124,7 +124,9 @@ Sources: [Sidehopper, Metroid Wiki](https://metroid.fandom.com/wiki/Sidehopper),
 | `npm --prefix apps/web run check:i18n` | PASS (53 texts in en, zh-CN and ja; 19 Rust codes) |
 | All relative links and anchors in Markdown files resolve | PASS (script check, 0 broken) |
 | `git diff --check` | PASS |
-| Built app named FlipHopper, creates `.fliphopper/seabag/` with `fliphopper/1`, three languages | NOT RUN yet: owner check (step 6) |
+| Built app (`npx --prefix apps/desktop tauri build --debug --bundles app`) | PASS: `target/debug/bundle/macos/FlipHopper.app` in the worktree, bundle name FlipHopper, ID `io.fliphopper` |
+| Built app started on an empty folder (`open -n FlipHopper.app --args <empty folder>`) | PASS: created `.fliphopper/seabag/` with `project.json` (`"format": "fliphopper/1"`, project named after the folder), 2 areas, 3 tasks |
+| Window title, "seabag" wording and all three languages on screen | NOT RUN by the agent: owner check (step 6) |
 
 **Where "glidebox" remains (any case), and why** — the rule is in [0013 § Where the old name stays](../decisions/0013-product-name-fliphopper.md#where-the-old-name-stays):
 
