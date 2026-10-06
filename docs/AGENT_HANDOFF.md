@@ -34,15 +34,7 @@ Updated: 2026-10-04
 
 ## Active resume
 
-One block per card in the board's Sessions table.
-
-### Task-A01-02 — claude/a01-02-ui-languages
-- Checkout: `.claude/worktrees/a01-02` · branch `claude/a01-02-ui-languages` · pushed: yes
-- Approvals in force: all local work on the card (owner, 2026-10-06). No external operations.
-- Uncommitted: none
-- Running: none (the stale A01-01 test window was stopped)
-- State: locally verified; evidence on the card. Built app: `target/debug/bundle/macos/Glidebox.app` in this worktree.
-- Next: the owner checks the wording and the language choice surviving a restart; then merge into `main`.
+One block per card in the board's Sessions table. None claimed.
 
 ## Live state
 
@@ -52,7 +44,7 @@ Checked 2026-10-04.
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | `origin` = `https://github.com/mypals-ml/glidebox.git` (added by the owner, 2026-10-04) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
-| Worktrees | `.claude/worktrees/a01-01` (branch `claude/a01-01-walking-skeleton`, merged into `main` 2026-10-06; holds the built `Glidebox.app` under `target/`; safe to remove) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
+| Worktrees | `.claude/worktrees/a01-01` and `.claude/worktrees/a01-02` (branches `claude/a01-01-walking-skeleton` and `claude/a01-02-ui-languages`, both merged into `main` 2026-10-06; each holds a built `Glidebox.app` under `target/`; safe to remove) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls

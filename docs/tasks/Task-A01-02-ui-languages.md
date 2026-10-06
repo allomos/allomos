@@ -55,6 +55,7 @@
 ## Notes
 
 - 2026-10-06 — Card written by the agent for the owner's review.
+- 2026-10-06 — Owner verified: wording and restart check passed. Done.
 - 2026-10-06 — Built and locally verified by the agent. The first session stopped at its usage limit before committing; a second session resumed the same worktree and finished it.
 
 ## Evidence (2026-10-06, agent)
@@ -79,6 +80,8 @@
 - Japanese: the window, state names and the problem (「"finished" は有効な値ではありません…」) are in Japanese, still naming `tasks/A01-02/task.json` and field `state`.
 - Simplified Chinese: 「此任务盒中有 1 个问题」, 「"doing" 不是有效的值。请使用以下之一…」, file and field named.
 - French (not one of the three): English.
-- **NOT RUN:** choosing a language in the window and restarting. Left for the owner's check.
+- Choosing a language and restarting: checked by the owner (below). The app's stored choice read `zh-CN`, then `en`, then none (follow the computer), matching each pick.
+
+**Owner check (2026-10-06): passed.** The owner read the Chinese and Japanese wording and found nothing to change, and confirmed that a chosen language survives a restart.
 
 **Found on the way (not part of this card):** the app reads only its *first* start-up argument as the folder, so an argument placed before the folder makes it ignore the folder and reopen the last one.

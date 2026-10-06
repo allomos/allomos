@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; twelve cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Its first card is done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md), owner verified 2026-10-06).
+**No card is claimed; eleven cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -20,8 +20,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 **What is next.**
 - The owner reviews the documents and answers the questions below.
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
-- Two Iteration 1 cards are approved (owner, 2026-10-06); A01-02 is being built:
-  - **UI languages** in English, Simplified Chinese and Japanese (R94), with a check that catches missing translations ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)).
+- The next approved Iteration 1 card is ready to claim (owner, 2026-10-06):
   - The **`glidebox` / `gb` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). `gb` and the running app take turns writing a task box with a short lock for each change (owner, 2026-10-06).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
@@ -31,7 +30,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a01-02-ui-languages` (`.claude/worktrees/a01-02`) | [`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md) | 2026-10-06 | the owner's visual check |
 
 ## Waiting on the owner
 
@@ -62,8 +60,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | **locally verified** | — | `claude/a01-02-ui-languages` | the owner checks the Chinese and Japanese wording, and that a chosen language survives a restart |
-| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it (best after A01-02) |
+| [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |
@@ -73,6 +70,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | Label | When |
 |---|---|---|
+| [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | **owner verified — Done**: the app speaks English, Simplified Chinese and Japanese, follows the computer's language, and keeps a chosen one | 2026-10-06 |
 | [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox`, pushed by the owner | 2026-10-04 |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | **owner verified — Done**: the macOS app opens a task box and shows its tasks by area | 2026-10-06 |
 | [`Task-A00-16-road-show-deck`](./tasks/Task-A00-16-road-show-deck.md) | done — English and Chinese decks published; addresses in [pitch/](./pitch/README.md) | 2026-10-04 |
