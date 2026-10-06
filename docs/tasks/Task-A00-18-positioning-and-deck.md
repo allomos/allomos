@@ -48,8 +48,8 @@ The owner chose **three sets: the main set, AI skills, and progress management**
 
 1. ~~Main purpose~~ Answered 2026-10-06: switching between AI agents and teammates, as discussed for the name.
 2. ~~Groups~~ Answered 2026-10-06: three sets — main, AI skills, progress management.
-3. Is "AI skills" content written by us (guides, checklists) inside the app, or links to outside material?
-4. Should the remaining-quota idea be researched now (a research card), or only mentioned as "later"?
+3. ~~AI-skills content~~ Answered 2026-10-06: keep "being designed" for now; decide later.
+4. ~~Quota idea~~ Answered 2026-10-06: not sure yet; recorded as the parked card [`Task-A03-02`](./Task-A03-02-account-quota-idea.md).
 5. Does the new purpose also change the plan's order ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), for example handoff and resume earlier, or only the message?
 
 ## What gets built (after the owner answers)

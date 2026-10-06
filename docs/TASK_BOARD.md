@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
+**One card is claimed; fifteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
 
 **Where the product stands.**
 - The owner has decided to **build FlipHopper ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -72,6 +72,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |
+| [`Task-A03-02-account-quota-idea`](./tasks/Task-A03-02-account-quota-idea.md) | backlog | — | — | owner decides when to research it |
 | [`Task-A03-01-agent-launch-research`](./tasks/Task-A03-01-agent-launch-research.md) | backlog | — | — | owner card review |
 
 ### Recently finished

@@ -25,8 +25,8 @@ Everything else is grouped into two more sets. All three work on the same seabag
 ## Not decided yet
 
 Recorded on [`Task-A00-18`](../tasks/Task-A00-18-positioning-and-deck.md) until the owner answers:
-- whether AI-skills content is written by us inside the app, or links to outside material;
-- whether showing each agent account's remaining quota (and suggesting when to switch) is researched now or later;
+- whether AI-skills content is written by us inside the app, or links to outside material (owner, 2026-10-06: "being designed" for now);
+- whether showing each agent account's remaining quota (and suggesting when to switch) is researched, and when: parked as [`Task-A03-02`](../tasks/Task-A03-02-account-quota-idea.md);
 - whether the plan's order changes (for example handoff and resume earlier). **Until then the order in [PLAN § 9](../product/PLAN.md#9-roadmap--releases) stands**; only the message changes.
 
 ## Consequences
