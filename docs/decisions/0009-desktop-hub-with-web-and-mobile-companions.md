@@ -50,8 +50,8 @@ Answered 2026-10-04: companions can act (through the desktop app); access from o
 1. ~~Mobile form~~ — **decided 2026-10-04: a phone-friendly web page.**
 2. ~~When the desktop app is off~~ — **decided 2026-10-04:** tell the user to start the desktop app; refreshing reconnects automatically.
 3. ~~Which desktop systems~~ — **decided 2026-10-04: macOS and Windows** ([0011](./0011-desktop-framework-and-shared-code.md)).
-4. **How to reach the desktop from outside cheaply:** to be researched. Candidates have free tiers, for example a tunnel service, a private network service, or a small relay. Each is an external service needing approval.
-5. ~~How the desktop app sends the code email~~ — **decided 2026-10-04: through a free email-sending service.** Still open: which service, and where its key lives (see the decision above).
+4. **How to reach the desktop from outside cheaply:** to be researched. Candidates have free tiers, for example a tunnel service, a private network service, or a small relay. Each is an external service needing approval. *Researched 2026-10-07* ([remote-access.md](../research/remote-access.md)); recommendation, not a decision: the user's own free Tailscale account (private network first, Funnel as fallback), and later a paid FlipHopper relay.
+5. ~~How the desktop app sends the code email~~ — **decided 2026-10-04: through a free email-sending service.** Still open: which service, and where its key lives (see the decision above). *Researched 2026-10-07* ([remote-access.md](../research/remote-access.md)); recommendation: one FlipHopper-run helper on Cloudflare Workers calling Resend, its key only a secret of the helper; it needs a FlipHopper domain.
 
 ### Proposed pairing details (to confirm)
 
