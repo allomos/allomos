@@ -1,7 +1,9 @@
 {
   "area": "A01",
-  "holder": "claude/a01-run",
+  "handoff_note": "Agent checks pass; owner's look in the app is left (see the card's Result).",
   "id": "A01-05",
-  "state": "in_progress",
-  "title": "Readme in new folder"
+  "label": "locally verified",
+  "state": "waiting",
+  "title": "Readme in new folder",
+  "waiting_on": "owner checks the README and notice in the app"
 }
