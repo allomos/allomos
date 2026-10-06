@@ -6,7 +6,7 @@
 
 ## In plain words
 
-Glidebox's screens are written **once**, as a web interface. The desktop app shows that interface in its own window, and also serves it to browsers and phones (the companions from [0009](./0009-desktop-hub-with-web-and-mobile-companions.md)). Only the desktop app contains the parts that need the computer itself: running `git`, starting and opening AI agents, the MCP server for agents, reading and writing the task box, and sending the pairing email. The desktop app is built for **macOS and Windows**.
+FlipHopper's screens are written **once**, as a web interface. The desktop app shows that interface in its own window, and also serves it to browsers and phones (the companions from [0009](./0009-desktop-hub-with-web-and-mobile-companions.md)). Only the desktop app contains the parts that need the computer itself: running `git`, starting and opening AI agents, the MCP server for agents, reading and writing the seabag, and sending the pairing email. The desktop app is built for **macOS and Windows**.
 
 ## Owner's statement (2026-10-04)
 
@@ -20,7 +20,7 @@ Glidebox's screens are written **once**, as a web interface. The desktop app sho
   - Git actions through the `git` command ([0010](./0010-project-data-folder.md));
   - starting and opening agent sessions ([0005](./0005-start-and-open-agent-sessions.md));
   - the MCP server and the local CLI connection;
-  - access to the task box;
+  - access to the seabag;
   - the local server for companions, with pairing and code email ([0009](./0009-desktop-hub-with-web-and-mobile-companions.md));
   - anything else that needs the operating system.
 

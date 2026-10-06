@@ -1,6 +1,6 @@
 # Cards, labels and claiming
 
-A **contract** for how work is recorded on glidebox while the board is Markdown. [TASK_BOARD.md](../TASK_BOARD.md) is the index; each card's detail is its own file in [docs/tasks/](../tasks/).
+A **contract** for how work is recorded on FlipHopper while the board is Markdown. [TASK_BOARD.md](../TASK_BOARD.md) is the index; each card's detail is its own file in [docs/tasks/](../tasks/).
 
 ## Areas
 
@@ -9,13 +9,13 @@ An **area** is *what part of the product* a card belongs to. Areas are named aft
 | ID | Area | What users can do | Iterations |
 |---|---|---|---|
 | A00 | Planning | Read the plan, requirements, decisions and research | all |
-| A01 | Tracking | Keep tasks in a task box, view and edit them, use the `glidebox` / `gb` command, commit and push from the app | 1, 2, 6 |
+| A01 | Tracking | Keep tasks in a seabag, view and edit them, use the `fliphopper` / `fh` command, commit and push from the app | 1, 2, 6 |
 | A02 | Progress & forecast | See progress, what waits on them, burndown, finish-date forecast, timeline; export a report | 4, 5, 12 |
 | A03 | Agents | Let Claude Code and Codex work through MCP; start and open agent sessions from the app | 3 (MCP), 8 (start/open agents) |
 | A04 | Companions | View progress and approve from a browser or phone, at home or away | 9, 10 |
 | A05 | Project setup & import | Import the SSR board; set up a project with an AI agent | 7, 11 |
 | A06 | Cloud & team | Keep a project in the cloud; invite teammates with roles | 13, 14 |
-| A07 | Platform & release | Use glidebox on Windows as well as macOS; install signed builds that update themselves | 2, 15 |
+| A07 | Platform & release | Use FlipHopper on Windows as well as macOS; install signed builds that update themselves | 2, 15 |
 
 A card that touches several layers (for example interface, Rust rules and files) still has **one** area: the capability it delivers.
 

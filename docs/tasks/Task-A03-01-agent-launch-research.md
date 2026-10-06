@@ -1,6 +1,6 @@
 # Task-A03-01-agent-launch-research
 
-- **Outcome.** The owner and the W07 worker know, from vendor documentation and local trials, exactly how glidebox can **start** a task in Claude Code and in Codex and later **jump into** that session — for each surface (CLI, desktop app, cloud/web) — so the runner design in [decision 0005](../decisions/0005-start-and-open-agent-sessions.md) can be confirmed or corrected.
+- **Outcome.** The owner and the W07 worker know, from vendor documentation and local trials, exactly how FlipHopper can **start** a task in Claude Code and in Codex and later **jump into** that session — for each surface (CLI, desktop app, cloud/web) — so the runner design in [decision 0005](../decisions/0005-start-and-open-agent-sessions.md) can be confirmed or corrected.
 - **Decisive unknowns** (worker finds out, from official docs and trying the installed tools):
   - How to launch each agent non-interactively with a prompt in a given directory, and get a **session id** back.
   - How to **resume** a given session (command, flags) and whether desktop/web apps offer a **link or URL** to a specific session.

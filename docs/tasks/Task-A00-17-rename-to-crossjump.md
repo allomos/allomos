@@ -70,6 +70,8 @@ The owner wants to rename the product from **Glidebox** to **FlipHopper**. The n
 - 2026-10-06 — Owner answered and approved; "seabag" chosen for the data (over belongings, bindle, kitbag, dunnage).
 - 2026-10-06 — Claimed; step 1 (name check) done. The owner compared names and chose **FlipHopper** (see Name decision).
 - 2026-10-06 — Step 2 done: GitHub repository renamed to `mypals-ml/fliphopper` with `gh repo rename` (owner confirmed); `origin` now `https://github.com/mypals-ml/fliphopper.git`. GitHub redirects the old address.
+- 2026-10-06 — Step 3 done: the owner moved the local folder to `…/glidepace/fliphopper`; work continues in the worktree `.claude/worktrees/a00-17`.
+- 2026-10-06 — Step 4 done (agent): code, data folder, interface texts and documents renamed; decision record [0013](../decisions/0013-product-name-fliphopper.md). Answer 8 built: the app now creates a new seabag in `.fliphopper/seabag/` also inside an empty folder (test `empty_folder_gets_starter_seabag_in_default_dir`). In the `fh` card, `--box` / `GLIDEBOX_BOX` became `--seabag` / `FLIPHOPPER_SEABAG` to match the new word. Checks: see [Step 4 evidence](#step-4-evidence-2026-10-06).
 
 ## Name check (2026-10-06, agent)
 
@@ -106,3 +108,27 @@ Sources: [CrossJump Studio on the App Store](https://apps.apple.com/lr/developer
 **FlipHopper check (agent, 2026-10-06):** crates.io, npm and GitHub account names free; `fliphopper.io` and `fliphopper.com` not registered; a web search found no product, company or trademark. The command short name `fh` is not taken on the owner's Mac. Same limits as above: not a legal trademark search.
 
 Sources: [Sidehopper, Metroid Wiki](https://metroid.fandom.com/wiki/Sidehopper), [Cross Hopper Road](https://www.amazon.com/Mkstudio-Cross-Hopper-Road/dp/B01G29AUL6), [Hopper Inc. trademarks](https://trademarks.justia.com/owners/hopper-inc-2594110/), [Mainsoft (GRASSHOPPER) trademarks](https://trademarks.justia.com/owners/mainsoft-corporation-2668817), [Cross Jumper, X](https://x.com/crossjumper?lang=en), [Flip-flop, Wikipedia](https://en.wikipedia.org/wiki/Flip-flop).
+
+## Step 4 evidence (2026-10-06)
+
+**In plain words:** the app and its code now say FlipHopper and seabag, all checks pass, and "glidebox" is left only where a document records the past.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check` | PASS |
+| `cargo clippy --workspace --all-targets -- -D warnings` | PASS |
+| `cargo test --workspace` | PASS (18 tests: 12 core, 6 store) |
+| `npm --prefix apps/web run typecheck` | PASS |
+| `npm --prefix apps/web run build` | PASS |
+| `npm --prefix apps/web run check:i18n` | PASS (53 texts in en, zh-CN and ja; 19 Rust codes) |
+| All relative links and anchors in Markdown files resolve | PASS (script check, 0 broken) |
+| `git diff --check` | PASS |
+| Built app named FlipHopper, creates `.fliphopper/seabag/` with `fliphopper/1`, three languages | NOT RUN yet: owner check (step 6) |
+
+**Where "glidebox" remains (any case), and why** — the rule is in [0013 § Where the old name stays](../decisions/0013-product-name-fliphopper.md#where-the-old-name-stays):
+
+| Kind | Files |
+|---|---|
+| States the old name on purpose | `AGENTS.md` (repository "renamed from `glidebox`"), [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) (old folder and repository, the removed `glidebox-local-cloud` worktree, the name bullet), [TASK_BOARD.md](../TASK_BOARD.md) (finished A00-02 row), [FILE-FORMAT.md](../product/FILE-FORMAT.md) (`glidebox/1` is refused), [REQUIREMENTS.md](../product/REQUIREMENTS.md) R88 (old command), [0013](../decisions/0013-product-name-fliphopper.md), this card |
+| Dated history | `docs/discussions/*`, `docs/research/*`, `docs/analysis/ssr-task-board.md`; finished cards A00-02, A00-04 to A00-09, A00-13, A00-16, A01-01, A01-02; dated Notes lines in A00-14 and A01-04 |
+| Step 5 | `docs/pitch/roadshow-en.html`, `docs/pitch/roadshow-zh.html` |

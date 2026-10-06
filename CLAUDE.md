@@ -1,4 +1,4 @@
-# Glidebox — Claude entry point
+# FlipHopper — Claude entry point
 
 @AGENTS.md
 

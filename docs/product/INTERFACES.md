@@ -1,6 +1,6 @@
 # Human and AI-agent interfaces
 
-**In plain words:** people and AI agents both use glidebox, so every way in follows the same rules: the desktop app, the web and mobile companions, the command line (CLI) and the agent tool protocol (MCP). Each change goes through one shared set of operations that checks permissions and records history. The **desktop app is the hub** with all features; web and mobile companions connect to it to view progress and status ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Everything below marked *proposed* still needs the owner's review.
+**In plain words:** people and AI agents both use FlipHopper, so every way in follows the same rules: the desktop app, the web and mobile companions, the command line (CLI) and the agent tool protocol (MCP). Each change goes through one shared set of operations that checks permissions and records history. The **desktop app is the hub** with all features; web and mobile companions connect to it to view progress and status ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Everything below marked *proposed* still needs the owner's review.
 
 A **contract** for interface scope, with proposed design rules to review before implementation. Created 2026-10-03 from the owner's request; evidence and source links live in [the interface investigation](../research/interface-patterns.md). Requirement IDs: [R60–R68](./REQUIREMENTS.md#human-and-agent-interfaces).
 
@@ -8,12 +8,12 @@ A **CLI** is a command-line interface used from a terminal by people, scripts an
 
 ## Accepted scope
 
-- Glidebox must be well structured for both humans and AI agents (R60).
+- FlipHopper must be well structured for both humans and AI agents (R60).
 - Human interfaces include desktop and mobile; browser and human CLI interfaces must also be considered in the design (R61–R62).
 - **The desktop app provides the complete feature set; web and mobile apps are companions that connect to the running desktop app and view its projects, including progress and status** (R69–R71, accepted 2026-10-04). Operating systems, the mobile form, whether companions may edit, and release order are not selected.
 - Agents already require structured task updates through CLI and MCP (R11). MCP is a protocol through which compatible agent clients discover and call tools.
-- Local project tracking stores project/task information on the user's device without sign-in or a Glidebox hosted service (R40–R43). Cloud projects require sign-in (R42). A client cannot silently publish local data to provide cross-device access.
-- The leader can use Glidebox's prompt with an external agent to produce files that Glidebox reads/transforms (R50–R51); see [AI-generated projects](./AI-GENERATED-PROJECTS.md).
+- Local project tracking stores project/task information on the user's device without sign-in or a FlipHopper hosted service (R40–R43). Cloud projects require sign-in (R42). A client cannot silently publish local data to provide cross-device access.
+- The leader can use FlipHopper's prompt with an external agent to produce files that FlipHopper reads/transforms (R50–R51); see [AI-generated projects](./AI-GENERATED-PROJECTS.md).
 
 All rules below are **proposed**, except where they restate these accepted requirements or existing owner-approval boundaries. They do not choose storage, permissions details, a UI framework or an upstream product.
 
@@ -21,7 +21,7 @@ All rules below are **proposed**, except where they restate these accepted requi
 
 Keep project/task behavior in one shared application layer. Desktop, mobile, browser, CLI, MCP and generated-file import translate their inputs into the same commands and queries. A **command** requests a change; a **query** reads information. The shared layer validates changes, checks the actor's permissions and records the resulting history. Presentation code formats that result for a person or an agent.
 
-*Superseded in detail: the current picture, with the desktop hub, Tauri, the task box and iteration numbers, is in [PLAN § 8 — At a glance](./PLAN.md#at-a-glance-updated-2026-10-04). The diagram below keeps the original logical layering.*
+*Superseded in detail: the current picture, with the desktop hub, Tauri, the seabag and iteration numbers, is in [PLAN § 8 — At a glance](./PLAN.md#at-a-glance-updated-2026-10-04). The diagram below keeps the original logical layering.*
 
 ```mermaid
 flowchart TD

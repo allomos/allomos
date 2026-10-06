@@ -1,8 +1,8 @@
 # Task-A00-10-docs-consistency-review
 
-- **Outcome.** After the 2026-10-04 review, the documents agree with each other: each finished piece of planning work has its own card, the owner's decision to build glidebox ourselves is recorded, contradictions are resolved, and the board and handoff show only current state.
+- **Outcome.** After the 2026-10-04 review, the documents agree with each other: each finished piece of planning work has its own card, the owner's decision to build FlipHopper ourselves is recorded, contradictions are resolved, and the board and handoff show only current state.
 - **Decisive unknowns.** None. The owner asked for the review findings to be fixed and decided "build our own" (2026-10-04).
-- **Files owned.** `AGENTS.md`, everything under `docs/`; removal of the unused worktree `glidebox-local-cloud`.
+- **Files owned.** `AGENTS.md`, everything under `docs/`; removal of the unused worktree `fliphopper-local-cloud`.
 - **External operations.** None.
 - **Done means mechanically.** Every review finding is fixed or recorded as an owner question. All relative links and anchors resolve. Table column counts are consistent. `git diff --check` is clean. The owner reviews the result.
 

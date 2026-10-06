@@ -6,11 +6,11 @@
 
 ## Context
 
-The owner requires Glidebox to run purely locally, keeping project and task information on the user’s machine. Users may also choose cloud projects, which require sign-in. The earlier plan assumed a hosted database for all projects.
+The owner requires FlipHopper to run purely locally, keeping project and task information on the user’s machine. Users may also choose cloud projects, which require sign-in. The earlier plan assumed a hosted database for all projects.
 
 ## Decision
 
-- Local projects store project information, tasks and event history locally and support tracking without sign-in, a cloud account or a Glidebox hosted service.
+- Local projects store project information, tasks and event history locally and support tracking without sign-in, a cloud account or a FlipHopper hosted service.
 - Cloud projects are optional and require sign-in; the existing cloud collaboration and invitation requirements apply there.
 - Local data stays local unless the user explicitly chooses to transfer or share it.
 - Each project's source of truth is its Git-tracked text files under [0007](./0007-git-like-project-sync.md), which superseded 0001 on 2026-10-04. Hand-maintained Markdown boards are still not live input.

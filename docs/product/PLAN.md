@@ -1,6 +1,6 @@
-# Glidebox — plan
+# FlipHopper — plan
 
-> Status: **draft, first written 2026-09-27, last revised 2026-10-04.** Decisions marked *proposed* are recommendations awaiting the owner's confirmation. Full records: [decisions/](../decisions/README.md); requirements: [REQUIREMENTS.md](./REQUIREMENTS.md); discussions: [all records](../README.md#discussions). Glidebox is developed by AI agents following [AGENTS.md](../../AGENTS.md).
+> Status: **draft, first written 2026-09-27, last revised 2026-10-04.** Decisions marked *proposed* are recommendations awaiting the owner's confirmation. Full records: [decisions/](../decisions/README.md); requirements: [REQUIREMENTS.md](./REQUIREMENTS.md); discussions: [all records](../README.md#discussions). FlipHopper is developed by AI agents following [AGENTS.md](../../AGENTS.md).
 
 ## 1. Problem
 
@@ -26,16 +26,16 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Interfaces for people and agents**, with desktop/mobile human use and browser/human CLI considered in the design. Shared structure and platform patterns are documented in [INTERFACES.md](./INTERFACES.md) (R60–R68; detailed design proposed).
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
-- **Generate project setup with an external AI agent:** a team leader supplies Glidebox’s prompt and team context; Glidebox reads/transforms the resulting project/task files ([feature contract](./AI-GENERATED-PROJECTS.md), R50–R51).
+- **Generate project setup with an external AI agent:** a team leader supplies FlipHopper’s prompt and team context; FlipHopper reads/transforms the resulting project/task files ([feature contract](./AI-GENERATED-PROJECTS.md), R50–R51).
 - **Start a task in a chosen AI agent** (Claude Code, Codex) from the app, and **jump into** an already-started task's agent session ([D5](../decisions/0005-start-and-open-agent-sessions.md)).
 
 ## 3. Non-goals (for now)
 
-- Orchestrating agents automatically (scheduling, auto-assigning, chaining agents). Glidebox starts an agent only when a person asks it to.
-- Replacing git, PRs or CI. Glidebox links to them.
+- Orchestrating agents automatically (scheduling, auto-assigning, chaining agents). FlipHopper starts an agent only when a person asks it to.
+- Replacing git, PRs or CI. FlipHopper links to them.
 - Storing secrets, credentials or evidence logs. Cards link to evidence; they do not hold it.
 - Full project-management features (budgets, time sheets, resource leveling).
-- Several glidebox projects inside one code repository ([D10](../decisions/0010-project-data-folder.md)); special handling for synced folders, network drives or removable disks.
+- Several FlipHopper projects inside one code repository ([D10](../decisions/0010-project-data-folder.md)); special handling for synced folders, network drives or removable disks.
 
 ## 4. Decisions
 
@@ -45,18 +45,18 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D2](../decisions/0002-burndown-counts-plus-sizes.md) | **Burndown uses task counts, plus optional sizes.** Every task counts as 1; a task may carry an optional size (points or days), and the chart can switch to size-weighted when sizes are present. | **accepted 2026-09-27** |
 | [D3](../decisions/0003-relationship-to-glidelines.md) | **Relationship to Glidelines.** Leaning: standalone product, reusing Glidelines ideas and code where it fits (same stack family; port the `tasklist.json` format and burndown/forecast logic from `glidepace-vibe-cc`, not fork the app). Options A–D are compared in the decision record. | **open — not decided** |
 | [D4](../decisions/0004-team-accounts-and-roles.md) | **Cloud team accounts with roles**: owner, admin, approver, contributor, viewer, and agent (token-based, scoped to a project). **An owner or admin adds members by email address**; no public sign-up. | **roles and email invites accepted 2026-09-27**; role details proposed |
-| [D5](../decisions/0005-start-and-open-agent-sessions.md) | **Start and open agent sessions from glidebox**, through a local runner daemon (`gb runner`) on a person's machine or a vendor cloud session. | **requirement accepted 2026-09-27**; design proposed |
+| [D5](../decisions/0005-start-and-open-agent-sessions.md) | **Start and open agent sessions from FlipHopper**, through a local runner daemon (`fh runner`) on a person's machine or a vendor cloud session. | **requirement accepted 2026-09-27**; design proposed |
 | [D6](../decisions/0006-local-and-cloud-projects.md) | **Local-only and optional cloud projects.** Local tracking stores data on the user’s machine without sign-in; cloud projects require sign-in. Storage technology and transfer/sync design remain open. | **requirement accepted 2026-10-01** |
-| [D7](../decisions/0007-git-like-project-sync.md) | **Git with readable text files is the source of truth.** JSON fields and Markdown narrative in the task box; a database is only a rebuildable index; push/pull/merge with a cloud copy. | **accepted 2026-10-04**; sync and merge details proposed |
+| [D7](../decisions/0007-git-like-project-sync.md) | **Git with readable text files is the source of truth.** JSON fields and Markdown narrative in the seabag; a database is only a rebuildable index; push/pull/merge with a cloud copy. | **accepted 2026-10-04**; sync and merge details proposed |
 | [D8](../decisions/0008-build-our-own.md) | **Build our own.** No open-source tracker (e.g. Backlog.md) is used as a base or fork; they are references only. | **accepted 2026-10-04** |
 | [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | **Desktop app is the hub.** Full features on desktop; web and mobile companions connect to the running desktop app to view progress and status. | **requirement accepted 2026-10-04**; design open |
-| [D10](../decisions/0010-project-data-folder.md) | **User-chosen task box.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
+| [D10](../decisions/0010-project-data-folder.md) | **User-chosen seabag.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
 | [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: **Tauri 2**. | **accepted 2026-10-04** |
 | [D12](../decisions/0012-free-local-app-paid-cloud.md) | **Free local app; payment only for the cloud.** | **accepted 2026-10-04**; paid features and source licence open |
 
 ## 5. Data model (first cut)
 
-- **Project** — storage mode (`local | cloud`), task box (local projects: any folder the user chooses, standalone or inside an existing project folder — [D10](../decisions/0010-project-data-folder.md)), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
+- **Project** — storage mode (`local | cloud`), seabag (local projects: any folder the user chooses, standalone or inside an existing project folder — [D10](../decisions/0010-project-data-folder.md)), name, label ladder (configurable; SSR default: `implemented → locally verified → connected → deployed and verified`), forecast settings.
 - **Area** — `id` (e.g. `W07`), title, order, optional estimate (low / likely / high). *What area of work* a task belongs to; stable for the life of the project.
 - **Iteration** (R89) — `id`, title, order, optional start/end dates and the release it produces. *When* a task is planned; optional. A task has one area and at most one iteration. The words "area" and "iteration" can be renamed per project (R90).
 - **Task** — hierarchical id (`A01-01-02`), title, area, parent, and:
@@ -87,7 +87,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 ### AI-generated project setup
 
-The leader gets a Glidebox prompt, asks their chosen external agent to generate a project bundle, then opens/imports it in Glidebox. Proposed flow: validate → preview → repair errors → accept locally → optionally publish after sign-in. The prompt/schema and adoption details are proposed in [AI-GENERATED-PROJECTS.md](./AI-GENERATED-PROJECTS.md). This path does not require the in-app agent runner or cloud access.
+The leader gets a FlipHopper prompt, asks their chosen external agent to generate a project bundle, then opens/imports it in FlipHopper. Proposed flow: validate → preview → repair errors → accept locally → optionally publish after sign-in. The prompt/schema and adoption details are proposed in [AI-GENERATED-PROJECTS.md](./AI-GENERATED-PROJECTS.md). This path does not require the in-app agent runner or cloud access.
 
 ### Human and agent interfaces
 
@@ -115,23 +115,23 @@ flowchart TD
     DW -- requests --> HUB
     BC -- "requests (paired)" --> HUB
     PC -- "requests (paired)" --> HUB
-    HUB["Glidebox desktop app · the one authority (Rust)<br/>project rules · validation · events · burndown and forecast"]
-    HUB --> TB[("Task box .glidebox/<br/>files tracked by Git<br/>Iteration 1")]
+    HUB["FlipHopper desktop app · the one authority (Rust)<br/>project rules · validation · events · burndown and forecast"]
+    HUB --> TB[("Seabag .fliphopper/seabag/<br/>files tracked by Git<br/>Iteration 1")]
     HUB --> GIT["Runs your git<br/>commit · push · pull<br/>Iteration 6"]
     HUB --> MCP["MCP server for agents<br/>Iteration 3"]
     HUB --> RUN["Start / open Claude Code and Codex<br/>Iteration 8"]
     HUB --> SRV["Local server + pairing emails<br/>Iteration 9–10"]
-    CLI["glidebox / gb command (Rust)<br/>same rules"] --> TB
+    CLI["fliphopper / fh command (Rust)<br/>same rules"] --> TB
     TB -. "optional cloud copy" .-> CLOUD["Cloud service · optional, paid<br/>Iteration 13–14"]
 ```
 
 - **One interface code base** runs in the desktop window, a browser and a phone ([D11](../decisions/0011-desktop-framework-and-shared-code.md), [D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). It only displays results and sends requests.
 - **The desktop app is the one authority.** Its Rust code checks every change, records it as an event, and owns the native parts. Companions' actions, such as approvals, are requests that the desktop app checks and applies (R77).
-- **The `gb` command** uses the same Rust rules on the same task box.
+- **The `fh` command** uses the same Rust rules on the same seabag.
 
 **Open points:**
 1. **How the interface reaches the Rust side inside the desktop window.** The proposal is the same kind of connection a browser will later use, so the interface never changes. Iteration 1 has no local server yet (it arrives in Iteration 9), so [`Task-A01-01`](../tasks/Task-A01-01-walking-skeleton.md) picks a first connection that can switch over later without rewriting the interface.
-2. **Two writers on one task box.** In Iteration 1, both the desktop app and `gb` can change the same `.glidebox/`. "One writer at a time" (R75) needs a mechanism, for example a lock file or `gb` passing changes through the running desktop app. The `gb` command card decides this.
+2. **Two writers on one seabag.** In Iteration 1, both the desktop app and `fh` can change the same `.fliphopper/seabag/`. "One writer at a time" (R75) needs a mechanism, for example a lock file or `fh` passing changes through the running desktop app. The `fh` command card decides this.
 
 ### Details
 
@@ -139,70 +139,70 @@ flowchart TD
 - **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: **Tauri 2** (owner, 2026-10-04); macOS and Windows released together; unsigned builds until the first public release.
 - **Monorepo — Rust workspace + TypeScript interface** ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Proposed layout; the first code card confirms it:
   - `crates/core` — Rust: domain model, validation, events, burndown and forecast (pure, unit-tested; the one authority for project rules)
-  - `crates/store` — Rust: reads and writes the project's user-chosen task box ([D10](../decisions/0010-project-data-folder.md)) as Git-tracked JSON/Markdown files (D7); runs the `git` command; keeps the rebuildable index outside the folder
-  - `crates/cli` — Rust: the `glidebox` command (alias `gb`, R88) for people and agents (`gb claim`, `gb label`, `gb wait`, `gb done`, `gb release`, `gb next`)
+  - `crates/store` — Rust: reads and writes the project's user-chosen seabag ([D10](../decisions/0010-project-data-folder.md)) as Git-tracked JSON/Markdown files (D7); runs the `git` command; keeps the rebuildable index outside the folder
+  - `crates/cli` — Rust: the `fliphopper` command (alias `fh`, R88) for people and agents (`fh claim`, `fh label`, `fh wait`, `fh done`, `fh release`, `fh next`)
   - `crates/mcp` — Rust: MCP server (official `rmcp` SDK) exposing the same operations to Claude Code and Codex
   - `crates/runner` — Rust: starts and resumes agents, creates worktrees, reports session state
-  - `crates/importer` — Rust: Markdown board → glidebox (first target: the SSR `TASK_BOARD.md` + `workstreams/`; SSR workstreams become areas) and AI-generated bundles
+  - `crates/importer` — Rust: Markdown board → FlipHopper (first target: the SSR `TASK_BOARD.md` + `workstreams/`; SSR workstreams become areas) and AI-generated bundles
   - `apps/desktop` — Tauri 2 app for macOS and Windows: wraps the crates above, hosts the local server for companions, shows `apps/web` in its window
   - `apps/web` — TypeScript + React + Vite + Tailwind interface (charts, lists, inbox); runs in the desktop window and is served to browser and phone companions; displays results and sends requests, holds no project rules
   - `supabase/` — cloud side (proposed): sign-in, roles, atomic claims and the cloud project index; how it hosts the Git remote is open under D7
-- **Storage modes ([D7](../decisions/0007-git-like-project-sync.md)):** local projects are Git-tracked text files in a user-chosen task box, with a rebuildable index outside it. Cloud projects are a hosted copy (a Git remote with server-side permission checks) and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. The index technology remains open.
+- **Storage modes ([D7](../decisions/0007-git-like-project-sync.md)):** local projects are Git-tracked text files in a user-chosen seabag, with a rebuildable index outside it. Cloud projects are a hosted copy (a Git remote with server-side permission checks) and require sign-in. The domain model and event rules must work in both modes. Local tracking cannot depend on cloud authentication or hosted services. The index technology remains open.
 - **Cloud backend (proposed):** Supabase — Postgres, Auth (cloud sign-in), Row Level Security per project and role, Realtime for live updates. Cloud agents use scoped project tokens; local agent access must work without a cloud token.
 - **Transfer and sync:** moving/copying a local project to the cloud, offline cloud edits, and two-way synchronization remain open; do not assume automatic uploads.
 - **Hosting:** to decide (Vercel or Cloudflare).
-- **Agent instructions:** a short `AGENTS.md` / `CLAUDE.md` snippet telling sessions to resume with `gb next` and report with `gb` instead of editing board markdown.
+- **Agent instructions:** a short `AGENTS.md` / `CLAUDE.md` snippet telling sessions to resume with `fh next` and report with `fh` instead of editing board markdown.
 
 ## 9. Roadmap — releases
 
-**Rapid iteration (owner, 2026-10-04; the 15 iterations confirmed the same day).** Iterations are numbered 1–15; each ends in a release (v0.1 … v0.14, then v1.0). Glidebox grows from a small prototype. **Every release is a usable product**: an installable desktop app (macOS and Windows; unsigned builds until v1.0) that someone can use for real work, and that the next release extends. Each release is built as thin end-to-end slices: interface → Rust rules → files in the task box. No release is "only a library" or "only a backend". Agents and the owner use each release on real projects (glidebox itself, the SSR migration) before the next one starts, and what they learn can reorder the later releases.
+**Rapid iteration (owner, 2026-10-04; the 15 iterations confirmed the same day).** Iterations are numbered 1–15; each ends in a release (v0.1 … v0.14, then v1.0). FlipHopper grows from a small prototype. **Every release is a usable product**: an installable desktop app (macOS and Windows; unsigned builds until v1.0) that someone can use for real work, and that the next release extends. Each release is built as thin end-to-end slices: interface → Rust rules → files in the seabag. No release is "only a library" or "only a backend". Agents and the owner use each release on real projects (FlipHopper itself, the SSR migration) before the next one starts, and what they learn can reorder the later releases.
 
 **Now / Next / Later** — iterations kept small (owner, 2026-10-04): each adds one visible capability to an app that already works.
 
 | Phase | # | Release | Usable for | What ships (products and contents) | Requirements |
 |---|---|---|---|---|---|
-| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **glidebox's own development tasks** on a Mac; the agents building glidebox update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the task box (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`glidebox` CLI** (short alias `gb`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · glidebox's own cards moved in from Markdown · *no server* | R91, R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
-| **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`glidebox` / `gb` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes | R81, R85 (released together from here on), R1–R2 (editing in the app) |
-| **Next** | **3** | **v0.3 — MCP for agents** | Claude Code and Codex use glidebox through **MCP tools**, not only shell commands | **MCP server** (`gb mcp`, started by the agent on the same computer); safe retries and stale-edit checks | R11 (MCP), R63–R65 |
+| **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **FlipHopper's own development tasks** on a Mac; the agents building FlipHopper update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the seabag (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`fliphopper` CLI** (short alias `fh`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · FlipHopper's own cards moved in from Markdown · *no server* | R91, R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
+| **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`fliphopper` / `fh` CLI** for Windows · one build pipeline producing both systems' builds · fixes for Windows differences (paths, line endings, the WebView2 engine) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes | R81, R85 (released together from here on), R1–R2 (editing in the app) |
+| **Next** | **3** | **v0.3 — MCP for agents** | Claude Code and Codex use FlipHopper through **MCP tools**, not only shell commands | **MCP server** (`fh mcp`, started by the agent on the same computer); safe retries and stale-edit checks | R11 (MCP), R63–R65 |
 | **Next** | **4** | **v0.4 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
 | **Next** | **5** | **v0.5 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
-| **Later** | **6** | **v0.6 — Git in the app** | The owner **commits and pushes task changes** without leaving glidebox | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
-| **Later** | **7** | **v0.7 — Import the SSR board** | The owner tracks the **SSR migration** in glidebox | SSR importer (in the app and `gb import`) with a reconciliation report | R15 |
-| **Later** | **8** | **v0.8 — Start and open agents** | The owner **starts a task in Claude Code or Codex from glidebox and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
+| **Later** | **6** | **v0.6 — Git in the app** | The owner **commits and pushes task changes** without leaving FlipHopper | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
+| **Later** | **7** | **v0.7 — Import the SSR board** | The owner tracks the **SSR migration** in FlipHopper | SSR importer (in the app and `fh import`) with a reconciliation report | R15 |
+| **Later** | **8** | **v0.8 — Start and open agents** | The owner **starts a task in Claude Code or Codex from FlipHopper and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
 | **Later** | **9** | **v0.9 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by email and long code (free email service, needs approval); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
 | **Later** | **10** | **v0.10 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
 | **Later** | **11** | **v0.11 — New projects in minutes** | A team leader **sets up a new project with any AI agent** | **Generation kit** (prompt, file schema, examples); desktop app validates, previews and adopts generated projects | R50–R55 |
 | **Later** | **12** | **v0.12 — Timeline and export** | The owner sees a **timeline** and can **share a Markdown report** | Desktop app: timeline (gantt) generated from events; Markdown export | R8 |
 | **Later** | **13** | **v0.13 — Cloud copy** | The owner **keeps a project in the cloud and works on it from two computers** | **Cloud service**, the first hosted server: sign-in, publish, clone, push and pull a project; **cloud web app** (the same web interface) | R42–R43, R92 (first paid features) |
 | **Later** | **14** | **v0.14 — Team** | A team **works on one project together online** | Cloud service: owner/admin invitations by email, roles, live updates, merging concurrent edits, atomic cloud claims | R12 (cloud), R20–R23 |
-| **Later** | **15** | **v1.0 — Public release** | Anyone can **download and install** glidebox | **Signed installers** (macOS `.dmg`, Windows installer), **auto-update feed** (GitHub Releases), download page and user guide, UI languages | R85 (signing), R61 |
+| **Later** | **15** | **v1.0 — Public release** | Anyone can **download and install** FlipHopper | **Signed installers** (macOS `.dmg`, Windows installer), **auto-update feed** (GitHub Releases), download page and user guide, UI languages | R85 (signing), R61 |
 
-**When can an agent set up a project's task box?** (`gb init` = "set up glidebox here", like `git init`)
-- **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `gb init` in a repository; this creates the task box with a starter project. It then adds areas and tasks one by one with `gb` commands. The desktop app can also create the folder.
-- **From Iteration 11 (v0.11).** An agent generates a **whole project at once** from glidebox's prompt, and glidebox validates and previews it before adopting it (R50–R55).
+**When can an agent set up a project's seabag?** (`fh init` = "set up FlipHopper here", like `git init`)
+- **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `fh init` in a repository; this creates the seabag with a starter project. It then adds areas and tasks one by one with `fh` commands. The desktop app can also create the folder.
+- **From Iteration 11 (v0.11).** An agent generates a **whole project at once** from FlipHopper's prompt, and FlipHopper validates and previews it before adopting it (R50–R55).
 
-**Task box name on disk (owner, 2026-10-04):** `.glidebox/` at the root of the repository, like `.github/` or `.vscode/`. `gb init` uses it by default; any other folder can still be chosen (R72).
+**Seabag place on disk (owner, 2026-10-04; renamed and made the only place 2026-10-06, [0013](../decisions/0013-product-name-fliphopper.md)):** `.fliphopper/seabag/` at the root of the folder the user picks, like `.github/` or `.vscode/`, also when that folder is empty. `fh init` and the app both create it there (R72, R87).
 
 **Every release** follows R60: one shared set of rules and commands serves people and agents alike.
 
 **Exit check for each iteration** (how we know it is usable):
 
 1. On a Mac:
-   - create the task box in a new folder, and inside a Git repository;
-   - add areas and tasks with the CLI (`gb add …`), and see them in the app;
-   - a real Claude Code session claims and finishes a task with `gb`, and the app shows it;
+   - create the seabag in a new folder, and inside a Git repository;
+   - add areas and tasks with the CLI (`fh add …`), and see them in the app;
+   - a real Claude Code session claims and finishes a task with `fh`, and the app shows it;
    - `git diff` shows readable changes;
-   - glidebox's own cards now live in its task box, and agents use `gb` instead of `TASK_BOARD.md`.
-2. The same checks pass on Windows; one pipeline builds both systems; on both systems, a task created and edited in the app appears in `gb list` and in `git diff` as readable changes.
+   - FlipHopper's own cards now live in its seabag, and agents use `fh` instead of `TASK_BOARD.md`.
+2. The same checks pass on Windows; one pipeline builds both systems; on both systems, a task created and edited in the app appears in `fh list` and in `git diff` as readable changes.
 3. Claude Code and Codex each claim and update a task through MCP; repeating a request does not repeat its effect.
 4. Progress bars, state chart and throughput match a known test project; "waiting on me" lists exactly the owner's items.
-5. The burndown and the finish-date range show for glidebox's own project; the calculations are checked with fixed test data.
+5. The burndown and the finish-date range show for FlipHopper's own project; the calculations are checked with fixed test data.
 6. Committing from the app runs the user's own `git`, including hooks; a refused commit shows the hook's message.
 7. The SSR board imports with every card accounted for in the reconciliation report.
 8. From the app, start one task in Claude Code and one in Codex; the status shows; "Open session" jumps in.
 9. A phone on the same network pairs by email code and shows progress; with the desktop app closed it shows the "start the desktop app" message.
 10. A phone away from home approves a waiting item; the desktop applies and records it.
-11. An agent generates a project from the kit; glidebox validates, previews and adopts it; a broken bundle changes nothing and gets clear errors.
+11. An agent generates a project from the kit; FlipHopper validates, previews and adopts it; a broken bundle changes nothing and gets clear errors.
 12. The timeline and the Markdown export match the project's events.
 13. A project published from one computer is cloned on another; changes push and pull both ways.
 14. A teammate invited by email signs in and edits; conflicting edits are merged, or the user is asked.
@@ -211,7 +211,7 @@ flowchart TD
 **Rules for the roadmap**
 
 - **Only "Now" is committed.** "Next" and "Later" are direction and may be reordered after each release, based on what using it teaches. Reordering is the owner's decision.
-- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from glidebox itself once Iteration 5 exists.
+- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from FlipHopper itself once Iteration 5 exists.
 - **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
 - **Dependencies to watch:**
   - Iteration 2's exit check runs on **a workmate's Windows machine** (owner, 2026-10-04). The agent prepares an unsigned Windows build and a short step-by-step check list. The workmate installs it, runs the checks and reports the results, which are recorded on the card. Expect a Windows security warning on install, because builds are unsigned until Iteration 15.
@@ -220,7 +220,7 @@ flowchart TD
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
   - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 9–10 choose services that use the user's own account or a free tier.
-- **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **glidebox itself**. When Iteration 1 passes its exit check, glidebox's own cards move from Markdown into a task box inside this repository, and the agents building glidebox track their work in it from then on ([AI-WORKFLOW § dogfooding](../workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding)). This is the first real test of every release.
+- **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **FlipHopper itself**. When Iteration 1 passes its exit check, FlipHopper's own cards move from Markdown into a seabag inside this repository, and the agents building FlipHopper track their work in it from then on ([AI-WORKFLOW § dogfooding](../workflow/AI-WORKFLOW.md#after-fliphopper-can-track-itself-dogfooding)). This is the first real test of every release.
 
 ## 10. Open questions
 

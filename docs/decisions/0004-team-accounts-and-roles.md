@@ -10,7 +10,7 @@ The owner wants teammates to collaborate online in cloud projects. [0006](./0006
 
 ## Decision (accepted 2026-09-27)
 
-- Glidebox **has roles**. Every project member holds one role, and what they can do depends on it.
+- FlipHopper **has roles**. Every project member holds one role, and what they can do depends on it.
 - **An owner or admin adds a new member by email address.** No public sign-up: a person can join a project only through such an invitation.
 
 ## Proposal — details not yet confirmed
@@ -29,7 +29,7 @@ The owner wants teammates to collaborate online in cloud projects. [0006](./0006
 **Invitation flow:**
 
 1. An owner or admin enters an email address and a role.
-2. Glidebox sends an invitation email with a single-use link that expires (e.g. after 7 days).
+2. FlipHopper sends an invitation email with a single-use link that expires (e.g. after 7 days).
 3. The invitee signs in or creates an account with **that same email address**, and joins with the given role.
 4. Pending invitations are listed; an owner or admin can resend or cancel them.
 5. Adding someone who already has an account adds the project to their account directly, with a notification email.

@@ -1,6 +1,6 @@
 # Requirements
 
-A **contract**: what glidebox must do. Each requirement has an ID that cards and tests cite. The *why* and design are in [PLAN.md](./PLAN.md) and the [decisions](../decisions/README.md). Status: **accepted** = the owner asked for it or accepted it; **proposed** = recommended, awaiting the owner.
+A **contract**: what FlipHopper must do. Each requirement has an ID that cards and tests cite. The *why* and design are in [PLAN.md](./PLAN.md) and the [decisions](../decisions/README.md). Status: **accepted** = the owner asked for it or accepted it; **proposed** = recommended, awaiting the owner.
 
 ## Visibility and progress
 
@@ -15,13 +15,13 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R7 | Burndown, timeline, "recently finished" and the session list are **computed from recorded events**, never maintained by hand. | [0001](../decisions/0001-database-source-of-truth.md), kept by [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R8 | A **timeline** (gantt) generated from task events. | PLAN | proposed |
 | R89 | Tasks are organised along **two independent axes**: **area** (*what* part of the product it belongs to) and **iteration** (*when* it is planned: a time-box ending in a release). Iteration is optional. Progress, burndown and forecast can be shown per area, per iteration, or for the whole project. | owner, 2026-10-04 | accepted |
-| R90 | Each project can **rename these terms** to the words its team already uses (for example area → epic or workstream; iteration → sprint, milestone or release). Glidebox's screens and command messages then use those words. Defaults: **Area** and **Iteration**. | owner, 2026-10-04 | accepted |
+| R90 | Each project can **rename these terms** to the words its team already uses (for example area → epic or workstream; iteration → sprint, milestone or release). FlipHopper's screens and command messages then use those words. Defaults: **Area** and **Iteration**. | owner, 2026-10-04 | accepted |
 
 ## Source of truth and agents
 
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R10 | Each project's **source of truth is readable text files tracked by Git** (JSON fields, Markdown narrative) in its task box; any database is a rebuildable index. Hand-maintained Markdown boards are only an import source. | owner, 2026-10-04; [0007](../decisions/0007-git-like-project-sync.md) | accepted |
+| R10 | Each project's **source of truth is readable text files tracked by Git** (JSON fields, Markdown narrative) in its seabag; any database is a rebuildable index. Hand-maintained Markdown boards are only an import source. | owner, 2026-10-04; [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R11 | **Agents write structured status** (state, label, claim, waiting-on, size) through a CLI and an MCP server. | [0001](../decisions/0001-database-source-of-truth.md), kept by [0007](../decisions/0007-git-like-project-sync.md) | accepted |
 | R12 | **Claiming is exclusive**: one task, one holder. A claim is atomic within one project authority (a local project's desktop app, or the cloud service for a connected cloud project). A claim made while disconnected from that authority is only tentative and is shown as such ([0007](../decisions/0007-git-like-project-sync.md)). | PLAN; revised 2026-10-04 | proposed |
 | R13 | A configurable **label ladder** per project (default: implemented → locally verified → connected → deployed and verified). | PLAN | proposed |
@@ -33,19 +33,19 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | ID | Requirement | Source | Status |
 |---|---|---|---|
 | R40 | Users can create and use a purely local project, with project information, tasks and their event history stored on their machine. | owner, 2026-10-01 | accepted |
-| R41 | Local project tracking requires no sign-in, cloud account or connection to a Glidebox hosted service. | owner, 2026-10-01 | accepted |
+| R41 | Local project tracking requires no sign-in, cloud account or connection to a FlipHopper hosted service. | owner, 2026-10-01 | accepted |
 | R42 | Users may choose cloud projects; cloud project access requires sign-in. | owner, 2026-10-01 | accepted |
 | R43 | Local project data stays local unless the user explicitly chooses to transfer or share it. Automatic cloud upload is not part of local mode. | local-only requirement, 2026-10-01; [0006](../decisions/0006-local-and-cloud-projects.md) | accepted |
 | R91 | The **local desktop app is free of charge** for developers and team leaders, with no account or payment needed. | owner, 2026-10-04; [0012](../decisions/0012-free-local-app-paid-cloud.md) | accepted |
 | R92 | **Payment is optional and only for cloud features** (cloud copies, team sign-in, invitations, roles, live collaboration). | owner, 2026-10-04; [0012](../decisions/0012-free-local-app-paid-cloud.md) | accepted |
 | R93 | Features in the free app that depend on a hosted service use the user's own account or a provider's free tier, so free users cost (almost) nothing to serve; otherwise the feature is paid. | [0012](../decisions/0012-free-local-app-paid-cloud.md) | proposed |
-| R72 | In the desktop app, the user **chooses each project's task box**; any writable folder is allowed. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
-| R73 | The task box may be a **standalone folder** or a **subfolder of an existing project folder** (for example inside a code repository). | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
-| R74 | A task box is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
-| R75 | Inside an existing Git repository, glidebox **does not create a nested repository** and never commits or pushes on its own; one running desktop app writes to a folder at a time. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
+| R72 | In the desktop app, the user **chooses each project's seabag**; any writable folder is allowed. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
+| R73 | The seabag may be a **standalone folder** or a **subfolder of an existing project folder** (for example inside a code repository). | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
+| R74 | A seabag is **self-contained**: moving or copying it moves the project; rebuildable caches and indexes stay out of it or are marked as ignorable. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
+| R75 | Inside an existing Git repository, FlipHopper **does not create a nested repository** and never commits or pushes on its own; one running desktop app writes to a folder at a time. | [0010](../decisions/0010-project-data-folder.md) | accepted 2026-10-04 |
 | R76 | **All Git actions run the `git` command** installed on the user's machine (commit, push, pull, status, diff), so the user's Git configuration, credentials and repository hooks apply. If `git` is missing, the app asks the user to install it. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
-| R87 | A project's folder is called the **task box** everywhere: documents, screens and command messages. Its default name on disk inside a repository is **`.glidebox/`**. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
-| R88 | The command-line program is called **`glidebox`**, with **`gb`** as a short alias. | owner, 2026-10-04 | accepted |
+| R87 | A project's folder is called the **seabag** everywhere: documents, screens and command messages. A new seabag always goes in **`.fliphopper/seabag/`** inside the folder the user picks, also an empty one. | owner, 2026-10-04 ("task box"); renamed and placed 2026-10-06, [0013](../decisions/0013-product-name-fliphopper.md) | accepted |
+| R88 | The command-line program is called **`fliphopper`**, with **`fh`** as a short alias. | owner, 2026-10-04 (`glidebox` / `gb`); renamed 2026-10-06, [0013](../decisions/0013-product-name-fliphopper.md) | accepted |
 | R94 | The interface supports **English, Simplified Chinese (zh-CN) and Japanese (ja)** from Iteration 1, following the computer's language by default with a setting to change it. To keep cost low: an automatic test fails when any language file misses a text; agents write English first and add the other two in the same edit; interface text stays short and plain; messages from Rust are codes that the interface words in each language. | owner, 2026-10-06 | accepted |
 
 Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
@@ -55,7 +55,7 @@ Local tracking works offline. AI-provider calls and other external integrations 
 | ID | Requirement | Source | Status |
 |---|---|---|---|
 | R20 | **Teammates collaborate online** in cloud projects with live updates. | owner, 2026-09-27 | accepted |
-| R21 | Glidebox has **roles**; what a member can do depends on the role. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
+| R21 | FlipHopper has **roles**; what a member can do depends on the role. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
 | R22 | For cloud projects, **an owner or admin adds a new member by email address**; no public sign-up for cloud membership. Local use requires no account. | owner, 2026-09-27; [0004](../decisions/0004-team-accounts-and-roles.md) | accepted |
 | R23 | Role set: owner, admin, approver, contributor, viewer, agent; agents cannot approve. | [0004](../decisions/0004-team-accounts-and-roles.md) | proposed |
 | R24 | A **"waiting on me"** inbox of checks and approvals owed by the current person (local identity or signed-in cloud member), with approvals recorded. | PLAN | proposed |
@@ -74,8 +74,8 @@ Local tracking works offline. AI-provider calls and other external integrations 
 
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by Glidebox. | owner, 2026-10-01 | accepted |
-| R51 | Glidebox can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | accepted |
+| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by FlipHopper. | owner, 2026-10-01 | accepted |
+| R51 | FlipHopper can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | accepted |
 | R52 | Supply a versioned generation prompt and file schema shared with the validator, with examples and explicit handling of unknown data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
 | R53 | Validate generated bundles and show an adoption/change preview with actionable errors before changing active project data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
 | R54 | Generated output cannot invent verified progress or authoritative approvals; missing completion history stays unknown. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
@@ -104,7 +104,7 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R79 | **Pairing:** the companion user gives a valid email address and an alias; the desktop user approves the email; the desktop app sends a long verification code to that email; the code grants access. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R80 | Pairing codes are single-use and short-lived; the desktop user can remove a paired device at any time; pairing and companion actions are recorded. | [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | proposed |
 | R81 | The desktop app ships for **macOS and Windows**. | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
-| R82 | The desktop window, browser companion and phone companion **share one interface source code**; only the desktop app adds native parts (Git, agent operations, MCP, task box, local server and other OS needs). | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
+| R82 | The desktop window, browser companion and phone companion **share one interface source code**; only the desktop app adds native parts (Git, agent operations, MCP, seabag, local server and other OS needs). | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |
 | R83 | When the desktop app is not running, a companion tells the user to **start the desktop app on their computer**; **refreshing reconnects automatically** once it runs. No stale data is shown meanwhile. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R84 | The pairing code email is sent through a **free email-sending service**. Its access key is never committed or embedded in the shipped app. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R85 | macOS and Windows versions are **released together**; builds stay **unsigned until the first public release**. | owner, 2026-10-04; [0011](../decisions/0011-desktop-framework-and-shared-code.md) | accepted |

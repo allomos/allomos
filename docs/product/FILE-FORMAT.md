@@ -1,22 +1,22 @@
-# Task box file format — `glidebox/1`
+# Seabag file format — `fliphopper/1`
 
-A **contract**: the files inside a task box. The glidebox app, the `gb` command and AI agents must all read and write exactly this. Code: `crates/core` (rules) and `crates/store` (reading and writing). Decided by [0007](../decisions/0007-git-like-project-sync.md) and [0010](../decisions/0010-project-data-folder.md).
+A **contract**: the files inside a seabag. The FlipHopper app, the `fh` command and AI agents must all read and write exactly this. Code: `crates/core` (rules) and `crates/store` (reading and writing). Decided by [0007](../decisions/0007-git-like-project-sync.md) and [0010](../decisions/0010-project-data-folder.md).
 
 ## In plain words
 
-A task box is an ordinary folder of small text files. There is one file for the project, one file per area, and one folder per task. Each task folder holds a JSON file for its fields and a Markdown file for its description. Because they are plain text, Git can show exactly what changed, and anyone can read them.
+A seabag is an ordinary folder of small text files. There is one file for the project, one file per area, and one folder per task. Each task folder holds a JSON file for its fields and a Markdown file for its description. Because they are plain text, Git can show exactly what changed, and anyone can read them.
 
-## Where the task box is
+## Where the seabag is
 
-- Inside a repository or any folder with other files: **`.glidebox/`** at that folder's root (the default).
-- Or a whole folder of its own, chosen by the user.
+- **Always `.fliphopper/seabag/`** at the root of the folder the user picks: a code repository, a folder with other files, or an empty folder ([0013](../decisions/0013-product-name-fliphopper.md)). `.fliphopper/` leaves room for other FlipHopper files later.
+- A folder that already holds `project.json` directly is opened as a seabag as it is; FlipHopper never creates one there.
 
-Glidebox never creates a Git repository inside a task box; the surrounding repository versions it.
+FlipHopper never creates a Git repository inside a seabag; the surrounding repository versions it.
 
 ## Layout
 
 ```text
-.glidebox/
+.fliphopper/seabag/
   project.json
   areas/
     A01.json
@@ -37,7 +37,7 @@ Glidebox never creates a Git repository inside a task box; the surrounding repos
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | Always `"glidebox/1"` for this version. Other values are refused. |
+| `format` | yes | Always `"fliphopper/1"` for this version. Other values are refused, including the earlier `"glidebox/1"`; old folders are not converted ([0013](../decisions/0013-product-name-fliphopper.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. |
@@ -69,7 +69,7 @@ Empty optional fields are left out rather than written as `null`. **Unknown fiel
 
 Free Markdown: the task's outcome and details. Optional; it is not stored inside `task.json`.
 
-## Checks glidebox makes
+## Checks FlipHopper makes
 
 Each problem names the **file** and, where it can, the **field**, with a plain explanation. Valid tasks still show when other files have problems.
 

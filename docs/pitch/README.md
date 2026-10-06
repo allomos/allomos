@@ -1,6 +1,6 @@
 # Road show deck / 路演幻灯片
 
-A nine-slide pitch deck for glidebox, in English and Simplified Chinese. It covers four messages: manage your project while vibe coding; work anytime; teammates cooperate; the local app is free, and people pay only for the cloud. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)).
+A nine-slide pitch deck for FlipHopper, in English and Simplified Chinese. It covers four messages: manage your project while vibe coding; work anytime; teammates cooperate; the local app is free, and people pay only for the cloud. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)).
 
 | Version | Published address (private claude.ai Artifact) | Source in this repo |
 |---|---|---|

@@ -1,4 +1,4 @@
-# Task board — glidebox
+# Task board — FlipHopper
 
 > **Last updated:** 2026-10-06
 
@@ -8,10 +8,10 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; thirteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
+**One card is claimed; thirteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Two cards are done: a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md)); both owner verified 2026-10-06.
 
 **Where the product stands.**
-- The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
+- The owner has decided to **build FlipHopper ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
 - **The local app is free**; payment is only for cloud features ([0012](./decisions/0012-free-local-app-paid-cloud.md)).
 - The product shape: a **desktop app for macOS and Windows as the hub**, built with **Tauri 2** and sharing one interface code base with the browser and phone ([`A00-12`](./tasks/Task-A00-12-desktop-platforms-and-shared-code.md)), with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Each project's data lives in a **folder the user chooses**, standalone or inside an existing project folder ([`A00-11`](./tasks/Task-A00-11-project-data-folder.md)), as **readable text files tracked by Git** ([`A00-06`](./tasks/Task-A00-06-git-sync-proposal.md)).
 - Requirements for local and cloud projects, AI-generated project setup and interfaces are recorded ([`A00-04`](./tasks/Task-A00-04-local-and-cloud-requirements.md), [`A00-08`](./tasks/Task-A00-08-ai-generated-project-setup.md), [`A00-09`](./tasks/Task-A00-09-interface-requirements.md)).
@@ -21,9 +21,9 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - The owner reviews the documents and answers the questions below.
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - The next approved Iteration 1 card is ready to claim (owner, 2026-10-06):
-  - The **`glidebox` / `gb` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). `gb` and the running app take turns writing a task box with a short lock for each change (owner, 2026-10-06).
+  - The **`fliphopper` / `fh` command** for agents ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)). `fh` and the running app take turns writing a seabag with a short lock for each change (owner, 2026-10-06).
 - **Rename to FlipHopper** is under way: a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data becomes a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md)). It runs before A01-03, so the command is built once as `fliphopper` / `fh`.
-- A small fix, waiting for the owner's review: starting glidebox with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
+- A small fix, waiting for the owner's review: starting FlipHopper with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
 ## Sessions
@@ -32,7 +32,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a00-17-rename` (worktree `.claude/worktrees/a00-17`) | [`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md) | 2026-10-06 | step 4 documents |
+| `claude/a00-17-rename` (worktree `.claude/worktrees/a00-17`) | [`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md) | 2026-10-06 | step 5 pitch decks |
 
 ## Waiting on the owner
 
@@ -64,7 +64,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
 | [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it (recommended after A00-17, the rename) |
-| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | step 4: rename in the repository (code done; documents next) |
+| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | step 5: update the published pitch decks; then the owner checks the built app (step 6) |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
@@ -76,7 +76,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Card | Label | When |
 |---|---|---|
 | [`Task-A01-02-ui-languages`](./tasks/Task-A01-02-ui-languages.md) | **owner verified — Done**: the app speaks English, Simplified Chinese and Japanese, follows the computer's language, and keeps a chosen one | 2026-10-06 |
-| [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox`, pushed by the owner | 2026-10-04 |
+| [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox` (renamed `mypals-ml/fliphopper` 2026-10-06), pushed by the owner | 2026-10-04 |
 | [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | **owner verified — Done**: the macOS app opens a task box and shows its tasks by area | 2026-10-06 |
 | [`Task-A00-16-road-show-deck`](./tasks/Task-A00-16-road-show-deck.md) | done — English and Chinese decks published; addresses in [pitch/](./pitch/README.md) | 2026-10-04 |
 | [`Task-A00-13-iterative-release-roadmap`](./tasks/Task-A00-13-iterative-release-roadmap.md) | owner confirmed — 15 iterations, each a usable release | 2026-10-04 |

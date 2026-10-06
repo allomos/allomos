@@ -1,6 +1,6 @@
 # Task-A00-01-planning-docs
 
-- **Outcome.** The owner and any new agent session can understand what glidebox is, what has been decided, what is still open, and how to work on it — by reading `AGENTS.md`, the board and the documents they link, without the original conversation.
+- **Outcome.** The owner and any new agent session can understand what FlipHopper is, what has been decided, what is still open, and how to work on it — by reading `AGENTS.md`, the board and the documents they link, without the original conversation.
 - **Decisive unknowns.** Whether the owner accepts the plan, requirements, workflow and handoff rules as written (owner).
 - **Files owned.** `AGENTS.md`, `CLAUDE.md`, `README.md`, `.gitignore`, `docs/product/PLAN.md`, `docs/workflow/`, `docs/TASK_BOARD.md`, `docs/AGENT_HANDOFF.md`, decisions 0001–0005, the 2026-09-27 and 2026-09-30 discussions, `docs/analysis/`, `docs/GLOSSARY.md`, `docs/REFERENCES.md`. Later planning work opens its own card.
 - **External operations.** None.

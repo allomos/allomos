@@ -1,4 +1,4 @@
-# 0008 — Build glidebox ourselves, not on an open-source base
+# 0008 — Build FlipHopper ourselves, not on an open-source base
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
@@ -6,15 +6,15 @@
 
 ## In plain words
 
-Other tools already do part of what glidebox will do. The research recommended looking at one of them, Backlog.md, as a starting point that we could copy and extend (a "fork"). The owner decided against that: **we write glidebox's own code**. Other projects remain useful for learning; we read them, but we don't build on them.
+Other tools already do part of what FlipHopper will do. The research recommended looking at one of them, Backlog.md, as a starting point that we could copy and extend (a "fork"). The owner decided against that: **we write FlipHopper's own code**. Other projects remain useful for learning; we read them, but we don't build on them.
 
 ## Context
 
-The [competitor investigation](../research/competitor-investigation.md) found that glidebox overlaps substantially with existing trackers and agent workspaces. On 2026-10-01 the owner said glidebox may be sold as a service. The research then recommended evaluating **Backlog.md** (MIT licence) as a possible base, and named veggiemonk/backlog (Apache-2.0) and git-bug (GPLv3) as other candidates.
+The [competitor investigation](../research/competitor-investigation.md) found that FlipHopper overlaps substantially with existing trackers and agent workspaces. On 2026-10-01 the owner said FlipHopper may be sold as a service. The research then recommended evaluating **Backlog.md** (MIT licence) as a possible base, and named veggiemonk/backlog (Apache-2.0) and git-bug (GPLv3) as other candidates.
 
 ## Decision (owner, 2026-10-04)
 
-- **Build our own.** Glidebox's code is written for glidebox. Backlog.md, backlog, git-bug and other open-source trackers are **not** used as a base, fork or embedded core.
+- **Build our own.** FlipHopper's code is written for FlipHopper. Backlog.md, backlog, git-bug and other open-source trackers are **not** used as a base, fork or embedded core.
 - They stay **references**. We may read their public documentation and source to learn designs, such as task-file layout, distributed history and agent interfaces. We do not copy their code.
 
 ## Consequences

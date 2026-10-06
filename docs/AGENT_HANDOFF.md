@@ -37,12 +37,12 @@ Updated: 2026-10-04
 One block per card in the board's Sessions table.
 
 ### Task-A00-17 — claude/a00-17-rename
-- Checkout: worktree `.claude/worktrees/a00-17`, branch `claude/a00-17-rename` · pushed: yes. Folder move (step 3) done: the main checkout is `/Users/wanghui/coding/glidepace/fliphopper`.
-- Approvals in force: the card and its external operations, for the name FlipHopper. Pitch decks (step 5) not touched yet.
-- Done: steps 1–3; step 4 code part: crates `fliphopper-*`, `TaskBox` → `Seabag`, format `fliphopper/1`, `FLIPHOPPER_OPEN`, app ID `io.fliphopper`, texts in en/zh-CN/ja (水手袋, シーバッグ), and answer 8 (a new seabag always goes in `.fliphopper/seabag/`, also in an empty folder). All six card checks PASS.
+- Checkout: worktree `.claude/worktrees/a00-17`, branch `claude/a00-17-rename` · pushed: yes. Not merged into `main` yet.
+- Approvals in force: the card and its external operations, for the name FlipHopper (includes updating the published pitch decks).
+- Done: steps 1–4. Step 4: code, seabag, texts in three languages, documents, decision 0013; all six card checks, links and `git diff --check` PASS (evidence on the card).
 - Uncommitted: none · Running: none
-- Next: step 4 documents part — decision record 0013, FILE-FORMAT, GLOSSARY, 0010, REQUIREMENTS R88, A01-03 card, AGENTS/CLAUDE/README and current docs; dated history keeps "glidebox".
-- Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-17. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Continue step 4 (documents)."
+- Next: step 5 — rename the two pitch decks in `docs/pitch/` and republish them to the addresses in `docs/pitch/README.md`; then build the app for the owner's check (step 6) and merge into `main`.
+- Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper/.claude/worktrees/a00-17. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Continue with step 5 (pitch decks)."
 
 ## Live state
 
@@ -72,17 +72,18 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the b
 - **Git identity** (repo-local config): `will.w.hui <willwhui@gmail.com>`. On 2026-10-04 the owner briefly asked for `willwhui`, then chose to keep `will.w.hui`. The remote uses HTTPS. SSH to GitHub authenticates as `wanghui2sea`.
 - **Decisions:**
   - Accepted: [0007](./decisions/0007-git-like-project-sync.md) **readable text files tracked by Git are the source of truth** (supersedes [0001](./decisions/0001-database-source-of-truth.md)); [0002](./decisions/0002-burndown-counts-plus-sizes.md) burndown by counts plus optional sizes; [0008](./decisions/0008-build-our-own.md) **build our own**, no open-source base.
-  - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**. Web and mobile companions view progress and status and act through the desktop app. They connect from outside at free or very low cost, and pair by email and code. Cloud projects are still needed. [0010](./decisions/0010-project-data-folder.md) **user-chosen task box**, standalone or inside an existing project folder. It is self-contained, uses the host repository's Git, and allows one writer. Every Git action runs the `git` command. Task box default on disk: `.glidebox/`. Iteration 2's Windows checks run on a workmate's machine. [0011](./decisions/0011-desktop-framework-and-shared-code.md) desktop for **macOS and Windows**; desktop window, browser and phone share **one interface code base** built with **Tauri 2** (project rules in Rust crates; interface TypeScript). Released together, unsigned until the first public release.
+  - Accepted in part or as requirements: [0004](./decisions/0004-team-accounts-and-roles.md) roles, owner/admin invite by email; [0005](./decisions/0005-start-and-open-agent-sessions.md) start/open agent sessions; [0006](./decisions/0006-local-and-cloud-projects.md) local-only and optional cloud projects; [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) **desktop hub**. Web and mobile companions view progress and status and act through the desktop app. They connect from outside at free or very low cost, and pair by email and code. Cloud projects are still needed. [0010](./decisions/0010-project-data-folder.md) **user-chosen seabag**, standalone or inside an existing project folder. It is self-contained, uses the host repository's Git, and allows one writer. Every Git action runs the `git` command. Seabag default on disk: `.fliphopper/seabag/`. Iteration 2's Windows checks run on a workmate's machine. [0011](./decisions/0011-desktop-framework-and-shared-code.md) desktop for **macOS and Windows**; desktop window, browser and phone share **one interface code base** built with **Tauri 2** (project rules in Rust crates; interface TypeScript). Released together, unsigned until the first public release.
   - Open: [0003](./decisions/0003-relationship-to-glidelines.md) reuse of the owner's Glidelines code.
   - Proposed: 0007's sync and merge details (layout, push/pull experience, merge rules, offline claims).
+- **Name** ([0013](./decisions/0013-product-name-fliphopper.md), 2026-10-06): the product is **FlipHopper** (`fliphopper`, command `fh`); a project's data is its **seabag**, always in `.fliphopper/seabag/`. Dated history keeps "glidebox".
 - **Business model** ([0012](./decisions/0012-free-local-app-paid-cloud.md), 2026-10-04): the local app is free, with no account; payment is only for cloud features. Free users must cost (almost) nothing to serve. The source licence is undecided.
-- **Until glidebox can track itself** (from the end of Iteration 1, decided by the owner 2026-10-04), this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-glidebox-can-track-itself-dogfooding).
+- **Until FlipHopper can track itself** (from the end of Iteration 1, decided by the owner 2026-10-04), this project's cards are Markdown in this repo; see [AI-WORKFLOW § dogfooding](./workflow/AI-WORKFLOW.md#after-fliphopper-can-track-itself-dogfooding).
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 
 ## Do not assume
 
 - That a decision marked *Proposed* or *Open* is approved — in particular 0003 (Glidelines reuse) and 0007's sync and merge details. Only 0007's storage foundation is accepted.
-- That a database is a source of truth — any database is a rebuildable index outside the task box (0007).
+- That a database is a source of truth — any database is a rebuildable index outside the seabag (0007).
 - That companions change project data directly — they send requests to the desktop app, which is the only authority (R77).
 - That an open-source tracker may be forked or its code copied — 0008 rules that out.
 - That interface, generated-project or packaging details marked *proposed* in [INTERFACES](./product/INTERFACES.md) and [AI-GENERATED-PROJECTS](./product/AI-GENERATED-PROJECTS.md) are accepted scope.

@@ -7,14 +7,14 @@
 ## In plain words
 
 In the desktop app, you decide **where each project's data is stored**. It can be any folder:
-- a **folder of its own**, for example `~/glidebox/my-project`;
-- a **subfolder inside an existing project folder**, for example a `glidebox/` folder inside a code repository, so the tasks live right next to the code they describe.
+- a **folder of its own**, for example `~/FlipHopper/my-project`;
+- a **subfolder inside an existing project folder**, for example a `FlipHopper/` folder inside a code repository, so the tasks live right next to the code they describe.
 
-Glidebox does not force all projects into one hidden app-data location.
+FlipHopper does not force all projects into one hidden app-data location.
 
-## Name: "task box" (owner, 2026-10-04)
+## Name: "seabag" (owner; "task box" 2026-10-04, renamed "seabag" 2026-10-06)
 
-We call a project's folder the **task box** — in the documents, the app's screens and the messages of the `glidebox` command. **On disk, its default name inside a repository is `.glidebox/`** (owner, 2026-10-04), at the repository root like `.github/` or `.vscode/`. `gb init` creates it there unless told otherwise; any other folder can still be chosen (R72).
+We call a project's folder the **seabag** — in the documents, the app's screens and the messages of the `fliphopper` command. **On disk, a new seabag always goes in `.fliphopper/seabag/`** inside the folder the user picks, at that folder's root like `.github/` or `.vscode/`. This holds also when the picked folder is empty, so agents, `fh` and the app look in one place only (owner, 2026-10-06, [0013](./0013-product-name-fliphopper.md); until then an empty folder became the seabag itself). `fh init` creates it there. The user still picks any writable folder (R72); a folder that already holds `project.json` directly is opened as it is.
 
 ## Owner's statement (2026-10-04)
 
@@ -24,10 +24,10 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 ## Decision
 
-- When creating or opening a local project, the user **chooses its task box**. Any folder they can write to is allowed.
+- When creating or opening a local project, the user **chooses its seabag**. Any folder they can write to is allowed.
 - Supported locations include a **standalone folder** and a **subfolder of an existing project folder**, such as a code repository.
-- The desktop app keeps a list of the projects it knows and their folders. Opening a folder that already holds glidebox data opens that project.
-- **Commit and push run the real `git` command** (owner, 2026-10-04). When glidebox commits or pushes a project's data, it calls the `git` program installed on the user's machine. It does not reimplement Git or use a separate Git library for these actions. In plain words: it does exactly what typing `git commit` / `git push` in a terminal would do. That means:
+- The desktop app keeps a list of the projects it knows and their folders. Opening a folder that already holds FlipHopper data opens that project.
+- **Commit and push run the real `git` command** (owner, 2026-10-04). When FlipHopper commits or pushes a project's data, it calls the `git` program installed on the user's machine. It does not reimplement Git or use a separate Git library for these actions. In plain words: it does exactly what typing `git commit` / `git push` in a terminal would do. That means:
   - the user's own Git settings apply: name and email, SSH keys, credential helpers;
   - the repository's hooks run (for example a pre-commit check), and a refusal from a hook is shown to the user, not bypassed;
   - the resulting history is ordinary Git history that any Git tool can read.
@@ -35,13 +35,13 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 ## Confirmed details (owner, 2026-10-04)
 
 - **Self-contained folder.** Everything that defines the project lives in its folder, so moving or copying the folder moves the project. Caches and indexes that can be rebuilt are kept outside it.
-- **Inside a Git repository** (for example, a subfolder of a code repo): glidebox uses that repository's Git and does not create a second repository nested inside.
-- **Glidebox never commits or pushes unless the user asks.**
+- **Inside a Git repository** (for example, a subfolder of a code repo): FlipHopper uses that repository's Git and does not create a second repository nested inside.
+- **FlipHopper never commits or pushes unless the user asks.**
 - **One writer at a time.** Only one running desktop app writes to a folder at a time. A second one opens it read-only, or is refused.
 - **All Git actions use the `git` command**, not only commit and push: pull, status and diff too.
 - **If `git` is not installed**, the desktop app asks the user to install it. Projects stay usable without Git actions until then.
 - **Only standalone folders and subfolders of an existing project folder** are in scope. No special handling is planned for synced folders (Dropbox, iCloud), network drives or removable disks.
-- **One glidebox project per repository.** Several glidebox projects in different subfolders of one code repository are **out of scope**.
+- **One FlipHopper project per repository.** Several FlipHopper projects in different subfolders of one code repository are **out of scope**.
 
 ## Proposed detail (not yet confirmed)
 

@@ -1,6 +1,6 @@
 # AI workflow and handoff
 
-How agent sessions (Claude Code, Codex) start, hand over and stop on glidebox. [AGENTS.md](../../AGENTS.md) holds the short, always-loaded version of these rules; this file holds the detail. Adapted from the owner's SSR migration project (`AI-WORKFLOW.md`, `AGENT_HANDOFF.md`; see [REFERENCES.md](../REFERENCES.md)).
+How agent sessions (Claude Code, Codex) start, hand over and stop on FlipHopper. [AGENTS.md](../../AGENTS.md) holds the short, always-loaded version of these rules; this file holds the detail. Adapted from the owner's SSR migration project (`AI-WORKFLOW.md`, `AGENT_HANDOFF.md`; see [REFERENCES.md](../REFERENCES.md)).
 
 ## Roles and effort
 
@@ -61,6 +61,6 @@ The agent raises this itself; the owner should not have to ask.
 - For **claude.ai (web) projects**: a local `CLAUDE.md` is not loaded automatically. Add `AGENTS.md`, this file and the current board as project knowledge, and paste an instruction to follow them. Never upload `.env` files, tokens or a whole working directory.
 - A switch preserves decisions, approvals, evidence and consumed attempts; it does not authorize repeating operations.
 
-## After glidebox can track itself (dogfooding)
+## After FlipHopper can track itself (dogfooding)
 
-**Decided by the owner, 2026-10-04:** glidebox's own tasks are Iteration 1's first real project. When Iteration 1 (v0.1, macOS) passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), glidebox's own cards move from Markdown into a task box inside this repository. This workflow then changes: claims, labels and waiting-on are written with `gb` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Until then, the Markdown board is authoritative.**
+**Decided by the owner, 2026-10-04:** FlipHopper's own tasks are Iteration 1's first real project. When Iteration 1 (v0.1, macOS) passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), FlipHopper's own cards move from Markdown into a seabag inside this repository. This workflow then changes: claims, labels and waiting-on are written with `fh` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Until then, the Markdown board is authoritative.**
