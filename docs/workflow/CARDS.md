@@ -1,6 +1,6 @@
 # Cards, labels and claiming
 
-A **contract** for how work is recorded on FlipHopper while the board is Markdown. [TASK_BOARD.md](../TASK_BOARD.md) is the index; each card's detail is its own file in [docs/tasks/](../tasks/).
+A **contract** for how work is recorded on FlipHopper. Since [`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md) (2026-10-06) FlipHopper tracks itself: **status lives in this repository's seabag** (`.fliphopper/seabag/` on `main`), changed with the `fh` command ([CODING_RULES § The `fh` command](./CODING_RULES.md#the-fh-command)). Each card's detail is its own file in [docs/tasks/](../tasks/). [TASK_BOARD.md](../TASK_BOARD.md) keeps only **Now** and **Waiting on the owner**, until it is removed or generated from the seabag (owner, 2026-10-06).
 
 ## Areas
 
@@ -40,17 +40,23 @@ Add an area by editing this table and the board in the same commit.
 
 ## Where status lives
 
-**Only on the board row** (State, Label, Session, Next dependency). The card file holds the outcome, scope, approvals and dated progress notes — never a copy of the state. When state changes, edit the board row; the card gets a dated note only if there is something to explain.
+**Only in the seabag on `main`**: each card is a task with the card's number as its ID (`A01-07`), and its state, label, holder and waiting-on are that task's fields. The card file holds the outcome, scope, approvals and dated progress notes — never a copy of the state. The task's `description.md` links to the card file.
+
+- **Change status only with `fh`, only on `main`.** Card branches hold an old copy of the seabag; never change it there. From a card's worktree, point `fh` at the main checkout: `export FLIPHOPPER_SEABAG=<main checkout>` (for example `/Users/wanghui/coding/glidepace/fliphopper`). Then commit only the seabag change on `main` (`git -C <main checkout> commit .fliphopper -m "fh: label A01-05 locally verified"`) and push it.
+- **Who you are:** `export FLIPHOPPER_HOLDER=<your branch>` (for example `claude/a01-05-readme`), or `--as <branch>` on each command.
+- **Next dependency:** for a waiting task it is its *waiting on*; for a held task it is in your handoff block; for a backlog task it is in its `description.md` until `fh` can set the field.
+- **Seeing status:** `fh list` (all, by area), `fh list --state in_progress` (who holds what — this replaces the old Sessions table), `fh list --state done`, `fh show <ID>`, `fh next`. The app shows the same when it opens this repository.
 
 ## States and labels
 
 - **State:** `backlog` → `ready` (owner reviewed the card) → `in progress` → `waiting` (on the owner or another card) → `done`; or `dropped`.
 - **Label**, the only progress claim, for work that ships:
+  0. **drafted** — a document or decision card is written for review
   1. **implemented** — code written, may not run end to end
   2. **locally verified** — the card's named checks pass locally, in the complete local app
   3. **deployed and verified** — running on the approved hosted target, hosted checks pass (only once a hosting target exists)
   4. **owner verified** — the owner checked it; the card may move to Done
-- Documentation or decision cards use: **drafted** → **owner accepted**.
+- Documentation or decision cards use **drafted** → **owner verified** (the owner accepted it). This is one ladder for every card, set in the seabag's `project.json` (owner, 2026-10-06).
 - Every open card names its **single next dependency** (what blocks the next label) and who it waits on.
 - Passing test counts support a label; they are never a label.
 
@@ -61,21 +67,24 @@ Add an area by editing this table and the board in the same commit.
 
 ## Claiming protocol
 
-One card is worked by exactly one session at a time. The board, not memory or chat, records who holds what.
+One card is worked by exactly one session at a time. The seabag on `main`, not memory or chat, records who holds what. Every step below is run against the main checkout's seabag (see [Where status lives](#where-status-lives)).
 
-1. **Pull before claiming** (when a remote exists) and read the latest board.
-2. **Claim in a commit of its own.** Pick a `ready` card with no session. Write your session name (branch or worktree name, e.g. `claude/w01-core-model-3f2a`) into the card's board row and the **Sessions** table, commit only that change, then start work.
-3. **A card claimed by another session is read-only to you.** If it holds a stale fact, correct only that fact and leave the Session untouched.
-4. **Two claims at once:** the second to land gets a merge conflict on that row — keep whichever landed first and claim a different card.
-5. **Release** a card you stop short of Done: clear its Session to `—`, remove your Sessions row and your handoff block, and set State/Next dependency so the next session knows what it is picking up.
-6. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
-7. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
+1. **Pull before claiming:** `git -C <main checkout> pull --ff-only`, then `fh next` (or `fh list --state ready`).
+2. **Claim in a commit of its own.** `fh claim <ID> --as <branch>`; commit only the seabag change on `main` (`fh: claim <ID>`), push it at once, then start work. `fh claim` refuses a task someone else holds (`task_held`), and the lock stops two sessions on this computer from both winning.
+3. **A card held by another session is read-only to you.** If its card file holds a stale fact, correct only that fact. `fh claim --take` is only for a session whose holder has stopped (for example its quota ran out) and says so in the handoff.
+4. **Two claims from different computers:** the second to push gets a merge conflict in that task's `task.json` — keep whichever landed first and claim a different card.
+5. **Labels and waiting:** `fh label <ID> "<label>"` and `fh wait <ID> --on "<what>"` on `main`, each committed and pushed as it happens.
+6. **Finish** after the owner's check: `fh label <ID> "owner verified"`, `fh done <ID>`, `fh release <ID>`; commit with the merge of the card's branch.
+7. **Release** a card you stop short of Done: `fh release <ID> --note "<what the next session needs>"`, remove your handoff block, commit and push.
+8. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
+9. **A new card:** write its file in `docs/tasks/`, then `fh add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../docs/tasks/<file>)"` on `main`; it starts in `backlog`. When the owner approves it, move it to `ready` with `fh claim` then `fh release`.
+10. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
 
 ## Now — rules
 
 **Now** answers two questions only: *what is true of the product today* and *what is next*. About 300 words.
 
-- Finishing a card removes its paragraph from Now in the same commit; one row goes to **Recently finished**.
+- Finishing a card removes its paragraph from Now in the same commit. (`fh list --state done` replaces the old Recently finished list.)
 - Now never repeats what a card says; every line names a card that exists.
 - Headings name states (Now, Waiting on the owner, Blocked, Done), never topics.
 - Before committing a board edit, read Now from the top; if two lines disagree, correct the older one in place.

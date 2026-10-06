@@ -28,15 +28,15 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 
 ## Working procedure
 
-1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/), listed on [docs/TASK_BOARD.md](docs/TASK_BOARD.md). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
+1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in this repository's seabag (`.fliphopper/seabag/`, worked with `fh`). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
 2. **Several sessions may work at once**, each in its own git worktree and branch (`claude/…`, `codex/…`), each holding **one** card. Claim before you work, following the [claiming protocol](docs/workflow/CARDS.md#claiming-protocol).
-3. **Status has one home: the card's row on the board.** Card files hold detail, never a second copy of state. Do not restate status anywhere else.
-4. **Labels are the only progress claims:** implemented → locally verified → deployed and verified → owner verified (Done). Each open card names its single next dependency.
+3. **Status has one home: the task in the seabag on `main`**, changed only with `fh` (`fh list`, `fh next`, `fh claim`, `fh label`, `fh wait`, `fh done`, `fh release`). Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the owner's open questions.
+4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → owner verified (Done). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
 6. **One card per outcome, including research and decision records.** Do not keep adding unrelated work to an existing card; open a new card, so each piece can be finished and reviewed on its own.
 7. **Push after every commit** (owner, 2026-10-04): push your branch to `origin` (`mypals-ml/fliphopper`, renamed from `glidebox` 2026-10-06) right after each commit, and confirm it landed (`git status -sb` shows no "ahead"). Never force-push, and never push to a remote other than `origin`.
 8. **Say who made each commit.** End every commit message with a line naming the agent, for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`, so history shows which agent and session did the work.
-9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes on the board; supersede stale lines by editing them in place.
+9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the seabag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
 ## Handoff — write it continuously
@@ -47,7 +47,7 @@ Quota can end a session without warning. After every meaningful step (a task fin
 
 | Activity | Read |
 |---|---|
-| Orient / resume | [docs/TASK_BOARD.md](docs/TASK_BOARD.md) → your card in [docs/tasks/](docs/tasks/) → [docs/AGENT_HANDOFF.md](docs/AGENT_HANDOFF.md) (your block, Live state, Pitfalls). New to the project: [docs/README.md](docs/README.md) |
+| Orient / resume | [docs/TASK_BOARD.md](docs/TASK_BOARD.md) and `fh list` / `fh next` → your card in [docs/tasks/](docs/tasks/) → [docs/AGENT_HANDOFF.md](docs/AGENT_HANDOFF.md) (your block, Live state, Pitfalls). New to the project: [docs/README.md](docs/README.md) |
 | Plan a card | [REQUIREMENTS.md](docs/product/REQUIREMENTS.md), [PLAN.md](docs/product/PLAN.md), the relevant [decisions](docs/decisions/README.md) |
 | Implement / test | the card, affected source and tests; coding rules once they exist (`docs/workflow/CODING_RULES.md`, created by the first code card) |
 | Look at prior art | [docs/REFERENCES.md](docs/REFERENCES.md) — read only the named files |
@@ -58,6 +58,7 @@ Reuse context you already have; do not re-read unchanged documents. **The measur
 
 ## Verification and reporting
 
+- Status changes: `fh list --json` reports no `issues`.
 - Documentation-only changes: check links and paths, instruction consistency, and `git diff --check`.
 - Code changes: run the card's named checks; report PASS / FAIL / NOT RUN separately, and untested gates separately.
 - Report briefly: what changed, what was verified, what remains and who it waits on.

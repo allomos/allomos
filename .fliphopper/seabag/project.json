@@ -1,0 +1,12 @@
+{
+  "format": "fliphopper/1",
+  "id": "fliphopper",
+  "name": "FlipHopper",
+  "labels": [
+    "drafted",
+    "implemented",
+    "locally verified",
+    "deployed and verified",
+    "owner verified"
+  ]
+}

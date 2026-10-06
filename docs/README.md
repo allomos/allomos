@@ -6,7 +6,7 @@
 
 | Where | What | Kind |
 |---|---|---|
-| [TASK_BOARD.md](./TASK_BOARD.md) | What is being worked on, by whom, and what waits on the owner. **The only home of status.** | status |
+| [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the seabag (`../.fliphopper/seabag/`, read with `fh list` or the app). | status |
 | [AGENT_HANDOFF.md](./AGENT_HANDOFF.md) | Restart mechanics for the next agent session: active resume, live state, pitfalls, current truth | handoff |
 | [tasks/](./tasks/) | One file per card: outcome, scope, approvals, notes | cards |
 | **product/** | | |
@@ -37,6 +37,6 @@
 
 ## Rules for documents
 
-- A new file only for a **contract**, **evidence**, a **decision record**, a **discussion record**, or material the owner asks for, such as the [road show deck](./pitch/README.md) ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes on the board.
+- A new file only for a **contract**, **evidence**, a **decision record**, a **discussion record**, or material the owner asks for, such as the [road show deck](./pitch/README.md) ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes in the seabag, with `fh`.
 - Supersede by editing the stale line in place; do not add a companion document.
 - Evidence of what actually ran goes under `docs/research/` or `docs/evidence/`, linked from the card.
