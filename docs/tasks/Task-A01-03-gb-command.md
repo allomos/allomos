@@ -101,7 +101,7 @@ Shared behaviour:
 
 **Decisions taken inside the card** (contracts in [FILE-FORMAT § Writing rules](../product/FILE-FORMAT.md#writing-rules-how-writers-take-turns) and [CODING_RULES § The `fh` command](../workflow/CODING_RULES.md#the-fh-command)):
 - **The lock:** `fs4` =1.1.0 (MIT or Apache-2.0). It locks `.fliphopper/seabag/.lock`, which the seabag's own `.gitignore` keeps out of Git. A writer waits up to 5 s, then exits with code 3.
-- **How the app learns about changes:** it asks for a fingerprint of the files once a second, instead of using a folder watcher. This needs no new package, and companions can use the same request later.
+- **How the app learns about changes:** it asks for a fingerprint of the files once a second, instead of using a folder watcher. This needs no new package. The check is a cheap local call inside the desktop app only. **Companions must not copy it:** over the network, the desktop app pushes a change notice to them instead of being asked on a timer (owner, 2026-10-06).
 - **Swapping in a new file is safe on macOS:** a reader that already opened the old file keeps reading the old file whole, and the race test's reader never saw a broken file. Windows is still to check in Iteration 2.
 - **Added beyond the proposal:** `fh claim --take` takes over a task someone else holds and prints a `took_over` warning. Without it, an agent whose quota ran out would block the task. Other agents may not change a held task (`task_held`). A release replaces the handoff note, or removes it when no note is given.
 - **Installing:** run `cargo install --path crates/cli`.

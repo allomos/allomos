@@ -102,6 +102,6 @@ npm --prefix apps/desktop run dev
 
 `npm --prefix apps/desktop run dev` starts the interface and the desktop window together and reloads on changes. To open a folder directly, pass it at start-up: `FLIPHOPPER_OPEN=/path/to/folder npm --prefix apps/desktop run dev`, or `open FlipHopper.app --args /path/to/folder` for a built app.
 
-While a seabag is open, the window checks about once a second whether its files changed (a fingerprint of names, sizes and change times, `seabag_stamp`) and reloads when they did, so changes made with `fh` show without reopening the folder. Polling was chosen over a folder watcher: no new package or thread, and the same request will serve the companions later.
+While a seabag is open, the window checks about once a second whether its files changed (a fingerprint of names, sizes and change times, `seabag_stamp`) and reloads when they did, so changes made with `fh` show without reopening the folder. Polling was chosen over a folder watcher because it needs no new package or thread, and inside the desktop app it is a cheap local call. **Companions are different:** over the network, the desktop app pushes a change notice to them; they never ask on a timer (owner, 2026-10-06).
 
 To build a local, unsigned app: `npx --prefix apps/desktop tauri build --debug --bundles app`. The result is `target/debug/bundle/macos/FlipHopper.app`.
