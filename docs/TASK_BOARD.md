@@ -20,6 +20,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 **What is next.**
 - The owner reviews the documents and answers the questions below.
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
+- **UI languages decided** (owner, 2026-10-06): English, Simplified Chinese and Japanese (R94). The agent prepares a small Iteration 1 card for it, before the interface grows.
 - The next Iteration 1 card is the **`glidebox` / `gb` command**: agents create the task box, then add, claim, update and finish tasks. It must also decide how `gb` and the running app avoid writing the same task box at once. The agent prepares the card for the owner's review.
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
@@ -44,7 +45,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
-| UI languages (Glidelines has en / ja / zh-CN / zh-TW) | [REQUIREMENTS](./product/REQUIREMENTS.md) | W04 |
 
 ## Cards
 

@@ -117,6 +117,10 @@ The owner then asked for a "what ships" column (apps, servers and so on) and sai
 
 Before approving the first code card, the owner asked whether the project is worth doing. Claude gave the case for and against, and recommended a time-boxed Iteration 1 with stop criteria. The owner then set the direction: **developers and team leaders can use the local app free, if they don't want to pay — which is also the owner's own wish.** Recorded as [0012](../decisions/0012-free-local-app-paid-cloud.md) and R91–R93.
 
+## UI languages (2026-10-06)
+
+After the first app passed its check, the owner asked whether to add a second UI language early. The answer was yes: it is cheap now and costly to retrofit. Asked about token cost, the owner accepted the cost-keeping rules and chose **English, Simplified Chinese and Japanese** (R94).
+
 ## Proposed plan change to confirm (superseded by the release roadmap)
 
 Cloud projects move from M2 to M4, so that M2 is the desktop hub and M2b is companion viewing. This follows from 0009, but the owner has not confirmed the new order.

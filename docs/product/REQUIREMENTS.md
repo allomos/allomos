@@ -46,6 +46,7 @@ A **contract**: what glidebox must do. Each requirement has an ID that cards and
 | R76 | **All Git actions run the `git` command** installed on the user's machine (commit, push, pull, status, diff), so the user's Git configuration, credentials and repository hooks apply. If `git` is missing, the app asks the user to install it. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 | R87 | A project's folder is called the **task box** everywhere: documents, screens and command messages. Its default name on disk inside a repository is **`.glidebox/`**. | owner, 2026-10-04; [0010](../decisions/0010-project-data-folder.md) | accepted |
 | R88 | The command-line program is called **`glidebox`**, with **`gb`** as a short alias. | owner, 2026-10-04 | accepted |
+| R94 | The interface supports **English, Simplified Chinese (zh-CN) and Japanese (ja)** from Iteration 1, following the computer's language by default with a setting to change it. To keep cost low: an automatic test fails when any language file misses a text; agents write English first and add the other two in the same edit; interface text stays short and plain; messages from Rust are codes that the interface words in each language. | owner, 2026-10-06 | accepted |
 
 Local tracking works offline. AI-provider calls and other external integrations may still need their own network access and authentication. Moving projects between modes and synchronization are not yet decided.
 
@@ -113,4 +114,4 @@ Read [INTERFACES.md](./INTERFACES.md) for the accepted scope and proposed shared
 
 ## Not yet decided
 
-Remote-access method, and which free email service to use ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); UI languages; hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).
+Remote-access method, and which free email service to use ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)); hosting target; one-time vs continuous import — see [TASK_BOARD § Waiting on the owner](../TASK_BOARD.md#waiting-on-the-owner).
