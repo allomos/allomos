@@ -3,6 +3,10 @@
   "bad_usage": [
     "detail"
   ],
+  "cannot_make_ready": [
+    "id",
+    "state"
+  ],
   "create_failed": [
     "path",
     "detail"

@@ -71,7 +71,7 @@ A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-c
 
 | Command | What it does |
 |---|---|
-| `fh init [--name <name>]` | Creates an empty seabag in `.fliphopper/seabag/` at the root of the current Git repository, or of the current folder outside Git. Refused (`seabag_exists`) when one is there. Never creates a Git repository. |
+| `fh init [--name <name>] [--id <id>] [--labels <a,b,…>]` | Creates an empty seabag in `.fliphopper/seabag/` at the root of the current Git repository, or of the current folder outside Git. Refused (`seabag_exists`) when one is there. Never creates a Git repository. `--id` sets the project ID (default: from the folder's name); `--labels` sets the label ladder, lowest step first (default: implemented, locally verified, deployed and verified, owner verified; empty → `ladder_empty`). |
 | `fh add area <id> <name>` | Adds an area, ordered after the existing ones. |
 | `fh add task <id> --area <id> --title <text> [--description <text>]` | Adds a task in `backlog`; the description goes into `description.md`. |
 | `fh list [--area <id>] [--state <state>] [--mine]` | Tasks grouped by area: ID, state, label, holder, title. |
@@ -81,6 +81,9 @@ A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-c
 | `fh wait <id> --on <text>` | State `waiting`, with what it waits on. |
 | `fh done <id>` | State `done`. Warns (`label_below_top`) without refusing when the label is below the top step. |
 | `fh release <id> [--note <text>]` | Clears the holder; `in_progress` goes back to `ready`. The note replaces the task's handoff note. |
+| `fh needs <id> [<text>]` | Sets the task's next dependency; without text, clears it. |
+| `fh ready <id>` | An unheld `backlog` or `waiting` task becomes `ready`, its *waiting on* cleared. Otherwise refused (`cannot_make_ready`). |
+| `fh drop <id>` | State `dropped`; holder and *waiting on* cleared. Refused (`task_closed`) when done or dropped. |
 | `fh next` | The first `ready` task no one holds (by area order, then ID), with its handoff note. |
 
 - **Holder rules.** `label`, `wait`, `done` and `release` are refused (`task_held`) on a task someone else holds; an unheld task may be changed by anyone.

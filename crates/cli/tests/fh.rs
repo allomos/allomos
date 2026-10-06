@@ -8,7 +8,7 @@ use std::process::{Command, Output};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 const FH: &str = env!("CARGO_BIN_EXE_fh");
 
@@ -452,4 +452,54 @@ fn git_sees_only_text_files() {
             ".fliphopper/seabag/tasks/A01-01/task.json",
         ]
     );
+}
+
+#[test]
+fn needs_ready_drop_and_init_options() {
+    let repo = filled();
+    // Next dependency: set, shown, cleared.
+    let v = ok(&repo, &["needs", "A01-01", "owner review"]);
+    assert_eq!(v["task"]["next_dependency"], "owner review");
+    assert_eq!(
+        task_file(&repo, "A01-01")["next_dependency"],
+        "owner review"
+    );
+    let out = fh(&repo, &["show", "A01-01"]);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("next dependency: owner review"));
+    ok(&repo, &["needs", "A01-01"]);
+    assert!(task_file(&repo, "A01-01").get("next_dependency").is_none());
+    // Ready from backlog; refused when already ready.
+    assert_eq!(ok(&repo, &["ready", "A01-01"])["task"]["state"], "ready");
+    refused(&repo, &["ready", "A01-01"], 1, "cannot_make_ready");
+    // Drop: refused for another holder's task, then closed for good.
+    ok(&repo, &["--as", "a", "claim", "A01-02"]);
+    refused(&repo, &["--as", "b", "drop", "A01-02"], 1, "task_held");
+    let d = ok(&repo, &["--as", "a", "drop", "A01-02"]);
+    assert_eq!(
+        (&d["task"]["state"], &d["task"]["holder"]),
+        (&json!("dropped"), &Value::Null)
+    );
+    refused(&repo, &["drop", "A01-02"], 1, "task_closed");
+
+    // init with an ID and a ladder; an empty ladder is refused and creates nothing.
+    let dir = tmp("init-options");
+    ok(
+        &dir,
+        &[
+            "init",
+            "--id",
+            "fliphopper",
+            "--labels",
+            "drafted, owner verified",
+        ],
+    );
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(dir.join(".fliphopper/seabag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(project["id"], "fliphopper");
+    assert_eq!(project["labels"], json!(["drafted", "owner verified"]));
+    let empty = tmp("init-empty-ladder");
+    refused(&empty, &["init", "--labels", " , "], 1, "ladder_empty");
+    assert!(!empty.join(".fliphopper/seabag").exists());
 }

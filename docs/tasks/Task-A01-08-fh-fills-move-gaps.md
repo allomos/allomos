@@ -36,3 +36,13 @@ Moving FlipHopper's own cards into its seabag showed four gaps in the `fh` comma
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the A01-07 findings.
+- 2026-10-06 — Worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-06)
+
+**In plain words.** `fh` can now set every status field of a card: `fh needs` sets or clears the next dependency, `fh ready` marks an approved backlog or waiting card ready, `fh drop` drops a card, and `fh init --id … --labels …` sets the project ID and its label ladder. The rules follow `fh`'s existing ones: a task someone else holds is refused, and a done or dropped task stays closed. One new problem code, `cannot_make_ready`, has words in three languages. CARDS.md and the `fh` contract in CODING_RULES use the new commands.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (core: new `needs_ready_and_drop`; store: new `init_with_own_id_and_ladder`; command: new `needs_ready_drop_and_init_options`) | PASS |
+| `npm --prefix apps/web run check:i18n` (74 texts, 35 codes) | PASS |

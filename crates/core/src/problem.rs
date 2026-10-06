@@ -94,6 +94,8 @@ problems! {
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
     /// FlipHopper was started with a folder that does not exist or is not a folder.
     StartupNotAFolder { path } => "startup_not_a_folder", "FlipHopper was started with {path}, which is not a folder, so nothing was opened.";
+    /// Only an unheld backlog or waiting task can be made ready.
+    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

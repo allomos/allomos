@@ -499,6 +499,17 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
 /// empty `areas/` and `tasks/`, and a `.gitignore` for the lock. Refused when `root` exists.
 /// Never creates a Git repository.
 pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
+    init_with_labels(root, id, name, fliphopper_core::default_labels())
+}
+
+/// [`init`] with the project's own label ladder, lowest step first. An empty ladder is
+/// refused (`ladder_empty`), like an invalid ID.
+pub fn init_with_labels(
+    root: &Path,
+    id: &str,
+    name: &str,
+    labels: Vec<String>,
+) -> Result<PathBuf, Problem> {
     if root.exists() {
         return Err(Problem::SeabagExists {
             path: root.display().to_string(),
@@ -508,7 +519,7 @@ pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
         format: FORMAT.to_string(),
         id: id.to_string(),
         name: name.to_string(),
-        labels: fliphopper_core::default_labels(),
+        labels,
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);
@@ -664,6 +675,30 @@ mod tests {
         let p = std::env::temp_dir().join(format!("fliphopper-test-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn init_with_own_id_and_ladder() {
+        let dir = tmp("init-ladder");
+        let root = dir.join(DEFAULT_DIR);
+        let ladder = vec!["drafted".to_string(), "owner verified".to_string()];
+        init_with_labels(&root, "fliphopper", "FlipHopper", ladder.clone()).unwrap();
+        let bag = load(&root).seabag.unwrap();
+        assert_eq!(
+            (bag.project.id.as_str(), bag.project.labels),
+            ("fliphopper", ladder)
+        );
+        let other = dir.join("other");
+        assert_eq!(
+            init_with_labels(&other, "p", "P", vec![]),
+            Err(Problem::LadderEmpty)
+        );
+        assert!(!other.exists());
+        assert!(matches!(
+            init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()]),
+            Err(Problem::InvalidId { .. })
+        ));
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
