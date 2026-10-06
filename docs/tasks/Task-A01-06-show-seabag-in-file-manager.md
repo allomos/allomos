@@ -48,8 +48,9 @@ While a seabag is open, the top bar has a button that opens the seabag's folder 
 | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` | PASS |
 | `cargo test --workspace` (36), including `file_manager_opens_only_a_seabag` | PASS |
 | `npm --prefix apps/web run typecheck` / `build` / `check:i18n` (71 texts, 33 codes) | PASS |
-| Pressing the button in the running app | owner check (the agent has no access to the window) |
+| Pressing the button in the running app | **PASS** (owner, 2026-10-06): Finder opened the `seabag` folder |
 
 ## Notes
 
-- 2026-10-06 — Card written by the agent from the owner's request. Not started: one card per session, and it follows A01-03.
+- 2026-10-06 — Card written by the agent from the owner's request.
+- 2026-10-06 — Built by `claude/a01-06-reveal`; owner verified; merged into `main`. **Done.**

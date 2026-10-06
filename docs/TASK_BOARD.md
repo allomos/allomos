@@ -8,9 +8,10 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed ([`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md)); fifteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Three cards are done, all owner verified 2026-10-06:
+**No card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Four cards are done, all owner verified 2026-10-06:
 - a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md));
-- the **`fliphopper` / `fh` command** ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)): agents create a seabag and claim, label, park, finish and release tasks, leaving a handoff note for the next one. A short lock for each change means two agents cannot take the same task, and the open app follows the changes.
+- the **`fliphopper` / `fh` command** ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)): agents create a seabag and claim, label, park, finish and release tasks, leaving a handoff note for the next one. A short lock for each change means two agents cannot take the same task, and the open app follows the changes;
+- a **Show in Finder / Explorer** link for the open seabag ([`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md)).
 
 **Where the product stands.**
 - The owner has decided to **build FlipHopper ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -24,7 +25,6 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - **Renamed to FlipHopper** (done 2026-10-06): a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data is a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md), [0013](./decisions/0013-product-name-fliphopper.md)).
 - **New main message** ([0014](./decisions/0014-main-purpose-and-three-sets.md)): switch between AI agents and teammates and keep the project; AI skills and progress management are the two other sets. Owner accepted the rewritten decks (done 2026-10-06) ([`Task-A00-18`](./tasks/Task-A00-18-positioning-and-deck.md)).
-- Ready: a **Show in Finder / Explorer** button for the open seabag ([`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md)).
 - Ready: when FlipHopper fills a folder that looks empty, it adds `README-fliphopper.md` ([`Task-A01-05`](./tasks/Task-A01-05-readme-in-new-folder.md)).
 - A small fix, waiting for the owner's review: starting FlipHopper with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
@@ -35,7 +35,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a01-06-reveal` (`.claude/worktrees/a01-06-reveal`) | [`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | 2026-10-06 | owner presses Show in Finder |
 
 ## Waiting on the owner
 
@@ -66,7 +65,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | waiting | locally verified (the button press not seen by the agent) | `claude/a01-06-reveal` | owner presses Show in Finder |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
 | [`Task-A07-01-app-icon-hopper`](./tasks/Task-A07-01-app-icon-hopper.md) | ready | — | — | a session claims it |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
@@ -80,6 +78,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | Label | When |
 |---|---|---|
+| [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | **owner verified — Done**: Show in Finder / Explorer for the open seabag | 2026-10-06 |
 | [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | **owner verified — Done**: the `fh` command for agents, a lock for each change, handoff notes, and the app following changes | 2026-10-06 |
 | [`Task-A00-18-positioning-and-deck`](./tasks/Task-A00-18-positioning-and-deck.md) | **owner accepted — Done**: main purpose is switching between AI agents and teammates (0014); decks rebuilt around the three sets, with the seabag and hopper mark | 2026-10-06 |
 | [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | **owner verified — Done**: the product is FlipHopper; the app makes a seabag in `.fliphopper/seabag/` and says so in three languages; decks republished at new addresses | 2026-10-06 |
