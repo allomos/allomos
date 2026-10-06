@@ -10,6 +10,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-06 | The 2026-10-04 review fixes accepted ("accept") | owner (chat) |
 | 2026-10-04 | Mobile companion is an installed native app (answer to 0009 Q6) — later replaced | owner (chat) |
 | 2026-10-04 | Mobile companion is a phone-friendly web page (confirmed) | owner (chat) |
 | 2026-10-04 | Fix the review findings; record the decision to build our own instead of starting from an open-source base | owner (chat) |
@@ -27,3 +28,5 @@
 - 2026-10-04 — The owner answered 0009 question 6: the mobile companion is an **installed native app**. Recorded in 0009, R70, PLAN and the board.
 
 - 2026-10-04 — Review findings: [discussion record](../discussions/2026-10-04-docs-review.md).
+
+- 2026-10-06 — **Owner accepted.** All relative links resolve (0 broken); `git diff --check` clean.

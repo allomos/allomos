@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**No card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Five cards are done, all owner verified 2026-10-06:
+**No card is claimed; twelve cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Five cards are done, all owner verified 2026-10-06:
 - a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md));
 - the **`fliphopper` / `fh` command** ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)): agents create a seabag and claim, label, park, finish and release tasks, leaving a handoff note for the next one. A short lock for each change means two agents cannot take the same task, and the open app follows the changes;
 - a **Show in Finder / Explorer** link for the open seabag ([`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md));
@@ -19,10 +19,10 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - **The local app is free**; payment is only for cloud features ([0012](./decisions/0012-free-local-app-paid-cloud.md)).
 - The product shape: a **desktop app for macOS and Windows as the hub**, built with **Tauri 2** and sharing one interface code base with the browser and phone ([`A00-12`](./tasks/Task-A00-12-desktop-platforms-and-shared-code.md)), with web and mobile companions that connect to it to view progress and status ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Each project's data lives in a **folder the user chooses**, standalone or inside an existing project folder ([`A00-11`](./tasks/Task-A00-11-project-data-folder.md)), as **readable text files tracked by Git** ([`A00-06`](./tasks/Task-A00-06-git-sync-proposal.md)).
 - Requirements for local and cloud projects, AI-generated project setup and interfaces are recorded ([`A00-04`](./tasks/Task-A00-04-local-and-cloud-requirements.md), [`A00-08`](./tasks/Task-A00-08-ai-generated-project-setup.md), [`A00-09`](./tasks/Task-A00-09-interface-requirements.md)).
-- The 2026-10-04 review has fixed the documents ([`Task-A00-10`](./tasks/Task-A00-10-docs-consistency-review.md)).
+- The planning documents, agent workflow and the 2026-10-04 review fixes are accepted ([`Task-A00-01`](./tasks/Task-A00-01-planning-docs.md), [`Task-A00-10`](./tasks/Task-A00-10-docs-consistency-review.md)).
 
 **What is next.**
-- The owner reviews the documents and answers the questions below.
+- The owner answers the questions below.
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - **Renamed to FlipHopper** (done 2026-10-06): a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data is a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md), [0013](./decisions/0013-product-name-fliphopper.md)).
 - **New main message** ([0014](./decisions/0014-main-purpose-and-three-sets.md)): switch between AI agents and teammates and keep the project; AI skills and progress management are the two other sets. Owner accepted the rewritten decks (done 2026-10-06) ([`Task-A00-18`](./tasks/Task-A00-18-positioning-and-deck.md)).
@@ -45,7 +45,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Question or approval | Record | Unblocks |
 |---|---|---|
-| Review and accept the planning documents and agent workflow, as corrected on 10-04 | [`Task-A00-01`](./tasks/Task-A00-01-planning-docs.md), [`Task-A00-10`](./tasks/Task-A00-10-docs-consistency-review.md) | everything |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
@@ -62,8 +61,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | State | Label | Session | Next dependency |
 |---|---|---|---|---|
-| [`Task-A00-01-planning-docs`](./tasks/Task-A00-01-planning-docs.md) | waiting | drafted | — | owner review of the documents |
-| [`Task-A00-10-docs-consistency-review`](./tasks/Task-A00-10-docs-consistency-review.md) | waiting | drafted | — | owner review of the corrected documents |
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
@@ -81,6 +78,8 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Card | Label | When |
 |---|---|---|
+| [`Task-A00-01-planning-docs`](./tasks/Task-A00-01-planning-docs.md) | **owner accepted — Done**: plan, decisions 0001–0005 records, agent workflow and handoff rules | 2026-10-06 |
+| [`Task-A00-10-docs-consistency-review`](./tasks/Task-A00-10-docs-consistency-review.md) | **owner accepted — Done**: the 2026-10-04 review fixes | 2026-10-06 |
 | [`Task-A00-03-glidelines-relationship`](./tasks/Task-A00-03-glidelines-relationship.md) | **owner decided — Done**: FlipHopper is a new standalone product (0003, option B); Glidelines is read for ideas only | 2026-10-06 |
 | [`Task-A07-01-app-icon-hopper`](./tasks/Task-A07-01-app-icon-hopper.md) | **owner verified — Done**: app icon and window mark, design Y2 in colours D4 (flat); `make-icons.sh` rebuilds the set | 2026-10-06 |
 | [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | **owner verified — Done**: Show in Finder / Explorer for the open seabag | 2026-10-06 |
