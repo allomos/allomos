@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**No card is claimed; fifteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Three cards are done, all owner verified 2026-10-06:
+**One card is claimed ([`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md)); fifteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Three cards are done, all owner verified 2026-10-06:
 - a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md));
 - the **`fliphopper` / `fh` command** ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)): agents create a seabag and claim, label, park, finish and release tasks, leaving a handoff note for the next one. A short lock for each change means two agents cannot take the same task, and the open app follows the changes.
 
@@ -35,6 +35,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
+| `claude/a01-06-reveal` (`.claude/worktrees/a01-06-reveal`) | [`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | 2026-10-06 | the top bar shows Show in Finder for the open seabag |
 
 ## Waiting on the owner
 
@@ -65,7 +66,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | ready | — | — | a session claims it |
+| [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | in progress | — | `claude/a01-06-reveal` | button built and tested |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
 | [`Task-A07-01-app-icon-hopper`](./tasks/Task-A07-01-app-icon-hopper.md) | ready | — | — | a session claims it |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
