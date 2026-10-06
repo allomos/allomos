@@ -34,7 +34,14 @@ Updated: 2026-10-04
 
 ## Active resume
 
-One block per card in the board's Sessions table. None claimed.
+One block per card in the board's Sessions table.
+
+### Task-A00-17 — claude/a00-17-rename
+- Checkout: main checkout `/Users/wanghui/coding/glidepace/glidebox`, branch `main` (docs only so far) · pushed: yes
+- Approvals in force: the card and its external operations (GitHub rename, local folder rename, pitch decks), in the card's order; nothing external done yet.
+- Uncommitted: none · Running: none
+- Done: step 1, name check (findings on the card).
+- Next: the owner confirms CrossJump (or CrossJumper); then step 2, rename the GitHub repository and update `origin`.
 
 ## Live state
 
