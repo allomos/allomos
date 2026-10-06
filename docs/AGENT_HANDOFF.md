@@ -37,12 +37,12 @@ Updated: 2026-10-04
 One block per card in the board's Sessions table.
 
 ### Task-A00-17 — claude/a00-17-rename
-- Checkout: main checkout `/Users/wanghui/coding/glidepace/glidebox`, branch `main` (docs only so far) · pushed: yes
-- Approvals in force: the card and its external operations (GitHub rename, local folder rename, pitch decks), in the card's order; nothing external done yet.
+- Checkout: main checkout, branch `main` · pushed: yes. **Moving** from `/Users/wanghui/coding/glidepace/glidebox` to `/Users/wanghui/coding/glidepace/fliphopper` (step 3).
+- Approvals in force: the card and its external operations, for the name FlipHopper (owner confirmed the GitHub target). Pitch decks (step 5) not touched yet.
+- Done: step 1 name check, name FlipHopper chosen; step 2 repository renamed to `mypals-ml/fliphopper`, `origin` updated, `AGENTS.md` push address fixed. Agent memory copied to `~/.claude/projects/-Users-wanghui-coding-glidepace-fliphopper/memory/`.
 - Uncommitted: none · Running: none
-- Done: step 1, name check (findings on the card).
-- Name chosen: **FlipHopper**. Step 2 done: repository renamed to `mypals-ml/fliphopper`, `origin` updated.
-- Next: step 3, move the local folder to `/Users/wanghui/coding/glidepace/fliphopper` (this session ends first; the owner starts a new session there).
+- Next: in the new folder, confirm `git status -sb` and `git remote -v`; then create the worktree `.claude/worktrees/a00-17` on branch `claude/a00-17-rename` and do step 4 (the rename in the repository), following the card.
+- Resume prompt: "Resume Task-A00-17 (rename to FlipHopper) in /Users/wanghui/coding/glidepace/fliphopper. Read AGENTS.md, the board, the card docs/tasks/Task-A00-17-rename-to-crossjump.md and your block in docs/AGENT_HANDOFF.md. Steps 1–3 are done; start step 4 in a new worktree."
 
 ## Live state
 
@@ -50,7 +50,7 @@ Checked 2026-10-06.
 
 | What | Where | Notes |
 |---|---|---|
-| Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Holds the merged app code (A01-01, A01-02); no dependencies installed and nothing built here (build in a card's worktree) |
+| Main checkout | `/Users/wanghui/coding/glidepace/fliphopper` (was `…/glidebox` until 2026-10-06), branch `main` | Holds the merged app code (A01-01, A01-02); no dependencies installed and nothing built here (build in a card's worktree) |
 | Git remote | `origin` = `https://github.com/mypals-ml/fliphopper.git` (repository renamed from `glidebox` 2026-10-06, A00-17; GitHub redirects the old address) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
 | Worktrees | none besides the main checkout (`a01-01` and `a01-02` removed after merging, 2026-10-06; their branches remain on GitHub) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
