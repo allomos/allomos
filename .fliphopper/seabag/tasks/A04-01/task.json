@@ -1,7 +1,9 @@
 {
   "area": "A04",
-  "holder": "claude/a01-run",
+  "handoff_note": "Research done: docs/research/remote-access.md.",
   "id": "A04-01",
-  "state": "in_progress",
-  "title": "Remote access research"
+  "label": "drafted",
+  "state": "waiting",
+  "title": "Remote access research",
+  "waiting_on": "owner reads the recommendation and decides 0009 questions 4 and 5"
 }
