@@ -1,7 +1,9 @@
 {
   "area": "A03",
-  "holder": "claude/a01-run",
+  "handoff_note": "Research done: docs/research/agent-launch-and-resume.md. Codex CLI on this Mac is broken.",
   "id": "A03-01",
-  "state": "in_progress",
-  "title": "Agent launch research"
+  "label": "drafted",
+  "state": "waiting",
+  "title": "Agent launch research",
+  "waiting_on": "owner reads the research; approves short real trials of both agents if wanted"
 }
