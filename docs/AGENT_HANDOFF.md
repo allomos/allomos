@@ -41,7 +41,8 @@ One block per card in the board's Sessions table.
 - Approvals in force: the card and its external operations (GitHub rename, local folder rename, pitch decks), in the card's order; nothing external done yet.
 - Uncommitted: none · Running: none
 - Done: step 1, name check (findings on the card).
-- Name chosen: **FlipHopper** (card § Name decision). Next: step 2, rename the GitHub repository to `mypals-ml/fliphopper` and update `origin` (owner confirming the new target).
+- Name chosen: **FlipHopper**. Step 2 done: repository renamed to `mypals-ml/fliphopper`, `origin` updated.
+- Next: step 3, move the local folder to `/Users/wanghui/coding/glidepace/fliphopper` (this session ends first; the owner starts a new session there).
 
 ## Live state
 
@@ -50,7 +51,7 @@ Checked 2026-10-06.
 | What | Where | Notes |
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Holds the merged app code (A01-01, A01-02); no dependencies installed and nothing built here (build in a card's worktree) |
-| Git remote | `origin` = `https://github.com/mypals-ml/glidebox.git` (added by the owner, 2026-10-04) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
+| Git remote | `origin` = `https://github.com/mypals-ml/fliphopper.git` (repository renamed from `glidebox` 2026-10-06, A00-17; GitHub redirects the old address) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
 | Worktrees | none besides the main checkout (`a01-01` and `a01-02` removed after merging, 2026-10-06; their branches remain on GitHub) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 

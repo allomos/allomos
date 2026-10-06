@@ -38,7 +38,7 @@ The owner wants to rename the product from **Glidebox** to **FlipHopper**. The n
 ## Order of work (when the owner says start)
 
 1. **Name check, first of all.** Done 2026-10-06; the owner chose FlipHopper over CrossJump (see [Name check](#name-check-2026-10-06-agent) and [Name decision](#name-decision)).
-2. **GitHub repository.** Rename `mypals-ml/glidebox` → `mypals-ml/fliphopper`, then point `origin` at the new address and confirm a push lands.
+2. **GitHub repository.** Rename `mypals-ml/glidebox` → `mypals-ml/fliphopper`, then point `origin` at the new address and confirm a push lands. Done 2026-10-06 (owner confirmed the new target in chat).
 3. **Local folder.** Rename `/Users/wanghui/coding/glidepace/glidebox` → `…/fliphopper`. Every session, worktree and the agents' saved memory depend on this path, so: the session commits and pushes everything, stops all its processes, and ends. The owner moves the folder (or lets the agent do it as that session's last action), then starts a **new session in the new folder** with the prompt the agent gives. The agents' memory folder is copied to the new path's name in the same step.
 4. **The rename in the repository**: the decision record, code, data folder, interface texts in three languages, documents and agent guides (the table above).
 5. **Pitch decks**: update the published decks ([`Task-A00-16`](./Task-A00-16-road-show-deck.md)) to the new name.
@@ -69,6 +69,7 @@ The owner wants to rename the product from **Glidebox** to **FlipHopper**. The n
 - 2026-10-06 — Card written by the agent for the owner's review.
 - 2026-10-06 — Owner answered and approved; "seabag" chosen for the data (over belongings, bindle, kitbag, dunnage).
 - 2026-10-06 — Claimed; step 1 (name check) done. The owner compared names and chose **FlipHopper** (see Name decision).
+- 2026-10-06 — Step 2 done: GitHub repository renamed to `mypals-ml/fliphopper` with `gh repo rename` (owner confirmed); `origin` now `https://github.com/mypals-ml/fliphopper.git`. GitHub redirects the old address.
 
 ## Name check (2026-10-06, agent)
 
