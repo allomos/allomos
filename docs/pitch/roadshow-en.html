@@ -1,4 +1,4 @@
-<title>Glidebox Road Show</title>
+<title>FlipHopper Road Show</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -167,7 +167,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 <header class="bar">
   <div class="brand">
     <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="6" width="24" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5 11 L13 16 L23 21" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/></svg>
-    Glidebox
+    FlipHopper
   </div>
   <span class="bar-note">ROAD SHOW · OCTOBER 2026 · IN DEVELOPMENT</span>
   <button class="btn" id="present-btn" type="button">Present ▸</button>
@@ -176,12 +176,12 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 <main class="deck" id="deck">
 
   <!-- 1 -->
-  <section class="slide hero" aria-label="Glidebox">
+  <section class="slide hero" aria-label="FlipHopper">
     <div class="hero-grid">
       <div>
         <p class="eyebrow">Project tracking for vibe coding</p>
         <h1>Land every <em>vibe-coded</em> project.</h1>
-        <p class="lede">Your AI agents write the code. Glidebox keeps the project on course: what's done, what's verified, what needs you, and when it will land.</p>
+        <p class="lede">Your AI agents write the code. FlipHopper keeps the project on course: what's done, what's verified, what needs you, and when it will land.</p>
         <div class="pill-row">
           <span class="pill free">Local app · free</span>
           <span class="pill">macOS · Windows</span>
@@ -216,7 +216,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
         </svg>
       </figure>
     </div>
-    <div class="foot"><span>Glidebox</span><span>01 / 09</span></div>
+    <div class="foot"><span>FlipHopper</span><span>01 / 09</span></div>
   </section>
 
   <!-- 2 -->
@@ -239,19 +239,19 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
     <h2>The board your agents keep up to date.</h2>
     <div class="cols">
       <ul class="ticks">
-        <li><span><b>A task box in your repo.</b> Tasks live as readable files in <span class="mono">.glidebox/</span>, versioned by your own Git.</span></li>
-        <li><span><b>Agents report as they work.</b> Claude Code and Codex claim, update and finish tasks through the <span class="mono">glidebox</span> command and MCP.</span></li>
+        <li><span><b>A seabag in your repo.</b> Tasks live as readable files in <span class="mono">.fliphopper/seabag/</span>, versioned by your own Git.</span></li>
+        <li><span><b>Agents report as they work.</b> Claude Code and Codex claim, update and finish tasks through the <span class="mono">fliphopper</span> command and MCP.</span></li>
         <li><span><b>Progress you can trust.</b> Each task climbs proven steps, and only you mark it done.</span></li>
         <li><span><b>A finish date, honestly.</b> From your team's real pace: the date you have a 50% chance of hitting, and the date you have an 85% chance of hitting.</span></li>
         <li><span><b>Start or reopen an agent</b> on any task, straight from the app.</span></li>
       </ul>
       <div style="display:grid;gap:14px;min-width:0">
         <div class="term" aria-label="Example commands"><span class="c"># an agent picks up work</span>
-gb next
+fh next
 <span class="ok">A01-03</span>  Sign-in page   ready
-gb claim A01-03
-gb label A01-03 "locally verified"
-gb wait A01-03 --on owner "check on phone"</div>
+fh claim A01-03
+fh label A01-03 "locally verified"
+fh wait A01-03 --on owner "check on phone"</div>
         <div class="ladder" aria-label="Verification steps">
           <div class="rung done"><i>1</i>Implemented</div>
           <div class="rung done"><i>2</i>Locally verified</div>
@@ -343,16 +343,16 @@ gb wait A01-03 --on owner "check on phone"</div>
     <h2>Plain files, real Git, one hub.</h2>
     <div class="cols">
       <ul class="ticks">
-        <li><span><b>Task box:</b> readable JSON and Markdown in <span class="mono">.glidebox/</span>, inside your repository.</span></li>
+        <li><span><b>Seabag:</b> readable JSON and Markdown in <span class="mono">.fliphopper/seabag/</span>, inside your repository.</span></li>
         <li><span><b>Your Git:</b> commit, push and pull run your own <span class="mono">git</span>, with your keys and hooks.</span></li>
         <li><span><b>One set of rules:</b> the app, the command line and MCP all go through the same checks and history.</span></li>
       </ul>
       <div class="flow" style="flex-direction:column;align-items:stretch">
-        <div class="node"><b>Agents</b>Claude Code · Codex → <span class="mono">gb</span> / MCP</div>
+        <div class="node"><b>Agents</b>Claude Code · Codex → <span class="mono">fh</span> / MCP</div>
         <span class="arrow" style="text-align:center">↓</span>
-        <div class="node" style="border-color:var(--amber)"><b>Glidebox desktop</b>rules · forecast · local server</div>
+        <div class="node" style="border-color:var(--amber)"><b>FlipHopper desktop</b>rules · forecast · local server</div>
         <span class="arrow" style="text-align:center">↓ ↑</span>
-        <div class="node"><b>.glidebox/ in your repo</b>files tracked by Git · optional cloud copy</div>
+        <div class="node"><b>.fliphopper/seabag/ in your repo</b>files tracked by Git · optional cloud copy</div>
       </div>
     </div>
     <div class="foot"><span>Local-first architecture</span><span>07 / 09</span></div>
@@ -372,19 +372,19 @@ gb wait A01-03 --on owner "check on phone"</div>
       <div class="leg"><span class="when">Then</span><h3>Team</h3>
         <ol><li><span>v0.13</span>Cloud copy</li><li><span>v0.14</span>Teams</li><li><span>v1.0</span>Public release</li></ol></div>
     </div>
-    <div class="foot"><span>Selected releases shown · glidebox tracks its own development from v0.1</span><span>08 / 09</span></div>
+    <div class="foot"><span>Selected releases shown · FlipHopper tracks its own development from v0.1</span><span>08 / 09</span></div>
   </section>
 
   <!-- 9 -->
   <section class="slide close" aria-label="Closing">
-    <p class="eyebrow">Glidebox</p>
+    <p class="eyebrow">FlipHopper</p>
     <h2>Your agents code.<br><em>You land the project.</em></h2>
     <p class="lede">Manage your project while vibe coding. Work from anywhere. Bring your team. Free on your machine; pay only if you want the cloud.</p>
     <div class="pill-row">
       <span class="pill free">Local app · free</span>
       <span class="pill">Early development · first release: macOS</span>
     </div>
-    <div class="foot"><span>Glidebox · October 2026</span><span>09 / 09</span></div>
+    <div class="foot"><span>FlipHopper · October 2026</span><span>09 / 09</span></div>
   </section>
 
   <nav class="nav" aria-label="Slide controls">

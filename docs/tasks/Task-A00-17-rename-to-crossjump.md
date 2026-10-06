@@ -72,6 +72,7 @@ The owner wants to rename the product from **Glidebox** to **FlipHopper**. The n
 - 2026-10-06 — Step 2 done: GitHub repository renamed to `mypals-ml/fliphopper` with `gh repo rename` (owner confirmed); `origin` now `https://github.com/mypals-ml/fliphopper.git`. GitHub redirects the old address.
 - 2026-10-06 — Step 3 done: the owner moved the local folder to `…/glidepace/fliphopper`; work continues in the worktree `.claude/worktrees/a00-17`.
 - 2026-10-06 — Step 4 done (agent): code, data folder, interface texts and documents renamed; decision record [0013](../decisions/0013-product-name-fliphopper.md). Answer 8 built: the app now creates a new seabag in `.fliphopper/seabag/` also inside an empty folder (test `empty_folder_gets_starter_seabag_in_default_dir`). In the `fh` card, `--box` / `GLIDEBOX_BOX` became `--seabag` / `FLIPHOPPER_SEABAG` to match the new word. Checks: see [Step 4 evidence](#step-4-evidence-2026-10-06).
+- 2026-10-06 — Step 5, part 1: both deck sources in `docs/pitch/` renamed (FlipHopper, seabag / 水手袋, `.fliphopper/seabag/`, `fh`) and checked in a browser. **Republishing is blocked:** this session's claude.ai account cannot find either published address in `docs/pitch/README.md` ("artifact not found"; its artifact list is empty), so they were probably published from another account or organization. Waiting on the owner: republish from the account that owns them, or approve new addresses.
 
 ## Name check (2026-10-06, agent)
 
@@ -131,4 +132,3 @@ Sources: [Sidehopper, Metroid Wiki](https://metroid.fandom.com/wiki/Sidehopper),
 |---|---|
 | States the old name on purpose | `AGENTS.md` (repository "renamed from `glidebox`"), [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) (old folder and repository, the removed `glidebox-local-cloud` worktree, the name bullet), [TASK_BOARD.md](../TASK_BOARD.md) (finished A00-02 row), [FILE-FORMAT.md](../product/FILE-FORMAT.md) (`glidebox/1` is refused), [REQUIREMENTS.md](../product/REQUIREMENTS.md) R88 (old command), [0013](../decisions/0013-product-name-fliphopper.md), this card |
 | Dated history | `docs/discussions/*`, `docs/research/*`, `docs/analysis/ssr-task-board.md`; finished cards A00-02, A00-04 to A00-09, A00-13, A00-16, A01-01, A01-02; dated Notes lines in A00-14 and A01-04 |
-| Step 5 | `docs/pitch/roadshow-en.html`, `docs/pitch/roadshow-zh.html` |

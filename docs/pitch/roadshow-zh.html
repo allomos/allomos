@@ -1,4 +1,4 @@
-<title>Glidebox 路演</title>
+<title>FlipHopper 路演</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
@@ -167,7 +167,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 <header class="bar">
   <div class="brand">
     <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="6" width="24" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5 11 L13 16 L23 21" fill="none" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/></svg>
-    Glidebox
+    FlipHopper
   </div>
   <span class="bar-note">路演 · 2026 年 10 月 · 开发中</span>
   <button class="btn" id="present-btn" type="button">演示 ▸</button>
@@ -175,12 +175,12 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 
 <main class="deck" id="deck" lang="zh-CN">
 
-  <section class="slide hero" aria-label="Glidebox">
+  <section class="slide hero" aria-label="FlipHopper">
     <div class="hero-grid">
       <div>
         <p class="eyebrow">专为 Vibe Coding 打造的项目管理工具</p>
         <h1>让每个 <em>Vibe Coding</em> 项目都稳稳落地</h1>
-        <p class="lede">代码交给 AI 来写，进度交给 Glidebox。做完了什么、验证了什么、哪些事在等你拍板、大概什么时候能交付，一目了然。</p>
+        <p class="lede">代码交给 AI 来写，进度交给 FlipHopper。做完了什么、验证了什么、哪些事在等你拍板、大概什么时候能交付，一目了然。</p>
         <div class="pill-row">
           <span class="pill free">本地应用免费</span>
           <span class="pill">macOS · Windows</span>
@@ -215,7 +215,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
         </svg>
       </figure>
     </div>
-    <div class="foot"><span>Glidebox</span><span>01 / 09</span></div>
+    <div class="foot"><span>FlipHopper</span><span>01 / 09</span></div>
   </section>
 
   <section class="slide" aria-label="问题">
@@ -236,19 +236,19 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
     <h2>看板由智能体自己来更新</h2>
     <div class="cols">
       <ul class="ticks">
-        <li><span><b>任务箱就放在你的代码仓库里。</b>任务是 <span class="mono">.glidebox/</span> 下的普通文本文件，用你自己的 Git 管理版本。</span></li>
-        <li><span><b>智能体干活时顺手汇报。</b>Claude Code 和 Codex 通过 <span class="mono">glidebox</span> 命令或 MCP 认领任务、更新进度、标记完成。</span></li>
+        <li><span><b>水手袋就放在你的代码仓库里。</b>任务是 <span class="mono">.fliphopper/seabag/</span> 下的普通文本文件，用你自己的 Git 管理版本。</span></li>
+        <li><span><b>智能体干活时顺手汇报。</b>Claude Code 和 Codex 通过 <span class="mono">fliphopper</span> 命令或 MCP 认领任务、更新进度、标记完成。</span></li>
         <li><span><b>进度经得起推敲。</b>每个任务都要一级一级通过验证，最后由你亲自确认完成。</span></li>
         <li><span><b>交付日期有据可依。</b>燃尽图按团队的真实速度给出两个日期：有五成把握的，和有八成五把握的。</span></li>
         <li><span><b>一键启动智能体。</b>在应用里就能为任意任务开启智能体，或回到之前的会话。</span></li>
       </ul>
       <div style="display:grid;gap:14px;min-width:0">
         <div class="term" aria-label="命令示例"><span class="c"># 智能体领取下一项工作</span>
-gb next
+fh next
 <span class="ok">A01-03</span>  Sign-in page   ready
-gb claim A01-03
-gb label A01-03 "locally verified"
-gb wait A01-03 --on owner "check on phone"</div>
+fh claim A01-03
+fh label A01-03 "locally verified"
+fh wait A01-03 --on owner "check on phone"</div>
         <div class="ladder" aria-label="验证阶梯">
           <div class="rung done"><i>1</i>已实现</div>
           <div class="rung done"><i>2</i>本地已验证</div>
@@ -336,16 +336,16 @@ gb wait A01-03 --on owner "check on phone"</div>
     <h2>普通文件 + 真正的 Git + 一个核心应用</h2>
     <div class="cols">
       <ul class="ticks">
-        <li><span><b>任务箱：</b>仓库里 <span class="mono">.glidebox/</span> 目录下可以直接阅读的 JSON 和 Markdown 文件。</span></li>
+        <li><span><b>水手袋：</b>仓库里 <span class="mono">.fliphopper/seabag/</span> 目录下可以直接阅读的 JSON 和 Markdown 文件。</span></li>
         <li><span><b>用你自己的 Git：</b>提交、推送、拉取都调用本机的 <span class="mono">git</span>，沿用你的密钥和钩子。</span></li>
         <li><span><b>一套规则管到底：</b>应用、命令行和 MCP 走同一套校验，留下同一份历史。</span></li>
       </ul>
       <div class="flow" style="flex-direction:column;align-items:stretch">
-        <div class="node"><b>智能体</b>Claude Code · Codex → <span class="mono">gb</span> / MCP</div>
+        <div class="node"><b>智能体</b>Claude Code · Codex → <span class="mono">fh</span> / MCP</div>
         <span class="arrow" style="text-align:center">↓</span>
-        <div class="node" style="border-color:var(--amber)"><b>Glidebox 桌面应用</b>规则 · 预测 · 本地服务</div>
+        <div class="node" style="border-color:var(--amber)"><b>FlipHopper 桌面应用</b>规则 · 预测 · 本地服务</div>
         <span class="arrow" style="text-align:center">↓ ↑</span>
-        <div class="node"><b>仓库里的 .glidebox/</b>由 Git 管理的文件 · 可选云端副本</div>
+        <div class="node"><b>仓库里的 .fliphopper/seabag/</b>由 Git 管理的文件 · 可选云端副本</div>
       </div>
     </div>
     <div class="foot"><span>本地优先的架构</span><span>07 / 09</span></div>
@@ -364,18 +364,18 @@ gb wait A01-03 --on owner "check on phone"</div>
       <div class="leg"><span class="when">最后</span><h3>团队</h3>
         <ol><li><span>v0.13</span>云端存储</li><li><span>v0.14</span>团队协作</li><li><span>v1.0</span>正式发布</li></ol></div>
     </div>
-    <div class="foot"><span>仅列出部分版本 · 从 v0.1 开始，Glidebox 就用自己来管理自己的开发</span><span>08 / 09</span></div>
+    <div class="foot"><span>仅列出部分版本 · 从 v0.1 开始，FlipHopper 就用自己来管理自己的开发</span><span>08 / 09</span></div>
   </section>
 
   <section class="slide close" aria-label="结尾">
-    <p class="eyebrow">Glidebox</p>
+    <p class="eyebrow">FlipHopper</p>
     <h2>智能体写代码，<br><em>你来掌控落地。</em></h2>
     <p class="lede">一边 Vibe Coding 一边管好项目，随时随地掌握进度，带着团队一起干。本地免费使用，需要云端时再付费。</p>
     <div class="pill-row">
       <span class="pill free">本地应用免费</span>
       <span class="pill">早期开发中 · 首个版本支持 macOS</span>
     </div>
-    <div class="foot"><span>Glidebox · 2026 年 10 月</span><span>09 / 09</span></div>
+    <div class="foot"><span>FlipHopper · 2026 年 10 月</span><span>09 / 09</span></div>
   </section>
 
   <nav class="nav" aria-label="幻灯片控制">

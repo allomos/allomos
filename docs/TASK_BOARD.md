@@ -64,7 +64,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
 | [`Task-A01-03-gb-command`](./tasks/Task-A01-03-gb-command.md) | ready | — | — | a session claims it (recommended after A00-17, the rename) |
-| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | step 5: update the published pitch decks; then the owner checks the built app (step 6) |
+| [`Task-A00-17-rename-to-crossjump`](./tasks/Task-A00-17-rename-to-crossjump.md) | in progress | — | `claude/a00-17-rename` | owner: the published decks are not visible to this session's account; republish them, or approve new addresses (step 5); then the owner checks the built app (step 6) |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |

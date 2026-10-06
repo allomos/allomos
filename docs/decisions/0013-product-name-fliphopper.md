@@ -36,7 +36,6 @@ The owner compared several names after a name check ([`Task-A00-17`](../tasks/Ta
 
 - discussion records ([discussions/](../discussions/)), research reports ([research/](../research/)) and the dated analysis ([analysis/](../analysis/));
 - finished cards, and dated lines in any card's Notes;
-- the pitch decks until they are updated ([`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md) step 5);
 - lines that state the old name on purpose, such as "renamed from `glidebox`".
 
 Card file names never change ([CARDS.md](../workflow/CARDS.md#card-ids-and-files)), so `Task-A01-03-gb-command.md` and `Task-A00-17-rename-to-crossjump.md` keep their names.
