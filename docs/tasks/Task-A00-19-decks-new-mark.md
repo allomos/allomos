@@ -39,3 +39,17 @@ The republish (external operation above) is **not yet approved**.
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the owner's request.
+- 2026-10-06 — Local part done in the card run (`claude/a01-run`), under the owner's "find them and do them". The republish was **not** done: it still needs the owner's approval.
+
+## Result so far (2026-10-06)
+
+**In plain words.** Both decks' top bar now shows the app's own mark, drawn exactly as in the app window (same shapes and flat colours: jade, terracotta, sand-yellow spark). `hopper-mark.svg` is that mark now, and the pitch README says the app icon, the window and the decks share it. The hero slide's seabag drawing is unchanged, as recommended.
+
+- **Decisive unknowns.** *Outline on dark slides:* the mark is one element in the page's top bar (not repeated per slide), and its colours are mid-tones that stay visible on both the light and the dark background, so no outline was added. *Hero drawing:* unchanged.
+
+| Check | Result |
+|---|---|
+| `git diff --check`; links in `docs/pitch/README.md` | PASS |
+| English and Chinese deck, light theme, in the browser pane | PASS: the new mark in the top bar; 10 slides, one mark |
+| Dark theme | not seen: the pane renders local files in light only — owner check |
+| Republish both decks at their existing addresses | **not done — waiting on the owner's approval** |

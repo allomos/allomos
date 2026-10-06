@@ -7,7 +7,7 @@ A ten-slide pitch deck for FlipHopper, in English and Simplified Chinese, organi
 | English | https://claude.ai/artifact/MGmzN64hzvRqWAMmvt1qyU | [roadshow-en.html](./roadshow-en.html) |
 | 中文 | https://claude.ai/artifact/XVe1UxXRUVt7WytcDgcABU | [roadshow-zh.html](./roadshow-zh.html) |
 
-The mark in the top bar, a person hopping with a seabag, is also kept as [hopper-mark.svg](./hopper-mark.svg); the app icon follows it ([`Task-A07-01`](../tasks/Task-A07-01-app-icon-hopper.md)).
+The mark in the top bar is the app's own mark: two pairs of balls hopping through one spark, jade side to side and terracotta up and down ([`Task-A07-01`](../tasks/Task-A07-01-app-icon-hopper.md)). The app icon, the app window and the decks share it; it is also kept as [hopper-mark.svg](./hopper-mark.svg) ([`Task-A00-19`](../tasks/Task-A00-19-decks-new-mark.md)).
 
 ## Using it
 
