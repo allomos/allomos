@@ -35,7 +35,14 @@
     "ladder"
   ],
   "ladder_empty": [],
+  "not_a_seabag": [
+    "path"
+  ],
   "not_json": [
+    "detail"
+  ],
+  "open_failed": [
+    "path",
     "detail"
   ],
   "project_name_missing": [],

@@ -4,7 +4,8 @@
 //! (`apps/web/src/messenger.ts`), so the same interface can later reach the desktop's
 //! local server from a browser without changes.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{Inspection, create_starter, git_root, inspect, load, stamp};
@@ -79,6 +80,42 @@ fn create_seabag(root: PathBuf, name: String) -> Result<Opened, Problem> {
     })
 }
 
+/// The system program that shows a folder: Finder on macOS, Explorer on Windows, the
+/// desktop's file manager elsewhere. Only a seabag folder is accepted, so the window cannot
+/// be used to open any other path.
+fn file_manager_command(root: &Path) -> Result<Command, Problem> {
+    if inspect(root)
+        != (Inspection::Found {
+            root: root.to_path_buf(),
+        })
+    {
+        return Err(Problem::NotASeabag {
+            path: root.display().to_string(),
+        });
+    }
+    let program = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    let mut command = Command::new(program);
+    command.arg(root);
+    Ok(command)
+}
+
+/// Show the open seabag's folder in Finder or Explorer.
+#[tauri::command]
+fn show_in_file_manager(root: PathBuf) -> Result<(), Problem> {
+    let mut command = file_manager_command(&root)?;
+    // Not waited for: Explorer reports failure even when it opened the folder.
+    command.spawn().map(drop).map_err(|e| Problem::OpenFailed {
+        path: root.display().to_string(),
+        detail: e.to_string(),
+    })
+}
+
 /// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).
 /// Read from the operating system: inside the macOS app window, `navigator.language` is
 /// not a reliable guide to the system's language.
@@ -97,8 +134,33 @@ pub fn run() {
             open_seabag,
             seabag_stamp,
             create_seabag,
+            show_in_file_manager,
             system_languages
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_manager_opens_only_a_seabag() {
+        let dir = std::env::temp_dir().join(format!("fliphopper-reveal-{}", std::process::id()));
+        let root = dir.join(fliphopper_store::DEFAULT_DIR);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // The project folder itself, a missing path and a plain file are refused.
+        for path in [dir.clone(), dir.join("missing"), root.clone()] {
+            assert!(matches!(
+                file_manager_command(&path),
+                Err(Problem::NotASeabag { .. })
+            ));
+        }
+        fliphopper_store::init(&root, "p", "P").unwrap();
+        let command = file_manager_command(&root).unwrap();
+        assert_eq!(command.get_args().collect::<Vec<_>>(), [root.as_os_str()]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

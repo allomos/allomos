@@ -35,7 +35,7 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a01-06-reveal` (`.claude/worktrees/a01-06-reveal`) | [`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | 2026-10-06 | the top bar shows Show in Finder for the open seabag |
+| `claude/a01-06-reveal` (`.claude/worktrees/a01-06-reveal`) | [`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | 2026-10-06 | owner presses Show in Finder |
 
 ## Waiting on the owner
 
@@ -66,7 +66,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | in progress | — | `claude/a01-06-reveal` | button built and tested |
+| [`Task-A01-06-show-seabag-in-file-manager`](./tasks/Task-A01-06-show-seabag-in-file-manager.md) | waiting | locally verified (the button press not seen by the agent) | `claude/a01-06-reveal` | owner presses Show in Finder |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
 | [`Task-A07-01-app-icon-hopper`](./tasks/Task-A07-01-app-icon-hopper.md) | ready | — | — | a session claims it |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |

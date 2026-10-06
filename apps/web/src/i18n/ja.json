@@ -1,6 +1,9 @@
 {
   "top.choose_folder": "フォルダーを選ぶ…",
   "top.open_another": "別のフォルダーを開く…",
+  "top.show_in_finder": "Finder で表示",
+  "top.show_in_explorer": "エクスプローラーで表示",
+  "top.show_in_files": "ファイルマネージャーで表示",
   "picker.title": "シーバッグのフォルダーを選ぶ",
   "language.label": "言語",
   "language.system": "システムに合わせる",
@@ -64,5 +67,7 @@
   "problem.task_closed": "タスク {id} は {state} のため、この方法では変更できません。",
   "problem.label_below_top": "ラベル「{label}」のまま完了しました。最上位の段階は「{top}」です。",
   "problem.took_over": "タスク {id} を {previous} から引き継ぎました。",
-  "problem.bad_usage": "{detail}"
+  "problem.bad_usage": "{detail}",
+  "problem.not_a_seabag": "{path} はシーバッグのフォルダーではありません。",
+  "problem.open_failed": "{path} をファイルマネージャーで開けません：{detail}。"
 }

@@ -34,6 +34,22 @@ While a seabag is open, the top bar has a button that opens the seabag's folder 
 |---|---|---|
 | 2026-10-06 | "Add a feature to allow open current seabag in Finder/Explorer" | owner (chat, while checking A01-03) |
 
+## What was built (2026-10-06)
+
+**In plain words.** While a seabag is open, a small **Show in Finder** link sits under its path in the top bar. It reads **Show in Explorer** on Windows and **Show in file manager** elsewhere. Pressing it opens the seabag folder `.fliphopper/seabag/`.
+
+- **How the folder is opened:** with the computer's own command (`open`, `explorer` or `xdg-open`), so no new package was needed.
+- **Only seabag folders are opened:** the desktop app opens a folder only when it is a seabag. Anything else is refused with `not_a_seabag`, and a start failure is reported as `open_failed`. Both are worded in all three languages.
+
+**Checks (2026-10-06):**
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` | PASS |
+| `cargo test --workspace` (36), including `file_manager_opens_only_a_seabag` | PASS |
+| `npm --prefix apps/web run typecheck` / `build` / `check:i18n` (71 texts, 33 codes) | PASS |
+| Pressing the button in the running app | owner check (the agent has no access to the window) |
+
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the owner's request. Not started: one card per session, and it follows A01-03.

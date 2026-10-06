@@ -1,6 +1,9 @@
 {
   "top.choose_folder": "选择文件夹…",
   "top.open_another": "打开其他文件夹…",
+  "top.show_in_finder": "在访达中显示",
+  "top.show_in_explorer": "在资源管理器中显示",
+  "top.show_in_files": "在文件管理器中显示",
   "picker.title": "为水手袋选择文件夹",
   "language.label": "语言",
   "language.system": "跟随系统",
@@ -64,5 +67,7 @@
   "problem.task_closed": "任务 {id} 的状态是 {state}，不能这样修改。",
   "problem.label_below_top": "完成时的标签是“{label}”，低于最高一级“{top}”。",
   "problem.took_over": "已从 {previous} 接手任务 {id}。",
-  "problem.bad_usage": "{detail}"
+  "problem.bad_usage": "{detail}",
+  "problem.not_a_seabag": "{path} 不是水手袋文件夹。",
+  "problem.open_failed": "无法在文件管理器中打开 {path}：{detail}。"
 }

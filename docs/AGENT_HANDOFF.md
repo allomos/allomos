@@ -36,6 +36,13 @@ Updated: 2026-10-04
 
 One block per card in the board's Sessions table.
 
+### Task-A01-06 — `claude/a01-06-reveal`
+
+- **Checkout:** worktree `.claude/worktrees/a01-06-reveal`, branch `claude/a01-06-reveal`; all work committed and pushed.
+- **Card and approval limits:** [`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md). Local work only.
+- **Running:** the desktop app in dev mode on the test repository `<scratchpad>/e2e-repo` (port 1420). Stop it by quitting the window.
+- **Next action:** the owner presses Show in Finder. Then merge into `main` and mark the card Done.
+
 ## Live state
 
 Checked 2026-10-06.

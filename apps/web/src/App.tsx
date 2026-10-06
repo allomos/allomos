@@ -5,6 +5,13 @@ import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Area, Issue, Opened, Problem, Task } from "./types";
 
+/** The file manager's name on this computer, for the button's words. */
+const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
+  ? "top.show_in_finder"
+  : /Windows/.test(navigator.userAgent)
+    ? "top.show_in_explorer"
+    : "top.show_in_files";
+
 const LAST_ROOT_KEY = "fliphopper.lastRoot";
 /** How often the window checks whether the seabag's files changed, for example through `fh`. */
 const FOLLOW_MS = 1000;
@@ -140,6 +147,13 @@ export function App({ messenger }: { messenger: Messenger }) {
           <div className="where">
             <strong>{opened.loaded.seabag.project.name}</strong>
             <code title={opened.root}>{opened.root}</code>
+            <button
+              type="button"
+              className="link"
+              onClick={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
+            >
+              {t(FILE_MANAGER_KEY)}
+            </button>
           </div>
         )}
         <LanguagePicker />

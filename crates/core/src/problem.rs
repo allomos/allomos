@@ -89,6 +89,9 @@ problems! {
     LabelBelowTop { label, top } => "label_below_top", "Finished with the label \"{label}\", below the top step \"{top}\".";
     /// A warning: the task was taken over from another holder.
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
+    NotASeabag { path } => "not_a_seabag", "{path} is not a seabag folder.";
+    /// The file manager could not be started. `detail` is the system's own text.
+    OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }
