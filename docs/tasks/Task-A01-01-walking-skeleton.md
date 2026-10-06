@@ -49,6 +49,13 @@
 
 ## Notes
 
+- 2026-10-06 — **Owner check PASSED** on the Mac, all three steps:
+  1. A new empty folder showed the starter project: two areas, three tasks, A01-01 "Done / owner verified", and the green "created" note.
+  2. A repository folder offered `.glidebox/`. Creating it worked; on disk there is no nested `.git` and `README.md` is untouched.
+  3. A broken file showed one problem naming `tasks/A01-02/task.json`, and the other tasks still listed.
+- 2026-10-06 — **Fixed after the check.** The broken-file problem named the bad value (`finished`) as the field, instead of the field name (`state`). Choice fields are now checked first and named correctly. Problems no longer guess a field when serde's message does not name one. Tests: 14 pass (core 8, store 6); clippy and fmt clean.
+- 2026-10-06 — **Correction to the agent's instructions:** the green note appears only when a starter project is created, not when an existing one is reopened. The owner's first look reopened a folder that already had one.
+
 - 2026-10-04 — **Built.** Rust workspace (`crates/core`, `crates/store`); Tauri 2.11.6 desktop app; React interface talking to Rust only through `apps/web/src/messenger.ts` (point 1 of [PLAN § 8](../product/PLAN.md#at-a-glance-updated-2026-10-04)). Added start-up folder support (`glidebox <folder>` or `GLIDEBOX_OPEN`). Wrote [FILE-FORMAT.md](../product/FILE-FORMAT.md) and [CODING_RULES.md](../workflow/CODING_RULES.md).
   - **Versions:** Rust 1.85.1 is what is installed (Homebrew). Tauri 2.12 needs Rust 1.90, so Tauri is pinned to 2.11.x and the JavaScript packages match it (`@tauri-apps/api` 2.11.1, `plugin-dialog` 2.7.3, CLI 2.11.5).
   - **Checks PASS:** `cargo fmt --check`; `cargo clippy --workspace --all-targets -D warnings`; `cargo test --workspace` (13 tests: core 7, store 6); web `typecheck` and `build`; `tauri build --debug --bundles app`.

@@ -32,11 +32,46 @@ pub struct Loaded {
     pub issues: Vec<Issue>,
 }
 
+/// Fields whose value must be one of a fixed list: (field, allowed values).
+const CHOICE_FIELDS: &[(&str, &[&str])] = &[(
+    "state",
+    &[
+        "backlog",
+        "ready",
+        "in_progress",
+        "waiting",
+        "done",
+        "dropped",
+    ],
+)];
+
 fn parse<T: DeserializeOwned>(file: &str, text: &str) -> Result<T, Issue> {
+    // Check fixed-choice fields first, so the problem names the field (e.g. `state`)
+    // rather than the bad value.
+    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(text) {
+        for (field, allowed) in CHOICE_FIELDS {
+            if let Some(value) = map.get(*field) {
+                let ok = value.as_str().is_some_and(|v| allowed.contains(&v));
+                if !ok {
+                    return Err(Issue {
+                        file: file.to_string(),
+                        field: Some((*field).to_string()),
+                        message: format!(
+                            "{value} is not a valid {field}. Use one of: {}.",
+                            allowed.join(", ")
+                        ),
+                    });
+                }
+            }
+        }
+    }
     serde_json::from_str(text).map_err(|e| {
         let msg = e.to_string();
-        // serde reports e.g. "missing field `title` at line 3 column 1" or "unknown field `foo`".
-        let field = msg.split('`').nth(1).map(String::from);
+        // Only "missing field `x`" and "unknown field `x`" name a field; other messages
+        // (for example a wrong value type) do not, so no field is guessed for them.
+        let field = (msg.starts_with("missing field") || msg.starts_with("unknown field"))
+            .then(|| msg.split('`').nth(1).map(String::from))
+            .flatten();
         Issue {
             file: file.to_string(),
             field,
@@ -218,13 +253,21 @@ mod tests {
     }
 
     #[test]
-    fn unknown_state_is_rejected() {
+    fn unknown_state_names_the_state_field() {
         let err = parse_task(
             "t.json",
             r#"{"id":"T1","title":"x","area":"A1","state":"finished"}"#,
         )
         .unwrap_err();
-        assert!(err[0].message.contains("finished"));
+        assert_eq!(err[0].field.as_deref(), Some("state"));
+        assert!(err[0].message.contains("\"finished\" is not a valid state"));
+        assert!(err[0].message.contains("in_progress"));
+    }
+
+    #[test]
+    fn wrong_type_does_not_guess_a_field() {
+        let err = parse_area("a.json", r#"{"id":"A1","name":"X","order":"first"}"#).unwrap_err();
+        assert_eq!(err[0].field, None);
     }
 
     #[test]

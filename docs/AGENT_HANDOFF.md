@@ -34,16 +34,7 @@ Updated: 2026-10-04
 
 ## Active resume
 
-One block per card in the board's Sessions table.
-
-### Task-A01-01 — `claude/a01-01-walking-skeleton`
-- Checkout: `/Users/wanghui/coding/glidepace/glidebox/.claude/worktrees/a01-01` · branch `claude/a01-01-walking-skeleton` · pushed: yes
-- Approvals in force: all local work for this card (owner, 2026-10-04). NOT: signing, publishing, hosted services
-- Uncommitted: none after this commit
-- Running: `Glidebox.app` (debug bundle, `target/debug/bundle/macos/`) opened on the scratch folder `…/scratchpad/a01-01-check/empty-folder`, for the owner's check; safe to quit. Restart: `open -n target/debug/bundle/macos/Glidebox.app --args <folder>`
-- Test folders: `…/scratchpad/a01-01-check/{empty-folder,demo-repo,broken-box}` (session scratchpad, temporary)
-- Unrecorded findings: none (see card notes)
-- Next action: owner check → merge branch into `main`, mark Done; then write the `gb` command card
+One block per card in the board's Sessions table. None claimed.
 
 ## Live state
 
@@ -53,7 +44,7 @@ Checked 2026-10-04.
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/glidebox`, branch `main` | Documentation only; no application code, no dependencies installed |
 | Git remote | `origin` = `https://github.com/mypals-ml/glidebox.git` (added by the owner, 2026-10-04) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
-| Worktrees | none besides the main checkout | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
+| Worktrees | `.claude/worktrees/a01-01` (branch `claude/a01-01-walking-skeleton`, merged into `main` 2026-10-06; holds the built `Glidebox.app` under `target/`; safe to remove) | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
 | Servers / hosted resources | none | — |
 
 ## Pitfalls

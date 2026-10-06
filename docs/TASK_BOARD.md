@@ -1,6 +1,6 @@
 # Task board — glidebox
 
-> **Last updated:** 2026-10-04
+> **Last updated:** 2026-10-06
 
 The index of all work and the **only home of status**. Card detail lives in [docs/tasks/](./tasks/); rules for cards, labels and claiming are in [workflow/CARDS.md](./workflow/CARDS.md). Restart mechanics (worktrees, servers, pitfalls) are in [AGENT_HANDOFF.md](./AGENT_HANDOFF.md). When another document disagrees with this board, the board is right — correct the other document in place.
 
@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**One card is claimed; eleven cards are open; no application code exists yet.** Glidebox is in planning; the first iteration, **1 — v0.1 macOS local tracker**, is next ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)).
+**Nothing is claimed; ten cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Its first card is done: a macOS app that opens a task box and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md), owner verified 2026-10-06).
 
 **Where the product stands.**
 - The owner has decided to **build glidebox ourselves** rather than start from an open-source tracker ([`Task-A00-07`](./tasks/Task-A00-07-open-source-base-decision.md)).
@@ -20,7 +20,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 **What is next.**
 - The owner reviews the documents and answers the questions below.
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
-- The first code card, [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md), is the Iteration 1 **walking skeleton**: the macOS desktop app opens a task box and shows its tasks. It can start once the owner reviews it.
+- The next Iteration 1 card is the **`glidebox` / `gb` command**: agents create the task box, then add, claim, update and finish tasks. It must also decide how `gb` and the running app avoid writing the same task box at once. The agent prepares the card for the owner's review.
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
 
 ## Sessions
@@ -29,7 +29,6 @@ The current holder of every claimed card. Empty means nothing is claimed.
 
 | Session (branch / worktree) | Card | Claimed | Next user-visible step |
 |---|---|---|---|
-| `claude/a01-01-walking-skeleton` | [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) | 2026-10-04 | Owner checks the running app: starter project, repo folder, broken file |
 
 ## Waiting on the owner
 
@@ -37,7 +36,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 
 | Question or approval | Record | Unblocks |
 |---|---|---|
-| **Check the first app** (steps in the session report): starter project shown by area; a repo folder offers `.glidebox/`; a broken file shows a clear problem | [`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md) | Done for A01-01; next card (`gb` command) |
 | Review and accept the planning documents and agent workflow, as corrected on 10-04 | [`Task-A00-01`](./tasks/Task-A00-01-planning-docs.md), [`Task-A00-10`](./tasks/Task-A00-10-docs-consistency-review.md) | everything |
 | Reuse of the owner's own Glidelines code: A extend · B standalone · C shared core · D Glidelines as a view (open-source bases are ruled out by 0008) | [0003](./decisions/0003-relationship-to-glidelines.md), [`Task-A00-03`](./tasks/Task-A00-03-glidelines-relationship.md) | app stack and repo layout (W03–W04) |
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
@@ -62,7 +60,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
-| [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | waiting | locally verified | `claude/a01-01-walking-skeleton` | owner checks the app on the Mac |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |
 | [`Task-A05-01-ssr-board-import`](./tasks/Task-A05-01-ssr-board-import.md) | backlog | — | — | Iteration 7 |
 | [`Task-A04-01-remote-access-research`](./tasks/Task-A04-01-remote-access-research.md) | backlog | — | — | owner card review |
@@ -73,6 +70,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Card | Label | When |
 |---|---|---|
 | [`Task-A00-02-github-remote`](./tasks/Task-A00-02-github-remote.md) | done — `mypals-ml/glidebox`, pushed by the owner | 2026-10-04 |
+| [`Task-A01-01-walking-skeleton`](./tasks/Task-A01-01-walking-skeleton.md) | **owner verified — Done**: the macOS app opens a task box and shows its tasks by area | 2026-10-06 |
 | [`Task-A00-16-road-show-deck`](./tasks/Task-A00-16-road-show-deck.md) | done — English and Chinese decks published; addresses in [pitch/](./pitch/README.md) | 2026-10-04 |
 | [`Task-A00-13-iterative-release-roadmap`](./tasks/Task-A00-13-iterative-release-roadmap.md) | owner confirmed — 15 iterations, each a usable release | 2026-10-04 |
 | [`Task-A00-12-desktop-platforms-and-shared-code`](./tasks/Task-A00-12-desktop-platforms-and-shared-code.md) | owner accepted — Tauri 2, macOS + Windows, one interface code base | 2026-10-04 |
