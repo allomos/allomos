@@ -8,7 +8,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 
 ## Now
 
-**No card is claimed; thirteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Five cards are done, all owner verified 2026-10-06:
+**No card is claimed; fourteen cards are open.** **Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). Five cards are done, all owner verified 2026-10-06:
 - a macOS app that opens a seabag and shows its tasks by area ([`Task-A01-01`](./tasks/Task-A01-01-walking-skeleton.md)), now in English, Simplified Chinese and Japanese ([`Task-A01-02`](./tasks/Task-A01-02-ui-languages.md));
 - the **`fliphopper` / `fh` command** ([`Task-A01-03`](./tasks/Task-A01-03-gb-command.md)): agents create a seabag and claim, label, park, finish and release tasks, leaving a handoff note for the next one. A short lock for each change means two agents cannot take the same task, and the open app follows the changes;
 - a **Show in Finder / Explorer** link for the open seabag ([`Task-A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md));
@@ -26,6 +26,7 @@ The index of all work and the **only home of status**. Card detail lives in [doc
 - The research card [`Task-A04-01`](./tasks/Task-A04-01-remote-access-research.md) looks for a free or very cheap way for companions to reach the desktop app from outside, and a free email service for the pairing code.
 - **Renamed to FlipHopper** (done 2026-10-06): a person or project hops back and forth between AI agents (反复横跳) and is handed between people; a project's data is a **seabag** in `.fliphopper/seabag/` ([`Task-A00-17`](./tasks/Task-A00-17-rename-to-crossjump.md), [0013](./decisions/0013-product-name-fliphopper.md)).
 - **New main message** ([0014](./decisions/0014-main-purpose-and-three-sets.md)): switch between AI agents and teammates and keep the project; AI skills and progress management are the two other sets. Owner accepted the rewritten decks (done 2026-10-06) ([`Task-A00-18`](./tasks/Task-A00-18-positioning-and-deck.md)).
+- Ready: the road show decks get the app's new mark ([`Task-A00-19`](./tasks/Task-A00-19-decks-new-mark.md)).
 - Ready: when FlipHopper fills a folder that looks empty, it adds `README-fliphopper.md` ([`Task-A01-05`](./tasks/Task-A01-05-readme-in-new-folder.md)).
 - A small fix, waiting for the owner's review: starting FlipHopper with a folder should open that folder even when an option comes first, and say so when the folder is wrong ([`Task-A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 - The research card [`Task-A03-01`](./tasks/Task-A03-01-agent-launch-research.md) is independent and can run in parallel.
@@ -49,6 +50,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
+| Republish both road show decks at their existing private addresses with the new mark | [`Task-A00-19`](./tasks/Task-A00-19-decks-new-mark.md) | A00-19's last step |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
 | Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
 
@@ -66,6 +68,7 @@ The single list of open questions and approvals. Remove a row when it is answere
 | [`Task-A00-11-project-data-folder`](./tasks/Task-A00-11-project-data-folder.md) | waiting | drafted | — | owner review of 0010 and R72–R76 |
 | [`Task-A00-14-areas-and-naming`](./tasks/Task-A00-14-areas-and-naming.md) | waiting | drafted | — | owner reviews the new areas |
 | [`Task-A00-15-free-local-app`](./tasks/Task-A00-15-free-local-app.md) | waiting | drafted | — | owner answers 0012's open questions |
+| [`Task-A00-19-decks-new-mark`](./tasks/Task-A00-19-decks-new-mark.md) | ready | — | — | a session claims it; the republish needs the owner's approval |
 | [`Task-A01-05-readme-in-new-folder`](./tasks/Task-A01-05-readme-in-new-folder.md) | ready | — | — | a session claims it (after A00-17 merges) |
 | [`Task-A01-04-startup-folder-argument`](./tasks/Task-A01-04-startup-folder-argument.md) | waiting | drafted | — | owner reviews the card |
 | [`Task-A02-01-burndown-and-forecast`](./tasks/Task-A02-01-burndown-and-forecast.md) | backlog | — | — | Iteration 5 (burndown and forecast) |

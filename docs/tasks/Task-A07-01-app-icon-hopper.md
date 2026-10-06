@@ -38,7 +38,7 @@ The FlipHopper app gets a new icon: **a person hopping with a seabag over the sh
 
 All colours are flat; the owner asked for no gradients. The mark at the top left of the window is the same drawing, and it keeps these colours in light and dark mode.
 
-**How the design was chosen** (owner, 2026-10-06; sketches kept outside the repository):
+**How the design was chosen** (owner, 2026-10-06; the sketches were not kept):
 1. The hopper figure (built, then judged too plain).
 2. Abstract directions A, B and C. B was chosen.
 3. B as brush strokes, then as a jump with the feet together.
@@ -51,7 +51,7 @@ All colours are flat; the owner asked for no gradients. The mark at the top left
 - [`icons/source.svg`](../../apps/desktop/src-tauri/icons/source.svg) is the drawing used from 48 px up.
 - [`icons/source-small.svg`](../../apps/desktop/src-tauri/icons/source-small.svg) is used at 16–32 px, with bigger balls, thicker rings and a bigger spark, so the small icon stays clear.
 - [`apps/desktop/scripts/make-icons.sh`](../../apps/desktop/scripts/make-icons.sh) rebuilds every icon file from those two drawings. It uses `rsvg-convert`, ImageMagick, `iconutil` and `tauri icon`, and adds nothing to the project's packages.
-- The decks still use the old hopper drawing ([`hopper-mark.svg`](../pitch/hopper-mark.svg)); updating them is not part of this card.
+- The decks still use the old hopper drawing ([`hopper-mark.svg`](../pitch/hopper-mark.svg)); [`Task-A00-19`](./Task-A00-19-decks-new-mark.md) updates them.
 
 **Why development mode shows no icon:** `npm … run dev` runs the bare program without an app bundle, so macOS has no icon to show there. Only the built `FlipHopper.app` shows one.
 
@@ -69,4 +69,4 @@ All colours are flat; the owner asked for no gradients. The mark at the top left
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the owner's request. The mark was drawn and used in the decks under A00-18; applying it to the app is this card.
-- 2026-10-06 — Owner verified the Y2/D4 icon; merged into `main`. **Done.** Later sketches (V5 with a star in the centre, S1–S8) were drawn but not chosen.
+- 2026-10-06 — Owner verified the Y2/D4 icon; merged into `main`. **Done.**
