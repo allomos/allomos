@@ -1,6 +1,6 @@
 {
   "area": "A01",
-  "holder": "claude/a01-run",
+  "handoff_note": "Built, merged, installed.",
   "id": "A01-14",
   "label": "locally verified",
   "state": "waiting",
