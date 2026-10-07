@@ -13,6 +13,8 @@ use fliphopper_store::{
     Inspection, add_readme_if_empty, create_starter, git_root, inspect, load, picked_folder, stamp,
 };
 use serde::Serialize;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 
 #[derive(Serialize)]
 struct FolderInfo {
@@ -171,10 +173,67 @@ fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
+/// The menu item's ID, and the event the interface hears when it is chosen.
+const OPEN_FOLDER_ID: &str = "open_folder";
+const OPEN_FOLDER_EVENT: &str = "menu:open_folder";
+
+/// The menu items whose words follow the interface's language.
+struct MenuTexts {
+    file: Submenu<Wry>,
+    open_folder: MenuItem<Wry>,
+}
+
+/// The system's usual menus, with **Open Folder…** (⌘O / Ctrl+O) at the top of the File menu.
+/// Words start in English; the interface sends its own with `set_menu_texts`.
+fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let menu = Menu::default(app)?;
+    let open_folder = MenuItem::with_id(
+        app,
+        OPEN_FOLDER_ID,
+        "Open Folder…",
+        true,
+        Some("CmdOrCtrl+O"),
+    )?;
+    let existing = menu
+        .items()?
+        .into_iter()
+        .filter_map(|item| item.as_submenu().cloned())
+        .find(|s| s.text().is_ok_and(|t| t == "File"));
+    let file = match existing {
+        Some(file) => {
+            file.prepend(&open_folder)?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 1)?;
+            file
+        }
+        None => {
+            let file = Submenu::with_items(app, "File", true, &[&open_folder])?;
+            // After the app menu on macOS; first elsewhere.
+            menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
+            file
+        }
+    };
+    app.manage(MenuTexts { file, open_folder });
+    Ok(menu)
+}
+
+/// Put the menu's words in the interface's language.
+#[tauri::command]
+fn set_menu_texts(texts: tauri::State<MenuTexts>, file: String, open_folder: String) {
+    // A menu that cannot be renamed keeps its previous words; nothing else depends on them.
+    let _ = texts.file.set_text(file);
+    let _ = texts.open_folder.set_text(open_folder);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .menu(build_menu)
+        .on_menu_event(|app, event| {
+            if event.id() == OPEN_FOLDER_ID {
+                let _ = app.emit(OPEN_FOLDER_EVENT, ());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             startup_folder,
             inspect_folder,
@@ -182,7 +241,8 @@ pub fn run() {
             seabag_stamp,
             create_seabag,
             show_in_file_manager,
-            system_languages
+            system_languages,
+            set_menu_texts
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");

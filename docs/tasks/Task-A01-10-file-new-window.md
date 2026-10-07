@@ -35,3 +35,22 @@ Today the only way to switch projects is the "choose a folder" button. After thi
 ## Notes
 
 - 2026-10-07 — Card written by the agent from the owner's request, then narrowed to Open Folder… after the owner's answers.
+- 2026-10-07 — Built in the card run (`claude/a01-run`).
+
+## Result (2026-10-07)
+
+**In plain words.** The app's File menu now starts with **Open Folder…** (⌘O on macOS, Ctrl+O on Windows), above the system's Close Window. Choosing it, or pressing the shortcut, runs the same "choose a folder" step as the button in the window. The menu's words follow the app's language: the interface sends them to the Rust side (`set_menu_texts`) at start and whenever the language changes, so no restart is needed. Closing the window still quits the app.
+
+- **Decisive unknown answered:** menu words can change while the app runs (`set_text` on the menu items), so they follow a language change at once.
+- **Where:** `build_menu`, `set_menu_texts` and the menu event in `apps/desktop/src-tauri/src/lib.rs`; `onOpenFolderMenu` and `setMenuTexts` in `messenger.ts`; two `useEffect`s in `App.tsx`; `menu.file` and `menu.open_folder` in three languages. No new package or permission.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (76 texts) | PASS |
+| Built app: menu bar is FlipHopper, File, Edit, View, Window, Help; File holds Open Folder… (shortcut ⌘O), Close Window, Close All (read through macOS accessibility) | PASS |
+| Built app: File → Open Folder… and ⌘O each open the folder dialog (the system's dialog service starts on the click and the key press); Escape cancels | PASS |
+| Menu words in Chinese and Japanese after switching the app's language | not seen: the agent could not drive the language list — owner check |
+| Picking a folder from the menu's dialog opens it | not seen (the dialog is drawn by a system process the agent cannot drive) — owner check |
+
+**Owner check:** in the app, press ⌘O, pick another folder: the window shows it. Switch the app's language to 日本語: the menu reads ファイル → フォルダーを開く….

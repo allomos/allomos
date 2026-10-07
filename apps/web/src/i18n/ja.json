@@ -1,6 +1,8 @@
 {
   "top.choose_folder": "フォルダーを選ぶ…",
   "top.open_another": "別のフォルダーを開く…",
+  "menu.file": "ファイル",
+  "menu.open_folder": "フォルダーを開く…",
   "top.show_in_finder": "Finder で表示",
   "top.show_in_explorer": "エクスプローラーで表示",
   "top.show_in_files": "ファイルマネージャーで表示",
