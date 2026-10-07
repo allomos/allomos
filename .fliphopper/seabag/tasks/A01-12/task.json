@@ -3,6 +3,7 @@
   "holder": "claude/a01-run",
   "id": "A01-12",
   "label": "locally verified",
-  "state": "in_progress",
-  "title": "fh --commit and --push"
+  "state": "waiting",
+  "title": "fh --commit and --push",
+  "waiting_on": "owner reviews fh --commit / --push"
 }
