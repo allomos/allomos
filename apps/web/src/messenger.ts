@@ -29,8 +29,22 @@ export interface Messenger {
   createSeabag(root: string, name: string, language: string): Promise<Opened>;
   /** Calls `handler` whenever File → Open Folder… is chosen. Resolves to a function that stops listening. */
   onOpenFolderMenu(handler: () => void): Promise<() => void>;
+  /** Calls `handler` with the folder chosen under File → Open Recent. */
+  onOpenRecentMenu(handler: (folder: string) => void): Promise<() => void>;
+  /** Calls `handler` when File → Open Recent → Clear Menu is chosen. */
+  onClearRecentMenu(handler: () => void): Promise<() => void>;
   /** Puts the app menu's words in the interface's language. */
-  setMenuTexts(texts: { file: string; openFolder: string }): Promise<void>;
+  setMenuTexts(texts: MenuTexts): Promise<void>;
+  /** Shows these folders, newest first, under File → Open Recent. */
+  setRecentFolders(folders: string[]): Promise<void>;
+}
+
+export interface MenuTexts {
+  file: string;
+  openFolder: string;
+  openRecent: string;
+  clearMenu: string;
+  noRecent: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -46,5 +60,8 @@ export const desktopMessenger: Messenger = {
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   createSeabag: (root, name, language) => invoke<Opened>("create_seabag", { root, name, language }),
   onOpenFolderMenu: (handler) => listen("menu:open_folder", () => handler()),
-  setMenuTexts: ({ file, openFolder }) => invoke<void>("set_menu_texts", { file, openFolder }),
+  onOpenRecentMenu: (handler) => listen<string>("menu:open_recent", (e) => handler(e.payload)),
+  onClearRecentMenu: (handler) => listen("menu:clear_recent", () => handler()),
+  setMenuTexts: (texts) => invoke<void>("set_menu_texts", { ...texts }),
+  setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
 };

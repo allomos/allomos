@@ -34,3 +34,21 @@ The File menu gets **Open Recent**: a list of the folders opened most recently, 
 ## Notes
 
 - 2026-10-07 — Card written by the agent from the owner's request, with the defaults above, and worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-07)
+
+**In plain words.** File → **Open Recent** lists up to 10 recently opened project folders, newest first, then **Clear Menu**; with no folders it shows a greyed "No recent folders". A folder joins the top of the list whenever it opens. Choosing one opens it like Open Folder…; a folder that is gone shows the usual message and leaves the list. The list is kept in the app's own storage on this computer; the interface sends it to the Rust side, which rebuilds the submenu. All its words follow the app's language.
+
+- **Where:** `fill_recent`, `set_recent_folders`, the extended `set_menu_texts` and the menu events in `apps/desktop/src-tauri/src/lib.rs`; `onOpenRecentMenu`, `onClearRecentMenu`, `setRecentFolders` in `messenger.ts`; the list in `App.tsx`; three new texts in three languages. No new package or permission.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (79 texts) | PASS |
+| Built app (in Japanese): ファイル holds フォルダーを開く…, 最近使った項目を開く, Close Window, Close All | PASS |
+| Opened this repository, then `~/fliphopper-check`: the list shows `~/fliphopper-check` first, then this repository | PASS |
+| Chose this repository from the list: the window showed it, and it moved to the top | PASS |
+| Clear Menu: the submenu shows only 最近使ったフォルダーはありません, greyed | PASS |
+| A folder that no longer exists leaves the list when chosen | not tried (code path only) |
+
+**Owner check:** File → Open Recent shows the folders you opened, newest first; choosing one opens it; Clear Menu empties the list.
