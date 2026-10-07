@@ -51,6 +51,12 @@ struct Cli {
     /// Print one JSON result on standard output, and nothing else.
     #[arg(long, global = true)]
     json: bool,
+    /// After a change, commit the seabag's files (only those) with Git.
+    #[arg(long, global = true)]
+    commit: bool,
+    /// After a change, commit the seabag's files and push the current branch.
+    #[arg(long, global = true)]
+    push: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -135,6 +141,31 @@ enum Add {
 }
 
 impl Command {
+    /// The task or area a command acts on, for the commit message.
+    fn target(&self) -> Option<&str> {
+        match self {
+            Command::Add(Add::Area { id, .. } | Add::Task { id, .. })
+            | Command::Show { id }
+            | Command::Claim { id, .. }
+            | Command::Label { id, .. }
+            | Command::Wait { id, .. }
+            | Command::Done { id }
+            | Command::Release { id, .. }
+            | Command::Needs { id, .. }
+            | Command::Ready { id }
+            | Command::Drop { id } => Some(id),
+            Command::Init { .. } | Command::List { .. } | Command::Next => None,
+        }
+    }
+
+    /// Whether the command writes to the seabag.
+    fn changes(&self) -> bool {
+        !matches!(
+            self,
+            Command::List { .. } | Command::Show { .. } | Command::Next
+        )
+    }
+
     fn name(&self) -> &'static str {
         match self {
             Command::Init { .. } => "init",
@@ -224,7 +255,12 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
     };
     let command = cli.command.name();
     match execute(&cli, cwd) {
-        Ok(done) => {
+        Ok(mut done) => {
+            if (cli.commit || cli.push) && cli.command.changes() {
+                if let Some(root) = done.fields["seabag"].as_str().map(PathBuf::from) {
+                    done.warnings.extend(share(&cli, &root));
+                }
+            }
             if cli.json {
                 let mut out = json!({ "schema": SCHEMA, "ok": true, "command": command });
                 if let (Some(out), Some(fields)) = (out.as_object_mut(), done.fields.as_object()) {
@@ -255,6 +291,57 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
             }
             exit_code(&problem)
         }
+    }
+}
+
+/// Run `git` in `dir`; on failure, Git's own message.
+fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(out)
+    } else {
+        let text = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        Err(if text.is_empty() {
+            format!("git {} failed", args.join(" "))
+        } else {
+            text
+        })
+    }
+}
+
+/// `--commit` / `--push`: commit only the seabag's files (other changes are left alone), then
+/// push if asked. The change itself is already saved, so a Git failure is a warning, not an error.
+fn share(cli: &Cli, seabag: &Path) -> Vec<Problem> {
+    let command = cli.command.name();
+    let subject = match cli.command.target() {
+        Some(id) => format!("fh: {command} {id}"),
+        None => format!("fh: {command}"),
+    };
+    let agent = format!("Agent: {}", cli.holder.as_deref().unwrap_or("unknown (fh)"));
+    let commit = (|| {
+        git(seabag, &["add", "--all", "--", "."])?;
+        // Nothing staged in the seabag: the change made no difference, so there is nothing to commit.
+        if git(seabag, &["diff", "--cached", "--quiet", "--", "."]).is_ok() {
+            return Ok(false);
+        }
+        git(
+            seabag,
+            &["commit", "--quiet", "-m", &subject, "-m", &agent, "--", "."],
+        )?;
+        Ok(true)
+    })();
+    match commit {
+        Err(detail) => vec![Problem::CommitFailed { detail }],
+        Ok(_) if !cli.push => vec![],
+        Ok(_) => match git(seabag, &["push", "--quiet"]) {
+            Ok(_) => vec![],
+            Err(detail) => vec![Problem::PushFailed { detail }],
+        },
     }
 }
 

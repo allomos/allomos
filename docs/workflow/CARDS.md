@@ -42,7 +42,7 @@ Add an area by editing this table and the board in the same commit.
 
 **Only in the seabag on `main`**: each card is a task with the card's number as its ID (`A01-07`), and its state, label, holder and waiting-on are that task's fields. The card file holds the outcome, scope, approvals and dated progress notes — never a copy of the state. The task's `description.md` links to the card file.
 
-- **Change status only with `fh`, only on `main`.** Card branches hold an old copy of the seabag; never change it there. From a card's worktree, point `fh` at the main checkout: `export FLIPHOPPER_SEABAG=<main checkout>` (for example `/Users/wanghui/coding/glidepace/fliphopper`). Then commit only the seabag change on `main` (`git -C <main checkout> commit .fliphopper -m "fh: label A01-05 locally verified"`) and push it.
+- **Change status only with `fh`, only on `main`.** Card branches hold an old copy of the seabag; never change it there. From a card's worktree, point `fh` at the main checkout: `export FLIPHOPPER_SEABAG=<main checkout>` (for example `/Users/wanghui/coding/glidepace/fliphopper`). Add `--push` to every status change: `fh` then commits only the seabag's files on `main` and pushes them (`fh label A01-05 "locally verified" --push`). Check the output for a `commit_failed` or `push_failed` warning; if one appears, commit or push by hand.
 - **Who you are:** `export FLIPHOPPER_HOLDER=<your branch>` (for example `claude/a01-05-readme`), or `--as <branch>` on each command.
 - **Next dependency:** `fh needs <ID> "<the one thing needed for the next label>"`. For a waiting task, its *waiting on* says it.
 - **Seeing status:** `fh list` (all, by area), `fh list --state in_progress` (who holds what — this replaces the old Sessions table), `fh list --state done`, `fh show <ID>`, `fh next`. The app shows the same when it opens this repository.
@@ -70,12 +70,12 @@ Add an area by editing this table and the board in the same commit.
 One card is worked by exactly one session at a time. The seabag on `main`, not memory or chat, records who holds what. Every step below is run against the main checkout's seabag (see [Where status lives](#where-status-lives)).
 
 1. **Pull before claiming:** `git -C <main checkout> pull --ff-only`, then `fh next` (or `fh list --state ready`).
-2. **Claim in a commit of its own.** `fh claim <ID> --as <branch>`; commit only the seabag change on `main` (`fh: claim <ID>`), push it at once, then start work. `fh claim` refuses a task someone else holds (`task_held`), and the lock stops two sessions on this computer from both winning.
+2. **Claim in a commit of its own.** `fh claim <ID> --as <branch> --push`, then start work. `fh claim` refuses a task someone else holds (`task_held`), and the lock stops two sessions on this computer from both winning.
 3. **A card held by another session is read-only to you.** If its card file holds a stale fact, correct only that fact. `fh claim --take` is only for a session whose holder has stopped (for example its quota ran out) and says so in the handoff.
 4. **Two claims from different computers:** the second to push gets a merge conflict in that task's `task.json` — keep whichever landed first and claim a different card.
-5. **Labels and waiting:** `fh label <ID> "<label>"` and `fh wait <ID> --on "<what>"` on `main`, each committed and pushed as it happens.
-6. **Finish** after the owner's check: `fh label <ID> "owner verified"`, `fh done <ID>`, `fh release <ID>`; commit with the merge of the card's branch.
-7. **Release** a card you stop short of Done: `fh release <ID> --note "<what the next session needs>"`, remove your handoff block, commit and push.
+5. **Labels and waiting:** `fh label <ID> "<label>" --push` and `fh wait <ID> --on "<what>" --push` on `main`.
+6. **Finish** after the owner's check: `fh label <ID> "owner verified" --push`, `fh done <ID> --push`.
+7. **Release** a card you stop short of Done: `fh release <ID> --note "<what the next session needs>" --push`, then remove your handoff block, commit and push.
 8. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
 9. **A new card:** write its file in `docs/tasks/`, then `fh add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../docs/tasks/<file>)"` on `main`; it starts in `backlog`. When the owner approves it: `fh ready <ID>`. A card that will not be done: `fh drop <ID>`.
 10. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.

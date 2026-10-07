@@ -96,6 +96,9 @@ problems! {
     StartupNotAFolder { path } => "startup_not_a_folder", "FlipHopper was started with {path}, which is not a folder, so nothing was opened.";
     /// Only an unheld backlog or waiting task can be made ready.
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
+    /// A warning from `fh --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.
+    CommitFailed { detail } => "commit_failed", "The change is saved, but committing it failed: {detail}";
+    PushFailed { detail } => "push_failed", "The change is saved and committed, but pushing it failed: {detail}";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

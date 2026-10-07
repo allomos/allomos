@@ -35,3 +35,14 @@ Today an agent changes a task with `fh`, then has to run `git commit` and `git p
 ## Notes
 
 - 2026-10-07 — Card written by the agent and worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-07)
+
+**In plain words.** `fh … --commit` now commits the change it just made, and `fh … --push` also pushes it. Only the seabag's files go into that commit, with the message `fh: <command> <id>` and an `Agent: <holder>` line; anything else you were editing is left alone. If Git refuses (for example outside a Git repository, or a push is rejected), the change stays saved and `fh` warns `commit_failed` or `push_failed` with Git's own words. Without the options, `fh` still never runs Git. CARDS.md now tells agents to add `--push` to every status change.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (command tests: 12, two new, in a real temporary Git repository with a local remote) | PASS |
+| New tests: `--commit` commits only `task.json`, message `fh: claim A01-01` + `Agent: agent-a`; another changed file stays uncommitted; `--push` lands on the remote; a no-op change makes no commit; outside Git, `commit_failed` warning and the change is kept | PASS |
+| `npm --prefix apps/web run check:i18n` (81 texts, 37 codes) | PASS |
+| This repository: A01-12's own status changes made with `--push` | see the `fh:` commits on `main` |

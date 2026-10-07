@@ -77,5 +77,7 @@
   "problem.not_a_seabag": "{path} 不是水手袋文件夹。",
   "problem.open_failed": "无法在文件管理器中打开 {path}：{detail}。",
   "problem.startup_not_a_folder": "FlipHopper 启动时指定了 {path}，但它不是文件夹，因此没有打开任何内容。",
-  "problem.cannot_make_ready": "任务 {id} 的状态是 {state}；只有无人持有的 backlog 或 waiting 任务才能设为 ready。"
+  "problem.cannot_make_ready": "任务 {id} 的状态是 {state}；只有无人持有的 backlog 或 waiting 任务才能设为 ready。",
+  "problem.commit_failed": "更改已保存，但提交失败：{detail}",
+  "problem.push_failed": "更改已保存并提交，但推送失败：{detail}"
 }
