@@ -1,0 +1,7 @@
+{
+  "area": "A01",
+  "id": "A01-10",
+  "next_dependency": "owner reviews the card and its three questions",
+  "state": "backlog",
+  "title": "File > New Window opens an empty window"
+}

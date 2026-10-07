@@ -32,6 +32,7 @@ When FlipHopper creates a seabag in a folder that has **no visible files or fold
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-07 | Owner check passed ("passed") | owner (chat) |
 | 2026-10-06 | "If a folder has no visible files or dirs, then add a readme.md at that folder to introduce fliphopper briefly." | owner (chat, while checking A00-17) |
 | 2026-10-06 | File name `README-fliphopper.md` | owner (chat) |
 
@@ -58,3 +59,4 @@ When FlipHopper creates a seabag in a folder that has **no visible files or fold
 | The notice's wording on screen | not seen by the agent (no screen access) — owner check |
 
 **Owner check:** in the app, choose a new empty folder. Expected: the seabag opens, the notice mentions `README-fliphopper.md`, and Finder shows that file in the app's language. Choose a code repository: no README.
+- 2026-10-07 — **Owner verified** in the built app ("passed").

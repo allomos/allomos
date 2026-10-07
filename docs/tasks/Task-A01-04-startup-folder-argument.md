@@ -32,6 +32,7 @@ FlipHopper can be started with a folder to open, for example `fliphopper ~/my-pr
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-07 | Owner check passed ("passed") | owner (chat) |
 
 ## Notes
 
@@ -56,3 +57,4 @@ FlipHopper can be started with a folder to open, for example `fliphopper ~/my-pr
 | `open FlipHopper.app --args ~/no-such-folder` shows the message | unit-tested; on screen not seen by the agent (no screen access) — owner check |
 
 **Owner check:** `open <FlipHopper.app> --args -AppleLanguages '(ja)' ~/some-folder` opens that folder in Japanese; `open <FlipHopper.app> --args ~/no-such-folder` shows a message naming that path.
+- 2026-10-07 — **Owner verified** in the built app ("passed").

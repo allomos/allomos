@@ -2,8 +2,7 @@
   "area": "A01",
   "handoff_note": "Done by the agent; only the owner's look in the app is left (see the card's Result).",
   "id": "A01-07",
-  "label": "implemented",
-  "state": "waiting",
-  "title": "Own cards in seabag",
-  "waiting_on": "owner opens this repository in the app and sees all 32 cards by area"
+  "label": "owner verified",
+  "state": "done",
+  "title": "Own cards in seabag"
 }

@@ -36,6 +36,7 @@ Today FlipHopper's own work is tracked by hand in [TASK_BOARD.md](../TASK_BOARD.
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-07 | Owner check passed ("passed") | owner (chat) |
 | 2026-10-06 | Write a card for moving FlipHopper's own cards into a seabag | owner (chat) |
 | 2026-10-06 | Card reviewed; all four recommended answers accepted (one combined label ladder with `owner accepted` → `owner verified`; TASK_BOARD.md keeps only Now and Waiting on the owner *for now*; holder = session branch name; finished cards move in as `done` *for now*) | owner (chat) |
 
@@ -64,3 +65,4 @@ Today FlipHopper's own work is tracked by hand in [TASK_BOARD.md](../TASK_BOARD.
 | Built app (`tauri build --debug`) opened on this repository | Built and started; **not seen by the agent** (no screen access) — owner check |
 
 **Owner check:** open this repository's folder (`/Users/wanghui/coding/glidepace/fliphopper`) in FlipHopper. Expected: areas A00–A07 (A06 empty), 32 cards, open ones with their labels; A01-07 shows as waiting on this check.
+- 2026-10-07 — **Owner verified** in the built app ("passed").
