@@ -161,6 +161,31 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
     )
 }
 
+/// What `fh init` (and later the app) asks an AI agent to do: add [`agent_section`] to the
+/// project's instruction files, merged with what is already there. Plain numbered steps, so any
+/// agent can follow them.
+pub fn agent_setup_request() -> String {
+    format!(
+        "FlipHopper has set up this project's seabag (.fliphopper/seabag/). Please now tell future \
+AI agents about it, in this project's root folder:
+
+1. Open AGENTS.md (create it if it is missing).
+2. If it has no section between {AGENT_SECTION_START} and {AGENT_SECTION_END}, add the section \
+below. If it has one, replace that section with the one below. Keep both marker lines.
+3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
+board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
+unrelated text, and do not add the same instructions twice.
+4. Make sure CLAUDE.md contains the line @AGENTS.md, so Claude Code reads AGENTS.md (create \
+CLAUDE.md with just that line if it is missing). Do not copy the section into CLAUDE.md.
+5. Show the user what you changed.
+
+The section to add:
+
+{}",
+        agent_section()
+    )
+}
+
 /// Add FlipHopper's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
 /// changing what is already there. `AGENTS.md`: created with the section, or the section is
 /// appended unless it is there. `CLAUDE.md`: created as `@AGENTS.md` (Claude Code then reads
@@ -777,6 +802,14 @@ mod tests {
             Err(Problem::InvalidId { .. })
         ));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn agent_setup_request_carries_the_section_and_steps() {
+        let r = agent_setup_request();
+        assert!(r.contains("1. Open AGENTS.md") && r.contains("@AGENTS.md"));
+        assert!(r.ends_with(&agent_section()));
+        assert_eq!(r.matches(AGENT_SECTION_START).count(), 2);
     }
 
     #[test]

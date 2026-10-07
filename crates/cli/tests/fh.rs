@@ -427,7 +427,7 @@ fn git_sees_only_text_files() {
         Ok(o) if o.status.success() => {}
         _ => return, // No Git on this machine: nothing to check.
     }
-    ok(&repo, &["init", "--no-agent-files"]);
+    ok(&repo, &["init"]);
     ok(&repo, &["add", "area", "A01", "One"]);
     ok(
         &repo,
@@ -546,7 +546,7 @@ fn real_repo() -> (PathBuf, PathBuf) {
 #[test]
 fn commit_and_push_share_only_the_seabag() {
     let (repo, remote) = real_repo();
-    let v = ok(&repo, &["init", "--commit"]);
+    let v = ok(&repo, &["init", "--write-agent-files", "--commit"]);
     assert_eq!(v["warnings"], json!([]));
     assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
     assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "fh: init");
@@ -606,11 +606,28 @@ fn commit_outside_git_warns_and_keeps_the_change() {
 }
 
 #[test]
-fn init_tells_agents_about_fliphopper() {
+fn init_asks_the_agent_or_writes_when_told() {
+    // By default: no files written; the request is printed and in `agent_setup`.
+    let dir = tmp("agent-ask");
+    let v = ok(&dir, &["init"]);
+    assert_eq!(v["agent_files"], json!([]));
+    assert!(
+        v["agent_setup"]
+            .as_str()
+            .unwrap()
+            .contains("1. Open AGENTS.md")
+    );
+    assert!(!dir.join("AGENTS.md").exists() && !dir.join("CLAUDE.md").exists());
+    let text = tmp("agent-ask-text");
+    let out = fh(&text, &["init"]);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Next step for the AI agent"));
+
+    // --write-agent-files: written directly, existing text kept.
     let dir = tmp("agent-files");
     fs::write(dir.join("AGENTS.md"), "# Ours\n").unwrap();
-    let v = ok(&dir, &["init"]);
+    let v = ok(&dir, &["init", "--write-agent-files"]);
     assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
+    assert_eq!(v["agent_setup"], Value::Null);
     let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
     assert!(
         agents.starts_with("# Ours\n\n<!-- fliphopper:start -->") && agents.contains("fh next")
@@ -619,9 +636,4 @@ fn init_tells_agents_about_fliphopper() {
         fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
         "@AGENTS.md\n"
     );
-    // Opting out writes neither file.
-    let bare = tmp("agent-files-off");
-    let v = ok(&bare, &["init", "--no-agent-files"]);
-    assert_eq!(v["agent_files"], json!([]));
-    assert!(!bare.join("AGENTS.md").exists() && !bare.join("CLAUDE.md").exists());
 }
