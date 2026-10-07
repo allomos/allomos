@@ -3,6 +3,7 @@
   "holder": "claude/a01-run",
   "id": "A01-13",
   "label": "locally verified",
-  "state": "in_progress",
-  "title": "Agent instructions on init"
+  "state": "waiting",
+  "title": "Agent instructions on init",
+  "waiting_on": "owner tries the app on a new folder and looks at AGENTS.md"
 }
