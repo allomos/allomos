@@ -1,6 +1,6 @@
 {
   "area": "A01",
-  "holder": "claude/a01-run",
+  "handoff_note": "Built, merged, installed; its own status changes used --push.",
   "id": "A01-12",
   "label": "locally verified",
   "state": "waiting",
