@@ -29,6 +29,7 @@ Today the only way to switch projects is the "choose a folder" button. After thi
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-07 | Owner check passed: ⌘O opens another folder; the menu reads ファイル → フォルダーを開く… in Japanese ("passed") | owner (chat) |
 | 2026-10-07 | "add a new feature as a new task card: allow user choose 'file->new' to open a new window with no folder opened" | owner (chat) |
 | 2026-10-07 | Card reviewed: Open Folder… (⌘O) yes, "then we need no 'file -> new window' menu for now"; closing the last window quits: yes; bring an already-open folder's window to the front: yes (later) | owner (chat) |
 
@@ -54,3 +55,4 @@ Today the only way to switch projects is the "choose a folder" button. After thi
 | Picking a folder from the menu's dialog opens it | not seen (the dialog is drawn by a system process the agent cannot drive) — owner check |
 
 **Owner check:** in the app, press ⌘O, pick another folder: the window shows it. Switch the app's language to 日本語: the menu reads ファイル → フォルダーを開く….
+- 2026-10-07 — **Owner verified** in the built app ("passed").

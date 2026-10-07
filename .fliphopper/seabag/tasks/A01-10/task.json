@@ -2,8 +2,7 @@
   "area": "A01",
   "handoff_note": "Built and merged; owner's check is on the card.",
   "id": "A01-10",
-  "label": "locally verified",
-  "state": "waiting",
-  "title": "File > Open Folder (Cmd+O)",
-  "waiting_on": "owner tries Cmd+O and the menu in Japanese"
+  "label": "owner verified",
+  "state": "done",
+  "title": "File > Open Folder (Cmd+O)"
 }
