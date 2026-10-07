@@ -19,7 +19,7 @@ This page keeps only **Now** and **Waiting on the owner**, until it is removed o
 
 **Built, waiting on the owner's look:** `fh needs`, `fh ready`, `fh drop` and `fh init --id --labels` ([`A01-08`](./tasks/Task-A01-08-fh-fills-move-gaps.md)); the decks show the app's mark ([`A00-19`](./tasks/Task-A00-19-decks-new-mark.md), republish not done). Research for the owner: companions away from home and the pairing email ([`A04-01`](./tasks/Task-A04-01-remote-access-research.md)); starting and reopening agent sessions ([`A03-01`](./tasks/Task-A03-01-agent-launch-research.md)).
 
-**What is next:** the owner answers v0.1 exit check 3, then v0.1 can be declared done; the owner reviews the new card File → New Window ([`A01-10`](./tasks/Task-A01-10-file-new-window.md)) ([`A01-09`](./tasks/Task-A01-09-v0-1-exit-check.md)). `fh next` names the next ready card.
+**What is next:** the owner answers v0.1 exit check 3, then v0.1 can be declared done; File → Open Folder… (⌘O) is ready to build ([`A01-10`](./tasks/Task-A01-10-file-new-window.md)) ([`A01-09`](./tasks/Task-A01-09-v0-1-exit-check.md)). `fh next` names the next ready card.
 
 ## Waiting on the owner
 
@@ -31,7 +31,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
-| Review the new card: File → New Window opens an empty window (three questions on the card) | [`A01-10`](./tasks/Task-A01-10-file-new-window.md) | A01-10 ready |
 | Review the new `fh` commands (`needs`, `ready`, `drop`, `init --id --labels`) | [`A01-08`](./tasks/Task-A01-08-fh-fills-move-gaps.md) | A01-08 Done |
 | Does this Claude Code session's use of `fh` count as v0.1 exit check 3? | [`A01-09`](./tasks/Task-A01-09-v0-1-exit-check.md) | v0.1 |
 | Republish both road show decks at their existing private addresses with the new mark (local files are done) | [`Task-A00-19`](./tasks/Task-A00-19-decks-new-mark.md) | A00-19's last step |
