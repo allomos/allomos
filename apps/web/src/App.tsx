@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
+import { AgentsPanel } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Area, Issue, Opened, Problem, Task } from "./types";
@@ -51,7 +52,7 @@ function folderName(path: string): string {
 type Pending = { folder: string; suggestedRoot: string; gitRoot: string | null };
 
 /** A banner's text: an interface message, or a problem sent by Rust. */
-type Note = Message | { problem: Problem };
+type Note = Message | { problem: Problem } | { text: string };
 
 function errorNote(e: unknown): Note {
   return isProblem(e) ? { problem: e } : { key: "error.unexpected", params: { detail: String(e) } };
@@ -63,6 +64,8 @@ export function App({ messenger }: { messenger: Messenger }) {
   const languageRef = useRef(language);
   languageRef.current = language;
   const [opened, setOpened] = useState<Opened | null>(null);
+  const openedRef = useRef(opened);
+  openedRef.current = opened;
   const [pending, setPending] = useState<Pending | null>(null);
   const [notices, setNotices] = useState<Note[]>([]);
   const [error, setError] = useState<Note | null>(null);
@@ -74,12 +77,13 @@ export function App({ messenger }: { messenger: Messenger }) {
       return next;
     });
   }, []);
-  const noteText = (n: Note) => ("problem" in n ? problem(n.problem) : t(n.key, n.params));
+  const noteText = (n: Note) => ("problem" in n ? problem(n.problem) : "text" in n ? n.text : t(n.key, n.params));
 
   const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
     setPending(null);
     setNotices(message ? [message] : []);
+    setAgentsFor(null);
     setError(null);
     try {
       localStorage.setItem(LAST_ROOT_KEY, o.root);
@@ -90,11 +94,10 @@ export function App({ messenger }: { messenger: Messenger }) {
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
   }, [changeRecent]);
 
-  /** After creating a seabag: say which instruction files got FlipHopper's section for AI agents. */
-  const noteAgentFiles = useCallback((o: Opened) => {
-    if (o.agent_files.length > 0) {
-      setNotices((list) => [...list, { key: "notice.agent_files", params: { files: o.agent_files.join(", ") } }]);
-    }
+  /** After creating a seabag: offer to tell AI agents about it (Task-A03-03). */
+  const [agentsFor, setAgentsFor] = useState<{ project: string; seabag: string } | null>(null);
+  const offerAgents = useCallback((o: Opened) => {
+    setAgentsFor({ project: projectFolder(o.root), seabag: o.root });
   }, []);
 
   const openFolder = useCallback(
@@ -108,7 +111,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         } else if (i.kind === "empty") {
           const o = await messenger.createSeabag(i.suggested_root, folderName(i.folder), languageRef.current);
           show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
-          noteAgentFiles(o);
+          offerAgents(o);
         } else if (i.kind === "no_seabag") {
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
         } else {
@@ -118,7 +121,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         setError(errorNote(e));
       }
     },
-    [messenger, show, noteAgentFiles],
+    [messenger, show, offerAgents],
   );
 
   // Follow changes made outside the window (by `fh` or by hand): reload when the files change.
@@ -192,6 +195,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         openRecent: t("menu.open_recent"),
         clearMenu: t("menu.clear_recent"),
         noRecent: t("menu.no_recent"),
+        agents: t("menu.agents"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -210,9 +214,14 @@ export function App({ messenger }: { messenger: Messenger }) {
       })();
     });
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
+    const stopAgents = messenger.onAgentsMenu(() => {
+      const root = openedRef.current?.root;
+      if (root) setAgentsFor({ project: projectFolder(root), seabag: root });
+    });
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
+      void stopAgents.then((f) => f()).catch(() => undefined);
     };
   }, [messenger, openFolder, changeRecent]);
 
@@ -221,7 +230,7 @@ export function App({ messenger }: { messenger: Messenger }) {
     try {
       const o = await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder), language);
       show(o, { key: "notice.created_nested" });
-      noteAgentFiles(o);
+      offerAgents(o);
     } catch (e) {
       setError(errorNote(e));
     }
@@ -268,6 +277,18 @@ export function App({ messenger }: { messenger: Messenger }) {
             {noteText(n)}
           </p>
         ))}
+        {agentsFor && (
+          <AgentsPanel
+            key={agentsFor.seabag}
+            messenger={messenger}
+            project={agentsFor.project}
+            seabag={agentsFor.seabag}
+            onDone={(message) => {
+              setAgentsFor(null);
+              if (message) setNotices((list) => [...list, { text: message }]);
+            }}
+          />
+        )}
 
         {pending && (
           <section className="card">
