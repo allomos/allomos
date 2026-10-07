@@ -29,6 +29,7 @@ The File menu gets **Open Recent**: a list of the folders opened most recently, 
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-07 | Owner check passed ("passed") | owner (chat) |
 | 2026-10-07 | "also need a new feature: the recently opened folders list in the file menu" | owner (chat) |
 
 ## Notes
@@ -52,3 +53,5 @@ The File menu gets **Open Recent**: a list of the folders opened most recently, 
 | A folder that no longer exists leaves the list when chosen | not tried (code path only) |
 
 **Owner check:** File → Open Recent shows the folders you opened, newest first; choosing one opens it; Clear Menu empties the list.
+
+- 2026-10-07 — **Owner verified** in the built app ("passed").

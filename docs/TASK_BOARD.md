@@ -15,11 +15,11 @@ This page keeps only **Now** and **Waiting on the owner**, until it is removed o
 
 **Decided:** build our own, standalone from Glidelines ([0008](./decisions/0008-build-our-own.md), [0003](./decisions/0003-relationship-to-glidelines.md)); a free local app with paid cloud ([0012](./decisions/0012-free-local-app-paid-cloud.md)); a Tauri 2 desktop hub for macOS and Windows with web and phone companions ([0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md), [0011](./decisions/0011-desktop-framework-and-shared-code.md)); readable Git-tracked files ([0007](./decisions/0007-git-like-project-sync.md)); the name FlipHopper and the seabag ([0013](./decisions/0013-product-name-fliphopper.md)); the main purpose, switching between agents and teammates ([0014](./decisions/0014-main-purpose-and-three-sets.md)). The planning documents are accepted ([`A00-01`](./tasks/Task-A00-01-planning-docs.md)).
 
-**Done 2026-10-07 (owner verified):** File → Open Folder… (⌘O) ([`A01-10`](./tasks/Task-A01-10-file-new-window.md)); a README in a folder FlipHopper fills ([`A01-05`](./tasks/Task-A01-05-readme-in-new-folder.md)); opening the folder given at start, even after macOS options ([`A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
+**Done 2026-10-07 (owner verified):** File → Open Recent ([`A01-11`](./tasks/Task-A01-11-recent-folders-menu.md)); File → Open Folder… (⌘O) ([`A01-10`](./tasks/Task-A01-10-file-new-window.md)); a README in a folder FlipHopper fills ([`A01-05`](./tasks/Task-A01-05-readme-in-new-folder.md)); opening the folder given at start, even after macOS options ([`A01-04`](./tasks/Task-A01-04-startup-folder-argument.md)).
 
 **Built, waiting on the owner's look:** `fh needs`, `fh ready`, `fh drop` and `fh init --id --labels` ([`A01-08`](./tasks/Task-A01-08-fh-fills-move-gaps.md)); the decks show the app's mark ([`A00-19`](./tasks/Task-A00-19-decks-new-mark.md), republish not done). Research for the owner: companions away from home and the pairing email ([`A04-01`](./tasks/Task-A04-01-remote-access-research.md)); starting and reopening agent sessions ([`A03-01`](./tasks/Task-A03-01-agent-launch-research.md)).
 
-**What is next:** the owner checks File → Open Recent ([`A01-11`](./tasks/Task-A01-11-recent-folders-menu.md)). `fh next` names the next ready card.
+**What is next:** `fh next` names the next ready card; the owner's open questions are below.
 
 ## Waiting on the owner
 
@@ -31,7 +31,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
-| **Check in the app:** File → Open Recent lists your folders, newest first; choosing one opens it; Clear Menu empties it | [`A01-11`](./tasks/Task-A01-11-recent-folders-menu.md) | A01-11 Done |
 | Review the new `fh` commands (`needs`, `ready`, `drop`, `init --id --labels`) | [`A01-08`](./tasks/Task-A01-08-fh-fills-move-gaps.md) | A01-08 Done |
 | Republish both road show decks at their existing private addresses with the new mark (local files are done) | [`Task-A00-19`](./tasks/Task-A00-19-decks-new-mark.md) | A00-19's last step |
 | Remote access and pairing email: accept or change the recommendation (own Tailscale account; later a paid relay; one FlipHopper email helper on Cloudflare Workers + Resend, which needs a domain) | [`A04-01`](./tasks/Task-A04-01-remote-access-research.md), [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | Iteration 10 |
