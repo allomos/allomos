@@ -65,4 +65,6 @@ export interface Opened {
   loaded: Loaded;
   /** README-fliphopper.md was just written next to .fliphopper/ (only when creating). */
   readme_added: boolean;
+  /** Instruction files that just got FlipHopper's section for AI agents (only when creating). */
+  agent_files: string[];
 }

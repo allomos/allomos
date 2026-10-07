@@ -427,7 +427,7 @@ fn git_sees_only_text_files() {
         Ok(o) if o.status.success() => {}
         _ => return, // No Git on this machine: nothing to check.
     }
-    ok(&repo, &["init"]);
+    ok(&repo, &["init", "--no-agent-files"]);
     ok(&repo, &["add", "area", "A01", "One"]);
     ok(
         &repo,
@@ -548,7 +548,14 @@ fn commit_and_push_share_only_the_seabag() {
     let (repo, remote) = real_repo();
     let v = ok(&repo, &["init", "--commit"]);
     assert_eq!(v["warnings"], json!([]));
+    assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
     assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "fh: init");
+    // The agent files went into the same commit as the new seabag.
+    let files = git(&repo, &["show", "--name-only", "--format=", "HEAD"]);
+    assert!(
+        files.contains("AGENTS.md") && files.contains("CLAUDE.md"),
+        "{files}"
+    );
     ok(&repo, &["add", "area", "A01", "Tracking", "--commit"]);
     ok(
         &repo,
@@ -596,4 +603,25 @@ fn commit_outside_git_warns_and_keeps_the_change() {
         dir.join(".fliphopper/seabag/tasks/A01-01/task.json")
             .is_file()
     );
+}
+
+#[test]
+fn init_tells_agents_about_fliphopper() {
+    let dir = tmp("agent-files");
+    fs::write(dir.join("AGENTS.md"), "# Ours\n").unwrap();
+    let v = ok(&dir, &["init"]);
+    assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
+    let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
+    assert!(
+        agents.starts_with("# Ours\n\n<!-- fliphopper:start -->") && agents.contains("fh next")
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
+        "@AGENTS.md\n"
+    );
+    // Opting out writes neither file.
+    let bare = tmp("agent-files-off");
+    let v = ok(&bare, &["init", "--no-agent-files"]);
+    assert_eq!(v["agent_files"], json!([]));
+    assert!(!bare.join("AGENTS.md").exists() && !bare.join("CLAUDE.md").exists());
 }

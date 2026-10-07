@@ -36,3 +36,14 @@ An AI agent learns how to work in a project from the project's instruction files
 ## Notes
 
 - 2026-10-07 — Card written by the agent and worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-07)
+
+**In plain words.** The existing `fh init` command and the app now set a project up for AI agents when they create its seabag. They add a short "Tasks: FlipHopper" section to the project's `AGENTS.md` (read by Codex), and make `CLAUDE.md` (read by Claude Code) point to it. The section says to start with `fh next` and to record every change with `fh … --push`. Existing text in those files is never changed; the section is added only once. `fh init --no-agent-files` skips it, and `fh init --commit` commits these files together with the new seabag. The app's notice names the files it changed.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (store: new rules test; command: new `init_tells_agents_about_fliphopper`, `init --commit` includes both files) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (82 texts) | PASS |
+| Built app on a new empty folder: `.fliphopper/`, `README-fliphopper.md`, `AGENTS.md` (with the section), `CLAUDE.md` (`@AGENTS.md`); the window shows both notices | PASS |
+| A new Claude Code or Codex session in such a project starts with `fh next` | not run (would start an agent) — owner check if wanted |

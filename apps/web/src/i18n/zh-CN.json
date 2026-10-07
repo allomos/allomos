@@ -15,6 +15,7 @@
   "notice.created_here": "已在此空文件夹的 .fliphopper/seabag/ 中创建水手袋和入门项目。",
   "notice.created_here_readme": "已在此空文件夹的 .fliphopper/seabag/ 中创建水手袋和入门项目，并添加了说明此文件夹的 README-fliphopper.md。",
   "notice.created_nested": "已在 .fliphopper/seabag/ 中创建水手袋和入门项目。",
+  "notice.agent_files": "已在 {files} 中添加面向 AI 智能体的 FlipHopper 说明，让 Claude Code 和 Codex 知道在这里使用 fh 命令。",
   "error.not_a_folder": "{path} 不是文件夹。",
   "error.unexpected": "出错了：{detail}",
   "pending.title": "此文件夹中还没有水手袋",
