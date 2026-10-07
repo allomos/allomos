@@ -32,3 +32,13 @@
 ## Notes
 
 - 2026-10-07 — Card written by the agent and worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-07)
+
+**In plain words.** `fh init` no longer writes `AGENTS.md` or `CLAUDE.md`. After creating the seabag it prints "Next step for the AI agent running this command:", five numbered steps and the exact section. The agent reads that output and edits the files itself, merging with any rules already there. `fh init --write-agent-files` still writes the section directly, for scripts. The app still writes directly until [`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md).
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (new: `init_asks_the_agent_or_writes_when_told`; store: `agent_setup_request_carries_the_section_and_steps`) | PASS |
+| `fh init` in a new folder: prints the request; no `AGENTS.md` / `CLAUDE.md` written | PASS |
+| An agent following the request | not run (would start an agent) — owner check if wanted |

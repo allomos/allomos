@@ -13,8 +13,8 @@ use clap::{Parser, Subcommand, error::ErrorKind};
 use fliphopper_core::ops::{self, Outcome};
 use fliphopper_core::{Issue, Problem, Seabag, State, Task};
 use fliphopper_store::{
-    DEFAULT_DIR, Lock, add_agent_instructions, find_seabag, git_root, id_from_name,
-    init_with_labels, load, picked_folder,
+    DEFAULT_DIR, Lock, add_agent_instructions, agent_setup_request, find_seabag, git_root,
+    id_from_name, init_with_labels, load, picked_folder,
 };
 use serde_json::{Value, json};
 
@@ -76,9 +76,10 @@ enum Command {
         /// Default: implemented, locally verified, deployed and verified, owner verified.
         #[arg(long, value_name = "A,B,…")]
         labels: Option<String>,
-        /// Do not add FlipHopper's section for AI agents to AGENTS.md and CLAUDE.md.
+        /// Write FlipHopper's section for AI agents into AGENTS.md and CLAUDE.md yourself,
+        /// instead of printing a request for the agent running `fh init` to do it.
         #[arg(long)]
-        no_agent_files: bool,
+        write_agent_files: bool,
     },
     /// Add an area or a task.
     #[command(subcommand)]
@@ -444,7 +445,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             name,
             id,
             labels,
-            no_agent_files,
+            write_agent_files,
         } => {
             let root = match &cli.seabag {
                 Some(p) => cwd.join(p),
@@ -471,10 +472,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             };
             let root = init_with_labels(&root, &id, &name, labels)?;
             let mut text = format!("Created an empty seabag at {}\n", root.display());
-            // Tell AI agents about FlipHopper in the project's instruction files.
+            // Tell AI agents about FlipHopper in the project's instruction files: by default ask
+            // the agent running `fh init` to merge the section in; with --write-agent-files, write it.
             let mut agent_files = Vec::new();
             let mut warnings = Vec::new();
-            if let (false, Some(folder)) = (*no_agent_files, picked_folder(&root)) {
+            let agent_setup = (!*write_agent_files).then(agent_setup_request);
+            if let (true, Some(folder)) = (*write_agent_files, picked_folder(&root)) {
                 match add_agent_instructions(folder) {
                     Ok(files) => agent_files = files,
                     Err(e) => warnings.push(Problem::WriteFailed {
@@ -489,7 +492,14 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     agent_files.join(" and ")
                 ));
             }
-            let mut done = Done::new(json!({ "seabag": root, "agent_files": agent_files }), text);
+            if let Some(request) = &agent_setup {
+                text.push_str("\nNext step for the AI agent running this command:\n\n");
+                text.push_str(request);
+            }
+            let mut done = Done::new(
+                json!({ "seabag": root, "agent_files": agent_files, "agent_setup": agent_setup }),
+                text,
+            );
             done.warnings = warnings;
             done.extra = agent_files.iter().map(|f| format!("../../{f}")).collect();
             Ok(done)
