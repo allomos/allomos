@@ -8,7 +8,7 @@ This page keeps only **Now** and **Waiting on the owner**, until it is removed o
 
 ## Now
 
-**Iteration 1 — v0.1 macOS local tracker** is under way ([PLAN § 9](./product/PLAN.md#9-roadmap--releases)). The product today:
+**Iteration 1 — v0.1 macOS local tracker passed its exit check** on 2026-10-07 ([`A01-09`](./tasks/Task-A01-09-v0-1-exit-check.md), [PLAN § 9](./product/PLAN.md#9-roadmap--releases)). The product today:
 - a macOS app that opens a seabag and shows its tasks by area, in English, Simplified Chinese and Japanese, with Show in Finder and the hopper icon ([`A01-01`](./tasks/Task-A01-01-walking-skeleton.md), [`A01-02`](./tasks/Task-A01-02-ui-languages.md), [`A01-06`](./tasks/Task-A01-06-show-seabag-in-file-manager.md), [`A07-01`](./tasks/Task-A07-01-app-icon-hopper.md));
 - the **`fliphopper` / `fh` command** for agents: claim, label, park, finish and release tasks with a handoff note, one short lock per change ([`A01-03`](./tasks/Task-A01-03-gb-command.md));
 - **FlipHopper's own cards live in its seabag** and agents use `fh` ([`A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md)).
@@ -19,7 +19,7 @@ This page keeps only **Now** and **Waiting on the owner**, until it is removed o
 
 **Built, waiting on the owner's look:** `fh needs`, `fh ready`, `fh drop` and `fh init --id --labels` ([`A01-08`](./tasks/Task-A01-08-fh-fills-move-gaps.md)); the decks show the app's mark ([`A00-19`](./tasks/Task-A00-19-decks-new-mark.md), republish not done). Research for the owner: companions away from home and the pairing email ([`A04-01`](./tasks/Task-A04-01-remote-access-research.md)); starting and reopening agent sessions ([`A03-01`](./tasks/Task-A03-01-agent-launch-research.md)).
 
-**What is next:** the owner answers v0.1 exit check 3, then v0.1 can be declared done; File → Open Folder… (⌘O) is ready to build ([`A01-10`](./tasks/Task-A01-10-file-new-window.md)) ([`A01-09`](./tasks/Task-A01-09-v0-1-exit-check.md)). `fh next` names the next ready card.
+**What is next:** File → Open Folder… (⌘O) is being built ([`A01-10`](./tasks/Task-A01-10-file-new-window.md)). `fh next` names the next ready card.
 
 ## Waiting on the owner
 
@@ -32,7 +32,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 | **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | Review the new `fh` commands (`needs`, `ready`, `drop`, `init --id --labels`) | [`A01-08`](./tasks/Task-A01-08-fh-fills-move-gaps.md) | A01-08 Done |
-| Does this Claude Code session's use of `fh` count as v0.1 exit check 3? | [`A01-09`](./tasks/Task-A01-09-v0-1-exit-check.md) | v0.1 |
 | Republish both road show decks at their existing private addresses with the new mark (local files are done) | [`Task-A00-19`](./tasks/Task-A00-19-decks-new-mark.md) | A00-19's last step |
 | Remote access and pairing email: accept or change the recommendation (own Tailscale account; later a paid relay; one FlipHopper email helper on Cloudflare Workers + Resend, which needs a domain) | [`A04-01`](./tasks/Task-A04-01-remote-access-research.md), [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | Iteration 10 |
 | Agent sessions: read the findings; approve short real trials of Claude Code and Codex if wanted (Codex CLI on this Mac is broken and needs reinstalling) | [`A03-01`](./tasks/Task-A03-01-agent-launch-research.md), [0005](./decisions/0005-start-and-open-agent-sessions.md) | Iteration 8 |
