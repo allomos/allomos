@@ -1,7 +1,7 @@
 {
   "area": "A03",
+  "holder": "claude/a01-run",
   "id": "A03-03",
-  "next_dependency": "owner says yes to the two defaults on the card",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "App asks AI agents to set up instructions"
 }
