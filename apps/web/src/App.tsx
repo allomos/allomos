@@ -13,6 +13,31 @@ const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
     : "top.show_in_files";
 
 const LAST_ROOT_KEY = "fliphopper.lastRoot";
+/** Recently opened project folders, newest first, for File → Open Recent. */
+const RECENT_KEY = "fliphopper.recentFolders";
+const RECENT_MAX = 10;
+
+/** The project folder the user picked, from a seabag root (`<folder>/.fliphopper/seabag`). */
+function projectFolder(root: string): string {
+  return root.replace(/[\\/]\.fliphopper[\\/]seabag[\\/]?$/, "");
+}
+
+function readRecent(): string[] {
+  try {
+    const list: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string").slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecent(list: string[]) {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch {
+    /* storage unavailable: the menu still shows this session's list */
+  }
+}
 /** How often the window checks whether the seabag's files changed, for example through `fh`. */
 const FOLLOW_MS = 1000;
 
@@ -41,6 +66,14 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [notice, setNotice] = useState<Note | null>(null);
   const [error, setError] = useState<Note | null>(null);
+  const [recent, setRecent] = useState<string[]>(readRecent);
+  const changeRecent = useCallback((change: (list: string[]) => string[]) => {
+    setRecent((list) => {
+      const next = change(list).slice(0, RECENT_MAX);
+      saveRecent(next);
+      return next;
+    });
+  }, []);
   const noteText = (n: Note) => ("problem" in n ? problem(n.problem) : t(n.key, n.params));
 
   const show = useCallback((o: Opened, message: Note | null) => {
@@ -53,7 +86,9 @@ export function App({ messenger }: { messenger: Messenger }) {
     } catch {
       /* storage unavailable: nothing to remember */
     }
-  }, []);
+    const folder = projectFolder(o.root);
+    changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
+  }, [changeRecent]);
 
   const openFolder = useCallback(
     async (path: string) => {
@@ -142,8 +177,36 @@ export function App({ messenger }: { messenger: Messenger }) {
 
   // The menu's words follow the interface's language.
   useEffect(() => {
-    void messenger.setMenuTexts({ file: t("menu.file"), openFolder: t("menu.open_folder") }).catch(() => undefined);
+    void messenger
+      .setMenuTexts({
+        file: t("menu.file"),
+        openFolder: t("menu.open_folder"),
+        openRecent: t("menu.open_recent"),
+        clearMenu: t("menu.clear_recent"),
+        noRecent: t("menu.no_recent"),
+      })
+      .catch(() => undefined);
   }, [messenger, t]);
+
+  // File → Open Recent: show the list; open a chosen folder (a folder that is gone leaves the
+  // list and shows the usual message); Clear Menu empties it.
+  useEffect(() => {
+    void messenger.setRecentFolders(recent).catch(() => undefined);
+  }, [messenger, recent]);
+  useEffect(() => {
+    const stopOpen = messenger.onOpenRecentMenu((folder) => {
+      void (async () => {
+        const info = await messenger.inspectFolder(folder).catch(() => null);
+        if (info?.inspection.kind === "not_a_folder") changeRecent((list) => list.filter((f) => f !== folder));
+        await openFolder(folder);
+      })();
+    });
+    const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
+    return () => {
+      void stopOpen.then((f) => f()).catch(() => undefined);
+      void stopClear.then((f) => f()).catch(() => undefined);
+    };
+  }, [messenger, openFolder, changeRecent]);
 
   const createNested = async () => {
     if (!pending) return;

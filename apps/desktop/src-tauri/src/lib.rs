@@ -7,6 +7,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
@@ -173,14 +174,68 @@ fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
-/// The menu item's ID, and the event the interface hears when it is chosen.
+/// The menu items' IDs, and the events the interface hears when they are chosen.
 const OPEN_FOLDER_ID: &str = "open_folder";
 const OPEN_FOLDER_EVENT: &str = "menu:open_folder";
+/// A recent folder's item is `recent:<position in the list>`.
+const RECENT_PREFIX: &str = "recent:";
+const OPEN_RECENT_EVENT: &str = "menu:open_recent";
+const CLEAR_RECENT_ID: &str = "recent_clear";
+const CLEAR_RECENT_EVENT: &str = "menu:clear_recent";
 
-/// The menu items whose words follow the interface's language.
+/// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
     file: Submenu<Wry>,
     open_folder: MenuItem<Wry>,
+    recent: Submenu<Wry>,
+    state: Mutex<Recent>,
+}
+
+/// What the Open Recent submenu shows: the folders, newest first, and its two fixed texts.
+struct Recent {
+    folders: Vec<String>,
+    clear: String,
+    none: String,
+}
+
+impl Default for Recent {
+    fn default() -> Self {
+        Recent {
+            folders: Vec::new(),
+            clear: "Clear Menu".into(),
+            none: "No recent folders".into(),
+        }
+    }
+}
+
+/// Refill the Open Recent submenu: one item per folder, then Clear Menu; or a greyed
+/// "No recent folders" when the list is empty.
+fn fill_recent(app: &AppHandle, submenu: &Submenu<Wry>, recent: &Recent) -> tauri::Result<()> {
+    for item in submenu.items()? {
+        submenu.remove(&item)?;
+    }
+    if recent.folders.is_empty() {
+        let none = MenuItem::with_id(app, "recent_none", &recent.none, false, None::<&str>)?;
+        return submenu.append(&none);
+    }
+    for (i, folder) in recent.folders.iter().enumerate() {
+        let item = MenuItem::with_id(
+            app,
+            format!("{RECENT_PREFIX}{i}"),
+            folder,
+            true,
+            None::<&str>,
+        )?;
+        submenu.append(&item)?;
+    }
+    submenu.append(&PredefinedMenuItem::separator(app)?)?;
+    submenu.append(&MenuItem::with_id(
+        app,
+        CLEAR_RECENT_ID,
+        &recent.clear,
+        true,
+        None::<&str>,
+    )?)
 }
 
 /// The system's usual menus, with **Open Folder…** (⌘O / Ctrl+O) at the top of the File menu.
@@ -194,6 +249,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         Some("CmdOrCtrl+O"),
     )?;
+    let recent = Submenu::new(app, "Open Recent", true)?;
+    fill_recent(app, &recent, &Recent::default())?;
     let existing = menu
         .items()?
         .into_iter()
@@ -201,27 +258,60 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .find(|s| s.text().is_ok_and(|t| t == "File"));
     let file = match existing {
         Some(file) => {
-            file.prepend(&open_folder)?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 1)?;
+            file.prepend_items(&[&open_folder, &recent])?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 2)?;
             file
         }
         None => {
-            let file = Submenu::with_items(app, "File", true, &[&open_folder])?;
+            let file = Submenu::with_items(app, "File", true, &[&open_folder, &recent])?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
             file
         }
     };
-    app.manage(MenuTexts { file, open_folder });
+    app.manage(MenuTexts {
+        file,
+        open_folder,
+        recent,
+        state: Mutex::new(Recent::default()),
+    });
     Ok(menu)
 }
 
 /// Put the menu's words in the interface's language.
 #[tauri::command]
-fn set_menu_texts(texts: tauri::State<MenuTexts>, file: String, open_folder: String) {
+fn set_menu_texts(
+    app: AppHandle,
+    texts: tauri::State<MenuTexts>,
+    file: String,
+    open_folder: String,
+    open_recent: String,
+    clear_menu: String,
+    no_recent: String,
+) {
     // A menu that cannot be renamed keeps its previous words; nothing else depends on them.
     let _ = texts.file.set_text(file);
     let _ = texts.open_folder.set_text(open_folder);
+    let _ = texts.recent.set_text(open_recent);
+    let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
+    recent.clear = clear_menu;
+    recent.none = no_recent;
+    let _ = fill_recent(&app, &texts.recent, &recent);
+}
+
+/// Show these folders, newest first, under File → Open Recent.
+#[tauri::command]
+fn set_recent_folders(app: AppHandle, texts: tauri::State<MenuTexts>, folders: Vec<String>) {
+    let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
+    recent.folders = folders;
+    let _ = fill_recent(&app, &texts.recent, &recent);
+}
+
+/// The folder behind a chosen Open Recent item, if `id` is one.
+fn recent_folder(texts: &MenuTexts, id: &str) -> Option<String> {
+    let i: usize = id.strip_prefix(RECENT_PREFIX)?.parse().ok()?;
+    let recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
+    recent.folders.get(i).cloned()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -230,8 +320,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .on_menu_event(|app, event| {
-            if event.id() == OPEN_FOLDER_ID {
+            let id = event.id().as_ref();
+            if id == OPEN_FOLDER_ID {
                 let _ = app.emit(OPEN_FOLDER_EVENT, ());
+            } else if id == CLEAR_RECENT_ID {
+                let _ = app.emit(CLEAR_RECENT_EVENT, ());
+            } else if let Some(folder) = recent_folder(&app.state::<MenuTexts>(), id) {
+                let _ = app.emit(OPEN_RECENT_EVENT, folder);
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -242,7 +337,8 @@ pub fn run() {
             create_seabag,
             show_in_file_manager,
             system_languages,
-            set_menu_texts
+            set_menu_texts,
+            set_recent_folders
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");
