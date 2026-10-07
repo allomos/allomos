@@ -13,6 +13,8 @@ A seabag is an ordinary folder of small text files. There is one file for the pr
 
 - **`README-fliphopper.md`** next to `.fliphopper/`: when the app creates a seabag in a folder that **looks empty** (no entries, or only hidden ones such as `.DS_Store` or `.git`), it also writes this short introduction in the interface's language, so the folder does not look empty to a person. It is written only there, never over an existing file, and never named `README.md`. It is not part of the seabag; the user may edit or delete it ([`Task-A01-05`](../tasks/Task-A01-05-readme-in-new-folder.md)).
 
+- **`AGENTS.md` and `CLAUDE.md`** next to `.fliphopper/`: when `fh init` or the app creates a seabag, it adds a short section telling AI agents to work the tasks with `fh`, between `<!-- fliphopper:start -->` and `<!-- fliphopper:end -->`. A missing `AGENTS.md` is created with it; an existing one gets it appended once. A missing `CLAUDE.md` is created as `@AGENTS.md` (Claude Code then reads AGENTS.md); an existing one is left alone when it imports `@AGENTS.md` or has the section, and otherwise gets it appended. Nothing already in either file is changed ([`Task-A01-13`](../tasks/Task-A01-13-agent-instructions-on-init.md)).
+
 FlipHopper never creates a Git repository inside a seabag; the surrounding repository versions it.
 
 ## Layout

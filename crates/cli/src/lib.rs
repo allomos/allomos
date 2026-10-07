@@ -13,7 +13,8 @@ use clap::{Parser, Subcommand, error::ErrorKind};
 use fliphopper_core::ops::{self, Outcome};
 use fliphopper_core::{Issue, Problem, Seabag, State, Task};
 use fliphopper_store::{
-    DEFAULT_DIR, Lock, find_seabag, git_root, id_from_name, init_with_labels, load,
+    DEFAULT_DIR, Lock, add_agent_instructions, find_seabag, git_root, id_from_name,
+    init_with_labels, load, picked_folder,
 };
 use serde_json::{Value, json};
 
@@ -75,6 +76,9 @@ enum Command {
         /// Default: implemented, locally verified, deployed and verified, owner verified.
         #[arg(long, value_name = "A,B,…")]
         labels: Option<String>,
+        /// Do not add FlipHopper's section for AI agents to AGENTS.md and CLAUDE.md.
+        #[arg(long)]
+        no_agent_files: bool,
     },
     /// Add an area or a task.
     #[command(subcommand)]
@@ -192,6 +196,8 @@ struct Done {
     text: String,
     warnings: Vec<Problem>,
     issues: Vec<Issue>,
+    /// Files outside the seabag that `--commit` also commits, relative to the seabag.
+    extra: Vec<String>,
 }
 
 impl Done {
@@ -201,6 +207,7 @@ impl Done {
             text,
             warnings: Vec::new(),
             issues: Vec::new(),
+            extra: Vec::new(),
         }
     }
 }
@@ -258,7 +265,7 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
         Ok(mut done) => {
             if (cli.commit || cli.push) && cli.command.changes() {
                 if let Some(root) = done.fields["seabag"].as_str().map(PathBuf::from) {
-                    done.warnings.extend(share(&cli, &root));
+                    done.warnings.extend(share(&cli, &root, &done.extra));
                 }
             }
             if cli.json {
@@ -316,23 +323,33 @@ fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
 
 /// `--commit` / `--push`: commit only the seabag's files (other changes are left alone), then
 /// push if asked. The change itself is already saved, so a Git failure is a warning, not an error.
-fn share(cli: &Cli, seabag: &Path) -> Vec<Problem> {
+fn share(cli: &Cli, seabag: &Path, extra: &[String]) -> Vec<Problem> {
     let command = cli.command.name();
     let subject = match cli.command.target() {
         Some(id) => format!("fh: {command} {id}"),
         None => format!("fh: {command}"),
     };
     let agent = format!("Agent: {}", cli.holder.as_deref().unwrap_or("unknown (fh)"));
+    // The seabag ("."), plus any other files the command wrote (for `init`, AGENTS.md / CLAUDE.md).
+    let paths: Vec<&str> = std::iter::once(".")
+        .chain(extra.iter().map(String::as_str))
+        .collect();
+    let run = |head: &[&str]| {
+        let args: Vec<&str> = head
+            .iter()
+            .copied()
+            .chain(["--"])
+            .chain(paths.iter().copied())
+            .collect();
+        git(seabag, &args)
+    };
     let commit = (|| {
-        git(seabag, &["add", "--all", "--", "."])?;
-        // Nothing staged in the seabag: the change made no difference, so there is nothing to commit.
-        if git(seabag, &["diff", "--cached", "--quiet", "--", "."]).is_ok() {
+        run(&["add", "--all"])?;
+        // Nothing staged: the change made no difference, so there is nothing to commit.
+        if run(&["diff", "--cached", "--quiet"]).is_ok() {
             return Ok(false);
         }
-        git(
-            seabag,
-            &["commit", "--quiet", "-m", &subject, "-m", &agent, "--", "."],
-        )?;
+        run(&["commit", "--quiet", "-m", &subject, "-m", &agent])?;
         Ok(true)
     })();
     match commit {
@@ -423,7 +440,12 @@ fn task_line(t: &Task) -> String {
 fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     let me = cli.holder.as_deref();
     match &cli.command {
-        Command::Init { name, id, labels } => {
+        Command::Init {
+            name,
+            id,
+            labels,
+            no_agent_files,
+        } => {
             let root = match &cli.seabag {
                 Some(p) => cwd.join(p),
                 None => git_root(cwd)
@@ -448,8 +470,29 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 None => fliphopper_core::default_labels(),
             };
             let root = init_with_labels(&root, &id, &name, labels)?;
-            let text = format!("Created an empty seabag at {}\n", root.display());
-            Ok(Done::new(json!({ "seabag": root }), text))
+            let mut text = format!("Created an empty seabag at {}\n", root.display());
+            // Tell AI agents about FlipHopper in the project's instruction files.
+            let mut agent_files = Vec::new();
+            let mut warnings = Vec::new();
+            if let (false, Some(folder)) = (*no_agent_files, picked_folder(&root)) {
+                match add_agent_instructions(folder) {
+                    Ok(files) => agent_files = files,
+                    Err(e) => warnings.push(Problem::WriteFailed {
+                        path: folder.join("AGENTS.md").display().to_string(),
+                        detail: e.to_string(),
+                    }),
+                }
+            }
+            if !agent_files.is_empty() {
+                text.push_str(&format!(
+                    "Added FlipHopper's section for AI agents to {}\n",
+                    agent_files.join(" and ")
+                ));
+            }
+            let mut done = Done::new(json!({ "seabag": root, "agent_files": agent_files }), text);
+            done.warnings = warnings;
+            done.extra = agent_files.iter().map(|f| format!("../../{f}")).collect();
+            Ok(done)
         }
         Command::Add(add) => {
             let root = locate(cli, cwd)?;

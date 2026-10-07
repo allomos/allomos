@@ -11,7 +11,8 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    Inspection, add_readme_if_empty, create_starter, git_root, inspect, load, picked_folder, stamp,
+    Inspection, add_agent_instructions, add_readme_if_empty, create_starter, git_root, inspect,
+    load, picked_folder, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -30,6 +31,8 @@ struct Opened {
     loaded: Loaded,
     /// A `README-fliphopper.md` was just written next to `.fliphopper/`.
     readme_added: bool,
+    /// Instruction files that just got FlipHopper's section for AI agents (`AGENTS.md`, `CLAUDE.md`).
+    agent_files: Vec<String>,
 }
 
 /// The folder named on the command line: the first argument that is not an option.
@@ -93,6 +96,7 @@ fn open_seabag(root: PathBuf) -> Opened {
         loaded: load(&root),
         root,
         readme_added: false,
+        agent_files: Vec::new(),
     }
 }
 
@@ -106,7 +110,8 @@ fn seabag_stamp(root: PathBuf) -> String {
 
 /// Create a starter seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
 /// When the picked folder looks empty, also write `README-fliphopper.md` there, in the
-/// interface's `language`; a README that cannot be written does not undo the seabag.
+/// interface's `language`. Also add FlipHopper's section for AI agents to the folder's
+/// `AGENTS.md` and `CLAUDE.md`. Neither extra undoes the seabag when it cannot be written.
 #[tauri::command]
 fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
     create_starter(&root, &name).map_err(|e| {
@@ -120,13 +125,20 @@ fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened
             }
         }
     })?;
-    let readme_added = picked_folder(&root)
-        .map(|folder| add_readme_if_empty(folder, &language).unwrap_or(false))
+    let folder = picked_folder(&root);
+    // The README is decided first: the agent files below would make the folder look not empty.
+    let readme_added = folder
+        .map(|f| add_readme_if_empty(f, &language).unwrap_or(false))
         .unwrap_or(false);
+    // Tell AI agents about FlipHopper; files that cannot be written do not undo the seabag.
+    let agent_files = folder
+        .map(|f| add_agent_instructions(f).unwrap_or_default())
+        .unwrap_or_default();
     Ok(Opened {
         loaded: load(&root),
         root,
         readme_added,
+        agent_files,
     })
 }
 

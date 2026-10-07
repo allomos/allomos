@@ -64,7 +64,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   languageRef.current = language;
   const [opened, setOpened] = useState<Opened | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
-  const [notice, setNotice] = useState<Note | null>(null);
+  const [notices, setNotices] = useState<Note[]>([]);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
   const changeRecent = useCallback((change: (list: string[]) => string[]) => {
@@ -79,7 +79,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
     setPending(null);
-    setNotice(message);
+    setNotices(message ? [message] : []);
     setError(null);
     try {
       localStorage.setItem(LAST_ROOT_KEY, o.root);
@@ -89,6 +89,13 @@ export function App({ messenger }: { messenger: Messenger }) {
     const folder = projectFolder(o.root);
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
   }, [changeRecent]);
+
+  /** After creating a seabag: say which instruction files got FlipHopper's section for AI agents. */
+  const noteAgentFiles = useCallback((o: Opened) => {
+    if (o.agent_files.length > 0) {
+      setNotices((list) => [...list, { key: "notice.agent_files", params: { files: o.agent_files.join(", ") } }]);
+    }
+  }, []);
 
   const openFolder = useCallback(
     async (path: string) => {
@@ -101,6 +108,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         } else if (i.kind === "empty") {
           const o = await messenger.createSeabag(i.suggested_root, folderName(i.folder), languageRef.current);
           show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
+          noteAgentFiles(o);
         } else if (i.kind === "no_seabag") {
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
         } else {
@@ -110,7 +118,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         setError(errorNote(e));
       }
     },
-    [messenger, show],
+    [messenger, show, noteAgentFiles],
   );
 
   // Follow changes made outside the window (by `fh` or by hand): reload when the files change.
@@ -211,9 +219,9 @@ export function App({ messenger }: { messenger: Messenger }) {
   const createNested = async () => {
     if (!pending) return;
     try {
-      show(await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder), language), {
-        key: "notice.created_nested",
-      });
+      const o = await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder), language);
+      show(o, { key: "notice.created_nested" });
+      noteAgentFiles(o);
     } catch (e) {
       setError(errorNote(e));
     }
@@ -255,7 +263,11 @@ export function App({ messenger }: { messenger: Messenger }) {
 
       <main className="main">
         {error && <p className="banner error">{noteText(error)}</p>}
-        {notice && <p className="banner ok">{noteText(notice)}</p>}
+        {notices.map((n, i) => (
+          <p key={i} className="banner ok">
+            {noteText(n)}
+          </p>
+        ))}
 
         {pending && (
           <section className="card">

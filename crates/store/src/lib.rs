@@ -135,6 +135,84 @@ pub fn add_readme_if_empty(folder: &Path, language: &str) -> io::Result<bool> {
     }
 }
 
+/// Marks FlipHopper's section in a project's `AGENTS.md` / `CLAUDE.md`, so it is added only once.
+pub const AGENT_SECTION_START: &str = "<!-- fliphopper:start -->";
+const AGENT_SECTION_END: &str = "<!-- fliphopper:end -->";
+
+/// The section that tells an AI agent this project's tasks are in FlipHopper. English: it is
+/// read by agents, not shown in the app.
+pub fn agent_section() -> String {
+    format!(
+        "{AGENT_SECTION_START}
+## Tasks: FlipHopper
+
+This project's tasks, progress and handoff notes live in FlipHopper's seabag
+(`.fliphopper/seabag/`). Work them with the `fh` command; never edit those files by hand.
+
+- Start a session with `fh next` (the next ready task and its handoff note), or `fh list`.
+- Take a task: `fh claim <id> --as <your session name> --push`.
+- Report progress: `fh label <id> \"<label>\" --push`; when blocked: `fh wait <id> --on \"<what>\" --push`.
+- Stopping before it is done: `fh release <id> --note \"<what the next one needs>\" --push`.
+- Finished: `fh done <id> --push`.
+
+`--push` commits only the seabag's files and pushes them, so others see the change.
+{AGENT_SECTION_END}
+"
+    )
+}
+
+/// Add FlipHopper's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
+/// changing what is already there. `AGENTS.md`: created with the section, or the section is
+/// appended unless it is there. `CLAUDE.md`: created as `@AGENTS.md` (Claude Code then reads
+/// AGENTS.md); an existing one is left alone if it imports `@AGENTS.md` or holds the section,
+/// otherwise the section is appended. Returns the names of the files it changed.
+pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
+    let mut changed = Vec::new();
+    let section = agent_section();
+    let agents = folder.join("AGENTS.md");
+    match fs::read_to_string(&agents) {
+        Ok(text) if text.contains(AGENT_SECTION_START) => {}
+        Ok(text) => {
+            append(&agents, &text, &section)?;
+            changed.push("AGENTS.md".to_string());
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            fs::write(&agents, format!("# Agent instructions\n\n{section}"))?;
+            changed.push("AGENTS.md".to_string());
+        }
+        Err(e) => return Err(e),
+    }
+    let claude = folder.join("CLAUDE.md");
+    match fs::read_to_string(&claude) {
+        Ok(text)
+            if text.contains(AGENT_SECTION_START)
+                || text.lines().any(|l| l.trim() == "@AGENTS.md") => {}
+        Ok(text) => {
+            append(&claude, &text, &section)?;
+            changed.push("CLAUDE.md".to_string());
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            fs::write(&claude, "@AGENTS.md\n")?;
+            changed.push("CLAUDE.md".to_string());
+        }
+        Err(e) => return Err(e),
+    }
+    Ok(changed)
+}
+
+/// Append `section` to a file whose current text is `text`, after one blank line.
+fn append(path: &Path, text: &str, section: &str) -> io::Result<()> {
+    let gap = if text.is_empty() || text.ends_with("\n\n") {
+        ""
+    } else if text.ends_with('\n') {
+        "\n"
+    } else {
+        "\n\n"
+    };
+    let mut file = fs::OpenOptions::new().append(true).open(path)?;
+    file.write_all(format!("{gap}{section}").as_bytes())
+}
+
 /// The folder the user picked, for a seabag at `<folder>/.fliphopper/seabag`; `None` for a
 /// seabag anywhere else.
 pub fn picked_folder(root: &Path) -> Option<&Path> {
@@ -698,6 +776,52 @@ mod tests {
             init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()]),
             Err(Problem::InvalidId { .. })
         ));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn agent_instructions_are_added_once_and_keep_existing_text() {
+        // No files: both created; CLAUDE.md only imports AGENTS.md.
+        let dir = tmp("agents-new");
+        assert_eq!(
+            add_agent_instructions(&dir).unwrap(),
+            ["AGENTS.md", "CLAUDE.md"]
+        );
+        let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
+        assert!(agents.contains(AGENT_SECTION_START) && agents.contains("fh next"));
+        assert_eq!(
+            fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
+            "@AGENTS.md\n"
+        );
+        // A second run changes nothing.
+        assert!(add_agent_instructions(&dir).unwrap().is_empty());
+        assert_eq!(fs::read_to_string(dir.join("AGENTS.md")).unwrap(), agents);
+        fs::remove_dir_all(dir).unwrap();
+
+        // Existing files without the section: it is appended once, earlier text kept.
+        let dir = tmp("agents-old");
+        fs::write(dir.join("AGENTS.md"), "# Ours\nKeep this.").unwrap();
+        fs::write(dir.join("CLAUDE.md"), "Claude rules\n").unwrap();
+        assert_eq!(
+            add_agent_instructions(&dir).unwrap(),
+            ["AGENTS.md", "CLAUDE.md"]
+        );
+        let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
+        assert!(agents.starts_with("# Ours\nKeep this.\n\n<!-- fliphopper:start -->"));
+        let claude = fs::read_to_string(dir.join("CLAUDE.md")).unwrap();
+        assert!(claude.starts_with("Claude rules\n\n<!-- fliphopper:start -->"));
+        assert_eq!(agents.matches(AGENT_SECTION_START).count(), 1);
+        assert!(add_agent_instructions(&dir).unwrap().is_empty());
+        fs::remove_dir_all(dir).unwrap();
+
+        // CLAUDE.md that already imports AGENTS.md is left alone.
+        let dir = tmp("agents-import");
+        fs::write(dir.join("CLAUDE.md"), "# Claude\n@AGENTS.md\n").unwrap();
+        assert_eq!(add_agent_instructions(&dir).unwrap(), ["AGENTS.md"]);
+        assert_eq!(
+            fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
+            "# Claude\n@AGENTS.md\n"
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 
