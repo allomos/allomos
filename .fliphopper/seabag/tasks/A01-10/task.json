@@ -1,6 +1,7 @@
 {
   "area": "A01",
+  "holder": "claude/a01-run",
   "id": "A01-10",
-  "state": "ready",
+  "state": "in_progress",
   "title": "File > Open Folder (Cmd+O)"
 }
