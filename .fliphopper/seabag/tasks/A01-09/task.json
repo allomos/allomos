@@ -1,8 +1,7 @@
 {
   "area": "A01",
   "id": "A01-09",
-  "label": "drafted",
-  "state": "waiting",
-  "title": "v0.1 exit check",
-  "waiting_on": "owner checks A01-07 in the app and accepts check 3"
+  "label": "owner verified",
+  "state": "done",
+  "title": "v0.1 exit check"
 }
