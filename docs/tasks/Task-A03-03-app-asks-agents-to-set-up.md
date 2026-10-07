@@ -8,6 +8,7 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 
 | Piece | What it is | Where |
 |---|---|---|
+| Project folder | The panel shows **Project folder: <path> [Change…]**. It starts as the folder the seabag was created in; the person may pick another folder (for example the repository's root above it). Agents open in that folder, and the request names it and the seabag's absolute path. |  `apps/web`, `apps/desktop` |
 | Finding agents | Looks for: **Claude Code (terminal)** — the `claude` command; **Claude (app)** — Claude.app; **Codex (terminal)** — the `codex` command, only if it actually runs; **Codex (app)** — the app that opens `codex://` links. Each found one shows; missing ones do not. | `apps/desktop` (Rust) |
 | The panel | A list with tick boxes, one line per agent and what will happen ("opens a terminal with the request typed in", "opens the app with the request typed in"), then Ask and Not now. In three languages. | `apps/web` |
 | Asking | Claude Code terminal: the `claude-cli://open?cwd=…&q=…` link. Claude app: `claude://code/new?folder=…&q=…`. Codex app: `codex://threads/new?path=…&prompt=…`. Codex terminal: a new Terminal window running `codex "<request>"`. Nothing is sent by FlipHopper: the person presses Enter in the agent. | `apps/desktop` |
@@ -19,7 +20,8 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 ## Details for the worker
 
 - **Outcome.** A person sets up a project for AI agents in one click, and the agent writes the instructions in a way that fits the project.
-- **Defaults chosen by the agent** (owner may change them on review):
+- **Owner's answers (2026-10-07):** both defaults below: yes. Add a project folder the person can change, and name the seabag's path in the request.
+- **Defaults** (accepted):
   1. FlipHopper only **opens** the agent with the request typed in; it never sends it or runs an agent in the background, so nothing runs or spends the person's plan without them pressing Enter.
   2. The panel shows after a seabag is created, and from a menu item (File → Tell AI Agents About This Project…).
 - **Decisive unknowns.**
@@ -33,6 +35,7 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-07 | Defaults 1 and 2: "yes", "yes"; "did you specify the tracking seabag path? and maybe we should let user select the working project path?" | owner (chat) |
 | 2026-10-07 | "let the app try to find the agents and ask the agents to do the job. if there are multiple agents, ask user to choose one or many. should consider the situation of agent apps and CLIs. show a UI to the user to do select." | owner (chat) |
 
 ## Notes
