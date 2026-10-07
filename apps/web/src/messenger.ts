@@ -5,6 +5,7 @@
 // local server instead; the rest of the interface does not change.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo, Opened } from "./types";
 
@@ -26,6 +27,10 @@ export interface Messenger {
    * looks empty it also writes README-fliphopper.md in `language` (`readme_added` says so).
    */
   createSeabag(root: string, name: string, language: string): Promise<Opened>;
+  /** Calls `handler` whenever File → Open Folder… is chosen. Resolves to a function that stops listening. */
+  onOpenFolderMenu(handler: () => void): Promise<() => void>;
+  /** Puts the app menu's words in the interface's language. */
+  setMenuTexts(texts: { file: string; openFolder: string }): Promise<void>;
 }
 
 export const desktopMessenger: Messenger = {
@@ -40,4 +45,6 @@ export const desktopMessenger: Messenger = {
   seabagStamp: (root) => invoke<string>("seabag_stamp", { root }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   createSeabag: (root, name, language) => invoke<Opened>("create_seabag", { root, name, language }),
+  onOpenFolderMenu: (handler) => listen("menu:open_folder", () => handler()),
+  setMenuTexts: ({ file, openFolder }) => invoke<void>("set_menu_texts", { file, openFolder }),
 };

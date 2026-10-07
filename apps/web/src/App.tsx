@@ -132,6 +132,19 @@ export function App({ messenger }: { messenger: Messenger }) {
     if (path) await openFolder(path);
   };
 
+  // File → Open Folder… (⌘O / Ctrl+O) does what the "choose a folder" button does.
+  const chooseRef = useRef(choose);
+  chooseRef.current = choose;
+  useEffect(() => {
+    const stop = messenger.onOpenFolderMenu(() => void chooseRef.current());
+    return () => void stop.then((f) => f()).catch(() => undefined);
+  }, [messenger]);
+
+  // The menu's words follow the interface's language.
+  useEffect(() => {
+    void messenger.setMenuTexts({ file: t("menu.file"), openFolder: t("menu.open_folder") }).catch(() => undefined);
+  }, [messenger, t]);
+
   const createNested = async () => {
     if (!pending) return;
     try {

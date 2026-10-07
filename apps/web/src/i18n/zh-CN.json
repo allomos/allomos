@@ -1,6 +1,8 @@
 {
   "top.choose_folder": "选择文件夹…",
   "top.open_another": "打开其他文件夹…",
+  "menu.file": "文件",
+  "menu.open_folder": "打开文件夹…",
   "top.show_in_finder": "在访达中显示",
   "top.show_in_explorer": "在资源管理器中显示",
   "top.show_in_files": "在文件管理器中显示",
