@@ -3,6 +3,7 @@
   "holder": "claude/a01-run",
   "id": "A03-03",
   "label": "implemented",
-  "state": "in_progress",
-  "title": "App asks AI agents to set up instructions"
+  "state": "waiting",
+  "title": "App asks AI agents to set up instructions",
+  "waiting_on": "owner tries the panel: Ask opens the agents with the request typed in"
 }
