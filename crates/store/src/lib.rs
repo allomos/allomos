@@ -164,14 +164,19 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
 /// What `fh init` (and later the app) asks an AI agent to do: add [`agent_section`] to the
 /// project's instruction files, merged with what is already there. Plain numbered steps, so any
 /// agent can follow them.
-pub fn agent_setup_request() -> String {
+pub fn agent_setup_request(project: &Path, seabag: &Path) -> String {
     format!(
-        "FlipHopper has set up this project's seabag (.fliphopper/seabag/). Please now tell future \
-AI agents about it, in this project's root folder:
+        "FlipHopper has set up this project's seabag. Please now tell future AI agents about it.
+
+Project folder: {project}
+Seabag (FlipHopper's task files): {seabag}
+
+In the project folder:
 
 1. Open AGENTS.md (create it if it is missing).
-2. If it has no section between {AGENT_SECTION_START} and {AGENT_SECTION_END}, add the section \
-below. If it has one, replace that section with the one below. Keep both marker lines.
+2. If AGENTS.md already has FlipHopper instructions (with or without the marker lines \
+{AGENT_SECTION_START} and {AGENT_SECTION_END}), replace them with the section below. \
+Otherwise add the section below. Keep both marker lines.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
@@ -182,7 +187,9 @@ CLAUDE.md with just that line if it is missing). Do not copy the section into CL
 The section to add:
 
 {}",
-        agent_section()
+        agent_section(),
+        project = project.display(),
+        seabag = seabag.display(),
     )
 }
 
@@ -806,8 +813,13 @@ mod tests {
 
     #[test]
     fn agent_setup_request_carries_the_section_and_steps() {
-        let r = agent_setup_request();
+        let r = agent_setup_request(Path::new("/p"), Path::new("/p/.fliphopper/seabag"));
         assert!(r.contains("1. Open AGENTS.md") && r.contains("@AGENTS.md"));
+        assert!(
+            r.contains("Project folder: /p\n")
+                && r.contains("task files): /p/.fliphopper/seabag\n")
+        );
+        assert!(r.contains("with or without the marker lines"));
         assert!(r.ends_with(&agent_section()));
         assert_eq!(r.matches(AGENT_SECTION_START).count(), 2);
     }

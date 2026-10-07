@@ -476,7 +476,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             // the agent running `fh init` to merge the section in; with --write-agent-files, write it.
             let mut agent_files = Vec::new();
             let mut warnings = Vec::new();
-            let agent_setup = (!*write_agent_files).then(agent_setup_request);
+            let project = picked_folder(&root).unwrap_or(&root).to_path_buf();
+            let agent_setup = (!*write_agent_files).then(|| agent_setup_request(&project, &root));
             if let (true, Some(folder)) = (*write_agent_files, picked_folder(&root)) {
                 match add_agent_instructions(folder) {
                     Ok(files) => agent_files = files,

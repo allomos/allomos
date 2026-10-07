@@ -42,3 +42,4 @@
 | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (new: `init_asks_the_agent_or_writes_when_told`; store: `agent_setup_request_carries_the_section_and_steps`) | PASS |
 | `fh init` in a new folder: prints the request; no `AGENTS.md` / `CLAUDE.md` written | PASS |
 | An agent following the request | not run (would start an agent) — owner check if wanted |
+- 2026-10-07 — Owner review: step 2 must not rely on the markers ("it is possible has this section but no markers"), and the request should name the seabag. Changed: step 2 now says "FlipHopper instructions (with or without the marker lines) … replace them", and the request starts with the absolute **project folder** and **seabag** paths. Tests updated; PASS.
