@@ -503,3 +503,97 @@ fn needs_ready_drop_and_init_options() {
     refused(&empty, &["init", "--labels", " , "], 1, "ladder_empty");
     assert!(!empty.join(".fliphopper/seabag").exists());
 }
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+/// A real Git repository with a first commit and a bare remote it can push to.
+fn real_repo() -> (PathBuf, PathBuf) {
+    let base = tmp("git");
+    let remote = base.join("remote.git");
+    let repo = base.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    git(
+        &base,
+        &["init", "--quiet", "--bare", remote.to_str().unwrap()],
+    );
+    git(&repo, &["init", "--quiet", "-b", "main"]);
+    git(&repo, &["config", "user.name", "Test"]);
+    git(&repo, &["config", "user.email", "test@example.com"]);
+    fs::write(repo.join("README.md"), "x\n").unwrap();
+    git(&repo, &["add", "README.md"]);
+    git(&repo, &["commit", "--quiet", "-m", "first"]);
+    git(
+        &repo,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&repo, &["push", "--quiet", "-u", "origin", "main"]);
+    (repo, remote)
+}
+
+#[test]
+fn commit_and_push_share_only_the_seabag() {
+    let (repo, remote) = real_repo();
+    let v = ok(&repo, &["init", "--commit"]);
+    assert_eq!(v["warnings"], json!([]));
+    assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "fh: init");
+    ok(&repo, &["add", "area", "A01", "Tracking", "--commit"]);
+    ok(
+        &repo,
+        &[
+            "add", "task", "A01-01", "--area", "A01", "--title", "T", "--commit",
+        ],
+    );
+    // Another changed file stays out of fh's commit.
+    fs::write(repo.join("README.md"), "changed\n").unwrap();
+    let v = ok(&repo, &["--as", "agent-a", "claim", "A01-01", "--push"]);
+    assert_eq!(v["warnings"], json!([]), "{v}");
+    assert_eq!(
+        git(&repo, &["log", "-1", "--format=%s%n%b"]),
+        "fh: claim A01-01\nAgent: agent-a"
+    );
+    assert_eq!(
+        git(&repo, &["show", "--name-only", "--format=", "HEAD"]),
+        ".fliphopper/seabag/tasks/A01-01/task.json"
+    );
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "M README.md");
+    // The push landed on the remote.
+    assert_eq!(
+        git(&remote, &["log", "-1", "--format=%s", "main"]),
+        "fh: claim A01-01"
+    );
+    // A change that changes nothing makes no commit.
+    let before = git(&repo, &["rev-parse", "HEAD"]);
+    ok(&repo, &["--as", "agent-a", "claim", "A01-01", "--commit"]);
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), before);
+}
+
+#[test]
+fn commit_outside_git_warns_and_keeps_the_change() {
+    let dir = tmp("no-git");
+    ok(&dir, &["init"]);
+    ok(&dir, &["add", "area", "A01", "Tracking"]);
+    let v = ok(
+        &dir,
+        &[
+            "add", "task", "A01-01", "--area", "A01", "--title", "T", "--commit",
+        ],
+    );
+    assert_eq!(v["warnings"][0]["code"], "commit_failed", "{v}");
+    assert!(
+        dir.join(".fliphopper/seabag/tasks/A01-01/task.json")
+            .is_file()
+    );
+}

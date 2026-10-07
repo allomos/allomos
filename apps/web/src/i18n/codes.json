@@ -7,6 +7,9 @@
     "id",
     "state"
   ],
+  "commit_failed": [
+    "detail"
+  ],
   "create_failed": [
     "path",
     "detail"
@@ -50,6 +53,9 @@
     "detail"
   ],
   "project_name_missing": [],
+  "push_failed": [
+    "detail"
+  ],
   "read_failed": [
     "detail"
   ],
