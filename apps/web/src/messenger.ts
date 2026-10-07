@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { FolderInfo, Opened } from "./types";
+import type { Agent, FolderInfo, Opened } from "./types";
 
 export interface Messenger {
   /** A folder given when FlipHopper was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -37,6 +37,14 @@ export interface Messenger {
   setMenuTexts(texts: MenuTexts): Promise<void>;
   /** Shows these folders, newest first, under File → Open Recent. */
   setRecentFolders(folders: string[]): Promise<void>;
+  /** Calls `handler` when File → Tell AI Agents About This Project… is chosen. */
+  onAgentsMenu(handler: () => void): Promise<() => void>;
+  /** The AI agents on this computer that can be asked to add FlipHopper's instructions. */
+  findAgents(): Promise<Agent[]>;
+  /** Opens each agent in `project` with the request typed in; resolves to the ones that opened. Rejects with a Problem. */
+  askAgents(agents: string[], project: string, seabag: string): Promise<string[]>;
+  /** Writes FlipHopper's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
+  writeAgentFiles(project: string): Promise<string[]>;
 }
 
 export interface MenuTexts {
@@ -45,6 +53,7 @@ export interface MenuTexts {
   openRecent: string;
   clearMenu: string;
   noRecent: string;
+  agents: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -62,6 +71,10 @@ export const desktopMessenger: Messenger = {
   onOpenFolderMenu: (handler) => listen("menu:open_folder", () => handler()),
   onOpenRecentMenu: (handler) => listen<string>("menu:open_recent", (e) => handler(e.payload)),
   onClearRecentMenu: (handler) => listen("menu:clear_recent", () => handler()),
-  setMenuTexts: (texts) => invoke<void>("set_menu_texts", { ...texts }),
+  setMenuTexts: (words) => invoke<void>("set_menu_texts", { words }),
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
+  onAgentsMenu: (handler) => listen("menu:agents", () => handler()),
+  findAgents: () => invoke<Agent[]>("find_agents"),
+  askAgents: (agents, project, seabag) => invoke<string[]>("ask_agents", { agents, project, seabag }),
+  writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
 };

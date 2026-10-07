@@ -4,6 +4,8 @@
 //! (`apps/web/src/messenger.ts`), so the same interface can later reach the desktop's
 //! local server from a browser without changes.
 
+mod agents;
+
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -11,8 +13,8 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    Inspection, add_agent_instructions, add_readme_if_empty, create_starter, git_root, inspect,
-    load, picked_folder, stamp,
+    Inspection, add_agent_instructions, add_readme_if_empty, agent_setup_request, create_starter,
+    git_root, inspect, load, picked_folder, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -31,8 +33,6 @@ struct Opened {
     loaded: Loaded,
     /// A `README-fliphopper.md` was just written next to `.fliphopper/`.
     readme_added: bool,
-    /// Instruction files that just got FlipHopper's section for AI agents (`AGENTS.md`, `CLAUDE.md`).
-    agent_files: Vec<String>,
 }
 
 /// The folder named on the command line: the first argument that is not an option.
@@ -96,7 +96,6 @@ fn open_seabag(root: PathBuf) -> Opened {
         loaded: load(&root),
         root,
         readme_added: false,
-        agent_files: Vec::new(),
     }
 }
 
@@ -110,8 +109,8 @@ fn seabag_stamp(root: PathBuf) -> String {
 
 /// Create a starter seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
 /// When the picked folder looks empty, also write `README-fliphopper.md` there, in the
-/// interface's `language`. Also add FlipHopper's section for AI agents to the folder's
-/// `AGENTS.md` and `CLAUDE.md`. Neither extra undoes the seabag when it cannot be written.
+/// interface's `language`; a README that cannot be written does not undo the seabag.
+/// (Telling AI agents about the project is a separate step: `ask_agents`.)
 #[tauri::command]
 fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
     create_starter(&root, &name).map_err(|e| {
@@ -125,20 +124,13 @@ fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened
             }
         }
     })?;
-    let folder = picked_folder(&root);
-    // The README is decided first: the agent files below would make the folder look not empty.
-    let readme_added = folder
+    let readme_added = picked_folder(&root)
         .map(|f| add_readme_if_empty(f, &language).unwrap_or(false))
         .unwrap_or(false);
-    // Tell AI agents about FlipHopper; files that cannot be written do not undo the seabag.
-    let agent_files = folder
-        .map(|f| add_agent_instructions(f).unwrap_or_default())
-        .unwrap_or_default();
     Ok(Opened {
         loaded: load(&root),
         root,
         readme_added,
-        agent_files,
     })
 }
 
@@ -186,6 +178,51 @@ fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
+/// The AI agents on this computer that can be asked to add FlipHopper's instructions.
+#[tauri::command]
+async fn find_agents() -> Vec<agents::Agent> {
+    agents::find_agents()
+}
+
+/// Open each chosen agent in `project` with the request to add FlipHopper's instructions typed
+/// in. Nothing is sent: the person sends it. Returns the agents that opened.
+#[tauri::command]
+async fn ask_agents(
+    agents: Vec<String>,
+    project: PathBuf,
+    seabag: PathBuf,
+) -> Result<Vec<String>, Problem> {
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    let found = agents::find_agents();
+    let mut request = agent_setup_request(&project, &seabag);
+    if let Some(note) = agents::shared_note(&agents) {
+        request = format!("{note}\n\n{request}");
+    }
+    let mut opened = Vec::new();
+    for id in &agents {
+        let Some(agent) = found.iter().find(|a| &a.id == id) else {
+            continue;
+        };
+        agents::ask(&agent.id, &project, &request, &agent.how)?;
+        opened.push(agent.id.clone());
+    }
+    Ok(opened)
+}
+
+/// Write FlipHopper's section into `project`'s AGENTS.md and CLAUDE.md directly, for when no
+/// agent is available. Returns the files changed.
+#[tauri::command]
+fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem> {
+    add_agent_instructions(&project).map_err(|e| Problem::WriteFailed {
+        path: project.join("AGENTS.md").display().to_string(),
+        detail: e.to_string(),
+    })
+}
+
 /// The menu items' IDs, and the events the interface hears when they are chosen.
 const OPEN_FOLDER_ID: &str = "open_folder";
 const OPEN_FOLDER_EVENT: &str = "menu:open_folder";
@@ -194,11 +231,14 @@ const RECENT_PREFIX: &str = "recent:";
 const OPEN_RECENT_EVENT: &str = "menu:open_recent";
 const CLEAR_RECENT_ID: &str = "recent_clear";
 const CLEAR_RECENT_EVENT: &str = "menu:clear_recent";
+const AGENTS_ID: &str = "agents";
+const AGENTS_EVENT: &str = "menu:agents";
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
     file: Submenu<Wry>,
     open_folder: MenuItem<Wry>,
+    agents: MenuItem<Wry>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -262,6 +302,13 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         Some("CmdOrCtrl+O"),
     )?;
     let recent = Submenu::new(app, "Open Recent", true)?;
+    let agents_item = MenuItem::with_id(
+        app,
+        AGENTS_ID,
+        "Tell AI Agents About This Project…",
+        true,
+        None::<&str>,
+    )?;
     fill_recent(app, &recent, &Recent::default())?;
     let existing = menu
         .items()?
@@ -270,12 +317,13 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .find(|s| s.text().is_ok_and(|t| t == "File"));
     let file = match existing {
         Some(file) => {
-            file.prepend_items(&[&open_folder, &recent])?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 2)?;
+            file.prepend_items(&[&open_folder, &recent, &agents_item])?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 3)?;
             file
         }
         None => {
-            let file = Submenu::with_items(app, "File", true, &[&open_folder, &recent])?;
+            let file =
+                Submenu::with_items(app, "File", true, &[&open_folder, &recent, &agents_item])?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
             file
@@ -284,30 +332,36 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     app.manage(MenuTexts {
         file,
         open_folder,
+        agents: agents_item,
         recent,
         state: Mutex::new(Recent::default()),
     });
     Ok(menu)
 }
 
-/// Put the menu's words in the interface's language.
-#[tauri::command]
-fn set_menu_texts(
-    app: AppHandle,
-    texts: tauri::State<MenuTexts>,
+/// The menu's words in the interface's language, as the interface sends them.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MenuWords {
     file: String,
     open_folder: String,
     open_recent: String,
     clear_menu: String,
     no_recent: String,
-) {
+    agents: String,
+}
+
+/// Put the menu's words in the interface's language.
+#[tauri::command]
+fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWords) {
     // A menu that cannot be renamed keeps its previous words; nothing else depends on them.
-    let _ = texts.file.set_text(file);
-    let _ = texts.open_folder.set_text(open_folder);
-    let _ = texts.recent.set_text(open_recent);
+    let _ = texts.file.set_text(words.file);
+    let _ = texts.open_folder.set_text(words.open_folder);
+    let _ = texts.recent.set_text(words.open_recent);
+    let _ = texts.agents.set_text(words.agents);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
-    recent.clear = clear_menu;
-    recent.none = no_recent;
+    recent.clear = words.clear_menu;
+    recent.none = words.no_recent;
     let _ = fill_recent(&app, &texts.recent, &recent);
 }
 
@@ -335,6 +389,8 @@ pub fn run() {
             let id = event.id().as_ref();
             if id == OPEN_FOLDER_ID {
                 let _ = app.emit(OPEN_FOLDER_EVENT, ());
+            } else if id == AGENTS_ID {
+                let _ = app.emit(AGENTS_EVENT, ());
             } else if id == CLEAR_RECENT_ID {
                 let _ = app.emit(CLEAR_RECENT_EVENT, ());
             } else if let Some(folder) = recent_folder(&app.state::<MenuTexts>(), id) {
@@ -350,7 +406,10 @@ pub fn run() {
             show_in_file_manager,
             system_languages,
             set_menu_texts,
-            set_recent_folders
+            set_recent_folders,
+            find_agents,
+            ask_agents,
+            write_agent_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");

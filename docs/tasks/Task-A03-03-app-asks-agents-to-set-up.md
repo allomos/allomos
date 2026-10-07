@@ -41,3 +41,20 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 ## Notes
 
 - 2026-10-07 — Card written by the agent from the owner's request; the two defaults above wait for the owner's yes.
+
+## Result (2026-10-07)
+
+**In plain words.** After the app creates a seabag, a panel "Tell AI agents about FlipHopper?" shows the project folder (with **Change…**), the seabag's path, and the AI agents found on this computer, each with a tick box and what will happen. **Ask** opens every ticked agent in the project folder with the request from A01-14 typed in (naming both paths); the person reads and sends it. With several agents, the request starts with a note telling them about each other, so they check before writing. If no agent is found, **Write the files for me** writes the section directly (A01-13). **Not now** closes the panel; **File → Tell AI Agents About This Project…** opens it again. The app no longer writes `AGENTS.md` / `CLAUDE.md` on its own.
+
+- **How agents are found:** command-line tools in the usual folders (a macOS app does not get the person's shell path) that answer `--version` — so a broken install, like this Mac's Codex CLI, is not offered; apps by the link types their `Info.plist` declares. On this Mac: Claude Code (`~/.local/bin/claude`, link handler present), Claude (app), and the ChatGPT app (it opens `codex://` links).
+- **How they are asked:** `claude-cli://open?cwd=…&q=…`, `claude://code/new?folder=…&q=…`, `codex://threads/new?path=…&prompt=…`; a command-line tool without a link opens in a new Terminal window in the project folder, with the request on the clipboard to paste. FlipHopper never sends the request.
+- **Decisive unknowns answered:** the Claude Code link handler is detected by its app (`~/Applications/Claude Code URL Handler.app` declares `claude-cli`); tools are found in `PATH` plus `~/.local/bin`, `~/.claude/local`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.cargo/bin`, `/opt/homebrew/bin`, `/usr/local/bin`. One detection run missed `claude` once; it now asks twice.
+- **Where:** `apps/desktop/src-tauri/src/agents.rs` (new), commands `find_agents`, `ask_agents`, `write_agent_files` and the menu item in `lib.rs`; `apps/web/src/AgentsPanel.tsx` (new); `App.tsx`, `messenger.ts`, `types.ts`; 17 texts in three languages. Windows: not yet (Iteration 2).
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (new: link encoding, the shared note, broken tools not offered, quoting) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (99 texts) | PASS |
+| Detection on this Mac with an app-like bare `PATH` (three runs) | PASS: Claude Code (terminal, link), Claude (app), Codex (app: ChatGPT); Codex CLI not offered |
+| Built app on a new folder: seabag and README created; File menu shows the new item (ファイル in Japanese) | PASS |
+| The panel on screen, and Ask opening each agent with the request typed in | not seen: the agent's accessibility tool could not reach the window during this test — owner check |

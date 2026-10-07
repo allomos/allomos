@@ -65,6 +65,13 @@ export interface Opened {
   loaded: Loaded;
   /** README-fliphopper.md was just written next to .fliphopper/ (only when creating). */
   readme_added: boolean;
-  /** Instruction files that just got FlipHopper's section for AI agents (only when creating). */
-  agent_files: string[];
+}
+
+/** An AI agent found on this computer (see apps/desktop/src-tauri/src/agents.rs). */
+export interface Agent {
+  id: "claude_cli" | "claude_app" | "codex_cli" | "codex_app";
+  /** The command's path, or the app's name. */
+  found: string;
+  /** "link": opens with the request typed in; "paste": a terminal opens and the request is on the clipboard. */
+  how: "link" | "paste";
 }
