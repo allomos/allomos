@@ -31,6 +31,7 @@ An AI agent learns how to work in a project from the project's instruction files
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner ran `fh init --write-agent-files` in a test folder: own text kept, section added once, no markers, CLAUDE.md `@AGENTS.md` | owner (terminal) |
 | 2026-10-07 | "Now: accept this" (instruction files on init); "With MCP (Iteration 3): accept this"; "Optional now [hook]: no need this" | owner (chat) |
 
 ## Notes
@@ -49,3 +50,4 @@ An AI agent learns how to work in a project from the project's instruction files
 | A new Claude Code or Codex session in such a project starts with `fh next` | not run (would start an agent) — owner check if wanted |
 - 2026-10-08 — Superseded in part: `fh init` now asks the agent ([`A01-14`](./Task-A01-14-init-asks-the-agent.md)); the app asks the agents it finds ([`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md)); the marker lines were removed at the owner's request. Direct writing remains for `fh init --write-agent-files` and the app's "Write the files for me".
 - 2026-10-08 — **Closed** at the owner's word ("yes"): replaced by A01-14 and A03-03; its direct writing remains for `fh init --write-agent-files` and the panel's "Write the files for me", both owner checked.
+- 2026-10-08 — **Owner verified** the direct writing that remains (`fh init --write-agent-files`) in `~/fh-try13`.
