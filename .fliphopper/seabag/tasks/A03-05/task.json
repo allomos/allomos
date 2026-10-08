@@ -3,7 +3,6 @@
   "handoff_note": "Built and merged.",
   "id": "A03-05",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "Agents panel: progress, groups, language",
-  "waiting_on": "owner checks the grouped panel, spinner and request language"
+  "state": "done",
+  "title": "Agents panel: progress, groups, language"
 }
