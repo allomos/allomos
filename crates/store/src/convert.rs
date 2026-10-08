@@ -217,7 +217,10 @@ pub fn agent_convert_request_in(
     } else {
         ""
     };
-    let fh = format!("fh --seabag \"{seabag}\"");
+    // Agents' shells often forget exported variables between commands, so every command names
+    // the seabag; the request says so once instead of repeating the path.
+    let with_seabag = format!("fh --seabag \"{seabag}\"");
+    let fh = "fh";
     let steps = match (language, seabag_exists) {
         ("zh-CN", exists) => {
             let create = if exists {
@@ -232,6 +235,7 @@ pub fn agent_convert_request_in(
 
 项目文件夹：{project}
 水手袋（FlipHopper 的任务文件）：{seabag}
+下面每条 `fh` 命令都请这样运行：`{with_seabag} …`
 
 FlipHopper 发现这个项目已经用别的方式跟踪任务：
 {findings}
@@ -264,6 +268,7 @@ FlipHopper 发现这个项目已经用别的方式跟踪任务：
 
 プロジェクトのフォルダー：{project}
 シーバッグ（FlipHopper のタスクファイル）：{seabag}
+以下の `fh` コマンドはすべて `{with_seabag} …` の形で実行してください。
 
 FlipHopper は、このプロジェクトがすでに別の方法でタスクを管理していることを見つけました：
 {findings}
@@ -296,6 +301,7 @@ FlipHopper は、このプロジェクトがすでに別の方法でタスクを
 
 Project folder: {project}
 Seabag (FlipHopper's task files): {seabag}
+Run every `fh` command below as `{with_seabag} …`.
 
 FlipHopper found that this project already tracks its tasks another way:
 {findings}
@@ -433,6 +439,17 @@ mod tests {
         assert_eq!(found.cards, 1);
         assert_eq!(found.rules, [PathBuf::from("AGENTS.md")]);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn notices_the_fixture_board() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/markdown-board");
+        let found = find_task_system(&fixture);
+        assert!(found.found());
+        assert_eq!(found.boards, [PathBuf::from("plan/TASK_BOARD.md")]);
+        assert_eq!(found.cards, 3);
+        assert_eq!(found.card_folders, [PathBuf::from("plan/areas")]);
+        assert_eq!(found.rules, [PathBuf::from("AGENTS.md")]);
     }
 
     #[test]
