@@ -19,6 +19,11 @@ use fliphopper_core::{
 };
 use serde::Serialize;
 
+mod convert;
+pub use convert::{
+    CONVERT_REQUEST_VERSION, TaskSystem, agent_convert_request_in, find_task_system,
+};
+
 /// Where a project's seabag lives inside the folder the user picked.
 /// Always used for a new seabag, also in an empty folder, so every tool looks in one place.
 pub const DEFAULT_DIR: &str = ".fliphopper/seabag";

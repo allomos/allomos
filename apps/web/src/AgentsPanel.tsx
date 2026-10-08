@@ -1,13 +1,17 @@
 // "Tell AI agents about FlipHopper?" (Task-A03-03): lists the AI agents on this computer, lets the
 // person pick one or more and the project folder, then opens each with the request typed in.
 // FlipHopper never sends the request; the person does.
+//
+// In "convert" mode (Task-A05-02) the request is to move a project that already tracks its tasks
+// another way into FlipHopper: the panel lists what was found and lets the person pick exactly
+// one agent, because two agents converting at once would add every task twice.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Agent } from "./types";
+import type { Agent, TaskSystem } from "./types";
 
 const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -29,13 +33,16 @@ export function AgentsPanel({
   messenger,
   project: startProject,
   seabag,
+  convert,
   onDone,
 }: {
   messenger: Messenger;
   project: string;
   seabag: string;
-  /** Closes the panel, with the message to show (or null). */
-  onDone: (message: string | null) => void;
+  /** What was found, when the request is to move the project's tasks into FlipHopper. */
+  convert?: TaskSystem;
+  /** Closes the panel, with the message to show (or null) and whether an agent was asked. */
+  onDone: (message: string | null, asked: boolean) => void;
 }) {
   const { t, problem, language } = useI18n();
   const [agents, setAgents] = useState<Agent[] | null>(null);
@@ -74,6 +81,7 @@ export function AgentsPanel({
 
   const toggleGroup = (name: string) =>
     setTicked((set) => {
+      if (convert) return new Set([name]);
       const next = new Set(set);
       if (next.has(name)) next.delete(name);
       else next.add(name);
@@ -92,9 +100,15 @@ export function AgentsPanel({
     setBusy(true);
     setError(null);
     try {
+      if (convert) {
+        const agent = chosen[0];
+        await messenger.askAgentToConvert(agent, project, seabag, language);
+        onDone(t("agents.asked_convert", { agent: t(AGENT_KEY[agent]) }), true);
+        return;
+      }
       const opened = await messenger.askAgents(chosen, project, seabag, language);
       const names = (agents ?? []).filter((a) => opened.includes(a.id)).map((a) => t(AGENT_KEY[a.id]));
-      onDone(t("agents.asked", { agents: names.join(", ") }));
+      onDone(t("agents.asked", { agents: names.join(", ") }), true);
     } catch (e) {
       fail(e);
     } finally {
@@ -107,7 +121,7 @@ export function AgentsPanel({
     setError(null);
     try {
       const files = await messenger.writeAgentFiles(project);
-      onDone(files.length > 0 ? t("agents.written", { files: files.join(", ") }) : null);
+      onDone(files.length > 0 ? t("agents.written", { files: files.join(", ") }) : null, false);
     } catch (e) {
       fail(e);
     } finally {
@@ -117,15 +131,19 @@ export function AgentsPanel({
 
   return (
     <section className="card agents">
-      <h2>{t("agents.title")}</h2>
-      <p>{t("agents.body")}</p>
+      <h2>{t(convert ? "convert.title" : "agents.title")}</h2>
+      <p>{t(convert ? "convert.body" : "agents.body")}</p>
+      {convert && <Findings found={convert} />}
       <div className="row">
         <span>
           {t("agents.project")}: <code>{project}</code>
         </span>
-        <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
-          {t("agents.change")}
-        </button>
+        {/* Converting puts the seabag in this folder, so the folder is fixed. */}
+        {!convert && (
+          <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
+            {t("agents.change")}
+          </button>
+        )}
       </div>
       <p className="muted">{t("agents.seabag", { path: seabag })}</p>
       {agents === null ? (
@@ -135,7 +153,7 @@ export function AgentsPanel({
           </p>
         )
       ) : agents.length === 0 ? (
-        <p>{t("agents.none")}</p>
+        <p>{t(convert ? "convert.none" : "agents.none")}</p>
       ) : (
         <ul className="agent-list">
           {GROUPS.map((g) => {
@@ -147,7 +165,13 @@ export function AgentsPanel({
             return (
               <li key={g.name}>
                 <label>
-                  <input type="checkbox" checked={on} onChange={() => toggleGroup(g.name)} disabled={busy} />{" "}
+                  <input
+                    type={convert ? "radio" : "checkbox"}
+                    name={convert ? "agent-group" : undefined}
+                    checked={on}
+                    onChange={() => toggleGroup(g.name)}
+                    disabled={busy}
+                  />{" "}
                   <strong>{g.name}</strong>
                 </label>
                 <ul className="agent-tools">
@@ -185,15 +209,38 @@ export function AgentsPanel({
             {t("agents.ask")}
           </button>
         )}
-        {agents && agents.length === 0 && (
+        {agents && agents.length === 0 && !convert && (
           <button type="button" className="primary" onClick={() => void write()} disabled={busy}>
             {t("agents.write")}
           </button>
         )}
-        <button type="button" onClick={() => onDone(null)} disabled={busy}>
+        <button type="button" onClick={() => onDone(null, false)} disabled={busy}>
           {t("agents.later")}
         </button>
       </div>
     </section>
+  );
+}
+
+/** What FlipHopper found: the board files, the card files and the agent rules. */
+export function Findings({ found }: { found: TaskSystem }) {
+  const { rich } = useI18n();
+  return (
+    <ul className="findings">
+      {found.boards.map((b) => (
+        <li key={b}>{rich("convert.board", { path: <code>{b}</code> })}</li>
+      ))}
+      {found.cards > 0 && (
+        <li>
+          {rich("convert.cards", {
+            count: String(found.cards),
+            folders: <code>{found.card_folders.join(", ")}</code>,
+          })}
+        </li>
+      )}
+      {found.rules.map((r) => (
+        <li key={r}>{rich("convert.rules", { path: <code>{r}</code> })}</li>
+      ))}
+    </ul>
   );
 }

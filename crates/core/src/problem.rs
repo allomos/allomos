@@ -96,6 +96,8 @@ problems! {
     NotASeabag { path } => "not_a_seabag", "{path} is not a seabag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
+    /// The chosen AI agent is no longer on this computer (Task-A05-02).
+    AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
     /// FlipHopper was started with a folder that does not exist or is not a folder.
     StartupNotAFolder { path } => "startup_not_a_folder", "FlipHopper was started with {path}, which is not a folder, so nothing was opened.";
     /// Only an unheld backlog or waiting task can be made ready.

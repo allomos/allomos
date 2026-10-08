@@ -1,4 +1,7 @@
 {
+  "agent_not_found": [
+    "agent"
+  ],
   "area_name_missing": [],
   "bad_usage": [
     "detail"

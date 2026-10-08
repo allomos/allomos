@@ -143,3 +143,5 @@ button.link:hover { text-decoration: underline; }
   .task .id { grid-column: 1 / -1; }
   .task .meta { grid-column: 1 / -1; }
 }
+.findings { margin: 0 0 12px; padding-left: 20px; }
+.findings li { margin: 2px 0; }

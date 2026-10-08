@@ -97,3 +97,19 @@ export interface AgentStatus {
   /** Who holds tasks in progress now. */
   holders: string[];
 }
+
+/** Signs that a project already tracks its tasks another way (Task-A05-02). Paths are relative to the project folder. */
+export interface TaskSystem {
+  boards: string[];
+  /** How many card files (Task-….md) there are. */
+  cards: number;
+  /** The folders holding the most card files. */
+  card_folders: string[];
+  /** AGENTS.md / CLAUDE.md with rules about a task board or claiming. */
+  rules: string[];
+}
+
+/** A board, or at least two card files (the same rule as Rust's `TaskSystem::found`). */
+export function foundTaskSystem(s: TaskSystem | null): s is TaskSystem {
+  return s !== null && (s.boards.length > 0 || s.cards >= 2);
+}

@@ -13,8 +13,9 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    AgentSetup, Inspection, add_agent_instructions, add_readme_if_empty, agent_setup,
-    agent_setup_request_in, create_starter, git_root, inspect, load, picked_folder, stamp,
+    AgentSetup, Inspection, TaskSystem, add_agent_instructions, add_readme_if_empty,
+    agent_convert_request_in, agent_setup, agent_setup_request_in, create_starter,
+    find_task_system, git_root, inspect, load, picked_folder, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -214,6 +215,38 @@ async fn ask_agents(
     Ok(opened)
 }
 
+/// Does `project` already track its tasks another way (a board, card files, agent rules)?
+/// Reads names only; changes nothing (Task-A05-02).
+#[tauri::command]
+async fn task_system(project: PathBuf) -> TaskSystem {
+    find_task_system(&project)
+}
+
+/// Open one chosen agent in `project` with the request to move the project's tasks into the
+/// seabag at `seabag` typed in. One agent only: two would add every task twice. The folder is
+/// looked at again here, so the request says what is there now. Nothing is sent: the person
+/// sends it.
+#[tauri::command]
+async fn ask_agent_to_convert(
+    agent: String,
+    project: PathBuf,
+    seabag: PathBuf,
+    language: String,
+) -> Result<(), Problem> {
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    let found = find_task_system(&project);
+    let exists = matches!(inspect(&seabag), Inspection::Found { .. });
+    let request = agent_convert_request_in(&language, &project, &seabag, &found, exists);
+    let Some(chosen) = agents::find_agents().into_iter().find(|a| a.id == agent) else {
+        return Err(Problem::AgentNotFound { agent });
+    };
+    agents::ask(&chosen.id, &project, &request, &chosen.how)
+}
+
 /// Do the AI agents know about this project? What the window's agent line shows (Task-A03-04).
 #[derive(Serialize)]
 struct AgentStatus {
@@ -270,12 +303,15 @@ const CLEAR_RECENT_ID: &str = "recent_clear";
 const CLEAR_RECENT_EVENT: &str = "menu:clear_recent";
 const AGENTS_ID: &str = "agents";
 const AGENTS_EVENT: &str = "menu:agents";
+const CONVERT_ID: &str = "convert";
+const CONVERT_EVENT: &str = "menu:convert";
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
     file: Submenu<Wry>,
     open_folder: MenuItem<Wry>,
     agents: MenuItem<Wry>,
+    convert: MenuItem<Wry>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -346,6 +382,13 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         None::<&str>,
     )?;
+    let convert_item = MenuItem::with_id(
+        app,
+        CONVERT_ID,
+        "Move Tasks Into FlipHopper…",
+        true,
+        None::<&str>,
+    )?;
     fill_recent(app, &recent, &Recent::default())?;
     let existing = menu
         .items()?
@@ -354,13 +397,17 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .find(|s| s.text().is_ok_and(|t| t == "File"));
     let file = match existing {
         Some(file) => {
-            file.prepend_items(&[&open_folder, &recent, &agents_item])?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 3)?;
+            file.prepend_items(&[&open_folder, &recent, &agents_item, &convert_item])?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 4)?;
             file
         }
         None => {
-            let file =
-                Submenu::with_items(app, "File", true, &[&open_folder, &recent, &agents_item])?;
+            let file = Submenu::with_items(
+                app,
+                "File",
+                true,
+                &[&open_folder, &recent, &agents_item, &convert_item],
+            )?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
             file
@@ -370,6 +417,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         file,
         open_folder,
         agents: agents_item,
+        convert: convert_item,
         recent,
         state: Mutex::new(Recent::default()),
     });
@@ -386,6 +434,7 @@ struct MenuWords {
     clear_menu: String,
     no_recent: String,
     agents: String,
+    convert: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -396,6 +445,7 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.open_folder.set_text(words.open_folder);
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.agents.set_text(words.agents);
+    let _ = texts.convert.set_text(words.convert);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -428,6 +478,8 @@ pub fn run() {
                 let _ = app.emit(OPEN_FOLDER_EVENT, ());
             } else if id == AGENTS_ID {
                 let _ = app.emit(AGENTS_EVENT, ());
+            } else if id == CONVERT_ID {
+                let _ = app.emit(CONVERT_EVENT, ());
             } else if id == CLEAR_RECENT_ID {
                 let _ = app.emit(CLEAR_RECENT_EVENT, ());
             } else if let Some(folder) = recent_folder(&app.state::<MenuTexts>(), id) {
@@ -447,7 +499,9 @@ pub fn run() {
             find_agents,
             ask_agents,
             write_agent_files,
-            agent_status
+            agent_status,
+            task_system,
+            ask_agent_to_convert
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");
