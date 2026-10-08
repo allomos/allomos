@@ -38,15 +38,15 @@ One block per card that `fh list --state in_progress` shows held.
 
 ## Live state
 
-Checked 2026-10-06.
+Checked 2026-10-08.
 
 | What | Where | Notes |
 |---|---|---|
 | Main checkout | `/Users/wanghui/coding/glidepace/fliphopper` (was `…/glidebox` until 2026-10-06), branch `main` | Holds the merged app code (A01-01, A01-02); no dependencies installed and nothing built here (build in a card's worktree) |
 | Git remote | `origin` = `https://github.com/mypals-ml/fliphopper.git` (repository renamed from `glidebox` 2026-10-06, A00-17; GitHub redirects the old address) | Agents push after every commit (owner, 2026-10-04); confirm with `git status -sb` that the push landed |
-| Worktrees | `.claude/worktrees/a01-run`, branch `claude/a01-run` (the 2026-10-06/07 card run: A01-07, A01-05, A01-04, A01-08, A00-19, A04-01, A03-01, A01-09, all merged; nothing held). Keep it until the owner has checked those cards: its `target/debug/bundle/macos/FlipHopper.app` is the build to check. Then remove it (CARDS.md step 8). Older worktrees removed after merging; their branches remain on GitHub | The unused `glidebox-local-cloud` worktree and its branch were removed by the owner on 2026-10-04 |
+| Worktrees | `.claude/worktrees/a01-run`, branch `claude/a01-run`: the 2026-10-06/08 card run (A01-04…A01-14, A00-19 local part, A03-01, A03-03…A03-05, A04-01), all merged into `main`; nothing held. Its `target/debug/bundle/macos/FlipHopper.app` is the build the owner checks (rebuild there with `npx --prefix apps/desktop tauri build --debug --bundles app`). Remove it once A03-05 is checked and no newer build is needed (CARDS.md step 8). Older worktrees removed after merging |
 | Servers / hosted resources | none | — |
-| `fh` on this Mac | `~/.cargo/bin/fh`, installed from the a01-run build (includes A01-08) | Agent shells may not have `~/.cargo/bin` on PATH: `export PATH="$HOME/.cargo/bin:$PATH"`. Reinstall after `fh` changes: `cargo install --path crates/cli --force` |
+| `fh` on this Mac | `~/.cargo/bin/fh`, installed from the a01-run build (includes A01-08, A01-12 `--push`, A01-14) | Agent shells may not have `~/.cargo/bin` on PATH: `export PATH="$HOME/.cargo/bin:$PATH"`. Reinstall after `fh` changes: `cargo install --path crates/cli --force` |
 
 ## Pitfalls
 
@@ -56,6 +56,8 @@ Lessons that change what you do.
 - **The SSR board's rules evolved on 2026-09-28:** status now lives only on each card and the board is generated (`check-board.mjs`, pre-commit hook). Earlier notes in [analysis/ssr-task-board.md](./analysis/ssr-task-board.md) describe the 2026-09-27 state.
 - **Do not grow one card into a catch-all.** On 10-01 to 10-03, six different outcomes were added to `Task-A00-01`; on 10-04 they had to be split back out. Open a new card for each outcome ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)).
 - **A handoff updates this file and the seabag (with `fh`)** — never a new "handoff" document.
+- **Use `--push` on every `fh` status change** (A01-12): it commits only the seabag and pushes; check for a `commit_failed` / `push_failed` warning.
+- **The Codex CLI on this Mac is broken** (`/opt/homebrew/bin/codex` 0.130.0: its platform binary is missing). The app does not offer it; reinstalling is the owner's call.
 - **Change status only on `main`.** From a card worktree, `fh` finds the worktree's stale copy of the seabag; set `FLIPHOPPER_SEABAG=<main checkout>` first ([CARDS.md](./workflow/CARDS.md#where-status-lives)).
 - **zsh expands a word starting with `=`** (e.g. `echo =====`) as a command lookup and fails; quote such strings in shell commands.
 
