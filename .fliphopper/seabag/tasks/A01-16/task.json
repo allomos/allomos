@@ -4,6 +4,7 @@
   "id": "A01-16",
   "iteration": "I02",
   "label": "locally verified",
-  "state": "in_progress",
-  "title": "Task pane"
+  "state": "waiting",
+  "title": "Task pane",
+  "waiting_on": "owner checks the task pane in the new build"
 }
