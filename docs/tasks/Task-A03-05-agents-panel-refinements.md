@@ -27,6 +27,7 @@ Three changes to the "Tell AI agents about FlipHopper?" panel:
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner check passed: spinner, grouped choice, request in the app's language ("passed") | owner (chat) |
 | 2026-10-08 | "there should be a progress indicator if searching for the ai agents took more than 200 ms"; "group the ai tools of the same ai agent … user can only select one of them in one group at one time"; "use the corresponding language to the ui language" | owner (chat) |
 
 ## Notes
@@ -46,3 +47,4 @@ Three changes to the "Tell AI agents about FlipHopper?" panel:
 | Built app (Chinese), new folder: group Claude ticked with Claude Code（终端） chosen and Claude（应用） as the other choice; group Codex unticked with Codex（应用） (ChatGPT) alone | PASS (read through macOS accessibility) |
 | Detection time on this Mac | 1.8–1.95 s before; 0.6–0.9 s after |
 | Spinner on screen; the request in Chinese / Japanese inside the agent | not seen by the agent — owner check |
+- 2026-10-08 — **Owner verified** in the built app ("passed").
