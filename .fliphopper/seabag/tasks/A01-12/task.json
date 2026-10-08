@@ -2,7 +2,7 @@
   "area": "A01",
   "handoff_note": "Built, merged, installed; its own status changes used --push.",
   "id": "A01-12",
-  "label": "locally verified",
+  "label": "owner verified",
   "state": "waiting",
   "title": "fh --commit and --push",
   "waiting_on": "owner reviews fh --commit / --push"
