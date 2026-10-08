@@ -1,7 +1,7 @@
 //! Reads and creates seabags on disk.
 //!
-//! A *seabag* is a folder holding `project.json`, `areas/<id>.json` and
-//! `tasks/<id>/task.json` (+ `description.md`). See `docs/product/FILE-FORMAT.md`.
+//! A *seabag* is a folder holding `project.json`, `areas/<id>.json`, optionally
+//! `iterations/<id>.json`, and `tasks/<id>/task.json` (+ `description.md`). See `docs/product/FILE-FORMAT.md`.
 //! This crate never runs `git`: a seabag inside a repository is versioned by that
 //! repository, and nothing here creates a nested one.
 
@@ -14,8 +14,8 @@ use std::time::{Duration, Instant};
 use fs4::{FileExt, TryLockError};
 
 use fliphopper_core::{
-    Area, FORMAT, Issue, Loaded, Problem, Project, Seabag, Task, parse_area, parse_project,
-    parse_task, validate_seabag,
+    Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Seabag, Task, parse_area,
+    parse_iteration, parse_project, parse_task, validate_seabag,
 };
 use serde::Serialize;
 
@@ -441,6 +441,21 @@ pub fn load(root: &Path) -> Loaded {
         }
     }
 
+    // Optional: a seabag without an `iterations/` folder simply has none.
+    let mut iterations: Vec<(String, Iteration)> = Vec::new();
+    for path in sorted_entries(&root.join("iterations")) {
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let file = rel(root, &path);
+        if let Some(text) = read(root, &path, &mut issues) {
+            match parse_iteration(&file, &text) {
+                Ok(i) => iterations.push((file, i)),
+                Err(mut e) => issues.append(&mut e),
+            }
+        }
+    }
+
     let mut tasks: Vec<(String, Task)> = Vec::new();
     for dir in sorted_entries(&root.join("tasks")) {
         if !dir.is_dir() {
@@ -464,14 +479,17 @@ pub fn load(root: &Path) -> Loaded {
         }
     }
 
-    issues.extend(validate_seabag(&project, &areas, &tasks));
+    issues.extend(validate_seabag(&project, &areas, &iterations, &tasks));
     let mut areas: Vec<Area> = areas.into_iter().map(|(_, a)| a).collect();
     areas.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
+    let mut iterations: Vec<Iteration> = iterations.into_iter().map(|(_, i)| i).collect();
+    iterations.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
     let tasks = tasks.into_iter().map(|(_, t)| t).collect();
     Loaded {
         seabag: Some(Seabag {
             project,
             areas,
+            iterations,
             tasks,
         }),
         issues,
@@ -564,6 +582,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             holder: None,
             waiting_on: None,
             next_dependency: None,
+            iteration: None,
             handoff_note: None,
             description: String::new(),
         };
@@ -793,6 +812,19 @@ impl Lock {
         write_atomic(&path, &json_text(area))
     }
 
+    /// Write a new iteration file. Refused when the file already exists.
+    pub fn create_iteration(&self, iteration: &Iteration) -> Result<(), Problem> {
+        let dir = self.root.join("iterations");
+        fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
+        let path = dir.join(format!("{}.json", iteration.id));
+        if path.exists() {
+            return Err(Problem::DuplicateIterationId {
+                id: iteration.id.clone(),
+            });
+        }
+        write_atomic(&path, &json_text(iteration))
+    }
+
     /// Write a new task folder: `task.json`, plus `description.md` when there is a description.
     pub fn create_task(&self, task: &Task) -> Result<(), Problem> {
         let dir = self.root.join("tasks");
@@ -830,8 +862,10 @@ pub fn stamp(root: &Path) -> u64 {
         }
     };
     add(&root.join(PROJECT_FILE));
-    for p in sorted_entries(&root.join("areas")) {
-        add(&p);
+    for folder in ["areas", "iterations"] {
+        for p in sorted_entries(&root.join(folder)) {
+            add(&p);
+        }
     }
     for dir in sorted_entries(&root.join("tasks")) {
         add(&dir);
@@ -1265,6 +1299,70 @@ mod tests {
             .filter(|n| n.starts_with(TMP_PREFIX))
             .collect();
         assert!(hidden.is_empty(), "{hidden:?}");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn iterations_are_written_read_and_sorted() {
+        use fliphopper_core::ops::{self, IterationDetails};
+        let dir = tmp("iterations");
+        let root = dir.join(DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        // A seabag made before iterations existed has no `iterations/` folder: still valid.
+        assert!(!root.join("iterations").exists());
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty() && loaded.seabag.unwrap().iterations.is_empty());
+
+        let before = stamp(&root);
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        let bag = lock.load().seabag.unwrap();
+        let two = ops::new_iteration(
+            &bag,
+            "I02",
+            "v0.2",
+            IterationDetails {
+                release: Some("v0.2"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        lock.create_iteration(&two).unwrap();
+        assert!(matches!(
+            lock.create_iteration(&two),
+            Err(Problem::DuplicateIterationId { .. })
+        ));
+        // Written by hand with a lower order: listed first.
+        fs::write(
+            root.join("iterations/I01.json"),
+            r#"{"id":"I01","name":"v0.1","order":0}"#,
+        )
+        .unwrap();
+        let bag = lock.load().seabag.unwrap();
+        lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let bag = lock.load().seabag.unwrap();
+        lock.create_task(&ops::new_task(&bag, "A01-01", "A01", "Do it", None).unwrap())
+            .unwrap();
+        let bag = lock.load().seabag.unwrap();
+        lock.save_task(&ops::plan(&bag, "A01-01", Some("I02")).unwrap().task)
+            .unwrap();
+        drop(lock);
+
+        let json = fs::read_to_string(root.join("iterations/I02.json")).unwrap();
+        assert!(!json.contains("null") && !json.contains("start"), "{json}");
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let bag = loaded.seabag.unwrap();
+        let ids: Vec<_> = bag.iterations.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, ["I01", "I02"]);
+        assert_eq!(bag.tasks[0].iteration.as_deref(), Some("I02"));
+        assert_ne!(stamp(&root), before);
+
+        // A task planned in a missing iteration is reported, and the task still shows.
+        fs::remove_file(root.join("iterations/I02.json")).unwrap();
+        let loaded = load(&root);
+        assert_eq!(loaded.issues[0].problem.code(), "unknown_iteration");
+        assert_eq!(loaded.seabag.unwrap().tasks.len(), 1);
         fs::remove_dir_all(dir).unwrap();
     }
 

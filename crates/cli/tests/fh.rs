@@ -635,3 +635,99 @@ fn init_asks_the_agent_or_writes_when_told() {
         "@AGENTS.md\n"
     );
 }
+
+#[test]
+fn plan_tasks_in_iterations_and_list_by_iteration() {
+    let repo = filled();
+    // No iterations yet: every task is unplanned.
+    let v = ok(&repo, &["list", "--by", "iteration"]);
+    assert_eq!(v["iterations"], json!([]));
+    assert_eq!(v["unplanned"].as_array().unwrap().len(), 3);
+
+    let v = ok(
+        &repo,
+        &[
+            "add",
+            "iteration",
+            "I01",
+            "v0.1",
+            "--release",
+            "v0.1",
+            "--end",
+            "2026-10-07",
+        ],
+    );
+    assert_eq!(v["iteration"]["order"], 1);
+    ok(&repo, &["add", "iteration", "I02", "v0.2"]);
+    refused(
+        &repo,
+        &["add", "iteration", "I02", "again"],
+        1,
+        "duplicate_iteration_id",
+    );
+    refused(
+        &repo,
+        &["add", "iteration", "I03", "x", "--start", "soon"],
+        1,
+        "invalid_date",
+    );
+    refused(
+        &repo,
+        &["add", "iteration", "I03", " "],
+        1,
+        "iteration_name_missing",
+    );
+    let file: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".fliphopper/seabag/iterations/I01.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        file,
+        json!({"id": "I01", "name": "v0.1", "order": 1, "end": "2026-10-07", "release": "v0.1"})
+    );
+
+    // Planning ignores who holds the task, and works on finished tasks.
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    let v = ok(&repo, &["--as", "b", "plan", "A01-01", "I01"]);
+    assert_eq!(v["task"]["iteration"], "I01");
+    ok(&repo, &["plan", "A02-01", "I02"]);
+    refused(&repo, &["plan", "A01-02", "I09"], 1, "unknown_iteration");
+    refused(&repo, &["plan", "Z", "I01"], 1, "task_not_found");
+    assert_eq!(task_file(&repo, "A01-01")["iteration"], "I01");
+
+    let v = ok(&repo, &["list", "--by", "iteration"]);
+    let groups = v["iterations"].as_array().unwrap();
+    let ids: Vec<_> = groups.iter().map(|g| g["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["I01", "I02"]);
+    assert_eq!(groups[0]["tasks"][0]["id"], "A01-01");
+    assert_eq!(groups[1]["tasks"][0]["id"], "A02-01");
+    assert_eq!(v["unplanned"][0]["id"], "A01-02");
+    let v = ok(&repo, &["list", "--iteration", "I02"]);
+    assert_eq!(v["areas"][1]["tasks"][0]["id"], "A02-01");
+    assert_eq!(v["areas"][0]["tasks"], json!([]));
+    refused(
+        &repo,
+        &["list", "--iteration", "I09"],
+        1,
+        "unknown_iteration",
+    );
+    refused(&repo, &["list", "--by", "week"], 2, "bad_usage");
+
+    let text = String::from_utf8(fh(&repo, &["list", "--by", "iteration"]).stdout).unwrap();
+    assert!(
+        text.starts_with("I01  v0.1  (v0.1, until 2026-10-07)\n  A01-01  done"),
+        "{text}"
+    );
+    assert!(
+        text.ends_with("Unplanned\n  A01-02  backlog  -  -  List\n"),
+        "{text}"
+    );
+    let text = String::from_utf8(fh(&repo, &["show", "A02-01"]).stdout).unwrap();
+    assert!(text.contains("iteration: I02\n"), "{text}");
+
+    // No iteration given: the task is taken out and becomes unplanned; its file loses the field.
+    let v = ok(&repo, &["plan", "A02-01"]);
+    assert_eq!(v["task"]["iteration"], Value::Null);
+    assert!(task_file(&repo, "A02-01").get("iteration").is_none());
+}

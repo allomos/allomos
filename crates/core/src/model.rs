@@ -37,6 +37,26 @@ pub struct Area {
     pub order: u32,
 }
 
+/// An iteration: *when* tasks are planned, a time-box that ends in a release (R89).
+/// Optional for a task; a task without one is unplanned.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Iteration {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub order: u32,
+    /// First day, `YYYY-MM-DD`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<String>,
+    /// Last day, `YYYY-MM-DD`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<String>,
+    /// The release this iteration produces, for example `v0.2`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release: Option<String>,
+}
+
 /// Where a task is in its life.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -90,6 +110,9 @@ pub struct Task {
     pub waiting_on: Option<String>,
     #[serde(default)]
     pub next_dependency: Option<String>,
+    /// The iteration the task is planned in, if any.
+    #[serde(default)]
+    pub iteration: Option<String>,
     /// A short note left on release for whoever picks the task up next.
     #[serde(default)]
     pub handoff_note: Option<String>,
@@ -97,10 +120,12 @@ pub struct Task {
     pub description: String,
 }
 
-/// A whole seabag after loading: the project, its areas and tasks.
+/// A whole seabag after loading: the project, its areas, iterations and tasks.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Seabag {
     pub project: Project,
     pub areas: Vec<Area>,
+    /// Sorted by order, then ID.
+    pub iterations: Vec<Iteration>,
     pub tasks: Vec<Task>,
 }

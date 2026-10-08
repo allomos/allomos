@@ -15,6 +15,16 @@ export interface Area {
   order: number;
 }
 
+/** When tasks are planned: a time-box that ends in a release (R89). */
+export interface Iteration {
+  id: string;
+  name: string;
+  order: number;
+  start?: string;
+  end?: string;
+  release?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -24,6 +34,7 @@ export interface Task {
   holder: string | null;
   waiting_on: string | null;
   next_dependency: string | null;
+  iteration: string | null;
   handoff_note: string | null;
   description: string;
 }
@@ -45,7 +56,7 @@ export interface Issue {
 }
 
 export interface Loaded {
-  seabag: { project: Project; areas: Area[]; tasks: Task[] } | null;
+  seabag: { project: Project; areas: Area[]; iterations: Iteration[]; tasks: Task[] } | null;
   issues: Issue[];
 }
 
