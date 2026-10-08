@@ -31,6 +31,7 @@ Moving FlipHopper's own cards into its seabag showed four gaps in the `fh` comma
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner tried it in a test folder ("passed" / output as expected) | owner (chat) |
 | 2026-10-06 | "find some easy task to do for the next 6 hrs … find them and do them" — the agent picked this card | owner (chat) |
 
 ## Notes
@@ -47,3 +48,4 @@ Moving FlipHopper's own cards into its seabag showed four gaps in the `fh` comma
 | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (core: new `needs_ready_and_drop`; store: new `init_with_own_id_and_ladder`; command: new `needs_ready_drop_and_init_options`) | PASS |
 | `npm --prefix apps/web run check:i18n` (74 texts, 35 codes) | PASS |
 - 2026-10-06 — Applied here with `fh needs`: the backlog cards' next dependencies moved from their descriptions into the field; `fh list --json` reports no issues.
+- 2026-10-08 — **Owner verified** in a throwaway folder (`~/fh-try`).

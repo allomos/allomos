@@ -27,6 +27,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner tried it in a test folder ("passed" / output as expected) | owner (chat) |
 | 2026-10-07 | "directly write these files? what about tell the agent to do it, then we can prevent duplicated contents writing?" — the agent's proposal (fh init asks; the app decided separately) | owner (chat) |
 
 ## Notes
@@ -44,3 +45,4 @@
 | An agent following the request | not run (would start an agent) — owner check if wanted |
 - 2026-10-07 — Owner review: step 2 must not rely on the markers ("it is possible has this section but no markers"), and the request should name the seabag. Changed: step 2 now says "FlipHopper instructions (with or without the marker lines) … replace them", and the request starts with the absolute **project folder** and **seabag** paths. Tests updated; PASS.
 - 2026-10-08 — Owner: "i don't like the marker lines of this section in the md file". Removed: the section is now just its heading `## Tasks: FlipHopper` and its lines; step 2 asks the agent to replace any FlipHopper instructions already there ("for example a section headed …, or any other text about FlipHopper or `fh`"); direct writing (`--write-agent-files`, the app's "Write the files for me") treats any Markdown heading that names FlipHopper as the section already being there. Tests updated; all checks PASS.
+- 2026-10-08 — **Owner verified** in a throwaway folder (`~/fh-try`).

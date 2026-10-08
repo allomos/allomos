@@ -30,6 +30,7 @@ Today an agent changes a task with `fh`, then has to run `git commit` and `git p
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner tried it in a test folder ("passed" / output as expected) | owner (chat) |
 | 2026-10-07 | "yes, write the card and build it" | owner (chat) |
 
 ## Notes
@@ -46,3 +47,4 @@ Today an agent changes a task with `fh`, then has to run `git commit` and `git p
 | New tests: `--commit` commits only `task.json`, message `fh: claim A01-01` + `Agent: agent-a`; another changed file stays uncommitted; `--push` lands on the remote; a no-op change makes no commit; outside Git, `commit_failed` warning and the change is kept | PASS |
 | `npm --prefix apps/web run check:i18n` (81 texts, 37 codes) | PASS |
 | This repository: A01-12's own status changes made with `--push` | see the `fh:` commits on `main` |
+- 2026-10-08 — **Owner verified** in a throwaway folder (`~/fh-try`).
