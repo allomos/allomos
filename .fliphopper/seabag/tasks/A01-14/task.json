@@ -3,7 +3,6 @@
   "handoff_note": "Markers removed; built, merged, installed.",
   "id": "A01-14",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "fh init asks the agent to add instructions",
-  "waiting_on": "owner reviews fh init's request (no marker lines now)"
+  "state": "done",
+  "title": "fh init asks the agent to add instructions"
 }
