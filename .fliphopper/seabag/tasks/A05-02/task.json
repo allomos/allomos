@@ -3,7 +3,7 @@
   "holder": "claude/a05-02-convert-project",
   "id": "A05-02",
   "label": "implemented",
-  "next_dependency": "conversion prompt, noticing and panel built and checked",
+  "next_dependency": "owner checks the panel in the built app (card § Result)",
   "state": "in_progress",
   "title": "Convert an existing project"
 }
