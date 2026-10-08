@@ -21,6 +21,8 @@ This page keeps only **Now** and **Waiting on the owner**, until it is removed o
 
 **What is next:** `fh next` names the next ready card; the owner's open questions are below.
 
+**Waiting on the owner's look:** the line "AI agents: …" under the top bar ([`A03-04`](./tasks/Task-A03-04-agent-awareness-line.md)).
+
 ## Waiting on the owner
 
 The single list of open questions and approvals. Remove a row when it is answered, and record the answer in the linked document.
