@@ -4,7 +4,6 @@
   "holder": "claude/a00-19-republish",
   "id": "A00-19",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "Decks new mark",
-  "waiting_on": "owner opens both deck addresses and checks the new mark (light and dark)"
+  "state": "done",
+  "title": "Decks new mark"
 }
