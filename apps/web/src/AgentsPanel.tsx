@@ -16,6 +16,15 @@ const AGENT_KEY: Record<Agent["id"], Key> = {
   codex_app: "agents.codex_app",
 };
 
+/** The tools of one agent, in the order the first is chosen: the terminal before the app. */
+const GROUPS: { name: string; tools: Agent["id"][] }[] = [
+  { name: "Claude", tools: ["claude_cli", "claude_app"] },
+  { name: "Codex", tools: ["codex_cli", "codex_app"] },
+];
+
+/** Show "Looking for AI agents…" only when finding them is slow. */
+const SPINNER_AFTER_MS = 200;
+
 export function AgentsPanel({
   messenger,
   project: startProject,
@@ -28,36 +37,49 @@ export function AgentsPanel({
   /** Closes the panel, with the message to show (or null). */
   onDone: (message: string | null) => void;
 }) {
-  const { t, problem } = useI18n();
+  const { t, problem, language } = useI18n();
   const [agents, setAgents] = useState<Agent[] | null>(null);
-  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [slow, setSlow] = useState(false);
+  /** Per group (by name): the chosen tool, or none when the group is not ticked. */
+  const [picked, setPicked] = useState<Record<string, Agent["id"]>>({});
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [project, setProject] = useState(startProject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
+    const timer = window.setTimeout(() => live && setSlow(true), SPINNER_AFTER_MS);
     messenger
       .findAgents()
       .then((found) => {
         if (!live) return;
         setAgents(found);
-        // The first one is ticked, so one click asks it.
-        setChosen(new Set(found.slice(0, 1).map((a) => a.id)));
+        // In each group the first found tool is chosen; only the first group is ticked.
+        const first: Record<string, Agent["id"]> = {};
+        for (const g of GROUPS) {
+          const tool = g.tools.find((id) => found.some((a) => a.id === id));
+          if (tool) first[g.name] = tool;
+        }
+        setPicked(first);
+        setTicked(new Set(GROUPS.filter((g) => first[g.name]).slice(0, 1).map((g) => g.name)));
       })
-      .catch(() => live && setAgents([]));
+      .catch(() => live && setAgents([]))
+      .finally(() => window.clearTimeout(timer));
     return () => {
       live = false;
+      window.clearTimeout(timer);
     };
   }, [messenger]);
 
-  const toggle = (id: string) =>
-    setChosen((set) => {
+  const toggleGroup = (name: string) =>
+    setTicked((set) => {
       const next = new Set(set);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
       return next;
     });
+  const chosen = GROUPS.filter((g) => ticked.has(g.name) && picked[g.name]).map((g) => picked[g.name]);
 
   const changeProject = async () => {
     const path = await messenger.pickFolder(t("agents.project"));
@@ -70,7 +92,7 @@ export function AgentsPanel({
     setBusy(true);
     setError(null);
     try {
-      const opened = await messenger.askAgents([...chosen], project, seabag);
+      const opened = await messenger.askAgents(chosen, project, seabag, language);
       const names = (agents ?? []).filter((a) => opened.includes(a.id)).map((a) => t(AGENT_KEY[a.id]));
       onDone(t("agents.asked", { agents: names.join(", ") }));
     } catch (e) {
@@ -106,27 +128,60 @@ export function AgentsPanel({
         </button>
       </div>
       <p className="muted">{t("agents.seabag", { path: seabag })}</p>
-      {agents === null ? null : agents.length === 0 ? (
+      {agents === null ? (
+        slow && (
+          <p className="muted searching" role="status">
+            <span className="spinner" aria-hidden="true" /> {t("agents.searching")}
+          </p>
+        )
+      ) : agents.length === 0 ? (
         <p>{t("agents.none")}</p>
       ) : (
         <ul className="agent-list">
-          {agents.map((a) => (
-            <li key={a.id}>
-              <label>
-                <input type="checkbox" checked={chosen.has(a.id)} onChange={() => toggle(a.id)} disabled={busy} />{" "}
-                <strong>{t(AGENT_KEY[a.id])}</strong>{" "}
-                <span className="muted">
-                  — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
-                </span>
-              </label>
-            </li>
-          ))}
+          {GROUPS.map((g) => {
+            const tools = g.tools
+              .map((id) => agents.find((a) => a.id === id))
+              .filter((a): a is Agent => a !== undefined);
+            if (tools.length === 0) return null;
+            const on = ticked.has(g.name);
+            return (
+              <li key={g.name}>
+                <label>
+                  <input type="checkbox" checked={on} onChange={() => toggleGroup(g.name)} disabled={busy} />{" "}
+                  <strong>{g.name}</strong>
+                </label>
+                <ul className="agent-tools">
+                  {tools.map((a) => (
+                    <li key={a.id}>
+                      <label className={on ? undefined : "muted"}>
+                        {tools.length > 1 && (
+                          <>
+                            <input
+                              type="radio"
+                              name={`tool-${g.name}`}
+                              checked={picked[g.name] === a.id}
+                              onChange={() => setPicked((p) => ({ ...p, [g.name]: a.id }))}
+                              disabled={busy || !on}
+                            />{" "}
+                          </>
+                        )}
+                        {t(AGENT_KEY[a.id])}{" "}
+                        <span className="muted">
+                          — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
         </ul>
       )}
       {error && <p className="banner error">{error}</p>}
       <div className="row">
         {agents && agents.length > 0 && (
-          <button type="button" className="primary" onClick={() => void ask()} disabled={busy || chosen.size === 0}>
+          <button type="button" className="primary" onClick={() => void ask()} disabled={busy || chosen.length === 0}>
             {t("agents.ask")}
           </button>
         )}

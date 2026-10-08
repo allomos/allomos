@@ -32,3 +32,17 @@ Three changes to the "Tell AI agents about FlipHopper?" panel:
 ## Notes
 
 - 2026-10-08 — Card written by the agent from the owner's requests and worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-08)
+
+**In plain words.** The panel now groups tools by agent: **Claude** (Claude Code in the terminal, the Claude app) and **Codex** (the Codex terminal tool, the Codex app). Each group has one tick box; inside it, round buttons choose exactly one tool, so the same agent is never asked twice (a group with one tool shows no round button). If finding the agents takes longer than 200 ms, a small spinner and "Looking for AI agents…" show until the list is ready. The request typed into the agent, and the note sent when several agents are asked, follow the app's language; the section the agent adds to `AGENTS.md` stays English (the request says so).
+
+- **Found on the way:** detection took about 1.9 s, almost all of it reading every app's `Info.plist`. It now checks the known apps first (Claude.app, Claude Code URL Handler.app, Codex.app, ChatGPT.app) and scans everything only when none of them answers: 0.6–0.9 s on this Mac, the rest mostly the broken Codex CLI failing its check twice. The spinner still shows briefly.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (new: request in zh-CN / ja with the section in English; shared note in three languages) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (106 texts) | PASS |
+| Built app (Chinese), new folder: group Claude ticked with Claude Code（终端） chosen and Claude（应用） as the other choice; group Codex unticked with Codex（应用） (ChatGPT) alone | PASS (read through macOS accessibility) |
+| Detection time on this Mac | 1.8–1.95 s before; 0.6–0.9 s after |
+| Spinner on screen; the request in Chinese / Japanese inside the agent | not seen by the agent — owner check |

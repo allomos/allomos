@@ -42,7 +42,7 @@ export interface Messenger {
   /** The AI agents on this computer that can be asked to add FlipHopper's instructions. */
   findAgents(): Promise<Agent[]>;
   /** Opens each agent in `project` with the request typed in; resolves to the ones that opened. Rejects with a Problem. */
-  askAgents(agents: string[], project: string, seabag: string): Promise<string[]>;
+  askAgents(agents: string[], project: string, seabag: string, language: string): Promise<string[]>;
   /** Writes FlipHopper's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
   /** Whether the AI agents know about the project of the seabag at `root`, and their last use of it. */
@@ -77,7 +77,8 @@ export const desktopMessenger: Messenger = {
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onAgentsMenu: (handler) => listen("menu:agents", () => handler()),
   findAgents: () => invoke<Agent[]>("find_agents"),
-  askAgents: (agents, project, seabag) => invoke<string[]>("ask_agents", { agents, project, seabag }),
+  askAgents: (agents, project, seabag, language) =>
+    invoke<string[]>("ask_agents", { agents, project, seabag, language }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
 };

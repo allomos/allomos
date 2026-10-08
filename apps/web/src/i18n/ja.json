@@ -24,6 +24,7 @@
   "agents.codex_app": "Codex（アプリ）",
   "agents.how_link": "依頼が入力済みの状態で開きます",
   "agents.how_paste": "ターミナルが開きます。依頼はクリップボードにあるので貼り付けてください",
+  "agents.searching": "AI エージェントを探しています…",
   "agents.none": "このコンピューターに AI エージェントが見つかりませんでした。",
   "agents.ask": "依頼する",
   "agents.write": "ファイルを書いてもらう",

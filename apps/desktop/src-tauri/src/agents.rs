@@ -99,8 +99,26 @@ fn app_schemes(app: &Path) -> Vec<String> {
         .collect()
 }
 
-/// The first app in `dirs` that opens `scheme://` links.
+/// Apps known to open each agent's links, checked first: reading every app's `Info.plist` takes
+/// about two seconds on a full Applications folder.
+const KNOWN_APPS: &[(&str, &[&str])] = &[
+    ("claude", &["Claude.app"]),
+    ("claude-cli", &["Claude Code URL Handler.app"]),
+    ("codex", &["Codex.app", "ChatGPT.app"]),
+];
+
+/// The first app in `dirs` that opens `scheme://` links: a known app first, else any app.
 fn find_app(scheme: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
+    let known = KNOWN_APPS
+        .iter()
+        .filter(|(s, _)| *s == scheme)
+        .flat_map(|(_, names)| names.iter())
+        .flat_map(|name| dirs.iter().map(move |d| d.join(name)))
+        .find(|app| app_schemes(app).iter().any(|s| s == scheme));
+    known.or_else(|| scan_apps(scheme, dirs))
+}
+
+fn scan_apps(scheme: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
     dirs.iter()
         .filter_map(|d| std::fs::read_dir(d).ok())
         .flatten()
@@ -228,16 +246,28 @@ pub fn link(agent: &str, project: &Path, request: &str) -> Option<String> {
 }
 
 /// A line added to the request when several agents are asked at once, so they do not write twice.
-pub fn shared_note(agents: &[String]) -> Option<String> {
+pub fn shared_note(agents: &[String], language: &str) -> Option<String> {
     if agents.len() < 2 {
         return None;
     }
     let names: Vec<&str> = agents.iter().map(|a| name(a)).collect();
-    Some(format!(
-        "Note: {} were asked to do this at the same time. Read AGENTS.md and CLAUDE.md first; \
+    Some(match language {
+        "zh-CN" => format!(
+            "注意：{} 同时收到了这个请求。请先阅读 AGENTS.md 和 CLAUDE.md；\
+如果其中已经有 FlipHopper 的说明，只需检查，不要做其他改动。",
+            names.join("和")
+        ),
+        "ja" => format!(
+            "注意：{} にも同時に同じ依頼をしています。まず AGENTS.md と CLAUDE.md を読み、\
+FlipHopper の説明がすでにあれば確認だけにして、ほかは変えないでください。",
+            names.join("と")
+        ),
+        _ => format!(
+            "Note: {} were asked to do this at the same time. Read AGENTS.md and CLAUDE.md first; \
 if FlipHopper's instructions are already there, only check them and change nothing else.",
-        names.join(" and ")
-    ))
+            names.join(" and ")
+        ),
+    })
 }
 
 fn name(agent: &str) -> &'static str {
@@ -346,9 +376,16 @@ mod tests {
 
     #[test]
     fn several_agents_are_told_about_each_other() {
-        assert_eq!(shared_note(&["claude_cli".into()]), None);
-        let note = shared_note(&["claude_cli".into(), "codex_app".into()]).unwrap();
+        assert_eq!(shared_note(&["claude_cli".into()], "en"), None);
+        let both = ["claude_cli".to_string(), "codex_app".to_string()];
+        let note = shared_note(&both, "en").unwrap();
         assert!(note.contains("Claude Code (terminal) and Codex (app)"));
+        assert!(shared_note(&both, "ja").unwrap().starts_with("注意："));
+        assert!(
+            shared_note(&both, "zh-CN")
+                .unwrap()
+                .contains("同时收到了这个请求")
+        );
     }
 
     #[test]
@@ -417,7 +454,10 @@ mod probe {
     #[test]
     #[ignore = "looks at this computer; run by hand"]
     fn print_found_agents() {
-        for a in super::find_agents() {
+        let start = std::time::Instant::now();
+        let found = super::find_agents();
+        println!("find_agents took {} ms", start.elapsed().as_millis());
+        for a in found {
             println!("{a:?}");
         }
     }
