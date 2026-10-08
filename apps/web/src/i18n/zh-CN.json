@@ -24,6 +24,7 @@
   "agents.codex_app": "Codex（应用）",
   "agents.how_link": "打开时已填好请求",
   "agents.how_paste": "打开终端；请求已复制到剪贴板，可粘贴",
+  "agents.searching": "正在查找 AI 智能体…",
   "agents.none": "这台电脑上没有找到 AI 智能体。",
   "agents.ask": "询问",
   "agents.write": "替我写入文件",

@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
     AgentSetup, Inspection, add_agent_instructions, add_readme_if_empty, agent_setup,
-    agent_setup_request, create_starter, git_root, inspect, load, picked_folder, stamp,
+    agent_setup_request_in, create_starter, git_root, inspect, load, picked_folder, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -191,6 +191,7 @@ async fn ask_agents(
     agents: Vec<String>,
     project: PathBuf,
     seabag: PathBuf,
+    language: String,
 ) -> Result<Vec<String>, Problem> {
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -198,8 +199,8 @@ async fn ask_agents(
         });
     }
     let found = agents::find_agents();
-    let mut request = agent_setup_request(&project, &seabag);
-    if let Some(note) = agents::shared_note(&agents) {
+    let mut request = agent_setup_request_in(&language, &project, &seabag);
+    if let Some(note) = agents::shared_note(&agents, &language) {
         request = format!("{note}\n\n{request}");
     }
     let mut opened = Vec::new();

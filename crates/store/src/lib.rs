@@ -162,8 +162,49 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
 /// project's instruction files, merged with what is already there. Plain numbered steps, so any
 /// agent can follow them.
 pub fn agent_setup_request(project: &Path, seabag: &Path) -> String {
-    format!(
-        "FlipHopper has set up this project's seabag. Please now tell future AI agents about it.
+    agent_setup_request_in("en", project, seabag)
+}
+
+/// [`agent_setup_request`] in an interface language (`en`, `zh-CN`, `ja`; English otherwise).
+/// The steps follow the language; the section itself stays English, so every agent and teammate
+/// reads the same rules.
+pub fn agent_setup_request_in(language: &str, project: &Path, seabag: &Path) -> String {
+    let (project, seabag, heading) = (project.display(), seabag.display(), AGENT_SECTION_HEADING);
+    let steps = match language {
+        "zh-CN" => format!(
+            "FlipHopper 已为这个项目建立了水手袋。现在请把它告诉以后的 AI 智能体。
+
+项目文件夹：{project}
+水手袋（FlipHopper 的任务文件）：{seabag}
+
+在项目文件夹中：
+
+1. 打开 AGENTS.md（如果没有就新建）。
+2. 如果 AGENTS.md 已经有关于 FlipHopper 的说明（例如标题为“{heading}”的一节，或其他关于 FlipHopper 或 `fh` 的文字），用下面这一节替换它们；否则添加下面这一节。
+3. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 FlipHopper，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
+4. 确保 CLAUDE.md 包含一行 @AGENTS.md，让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
+5. 告诉用户你改了什么。
+
+下面这一节请保持英文原样添加："
+        ),
+        "ja" => format!(
+            "FlipHopper がこのプロジェクトのシーバッグを用意しました。これからの AI エージェントにそれを伝えてください。
+
+プロジェクトのフォルダー：{project}
+シーバッグ（FlipHopper のタスクファイル）：{seabag}
+
+プロジェクトのフォルダーで：
+
+1. AGENTS.md を開きます（なければ作成します）。
+2. AGENTS.md にすでに FlipHopper の説明（たとえば「{heading}」という見出しの節や、FlipHopper または `fh` についてのほかの文）があれば、下の節で置き換えます。なければ下の節を追加します。
+3. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう FlipHopper を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
+4. CLAUDE.md に @AGENTS.md という行があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
+5. 何を変えたかをユーザーに見せてください。
+
+下の節は英語のまま追加してください："
+        ),
+        _ => format!(
+            "FlipHopper has set up this project's seabag. Please now tell future AI agents about it.
 
 Project folder: {project}
 Seabag (FlipHopper's task files): {seabag}
@@ -172,7 +213,7 @@ In the project folder:
 
 1. Open AGENTS.md (create it if it is missing).
 2. If AGENTS.md already has FlipHopper instructions (for example a section headed \
-\"{AGENT_SECTION_HEADING}\", or any other text about FlipHopper or `fh`), replace them with the \
+\"{heading}\", or any other text about FlipHopper or `fh`), replace them with the \
 section below. Otherwise add the section below.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
@@ -181,13 +222,10 @@ unrelated text, and do not add the same instructions twice.
 CLAUDE.md with just that line if it is missing). Do not copy the section into CLAUDE.md.
 5. Show the user what you changed.
 
-The section to add:
-
-{}",
-        agent_section(),
-        project = project.display(),
-        seabag = seabag.display(),
-    )
+The section to add:"
+        ),
+    };
+    format!("{steps}\n\n{}", agent_section())
 }
 
 /// Add FlipHopper's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
@@ -841,6 +879,25 @@ mod tests {
             Err(Problem::InvalidId { .. })
         ));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn agent_setup_request_follows_the_language_but_keeps_the_section_english() {
+        let (p, b) = (Path::new("/p"), Path::new("/p/.fliphopper/seabag"));
+        let zh = agent_setup_request_in("zh-CN", p, b);
+        let ja = agent_setup_request_in("ja", p, b);
+        assert!(zh.contains("1. 打开 AGENTS.md") && zh.contains("项目文件夹：/p\n"));
+        assert!(
+            ja.contains("1. AGENTS.md を開きます")
+                && ja.contains("シーバッグ（FlipHopper のタスクファイル）：/p/.fliphopper/seabag")
+        );
+        for r in [&zh, &ja] {
+            assert!(r.ends_with(&agent_section()), "the section stays English");
+        }
+        assert_eq!(
+            agent_setup_request_in("fr", p, b),
+            agent_setup_request(p, b)
+        );
     }
 
     #[test]
