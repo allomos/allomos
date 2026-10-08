@@ -33,15 +33,15 @@ The English and Chinese road show decks show the app's new mark instead of the o
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-06 | A card to update the decks with the new mark ("ok") | owner (chat) |
-
-The republish (external operation above) is **not yet approved**.
+| 2026-10-08 | Republish both decks at their existing addresses ("proceed this task: the decks republish") | owner (chat) |
 
 ## Notes
 
 - 2026-10-06 — Card written by the agent from the owner's request.
-- 2026-10-06 — Local part done in the card run (`claude/a01-run`), under the owner's "find them and do them". The republish was **not** done: it still needs the owner's approval.
+- 2026-10-06 — Local part done in the card run (`claude/a01-run`), under the owner's "find them and do them". The republish was **not** done: it still needed the owner's approval.
+- 2026-10-08 — Owner approved the republish; both decks republished in place (session `claude/a00-19-republish`, on `main`).
 
-## Result so far (2026-10-06)
+## Result so far (2026-10-06, republished 2026-10-08)
 
 **In plain words.** Both decks' top bar now shows the app's own mark, drawn exactly as in the app window (same shapes and flat colours: jade, terracotta, sand-yellow spark). `hopper-mark.svg` is that mark now, and the pitch README says the app icon, the window and the decks share it. The hero slide's seabag drawing is unchanged, as recommended.
 
@@ -52,4 +52,5 @@ The republish (external operation above) is **not yet approved**.
 | `git diff --check`; links in `docs/pitch/README.md` | PASS |
 | English and Chinese deck, light theme, in the browser pane | PASS: the new mark in the top bar; 10 slides, one mark |
 | Dark theme | not seen: the pane renders local files in light only — owner check |
-| Republish both decks at their existing addresses | **not done — waiting on the owner's approval** |
+| Republish both decks at their existing addresses (2026-10-08) | PASS: English → version 4 (`1791444181-1abf`), 中文 → version 4 (`1791444183-3523`). Before publishing, the live pages were read and differed from the repo source only in the top-bar mark, so nothing else was overwritten. Reading the English address back shows the new mark. |
+| Owner opens both addresses and checks the mark (including dark theme) | waiting on the owner |
