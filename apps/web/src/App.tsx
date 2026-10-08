@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
+import { AgentLine } from "./AgentLine";
 import { AgentsPanel } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
@@ -272,6 +273,13 @@ export function App({ messenger }: { messenger: Messenger }) {
 
       <main className="main">
         {error && <p className="banner error">{noteText(error)}</p>}
+        {opened?.loaded.seabag && (
+          <AgentLine
+            messenger={messenger}
+            root={opened.root}
+            onTell={() => setAgentsFor({ project: projectFolder(opened.root), seabag: opened.root })}
+          />
+        )}
         {notices.map((n, i) => (
           <p key={i} className="banner ok">
             {noteText(n)}

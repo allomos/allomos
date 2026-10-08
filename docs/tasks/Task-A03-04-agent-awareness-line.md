@@ -41,3 +41,17 @@ One line under the window's top bar answers "do the AI agents know about this pr
 ## Notes
 
 - 2026-10-08 — Card written by the agent and worked in the card run (`claude/a01-run`).
+
+## Result (2026-10-08)
+
+**In plain words.** Under the top bar, the window now says whether AI agents know about the open project, worked out by FlipHopper itself (no flag written by agents). It checks `AGENTS.md` (Codex) and `CLAUDE.md` (Claude Code, also through `@AGENTS.md`) about every 4 seconds, and reads the seabag's Git history for the newest commit with an `Agent:` line (written by `fh --push` / `--commit`); with no such commit it names whoever holds a task in progress. When an agent is missing, a **Tell AI agents…** button opens the A03-03 panel. The same check now stops "Write the files for me" from adding a second copy after an agent merged the rules in its own words.
+
+- **The check:** a file tells agents about FlipHopper when a Markdown heading names FlipHopper, or it mentions `fh next` or `fh claim`, or `.fliphopper/seabag` (`tells_agents`, `agent_setup` in `crates/store`).
+- **Where:** `agent_status` in `apps/desktop/src-tauri/src/lib.rs`; `last_agent_use` in `agents.rs` (runs `git log`, read-only); `AgentLine.tsx` (new); six texts in three languages.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (new: the check's cases, CLAUDE.md through AGENTS.md; parsing the log; a real temporary Git repository) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (105 texts) | PASS |
+| Built app on this repository | PASS: "AI agents: Codex ✓ Claude Code ✓ — last used by claude/a01-run, <date>" |
+| Built app on `~/fliphopper-check3` (no instructions); then an `AGENTS.md` mentioning `fh next` added by hand | PASS: "not told about this project yet", then within seconds "Codex ✓ Claude Code ✗ — no agent has used fh here yet" (test file removed afterwards) |

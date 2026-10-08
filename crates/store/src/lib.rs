@@ -200,7 +200,7 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
     let section = agent_section();
     let agents = folder.join("AGENTS.md");
     match fs::read_to_string(&agents) {
-        Ok(text) if has_fliphopper_section(&text) => {}
+        Ok(text) if tells_agents(&text) => {}
         Ok(text) => {
             append(&agents, &text, &section)?;
             changed.push("AGENTS.md".to_string());
@@ -213,8 +213,7 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
     }
     let claude = folder.join("CLAUDE.md");
     match fs::read_to_string(&claude) {
-        Ok(text)
-            if has_fliphopper_section(&text) || text.lines().any(|l| l.trim() == "@AGENTS.md") => {}
+        Ok(text) if tells_agents(&text) || imports_agents_md(&text) => {}
         Ok(text) => {
             append(&claude, &text, &section)?;
             changed.push("CLAUDE.md".to_string());
@@ -228,12 +227,41 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
     Ok(changed)
 }
 
-/// Whether a Markdown text already has a section about FlipHopper: a heading that names it.
-fn has_fliphopper_section(text: &str) -> bool {
-    text.lines().any(|l| {
-        let l = l.trim_start();
-        l.starts_with('#') && l.to_lowercase().contains("fliphopper")
-    })
+/// Whether an instruction file's text tells AI agents about FlipHopper: a Markdown heading names
+/// it, or the text mentions `fh next` or `fh claim`, or `.fliphopper/seabag`. Agents may merge the
+/// section in their own words, so any of these counts.
+pub fn tells_agents(text: &str) -> bool {
+    text.contains("fh next")
+        || text.contains("fh claim")
+        || text.contains(".fliphopper/seabag")
+        || text.lines().any(|l| {
+            let l = l.trim_start();
+            l.starts_with('#') && l.to_lowercase().contains("fliphopper")
+        })
+}
+
+fn imports_agents_md(text: &str) -> bool {
+    text.lines().any(|l| l.trim() == "@AGENTS.md")
+}
+
+/// Which AI agents' instruction files in `project` tell them about FlipHopper.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct AgentSetup {
+    /// Codex reads `AGENTS.md`.
+    pub codex: bool,
+    /// Claude Code reads `CLAUDE.md`, and through `@AGENTS.md` also `AGENTS.md`.
+    pub claude: bool,
+}
+
+/// Read `project`'s `AGENTS.md` and `CLAUDE.md` and say which agents are told about FlipHopper.
+pub fn agent_setup(project: &Path) -> AgentSetup {
+    let agents = fs::read_to_string(project.join("AGENTS.md")).unwrap_or_default();
+    let claude = fs::read_to_string(project.join("CLAUDE.md")).unwrap_or_default();
+    let codex = tells_agents(&agents);
+    AgentSetup {
+        codex,
+        claude: tells_agents(&claude) || (imports_agents_md(&claude) && codex),
+    }
 }
 
 /// Append `section` to a file whose current text is `text`, after one blank line.
@@ -826,6 +854,43 @@ mod tests {
         assert!(r.contains("any other text about FlipHopper") && !r.contains("<!--"));
         assert!(r.ends_with(&agent_section()));
         assert_eq!(r.matches(AGENT_SECTION_HEADING).count(), 2);
+    }
+
+    #[test]
+    fn agent_setup_reads_the_instruction_files() {
+        let dir = tmp("agent-setup");
+        let none = AgentSetup {
+            codex: false,
+            claude: false,
+        };
+        assert_eq!(agent_setup(&dir), none);
+        // Unrelated instructions do not count.
+        fs::write(dir.join("AGENTS.md"), "# Rules\nRun the tests.\n").unwrap();
+        assert_eq!(agent_setup(&dir), none);
+        // Merged in other words: `fh next` counts; CLAUDE.md importing AGENTS.md follows it.
+        fs::write(dir.join("AGENTS.md"), "## Workflow\nStart with fh next.\n").unwrap();
+        fs::write(dir.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
+        assert_eq!(
+            agent_setup(&dir),
+            AgentSetup {
+                codex: true,
+                claude: true
+            }
+        );
+        // CLAUDE.md alone, mentioning the seabag; AGENTS.md without it.
+        fs::write(dir.join("AGENTS.md"), "# Rules\n").unwrap();
+        fs::write(dir.join("CLAUDE.md"), "Tasks are in .fliphopper/seabag/.\n").unwrap();
+        assert_eq!(
+            agent_setup(&dir),
+            AgentSetup {
+                codex: false,
+                claude: true
+            }
+        );
+        // A heading naming FlipHopper.
+        fs::write(dir.join("AGENTS.md"), "### Using FlipHopper\n").unwrap();
+        assert!(agent_setup(&dir).codex);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
