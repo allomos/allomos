@@ -135,16 +135,14 @@ pub fn add_readme_if_empty(folder: &Path, language: &str) -> io::Result<bool> {
     }
 }
 
-/// Marks FlipHopper's section in a project's `AGENTS.md` / `CLAUDE.md`, so it is added only once.
-pub const AGENT_SECTION_START: &str = "<!-- fliphopper:start -->";
-const AGENT_SECTION_END: &str = "<!-- fliphopper:end -->";
+/// The heading of FlipHopper's section in a project's `AGENTS.md` / `CLAUDE.md`.
+pub const AGENT_SECTION_HEADING: &str = "## Tasks: FlipHopper";
 
 /// The section that tells an AI agent this project's tasks are in FlipHopper. English: it is
 /// read by agents, not shown in the app.
 pub fn agent_section() -> String {
     format!(
-        "{AGENT_SECTION_START}
-## Tasks: FlipHopper
+        "{AGENT_SECTION_HEADING}
 
 This project's tasks, progress and handoff notes live in FlipHopper's seabag
 (`.fliphopper/seabag/`). Work them with the `fh` command; never edit those files by hand.
@@ -156,7 +154,6 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
 - Finished: `fh done <id> --push`.
 
 `--push` commits only the seabag's files and pushes them, so others see the change.
-{AGENT_SECTION_END}
 "
     )
 }
@@ -174,9 +171,9 @@ Seabag (FlipHopper's task files): {seabag}
 In the project folder:
 
 1. Open AGENTS.md (create it if it is missing).
-2. If AGENTS.md already has FlipHopper instructions (with or without the marker lines \
-{AGENT_SECTION_START} and {AGENT_SECTION_END}), replace them with the section below. \
-Otherwise add the section below. Keep both marker lines.
+2. If AGENTS.md already has FlipHopper instructions (for example a section headed \
+\"{AGENT_SECTION_HEADING}\", or any other text about FlipHopper or `fh`), replace them with the \
+section below. Otherwise add the section below.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
@@ -203,7 +200,7 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
     let section = agent_section();
     let agents = folder.join("AGENTS.md");
     match fs::read_to_string(&agents) {
-        Ok(text) if text.contains(AGENT_SECTION_START) => {}
+        Ok(text) if has_fliphopper_section(&text) => {}
         Ok(text) => {
             append(&agents, &text, &section)?;
             changed.push("AGENTS.md".to_string());
@@ -217,8 +214,7 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
     let claude = folder.join("CLAUDE.md");
     match fs::read_to_string(&claude) {
         Ok(text)
-            if text.contains(AGENT_SECTION_START)
-                || text.lines().any(|l| l.trim() == "@AGENTS.md") => {}
+            if has_fliphopper_section(&text) || text.lines().any(|l| l.trim() == "@AGENTS.md") => {}
         Ok(text) => {
             append(&claude, &text, &section)?;
             changed.push("CLAUDE.md".to_string());
@@ -230,6 +226,14 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
         Err(e) => return Err(e),
     }
     Ok(changed)
+}
+
+/// Whether a Markdown text already has a section about FlipHopper: a heading that names it.
+fn has_fliphopper_section(text: &str) -> bool {
+    text.lines().any(|l| {
+        let l = l.trim_start();
+        l.starts_with('#') && l.to_lowercase().contains("fliphopper")
+    })
 }
 
 /// Append `section` to a file whose current text is `text`, after one blank line.
@@ -819,9 +823,9 @@ mod tests {
             r.contains("Project folder: /p\n")
                 && r.contains("task files): /p/.fliphopper/seabag\n")
         );
-        assert!(r.contains("with or without the marker lines"));
+        assert!(r.contains("any other text about FlipHopper") && !r.contains("<!--"));
         assert!(r.ends_with(&agent_section()));
-        assert_eq!(r.matches(AGENT_SECTION_START).count(), 2);
+        assert_eq!(r.matches(AGENT_SECTION_HEADING).count(), 2);
     }
 
     #[test]
@@ -833,7 +837,8 @@ mod tests {
             ["AGENTS.md", "CLAUDE.md"]
         );
         let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
-        assert!(agents.contains(AGENT_SECTION_START) && agents.contains("fh next"));
+        assert!(agents.contains(AGENT_SECTION_HEADING) && agents.contains("fh next"));
+        assert!(!agents.contains("<!--"));
         assert_eq!(
             fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
             "@AGENTS.md\n"
@@ -852,11 +857,21 @@ mod tests {
             ["AGENTS.md", "CLAUDE.md"]
         );
         let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
-        assert!(agents.starts_with("# Ours\nKeep this.\n\n<!-- fliphopper:start -->"));
+        assert!(agents.starts_with("# Ours\nKeep this.\n\n## Tasks: FlipHopper"));
         let claude = fs::read_to_string(dir.join("CLAUDE.md")).unwrap();
-        assert!(claude.starts_with("Claude rules\n\n<!-- fliphopper:start -->"));
-        assert_eq!(agents.matches(AGENT_SECTION_START).count(), 1);
+        assert!(claude.starts_with("Claude rules\n\n## Tasks: FlipHopper"));
+        assert_eq!(agents.matches(AGENT_SECTION_HEADING).count(), 1);
         assert!(add_agent_instructions(&dir).unwrap().is_empty());
+        fs::remove_dir_all(dir).unwrap();
+
+        // A FlipHopper section under another heading (no markers) is recognised too.
+        let dir = tmp("agents-own-heading");
+        fs::write(
+            dir.join("AGENTS.md"),
+            "# Ours\n\n## Using FlipHopper\nRun fh next.\n",
+        )
+        .unwrap();
+        assert_eq!(add_agent_instructions(&dir).unwrap(), ["CLAUDE.md"]);
         fs::remove_dir_all(dir).unwrap();
 
         // CLAUDE.md that already imports AGENTS.md is left alone.

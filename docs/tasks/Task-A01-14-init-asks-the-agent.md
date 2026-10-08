@@ -8,7 +8,7 @@
 
 | Piece | What it is | Where |
 |---|---|---|
-| The request | Numbered steps plus the section: open or create `AGENTS.md`; add or replace the section between the FlipHopper markers; point any older task-tracking rule to FlipHopper; make `CLAUDE.md` contain `@AGENTS.md`; show the user the changes. One text, used by `fh init` and later by the app ([`Task-A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md)). | `crates/store` |
+| The request | Numbered steps plus the section: open or create `AGENTS.md`; add the section, or replace any FlipHopper instructions already there; point any older task-tracking rule to FlipHopper; make `CLAUDE.md` contain `@AGENTS.md`; show the user the changes. One text, used by `fh init` and later by the app ([`Task-A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md)). | `crates/store` |
 | `fh init` | Prints the request after creating the seabag (in `--json`: the field `agent_setup`). It writes neither file. | `crates/cli` |
 | `--write-agent-files` | Keeps A01-13's direct writing, for scripts with no agent. | `crates/cli` |
 | The app | Unchanged for now: it still writes the files directly, until A03-03 lets it ask an agent instead. | — |
@@ -43,3 +43,4 @@
 | `fh init` in a new folder: prints the request; no `AGENTS.md` / `CLAUDE.md` written | PASS |
 | An agent following the request | not run (would start an agent) — owner check if wanted |
 - 2026-10-07 — Owner review: step 2 must not rely on the markers ("it is possible has this section but no markers"), and the request should name the seabag. Changed: step 2 now says "FlipHopper instructions (with or without the marker lines) … replace them", and the request starts with the absolute **project folder** and **seabag** paths. Tests updated; PASS.
+- 2026-10-08 — Owner: "i don't like the marker lines of this section in the md file". Removed: the section is now just its heading `## Tasks: FlipHopper` and its lines; step 2 asks the agent to replace any FlipHopper instructions already there ("for example a section headed …, or any other text about FlipHopper or `fh`"); direct writing (`--write-agent-files`, the app's "Write the files for me") treats any Markdown heading that names FlipHopper as the section already being there. Tests updated; all checks PASS.

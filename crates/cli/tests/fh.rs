@@ -629,9 +629,7 @@ fn init_asks_the_agent_or_writes_when_told() {
     assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
     assert_eq!(v["agent_setup"], Value::Null);
     let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
-    assert!(
-        agents.starts_with("# Ours\n\n<!-- fliphopper:start -->") && agents.contains("fh next")
-    );
+    assert!(agents.starts_with("# Ours\n\n## Tasks: FlipHopper") && agents.contains("fh next"));
     assert_eq!(
         fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
         "@AGENTS.md\n"
