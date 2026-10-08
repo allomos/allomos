@@ -13,8 +13,8 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    Inspection, add_agent_instructions, add_readme_if_empty, agent_setup_request, create_starter,
-    git_root, inspect, load, picked_folder, stamp,
+    AgentSetup, Inspection, add_agent_instructions, add_readme_if_empty, agent_setup,
+    agent_setup_request, create_starter, git_root, inspect, load, picked_folder, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -213,6 +213,42 @@ async fn ask_agents(
     Ok(opened)
 }
 
+/// Do the AI agents know about this project? What the window's agent line shows (Task-A03-04).
+#[derive(Serialize)]
+struct AgentStatus {
+    /// The project folder the line is about.
+    project: PathBuf,
+    /// Which agents' instruction files tell them about FlipHopper.
+    setup: AgentSetup,
+    /// The newest seabag change an agent made with `fh --commit` / `--push`.
+    last: Option<agents::LastUse>,
+    /// Who holds tasks in progress now.
+    holders: Vec<String>,
+}
+
+#[tauri::command]
+async fn agent_status(root: PathBuf) -> AgentStatus {
+    let project = picked_folder(&root).unwrap_or(&root).to_path_buf();
+    let mut holders: Vec<String> = load(&root)
+        .seabag
+        .map(|bag| {
+            bag.tasks
+                .into_iter()
+                .filter(|t| t.state == fliphopper_core::State::InProgress)
+                .filter_map(|t| t.holder)
+                .collect()
+        })
+        .unwrap_or_default();
+    holders.sort();
+    holders.dedup();
+    AgentStatus {
+        setup: agent_setup(&project),
+        last: agents::last_agent_use(&root),
+        holders,
+        project,
+    }
+}
+
 /// Write FlipHopper's section into `project`'s AGENTS.md and CLAUDE.md directly, for when no
 /// agent is available. Returns the files changed.
 #[tauri::command]
@@ -409,7 +445,8 @@ pub fn run() {
             set_recent_folders,
             find_agents,
             ask_agents,
-            write_agent_files
+            write_agent_files,
+            agent_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");

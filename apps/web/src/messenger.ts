@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, FolderInfo, Opened } from "./types";
+import type { Agent, AgentStatus, FolderInfo, Opened } from "./types";
 
 export interface Messenger {
   /** A folder given when FlipHopper was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -45,6 +45,8 @@ export interface Messenger {
   askAgents(agents: string[], project: string, seabag: string): Promise<string[]>;
   /** Writes FlipHopper's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
+  /** Whether the AI agents know about the project of the seabag at `root`, and their last use of it. */
+  agentStatus(root: string): Promise<AgentStatus>;
 }
 
 export interface MenuTexts {
@@ -77,4 +79,5 @@ export const desktopMessenger: Messenger = {
   findAgents: () => invoke<Agent[]>("find_agents"),
   askAgents: (agents, project, seabag) => invoke<string[]>("ask_agents", { agents, project, seabag }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
+  agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
 };

@@ -75,3 +75,14 @@ export interface Agent {
   /** "link": opens with the request typed in; "paste": a terminal opens and the request is on the clipboard. */
   how: "link" | "paste";
 }
+
+/** Do the AI agents know about this project? (apps/desktop: `agent_status`) */
+export interface AgentStatus {
+  project: string;
+  /** Which agents' instruction files tell them about FlipHopper. */
+  setup: { codex: boolean; claude: boolean };
+  /** The newest seabag change an agent made with `fh --commit` / `--push`. `when` is in seconds. */
+  last: { who: string; when: number } | null;
+  /** Who holds tasks in progress now. */
+  holders: string[];
+}

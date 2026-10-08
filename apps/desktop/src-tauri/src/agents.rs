@@ -163,6 +163,45 @@ pub fn find_agents() -> Vec<Agent> {
     agents
 }
 
+/// The newest change to a seabag made by an agent through `fh --commit` / `--push`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LastUse {
+    /// The agent's name from the commit's `Agent:` line.
+    pub who: String,
+    /// When, in seconds since 1970 (the commit's time).
+    pub when: i64,
+}
+
+/// Read the seabag's Git history (read-only) for the newest commit with an `Agent:` line.
+pub fn last_agent_use(seabag: &Path) -> Option<LastUse> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(seabag)
+        .args(["log", "-n", "200", "--format=%ct%x1f%B%x1e", "--", "."])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    parse_last_use(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The first commit in `git log --format=%ct%x1f%B%x1e` output whose message names an agent.
+fn parse_last_use(log: &str) -> Option<LastUse> {
+    log.split('\u{1e}').find_map(|commit| {
+        let (when, body) = commit.trim_start().split_once('\u{1f}')?;
+        let who = body
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("Agent:"))
+            .map(str::trim)
+            .filter(|w| !w.is_empty() && !w.starts_with("unknown"))?;
+        Some(LastUse {
+            who: who.to_string(),
+            when: when.trim().parse().ok()?,
+        })
+    })
+}
+
 /// Percent-encode a link's query value (everything but unreserved characters).
 pub fn encode(text: &str) -> String {
     let mut out = String::new();
@@ -320,6 +359,49 @@ mod tests {
         std::fs::write(dir.join("codex"), "not a program").unwrap();
         assert_eq!(find_tool("codex", std::slice::from_ref(&dir)), None);
         assert_eq!(find_app("codex", std::slice::from_ref(&dir)), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn last_use_is_the_newest_commit_naming_an_agent() {
+        let log = "1700000300\u{1f}fix typo\n\u{1e}\n1700000200\u{1f}fh: claim A01-02\n\nAgent: unknown (fh)\n\u{1e}\n1700000100\u{1f}fh: label A01-01\n\nAgent: claude/a01-run\n\u{1e}\n";
+        assert_eq!(
+            parse_last_use(log),
+            Some(LastUse {
+                who: "claude/a01-run".into(),
+                when: 1_700_000_100
+            })
+        );
+        assert_eq!(parse_last_use("1\u{1f}no agent\n\u{1e}"), None);
+    }
+
+    #[test]
+    fn last_use_comes_from_a_real_repository() {
+        let dir = std::env::temp_dir().join(format!("fliphopper-lastuse-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let seabag = dir.join(".fliphopper/seabag");
+        std::fs::create_dir_all(&seabag).unwrap();
+        let git = |args: &[&str]| {
+            let ok = Command::new("git")
+                .arg("-C")
+                .arg(&dir)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                ok.status.success(),
+                "{}",
+                String::from_utf8_lossy(&ok.stderr)
+            );
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.name", "T"]);
+        git(&["config", "user.email", "t@example.com"]);
+        assert_eq!(last_agent_use(&seabag), None);
+        std::fs::write(seabag.join("project.json"), "{}").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "fh: init", "-m", "Agent: codex/s1"]);
+        assert_eq!(last_agent_use(&seabag).unwrap().who, "codex/s1");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
