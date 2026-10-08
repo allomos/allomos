@@ -1,9 +1,9 @@
 {
   "area": "A00",
   "handoff_note": "Local files done and merged; only the approved republish is left (pitch/README 'Updating it').",
+  "holder": "claude/a00-19-republish",
   "id": "A00-19",
   "label": "drafted",
-  "state": "waiting",
-  "title": "Decks new mark",
-  "waiting_on": "owner approves republishing both decks at their existing addresses"
+  "state": "in_progress",
+  "title": "Decks new mark"
 }
