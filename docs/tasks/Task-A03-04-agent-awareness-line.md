@@ -1,0 +1,43 @@
+# Task-A03-04-agent-awareness-line
+
+*Card type: coding. Area A03 (Agents). Requested by the owner (2026-10-08): the app should show whether the AI agents know about this project's seabag, without asking agents to write a flag.*
+
+## What gets built (plain words)
+
+One line under the window's top bar answers "do the AI agents know about this project?". FlipHopper works it out itself, from two things it can see:
+
+1. **Are the instructions there?** It reads the project's `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) and checks whether they tell agents about FlipHopper.
+2. **Do agents use it?** It looks at who last changed the seabag with `fh` (the `Agent:` line that `fh --push` / `--commit` writes into each commit, and the holders of tasks in progress).
+
+| State | What the line shows |
+|---|---|
+| Not set up | "AI agents: not told about this project yet" (and which agent is missing, e.g. "Claude Code ✗") → **Tell AI agents…** (opens the A03-03 panel) |
+| Set up, not used yet | "AI agents: Codex ✓ Claude Code ✓ — no agent has used fh here yet" |
+| In use | "AI agents: Codex ✓ Claude Code ✓ — last used by claude/a01-run, 14:02 today" |
+
+| Piece | What it is | Where |
+|---|---|---|
+| The check | A file counts as telling agents about FlipHopper when a Markdown heading names FlipHopper, or its text mentions `fh next` or `fh claim`, or `.fliphopper/seabag`. Codex: `AGENTS.md` passes. Claude Code: `CLAUDE.md` passes, or it imports `@AGENTS.md` and `AGENTS.md` passes. The same check stops "Write the files for me" from adding a second copy. | `crates/store` |
+| Last use | The newest commit touching the seabag whose message has an `Agent:` line (name and time), from `git log`; else a task's current holder. No Git: holders only. | `apps/desktop` (runs `git`, read-only) |
+| The line | In the window, refreshed when the seabag or those files change (about every few seconds), in three languages. | `apps/web` |
+
+**What you can see at the end:** open a project without the instructions: the line says so and offers the button; after an agent adds them, the line turns to ✓ within seconds; after an agent runs `fh … --push`, it shows who and when.
+
+## Details for the worker
+
+- **Outcome.** The owner sees at a glance whether AI agents know about a project and are using FlipHopper there.
+- **Owner's choices (2026-10-08).** No flag written by agents; FlipHopper checks the files and the activity itself.
+- **Decisive unknowns.** None.
+- **Files owned.** `crates/store/src/lib.rs`, `apps/desktop/src-tauri/src/lib.rs` (or `agents.rs`), `apps/web/src/App.tsx` (or a small component), `apps/web/src/messenger.ts`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`, `apps/web/src/styles.css`, this card.
+- **External operations.** None.
+- **Done means mechanically.** The usual Rust and web checks pass; tests cover the check (heading, `fh next` in other words, `.fliphopper/seabag`, CLAUDE.md importing AGENTS.md, none) and reading the last `Agent:` commit in a temporary Git repository; in the built app, this repository shows "in use" with the last agent, and a new folder shows "not set up". Recorded on the card; then the owner checks.
+
+## Approvals
+
+| Date | What was approved | By |
+|---|---|---|
+| 2026-10-08 | "ok. yes" to the agent's recommendation: check the instruction files and show agent activity, no flag | owner (chat) |
+
+## Notes
+
+- 2026-10-08 — Card written by the agent and worked in the card run (`claude/a01-run`).
