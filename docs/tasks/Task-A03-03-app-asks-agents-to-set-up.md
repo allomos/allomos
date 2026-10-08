@@ -35,6 +35,7 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner check passed: the panel and Ask ("passed") | owner (chat) |
 | 2026-10-07 | Defaults 1 and 2: "yes", "yes"; "did you specify the tracking seabag path? and maybe we should let user select the working project path?" | owner (chat) |
 | 2026-10-07 | "let the app try to find the agents and ask the agents to do the job. if there are multiple agents, ask user to choose one or many. should consider the situation of agent apps and CLIs. show a UI to the user to do select." | owner (chat) |
 
@@ -58,3 +59,5 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 | Detection on this Mac with an app-like bare `PATH` (three runs) | PASS: Claude Code (terminal, link), Claude (app), Codex (app: ChatGPT); Codex CLI not offered |
 | Built app on a new folder: seabag and README created; File menu shows the new item (ファイル in Japanese) | PASS |
 | The panel on screen, and Ask opening each agent with the request typed in | not seen: the agent's accessibility tool could not reach the window during this test — owner check |
+
+- 2026-10-08 — **Owner verified** in the built app ("passed").
