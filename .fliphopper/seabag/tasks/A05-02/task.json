@@ -2,6 +2,7 @@
   "area": "A05",
   "id": "A05-02",
   "label": "drafted",
-  "state": "backlog",
-  "title": "Convert an existing project"
+  "state": "waiting",
+  "title": "Convert an existing project",
+  "waiting_on": "owner accepts or changes the six defaults (card § Proposed defaults)"
 }
