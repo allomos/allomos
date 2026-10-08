@@ -1,7 +1,8 @@
 {
   "area": "A05",
+  "holder": "claude/a05-02-convert-project",
   "id": "A05-02",
   "label": "drafted",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Convert an existing project"
 }
