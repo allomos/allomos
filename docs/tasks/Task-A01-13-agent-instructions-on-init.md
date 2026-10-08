@@ -47,3 +47,4 @@ An AI agent learns how to work in a project from the project's instruction files
 | `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (82 texts) | PASS |
 | Built app on a new empty folder: `.fliphopper/`, `README-fliphopper.md`, `AGENTS.md` (with the section), `CLAUDE.md` (`@AGENTS.md`); the window shows both notices | PASS |
 | A new Claude Code or Codex session in such a project starts with `fh next` | not run (would start an agent) — owner check if wanted |
+- 2026-10-08 — Superseded in part: `fh init` now asks the agent ([`A01-14`](./Task-A01-14-init-asks-the-agent.md)); the app asks the agents it finds ([`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md)); the marker lines were removed at the owner's request. Direct writing remains for `fh init --write-agent-files` and the app's "Write the files for me".

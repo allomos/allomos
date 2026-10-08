@@ -196,7 +196,7 @@ pub fn shared_note(agents: &[String]) -> Option<String> {
     let names: Vec<&str> = agents.iter().map(|a| name(a)).collect();
     Some(format!(
         "Note: {} were asked to do this at the same time. Read AGENTS.md and CLAUDE.md first; \
-if the FlipHopper section is already there, only check it and change nothing else.",
+if FlipHopper's instructions are already there, only check them and change nothing else.",
         names.join(" and ")
     ))
 }
