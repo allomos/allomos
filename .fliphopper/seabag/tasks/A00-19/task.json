@@ -3,7 +3,7 @@
   "handoff_note": "Local files done and merged; only the approved republish is left (pitch/README 'Updating it').",
   "holder": "claude/a00-19-republish",
   "id": "A00-19",
-  "label": "deployed and verified",
+  "label": "owner verified",
   "state": "waiting",
   "title": "Decks new mark",
   "waiting_on": "owner opens both deck addresses and checks the new mark (light and dark)"
