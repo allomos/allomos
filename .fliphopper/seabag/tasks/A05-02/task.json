@@ -2,7 +2,6 @@
   "area": "A05",
   "id": "A05-02",
   "label": "drafted",
-  "state": "waiting",
-  "title": "Convert an existing project",
-  "waiting_on": "owner reviews the rewritten card (agent-prompt version) and approves it as ready"
+  "state": "ready",
+  "title": "Convert an existing project"
 }
