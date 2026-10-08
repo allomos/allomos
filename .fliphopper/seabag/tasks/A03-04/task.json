@@ -2,7 +2,7 @@
   "area": "A03",
   "handoff_note": "Built and merged.",
   "id": "A03-04",
-  "label": "locally verified",
+  "label": "owner verified",
   "state": "waiting",
   "title": "Agent awareness line in the app",
   "waiting_on": "owner looks at the agent line in the app"
