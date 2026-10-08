@@ -1,6 +1,7 @@
 {
   "area": "A05",
   "id": "A05-02",
+  "label": "drafted",
   "state": "backlog",
   "title": "Convert an existing project"
 }
