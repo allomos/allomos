@@ -20,6 +20,11 @@ export interface Messenger {
   openSeabag(root: string): Promise<Opened>;
   /** A fingerprint of the seabag's files; it changes whenever a file is written. */
   seabagStamp(root: string): Promise<string>;
+  /**
+   * Opens a link from task `task`'s description: a web page, or a text file inside the project
+   * (such as the task's card) in the user's editor. Rejects with a Problem for anything else.
+   */
+  openTaskLink(root: string, task: string, link: string): Promise<void>;
   /** Show the seabag's folder in Finder or Explorer. Rejects with a Problem on failure. */
   showInFileManager(root: string): Promise<void>;
   /**
@@ -69,6 +74,7 @@ export const desktopMessenger: Messenger = {
   openSeabag: (root) => invoke<Opened>("open_seabag", { root }),
   seabagStamp: (root) => invoke<string>("seabag_stamp", { root }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
+  openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
   createSeabag: (root, name, language) => invoke<Opened>("create_seabag", { root, name, language }),
   onOpenFolderMenu: (handler) => listen("menu:open_folder", () => handler()),
   onOpenRecentMenu: (handler) => listen<string>("menu:open_recent", (e) => handler(e.payload)),

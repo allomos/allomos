@@ -49,6 +49,12 @@
     "ladder"
   ],
   "ladder_empty": [],
+  "link_not_found": [
+    "link"
+  ],
+  "link_refused": [
+    "link"
+  ],
   "not_a_seabag": [
     "path"
   ],

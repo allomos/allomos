@@ -3,6 +3,7 @@ import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
 import { AgentsPanel } from "./AgentsPanel";
+import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Issue, Iteration, Opened, Problem, Task } from "./types";
@@ -316,7 +317,7 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {!opened && !pending && <Welcome onChoose={choose} />}
 
-        {opened && <SeabagView opened={opened} />}
+        {opened && <SeabagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
       </main>
     </div>
   );
@@ -368,7 +369,18 @@ function readGroupBy(): GroupBy {
   }
 }
 
-function SeabagView({ opened }: { opened: Opened }) {
+/** One group of the list as shown: an area or an iteration with its tasks. */
+type Group = { key: string; id: string; name: string; sub?: string; empty: string; tasks: Task[] };
+
+function SeabagView({
+  opened,
+  messenger,
+  onError,
+}: {
+  opened: Opened;
+  messenger: Messenger;
+  onError: (e: unknown) => void;
+}) {
   const { t, rich } = useI18n();
   const { seabag: box, issues } = opened.loaded;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
@@ -382,6 +394,73 @@ function SeabagView({ opened }: { opened: Opened }) {
   };
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
+
+  // The groups in the order they are shown; the task pane's arrow keys follow this order.
+  const groups: Group[] = [];
+  if (box && groupBy === "iteration") {
+    for (const it of iterations) {
+      groups.push({
+        key: `i-${it.id}`,
+        id: it.id,
+        name: it.name,
+        sub: iterationSub(it, t),
+        empty: t("iteration.no_tasks"),
+        tasks: box.tasks.filter((task) => task.iteration === it.id),
+      });
+    }
+    // Tasks with no iteration, or one that does not exist (reported above), come last.
+    const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
+    if (unplanned.length > 0) groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned });
+  } else if (box) {
+    for (const area of box.areas) {
+      groups.push({
+        key: `a-${area.id}`,
+        id: area.id,
+        name: area.name,
+        empty: t("area.no_tasks"),
+        tasks: box.tasks.filter((task) => task.area === area.id),
+      });
+    }
+    const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
+    if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
+  }
+  const shown = groups.flatMap((g) => g.tasks);
+
+  // The task shown in the pane, by ID, so it stays selected when the seabag reloads.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
+  // Up and down move through the tasks as listed; Esc closes the pane.
+  useEffect(() => {
+    if (!selectedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") {
+        setSelectedId(null);
+        return;
+      }
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const list = shownRef.current;
+      const at = list.findIndex((task) => task.id === selectedId);
+      const next = list[Math.max(0, Math.min(list.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)))];
+      if (next) {
+        e.preventDefault();
+        setSelectedId(next.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId]);
+  useEffect(() => {
+    if (selectedId) document.getElementById(`task-${selectedId}`)?.scrollIntoView({ block: "nearest" });
+  }, [selectedId, groupBy]);
+
+  const openLink = (href: string) => {
+    if (selected) messenger.openTaskLink(opened.root, selected.id, href).catch(onError);
+  };
+
   return (
     <>
       {issues.length > 0 && <Issues issues={issues} />}
@@ -396,55 +475,40 @@ function SeabagView({ opened }: { opened: Opened }) {
               ))}
             </div>
           )}
-          {groupBy === "iteration" ? (
+          <div className={selected ? "with-pane" : undefined}>
             <div className="areas">
-              {iterations.length === 0 && box.tasks.length > 0 && (
+              {groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
                   {rich("box.no_iterations", { add: <code>fh add iteration</code>, plan: <code>fh plan</code> })}
                 </p>
               )}
-              {iterations.map((it) => (
+              {groups.map((g) => (
                 <TaskGroup
-                  key={it.id}
-                  id={it.id}
-                  name={it.name}
-                  sub={iterationSub(it, t)}
-                  empty={t("iteration.no_tasks")}
-                  tasks={box.tasks.filter((task) => task.iteration === it.id)}
+                  key={g.key}
+                  id={g.id}
+                  name={g.name}
+                  sub={g.sub}
+                  empty={g.empty}
+                  tasks={g.tasks}
+                  iterationName={groupBy === "area" ? iterationName : undefined}
+                  selectedId={selectedId}
+                  onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
                 />
               ))}
-              {/* Tasks with no iteration, or one that does not exist (reported above), come last. */}
-              {(() => {
-                const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
-                return unplanned.length > 0 ? (
-                  <TaskGroup id="" name={t("box.unplanned")} empty="" tasks={unplanned} />
-                ) : null;
-              })()}
-            </div>
-          ) : (
-            <div className="areas">
-              {box.areas.map((area) => (
-                <TaskGroup
-                  key={area.id}
-                  id={area.id}
-                  name={area.name}
-                  empty={t("area.no_tasks")}
-                  tasks={box.tasks.filter((task) => task.area === area.id)}
-                  iterationName={iterationName}
-                />
-              ))}
-              {box.tasks.some((task) => !box.areas.find((a) => a.id === task.area)) && (
-                <TaskGroup
-                  id="?"
-                  name={t("box.unknown_area")}
-                  empty=""
-                  tasks={box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area))}
-                  iterationName={iterationName}
-                />
+              {groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
+                <p className="muted">{t("box.empty")}</p>
               )}
-              {box.areas.length === 0 && box.tasks.length === 0 && <p className="muted">{t("box.empty")}</p>}
             </div>
-          )}
+            {selected && (
+              <TaskPane
+                task={selected}
+                area={box.areas.find((a) => a.id === selected.area)}
+                iteration={iterations.find((i) => i.id === selected.iteration)}
+                onClose={() => setSelectedId(null)}
+                onLink={openLink}
+              />
+            )}
+          </div>
         </>
       ) : (
         <p className="muted">{t("box.no_project")}</p>
@@ -489,6 +553,8 @@ function TaskGroup({
   empty,
   tasks,
   iterationName,
+  selectedId,
+  onSelect,
 }: {
   id: string;
   name: string;
@@ -497,6 +563,9 @@ function TaskGroup({
   tasks: Task[];
   /** Given in the by-area view, so each task says which iteration it is planned in. */
   iterationName?: (id: string | null) => string | null;
+  selectedId: string | null;
+  /** Clicking a task opens it in the task pane; clicking it again closes the pane. */
+  onSelect: (id: string) => void;
 }) {
   const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
@@ -520,7 +589,20 @@ function TaskGroup({
           {tasks.map((task) => {
             const iteration = iterationName?.(task.iteration);
             return (
-              <li key={task.id} className="task">
+              <li
+                key={task.id}
+                id={`task-${task.id}`}
+                className={task.id === selectedId ? "task selected" : "task"}
+                tabIndex={0}
+                aria-current={task.id === selectedId ? "true" : undefined}
+                onClick={() => onSelect(task.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelect(task.id);
+                  }
+                }}
+              >
                 <span className="id">{task.id}</span>
                 <span className="title">{task.title}</span>
                 <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
