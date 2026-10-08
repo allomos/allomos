@@ -1,7 +1,6 @@
 {
   "area": "A01",
-  "handoff_note": "Built, merged, installed.",
-  "holder": "claude/a01-run",
+  "handoff_note": "Markers removed; built, merged, installed.",
   "id": "A01-14",
   "label": "locally verified",
   "state": "waiting",
