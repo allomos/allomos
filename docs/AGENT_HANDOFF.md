@@ -40,7 +40,7 @@ One block per card that `fh list --state in_progress` shows held.
 - Checkout: `.claude/worktrees/a05-02` · branch `claude/a05-02-convert-project` · pushed: yes
 - Approvals in force: the card (owner, 2026-10-08), local work only. Not approved: any write to the SSR repository.
 - Uncommitted: none
-- Running: a debug app build (`npx --prefix apps/desktop tauri build --debug --bundles app`), then the owner's check of the panel
+- Running: the built app `target/debug/bundle/macos/FlipHopper.app` (this worktree), opened on a scratch copy of the fixture board; safe to quit. The owner's panel check is not done: screen access was declined, so the agent did not see it
 - Next: owner checks the panel in the built app; then merge into `main`
 
 ## Live state
