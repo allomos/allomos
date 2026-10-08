@@ -1,7 +1,8 @@
 {
   "area": "A01",
+  "holder": "claude/a01-16-task-pane",
   "id": "A01-16",
   "iteration": "I02",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Task pane"
 }
