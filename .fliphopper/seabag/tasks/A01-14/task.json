@@ -1,9 +1,9 @@
 {
   "area": "A01",
   "handoff_note": "Built, merged, installed.",
+  "holder": "claude/a01-run",
   "id": "A01-14",
   "label": "locally verified",
-  "state": "waiting",
-  "title": "fh init asks the agent to add instructions",
-  "waiting_on": "owner reviews fh init's request"
+  "state": "in_progress",
+  "title": "fh init asks the agent to add instructions"
 }
