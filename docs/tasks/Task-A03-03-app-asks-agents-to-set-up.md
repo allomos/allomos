@@ -61,3 +61,4 @@ After the app creates a seabag, a small panel says "Tell AI agents about FlipHop
 | The panel on screen, and Ask opening each agent with the request typed in | not seen: the agent's accessibility tool could not reach the window during this test — owner check |
 
 - 2026-10-08 — **Owner verified** in the built app ("passed").
+- 2026-10-08 — Owner checked again end to end: the panel, Ask with Claude Code (terminal), and the agent line turning to ✓ ("passed"). Follow-up requests are in [`A03-05`](./Task-A03-05-agents-panel-refinements.md).
