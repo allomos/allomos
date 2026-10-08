@@ -3,6 +3,7 @@
   "holder": "claude/a01-run",
   "id": "A03-05",
   "label": "locally verified",
-  "state": "in_progress",
-  "title": "Agents panel: progress, groups, language"
+  "state": "waiting",
+  "title": "Agents panel: progress, groups, language",
+  "waiting_on": "owner checks the grouped panel, spinner and request language"
 }
