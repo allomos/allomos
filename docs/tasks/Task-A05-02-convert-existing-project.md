@@ -1,94 +1,89 @@
 # Task-A05-02-convert-existing-project
 
-*Card type: decision (a proposal for the owner). Area A05 (Project setup & import). Requested by the owner (2026-10-08): look at the SSR migration plan (`next-ssr/docs/migration-plan-ssr/`) and the `AGENTS.md` that governs it, and propose how a person uses the FlipHopper app to turn such a project into a standard FlipHopper project. Read-only observation of the SSR repository on 2026-10-08; nothing there was changed.*
+*Card type: coding. Area A05 (Project setup & import). Requested by the owner (2026-10-08): the conversion of an existing project into a standard FlipHopper project is **a prompt given to an AI agent the person chooses**, and the app includes that prompt when opening or setting up a project folder that needs it. Studied on the SSR migration plan (`next-ssr/docs/migration-plan-ssr/`) and its repository-root `AGENTS.md`, read only.*
 
 ## What gets built (plain words)
 
-A person opens an existing project folder in FlipHopper and chooses **File → Convert This Project…**. FlipHopper reads the folder without changing it and says what it found: "a task board, 101 card files in 16 areas, a handoff file, agent instructions that say how to claim cards". It then shows **what the project would look like in FlipHopper** — every area and task, its state, label, holder and next dependency — next to a list of everything it could not place. The person corrects the few mappings it asks about (for example, which of their words means *done*). Pressing **Convert** writes the seabag on a new Git branch, and asks the person's AI agent to rewrite the project's own instructions so agents use `fh` from then on. Nothing is committed, merged or pushed until the person says so.
+Today, when a person sets up a folder, FlipHopper creates an empty seabag and then offers to ask their AI agents to add FlipHopper's instructions ([`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md), [`A03-05`](./Task-A03-05-agents-panel-refinements.md)). This card adds a second kind of request: **"move this project's tasks into FlipHopper"**.
 
-| Step | What the person sees | What happens underneath |
+When the folder the person opens or sets up **already tracks its tasks another way** — a Markdown task board, card files, agent rules about claiming and status — the panel says so and offers to ask **one** AI agent the person picks to do the conversion. FlipHopper does not read or convert the board itself; the agent does, following FlipHopper's conversion prompt, and writes the seabag only through the `fh` command, so every change passes FlipHopper's own checks.
+
+| Piece | What it is | Where |
 |---|---|---|
-| 1. Look | "This folder has a Markdown task board" and a short inventory | A read-only **scan** finds the board, card files, area files, handoff file and agent instructions |
-| 2. Preview | Areas and tasks as FlipHopper will show them, plus **"Not placed"** and **"Needs your answer"** lists | A **reader** for the recognised board shape (or the person's AI agent, for shapes FlipHopper does not know) produces a *proposed* seabag in a staging folder; FlipHopper validates it |
-| 3. Answer | A few questions: which label words form the ladder, which states mean done or waiting, what to call areas | The answers are saved with the conversion, so running it again gives the same result |
-| 4. Convert | A new branch `fliphopper/convert` with `.fliphopper/seabag/` and a reconciliation report | Card files stay where they are; each task links to its card file, as FlipHopper's own tasks do |
-| 5. Switch the agents over | The existing "Tell AI agents about this project" panel ([`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md)), with a conversion request | The person's agent edits `AGENTS.md` / `CLAUDE.md` in place: status and claiming move to `fh`; every other rule stays |
-| 6. Retire the old status | A checklist: board-fields tables, the generated board sections, the board generator and its pre-commit hook | Done by the person's agent on the conversion branch, only after the person agrees, because it changes their repository's rules |
+| Noticing | When a folder is opened or set up, a quick look for signs of another task system: a board file (`TASK_BOARD.md`, `*board*.md`, `TODO.md`), card files (`Task-*.md`, `docs/tasks/`), or an `AGENTS.md` / `CLAUDE.md` that talks about claiming, a session registry or task status. Names of what it found, nothing more. | `crates/store` (a `find_task_system` function), called from `apps/desktop/src-tauri/src/lib.rs` |
+| When it is offered | (a) setting up a folder that has no seabag but shows those signs — FlipHopper then **does not create an empty seabag first**; the agent creates it; (b) opening a folder whose seabag is empty while those signs are there; (c) any time, from **File → Move Tasks Into FlipHopper…** | `lib.rs`, `apps/web/src/App.tsx` |
+| The panel | The same agents panel, with the title "This project already tracks its tasks — move them into FlipHopper?", the list of what was found, and **one** agent to choose (two agents converting at once would add every task twice). The person may switch to the plain setup request instead. | `apps/web/src/AgentsPanel.tsx`, `i18n/*` |
+| The conversion prompt | A versioned text, in the app's language, built like the setup request (`agent_setup_request_in`): the project folder, the seabag path, what was found, the steps below, and FlipHopper's agent section | `crates/store/src/lib.rs` (`agent_convert_request_in`) |
+| Asking | Exactly as today: the chosen agent opens in the project folder with the prompt typed in; nothing runs until the person presses Enter | `agents.rs` (unchanged) |
+| Seeing it land | The app already watches the folder; when the seabag appears and fills, the window shows the tasks | existing awareness line and reload |
 
-**What you can see at the end:** the SSR project opens in FlipHopper with all its cards in their areas, the three claimed cards held by their sessions, the done cards with their done dates (so a burndown has real history), and its `AGENTS.md` telling agents to `fh claim` instead of editing a Session field.
+**What you can see at the end:** open the SSR project folder (or a test copy of one) in the app; the panel says it found `TASK_BOARD.md`, 101 card files and claiming rules in `AGENTS.md`; pick Claude Code, press Ask, press Enter in the terminal; the agent first shows its plan and asks a few questions, then fills the seabag with `fh`; the app shows every card in its area with its state, label and holder; the agent shows the changes to `AGENTS.md` and a short report, and commits nothing until asked.
 
-## Why this shape
+## The conversion prompt — what it asks the agent to do
 
-**Two halves, two different kinds of work.** Moving *status* (state, label, holder, dates) is mechanical and must be exact: a dropped or duplicated card is a lie on the board. Rewriting *instructions* (`AGENTS.md`) is judgement: it is the owner's rule book, written in their words, mixing status rules with safety boundaries that must survive untouched. So FlipHopper does the first itself, deterministically, and asks an agent to do the second, with the person pressing Enter — the same split the app already uses when it asks agents to add FlipHopper's instructions ([`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md)).
+Plain numbered steps any agent can follow, in the spirit of the setup request:
 
-**Status is copied, narrative is linked.** FlipHopper already keeps "the narrative stays in the repo" ([analysis](../analysis/ssr-task-board.md#what-glidebox-should-keep)): a task's `description.md` points at its card file. Converting therefore moves only the fields FlipHopper owns, and leaves the outcome, unknowns, approvals and progress notes where the team reads them.
+1. **Look first, change nothing.** Find where this project keeps its tasks, their status, who holds each one, their labels, areas and next steps, and which rules in `AGENTS.md` / `CLAUDE.md` describe them. Do not run the project's scripts or hooks.
+2. **Show the plan and ask.** Tell the person, briefly: how the areas and task IDs will map (keep the project's own IDs, dropping only prefixes like `Task-` and the trailing description); which words become the **label ladder** (keep the project's own, in order); which words mean *ready*, *waiting*, *done*, *dropped*; what to do with planned work that has no card yet; and anything ambiguous. **Wait for the person's answer.**
+3. **Work on a new branch** (`fliphopper/convert` unless the person names one). Never use `--push` during the conversion; commit only when the person asks.
+4. **Create the seabag with `fh`:** `fh init --id … --labels …` with the agreed ladder, then `fh add area` for each area and `fh add task` for each task, with a description that links to its card file (or to `file.md#section` when a card is a section of a bigger file). **Never write the seabag's files by hand.**
+5. **Copy status exactly as the files say it**, with `fh claim --as <holder>`, `fh label`, `fh wait --on`, `fh needs`, `fh ready`, `fh done`, `fh drop`. Copy only what is written: an unknown state, date or holder stays unknown and goes in the report; never invent progress, verification or approvals. Approvals and status prose stay in the card files.
+6. **Write a short report** (`docs/fliphopper-conversion.md`): every card file and the task ID it became, nothing dropped or duplicated; every value that could not be copied, with file and line; planned work left out. Run `fh list --json` and confirm it reports no issues.
+7. **Switch the instructions over.** In `AGENTS.md`, replace the rules about where status lives, how to claim and release, session registries and regenerating the board with FlipHopper's section (given below); **keep every other rule word for word**. Make sure `CLAUDE.md` contains `@AGENTS.md`. Show the diff.
+8. **List, do not do, the cut-over.** Name what still holds the old status — status tables in card files, generated board sections, board-generator scripts, hooks and CI checks that enforce them — and ask the person whether and when to remove them. Leave them in place unless the person says so.
+9. **Tell the person what changed** and what waits on them.
 
-**Preview before anything changes.** This is the accepted rule for generated projects (R53–R55, [AI-GENERATED-PROJECTS](../product/AI-GENERATED-PROJECTS.md#validation-and-adoption-rules--proposed)): validate, show, then adopt; never adopt half a project.
+The prompt carries the same FlipHopper section that the setup request adds to `AGENTS.md` (`agent_section`), so both requests end in identical instructions.
 
-## What the SSR project looks like today (observed 2026-10-08)
+## How this fits the SSR project (read 2026-10-08)
 
-| Thing | Where | FlipHopper equivalent |
-|---|---|---|
-| **Areas** A00–A15 (one file each, e.g. `areas/A09-enterprise-ui.md`, with a `## Tasks` table) | `areas/` | areas `A00`…`A15`; name from the file's `# A9 — Enterprise UI` heading |
-| **Cards**: 101 `areas/Task-A…-….md` files; a few older cards are *sections* inside an area file (`A09-enterprise-ui.md#task-a09-01-…`); one sub-folder of supporting documents (`areas/A03-04/`) that is not a card | `areas/` | one task each; ID without `Task-` and description (`A09-05`, `A07-01-08`); three-level IDs are already valid in FlipHopper |
-| **Board-fields table** on each card: State, Done, Priority, Depends on, Waiting on, Feature | top of each card | `state`, done date, priority, dependencies, `waiting_on`, feature — **the last four are not yet in FlipHopper's task model** (see Gaps) |
-| **Status table** on each card: Status (prose), Label, Approval, Session, Next dependency | top of each card | `label`, `holder` (Session), `next_dependency`; Approval and Status prose stay in the card |
-| **Label ladder**: implemented → locally verified → connected → deployed and verified (+ owner verified) | `TASK_BOARD.md` Conventions, `AGENTS.md` gate 3 | the project's own ladder in `project.json` — FlipHopper already allows one per project |
-| **Session registry** (who holds what) | `TASK_BOARD.md` | `holder` on each task; the registry disappears (`fh list --state in_progress`) |
-| **Generated board sections** (`<!-- board:open/done/recent -->`) and counts, from `next-ssr/src/tools/board/check-board.mjs`, enforced by a pre-commit hook and CI | `TASK_BOARD.md`, the hook | the app's views; the generator and hook are retired or pointed at the seabag at cut-over |
-| **Now**, Waiting on the owner, Timeline (hand-drawn gantt), Deferred | `TASK_BOARD.md` | Now stays as text (as FlipHopper's own board does); the gantt is replaced by the burndown and forecast ([`A02-01`](./Task-A02-01-burndown-and-forecast.md)) |
-| **Roadmap work not yet carded** (rows in area `## Tasks` tables without a card file) | area files | backlog tasks, marked "no card yet" — or left out; the person chooses |
-| **Handoff** (`AGENT_HANDOFF.md`, active resume blocks) | | stays as it is; `fh release --note` covers only the one-line per-task note |
-| **Estimates** per area in person-weeks | `ESTIMATE.md` §4 | not converted now; a later forecasting card |
-| **Agent rules** on status: "Status has one home: the card", the claiming protocol, the session registry, "run check-board.mjs after changing a card" | `AGENTS.md` § Working procedure, `TASK_BOARD.md` Conventions | replaced by FlipHopper's short `fh` section; everything else (boundaries, five gates, card runs, reading rules, verification language) is kept word for word |
+The prompt has to work on the real case without special code for it. What the agent will meet there, and where each lands:
 
-Two things the scan must expect, because they are true here: the Conventions block still says `Task-W{…}` while every file is `Task-A{…}` (old IDs need an alias list, not a guess), and the board says `workstreams/` in places where the folder is now `areas/`.
+| In the SSR project | Becomes |
+|---|---|
+| Areas `A00`–`A15`, one file each (`areas/A09-enterprise-ui.md`) | `fh add area A09 "Enterprise UI"` |
+| 101 card files `areas/Task-A…-….md`; a few older cards are sections of an area file; IDs up to three levels (`A07-01-08`) | `fh add task A07-01-08 …` with a link to the card file or section |
+| Each card's board-fields table (State, Done, Priority, Depends on, Waiting on, Feature) and status table (Label, Session, Next dependency) | state, label, holder, waiting on, next dependency; Done date, Priority, Depends on, Feature go in the report until FlipHopper can hold them (see Gaps) |
+| Ladder: implemented → locally verified → connected → deployed and verified → owner verified | the seabag's ladder (`fh init --labels`) |
+| Session registry in `TASK_BOARD.md`; `check-board.mjs` generating board sections, enforced by a pre-commit hook and CI | holders on the tasks; the generator, hook and CI check listed as cut-over steps for the owner |
+| `AGENTS.md` § Working procedure: "Status has one home: the card", claiming protocol, card file rules | the status and claiming parts replaced by FlipHopper's section; the boundaries, five gates, card runs, reading rules and verification language kept |
 
-## The pieces
+Two traps the agent will have to report rather than guess: the board's Conventions block still says `Task-W{…}` while every file is `Task-A{…}`, and some board text still says `workstreams/` where the folder is now `areas/`.
 
-1. **Scan** (Rust, read-only). Walks the chosen folder for agent instruction files, a board file, card-like files (`Task-*.md` or a configurable pattern), area files and a handoff file. Produces an inventory. Never runs the project's scripts or hooks.
-2. **Readers.** One per board shape FlipHopper recognises. The first is the **card-file board with a board-fields table** — the SSR shape — and is exactly the importer of [`A05-01`](./Task-A05-01-ssr-board-import.md), which this card generalises: A05-01 becomes "the first reader". A reader turns files into a proposed seabag plus a list of what it could not read; it never guesses (an unknown state word is a question, not a default).
-3. **Agent fallback for unknown shapes.** If no reader recognises the folder, the app offers the AI-generated route (R50–R52): it opens the person's agent with a versioned conversion prompt that says *write a seabag into `.fliphopper/staging/`, copy only what the files say, leave unknown dates unknown, list everything you skipped*. FlipHopper then validates that staging folder exactly as it validates a reader's output. An agent never writes the live seabag directly.
-4. **Preview and questions** (app). Areas and tasks, counts per state, a "Not placed" list (file, line, why) and a "Needs your answer" list. The answers — label ladder, state mapping, area word (R90: SSR says "area" now, earlier "workstream"), what to do with uncarded roadmap rows — are saved in `.fliphopper/convert.json` on the branch, so a second run (for example after the team kept working for a week) gives the same mapping and shows only what changed.
-5. **Convert.** On a new branch (or worktree) the person names: writes `.fliphopper/seabag/` and `docs/fliphopper-conversion-report.md` (every card file → task ID, nothing dropped or duplicated; every unread value). Uses the real `git` ([0010](../decisions/0010-project-data-folder.md)); never commits unless asked; never runs or bypasses the project's hooks.
-6. **Switch the agents over.** The conversion request sent through the A03-03 panel: *in `AGENTS.md` (Codex) / `CLAUDE.md` (Claude), replace the rules that say where status lives and how to claim with FlipHopper's `fh` section; keep every other rule word for word; show the diff.* The request names the exact sections the scan found.
-7. **Cut over.** A checklist the person ticks, each item done by their agent on the conversion branch: remove the board-fields tables from cards (or leave them and mark them stale — the person chooses), remove the generated board sections and session registry, retire or rewrite `check-board.mjs` and its hook. Until cut-over, the cards stay the source of status and the seabag is a read-only **mirror** the app regenerates on demand; after it, the seabag is the source and the cards hold only narrative.
+## Gaps in `fh` this depends on (each a small card of its own in A01)
 
-## Proposed defaults (owner to accept or change)
+The agent can only copy what `fh` can record. Today it cannot record:
 
-1. **Mirror first, then cut over.** The first conversion is a read-only mirror the team can look at in the app while still working the old way; cut-over is a separate, explicit step. This answers the open board question *"one-time import or keep syncing during the transition?"* with "sync one way (cards → seabag) until cut-over, then one-time switch".
-2. **The project's own ladder is kept** (here: implemented, locally verified, connected, deployed and verified, owner verified), not FlipHopper's.
-3. **Task IDs drop only the `Task-` prefix and the description**: `Task-A07-01-08-seeker-application-list` → `A07-01-08`. Card files keep their names and places.
-4. **Uncarded roadmap rows become backlog tasks** with "no card yet" in their description, so the forecast knows the full scope.
-5. **Status prose and approvals stay in the card file**, never parsed into fields (R54: a converted record must not invent an approval).
-6. **FlipHopper itself never edits the project's agent instructions or hooks**; it asks the person's agent, who shows a diff.
+- **a done date** (`fh done --on <date>`): the SSR project has about 80 done cards with dates, which the burndown and forecast ([`A02-01`](./Task-A02-01-burndown-and-forecast.md)) need;
+- **dependencies** between tasks (`Depends on`);
+- **changing the ladder after `fh init`**, for a folder whose seabag already exists (case b above);
+- optionally **priority** and **feature** (owner: fields, or description text).
 
-## Gaps this exposes in FlipHopper (each its own card when this is accepted)
-
-| Gap | Why the SSR project needs it | Proposed card |
-|---|---|---|
-| Task **dependencies** (`Depends on`) | cards name the cards they wait for | A01: dependencies on tasks |
-| **Done date** and state history | burndown and forecast need when each card finished; SSR has about 80 done cards with dates | A02-01 (burndown) reads it; the model gains `done_on` / an event log |
-| **Priority** and **Feature** fields | used on SSR cards | A01: optional extra fields, or kept as description text (owner) |
-| Card file **sections** as tasks | some old cards live inside an area file | handled by the reader (description links to `file.md#anchor`) |
-| **Convert** menu, scan, preview | this outcome | A05-02-01 scan and preview (mirror); A05-02-02 cut-over and agent switch |
+Until they exist, the prompt tells the agent to put those values in the report, so nothing is lost and a later run can fill them in.
 
 ## Details for the worker
 
-- **Outcome.** A person converts an existing Markdown-board project into a standard FlipHopper project from the app: a read-only preview first, then a seabag on a branch, then their agents switched to `fh`, without losing any card or rule.
+- **Outcome.** A person whose project already tracks tasks another way picks one AI agent in FlipHopper, presses Ask, and that agent moves the tasks into a seabag through `fh` and switches the project's agent instructions to FlipHopper, after showing its plan and asking.
+- **Defaults chosen by the agent** (the owner may change them on review):
+  1. One agent per conversion (the panel lets the person pick only one).
+  2. Setting up a folder with signs of another task system does **not** create an empty seabag first; the agent creates it with the agreed ladder.
+  3. The agent shows its plan and waits for the person before writing anything.
+  4. The conversion happens on a new branch and nothing is pushed; old status tables, generators and hooks stay until the person asks.
+  5. The prompt's steps follow the app's language; FlipHopper's section stays English (as in A03-05).
 - **Decisive unknowns.**
-  - The owner accepts or changes the six defaults above (owner).
-  - Whether Priority and Feature become task fields or stay description text (owner).
-  - Whether the real SSR conversion is wanted as the first real use — it writes to the SSR repository, which is read-only to FlipHopper's agents, so it needs the owner's exact approval (owner).
-- **Files owned (this card).** This card only. The implementation cards named in Gaps own code.
-- **External operations.** None for this proposal. A conversion of the real SSR repository (a branch and files there) needs its own exact approval on the implementing card.
-- **Done means mechanically.** The owner accepts or changes the defaults; accepted pieces are opened as implementation cards (scan and mirror first, then cut-over); A05-01 is re-scoped as the first reader.
+  - Which signs reliably mean "another task system" without false alarms on ordinary repositories (a `TODO.md` alone may be too weak) — the worker tries the rule on this repository, Glidelines, the SSR project and a few plain repositories, all read only.
+  - Whether a real agent follows the prompt on a project the size of SSR in one session (about 100 cards, several hundred `fh` calls) — worker, on a copy.
+- **Files owned.** `crates/store/src/lib.rs` (the noticing function and the conversion prompt, with tests), `apps/desktop/src-tauri/src/lib.rs` (when to offer; the menu item), `apps/web/src/AgentsPanel.tsx`, `apps/web/src/App.tsx`, `apps/web/src/messenger.ts`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`, a synthetic test board under `crates/store/tests/fixtures/`, this card. [`A05-01`](./Task-A05-01-ssr-board-import.md) (a built-in SSR importer) is superseded by this card and should be dropped when the owner accepts it.
+- **External operations.** None by FlipHopper. Trying the prompt on the **real SSR repository** writes a branch and files there, which is read-only to FlipHopper's agents — it needs the owner's exact approval; otherwise the trial runs on a copy in a scratch folder.
+- **Done means mechanically.** The usual Rust and web checks pass; unit tests cover noticing (a synthetic board, a plain repository, an empty folder) and the prompt in three languages (folder, seabag path and findings present; section English); in the built app, setting up the synthetic board folder offers the conversion with one agent to choose, and Ask opens it with the prompt typed in; one real agent run on the synthetic board (and, if approved, a copy of SSR) ends with `fh list --json` reporting no issues and a report that accounts for every card.
 
 ## Approvals
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Direction: "i want this feature as a prompt to ai agent. user can choose an ai agent to do the transformation. and when openning/setting the project folder, the prompt should also be included in when needed." (replaces the first draft, a built-in converter) | owner (chat) |
 
 ## Notes
 
-- 2026-10-08 — Proposal written from a read-only look at `next-ssr/docs/migration-plan-ssr/` (TASK_BOARD.md, areas/, a sample card, an area file) and the repository-root `AGENTS.md`. Counts: 101 card files in `areas/` across A00–A15, 3 cards claimed, board sections generated by `check-board.mjs`. Recounted at implementation time; never copy private board text into fixtures.
+- 2026-10-08 — First draft proposed a built-in scan-and-convert feature; the owner chose an agent prompt instead. Rewritten the same day.
+- 2026-10-08 — Read only, to write this card: `next-ssr/docs/migration-plan-ssr/` (TASK_BOARD.md, areas/, a sample card, an area file) and the SSR repository's `AGENTS.md`. 101 card files in `areas/`, 3 cards claimed, board sections generated by `check-board.mjs`. Recount at implementation time; never copy private board text into fixtures.
