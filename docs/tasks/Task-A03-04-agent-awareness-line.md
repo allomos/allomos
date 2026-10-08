@@ -36,6 +36,7 @@ One line under the window's top bar answers "do the AI agents know about this pr
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-08 | Owner check passed, after the alignment fix ("passed") | owner (chat) |
 | 2026-10-08 | "ok. yes" to the agent's recommendation: check the instruction files and show agent activity, no flag | owner (chat) |
 
 ## Notes
@@ -56,3 +57,4 @@ One line under the window's top bar answers "do the AI agents know about this pr
 | Built app on this repository | PASS: "AI agents: Codex ✓ Claude Code ✓ — last used by claude/a01-run, <date>" |
 | Built app on `~/fliphopper-check3` (no instructions); then an `AGENTS.md` mentioning `fh next` added by hand | PASS: "not told about this project yet", then within seconds "Codex ✓ Claude Code ✗ — no agent has used fh here yet" (test file removed afterwards) |
 - 2026-10-08 — Owner: the Tell AI agents… button was not vertically aligned. Cause: link-style buttons were pinned to the top of their row (`align-self: start`) with a smaller font. Fixed for this line and the panel's Change… row (centred, same font size); measured in the browser pane: button and text middles equal (67/67, 351/351; before 26/29 and 309/350).
+- 2026-10-08 — **Owner verified** in the built app ("passed").
