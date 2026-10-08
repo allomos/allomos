@@ -4,5 +4,5 @@
   "label": "drafted",
   "state": "waiting",
   "title": "Convert an existing project",
-  "waiting_on": "owner accepts or changes the six defaults (card § Proposed defaults)"
+  "waiting_on": "owner reviews the rewritten card (agent-prompt version) and approves it as ready"
 }
