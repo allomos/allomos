@@ -55,4 +55,4 @@ FlipHopper's own seabag got its 15 iterations (named by what they deliver, relea
 | `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (121 texts, 41 codes) | PASS |
 | `fh` by hand on a copy of FlipHopper's seabag: 15 iterations added, tasks planned, `fh list --by iteration` grouped as described, no issues | PASS |
 | The interface in a browser with a copy of FlipHopper's seabag: the switch, Iteration 1 with 34 done tasks, empty iterations, Unplanned last, iteration shown in the by-area view | PASS (the built app's window could not be screenshotted here; same interface code) |
-| Built app `target/debug/bundle/macos/FlipHopper.app` | built; owner check |
+| Built app `target/debug/bundle/macos/FlipHopper.app` on FlipHopper's own repository: By iteration, then back to By area | PASS: owner verified ("checked", 2026-10-08) |
