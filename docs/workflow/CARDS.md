@@ -19,6 +19,8 @@ An **area** is *what part of the product* a card belongs to. Areas are named aft
 
 A card that touches several layers (for example interface, Rust rules and files) still has **one** area: the capability it delivers.
 
+**Iterations in the seabag** ([`Task-A01-15`](../tasks/Task-A01-15-iterations-view.md), 2026-10-08): FlipHopper's own seabag holds the 15 iterations of [PLAN § 9](../product/PLAN.md#9-roadmap--releases) as `I01` … `I15` (Iteration 15 produces v1.0). When a card is added to the roadmap, plan its task too: `fh plan <ID> I02 --push`. Ideas not yet on the roadmap stay unplanned.
+
 Add an area by editing this table and the board in the same commit.
 
 **Renamed 2026-10-04.** Until then, "workstream" (W00–W10, grouped by technical layer) was used:

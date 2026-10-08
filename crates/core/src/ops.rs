@@ -5,8 +5,9 @@
 //! the seabag, applies one change and writes the result, all while holding the
 //! seabag's lock (see `crates/store`).
 
-use crate::model::{Area, Seabag, State, Task};
+use crate::model::{Area, Iteration, Seabag, State, Task};
 use crate::problem::Problem;
+use crate::validate::valid_date;
 
 /// A changed task plus warnings: things worth telling the user that do not refuse the change.
 #[derive(Debug, Clone, PartialEq)]
@@ -94,6 +95,59 @@ pub fn new_area(seabag: &Seabag, id: &str, name: &str) -> Result<Area, Problem> 
     })
 }
 
+/// The parts of a new iteration besides its ID and name; all optional.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct IterationDetails<'a> {
+    pub release: Option<&'a str>,
+    pub start: Option<&'a str>,
+    pub end: Option<&'a str>,
+}
+
+/// A new iteration, ordered after the existing ones. Its ID must be valid and unused, it needs a
+/// name, and its dates must be `YYYY-MM-DD`.
+pub fn new_iteration(
+    seabag: &Seabag,
+    id: &str,
+    name: &str,
+    details: IterationDetails,
+) -> Result<Iteration, Problem> {
+    check_id(id)?;
+    if seabag.iterations.iter().any(|i| i.id == id) {
+        return Err(Problem::DuplicateIterationId { id: id.to_string() });
+    }
+    let name = non_empty(Some(name)).ok_or(Problem::IterationNameMissing)?;
+    let date = |d: Option<&str>| match non_empty(d) {
+        Some(d) if !valid_date(&d) => Err(Problem::InvalidDate { value: d }),
+        d => Ok(d),
+    };
+    let order = seabag.iterations.iter().map(|i| i.order).max().unwrap_or(0) + 1;
+    Ok(Iteration {
+        id: id.to_string(),
+        name,
+        order,
+        start: date(details.start)?,
+        end: date(details.end)?,
+        release: non_empty(details.release),
+    })
+}
+
+/// Plan the task in an iteration, or take it out of its iteration with `None`. Planning is not
+/// progress, so anyone may do it, whoever holds the task and in any state (a finished task can
+/// still be placed in the iteration it was finished in).
+pub fn plan(seabag: &Seabag, id: &str, iteration: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(seabag, id)?;
+    let iteration = non_empty(iteration);
+    if let Some(it) = &iteration {
+        if !seabag.iterations.iter().any(|i| &i.id == it) {
+            return Err(Problem::UnknownIteration {
+                iteration: it.clone(),
+            });
+        }
+    }
+    task.iteration = iteration;
+    Ok(Outcome::plain(task))
+}
+
 /// A new task in `backlog`. Its ID must be valid and unused, its area must exist, and it
 /// needs a title.
 pub fn new_task(
@@ -126,6 +180,7 @@ pub fn new_task(
         holder: None,
         waiting_on: None,
         next_dependency: None,
+        iteration: None,
         handoff_note: None,
         description,
     })
@@ -297,6 +352,7 @@ mod tests {
                 labels: default_labels(),
             },
             areas: vec![],
+            iterations: vec![],
             tasks: vec![],
         };
         s.areas.push(new_area(&s, "A02", "Second").unwrap());
@@ -534,6 +590,76 @@ mod tests {
         top.holder = None;
         put!(s, top);
         assert!(finish(&s, "A01-01", None).unwrap().warnings.is_empty());
+    }
+
+    #[test]
+    fn iterations_and_planning() {
+        let mut s = bag();
+        let one = new_iteration(&s, "I01", "v0.1", IterationDetails::default()).unwrap();
+        assert_eq!((one.order, one.release.clone()), (1, None));
+        s.iterations.push(one);
+        let two = new_iteration(
+            &s,
+            "I02",
+            " v0.2 ",
+            IterationDetails {
+                release: Some("v0.2"),
+                start: Some("2026-10-08"),
+                end: Some(" "),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                two.order,
+                two.name.as_str(),
+                two.start.as_deref(),
+                two.end.clone()
+            ),
+            (2, "v0.2", Some("2026-10-08"), None)
+        );
+        s.iterations.push(two);
+        assert_eq!(
+            new_iteration(&s, "I01", "x", IterationDetails::default()),
+            Err(Problem::DuplicateIterationId { id: "I01".into() })
+        );
+        assert_eq!(
+            new_iteration(&s, "I03", "", IterationDetails::default()),
+            Err(Problem::IterationNameMissing)
+        );
+        assert_eq!(
+            new_iteration(
+                &s,
+                "I03",
+                "x",
+                IterationDetails {
+                    end: Some("next week"),
+                    ..Default::default()
+                }
+            ),
+            Err(Problem::InvalidDate {
+                value: "next week".into()
+            })
+        );
+
+        // Planning works whoever holds the task, and on finished tasks too.
+        put!(s, claim(&s, "A01-01", Some("a"), false).unwrap().task);
+        put!(s, finish(&s, "A01-01", Some("a")).unwrap().task);
+        let t = plan(&s, "A01-01", Some("I01")).unwrap().task;
+        assert_eq!(t.iteration.as_deref(), Some("I01"));
+        put!(s, t);
+        assert_eq!(
+            plan(&s, "A01-01", Some("I09")),
+            Err(Problem::UnknownIteration {
+                iteration: "I09".into()
+            })
+        );
+        assert_eq!(plan(&s, "A01-01", None).unwrap().task.iteration, None);
+        assert_eq!(plan(&s, "A01-01", Some("")).unwrap().task.iteration, None);
+        assert!(matches!(
+            plan(&s, "nope", None),
+            Err(Problem::TaskNotFound { .. })
+        ));
     }
 
     #[test]

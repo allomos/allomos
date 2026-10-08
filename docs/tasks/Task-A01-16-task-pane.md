@@ -26,7 +26,6 @@ Today the app lists tasks but clicking one does nothing. After this card, clicki
 - **Owner's choices (2026-10-08).** A pane beside the list: accepted. Release v0.2: "ok for now".
 - **Not in the pane.** Approvals: the seabag has no approvals field; for FlipHopper's own tasks they stay in the card file, reached through the description link.
 - **Decisive unknowns.**
-  - The owner has not yet accepted the list of lines above (the first explanation was unclear; this table replaces it).
   - How the pane behaves in a narrow window (below or over the list): the worker proposes one at the check.
 - **Files owned.** `apps/web/src/App.tsx` (or a new `TaskPane.tsx`), `apps/web/src/types.ts`, `apps/web/src/i18n/*`, `apps/desktop/src-tauri/src/lib.rs` (reading one task's description, opening a linked file), `crates/store` if a read function is missing, this card.
 - **External operations.** None.
@@ -39,8 +38,8 @@ Today the app lists tasks but clicking one does nothing. After this card, clicki
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-08 | Write the card; a pane beside the list; release v0.2 "ok for now" | owner (chat) |
+| 2026-10-08 | The pane's lines as listed ("accept, start it") | owner (chat) |
 
-The card is in backlog until the owner accepts the pane's lines.
 
 ## Notes
 

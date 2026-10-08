@@ -4,7 +4,7 @@ A **contract**: the files inside a seabag. The FlipHopper app, the `fh` command 
 
 ## In plain words
 
-A seabag is an ordinary folder of small text files. There is one file for the project, one file per area, and one folder per task. Each task folder holds a JSON file for its fields and a Markdown file for its description. Because they are plain text, Git can show exactly what changed, and anyone can read them.
+A seabag is an ordinary folder of small text files. There is one file for the project, one file per area, one file per iteration (if the project plans by iteration), and one folder per task. Each task folder holds a JSON file for its fields and a Markdown file for its description. Because they are plain text, Git can show exactly what changed, and anyone can read them.
 
 ## Where the seabag is
 
@@ -27,6 +27,9 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
   areas/
     A01.json
     A02.json
+  iterations/       optional: a seabag without it has no iterations
+    I01.json
+    I02.json
   tasks/
     A01-01/
       task.json
@@ -57,6 +60,19 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 | `name` | yes | What part of the product this is. |
 | `order` | no | Sort order on screen; default `0`, then by ID. |
 
+## `iterations/<id>.json`
+
+An **iteration** is *when* tasks are planned: a time-box that ends in a release (R89). Optional: a seabag without this folder is valid, and a task without an iteration is *unplanned*. Added by [`Task-A01-15`](../tasks/Task-A01-15-iterations-view.md) (2026-10-08).
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | yes | Iteration ID, unique in the project (e.g. `I02`). |
+| `name` | yes | What the iteration delivers, e.g. `v0.2 — macOS + Windows`. |
+| `order` | no | Sort order on screen; default `0`, then by ID. |
+| `start` | no | First day, `YYYY-MM-DD`. |
+| `end` | no | Last day, `YYYY-MM-DD`. |
+| `release` | no | The release it produces, e.g. `v0.2`. |
+
 ## `tasks/<id>/task.json`
 
 | Field | Required | Meaning |
@@ -69,6 +85,7 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 | `holder` | no | Who holds the task: a person or an agent session. |
 | `waiting_on` | no | What blocks the next step, in plain words. **Required when `state` is `waiting`.** |
 | `next_dependency` | no | The single thing needed for the next label. |
+| `iteration` | no | ID of an existing iteration the task is planned in. Without it the task is unplanned. |
 | `handoff_note` | no | A short note left by the last holder on release (`fh release --note`) for whoever picks the task up next. Each release replaces it, or removes it when no note is given. |
 
 Empty optional fields are left out rather than written as `null`. **Unknown fields are refused**, so mistyped names are caught.
@@ -94,13 +111,16 @@ Each problem names the **file** and, where it can, the **field**, with a plain e
 - **Within one file:** valid JSON; required fields present; no unknown fields; valid IDs; a known `state`; the right `format`.
 - **Across files:**
   - area IDs and task IDs are unique;
-  - every task's `area` exists;
+  - iteration IDs are unique;
+  - every task's `area` exists, and its `iteration`, when it has one;
   - every `label` is on the project's ladder;
-  - every `waiting` task says what it waits on.
+  - every `waiting` task says what it waits on;
+  - an iteration's `start` and `end` are real dates written `YYYY-MM-DD`.
 
 ## Not yet in this version
 
 - **Events** (the history of changes, R7) arrive with editing (Iteration 2). They will go in `events/`.
-- **Iterations** (R89) will add an optional `iteration` field.
 
-Both are additions; existing files stay valid.
+This is an addition; existing files stay valid.
+
+**Older FlipHopper versions** refuse a task with an `iteration` field (`field_unknown`), because unknown fields are refused. Update `fh` and the app before planning tasks in iterations.

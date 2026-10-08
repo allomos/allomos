@@ -5,7 +5,7 @@ import { AgentLine } from "./AgentLine";
 import { AgentsPanel } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Area, Issue, Opened, Problem, Task } from "./types";
+import type { Issue, Iteration, Opened, Problem, Task } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -356,32 +356,111 @@ function Welcome({ onChoose }: { onChoose: () => void }) {
   );
 }
 
+/** How the task list is grouped; remembered in the window's storage (Task-A01-15). */
+type GroupBy = "area" | "iteration";
+const GROUP_BY_KEY = "fliphopper.groupBy";
+
+function readGroupBy(): GroupBy {
+  try {
+    return localStorage.getItem(GROUP_BY_KEY) === "iteration" ? "iteration" : "area";
+  } catch {
+    return "area";
+  }
+}
+
 function SeabagView({ opened }: { opened: Opened }) {
-  const { t } = useI18n();
+  const { t, rich } = useI18n();
   const { seabag: box, issues } = opened.loaded;
+  const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
+  const choose = (g: GroupBy) => {
+    setGroupBy(g);
+    try {
+      localStorage.setItem(GROUP_BY_KEY, g);
+    } catch {
+      /* storage unavailable: the choice lasts until the window closes */
+    }
+  };
+  const iterations = box?.iterations ?? [];
+  const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
   return (
     <>
       {issues.length > 0 && <Issues issues={issues} />}
       {box ? (
-        <div className="areas">
-          {box.areas.map((area) => (
-            <AreaSection key={area.id} area={area} tasks={box.tasks.filter((t) => t.area === area.id)} />
-          ))}
-          {box.tasks.some((t) => !box.areas.find((a) => a.id === t.area)) && (
-            <AreaSection
-              area={{ id: "?", name: t("box.unknown_area"), order: 9999 }}
-              tasks={box.tasks.filter((t) => !box.areas.find((a) => a.id === t.area))}
-            />
+        <>
+          {box.tasks.length > 0 && (
+            <div className="group-by" role="group" aria-label={t("group.label")}>
+              {(["area", "iteration"] as const).map((g) => (
+                <button key={g} type="button" aria-pressed={groupBy === g} onClick={() => choose(g)}>
+                  {t(g === "area" ? "group.by_area" : "group.by_iteration")}
+                </button>
+              ))}
+            </div>
           )}
-          {box.areas.length === 0 && box.tasks.length === 0 && (
-            <p className="muted">{t("box.empty")}</p>
+          {groupBy === "iteration" ? (
+            <div className="areas">
+              {iterations.length === 0 && box.tasks.length > 0 && (
+                <p className="muted small">
+                  {rich("box.no_iterations", { add: <code>fh add iteration</code>, plan: <code>fh plan</code> })}
+                </p>
+              )}
+              {iterations.map((it) => (
+                <TaskGroup
+                  key={it.id}
+                  id={it.id}
+                  name={it.name}
+                  sub={iterationSub(it, t)}
+                  empty={t("iteration.no_tasks")}
+                  tasks={box.tasks.filter((task) => task.iteration === it.id)}
+                />
+              ))}
+              {/* Tasks with no iteration, or one that does not exist (reported above), come last. */}
+              {(() => {
+                const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
+                return unplanned.length > 0 ? (
+                  <TaskGroup id="" name={t("box.unplanned")} empty="" tasks={unplanned} />
+                ) : null;
+              })()}
+            </div>
+          ) : (
+            <div className="areas">
+              {box.areas.map((area) => (
+                <TaskGroup
+                  key={area.id}
+                  id={area.id}
+                  name={area.name}
+                  empty={t("area.no_tasks")}
+                  tasks={box.tasks.filter((task) => task.area === area.id)}
+                  iterationName={iterationName}
+                />
+              ))}
+              {box.tasks.some((task) => !box.areas.find((a) => a.id === task.area)) && (
+                <TaskGroup
+                  id="?"
+                  name={t("box.unknown_area")}
+                  empty=""
+                  tasks={box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area))}
+                  iterationName={iterationName}
+                />
+              )}
+              {box.areas.length === 0 && box.tasks.length === 0 && <p className="muted">{t("box.empty")}</p>}
+            </div>
           )}
-        </div>
+        </>
       ) : (
         <p className="muted">{t("box.no_project")}</p>
       )}
     </>
   );
+}
+
+/** An iteration's release and dates, for the line under its name. */
+function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string {
+  const parts: string[] = [];
+  if (it.release) parts.push(t("iteration.release", { release: it.release }));
+  if (it.start && it.end) parts.push(t("iteration.dates", { start: it.start, end: it.end }));
+  else if (it.start) parts.push(t("iteration.from", { start: it.start }));
+  else if (it.end) parts.push(t("iteration.until", { end: it.end }));
+  return parts.join(" · ");
 }
 
 function Issues({ issues }: { issues: Issue[] }) {
@@ -402,7 +481,23 @@ function Issues({ issues }: { issues: Issue[] }) {
   );
 }
 
-function AreaSection({ area, tasks }: { area: Area; tasks: Task[] }) {
+/** One group of the task list: an area or an iteration, with its progress and its tasks. */
+function TaskGroup({
+  id,
+  name,
+  sub,
+  empty,
+  tasks,
+  iterationName,
+}: {
+  id: string;
+  name: string;
+  sub?: string;
+  empty: string;
+  tasks: Task[];
+  /** Given in the by-area view, so each task says which iteration it is planned in. */
+  iterationName?: (id: string | null) => string | null;
+}) {
   const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
@@ -410,30 +505,35 @@ function AreaSection({ area, tasks }: { area: Area; tasks: Task[] }) {
     <section className="area">
       <header className="area-head">
         <h2>
-          <span className="id">{area.id}</span> {area.name}
+          {id && <span className="id">{id}</span>} {name}
         </h2>
         <span className="count">{t("area.count", { done, total: tasks.length })}</span>
+        {sub && <span className="sub">{sub}</span>}
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
       </header>
       {tasks.length === 0 ? (
-        <p className="muted small">{t("area.no_tasks")}</p>
+        <p className="muted small">{empty}</p>
       ) : (
         <ul className="tasks">
-          {tasks.map((task) => (
-            <li key={task.id} className="task">
-              <span className="id">{task.id}</span>
-              <span className="title">{task.title}</span>
-              <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
-              <span className="meta">
-                {task.label && <span className="label">{task.label}</span>}
-                {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
-                {task.waiting_on && <span>{t("task.waiting_on", { what: task.waiting_on })}</span>}
-                {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
-              </span>
-            </li>
-          ))}
+          {tasks.map((task) => {
+            const iteration = iterationName?.(task.iteration);
+            return (
+              <li key={task.id} className="task">
+                <span className="id">{task.id}</span>
+                <span className="title">{task.title}</span>
+                <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
+                <span className="meta">
+                  {task.label && <span className="label">{task.label}</span>}
+                  {iteration && <span>{t("task.iteration", { iteration })}</span>}
+                  {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
+                  {task.waiting_on && <span>{t("task.waiting_on", { what: task.waiting_on })}</span>}
+                  {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

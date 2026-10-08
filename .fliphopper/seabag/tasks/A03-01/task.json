@@ -2,6 +2,7 @@
   "area": "A03",
   "handoff_note": "Research done: docs/research/agent-launch-and-resume.md. Codex CLI on this Mac is broken.",
   "id": "A03-01",
+  "iteration": "I08",
   "label": "drafted",
   "state": "waiting",
   "title": "Agent launch research",
