@@ -3,7 +3,6 @@
   "handoff_note": "All checks pass; this repository's next dependencies now use fh needs.",
   "id": "A01-08",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "fh fills the gaps found in the move",
-  "waiting_on": "owner reviews the new fh commands (card Result)"
+  "state": "done",
+  "title": "fh fills the gaps found in the move"
 }
