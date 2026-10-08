@@ -2,7 +2,7 @@
   "area": "A03",
   "handoff_note": "Built and merged; panel not seen by the agent.",
   "id": "A03-03",
-  "label": "implemented",
+  "label": "owner verified",
   "state": "waiting",
   "title": "App asks AI agents to set up instructions",
   "waiting_on": "owner tries the panel: Ask opens the agents with the request typed in"
