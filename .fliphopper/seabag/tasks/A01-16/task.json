@@ -1,6 +1,7 @@
 {
   "area": "A01",
   "id": "A01-16",
+  "next_dependency": "owner accepts the lines the pane shows",
   "state": "backlog",
   "title": "Task pane"
 }
