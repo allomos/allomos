@@ -2,6 +2,7 @@
   "area": "A03",
   "holder": "claude/a01-run",
   "id": "A03-05",
+  "label": "locally verified",
   "state": "in_progress",
   "title": "Agents panel: progress, groups, language"
 }
