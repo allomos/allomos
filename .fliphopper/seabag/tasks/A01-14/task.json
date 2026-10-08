@@ -2,6 +2,7 @@
   "area": "A01",
   "handoff_note": "Markers removed; built, merged, installed.",
   "id": "A01-14",
+  "iteration": "I01",
   "label": "owner verified",
   "state": "done",
   "title": "fh init asks the agent to add instructions"
