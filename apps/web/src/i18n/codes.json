@@ -17,6 +17,9 @@
   "duplicate_area_id": [
     "id"
   ],
+  "duplicate_iteration_id": [
+    "id"
+  ],
   "duplicate_task_id": [
     "id"
   ],
@@ -30,9 +33,13 @@
     "value",
     "allowed"
   ],
+  "invalid_date": [
+    "value"
+  ],
   "invalid_id": [
     "id"
   ],
+  "iteration_name_missing": [],
   "label_below_top": [
     "label",
     "top"
@@ -94,6 +101,9 @@
   ],
   "unknown_area": [
     "area"
+  ],
+  "unknown_iteration": [
+    "iteration"
   ],
   "waiting_on_missing": [],
   "write_failed": [

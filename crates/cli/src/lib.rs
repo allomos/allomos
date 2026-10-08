@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use clap::{Parser, Subcommand, error::ErrorKind};
 use fliphopper_core::ops::{self, Outcome};
-use fliphopper_core::{Issue, Problem, Seabag, State, Task};
+use fliphopper_core::{Issue, Iteration, Problem, Seabag, State, Task};
 use fliphopper_store::{
     DEFAULT_DIR, Lock, add_agent_instructions, agent_setup_request, find_seabag, git_root,
     id_from_name, init_with_labels, load, picked_folder,
@@ -84,10 +84,16 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
-    /// List tasks, grouped by area.
+    /// List tasks, grouped by area (or by iteration with --by iteration).
     List {
         #[arg(long)]
         area: Option<String>,
+        /// Only tasks planned in this iteration.
+        #[arg(long)]
+        iteration: Option<String>,
+        /// Group by area (the default) or by iteration; tasks with no iteration come last, as unplanned.
+        #[arg(long, value_parser = ["area", "iteration"], default_value = "area")]
+        by: String,
         #[arg(long, value_parser = State::ALL.map(State::as_str))]
         state: Option<String>,
         /// Only tasks you hold.
@@ -121,6 +127,11 @@ enum Command {
     },
     /// Set the task's next dependency (the one thing needed for its next label); no text clears it.
     Needs { id: String, text: Option<String> },
+    /// Plan a task in an iteration; no iteration takes it out (it becomes unplanned).
+    Plan {
+        id: String,
+        iteration: Option<String>,
+    },
     /// Mark an unheld backlog or waiting task ready (for example, the owner approved it).
     Ready { id: String },
     /// Drop a task: it will not be done.
@@ -133,6 +144,20 @@ enum Command {
 enum Add {
     /// Add an area.
     Area { id: String, name: String },
+    /// Add an iteration (when tasks are planned), ordered after the existing ones.
+    Iteration {
+        id: String,
+        name: String,
+        /// The release it produces, for example v0.2.
+        #[arg(long)]
+        release: Option<String>,
+        /// First day, YYYY-MM-DD.
+        #[arg(long, value_name = "DATE")]
+        start: Option<String>,
+        /// Last day, YYYY-MM-DD.
+        #[arg(long, value_name = "DATE")]
+        end: Option<String>,
+    },
     /// Add a task in backlog.
     Task {
         id: String,
@@ -149,7 +174,9 @@ impl Command {
     /// The task or area a command acts on, for the commit message.
     fn target(&self) -> Option<&str> {
         match self {
-            Command::Add(Add::Area { id, .. } | Add::Task { id, .. })
+            Command::Add(
+                Add::Area { id, .. } | Add::Iteration { id, .. } | Add::Task { id, .. },
+            )
             | Command::Show { id }
             | Command::Claim { id, .. }
             | Command::Label { id, .. }
@@ -157,6 +184,7 @@ impl Command {
             | Command::Done { id }
             | Command::Release { id, .. }
             | Command::Needs { id, .. }
+            | Command::Plan { id, .. }
             | Command::Ready { id }
             | Command::Drop { id } => Some(id),
             Command::Init { .. } | Command::List { .. } | Command::Next => None,
@@ -175,6 +203,7 @@ impl Command {
         match self {
             Command::Init { .. } => "init",
             Command::Add(Add::Area { .. }) => "add area",
+            Command::Add(Add::Iteration { .. }) => "add iteration",
             Command::Add(Add::Task { .. }) => "add task",
             Command::List { .. } => "list",
             Command::Show { .. } => "show",
@@ -184,6 +213,7 @@ impl Command {
             Command::Done { .. } => "done",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
+            Command::Plan { .. } => "plan",
             Command::Ready { .. } => "ready",
             Command::Drop { .. } => "drop",
             Command::Next => "next",
@@ -426,6 +456,22 @@ fn task_json(t: &Task) -> Value {
     serde_json::to_value(t).expect("tasks serialize")
 }
 
+/// An iteration's heading: ID and name, then its release and dates when it has them.
+fn iteration_heading(it: &Iteration) -> String {
+    let mut s = format!("{}  {}", it.id, it.name);
+    let dates = match (&it.start, &it.end) {
+        (Some(a), Some(b)) => Some(format!("{a} to {b}")),
+        (Some(a), None) => Some(format!("from {a}")),
+        (None, Some(b)) => Some(format!("until {b}")),
+        (None, None) => None,
+    };
+    let extra: Vec<String> = it.release.iter().cloned().chain(dates).collect();
+    if !extra.is_empty() {
+        s.push_str(&format!("  ({})", extra.join(", ")));
+    }
+    s
+}
+
 /// One line about a task: ID, state, label, holder, title.
 fn task_line(t: &Task) -> String {
     format!(
@@ -516,6 +562,23 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     let text = format!("Added area {} ({})\n", area.id, area.name);
                     Done::new(json!({ "seabag": root, "area": area }), text)
                 }
+                Add::Iteration {
+                    id,
+                    name,
+                    release,
+                    start,
+                    end,
+                } => {
+                    let details = ops::IterationDetails {
+                        release: release.as_deref(),
+                        start: start.as_deref(),
+                        end: end.as_deref(),
+                    };
+                    let iteration = ops::new_iteration(&bag, id, name, details)?;
+                    lock.create_iteration(&iteration)?;
+                    let text = format!("Added iteration {}\n", iteration_heading(&iteration));
+                    Done::new(json!({ "seabag": root, "iteration": iteration }), text)
+                }
                 Add::Task {
                     id,
                     area,
@@ -531,7 +594,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::List { area, state, mine } => {
+        Command::List {
+            area,
+            iteration,
+            by,
+            state,
+            mine,
+        } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = seabag_of(&root, load(&root))?;
             if *mine && me.is_none() {
@@ -542,36 +611,81 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     return Err(Problem::UnknownArea { area: a.clone() });
                 }
             }
+            if let Some(i) = iteration {
+                if !bag.iterations.iter().any(|x| &x.id == i) {
+                    return Err(Problem::UnknownIteration {
+                        iteration: i.clone(),
+                    });
+                }
+            }
             let keep = |t: &&Task| {
                 area.as_ref().is_none_or(|a| &t.area == a)
+                    && iteration
+                        .as_ref()
+                        .is_none_or(|i| t.iteration.as_ref() == Some(i))
                     && state.as_ref().is_none_or(|s| t.state.as_str() == s)
                     && (!*mine || t.holder.as_deref() == me)
             };
             let mut tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
             tasks.sort_by(|a, b| a.id.cmp(&b.id));
             let mut text = String::new();
-            let mut areas = Vec::new();
-            for a in &bag.areas {
-                let mine: Vec<&&Task> = tasks.iter().filter(|t| t.area == a.id).collect();
-                if area.as_ref().is_some_and(|x| x != &a.id) {
-                    continue;
+            let mut group = |heading: String, members: &[&&Task]| {
+                if members.is_empty() {
+                    return;
                 }
-                areas.push(json!({
-                    "id": a.id, "name": a.name, "order": a.order,
-                    "tasks": mine.iter().map(|t| task_json(t)).collect::<Vec<_>>(),
-                }));
-                if mine.is_empty() {
-                    continue;
-                }
-                text.push_str(&format!("{}  {}\n", a.id, a.name));
-                for t in mine {
+                text.push_str(&heading);
+                text.push('\n');
+                for t in members {
                     text.push_str(&format!("  {}\n", task_line(t)));
                 }
-            }
+            };
+            let tasks_json =
+                |members: &[&&Task]| members.iter().map(|t| task_json(t)).collect::<Vec<_>>();
+            let fields = if by == "iteration" {
+                let mut groups = Vec::new();
+                for it in &bag.iterations {
+                    if iteration.as_ref().is_some_and(|x| x != &it.id) {
+                        continue;
+                    }
+                    let members: Vec<&&Task> = tasks
+                        .iter()
+                        .filter(|t| t.iteration.as_ref() == Some(&it.id))
+                        .collect();
+                    group(iteration_heading(it), &members);
+                    let mut g = json!(it);
+                    g["tasks"] = json!(tasks_json(&members));
+                    groups.push(g);
+                }
+                // Tasks with no iteration, or one that does not exist, come last.
+                let unplanned: Vec<&&Task> = tasks
+                    .iter()
+                    .filter(|t| {
+                        t.iteration
+                            .as_ref()
+                            .is_none_or(|i| !bag.iterations.iter().any(|x| &x.id == i))
+                    })
+                    .collect();
+                group("Unplanned".to_string(), &unplanned);
+                json!({ "seabag": root, "iterations": groups, "unplanned": tasks_json(&unplanned) })
+            } else {
+                let mut groups = Vec::new();
+                for a in &bag.areas {
+                    if area.as_ref().is_some_and(|x| x != &a.id) {
+                        continue;
+                    }
+                    let members: Vec<&&Task> = tasks.iter().filter(|t| t.area == a.id).collect();
+                    group(format!("{}  {}", a.id, a.name), &members);
+                    groups.push(json!({
+                        "id": a.id, "name": a.name, "order": a.order,
+                        "tasks": tasks_json(&members),
+                    }));
+                }
+                json!({ "seabag": root, "areas": groups })
+            };
             if text.is_empty() {
                 text.push_str("No tasks.\n");
             }
-            let mut done = Done::new(json!({ "seabag": root, "areas": areas }), text);
+            let mut done = Done::new(fields, text);
             done.issues = issues;
             Ok(done)
         }
@@ -584,6 +698,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
                 ("area", Some(task.area.as_str())),
+                ("iteration", task.iteration.as_deref()),
                 ("state", Some(task.state.as_str())),
                 ("label", task.label.as_deref()),
                 ("holder", task.holder.as_deref()),
@@ -628,6 +743,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Done { id } => change(cli, cwd, |bag| ops::finish(bag, id, me)),
         Command::Needs { id, text } => {
             change(cli, cwd, |bag| ops::set_next(bag, id, me, text.as_deref()))
+        }
+        Command::Plan { id, iteration } => {
+            change(cli, cwd, |bag| ops::plan(bag, id, iteration.as_deref()))
         }
         Command::Ready { id } => change(cli, cwd, |bag| ops::make_ready(bag, id, me)),
         Command::Drop { id } => change(cli, cwd, |bag| ops::drop_task(bag, id, me)),

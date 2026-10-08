@@ -68,6 +68,10 @@ problems! {
     UnknownArea { area } => "unknown_area", "The area \"{area}\" does not exist. Add areas/{area}.json or use an existing area ID.";
     LabelNotOnLadder { label, ladder } => "label_not_on_ladder", "\"{label}\" is not a step of this project's ladder ({ladder}).";
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
+    IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
+    DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
+    UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `fh add iteration`, or use an existing iteration ID.";
+    InvalidDate { value } => "invalid_date", "\"{value}\" is not a date. Write it as YYYY-MM-DD, for example 2026-10-08.";
     /// The file exists but could not be read. `detail` is the system's own text.
     ReadFailed { detail } => "read_failed", "Could not read this file: {detail}.";
     TaskFileMissing => "task_file_missing", "This task folder has no task.json.";

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::model::{Area, FORMAT, Project, Seabag, State, Task};
+use crate::model::{Area, FORMAT, Iteration, Project, Seabag, State, Task};
 use crate::problem::Problem;
 
 /// One problem found in a seabag, tied to the file (and field, when known) that caused it.
@@ -139,6 +139,61 @@ pub fn parse_area(file: &str, text: &str) -> Result<Area, Vec<Issue>> {
     }
 }
 
+/// A calendar date written `YYYY-MM-DD`, for example `2026-10-08`.
+pub fn valid_date(text: &str) -> bool {
+    let b = text.as_bytes();
+    let digits = |r: std::ops::Range<usize>| b[r].iter().all(u8::is_ascii_digit);
+    if b.len() != 10
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || !digits(0..4)
+        || !digits(5..7)
+        || !digits(8..10)
+    {
+        return false;
+    }
+    let num = |r: std::ops::Range<usize>| text[r].parse::<u32>().unwrap_or(0);
+    let (year, month, day) = (num(0..4), num(5..7), num(8..10));
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days).contains(&day)
+}
+
+pub fn parse_iteration(file: &str, text: &str) -> Result<Iteration, Vec<Issue>> {
+    let iteration: Iteration = parse(file, text).map_err(|i| vec![i])?;
+    let mut issues = Vec::new();
+    check_id(file, "id", &iteration.id, &mut issues);
+    if iteration.name.trim().is_empty() {
+        issues.push(Issue::new(
+            file,
+            Some("name"),
+            Problem::IterationNameMissing,
+        ));
+    }
+    for (field, value) in [("start", &iteration.start), ("end", &iteration.end)] {
+        if let Some(v) = value.as_deref().filter(|v| !valid_date(v)) {
+            issues.push(Issue::new(
+                file,
+                Some(field),
+                Problem::InvalidDate {
+                    value: v.to_string(),
+                },
+            ));
+        }
+    }
+    if issues.is_empty() {
+        Ok(iteration)
+    } else {
+        Err(issues)
+    }
+}
+
 pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
     let task: Task = parse(file, text).map_err(|i| vec![i])?;
     let mut issues = Vec::new();
@@ -153,11 +208,12 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
     }
 }
 
-/// Cross-file checks: unique IDs, every task's area exists, labels are on the project's ladder,
-/// and a waiting task says what it waits on.
+/// Cross-file checks: unique IDs, every task's area (and iteration, when it has one) exists,
+/// labels are on the project's ladder, and a waiting task says what it waits on.
 pub fn validate_seabag(
     project: &Project,
     areas: &[(String, Area)],
+    iterations: &[(String, Iteration)],
     tasks: &[(String, Task)],
 ) -> Vec<Issue> {
     let mut issues = Vec::new();
@@ -169,6 +225,18 @@ pub fn validate_seabag(
                 Some("id"),
                 Problem::DuplicateAreaId {
                     id: area.id.clone(),
+                },
+            ));
+        }
+    }
+    let mut iteration_ids = HashSet::new();
+    for (file, iteration) in iterations {
+        if !iteration_ids.insert(iteration.id.as_str()) {
+            issues.push(Issue::new(
+                file,
+                Some("id"),
+                Problem::DuplicateIterationId {
+                    id: iteration.id.clone(),
                 },
             ));
         }
@@ -192,6 +260,17 @@ pub fn validate_seabag(
                     area: task.area.clone(),
                 },
             ));
+        }
+        if let Some(iteration) = &task.iteration {
+            if !iteration_ids.contains(iteration.as_str()) {
+                issues.push(Issue::new(
+                    file,
+                    Some("iteration"),
+                    Problem::UnknownIteration {
+                        iteration: iteration.clone(),
+                    },
+                ));
+            }
         }
         if let Some(label) = &task.label {
             if !project.labels.contains(label) {
@@ -317,7 +396,7 @@ mod tests {
                 .unwrap(),
             ),
         ];
-        let issues = validate_seabag(&project(), &areas, &tasks);
+        let issues = validate_seabag(&project(), &areas, &[], &tasks);
         let fields: Vec<_> = issues
             .iter()
             .map(|i| (i.file.as_str(), i.field.as_deref().unwrap()))
@@ -335,11 +414,106 @@ mod tests {
             parse_area("a", r#"{"id":"A1","name":"Tracking"}"#).unwrap(),
         )];
         let tasks = vec![("t".to_string(), parse_task("t", r#"{"id":"T1","title":"x","area":"A1","state":"in_progress","label":"implemented"}"#).unwrap())];
-        assert!(validate_seabag(&project(), &areas, &tasks).is_empty());
+        assert!(validate_seabag(&project(), &areas, &[], &tasks).is_empty());
         let _ = Seabag {
             project: project(),
             areas: vec![],
+            iterations: vec![],
             tasks: vec![],
         };
+    }
+
+    #[test]
+    fn dates() {
+        for good in ["2026-10-08", "2024-02-29", "2000-02-29", "2026-12-31"] {
+            assert!(valid_date(good), "{good}");
+        }
+        for bad in [
+            "2026-1-08",
+            "2026-13-01",
+            "2026-02-29",
+            "1900-02-29",
+            "2026-04-31",
+            "2026/10/08",
+            "today",
+            "2026-10-08x",
+        ] {
+            assert!(!valid_date(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn iterations() {
+        let it = parse_iteration(
+            "iterations/I02.json",
+            r#"{"id":"I02","name":"v0.2","order":2,"release":"v0.2","start":"2026-10-08"}"#,
+        )
+        .unwrap();
+        assert_eq!((it.release.as_deref(), it.end), (Some("v0.2"), None));
+        let err = parse_iteration("i", r#"{"id":"I1","name":" ","end":"soon"}"#).unwrap_err();
+        let problems: Vec<_> = err
+            .iter()
+            .map(|i| (i.field.as_deref(), i.problem.code()))
+            .collect();
+        assert_eq!(
+            problems,
+            vec![
+                (Some("name"), "iteration_name_missing"),
+                (Some("end"), "invalid_date")
+            ]
+        );
+
+        let areas = vec![(
+            "a".to_string(),
+            parse_area("a", r#"{"id":"A1","name":"T"}"#).unwrap(),
+        )];
+        let iterations = vec![
+            (
+                "iterations/I1.json".to_string(),
+                parse_iteration("i", r#"{"id":"I1","name":"One"}"#).unwrap(),
+            ),
+            (
+                "iterations/x.json".to_string(),
+                parse_iteration("i", r#"{"id":"I1","name":"Again"}"#).unwrap(),
+            ),
+        ];
+        let tasks = vec![
+            (
+                "tasks/T1/task.json".to_string(),
+                parse_task(
+                    "t",
+                    r#"{"id":"T1","title":"x","area":"A1","state":"ready","iteration":"I1"}"#,
+                )
+                .unwrap(),
+            ),
+            (
+                "tasks/T2/task.json".to_string(),
+                parse_task(
+                    "t",
+                    r#"{"id":"T2","title":"y","area":"A1","state":"ready","iteration":"I9"}"#,
+                )
+                .unwrap(),
+            ),
+            (
+                "tasks/T3/task.json".to_string(),
+                parse_task(
+                    "t",
+                    r#"{"id":"T3","title":"z","area":"A1","state":"ready"}"#,
+                )
+                .unwrap(),
+            ),
+        ];
+        let issues = validate_seabag(&project(), &areas, &iterations, &tasks);
+        let found: Vec<_> = issues
+            .iter()
+            .map(|i| (i.file.as_str(), i.problem.code()))
+            .collect();
+        assert_eq!(
+            found,
+            vec![
+                ("iterations/x.json", "duplicate_iteration_id"),
+                ("tasks/T2/task.json", "unknown_iteration"),
+            ]
+        );
     }
 }
