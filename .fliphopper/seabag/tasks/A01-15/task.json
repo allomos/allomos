@@ -4,6 +4,7 @@
   "id": "A01-15",
   "iteration": "I02",
   "label": "locally verified",
-  "state": "in_progress",
-  "title": "Tasks by iteration"
+  "state": "waiting",
+  "title": "Tasks by iteration",
+  "waiting_on": "owner checks By iteration in the new build"
 }
