@@ -1,6 +1,7 @@
 {
   "area": "A01",
+  "holder": "claude/a01-15-iterations",
   "id": "A01-15",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Tasks by iteration"
 }
