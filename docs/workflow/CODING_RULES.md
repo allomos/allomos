@@ -88,6 +88,7 @@ A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-c
 | `fh ready <id>` | An unheld `backlog` or `waiting` task becomes `ready`, its *waiting on* cleared. Otherwise refused (`cannot_make_ready`). |
 | `fh drop <id>` | State `dropped`; holder and *waiting on* cleared. Refused (`task_closed`) when done or dropped. |
 | `fh next` | The first `ready` task no one holds (by area order, then ID), with its handoff note. |
+| `fh confirm --title <text> --plan <file.md> [--timeout <seconds>]` | Shows the plan to the person in the FlipHopper app and waits (default 600 s) for **Go ahead** (exit 0) or **Cancel** (`confirm_declined`, exit 1); no answer in time is `confirm_timeout` (exit 1). The question waits in `<project>/.fliphopper/requests/` (ignored by Git) and is removed once settled. If no open window shows it within 3 s, `fh` opens the app on the project (macOS; `FLIPHOPPER_NO_LAUNCH` turns this off). It never writes the seabag, which may not exist yet ([`Task-A05-02`](../tasks/Task-A05-02-convert-existing-project.md)). |
 
 - **Holder rules.** `label`, `wait`, `done` and `release` are refused (`task_held`) on a task someone else holds; an unheld task may be changed by anyone.
 - **Finding the seabag:** `--seabag <path>` (the seabag itself or a folder holding `.fliphopper/seabag/`), else `FLIPHOPPER_SEABAG`, else the nearest `.fliphopper/seabag/` at or above the current folder.

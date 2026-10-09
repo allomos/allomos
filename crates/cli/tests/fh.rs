@@ -731,3 +731,79 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
     assert_eq!(v["task"]["iteration"], Value::Null);
     assert!(task_file(&repo, "A02-01").get("iteration").is_none());
 }
+
+/// `fh confirm` in `project` (which has no seabag yet), answered by a stand-in for the app.
+fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32, Value) {
+    let plan = project.join("plan.md");
+    fs::write(&plan, "## Plan\n\n- 3 areas\n- 5 tasks\n").unwrap();
+    let seabag = project.join(".fliphopper/seabag");
+    let child = Command::new(FH)
+        .current_dir(project)
+        .args(["--json", "--as", "claude/test", "--seabag"])
+        .arg(&seabag)
+        .args([
+            "confirm",
+            "--title",
+            "Move tasks into FlipHopper",
+            "--plan",
+            "plan.md",
+        ])
+        .args(["--timeout", timeout])
+        .env_remove("FLIPHOPPER_SEABAG")
+        .env_remove("FLIPHOPPER_HOLDER")
+        .env("FLIPHOPPER_NO_LAUNCH", "1")
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    if let Some(yes) = answer {
+        // The app: wait for the question, check it, answer it.
+        let asked = (0..100)
+            .find_map(|_| {
+                std::thread::sleep(Duration::from_millis(100));
+                fliphopper_store::pending_confirms(project).pop()
+            })
+            .expect("the question appears");
+        assert_eq!(asked.title, "Move tasks into FlipHopper");
+        assert!(asked.plan.contains("- 5 tasks"));
+        assert_eq!(asked.from.as_deref(), Some("claude/test"));
+        fliphopper_store::answer_confirm(project, &asked.id, yes).unwrap();
+    }
+    let out = child.wait_with_output().unwrap();
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    // Settled questions are tidied away; only the folder's .gitignore stays.
+    let left: Vec<_> = fs::read_dir(project.join(".fliphopper/requests"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(left, [".gitignore"]);
+    assert!(!seabag.exists(), "asking never creates the seabag");
+    (out.status.code().unwrap(), v)
+}
+
+#[test]
+fn confirm_waits_for_the_answer_in_the_app() {
+    let project = tmp("confirm-yes");
+    let (code, v) = confirm_answered(&project, Some(true), "20");
+    assert_eq!(
+        (code, &v["ok"], &v["answer"]),
+        (0, &json!(true), &json!("yes"))
+    );
+
+    let project = tmp("confirm-no");
+    let (code, v) = confirm_answered(&project, Some(false), "20");
+    assert_eq!((code, &v["error"]["code"]), (1, &json!("confirm_declined")));
+
+    let project = tmp("confirm-none");
+    let (code, v) = confirm_answered(&project, None, "1");
+    assert_eq!((code, &v["error"]["code"]), (1, &json!("confirm_timeout")));
+
+    // A plan that cannot be read is refused before anything is asked.
+    let project = tmp("confirm-missing");
+    refused(
+        &project,
+        &["confirm", "--title", "x", "--plan", "nope.md"],
+        3,
+        "read_failed",
+    );
+    assert!(!project.join(".fliphopper").exists());
+}

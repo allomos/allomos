@@ -2,16 +2,16 @@
 // person pick one or more and the project folder, then opens each with the request typed in.
 // FlipHopper never sends the request; the person does.
 //
-// In "convert" mode (Task-A05-02) the request is to move a project that already tracks its tasks
-// another way into FlipHopper: the panel lists what was found and lets the person pick exactly
-// one agent, because two agents converting at once would add every task twice.
+// In "convert" mode (Task-A05-02) the request is to find the project's tasks and move them into
+// FlipHopper: the person picks exactly one agent, because two agents converting at once would add
+// every task twice. The agent asks before changing anything, with `fh confirm`.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Agent, TaskSystem } from "./types";
+import type { Agent } from "./types";
 
 const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -39,8 +39,8 @@ export function AgentsPanel({
   messenger: Messenger;
   project: string;
   seabag: string;
-  /** What was found, when the request is to move the project's tasks into FlipHopper. */
-  convert?: TaskSystem;
+  /** The request is to find the project's tasks and move them into FlipHopper. */
+  convert?: boolean;
   /** Closes the panel, with the message to show (or null) and whether an agent was asked. */
   onDone: (message: string | null, asked: boolean) => void;
 }) {
@@ -133,7 +133,6 @@ export function AgentsPanel({
     <section className="card agents">
       <h2>{t(convert ? "convert.title" : "agents.title")}</h2>
       <p>{t(convert ? "convert.body" : "agents.body")}</p>
-      {convert && <Findings found={convert} />}
       <div className="row">
         <span>
           {t("agents.project")}: <code>{project}</code>
@@ -222,25 +221,3 @@ export function AgentsPanel({
   );
 }
 
-/** What FlipHopper found: the board files, the card files and the agent rules. */
-export function Findings({ found }: { found: TaskSystem }) {
-  const { rich } = useI18n();
-  return (
-    <ul className="findings">
-      {found.boards.map((b) => (
-        <li key={b}>{rich("convert.board", { path: <code>{b}</code> })}</li>
-      ))}
-      {found.cards > 0 && (
-        <li>
-          {rich("convert.cards", {
-            count: String(found.cards),
-            folders: <code>{found.card_folders.join(", ")}</code>,
-          })}
-        </li>
-      )}
-      {found.rules.map((r) => (
-        <li key={r}>{rich("convert.rules", { path: <code>{r}</code> })}</li>
-      ))}
-    </ul>
-  );
-}

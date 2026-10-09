@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, FolderInfo, Opened, TaskSystem } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, Opened } from "./types";
 
 export interface Messenger {
   /** A folder given when FlipHopper was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -54,10 +54,12 @@ export interface Messenger {
   agentStatus(root: string): Promise<AgentStatus>;
   /** Calls `handler` when File → Move Tasks Into FlipHopper… is chosen. */
   onConvertMenu(handler: () => void): Promise<() => void>;
-  /** Signs that `project` already tracks its tasks another way. Changes nothing. */
-  taskSystem(project: string): Promise<TaskSystem>;
-  /** Opens one agent in `project` with the request to move its tasks into the seabag at `seabag` typed in. Rejects with a Problem. */
+  /** Opens one agent in `project` with the request to find its tasks and move them into the seabag at `seabag` typed in. Rejects with a Problem. */
   askAgentToConvert(agent: string, project: string, seabag: string, language: string): Promise<void>;
+  /** Questions an agent asks about `project` with `fh confirm`, oldest first. */
+  confirmRequests(project: string): Promise<ConfirmRequest[]>;
+  /** The person's answer to one of them. Rejects with a Problem when it is no longer waiting. */
+  answerConfirm(project: string, id: string, yes: boolean): Promise<void>;
 }
 
 export interface MenuTexts {
@@ -95,7 +97,8 @@ export const desktopMessenger: Messenger = {
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   onConvertMenu: (handler) => listen("menu:convert", () => handler()),
-  taskSystem: (project) => invoke<TaskSystem>("task_system", { project }),
   askAgentToConvert: (agent, project, seabag, language) =>
     invoke<void>("ask_agent_to_convert", { agent, project, seabag, language }),
+  confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
+  answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
 };

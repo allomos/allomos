@@ -13,8 +13,9 @@ use clap::{Parser, Subcommand, error::ErrorKind};
 use fliphopper_core::ops::{self, Outcome};
 use fliphopper_core::{Issue, Iteration, Problem, Seabag, State, Task};
 use fliphopper_store::{
-    DEFAULT_DIR, Lock, add_agent_instructions, agent_setup_request, find_seabag, git_root,
-    id_from_name, init_with_labels, load, picked_folder,
+    DEFAULT_DIR, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_setup_request, find_seabag,
+    git_root, id_from_name, init_with_labels, load, picked_folder, post_confirm, read_answer,
+    requests_dir, was_seen, withdraw_confirm,
 };
 use serde_json::{Value, json};
 
@@ -84,6 +85,19 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
+    /// Show a plan to the person in the FlipHopper app and wait for their answer: exit 0 means
+    /// go ahead; exit 1 (confirm_declined, confirm_timeout) means change nothing.
+    Confirm {
+        /// The popup's heading.
+        #[arg(long)]
+        title: String,
+        /// A Markdown file with the plan to show.
+        #[arg(long, value_name = "FILE")]
+        plan: PathBuf,
+        /// How long to wait for the answer, in seconds.
+        #[arg(long, default_value_t = 600, value_name = "SECONDS")]
+        timeout: u64,
+    },
     /// List tasks, grouped by area (or by iteration with --by iteration).
     List {
         #[arg(long)]
@@ -187,7 +201,10 @@ impl Command {
             | Command::Plan { id, .. }
             | Command::Ready { id }
             | Command::Drop { id } => Some(id),
-            Command::Init { .. } | Command::List { .. } | Command::Next => None,
+            Command::Init { .. }
+            | Command::Confirm { .. }
+            | Command::List { .. }
+            | Command::Next => None,
         }
     }
 
@@ -195,13 +212,14 @@ impl Command {
     fn changes(&self) -> bool {
         !matches!(
             self,
-            Command::List { .. } | Command::Show { .. } | Command::Next
+            Command::List { .. } | Command::Show { .. } | Command::Next | Command::Confirm { .. }
         )
     }
 
     fn name(&self) -> &'static str {
         match self {
             Command::Init { .. } => "init",
+            Command::Confirm { .. } => "confirm",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
             Command::Add(Add::Task { .. }) => "add task",
@@ -435,6 +453,95 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
     }
 }
 
+/// The project folder `fh confirm` asks about: the folder holding the seabag given with
+/// `--seabag` (which may not exist yet), else the nearest seabag's, else the Git repository's
+/// root, else `cwd`.
+fn confirm_project(cli: &Cli, cwd: &Path) -> PathBuf {
+    let seabag = match &cli.seabag {
+        Some(path) => cwd.join(path),
+        None => find_seabag(cwd).unwrap_or_else(|| {
+            git_root(cwd)
+                .unwrap_or_else(|| cwd.to_path_buf())
+                .join(DEFAULT_DIR)
+        }),
+    };
+    picked_folder(&seabag)
+        .map(Path::to_path_buf)
+        .unwrap_or(seabag)
+}
+
+/// How often `fh confirm` looks for the answer, and how long it gives an open app to show the
+/// question before opening the app itself.
+const CONFIRM_POLL: Duration = Duration::from_millis(250);
+const CONFIRM_LAUNCH_AFTER: Duration = Duration::from_secs(3);
+
+/// Open the FlipHopper app on `project`, so it can show the question. macOS only for now;
+/// `FLIPHOPPER_NO_LAUNCH` turns it off (tests).
+fn open_app(project: &Path) {
+    if cfg!(target_os = "macos") && std::env::var_os("FLIPHOPPER_NO_LAUNCH").is_none() {
+        let _ = std::process::Command::new("open")
+            .args(["-n", "-b", "io.fliphopper", "--args"])
+            .arg(project)
+            .status();
+    }
+}
+
+/// `fh confirm`: leave the question, wait for the person's answer in the app, then tidy up.
+fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Result<Done, Problem> {
+    let project = confirm_project(cli, cwd);
+    let path = cwd.join(plan);
+    let text = std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+        detail: format!("{}: {e}", path.display()),
+    })?;
+    if text.len() > MAX_PLAN_BYTES {
+        return Err(Problem::BadUsage {
+            detail: format!(
+                "the plan is longer than {} KB; keep it to what the person must decide",
+                MAX_PLAN_BYTES / 1024
+            ),
+        });
+    }
+    let asked =
+        post_confirm(&project, title, &text, cli.holder.as_deref(), timeout).map_err(|e| {
+            Problem::WriteFailed {
+                path: requests_dir(&project).display().to_string(),
+                detail: e.to_string(),
+            }
+        })?;
+    if !cli.json {
+        eprintln!(
+            "Waiting for the person to answer in the FlipHopper app (project {})…",
+            project.display()
+        );
+    }
+    let start = std::time::Instant::now();
+    let mut launched = false;
+    let answer = loop {
+        if let Some(answer) = read_answer(&project, &asked.id) {
+            break Some(answer);
+        }
+        if start.elapsed() >= Duration::from_secs(timeout) {
+            break None;
+        }
+        if !launched && start.elapsed() >= CONFIRM_LAUNCH_AFTER && !was_seen(&project, &asked.id) {
+            launched = true;
+            open_app(&project);
+        }
+        std::thread::sleep(CONFIRM_POLL);
+    };
+    withdraw_confirm(&project, &asked.id);
+    match answer {
+        Some(true) => Ok(Done::new(
+            json!({ "answer": "yes", "project": project }),
+            "The person chose Go ahead.\n".to_string(),
+        )),
+        Some(false) => Err(Problem::ConfirmDeclined),
+        None => Err(Problem::ConfirmTimeout {
+            seconds: timeout.to_string(),
+        }),
+    }
+}
+
 fn seabag_of(
     root: &Path,
     loaded: fliphopper_core::Loaded,
@@ -551,6 +658,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.extra = agent_files.iter().map(|f| format!("../../{f}")).collect();
             Ok(done)
         }
+        Command::Confirm {
+            title,
+            plan,
+            timeout,
+        } => confirm(cli, cwd, title, plan, *timeout),
         Command::Add(add) => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;

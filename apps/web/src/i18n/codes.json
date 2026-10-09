@@ -13,6 +13,10 @@
   "commit_failed": [
     "detail"
   ],
+  "confirm_declined": [],
+  "confirm_timeout": [
+    "seconds"
+  ],
   "create_failed": [
     "path",
     "detail"
@@ -74,6 +78,9 @@
   ],
   "read_failed": [
     "detail"
+  ],
+  "request_not_found": [
+    "id"
   ],
   "seabag_busy": [
     "path"

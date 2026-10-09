@@ -98,6 +98,12 @@ problems! {
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
     /// The chosen AI agent is no longer on this computer (Task-A05-02).
     AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
+    /// `fh confirm`: the person chose Cancel in the app (Task-A05-02).
+    ConfirmDeclined => "confirm_declined", "The person chose Cancel in FlipHopper, so nothing should change.";
+    /// `fh confirm`: no answer came in time.
+    ConfirmTimeout { seconds } => "confirm_timeout", "No answer came from the FlipHopper app within {seconds} seconds, so nothing should change. Open the project folder in the app and ask again.";
+    /// The app was asked to answer a question that is no longer waiting.
+    RequestNotFound { id } => "request_not_found", "The question {id} is no longer waiting for an answer.";
     /// A link in a task's description that FlipHopper will not open (Task-A01-16).
     LinkRefused { link } => "link_refused", "FlipHopper opens only web links and text files (.md, .txt) inside this project, so it did not open \"{link}\".";
     LinkNotFound { link } => "link_not_found", "The file \"{link}\" does not exist.";

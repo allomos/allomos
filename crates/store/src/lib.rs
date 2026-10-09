@@ -19,10 +19,13 @@ use fliphopper_core::{
 };
 use serde::Serialize;
 
+mod confirm;
 mod convert;
-pub use convert::{
-    CONVERT_REQUEST_VERSION, TaskSystem, agent_convert_request_in, find_task_system,
+pub use confirm::{
+    ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
+    read_answer, requests_dir, was_seen, withdraw_confirm,
 };
+pub use convert::{CONVERT_REQUEST_VERSION, agent_convert_request_in};
 
 /// Where a project's seabag lives inside the folder the user picked.
 /// Always used for a new seabag, also in an empty folder, so every tool looks in one place.

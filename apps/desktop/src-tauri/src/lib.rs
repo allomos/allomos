@@ -13,9 +13,10 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    AgentSetup, Inspection, LinkTarget, TaskSystem, add_agent_instructions, add_readme_if_empty,
-    agent_convert_request_in, agent_setup, agent_setup_request_in, create_starter,
-    find_task_system, git_root, inspect, load, picked_folder, resolve_task_link, stamp,
+    AgentSetup, ConfirmRequest, Inspection, LinkTarget, add_agent_instructions,
+    add_readme_if_empty, agent_convert_request_in, agent_setup, agent_setup_request_in,
+    answer_confirm, create_starter, git_root, inspect, load, pending_confirms, picked_folder,
+    resolve_task_link, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -242,17 +243,9 @@ async fn ask_agents(
     Ok(opened)
 }
 
-/// Does `project` already track its tasks another way (a board, card files, agent rules)?
-/// Reads names only; changes nothing (Task-A05-02).
-#[tauri::command]
-async fn task_system(project: PathBuf) -> TaskSystem {
-    find_task_system(&project)
-}
-
-/// Open one chosen agent in `project` with the request to move the project's tasks into the
-/// seabag at `seabag` typed in. One agent only: two would add every task twice. The folder is
-/// looked at again here, so the request says what is there now. Nothing is sent: the person
-/// sends it.
+/// Open one chosen agent in `project` with the request to find the project's tasks and move them
+/// into the seabag at `seabag` typed in. One agent only: two would add every task twice. Nothing
+/// is sent: the person sends it.
 #[tauri::command]
 async fn ask_agent_to_convert(
     agent: String,
@@ -265,13 +258,25 @@ async fn ask_agent_to_convert(
             path: project.display().to_string(),
         });
     }
-    let found = find_task_system(&project);
     let exists = matches!(inspect(&seabag), Inspection::Found { .. });
-    let request = agent_convert_request_in(&language, &project, &seabag, &found, exists);
+    let request = agent_convert_request_in(&language, &project, &seabag, exists);
     let Some(chosen) = agents::find_agents().into_iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
     agents::ask(&chosen.id, &project, &request, &chosen.how)
+}
+
+/// Questions an agent is asking about `project` with `fh confirm`, oldest first. Listing them
+/// marks them seen, so `fh` knows this window shows them.
+#[tauri::command]
+fn confirm_requests(project: PathBuf) -> Vec<ConfirmRequest> {
+    pending_confirms(&project)
+}
+
+/// The person's answer to question `id`: go ahead (`yes`) or cancel.
+#[tauri::command]
+fn answer_confirm_request(project: PathBuf, id: String, yes: bool) -> Result<(), Problem> {
+    answer_confirm(&project, &id, yes)
 }
 
 /// Do the AI agents know about this project? What the window's agent line shows (Task-A03-04).
@@ -528,8 +533,9 @@ pub fn run() {
             ask_agents,
             write_agent_files,
             agent_status,
-            task_system,
-            ask_agent_to_convert
+            ask_agent_to_convert,
+            confirm_requests,
+            answer_confirm_request
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");

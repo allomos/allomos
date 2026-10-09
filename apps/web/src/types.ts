@@ -98,18 +98,14 @@ export interface AgentStatus {
   holders: string[];
 }
 
-/** Signs that a project already tracks its tasks another way (Task-A05-02). Paths are relative to the project folder. */
-export interface TaskSystem {
-  boards: string[];
-  /** How many card files (Task-….md) there are. */
-  cards: number;
-  /** The folders holding the most card files. */
-  card_folders: string[];
-  /** AGENTS.md / CLAUDE.md with rules about a task board or claiming. */
-  rules: string[];
-}
-
-/** A board, or at least two card files (the same rule as Rust's `TaskSystem::found`). */
-export function foundTaskSystem(s: TaskSystem | null): s is TaskSystem {
-  return s !== null && (s.boards.length > 0 || s.cards >= 2);
+/** A question an agent asks with `fh confirm` (crates/store/src/confirm.rs). */
+export interface ConfirmRequest {
+  id: string;
+  title: string;
+  /** Markdown. */
+  plan: string;
+  from: string | null;
+  /** Seconds since 1970. */
+  asked: number;
+  until: number;
 }
