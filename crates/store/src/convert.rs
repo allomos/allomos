@@ -47,7 +47,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
 
 1. 先查看，不要改动。找出这个项目是否、以及在哪里记录任务、状态、负责人、标签、领域和下一步（例如任务看板、卡片文件、待办清单），以及 AGENTS.md / CLAUDE.md 中哪些规则描述了它们。不要运行项目的脚本或钩子。如果没有找到任务，告诉用户，然后停止。
 2. 如果有不清楚的地方——领域和任务 ID 如何对应（保留项目自己的 ID，只去掉 `Task-` 这样的前缀和结尾的描述）、哪些词组成标签阶梯（保留项目自己的，按顺序）、哪些词表示 ready、waiting、done、dropped、还没有卡片的计划工作怎么处理——先在对话中问用户。
-3. 在改动任何东西之前，请用户在 FlipHopper 应用中确认。把计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、状态词、要放进报告的内容、分支名、AGENTS.md 中要替换的规则。然后运行 `fh confirm --title \"{title}\" --plan <文件>`。它会在应用中弹出计划并等待用户回答。退出码 0 表示可以继续；其他退出码表示用户取消或没有回答：什么都不要改，告诉用户，然后停止（或者问用户要改什么，再确认一次）。
+3. 在改动任何东西之前，请用户在 FlipHopper 应用中确认。把计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、状态词、要放进报告的内容、分支名、AGENTS.md 中要替换的规则。然后运行 `fh confirm --title \"{title}\" --plan <文件>`。它会在应用中弹出计划并等待用户回答。退出码 0 表示可以继续；其他退出码表示用户取消或没有回答：什么都不要改，然后停止，并告诉用户：没有任何改动；如果改主意了，可以在这里让你再给他看一次计划，或在 FlipHopper 中选择“文件 → 把任务搬进 FlipHopper…”重新开始。如果用户说出要改的地方，修改计划后再确认一次。
 4. 如果项目是 Git 仓库，在新分支上工作（`fliphopper/convert`，除非用户另起名字）。转换期间不要用 `--push`；只有用户要求时才提交。
 5. 只用 `fh` 写水手袋，绝不手工编辑它的文件。{create}然后每个领域 `fh add area <id> \"<名称>\"`，每个任务 `fh add task <id> --area <id> --title \"<标题>\" --description \"Card: [<路径>]({up}<从项目文件夹起的路径>)\"`（卡片是大文件中的一节时，链接到 `文件.md#节`）。
 6. 照文件所写原样复制状态：`fh --as <负责人> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。只复制写明的内容：不明的状态、日期或负责人保持不明，并写进报告；绝不编造进度、验证或批准。批准和状态说明留在卡片文件里。`fh` 还记不下的值（完成日期、依赖、优先级等）也写进报告。
@@ -72,7 +72,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
 
 1. まず見るだけで、何も変えません。このプロジェクトがタスク、状況、担当者、ラベル、エリア、次の一歩を記録しているか、どこに記録しているか（タスクボード、カードのファイル、TODO リストなど）、AGENTS.md / CLAUDE.md のどのルールがそれを説明しているかを調べます。プロジェクトのスクリプトやフックは実行しません。タスクが見つからなければ、そう伝えて終わります。
 2. 判断のつかない点——エリアとタスク ID の対応（プロジェクト自身の ID を残し、`Task-` のような接頭辞と末尾の説明だけを外す）、どの言葉がラベルの段階になるか（プロジェクト自身のものを順に）、どの言葉が ready、waiting、done、dropped にあたるか、まだカードのない予定の作業をどうするか——があれば、先にチャットでユーザーに尋ねます。
-3. 何かを変える前に、FlipHopper アプリで確認を取ります。計画を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、状況の言葉、レポートに書く値、ブランチ名、AGENTS.md で置き換えるルール。そして `fh confirm --title \"{title}\" --plan <ファイル>` を実行します。アプリに計画が表示され、ユーザーの答えを待ちます。終了コード 0 なら続けます。それ以外はキャンセルか無回答です：何も変えず、そう伝えて終わります（または、何を変えるかを尋ねて、もう一度確認します）。
+3. 何かを変える前に、FlipHopper アプリで確認を取ります。計画を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、状況の言葉、レポートに書く値、ブランチ名、AGENTS.md で置き換えるルール。そして `fh confirm --title \"{title}\" --plan <ファイル>` を実行します。アプリに計画が表示され、ユーザーの答えを待ちます。終了コード 0 なら続けます。それ以外はキャンセルか無回答です：何も変えずに終わり、ユーザーに伝えます：何も変わっていないこと、考えが変わったらここでもう一度計画を見せるよう頼めること、または FlipHopper の「ファイル → タスクを FlipHopper に移す…」からやり直せること。直したい点を言われたら、計画を直してもう一度確認します。
 4. プロジェクトが Git リポジトリなら、新しいブランチで作業します（ユーザーが別の名前を言わなければ `fliphopper/convert`）。移行中は `--push` を使わず、ユーザーに頼まれたときだけコミットします。
 5. シーバッグは `fh` だけで書き、ファイルを手で編集しません。{create}続いてエリアごとに `fh add area <id> \"<名前>\"`、タスクごとに `fh add task <id> --area <id> --title \"<題名>\" --description \"Card: [<パス>]({up}<プロジェクトのフォルダーからのパス>)\"`（カードが大きなファイルの一節なら `ファイル.md#節` へリンク）。
 6. 状況はファイルに書かれているとおりに写します：`fh --as <担当者> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。書かれていることだけを写し、わからない状況・日付・担当者はわからないままにしてレポートに書きます。進捗、検証、承認を作り出してはいけません。承認と状況の説明文はカードのファイルに残します。`fh` がまだ記録できない値（完了日、依存関係、優先度など）もレポートに書きます。
@@ -111,8 +111,10 @@ in Markdown to a file outside the project (for example in the system's temporary
 mapping table, the label ladder, the state words, what goes in the report, the branch name, and \
 the rules you will replace in AGENTS.md. Then run `fh confirm --title \"{title}\" --plan <file>`. \
 It shows the plan in the app and waits for the person's answer. Exit code 0 means go ahead; any \
-other exit code means the person cancelled or did not answer: change nothing, tell the person \
-and stop (or ask what to change and confirm again).
+other exit code means the person cancelled or did not answer: change nothing and stop, and tell \
+the person that nothing changed and that, if they change their mind, they can ask you here to \
+show the plan again, or choose File → Move Tasks Into FlipHopper… in FlipHopper to start again. \
+If they say what to change, change the plan and confirm again.
 4. If the project is a Git repository, work on a new branch (`fliphopper/convert` unless the \
 person names one). Never use `--push` during the conversion; commit only when the person asks.
 5. Write the seabag only with `fh`; never edit its files by hand. {create}Then `fh add area <id> \

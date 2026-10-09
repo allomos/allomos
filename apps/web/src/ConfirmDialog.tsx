@@ -13,7 +13,16 @@ import type { ConfirmRequest } from "./types";
 /** How often the window looks for questions. `fh confirm` opens the app if none is seen in 3 s. */
 const LOOK_MS = 1000;
 
-export function ConfirmDialog({ messenger, project }: { messenger: Messenger; project: string }) {
+export function ConfirmDialog({
+  messenger,
+  project,
+  onCancelled,
+}: {
+  messenger: Messenger;
+  project: string;
+  /** The person chose Cancel: the window says nothing changed and how to ask again. */
+  onCancelled?: () => void;
+}) {
   const { t, problem } = useI18n();
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,6 +56,7 @@ export function ConfirmDialog({ messenger, project }: { messenger: Messenger; pr
     try {
       await messenger.answerConfirm(project, request.id, yes);
       setRequest(null);
+      if (!yes) onCancelled?.();
     } catch (e) {
       setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
     } finally {

@@ -390,7 +390,13 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {/* Questions an agent asks with `fh confirm` about the folder this window shows (Task-A05-02). */}
         {/* `fh confirm` asks about the folder holding `.fliphopper/`, where its --seabag points. */}
-        {opened && <ConfirmDialog messenger={messenger} project={projectFolder(opened.root)} />}
+        {opened && (
+          <ConfirmDialog
+            messenger={messenger}
+            project={projectFolder(opened.root)}
+            onCancelled={() => setNotices((list) => [...list, { key: "confirm.cancelled" }])}
+          />
+        )}
 
         {opened && <SeabagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
       </main>

@@ -37,6 +37,7 @@
   "confirm.from_unknown": "一个 AI 智能体在改动这个项目之前询问你：",
   "confirm.go": "继续",
   "confirm.cancel": "取消",
+  "confirm.cancelled": "已取消：没有任何改动。要再次询问，可以在 AI 智能体的窗口里告诉它，例如“我改主意了，请再给我看一次计划”；或者选择“文件 → 把任务搬进 FlipHopper…”，用任意智能体重新开始。",
   "convert.title": "找出这个项目的任务并搬进 FlipHopper？",
   "convert.body": "选择一个 AI 智能体。它会在项目文件夹中打开，并已填好请求：查找项目已有的任务（任务看板、卡片文件、待办清单）。如果找到，它会在这里给你看计划，由你继续或取消，然后用 fh 把它们搬进这个水手袋，并把 AGENTS.md 改为使用 FlipHopper。在你发送之前不会发送任何内容。",
   "convert.none": "在这台电脑上没有找到 AI 智能体。请安装 Claude Code 或 Codex，然后再试。",
