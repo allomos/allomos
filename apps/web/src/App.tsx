@@ -475,7 +475,8 @@ function SeabagView({
               ))}
             </div>
           )}
-          <div className={selected ? "with-pane" : undefined}>
+          {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
+          <div className={selected ? "list-layout with-pane" : "list-layout"}>
             <div className="areas">
               {groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
