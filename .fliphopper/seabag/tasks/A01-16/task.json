@@ -4,7 +4,6 @@
   "id": "A01-16",
   "iteration": "I02",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "Task pane",
-  "waiting_on": "owner checks the task pane in the new build"
+  "state": "done",
+  "title": "Task pane"
 }
