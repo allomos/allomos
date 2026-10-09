@@ -81,6 +81,8 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-09 | Open-folder flow decisions accepted ("ok", "yes"): empty new seabag; "Not now" holds until the folder is opened again; Change… re-records the project folder; the AGENTS.md section names the seabag when it is outside the project folder; `fh labels`; conversion request version 3 | owner (chat) |
+| 2026-10-09 | Open-folder flow specified (now [OPEN-FOLDER-FLOW.md](../product/OPEN-FOLDER-FLOW.md)); the popup lives in the app; the app no longer looks for boards | owner (chat) |
 | 2026-10-08 | Card approved; "drop A05-01 and implement it in a work tree" | owner (chat) |
 | 2026-10-08 | Direction: "i want this feature as a prompt to ai agent. user can choose an ai agent to do the transformation. and when openning/setting the project folder, the prompt should also be included in when needed." (replaces the first draft, a built-in converter) | owner (chat) |
 
@@ -126,5 +128,5 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 
 **In plain words.** The app no longer hands the seabag's creation to the agent. Opening a folder now goes step by step: FlipHopper creates an **empty** seabag (as before, asking first when the folder has other files); finds the project folder (the folder itself when `AGENTS.md` or `CLAUDE.md` is there, otherwise it asks "Which folder holds this project?") and records it in `project.json`; opens "Tell AI agents about FlipHopper?" if the instructions lack FlipHopper's section; and, if the seabag has no tasks, opens "Find this project's tasks and move them into FlipHopper?". **Not now** on either panel holds until the folder is opened again.
 
-- **Decisions made by the agent (owner may change):** the app's new seabag is empty (example tasks would always count as "has tasks", so the migration step would never run); the project folder is stored relative to the FlipHopper folder (`"."`, `"../app"`); **Change…** in the agents panel re-records it; the section added to `AGENTS.md` names the seabag's place when it is not inside the project folder.
+- **Decisions made by the agent, accepted by the owner 2026-10-09:** the app's new seabag is empty (example tasks would always count as "has tasks", so the migration step would never run); the project folder is stored relative to the FlipHopper folder (`"."`, `"../app"`); **Change…** in the agents panel re-records it; the section added to `AGENTS.md` names the seabag's place when it is not inside the project folder.
 - **Added:** `project_folder` in `project.json` (core model), `crates/store/src/setup.rs` (`setup_state`, `record_project_folder`, `relative_path`), `fh labels` (the agent sets the project's own ladder on the existing seabag), desktop commands `project_setup`, `set_project_folder`, `set_convert_enabled`; the request is **version 3** (no `fh init`; card links computed from the recorded project folder).
