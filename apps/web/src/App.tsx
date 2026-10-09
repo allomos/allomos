@@ -7,7 +7,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Issue, Iteration, Opened, Problem, Task } from "./types";
+import type { Issue, Iteration, Opened, Problem, SetupState, Task } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -44,8 +44,6 @@ function saveRecent(list: string[]) {
 }
 /** How often the window checks whether the seabag's files changed, for example through `fh`. */
 const FOLLOW_MS = 1000;
-/** How often the window looks for the seabag an agent was asked to create (Task-A05-02). */
-const AWAIT_MS = 2000;
 
 function folderName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -72,8 +70,6 @@ export function App({ messenger }: { messenger: Messenger }) {
   const openedRef = useRef(opened);
   openedRef.current = opened;
   const [pending, setPending] = useState<Pending | null>(null);
-  const pendingRef = useRef(pending);
-  pendingRef.current = pending;
   const [notices, setNotices] = useState<Note[]>([]);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
@@ -91,7 +87,8 @@ export function App({ messenger }: { messenger: Messenger }) {
     setPending(null);
     setNotices(message ? [message] : []);
     setAgentsFor(null);
-    setAwaiting(null);
+    setSetup(null);
+    setSkipped({ md: false, migrate: false });
     setError(null);
     try {
       localStorage.setItem(LAST_ROOT_KEY, o.root);
@@ -102,14 +99,27 @@ export function App({ messenger }: { messenger: Messenger }) {
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
   }, [changeRecent]);
 
-  /** After creating a seabag: offer to tell AI agents about it (Task-A03-03); or ask one agent to move
-   * the project's tasks into FlipHopper (`convert`, Task-A05-02). */
+  /** The agents panel: tell AI agents about FlipHopper (Task-A03-03), or ask one agent to find the
+   * project's tasks and move them into FlipHopper (`convert`, Task-A05-02). */
   const [agentsFor, setAgentsFor] = useState<{ project: string; seabag: string; convert?: boolean } | null>(null);
-  /** An agent was asked to create the seabag here; the window opens it when it appears. */
-  const [awaiting, setAwaiting] = useState<{ folder: string } | null>(null);
-  const offerAgents = useCallback((o: Opened) => {
-    setAgentsFor({ project: projectFolder(o.root), seabag: o.root });
-  }, []);
+
+  /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open seabag's project folder,
+   * agent instructions and tasks, and the steps the person put off with "Not now" this time. */
+  const [setup, setSetup] = useState<SetupState | null>(null);
+  const setupRef = useRef(setup);
+  setupRef.current = setup;
+  const [skipped, setSkipped] = useState({ md: false, migrate: false });
+  const refreshSetup = useCallback(
+    async (root: string) => {
+      try {
+        const state = await messenger.projectSetup(root);
+        if (openedRef.current?.root === root) setSetup(state);
+      } catch (e) {
+        setError(errorNote(e));
+      }
+    },
+    [messenger],
+  );
 
   const openFolder = useCallback(
     async (path: string) => {
@@ -122,11 +132,9 @@ export function App({ messenger }: { messenger: Messenger }) {
         } else if (i.kind === "empty") {
           const o = await messenger.createSeabag(i.suggested_root, folderName(i.folder), languageRef.current);
           show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
-          offerAgents(o);
         } else if (i.kind === "no_seabag") {
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
           setAgentsFor(null);
-          setAwaiting(null);
         } else {
           setError({ key: "error.not_a_folder", params: { path: i.path } });
         }
@@ -134,23 +142,32 @@ export function App({ messenger }: { messenger: Messenger }) {
         setError(errorNote(e));
       }
     },
-    [messenger, show, offerAgents],
+    [messenger, show],
   );
 
-  // After an agent was asked to create the seabag: open it as soon as it is there.
-  const awaitingFolder = awaiting?.folder;
+  // Steps 2–5 of the flow, one at a time: after opening, and whenever the seabag's files change.
+  const root0 = opened?.root;
+  const taskCount = opened?.loaded.seabag?.tasks.length;
   useEffect(() => {
-    if (!awaitingFolder) return;
-    const timer = window.setInterval(() => {
-      void messenger
-        .inspectFolder(awaitingFolder)
-        .then((info) => {
-          if (info.inspection.kind === "found") void openFolder(awaitingFolder);
-        })
-        .catch(() => undefined);
-    }, AWAIT_MS);
-    return () => window.clearInterval(timer);
-  }, [messenger, awaitingFolder, openFolder]);
+    if (root0) void refreshSetup(root0);
+  }, [root0, taskCount, refreshSetup]);
+  useEffect(() => {
+    if (!opened || !setup || agentsFor) return;
+    const project = setup.project_folder;
+    if (!project) return; // step 2 asks on the page
+    if (!(setup.agents.codex && setup.agents.claude) && !skipped.md) {
+      setAgentsFor({ project, seabag: opened.root });
+    } else if (!setup.has_tasks && !skipped.migrate) {
+      setAgentsFor({ project, seabag: opened.root, convert: true });
+    }
+  }, [opened, setup, agentsFor, skipped]);
+  // File → Move Tasks Into FlipHopper… only while the open seabag has a project folder.
+  const hasProjectFolder = Boolean(opened && setup?.project_folder);
+  useEffect(() => {
+    void messenger.setConvertEnabled(hasProjectFolder).catch(() => undefined);
+  }, [messenger, hasProjectFolder]);
+  /** The project folder for the agents panel: the recorded one, else the folder holding `.fliphopper/`. */
+  const agentsProject = (root: string) => setupRef.current?.project_folder ?? projectFolder(root);
 
   // Follow changes made outside the window (by `fh` or by hand): reload when the files change.
   const root = opened?.root;
@@ -245,22 +262,13 @@ export function App({ messenger }: { messenger: Messenger }) {
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
     const stopAgents = messenger.onAgentsMenu(() => {
       const root = openedRef.current?.root;
-      if (root) setAgentsFor({ project: projectFolder(root), seabag: root });
+      if (root) setAgentsFor({ project: agentsProject(root), seabag: root });
     });
-    // File → Move Tasks Into FlipHopper…: for the open project, or the folder being set up; with
-    // nothing open, choose a folder first (a folder without a seabag then offers the move).
+    // File → Move Tasks Into FlipHopper… (enabled only with a recorded project folder).
     const stopConvert = messenger.onConvertMenu(() => {
       const root = openedRef.current?.root;
-      const target = root
-        ? { project: projectFolder(root), seabag: root }
-        : pendingRef.current
-          ? { project: pendingRef.current.folder, seabag: pendingRef.current.suggestedRoot }
-          : null;
-      if (!target) {
-        void chooseRef.current();
-        return;
-      }
-      setAgentsFor({ ...target, convert: true });
+      const project = setupRef.current?.project_folder;
+      if (root && project) setAgentsFor({ project, seabag: root, convert: true });
     });
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
@@ -275,7 +283,6 @@ export function App({ messenger }: { messenger: Messenger }) {
     try {
       const o = await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder), language);
       show(o, { key: "notice.created_nested" });
-      offerAgents(o);
     } catch (e) {
       setError(errorNote(e));
     }
@@ -321,7 +328,7 @@ export function App({ messenger }: { messenger: Messenger }) {
           <AgentLine
             messenger={messenger}
             root={opened.root}
-            onTell={() => setAgentsFor({ project: projectFolder(opened.root), seabag: opened.root })}
+            onTell={() => setAgentsFor({ project: agentsProject(opened.root), seabag: opened.root })}
           />
         )}
         {notices.map((n, i) => (
@@ -336,41 +343,31 @@ export function App({ messenger }: { messenger: Messenger }) {
             project={agentsFor.project}
             seabag={agentsFor.seabag}
             convert={agentsFor.convert}
-            onDone={(message, asked) => {
-              const convert = agentsFor.convert;
+            onProjectChange={async (folder) => {
+              const state = await messenger.setProjectFolder(agentsFor.seabag, folder);
+              setSetup(state);
+            }}
+            onDone={(message) => {
+              // Asked or not now: this step is done until the folder is opened again.
+              setSkipped((s) => (agentsFor.convert ? { ...s, migrate: true } : { ...s, md: true }));
               setAgentsFor(null);
               if (message) setNotices((list) => [...list, { text: message }]);
-              if (convert && asked) {
-                // No seabag yet: wait for the agent to create it. An open seabag reloads by itself.
-                if (!openedRef.current) {
-                  setPending(null);
-                  setAwaiting({ folder: agentsFor.project });
-                }
-              }
             }}
           />
         )}
 
-        {awaiting && (
-          <section className="card">
-            <h2>{t("awaiting.title")}</h2>
-            <p className="searching">
-              <span className="spinner" aria-hidden="true" />{" "}
-              {rich("awaiting.body", { folder: <code>{awaiting.folder}</code> })}
-            </p>
-            <div className="row">
-              <button
-                type="button"
-                onClick={() => {
-                  const folder = awaiting.folder;
-                  setAwaiting(null);
-                  void openFolder(folder);
-                }}
-              >
-                {t("awaiting.stop")}
-              </button>
-            </div>
-          </section>
+        {opened && setup && !setup.project_folder && (
+          <ProjectFolderStep
+            fliphopperFolder={setup.fliphopper_folder}
+            onChoose={async (folder) => {
+              try {
+                setSetup(await messenger.setProjectFolder(opened.root, folder));
+              } catch (e) {
+                setError(errorNote(e));
+              }
+            }}
+            pick={() => messenger.pickFolder(t("folder.pick"))}
+          />
         )}
 
         {pending && (
@@ -378,17 +375,8 @@ export function App({ messenger }: { messenger: Messenger }) {
             <h2>{t("pending.title")}</h2>
             <p>{rich("pending.body", { folder: <code>{pending.folder}</code> })}</p>
             {pending.gitRoot && <p className="muted">{rich("pending.git", { repo: <code>{pending.gitRoot}</code> })}</p>}
-            <p>{t("pending.move_body")}</p>
             <div className="row">
-              <button
-                type="button"
-                className="primary"
-                disabled={agentsFor !== null}
-                onClick={() => setAgentsFor({ project: pending.folder, seabag: pending.suggestedRoot, convert: true })}
-              >
-                {t("pending.move")}
-              </button>
-              <button type="button" onClick={createNested}>
+              <button type="button" className="primary" onClick={createNested}>
                 {t("pending.create")}
               </button>
               <button type="button" onClick={() => setPending(null)}>
@@ -398,19 +386,49 @@ export function App({ messenger }: { messenger: Messenger }) {
           </section>
         )}
 
-        {!opened && !pending && !awaiting && <Welcome onChoose={choose} />}
+        {!opened && !pending && <Welcome onChoose={choose} />}
 
         {/* Questions an agent asks with `fh confirm` about the folder this window shows (Task-A05-02). */}
-        {(opened || pending || awaiting) && (
-          <ConfirmDialog
-            messenger={messenger}
-            project={opened ? projectFolder(opened.root) : (pending?.folder ?? awaiting?.folder ?? "")}
-          />
-        )}
+        {/* `fh confirm` asks about the folder holding `.fliphopper/`, where its --seabag points. */}
+        {opened && <ConfirmDialog messenger={messenger} project={projectFolder(opened.root)} />}
 
         {opened && <SeabagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
       </main>
     </div>
+  );
+}
+
+/** Step 2 of the flow: no project folder is recorded and none was found beside `.fliphopper/`. */
+function ProjectFolderStep({
+  fliphopperFolder,
+  onChoose,
+  pick,
+}: {
+  fliphopperFolder: string;
+  onChoose: (folder: string) => Promise<void>;
+  pick: () => Promise<string | null>;
+}) {
+  const { t, rich } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const choose = async (folder: string | null) => {
+    if (!folder) return;
+    setBusy(true);
+    await onChoose(folder);
+    setBusy(false);
+  };
+  return (
+    <section className="card">
+      <h2>{t("folder.title")}</h2>
+      <p>{rich("folder.body", { folder: <code>{fliphopperFolder}</code> })}</p>
+      <div className="row">
+        <button type="button" className="primary" disabled={busy} onClick={() => void choose(fliphopperFolder)}>
+          {t("folder.this")}
+        </button>
+        <button type="button" disabled={busy} onClick={() => void pick().then(choose)}>
+          {t("folder.other")}
+        </button>
+      </div>
+    </section>
   );
 }
 

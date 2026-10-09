@@ -13,6 +13,11 @@ pub struct Project {
     /// The progress ladder for this project, lowest step first.
     #[serde(default = "default_labels")]
     pub labels: Vec<String>,
+    /// The folder with the project's code and its AGENTS.md / CLAUDE.md, relative to the folder
+    /// holding `.fliphopper/` (`.` when it is that folder), or absolute. Unset until the app
+    /// records it (docs/product/OPEN-FOLDER-FLOW.md).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_folder: Option<String>,
 }
 
 pub fn default_labels() -> Vec<String> {

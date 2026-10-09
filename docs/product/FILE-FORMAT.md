@@ -50,7 +50,8 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 | `format` | yes | Always `"fliphopper/1"` for this version. Other values are refused, including the earlier `"glidebox/1"`; old folders are not converted ([0013](../decisions/0013-product-name-fliphopper.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
-| `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. |
+| `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `fh labels`. |
+| `project_folder` | no | The project folder (code, `AGENTS.md`, `CLAUDE.md`), relative to the folder holding `.fliphopper/` (`"."` for that folder, `"../app"` for a sibling), or absolute when no relative path exists. Written by the app ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)). Older `fh` builds refuse a seabag that has it (`field_unknown`): reinstall `fh`. |
 
 ## `areas/<id>.json`
 
@@ -101,7 +102,7 @@ Owner's choice A, 2026-10-06 ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md
 - **One short lock per change.** Every FlipHopper writer (`fh` now, the app when it starts editing) takes an exclusive operating-system lock on `.lock` for one change only: read the seabag, check the rules, write, let go. A second writer waits up to 5 seconds, then gives up with `seabag_busy`. The operating system drops the lock if the process dies, so a crash never leaves the seabag locked.
 - **Whole files only.** A file is written to a temporary `.tmp-…` file in the same folder, flushed to disk, then renamed over the old one; a new task folder is filled under a temporary name and renamed into place. A reader sees the old file or the new one, never half of one. On macOS a reader that already opened the old file keeps reading the old file whole. (Windows is checked when the app starts writing, Iteration 2.)
 - **Readers need no lock.** The app and `fh list` / `show` / `next` read without waiting.
-- **`.gitignore`** in the seabag lists `.lock` and `.tmp-*`. `fh init` and the app's starter project both write it.
+- **`.gitignore`** in the seabag lists `.lock` and `.tmp-*`. `fh init` and the app both write it; since 2026-10-09 the app, like `fh init`, creates an empty seabag ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)).
 - The lock only orders FlipHopper's own writers; a person editing a file by hand is not blocked. The checks below still catch a bad file.
 
 ## Checks FlipHopper makes

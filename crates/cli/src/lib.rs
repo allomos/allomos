@@ -85,6 +85,12 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
+    /// Set the project's label ladder, lowest step first, separated by commas. Refused when a
+    /// task's label would no longer be on it.
+    Labels {
+        #[arg(value_name = "A,B,…")]
+        ladder: String,
+    },
     /// Show a plan to the person in the FlipHopper app and wait for their answer: exit 0 means
     /// go ahead; exit 1 (confirm_declined, confirm_timeout) means change nothing.
     Confirm {
@@ -202,6 +208,7 @@ impl Command {
             | Command::Ready { id }
             | Command::Drop { id } => Some(id),
             Command::Init { .. }
+            | Command::Labels { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
             | Command::Next => None,
@@ -220,6 +227,7 @@ impl Command {
         match self {
             Command::Init { .. } => "init",
             Command::Confirm { .. } => "confirm",
+            Command::Labels { .. } => "labels",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
             Command::Add(Add::Task { .. }) => "add task",
@@ -663,6 +671,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             plan,
             timeout,
         } => confirm(cli, cwd, title, plan, *timeout),
+        Command::Labels { ladder } => {
+            let root = locate(cli, cwd)?;
+            let lock = Lock::acquire(&root, lock_wait())?;
+            let (bag, issues) = seabag_of(&root, lock.load())?;
+            let labels: Vec<String> = ladder.split(',').map(String::from).collect();
+            let project = ops::set_ladder(&bag, &labels)?;
+            lock.save_project(&project)?;
+            let mut done = Done::new(
+                json!({ "seabag": root, "labels": project.labels }),
+                format!("Label ladder: {}\n", project.labels.join(" → ")),
+            );
+            done.issues = issues;
+            Ok(done)
+        }
         Command::Add(add) => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;

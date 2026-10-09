@@ -34,6 +34,7 @@ export function AgentsPanel({
   project: startProject,
   seabag,
   convert,
+  onProjectChange,
   onDone,
 }: {
   messenger: Messenger;
@@ -41,6 +42,8 @@ export function AgentsPanel({
   seabag: string;
   /** The request is to find the project's tasks and move them into FlipHopper. */
   convert?: boolean;
+  /** Records a project folder the person chose with Change… (the open-folder flow). */
+  onProjectChange?: (folder: string) => Promise<void>;
   /** Closes the panel, with the message to show (or null) and whether an agent was asked. */
   onDone: (message: string | null, asked: boolean) => void;
 }) {
@@ -91,7 +94,13 @@ export function AgentsPanel({
 
   const changeProject = async () => {
     const path = await messenger.pickFolder(t("agents.project"));
-    if (path) setProject(path);
+    if (!path) return;
+    try {
+      await onProjectChange?.(path);
+      setProject(path);
+    } catch (e) {
+      fail(e);
+    }
   };
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
@@ -137,12 +146,9 @@ export function AgentsPanel({
         <span>
           {t("agents.project")}: <code>{project}</code>
         </span>
-        {/* Converting puts the seabag in this folder, so the folder is fixed. */}
-        {!convert && (
-          <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
-            {t("agents.change")}
-          </button>
-        )}
+        <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
+          {t("agents.change")}
+        </button>
       </div>
       <p className="muted">{t("agents.seabag", { path: seabag })}</p>
       {agents === null ? (

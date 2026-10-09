@@ -119,3 +119,12 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 | Web `typecheck`, `build`, `check:i18n` (155 texts, 47 codes) | PASS |
 | The built app on `~/fliphopper-tests/a05-02-bakery` saw a test question from `fh confirm` within 2.5 s (it marked it seen); the question timed out as asked | PASS |
 | The popup and the whole flow on screen | owner check |
+
+## Change (2026-10-09, owner): the open-folder flow
+
+**Owner's request:** a FlipHopper folder has a corresponding project folder; opening a folder walks: initialize the seabag → find or ask for the project folder → check the agent instructions (offer an agent to add FlipHopper's section) → if the seabag has no tasks, offer an agent to find existing tasks and, after the person agrees, move them with `fh`; the migration step is also in the File menu, only when the project folder is specified. Recorded as the contract [OPEN-FOLDER-FLOW.md](../product/OPEN-FOLDER-FLOW.md).
+
+**In plain words.** The app no longer hands the seabag's creation to the agent. Opening a folder now goes step by step: FlipHopper creates an **empty** seabag (as before, asking first when the folder has other files); finds the project folder (the folder itself when `AGENTS.md` or `CLAUDE.md` is there, otherwise it asks "Which folder holds this project?") and records it in `project.json`; opens "Tell AI agents about FlipHopper?" if the instructions lack FlipHopper's section; and, if the seabag has no tasks, opens "Find this project's tasks and move them into FlipHopper?". **Not now** on either panel holds until the folder is opened again.
+
+- **Decisions made by the agent (owner may change):** the app's new seabag is empty (example tasks would always count as "has tasks", so the migration step would never run); the project folder is stored relative to the FlipHopper folder (`"."`, `"../app"`); **Change…** in the agents panel re-records it; the section added to `AGENTS.md` names the seabag's place when it is not inside the project folder.
+- **Added:** `project_folder` in `project.json` (core model), `crates/store/src/setup.rs` (`setup_state`, `record_project_folder`, `relative_path`), `fh labels` (the agent sets the project's own ladder on the existing seabag), desktop commands `project_setup`, `set_project_folder`, `set_convert_enabled`; the request is **version 3** (no `fh init`; card links computed from the recorded project folder).

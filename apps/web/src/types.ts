@@ -109,3 +109,14 @@ export interface ConfirmRequest {
   asked: number;
   until: number;
 }
+
+/** Where the open seabag stands in the open-folder flow (crates/store/src/setup.rs). */
+export interface SetupState {
+  /** The folder holding `.fliphopper/`. */
+  fliphopper_folder: string;
+  /** The recorded project folder; null until known. */
+  project_folder: string | null;
+  /** Which agents' instruction files in the project folder mention FlipHopper. */
+  agents: { codex: boolean; claude: boolean };
+  has_tasks: boolean;
+}

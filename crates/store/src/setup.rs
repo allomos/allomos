@@ -1,0 +1,216 @@
+//! The checks the app makes after opening a seabag (docs/product/OPEN-FOLDER-FLOW.md): which
+//! project folder the seabag belongs to, whether that folder's agent instructions mention
+//! FlipHopper, and whether the seabag has tasks yet.
+
+use std::path::{Component, Path, PathBuf};
+
+use fliphopper_core::{Problem, Project, parse_project};
+use serde::Serialize;
+
+use crate::{AgentSetup, Lock, PROJECT_FILE, agent_setup, json_text, picked_folder, write_atomic};
+
+/// How long recording the project folder waits for another writer.
+const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The folder holding `.fliphopper/` for a seabag at `root`; the seabag itself when it lives
+/// somewhere else.
+pub fn fliphopper_folder(root: &Path) -> PathBuf {
+    picked_folder(root).unwrap_or(root).to_path_buf()
+}
+
+/// `to` written relative to the folder `from` (both absolute): `.` for the same folder,
+/// `../app` for a sibling. `None` when there is no relative way (another disk on Windows).
+pub fn relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
+    let from: Vec<Component> = from.components().collect();
+    let to: Vec<Component> = to.components().collect();
+    if from.first() != to.first() {
+        return None;
+    }
+    let same = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    let mut path = PathBuf::new();
+    for _ in same..from.len() {
+        path.push("..");
+    }
+    for part in &to[same..] {
+        path.push(part);
+    }
+    Some(if path.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        path
+    })
+}
+
+/// The project folder recorded in `project`, as an absolute path, for a seabag at `root`.
+pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
+    let recorded = project.project_folder.as_deref()?.trim();
+    if recorded.is_empty() {
+        return None;
+    }
+    let path = fliphopper_folder(root).join(recorded);
+    // Tidy `.` and `..` without asking the disk, so a moved folder still gives a clear path.
+    let mut clean = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                clean.pop();
+            }
+            other => clean.push(other),
+        }
+    }
+    Some(clean)
+}
+
+/// Record `folder` as the project folder of the seabag at `root`, relative to the FlipHopper
+/// folder when it can be. Returns what was written.
+pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Problem> {
+    if !folder.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: folder.display().to_string(),
+        });
+    }
+    let folder = std::path::absolute(folder).unwrap_or_else(|_| folder.to_path_buf());
+    let base =
+        std::path::absolute(fliphopper_folder(root)).unwrap_or_else(|_| fliphopper_folder(root));
+    let recorded = relative_path(&base, &folder)
+        .unwrap_or(folder)
+        .to_string_lossy()
+        .into_owned();
+    let lock = Lock::acquire(root, LOCK_WAIT)?;
+    let path = lock.root().join(PROJECT_FILE);
+    let text = std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+        detail: format!("{}: {e}", path.display()),
+    })?;
+    let mut project =
+        parse_project(PROJECT_FILE, &text).map_err(|issues| issues[0].problem.clone())?;
+    project.project_folder = Some(recorded.clone());
+    write_atomic(&path, &json_text(&project))?;
+    Ok(recorded)
+}
+
+/// Where the opened seabag stands in the flow.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SetupState {
+    /// The FlipHopper folder (holding `.fliphopper/`).
+    pub fliphopper_folder: PathBuf,
+    /// The project folder, once known. `None`: the app asks the person.
+    pub project_folder: Option<PathBuf>,
+    /// Which agents' instruction files in the project folder mention FlipHopper.
+    pub agents: AgentSetup,
+    /// Whether the seabag has any task.
+    pub has_tasks: bool,
+}
+
+/// Step 2 to 4 of the flow for the seabag at `root`. When no project folder is recorded and
+/// `AGENTS.md` or `CLAUDE.md` sits beside `.fliphopper/`, that folder is recorded here.
+pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
+    let loaded = crate::load(root);
+    let Some(bag) = loaded.seabag else {
+        return Err(Problem::SeabagUnreadable {
+            path: root.display().to_string(),
+            detail: loaded
+                .issues
+                .first()
+                .map(|i| format!("{}: {}", i.file, i.problem.english()))
+                .unwrap_or_default(),
+        });
+    };
+    let home = fliphopper_folder(root);
+    let mut project_folder = project_folder_of(root, &bag.project);
+    if project_folder.is_none()
+        && (home.join("AGENTS.md").is_file() || home.join("CLAUDE.md").is_file())
+    {
+        record_project_folder(root, &home)?;
+        project_folder = Some(home.clone());
+    }
+    Ok(SetupState {
+        agents: project_folder
+            .as_deref()
+            .map(agent_setup)
+            .unwrap_or(AgentSetup {
+                codex: false,
+                claude: false,
+            }),
+        project_folder,
+        fliphopper_folder: home,
+        has_tasks: !bag.tasks.is_empty(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{DEFAULT_DIR, init};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn tmp(name: &str) -> PathBuf {
+        let n = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let p = std::env::temp_dir().join(format!("fliphopper-setup-{name}-{n}"));
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn relative_paths() {
+        let r = |a: &str, b: &str| relative_path(Path::new(a), Path::new(b)).unwrap();
+        assert_eq!(r("/a/b", "/a/b"), PathBuf::from("."));
+        assert_eq!(r("/a/b", "/a/b/c"), PathBuf::from("c"));
+        assert_eq!(r("/a/b", "/a/app"), PathBuf::from("../app"));
+        assert_eq!(r("/a/b/c", "/x"), PathBuf::from("../../../x"));
+    }
+
+    #[test]
+    fn the_project_folder_is_found_beside_fliphopper_or_left_to_ask() {
+        let home = tmp("home");
+        let root = home.join(DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        // Nothing beside .fliphopper: the app asks.
+        let s = setup_state(&root).unwrap();
+        assert_eq!(s.project_folder, None);
+        assert!(!s.has_tasks);
+        assert_eq!(s.fliphopper_folder, home);
+
+        // AGENTS.md beside .fliphopper: recorded as "." and used.
+        fs::write(home.join("AGENTS.md"), "# Guide\n").unwrap();
+        let s = setup_state(&root).unwrap();
+        assert_eq!(s.project_folder.as_deref(), Some(home.as_path()));
+        assert_eq!(
+            s.agents,
+            AgentSetup {
+                codex: false,
+                claude: false
+            }
+        );
+        let text = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+        assert!(text.contains("\"project_folder\": \".\""), "{text}");
+
+        // FlipHopper's section in AGENTS.md: Codex is told.
+        fs::write(home.join("AGENTS.md"), crate::agent_section()).unwrap();
+        assert!(setup_state(&root).unwrap().agents.codex);
+        fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn a_chosen_project_folder_is_recorded_relative() {
+        let base = tmp("sibling");
+        let home = base.join("tasks-home");
+        let app = base.join("app");
+        fs::create_dir_all(&app).unwrap();
+        let root = home.join(DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        assert_eq!(record_project_folder(&root, &app).unwrap(), "../app");
+        assert_eq!(
+            setup_state(&root).unwrap().project_folder,
+            Some(app.clone())
+        );
+        // A folder that does not exist is refused, and nothing changes.
+        assert!(record_project_folder(&root, &base.join("missing")).is_err());
+        assert_eq!(setup_state(&root).unwrap().project_folder, Some(app));
+        fs::remove_dir_all(&base).unwrap();
+    }
+}

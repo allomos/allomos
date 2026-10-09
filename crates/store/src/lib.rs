@@ -21,11 +21,16 @@ use serde::Serialize;
 
 mod confirm;
 mod convert;
+mod setup;
 pub use confirm::{
     ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
     read_answer, requests_dir, was_seen, withdraw_confirm,
 };
 pub use convert::{CONVERT_REQUEST_VERSION, agent_convert_request_in};
+pub use setup::{
+    SetupState, fliphopper_folder, project_folder_of, record_project_folder, relative_path,
+    setup_state,
+};
 
 /// Where a project's seabag lives inside the folder the user picked.
 /// Always used for a new seabag, also in an empty folder, so every tool looks in one place.
@@ -166,6 +171,25 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
     )
 }
 
+/// [`agent_section`], plus where the seabag is when it is not inside `project` (written relative
+/// to `project`, so the file works on every computer that has both folders side by side).
+pub fn agent_section_for(project: &Path, seabag: &Path) -> String {
+    let section = agent_section();
+    if seabag.starts_with(project) {
+        return section;
+    }
+    let at = relative_path(project, seabag)
+        .unwrap_or_else(|| seabag.to_path_buf())
+        .display()
+        .to_string();
+    format!(
+        "{section}
+This project's seabag is not inside this folder: it is at `{at}`. Run every `fh` command with
+`--seabag \"{at}\"` (or set `FLIPHOPPER_SEABAG` to that path).
+"
+    )
+}
+
 /// What `fh init` (and later the app) asks an AI agent to do: add [`agent_section`] to the
 /// project's instruction files, merged with what is already there. Plain numbered steps, so any
 /// agent can follow them.
@@ -176,8 +200,12 @@ pub fn agent_setup_request(project: &Path, seabag: &Path) -> String {
 /// [`agent_setup_request`] in an interface language (`en`, `zh-CN`, `ja`; English otherwise).
 /// The steps follow the language; the section itself stays English, so every agent and teammate
 /// reads the same rules.
-pub fn agent_setup_request_in(language: &str, project: &Path, seabag: &Path) -> String {
-    let (project, seabag, heading) = (project.display(), seabag.display(), AGENT_SECTION_HEADING);
+pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: &Path) -> String {
+    let (project, seabag, heading) = (
+        project_path.display(),
+        seabag_path.display(),
+        AGENT_SECTION_HEADING,
+    );
     let steps = match language {
         "zh-CN" => format!(
             "FlipHopper 已为这个项目建立了水手袋。现在请把它告诉以后的 AI 智能体。
@@ -233,7 +261,10 @@ CLAUDE.md with just that line if it is missing). Do not copy the section into CL
 The section to add:"
         ),
     };
-    format!("{steps}\n\n{}", agent_section())
+    format!(
+        "{steps}\n\n{}",
+        agent_section_for(project_path, seabag_path)
+    )
 }
 
 /// Add FlipHopper's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
@@ -591,6 +622,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         id: "project".to_string(),
         name: name.to_string(),
         labels: fliphopper_core::default_labels(),
+        project_folder: None,
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -778,6 +810,7 @@ pub fn init_with_labels(
         id: id.to_string(),
         name: name.to_string(),
         labels,
+        project_folder: None,
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);
@@ -899,6 +932,11 @@ impl Lock {
             files.push(("description.md", task.description.clone()));
         }
         create_dir_atomic(&target, &files)
+    }
+
+    /// Rewrite `project.json` (`fh labels`).
+    pub fn save_project(&self, project: &Project) -> Result<(), Problem> {
+        write_atomic(&self.root.join(PROJECT_FILE), &json_text(project))
     }
 
     /// Rewrite an existing task's `task.json`. Its description is left as it is.

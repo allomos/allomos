@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, Opened } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, Opened, SetupState } from "./types";
 
 export interface Messenger {
   /** A folder given when FlipHopper was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -60,6 +60,12 @@ export interface Messenger {
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
   /** The person's answer to one of them. Rejects with a Problem when it is no longer waiting. */
   answerConfirm(project: string, id: string, yes: boolean): Promise<void>;
+  /** The open-folder flow's state for the seabag at `root` (records the project folder when it is beside `.fliphopper/`). */
+  projectSetup(root: string): Promise<SetupState>;
+  /** Records `folder` as the project folder of the seabag at `root`. Rejects with a Problem. */
+  setProjectFolder(root: string, folder: string): Promise<SetupState>;
+  /** Enables or disables File → Move Tasks Into FlipHopper…. */
+  setConvertEnabled(enabled: boolean): Promise<void>;
 }
 
 export interface MenuTexts {
@@ -101,4 +107,7 @@ export const desktopMessenger: Messenger = {
     invoke<void>("ask_agent_to_convert", { agent, project, seabag, language }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
+  projectSetup: (root) => invoke<SetupState>("project_setup", { root }),
+  setProjectFolder: (root, folder) => invoke<SetupState>("set_project_folder", { root, folder }),
+  setConvertEnabled: (enabled) => invoke<void>("set_convert_enabled", { enabled }),
 };

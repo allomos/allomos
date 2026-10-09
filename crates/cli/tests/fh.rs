@@ -807,3 +807,21 @@ fn confirm_waits_for_the_answer_in_the_app() {
     );
     assert!(!project.join(".fliphopper").exists());
 }
+
+#[test]
+fn labels_change_the_ladder_without_stranding_a_task() {
+    let repo = filled();
+    let v = ok(&repo, &["labels", "implemented, connected,owner verified"]);
+    assert_eq!(
+        v["labels"],
+        json!(["implemented", "connected", "owner verified"])
+    );
+    ok(&repo, &["label", "A01-01", "connected"]);
+    refused(&repo, &["labels", "implemented"], 1, "label_not_on_ladder");
+    refused(&repo, &["labels", " , "], 1, "ladder_empty");
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".fliphopper/seabag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(project["labels"][1], "connected");
+}

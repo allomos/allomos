@@ -13,10 +13,10 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    AgentSetup, ConfirmRequest, Inspection, LinkTarget, add_agent_instructions,
+    AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
     add_readme_if_empty, agent_convert_request_in, agent_setup, agent_setup_request_in,
-    answer_confirm, create_starter, git_root, inspect, load, pending_confirms, picked_folder,
-    resolve_task_link, stamp,
+    answer_confirm, git_root, id_from_name, init, inspect, load, pending_confirms, picked_folder,
+    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -109,22 +109,18 @@ fn seabag_stamp(root: PathBuf) -> String {
     stamp(&root).to_string()
 }
 
-/// Create a starter seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
+/// Create an empty seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
+/// Empty, with no example tasks, so the open-folder flow can tell whether the project has tasks
+/// yet (docs/product/OPEN-FOLDER-FLOW.md).
 /// When the picked folder looks empty, also write `README-fliphopper.md` there, in the
 /// interface's `language`; a README that cannot be written does not undo the seabag.
 /// (Telling AI agents about the project is a separate step: `ask_agents`.)
 #[tauri::command]
 fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
-    create_starter(&root, &name).map_err(|e| {
-        let path = root.display().to_string();
-        if e.kind() == std::io::ErrorKind::AlreadyExists {
-            Problem::FolderNotEmpty { path }
-        } else {
-            Problem::CreateFailed {
-                path,
-                detail: e.to_string(),
-            }
-        }
+    init(&root, &id_from_name(&name), &name).map_err(|p| match p {
+        Problem::SeabagExists { path } => Problem::FolderNotEmpty { path },
+        Problem::WriteFailed { path, detail } => Problem::CreateFailed { path, detail },
+        other => other,
     })?;
     let readme_added = picked_folder(&root)
         .map(|f| add_readme_if_empty(f, &language).unwrap_or(false))
@@ -258,12 +254,32 @@ async fn ask_agent_to_convert(
             path: project.display().to_string(),
         });
     }
-    let exists = matches!(inspect(&seabag), Inspection::Found { .. });
-    let request = agent_convert_request_in(&language, &project, &seabag, exists);
+    let request = agent_convert_request_in(&language, &project, &seabag);
     let Some(chosen) = agents::find_agents().into_iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
     agents::ask(&chosen.id, &project, &request, &chosen.how)
+}
+
+/// Steps 2 to 4 of the open-folder flow for the seabag at `root`: its project folder (recorded
+/// here when AGENTS.md or CLAUDE.md sits beside `.fliphopper/`), whether that folder's agent
+/// instructions mention FlipHopper, and whether the seabag has tasks.
+#[tauri::command]
+fn project_setup(root: PathBuf) -> Result<SetupState, Problem> {
+    setup_state(&root)
+}
+
+/// Record `folder` as the project folder of the seabag at `root`; then the flow's new state.
+#[tauri::command]
+fn set_project_folder(root: PathBuf, folder: PathBuf) -> Result<SetupState, Problem> {
+    record_project_folder(&root, &folder)?;
+    setup_state(&root)
+}
+
+/// File → Move Tasks Into FlipHopper… is offered only while the open seabag has a project folder.
+#[tauri::command]
+fn set_convert_enabled(texts: tauri::State<MenuTexts>, enabled: bool) {
+    let _ = texts.convert.set_enabled(enabled);
 }
 
 /// Questions an agent is asking about `project` with `fh confirm`, oldest first. Listing them
@@ -294,9 +310,13 @@ struct AgentStatus {
 
 #[tauri::command]
 async fn agent_status(root: PathBuf) -> AgentStatus {
-    let project = picked_folder(&root).unwrap_or(&root).to_path_buf();
-    let mut holders: Vec<String> = load(&root)
-        .seabag
+    let loaded = load(&root).seabag;
+    // The recorded project folder; before one is recorded, the folder holding `.fliphopper/`.
+    let project = loaded
+        .as_ref()
+        .and_then(|bag| project_folder_of(&root, &bag.project))
+        .unwrap_or_else(|| picked_folder(&root).unwrap_or(&root).to_path_buf());
+    let mut holders: Vec<String> = loaded
         .map(|bag| {
             bag.tasks
                 .into_iter()
@@ -418,7 +438,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         app,
         CONVERT_ID,
         "Move Tasks Into FlipHopper…",
-        true,
+        // Enabled by the window once the open seabag has a project folder.
+        false,
         None::<&str>,
     )?;
     fill_recent(app, &recent, &Recent::default())?;
@@ -535,7 +556,10 @@ pub fn run() {
             agent_status,
             ask_agent_to_convert,
             confirm_requests,
-            answer_confirm_request
+            answer_confirm_request,
+            project_setup,
+            set_project_folder,
+            set_convert_enabled
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlipHopper");

@@ -5,7 +5,7 @@
 //! the seabag, applies one change and writes the result, all while holding the
 //! seabag's lock (see `crates/store`).
 
-use crate::model::{Area, Iteration, Seabag, State, Task};
+use crate::model::{Area, Iteration, Project, Seabag, State, Task};
 use crate::problem::Problem;
 use crate::validate::valid_date;
 
@@ -92,6 +92,34 @@ pub fn new_area(seabag: &Seabag, id: &str, name: &str) -> Result<Area, Problem> 
         id: id.to_string(),
         name,
         order,
+    })
+}
+
+/// The project with a new label ladder, lowest step first (`fh labels`). Refused when it is
+/// empty, or when a task's label is not on it: changing the ladder never strands a task.
+pub fn set_ladder(seabag: &Seabag, labels: &[String]) -> Result<Project, Problem> {
+    let labels: Vec<String> = labels
+        .iter()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    if labels.is_empty() {
+        return Err(Problem::LadderEmpty);
+    }
+    if let Some(label) = seabag
+        .tasks
+        .iter()
+        .filter_map(|t| t.label.as_ref())
+        .find(|l| !labels.contains(l))
+    {
+        return Err(Problem::LabelNotOnLadder {
+            label: label.clone(),
+            ladder: labels.join(" → "),
+        });
+    }
+    Ok(Project {
+        labels,
+        ..seabag.project.clone()
     })
 }
 
@@ -341,7 +369,7 @@ pub fn next(seabag: &Seabag) -> Option<&Task> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Project, default_labels};
+    use crate::model::default_labels;
 
     fn bag() -> Seabag {
         let mut s = Seabag {
@@ -350,6 +378,7 @@ mod tests {
                 id: "p".into(),
                 name: "P".into(),
                 labels: default_labels(),
+                project_folder: None,
             },
             areas: vec![],
             iterations: vec![],
@@ -372,6 +401,24 @@ mod tests {
             let i = $s.tasks.iter().position(|x| x.id == t.id).unwrap();
             $s.tasks[i] = t;
         }};
+    }
+
+    #[test]
+    fn the_ladder_changes_only_when_no_task_is_stranded() {
+        let mut s = bag();
+        let ladder = |l: &[&str]| l.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let p = set_ladder(&s, &ladder(&["implemented", " connected ", ""])).unwrap();
+        assert_eq!(p.labels, ["implemented", "connected"]);
+        assert_eq!((p.id.as_str(), p.name.as_str()), ("p", "P"));
+        assert_eq!(set_ladder(&s, &ladder(&[" "])), Err(Problem::LadderEmpty));
+        s.tasks[0].label = Some("owner verified".into());
+        assert_eq!(
+            set_ladder(&s, &ladder(&["implemented"])),
+            Err(Problem::LabelNotOnLadder {
+                label: "owner verified".into(),
+                ladder: "implemented".into()
+            })
+        );
     }
 
     #[test]
