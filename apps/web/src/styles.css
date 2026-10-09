@@ -166,6 +166,10 @@ button.link:hover { text-decoration: underline; }
 .markdown h3, .markdown h4, .markdown h5, .markdown h6 { margin: 10px 0 6px; font-size: 14px; color: var(--ink); }
 .markdown pre { background: var(--line); border-radius: 6px; padding: 8px 10px; overflow: auto; }
 .markdown a { color: var(--accent-ink); }
+.markdown .md-table { overflow-x: auto; margin: 0 0 8px; }
+.markdown table { border-collapse: collapse; font-size: 13px; }
+.markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; text-align: left; }
+.markdown th { background: var(--bg); font-weight: 600; }
 .state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
 .s-in_progress { border-color: var(--accent); color: var(--accent-ink); }
 .s-waiting { background: var(--warn-bg); color: var(--warn); border-color: transparent; }

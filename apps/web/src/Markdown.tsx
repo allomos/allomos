@@ -1,5 +1,6 @@
-// A small Markdown reader for task descriptions (Task-A01-16): headings, paragraphs, lists,
-// code blocks, and inline code, bold, italics and links. It builds React elements, never HTML
+// A small Markdown reader for task descriptions (Task-A01-16) and agents' plans in the `fh confirm`
+// popup (Task-A05-02): headings, paragraphs, lists, code blocks, tables, and inline code, bold,
+// italics and links. It builds React elements, never HTML
 // text, so a description cannot inject markup. Links are handed to `onLink`, which asks the
 // desktop app to open them; the app decides what may be opened.
 
@@ -9,7 +10,41 @@ type Block =
   | { kind: "heading"; level: number; text: string }
   | { kind: "para"; text: string }
   | { kind: "list"; ordered: boolean; items: string[] }
-  | { kind: "code"; text: string };
+  | { kind: "code"; text: string }
+  | { kind: "table"; head: string[]; align: Align[]; rows: string[][] };
+
+type Align = "left" | "center" | "right" | undefined;
+
+/** A table's row: `| a | b |`. Its cells, split on `|` outside inline code (`\|` is a literal bar). */
+function cells(line: string): string[] {
+  const text = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const out: string[] = [];
+  let cell = "";
+  let inCode = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "\\" && text[i + 1] === "|") {
+      cell += "|";
+      i++;
+    } else if (c === "`") {
+      inCode = !inCode;
+      cell += c;
+    } else if (c === "|" && !inCode) {
+      out.push(cell.trim());
+      cell = "";
+    } else cell += c;
+  }
+  out.push(cell.trim());
+  return out;
+}
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+/** The line under a table's header: `|---|:---:|---:|`. */
+const TABLE_RULE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
+function isTableStart(lines: string[], i: number): boolean {
+  return TABLE_ROW.test(lines[i]) && i + 1 < lines.length && TABLE_RULE.test(lines[i + 1]);
+}
 
 function blocks(source: string): Block[] {
   const out: Block[] = [];
@@ -25,6 +60,15 @@ function blocks(source: string): Block[] {
       while (i < lines.length && !lines[i].startsWith("```")) code.push(lines[i++]);
       i++;
       out.push({ kind: "code", text: code.join("\n") });
+    } else if (isTableStart(lines, i)) {
+      const head = cells(line);
+      const align: Align[] = cells(lines[i + 1]).map((c) =>
+        c.startsWith(":") && c.endsWith(":") ? "center" : c.endsWith(":") ? "right" : c.startsWith(":") ? "left" : undefined,
+      );
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && TABLE_ROW.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push({ kind: "table", head, align, rows });
     } else if (/^#{1,6}\s/.test(line)) {
       const level = line.match(/^#+/)![0].length;
       out.push({ kind: "heading", level, text: line.slice(level).trim() });
@@ -47,6 +91,7 @@ function blocks(source: string): Block[] {
         i < lines.length &&
         lines[i].trim() &&
         !lines[i].startsWith("```") &&
+        !isTableStart(lines, i) &&
         !/^#{1,6}\s/.test(lines[i]) &&
         !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i])
       ) {
@@ -113,6 +158,34 @@ export function Markdown({ source, onLink }: { source: string; onLink: (href: st
               </Tag>
             );
           }
+          case "table":
+            // Wide tables scroll sideways inside their own box.
+            return (
+              <div key={k} className="md-table">
+                <table>
+                  <thead>
+                    <tr>
+                      {b.head.map((c, j) => (
+                        <th key={j} style={{ textAlign: b.align[j] }}>
+                          {inline(c, onLink, `${k}-h${j}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.rows.map((row, r) => (
+                      <tr key={r}>
+                        {b.head.map((_, j) => (
+                          <td key={j} style={{ textAlign: b.align[j] }}>
+                            {inline(row[j] ?? "", onLink, `${k}-${r}-${j}`)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
           case "code":
             return (
               <pre key={k}>
