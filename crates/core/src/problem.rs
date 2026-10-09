@@ -98,6 +98,9 @@ problems! {
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
     /// The chosen AI agent is no longer on this computer (Task-A05-02).
     AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
+    /// A link in a task's description that FlipHopper will not open (Task-A01-16).
+    LinkRefused { link } => "link_refused", "FlipHopper opens only web links and text files (.md, .txt) inside this project, so it did not open \"{link}\".";
+    LinkNotFound { link } => "link_not_found", "The file \"{link}\" does not exist.";
     /// FlipHopper was started with a folder that does not exist or is not a folder.
     StartupNotAFolder { path } => "startup_not_a_folder", "FlipHopper was started with {path}, which is not a folder, so nothing was opened.";
     /// Only an unheld backlog or waiting task can be made ready.

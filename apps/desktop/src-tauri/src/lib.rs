@@ -13,9 +13,9 @@ use std::sync::Mutex;
 
 use fliphopper_core::{Loaded, Problem};
 use fliphopper_store::{
-    AgentSetup, Inspection, TaskSystem, add_agent_instructions, add_readme_if_empty,
+    AgentSetup, Inspection, LinkTarget, TaskSystem, add_agent_instructions, add_readme_if_empty,
     agent_convert_request_in, agent_setup, agent_setup_request_in, create_starter,
-    find_task_system, git_root, inspect, load, picked_folder, stamp,
+    find_task_system, git_root, inspect, load, picked_folder, resolve_task_link, stamp,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -158,6 +158,33 @@ fn file_manager_command(root: &Path) -> Result<Command, Problem> {
     let mut command = Command::new(program);
     command.arg(root);
     Ok(command)
+}
+
+/// The system program that opens a file or web address with the user's own app for it.
+fn opener() -> Command {
+    Command::new(if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    })
+}
+
+/// Open a link from a task's description: a web page in the browser, or a text file inside the
+/// project (such as the task's card) in the user's editor. Anything else is refused by
+/// `resolve_task_link` (Task-A01-16).
+#[tauri::command]
+fn open_task_link(root: PathBuf, task: String, link: String) -> Result<(), Problem> {
+    let mut command = opener();
+    match resolve_task_link(&root, &task, &link)? {
+        LinkTarget::Web(url) => command.arg(url),
+        LinkTarget::File(path) => command.arg(path),
+    };
+    command.spawn().map(drop).map_err(|e| Problem::OpenFailed {
+        path: link,
+        detail: e.to_string(),
+    })
 }
 
 /// Show the open seabag's folder in Finder or Explorer.
@@ -493,6 +520,7 @@ pub fn run() {
             seabag_stamp,
             create_seabag,
             show_in_file_manager,
+            open_task_link,
             system_languages,
             set_menu_texts,
             set_recent_folders,

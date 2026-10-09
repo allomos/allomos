@@ -26,7 +26,7 @@ Today the app lists tasks but clicking one does nothing. After this card, clicki
 - **Owner's choices (2026-10-08).** A pane beside the list: accepted. Release v0.2: "ok for now".
 - **Not in the pane.** Approvals: the seabag has no approvals field; for FlipHopper's own tasks they stay in the card file, reached through the description link.
 - **Decisive unknowns.**
-  - How the pane behaves in a narrow window (below or over the list): the worker proposes one at the check.
+  - How the pane behaves in a narrow window: proposed and built **over the list**, with a close button (below 720 px wide).
 - **Files owned.** `apps/web/src/App.tsx` (or a new `TaskPane.tsx`), `apps/web/src/types.ts`, `apps/web/src/i18n/*`, `apps/desktop/src-tauri/src/lib.rs` (reading one task's description, opening a linked file), `crates/store` if a read function is missing, this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -40,7 +40,21 @@ Today the app lists tasks but clicking one does nothing. After this card, clicki
 | 2026-10-08 | Write the card; a pane beside the list; release v0.2 "ok for now" | owner (chat) |
 | 2026-10-08 | The pane's lines as listed ("accept, start it") | owner (chat) |
 
-
 ## Notes
 
 - 2026-10-08 — Card written by the agent from the owner's request.
+- 2026-10-08 — Owner accepted the pane's lines; worked in `claude/a01-16-task-pane`.
+
+## Result (2026-10-08)
+
+**In plain words.** Clicking a task in the list opens a pane beside it with the task's ID and title, area, iteration (with its release), state, label, holder, what it waits on, its next need, its handoff note, its description and a history line. Empty fields show a dash. The description is shown as formatted text (headings, lists, code, bold, links). Clicking the card link opens the card file in the user's editor. Up and down arrows move through the tasks in the order the list shows them (by area or by iteration), Esc or × closes the pane, and clicking the selected task again closes it too. In a narrow window the pane covers the list instead of sitting beside it. History says it is not recorded yet; it fills in once editing records changes.
+
+**Opening links safely.** A description is plain text anyone can write, so the app opens only two kinds of link: web pages (`http`, `https`) in the browser, and `.md`, `.markdown` or `.txt` files inside the project folder in the user's editor. Any other link (a program, a folder, a file outside the project, `file:` or `mailto:`) is refused with a plain message (`link_refused`; a missing file: `link_not_found`). The check is in Rust (`resolve_task_link` in `crates/store`); the Markdown is turned into page elements directly, never into HTML text, so a description cannot add markup. No new package was needed.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (store: new `task_links_open_only_text_files_in_the_project_and_web_pages`) | PASS |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (137 texts, 43 codes) | PASS |
+| The interface in a browser with FlipHopper's own tasks and descriptions: click opens the pane; ↓ ↓ ↑ move the selection; the card link asks the app to open `../../../../docs/tasks/Task-A00-03-….md`; Esc closes; narrow window: pane over the list; dark mode readable | PASS |
+| Built app on FlipHopper's own repository: click a task, open its card link, keyboard | PASS: owner (2026-10-09), with one change asked: the scroll bar belongs at the list's right edge, not the pane's |
+| Change (2026-10-09): the list scrolls on its own, beside the pane, which scrolls separately; the window no longer scrolls as a whole. In the browser: the list's scroll bar is at its right edge (x 642, pane from x 656); opening the pane keeps the list's place | PASS: owner verified ("fine", 2026-10-09) |

@@ -320,6 +320,57 @@ fn append(path: &Path, text: &str, section: &str) -> io::Result<()> {
     file.write_all(format!("{gap}{section}").as_bytes())
 }
 
+/// Where a link in a task's description leads, once FlipHopper has agreed to open it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LinkTarget {
+    /// An `http` or `https` address, for the web browser.
+    Web(String),
+    /// A text file inside the project, for the user's editor.
+    File(PathBuf),
+}
+
+/// File types a description link may open: text the user reads or edits, never a program.
+const LINKABLE: &[&str] = &["md", "markdown", "txt"];
+
+/// Check a link from task `task`'s `description.md` in the seabag at `root`. Web addresses
+/// (`http`, `https`) are allowed. A relative path is read from the task's folder, the way a
+/// Markdown viewer would, and must lead to an existing `.md`, `.markdown` or `.txt` file inside
+/// the project folder (the folder holding `.fliphopper/`, or the seabag itself when it stands
+/// alone). Everything else is refused, so a description cannot be used to start a program.
+pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarget, Problem> {
+    let refused = || Problem::LinkRefused {
+        link: link.to_string(),
+    };
+    let lower = link.to_ascii_lowercase();
+    if lower.starts_with("http://") || lower.starts_with("https://") {
+        return Ok(LinkTarget::Web(link.to_string()));
+    }
+    // Any other scheme (`file:`, `mailto:`, `javascript:` …) and absolute paths are refused.
+    if link.is_empty() || link.contains(':') || link.starts_with('/') || link.starts_with('\\') {
+        return Err(refused());
+    }
+    if !fliphopper_core::ops::valid_id(task) {
+        return Err(refused());
+    }
+    // A link may point into a file (`card.md#approvals`); the part after `#` is not a file name.
+    let path = link.split('#').next().unwrap_or_default();
+    let project = picked_folder(root).unwrap_or(root);
+    let target = root.join("tasks").join(task).join(path);
+    let (Ok(project), Ok(target)) = (project.canonicalize(), target.canonicalize()) else {
+        return Err(Problem::LinkNotFound {
+            link: link.to_string(),
+        });
+    };
+    let text = target
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| LINKABLE.contains(&e.to_ascii_lowercase().as_str()));
+    if !target.starts_with(&project) || !target.is_file() || !text {
+        return Err(refused());
+    }
+    Ok(LinkTarget::File(target))
+}
+
 /// The folder the user picked, for a seabag at `<folder>/.fliphopper/seabag`; `None` for a
 /// seabag anywhere else.
 pub fn picked_folder(root: &Path) -> Option<&Path> {
@@ -1369,6 +1420,64 @@ mod tests {
         assert_eq!(loaded.issues[0].problem.code(), "unknown_iteration");
         assert_eq!(loaded.seabag.unwrap().tasks.len(), 1);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn task_links_open_only_text_files_in_the_project_and_web_pages() {
+        let dir = tmp("links");
+        let root = dir.join(DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        fs::create_dir_all(dir.join("docs/tasks")).unwrap();
+        fs::write(dir.join("docs/tasks/Card.md"), "# Card\n").unwrap();
+        fs::write(dir.join("docs/run.sh"), "echo\n").unwrap();
+        fs::create_dir_all(root.join("tasks/T1")).unwrap();
+        let outside = tmp("links-outside");
+        fs::write(outside.join("other.md"), "x").unwrap();
+
+        let card = dir.join("docs/tasks/Card.md").canonicalize().unwrap();
+        let file = |link: &str| resolve_task_link(&root, "T1", link);
+        assert_eq!(
+            file("../../../../docs/tasks/Card.md"),
+            Ok(LinkTarget::File(card.clone()))
+        );
+        assert_eq!(
+            file("../../../../docs/tasks/Card.md#approvals"),
+            Ok(LinkTarget::File(card))
+        );
+        assert_eq!(
+            file("https://example.com/a"),
+            Ok(LinkTarget::Web("https://example.com/a".into()))
+        );
+        let refused = |link: &str| Err(Problem::LinkRefused { link: link.into() });
+        for link in [
+            "../../../../docs/run.sh",
+            "../../../../docs/tasks",
+            "file:///etc/hosts",
+            "mailto:a@b.c",
+            "javascript:alert(1)",
+            "/etc/hosts",
+            "",
+        ] {
+            assert_eq!(file(link), refused(link), "{link}");
+        }
+        // Outside the project, even as a text file.
+        let escape = format!(
+            "../../../../../{}/other.md",
+            outside.file_name().unwrap().to_str().unwrap()
+        );
+        assert_eq!(file(&escape), refused(&escape));
+        assert_eq!(
+            file("../../../../docs/tasks/Gone.md"),
+            Err(Problem::LinkNotFound {
+                link: "../../../../docs/tasks/Gone.md".into()
+            })
+        );
+        assert!(matches!(
+            resolve_task_link(&root, "../x", "a.md"),
+            Err(Problem::LinkRefused { .. })
+        ));
+        fs::remove_dir_all(dir).unwrap();
+        fs::remove_dir_all(outside).unwrap();
     }
 
     #[test]
