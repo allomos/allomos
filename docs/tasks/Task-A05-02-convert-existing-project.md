@@ -103,3 +103,19 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 | `npm --prefix apps/web run typecheck`, `build`, `check:i18n` (137 texts, 42 Rust codes) | PASS |
 | **Real agent trial** — Claude Code, request version 1 in English, on a Git copy of `crates/store/tests/fixtures/markdown-board` in a scratch folder. Turn 1: it changed nothing, showed a mapping table and asked 5 questions. Turn 2 ("go", plus one change): branch `fliphopper/convert`, seabag with the project's ladder, 3 areas, 5 tasks (done, held by `claude/order-form` with label, waiting with next dependency, ready, backlog "no card yet"), report `docs/fliphopper-conversion.md`, `AGENTS.md` status and claiming rules replaced and boundaries kept, cut-over listed and left in place, nothing pushed. `fh list --json`: no issues. Task links resolve to the card files (one to an area-file section). | PASS |
 | The panel in the built app | owner check |
+
+## Change (2026-10-09, owner): the agent finds the tasks, and asks in the app before moving
+
+**Owner's request:** "prompt no task here, and user can use one of his agents to detect the tasks and move. before moving, there will be a confirm popup, which is showed up by the agent to call the fh command. user can choose cancel in that popup." Answers: the popup is in the FlipHopper app; the app no longer looks for a board.
+
+**In plain words.** A folder without a seabag now says **No tasks here yet**, with **Ask an AI agent to find and move tasks…** and **Create an empty seabag**. FlipHopper no longer looks for boards or card files itself; the agent does. Before the agent changes anything, it writes its plan to a file and runs `fh confirm`: the FlipHopper window shows the plan in a popup with **Go ahead** and **Cancel**, and `fh confirm` tells the agent the answer (exit 0, or exit 1 `confirm_declined`). If no window shows the question within 3 seconds, `fh` opens the app on the project; with no answer in 10 minutes it gives up (`confirm_timeout`) and the popup disappears.
+
+- **Removed:** `find_task_system` and the "what was found" lists; the request no longer lists findings.
+- **Added:** `crates/store/src/confirm.rs` (questions in `<project>/.fliphopper/requests/`, ignored by Git, each with a time limit), `fh confirm` in `crates/cli`, the desktop commands `confirm_requests` and `answer_confirm_request`, `apps/web/src/ConfirmDialog.tsx`, problem codes `confirm_declined`, `confirm_timeout`, `request_not_found`; the request is **version 2**.
+
+| Check (2026-10-09) | Result |
+|---|---|
+| `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` (new: `fh confirm` answered Go ahead, Cancel and not at all; an unreadable plan; questions asked, seen, answered, expired and withdrawn; request v2 in three languages) | PASS |
+| Web `typecheck`, `build`, `check:i18n` (155 texts, 47 codes) | PASS |
+| The built app on `~/fliphopper-tests/a05-02-bakery` saw a test question from `fh confirm` within 2.5 s (it marked it seen); the question timed out as asked | PASS |
+| The popup and the whole flow on screen | owner check |
