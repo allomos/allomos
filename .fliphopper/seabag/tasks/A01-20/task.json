@@ -1,0 +1,7 @@
+{
+  "area": "A01",
+  "id": "A01-20",
+  "next_dependency": "do together with A00-21 (Allomos): folder .allomos/taskbag/",
+  "state": "ready",
+  "title": "Rename seabag to taskcase"
+}

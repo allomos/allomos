@@ -1,0 +1,8 @@
+{
+  "area": "A00",
+  "id": "A00-21",
+  "next_dependency": "owner: a CNIPA search for China and an attorney's view on ALLMOS/ALOMOS/ALTOMOS; then say when to start",
+  "state": "waiting",
+  "title": "Rename the app to Allomos",
+  "waiting_on": "owner (later): CNIPA search for China, and a trademark attorney's view on ALLMOS/ALOMOS/ALTOMOS; then the word to start"
+}
