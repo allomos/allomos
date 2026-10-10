@@ -101,7 +101,7 @@ fn check_id(file: &str, field: &str, id: &str, issues: &mut Vec<Issue>) {
 pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     let project: Project = parse(file, text).map_err(|i| vec![i])?;
     let mut issues = Vec::new();
-    if project.format != FORMAT && project.format != crate::model::LEGACY_FORMAT {
+    if project.format != FORMAT {
         issues.push(Issue::new(
             file,
             Some("format"),

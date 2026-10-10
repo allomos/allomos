@@ -42,9 +42,6 @@ pub use setup::{
 /// Where a project's taskbag lives inside the folder the user picked.
 /// Always used for a new taskbag, also in an empty folder, so every tool looks in one place.
 pub const DEFAULT_DIR: &str = ".allomos/taskbag";
-/// Where FlipHopper kept a project's tasks before the app was renamed Allomos (decision 0013,
-/// 2026-10-10). Still found and opened; [`move_legacy_taskbag`] moves it to [`DEFAULT_DIR`].
-pub const LEGACY_DIR: &str = ".fliphopper/seabag";
 const PROJECT_FILE: &str = "project.json";
 /// The file every writer locks for the length of one change. Never committed.
 pub const LOCK_FILE: &str = ".lock";
@@ -444,7 +441,7 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
 /// The folder the user picked, for a taskbag at `<folder>/.allomos/taskbag`; `None` for a
 /// taskbag anywhere else.
 pub fn picked_folder(root: &Path) -> Option<&Path> {
-    if root.ends_with(DEFAULT_DIR) || root.ends_with(LEGACY_DIR) {
+    if root.ends_with(DEFAULT_DIR) {
         root.parent()?.parent()
     } else {
         None
@@ -466,10 +463,6 @@ pub fn inspect(folder: &Path) -> Inspection {
     let nested = folder.join(DEFAULT_DIR);
     if nested.join(PROJECT_FILE).is_file() {
         return Inspection::Found { root: nested };
-    }
-    let legacy = folder.join(LEGACY_DIR);
-    if legacy.join(PROJECT_FILE).is_file() {
-        return Inspection::Found { root: legacy };
     }
     if looks_empty(folder) {
         Inspection::Empty {
@@ -727,52 +720,10 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
 /// Find the taskbag for `start`: the nearest `.allomos/taskbag/` at or above it,
 /// the way Git finds its repository.
 pub fn find_taskbag(start: &Path) -> Option<PathBuf> {
-    start.ancestors().find_map(|p| {
-        [DEFAULT_DIR, LEGACY_DIR]
-            .into_iter()
-            .map(|dir| p.join(dir))
-            .find(|root| root.join(PROJECT_FILE).is_file())
-    })
-}
-
-/// Whether the taskbag at `root` is still in FlipHopper's old place, `.fliphopper/seabag/`.
-pub fn is_legacy_taskbag(root: &Path) -> bool {
-    root.ends_with(LEGACY_DIR)
-}
-
-/// Move a taskbag from FlipHopper's old place (`<folder>/.fliphopper/seabag/`) to
-/// `<folder>/.allomos/taskbag/`, and mark its `project.json` with the current format. Holds the
-/// lock while it moves, so no writer is half-way through. An empty `.fliphopper/` left behind is
-/// removed. Returns the new root. Refused when a taskbag is already at the new place.
-pub fn move_legacy_taskbag(root: &Path) -> Result<PathBuf, Problem> {
-    let Some(folder) = picked_folder(root).filter(|_| is_legacy_taskbag(root)) else {
-        return Err(Problem::NotATaskbag {
-            path: root.display().to_string(),
-        });
-    };
-    let target = folder.join(DEFAULT_DIR);
-    if target.exists() {
-        return Err(Problem::TaskbagExists {
-            path: target.display().to_string(),
-        });
-    }
-    let lock = Lock::acquire(root, Duration::from_secs(5))?;
-    let parent = target.parent().expect("the new place has a parent");
-    fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
-    fs::rename(root, &target).map_err(|e| write_failed(&target, e))?;
-    drop(lock);
-    // The format tag says which program wrote the folder; now it is Allomos's.
-    let path = target.join(PROJECT_FILE);
-    if let Ok(text) = fs::read_to_string(&path) {
-        if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&text) {
-            value["format"] = serde_json::Value::String(FORMAT.to_string());
-            write_atomic(&path, &json_text(&value))?;
-        }
-    }
-    let old = folder.join(".fliphopper");
-    let _ = fs::remove_dir(old.join("requests"));
-    let _ = fs::remove_dir(&old);
-    Ok(target)
+    start
+        .ancestors()
+        .map(|p| p.join(DEFAULT_DIR))
+        .find(|p| p.join(PROJECT_FILE).is_file())
 }
 
 /// A project ID made from a folder name: letters, digits, `-` and `_` kept, anything else

@@ -10,8 +10,8 @@ mod problem;
 mod validate;
 
 pub use model::{
-    Area, FORMAT, Iteration, LEGACY_FORMAT, Project, State, TASK_LANGUAGE_UI, Task, Taskbag,
-    default_labels, valid_language,
+    Area, FORMAT, Iteration, Project, State, TASK_LANGUAGE_UI, Task, Taskbag, default_labels,
+    valid_language,
 };
 pub use problem::Problem;
 pub use validate::{

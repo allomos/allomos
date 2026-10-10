@@ -47,7 +47,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | `"allomos/1"` for this version. FlipHopper's `"fliphopper/1"` is still read; `alm migrate` and the app's move rewrite it as `"allomos/1"` ([0015](../decisions/0015-product-name-allomos.md)). Other values are refused, including the earlier `"glidebox/1"`; those folders are not converted ([0013](../decisions/0013-product-name-fliphopper.md)). |
+| `format` | yes | Always `"allomos/1"` for this version. Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `alm labels`. |

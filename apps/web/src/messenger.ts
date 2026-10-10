@@ -20,8 +20,6 @@ export interface Messenger {
   pickFolder(title: string): Promise<string | null>;
   inspectFolder(path: string): Promise<FolderInfo>;
   openTaskbag(root: string): Promise<Opened>;
-  /** Moves a taskbag from FlipHopper's old `.fliphopper/seabag/` to `.allomos/taskbag/` and opens it there. Rejects with a Problem. */
-  moveLegacyTaskbag(root: string): Promise<Opened>;
   /** A fingerprint of the taskbag's files; it changes whenever a file is written. */
   taskbagStamp(root: string): Promise<string>;
   /**
@@ -92,7 +90,6 @@ export const desktopMessenger: Messenger = {
   },
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
   openTaskbag: (root) => invoke<Opened>("open_taskbag", { root }),
-  moveLegacyTaskbag: (root) => invoke<Opened>("move_legacy_taskbag", { root }),
   taskbagStamp: (root) => invoke<string>("taskbag_stamp", { root }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),

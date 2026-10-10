@@ -41,13 +41,7 @@ const LOCK_WAIT_MS: u64 = 5000;
 )]
 struct Cli {
     /// The taskbag folder, or a folder holding .allomos/taskbag/. Default: search upward from here.
-    #[arg(
-        long,
-        global = true,
-        env = "ALLOMOS_TASKBAG",
-        value_name = "PATH",
-        alias = "seabag"
-    )]
+    #[arg(long, global = true, env = "ALLOMOS_TASKBAG", value_name = "PATH")]
     taskbag: Option<PathBuf>,
     /// Who you are, for example claude/a01-03-alm.
     #[arg(
@@ -94,9 +88,6 @@ enum Command {
     Add(Add),
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
-    /// Move this project's taskbag from FlipHopper's old place, .fliphopper/seabag/, to
-    /// .allomos/taskbag/ (the app was renamed Allomos).
-    Migrate,
     /// Print the details the brief points to: terms, what a project may customize, commands,
     /// and how to work the tasks. All topics when none is named.
     Guide {
@@ -237,7 +228,6 @@ impl Command {
             | Command::Labels { .. }
             | Command::TaskLanguage { .. }
             | Command::Brief
-            | Command::Migrate
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
@@ -256,8 +246,6 @@ impl Command {
                 | Command::Show { .. }
                 | Command::Next
                 | Command::Confirm { .. }
-                // Moves the whole folder; `--commit` would stage only the new place. Commit by hand.
-                | Command::Migrate
                 | Command::Brief
                 | Command::Guide { .. }
         )
@@ -270,7 +258,6 @@ impl Command {
             Command::Labels { .. } => "labels",
             Command::TaskLanguage { .. } => "task-language",
             Command::Brief => "brief",
-            Command::Migrate => "migrate",
             Command::Guide { .. } => "guide",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
@@ -478,20 +465,6 @@ fn print_error(command: Option<&str>, problem: &Problem) {
 
 /// The entry point of both programs.
 pub fn main() -> i32 {
-    // Before the rename the settings were FLIPHOPPER_*; honour them when the new ones are unset.
-    for (new, old) in [
-        ("ALLOMOS_TASKBAG", "FLIPHOPPER_SEABAG"),
-        ("ALLOMOS_HOLDER", "FLIPHOPPER_HOLDER"),
-        ("ALLOMOS_SETTINGS_DIR", "FLIPHOPPER_SETTINGS_DIR"),
-        ("ALLOMOS_LOCK_WAIT_MS", "FLIPHOPPER_LOCK_WAIT_MS"),
-    ] {
-        if std::env::var_os(new).is_none() {
-            if let Some(value) = std::env::var_os(old) {
-                // SAFETY: at the very start of the program, before any thread exists.
-                unsafe { std::env::set_var(new, value) };
-            }
-        }
-    }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     run(std::env::args_os().collect(), &cwd)
 }
@@ -517,12 +490,6 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
                 Ok(path)
             } else if path.join(DEFAULT_DIR).join("project.json").is_file() {
                 Ok(path.join(DEFAULT_DIR))
-            } else if path
-                .join(allomos_store::LEGACY_DIR)
-                .join("project.json")
-                .is_file()
-            {
-                Ok(path.join(allomos_store::LEGACY_DIR))
             } else {
                 Err(not_found(&path))
             }
@@ -751,23 +718,6 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             plan,
             timeout,
         } => confirm(cli, cwd, title, plan, *timeout),
-        Command::Migrate => {
-            let root = locate(cli, cwd)?;
-            if !allomos_store::is_legacy_taskbag(&root) {
-                let text = format!("Already in the new place: {}\n", root.display());
-                return Ok(Done::new(json!({ "taskbag": root, "moved": false }), text));
-            }
-            let new = allomos_store::move_legacy_taskbag(&root)?;
-            let text = format!(
-                "Moved {} to {}\nRefresh the AGENTS.md section with `alm brief`.\n",
-                root.display(),
-                new.display()
-            );
-            Ok(Done::new(
-                json!({ "taskbag": new, "moved": true, "from": root }),
-                text,
-            ))
-        }
         Command::Brief => {
             // With a taskbag, the section names it when it is outside the project folder.
             let text = match locate(cli, cwd) {

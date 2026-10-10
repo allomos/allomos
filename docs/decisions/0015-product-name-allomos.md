@@ -24,9 +24,9 @@ The folder that holds a project's tasks, the **seabag**, is now the **taskbag**:
 | Environment settings | `FLIPHOPPER_*` | **`ALLOMOS_*`** |
 | App ID and settings folder | `io.fliphopper` | **`io.allomos`** |
 | Icon | the hopper | **kept** |
-| GitHub repository, local folder | `mypals-ml/fliphopper`, `…/glidepace/fliphopper` | to be renamed **only with the owner's separate approval** (external operation) |
+| GitHub repository, local folder | `mypals-ml/fliphopper`, `…/glidepace/fliphopper` | **`mypals-ml/allomos`, `…/glidepace/allomos`** (owner approved 2026-10-11) |
 
-**Old projects keep working.** Allomos still opens `.fliphopper/seabag/`, still reads `fliphopper/1`, still honours `--seabag` and `FLIPHOPPER_*` settings, and reads FlipHopper's settings file until it saves its own. `alm migrate`, or the app's **Move to .allomos/taskbag/** button, moves an old project once. The old FlipHopper section in an `AGENTS.md` is not taken as telling agents about Allomos, so the app offers to refresh it.
+**An old FlipHopper project is treated like any other task system** (owner, 2026-10-11). Allomos does not open `.fliphopper/seabag/` or read `fliphopper/1`; a folder holding one gets a new, empty taskbag, and the open-folder flow offers its usual step: one AI agent finds the existing tasks (here, FlipHopper's files) and, after **Go ahead** in the app, moves them in with `alm` ([OPEN-FOLDER-FLOW](../product/OPEN-FOLDER-FLOW.md)). The old FlipHopper section in an `AGENTS.md` does not count as telling agents about Allomos, so the app offers to refresh it. Only the app's interface-language setting is read from FlipHopper's settings file until Allomos saves its own. FlipHopper's own repository moved its folder once by hand (`git mv`).
 
 ## Why this name
 

@@ -3,10 +3,6 @@ use serde::{Deserialize, Serialize};
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`).
 pub const FORMAT: &str = "allomos/1";
 
-/// The format FlipHopper wrote before the app was renamed Allomos (decision 0013, 2026-10-10).
-/// Still read, so no project breaks; `alm migrate` and the app's move rewrite it as [`FORMAT`].
-pub const LEGACY_FORMAT: &str = "fliphopper/1";
-
 /// A project: one taskbag.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

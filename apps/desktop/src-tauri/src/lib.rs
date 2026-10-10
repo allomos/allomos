@@ -101,18 +101,6 @@ fn open_taskbag(root: PathBuf) -> Opened {
     }
 }
 
-/// Move a project's taskbag from FlipHopper's old place, `.fliphopper/seabag/`, to
-/// `.allomos/taskbag/`, then load it from the new place.
-#[tauri::command]
-fn move_legacy_taskbag(root: PathBuf) -> Result<Opened, Problem> {
-    let new = allomos_store::move_legacy_taskbag(&root)?;
-    Ok(Opened {
-        loaded: load(&new),
-        root: new,
-        readme_added: false,
-    })
-}
-
 /// A fingerprint of the taskbag's files. The window asks for it about once a second and
 /// reloads when it changes, so changes made by `alm` show without reopening the folder.
 /// Sent as text: a 64-bit number does not fit a JavaScript number.
@@ -562,7 +550,6 @@ pub fn run() {
             startup_folder,
             inspect_folder,
             open_taskbag,
-            move_legacy_taskbag,
             taskbag_stamp,
             create_taskbag,
             show_in_file_manager,

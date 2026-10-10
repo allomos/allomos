@@ -41,6 +41,8 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-11 | **External operations approved:** rename the GitHub repository `mypals-ml/fliphopper` to `mypals-ml/allomos` and update `origin`; rename the local folder `…/glidepace/fliphopper` to `…/glidepace/allomos` ("the project folder and the github repository name should also be changed") | owner (chat) |
+| 2026-10-11 | Old FlipHopper projects: no move button; "treat it as standard need to be moved task system" | owner (chat) |
 | 2026-10-10 | Rename approved; alias `alm`; `fh` not kept; owner registers domains; hopper icon kept; taskbag + 任务包 for the folder word | owner (chat) |
 
 ## Notes
@@ -63,3 +65,4 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
 - 2026-10-11 — **Owner: "then Allomos. start now"** (after comparing Allom, Allamos and the allagí + ōmos forms). Started before the owner's China search and attorney review, at the owner's choice. Claimed; branch `claude/a00-21-allomos`, done together with [`A01-20`](./Task-A01-20-rename-seabag-to-taskcase.md).
 - 2026-10-11 — **Code renamed** (crates, apps): `allomos` / `alm`, `.allomos/taskbag/`, `allomos/1`, `ALLOMOS_*`, `io.allomos`; 换肩 in Chinese screens, アロモス in Japanese ones; 任务包 / タスクバッグ. **Compatibility:** `.fliphopper/seabag/` and `fliphopper/1` still read; `--seabag` and `FLIPHOPPER_*` still honoured; FlipHopper's settings file read until Allomos saves its own; `alm migrate` and the app's **Move to .allomos/taskbag/** button move an old project. Checks: `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` (new test: an old project opens by folder, `--seabag` and `FLIPHOPPER_SEABAG`, and `alm migrate` moves it), web typecheck, build, `check:i18n` (160 texts, 48 codes): PASS.
 - 2026-10-11 — **Current documents renamed**; new decision [0015](../decisions/0015-product-name-allomos.md) supersedes 0013's name. Kept on purpose: `mypals-ml/fliphopper`, `…/glidepace/fliphopper` (external operations, not approved yet), file names, and dated history.
+- 2026-10-11 — Owner checked the built app: the name shows correctly ("passed"). **Compatibility removed** at the owner's word: `.fliphopper/seabag/`, `fliphopper/1`, `--seabag`, `FLIPHOPPER_*`, `alm migrate` and the move button are gone; an old FlipHopper project is moved in by an AI agent through the open-folder flow, like any other task system. Checks after the removal: Rust fmt, clippy, all tests; web typecheck, build, `check:i18n` (156 texts): PASS.

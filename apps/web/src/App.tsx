@@ -24,12 +24,7 @@ const RECENT_MAX = 10;
 
 /** The project folder the user picked, from a taskbag root (`<folder>/.allomos/taskbag`). */
 function projectFolder(root: string): string {
-  return root.replace(/[\\/](\.allomos[\\/]taskbag|\.fliphopper[\\/]seabag)[\\/]?$/, "");
-}
-
-/** A taskbag still in FlipHopper's old place, `.fliphopper/seabag/` (before the rename to Allomos). */
-function isLegacyTaskbag(root: string): boolean {
-  return /[\\/]\.fliphopper[\\/]seabag[\\/]?$/.test(root);
+  return root.replace(/[\\/]\.allomos[\\/]taskbag[\\/]?$/, "");
 }
 
 function readRecent(): string[] {
@@ -54,11 +49,7 @@ const FOLLOW_MS = 1000;
 function folderName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   // The project is named after the picked folder, not the `.allomos/taskbag` inside it.
-  if (
-    (parts.at(-1) === "taskbag" && parts.at(-2) === ".allomos") ||
-    (parts.at(-1) === "seabag" && parts.at(-2) === ".fliphopper")
-  )
-    parts.splice(-2);
+  if (parts.at(-1) === "taskbag" && parts.at(-2) === ".allomos") parts.splice(-2);
   return parts.at(-1) ?? "Project";
 }
 
@@ -379,27 +370,6 @@ export function App({ messenger }: { messenger: Messenger }) {
               if (message) setNotices((list) => [...list, { text: message }]);
             }}
           />
-        )}
-
-        {opened && isLegacyTaskbag(opened.root) && (
-          <section className="card">
-            <h2>{t("legacy.title")}</h2>
-            <p>{rich("legacy.body", { old: <code>.fliphopper/seabag/</code>, new: <code>.allomos/taskbag/</code> })}</p>
-            <div className="row">
-              <button
-                type="button"
-                className="primary"
-                onClick={() =>
-                  void messenger
-                    .moveLegacyTaskbag(opened.root)
-                    .then((o) => show(o, { key: "legacy.moved" }))
-                    .catch((e) => setError(errorNote(e)))
-                }
-              >
-                {t("legacy.move")}
-              </button>
-            </div>
-          </section>
         )}
 
         {opened && setup && !setup.project_folder && (
