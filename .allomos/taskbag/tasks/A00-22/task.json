@@ -3,6 +3,7 @@
   "holder": "claude/a00-22-leftover-names",
   "id": "A00-22",
   "label": "locally verified",
+  "next_dependency": "owner: the ~/fliphopper-tests path and scripts/move-board-to-seabag.py",
   "state": "in_progress",
   "title": "Clear leftover FlipHopper names"
 }
