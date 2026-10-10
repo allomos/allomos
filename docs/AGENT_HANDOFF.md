@@ -37,11 +37,10 @@ Updated: 2026-10-04
 One block per card that `alm list --state in_progress` shows held.
 
 ### Task-A00-21 (with A01-20) — claude/a00-21-allomos
-- Checkout: `.claude/worktrees/a00-21-allomos` · branch `claude/a00-21-allomos` · pushed: yes
-- Approvals in force: the rename (owner 2026-10-10/11), local work only. Approved 2026-10-11: renaming the GitHub repository and the local folder. **Not approved:** republishing decks.
-- Done: code and current documents renamed; checks pass (card Notes).
-- Next: owner looks at the built Allomos app; then merge into `main`, install `alm` (`cargo install --locked --path crates/cli`), move FlipHopper's own `.fliphopper/seabag/` with `git mv` to `.allomos/taskbag/` (format `allomos/1`), commit, push; rename the GitHub repository and the local folder (approved); tell other sessions to use `alm` and `ALLOMOS_*` (old names no longer work).
-- Pitfall: until the merge, `main` still has `fh`; after it, sessions must reinstall (`fh` is gone).
+- Checkout: `.claude/worktrees/a00-21-allomos` (inside the main folder) · branch `claude/a00-21-allomos`, merged into `main` · pushed: yes
+- Done: code, documents, own taskbag moved, `alm` installed, `fh` uninstalled, GitHub repository renamed to `mypals-ml/allomos`.
+- In progress: renaming the local folder to `/Users/wanghui/coding/glidepace/allomos`, then `git worktree repair`. If a session finds the old path missing, open the new one.
+- Next: owner's last look; then label owner verified and finish A00-21 and A01-20.
 
 ## Live state
 
