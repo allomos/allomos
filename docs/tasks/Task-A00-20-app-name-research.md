@@ -18,7 +18,9 @@ A name check for "Handoff" and names like it, in the same way FlipHopper's name 
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-10 | "keep fliphopper for now": no rename | owner (chat) |
 
 ## Notes
 
 - 2026-10-10 — **Finding:** "Handoff" is a built-in Apple feature on the Mac, the agent world's own word for passing work between agents, and the name of at least five small tools in our exact space; every name and domain is taken. **Recommendation:** keep FlipHopper and say "handoffs" in the tagline; if a new name is wanted, **Batonhop** (free everywhere except `.com`). Waiting on the owner.
+- 2026-10-10 — **Owner decided: keep FlipHopper for now.** The taskcase rename ([`A01-20`](./Task-A01-20-rename-seabag-to-taskcase.md)) can go ahead with `.fliphopper/taskcase/`.

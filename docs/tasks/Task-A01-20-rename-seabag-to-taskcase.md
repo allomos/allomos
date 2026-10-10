@@ -18,7 +18,7 @@
 
 - **Outcome.** Everyone sees the new word, new projects use the new folder, and no existing project breaks.
 - **Decisive unknowns.**
-  - Whether the app's name changes too (owner, [`A00-20`](./Task-A00-20-app-name-research.md)). **Do this card after that answer**, so projects move only once.
+  - ~~Whether the app's name changes too~~ — answered 2026-10-10: **keep FlipHopper for now** ([`A00-20`](./Task-A00-20-app-name-research.md)), so the folder is `.fliphopper/taskcase/`.
   - Whether FlipHopper's own `.fliphopper/seabag/` is renamed in this card or later (owner; it changes every session's `FLIPHOPPER_SEABAG`).
 - **Files owned.** `crates/*` (paths, option, messages, guide, brief), `apps/*` (texts in three languages), `docs/` (current documents; dated history keeps "seabag", as 0013 says for "glidebox"), this card.
 - **External operations.** None.

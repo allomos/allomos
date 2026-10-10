@@ -32,7 +32,7 @@ The folder that holds a project's tasks, formerly the **task box**, is now the *
 
 - The folder on disk and the command option are renamed too: `.fliphopper/taskcase/`, `fh --taskcase`. FlipHopper keeps reading old `.fliphopper/seabag/` folders, so no project breaks.
 - Other names considered: 手提箱 (the owner chose 任务箱 for Chinese), taskfolder (clashes with "FlipHopper folder" and "project folder"), shoulderbag, 背包, 双肩包.
-- **Not built yet.** Until [`Task-A01-20`](../tasks/Task-A01-20-rename-seabag-to-taskcase.md) is done, the product and its documents still say "seabag". That card waits for the answer on the app's name ([`Task-A00-20`](../tasks/Task-A00-20-app-name-research.md)), so projects move only once.
+- **Not built yet.** Until [`Task-A01-20`](../tasks/Task-A01-20-rename-seabag-to-taskcase.md) is done, the product and its documents still say "seabag". The owner checked a rename of the app itself to "Handoff" or similar and kept FlipHopper for now (2026-10-10, [`Task-A00-20`](../tasks/Task-A00-20-app-name-research.md)).
 
 ## Why this name
 
