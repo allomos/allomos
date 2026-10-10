@@ -36,3 +36,8 @@ Allomos's Windows version can be built on the owner's Mac, without a Windows com
 
 - 2026-10-09 — Card written by the agent. Next: the owner approves the card and its external operations.
 - 2026-10-11 — First cross-build on the Mac made `Allomos_0.1.0_x64-setup.exe` (2.2 MB) and `alm.exe` (1.8 MB). **Pitfall found:** Homebrew `makensis` 3.13 crashes (`std::bad_alloc`) on any script when no locale is set (`LANG` empty, as in agent shells); rebuilding it from source did not help, `LC_ALL=en_US.UTF-8` does. The script sets it.
+- 2026-10-11 — Script and CODING_RULES section written (branch `claude/a07-02-windows-build`). Evidence, in a fresh worktree on the Mac:
+  - `PATH=/usr/bin:/bin bash apps/desktop/scripts/build-windows.sh` → `build-windows: makensis not found. Install: brew install makensis`, exit 1 — PASS.
+  - `bash apps/desktop/scripts/build-windows.sh` (no locale set) → exit 0; `target/windows/Allomos_0.1.0_x64-setup.exe` (2,192,849 bytes, "Nullsoft Installer self-extracting archive") and `alm.exe` (1,776,640 bytes, "PE32+ executable (console) x86-64") — PASS.
+  - `git diff --check`, links — PASS. Running the installer on Windows — NOT RUN (no Windows computer; A07-03/A07-04).
+  - Next: the owner runs the script once (owner verified).

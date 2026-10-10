@@ -119,3 +119,23 @@ npm --prefix apps/desktop run dev
 While a taskbag is open, the window checks about once a second whether its files changed (a fingerprint of names, sizes and change times, `taskbag_stamp`) and reloads when they did, so changes made with `alm` show without reopening the folder. Polling was chosen over a folder watcher because it needs no new package or thread, and inside the desktop app it is a cheap local call. **Companions are different:** over the network, the desktop app pushes a change notice to them; they never ask on a timer (owner, 2026-10-06).
 
 To build a local, unsigned app: `npx --prefix apps/desktop tauri build --debug --bundles app`. The result is `target/debug/bundle/macos/Allomos.app`.
+
+## Building for Windows
+
+The Windows version is built on the Mac; there is no GitHub pipeline, because the repository is private on GitHub's Free plan and every run would use up its free minutes (owner, 2026-10-11, [`Task-A07-02`](../tasks/Task-A07-02-build-pipeline.md)). The Mac can only *build* the Windows version, not run it: nothing is tested on Windows this way.
+
+```bash
+bash apps/desktop/scripts/build-windows.sh
+```
+
+It leaves `Allomos_<version>_x64-setup.exe` (the unsigned installer; it needs no administrator rights) and `alm.exe` in `target/windows/`. Windows warns that the publisher is unknown until builds are signed at v1.0. The first build downloads Microsoft's Windows SDK libraries into a local cache and takes a few minutes.
+
+One-time tools (the script names any that are missing):
+
+```bash
+brew install rustup makensis llvm
+/opt/homebrew/opt/rustup/bin/rustup toolchain install 1.85.1 --profile minimal -c rustfmt,clippy -t x86_64-pc-windows-msvc
+/opt/homebrew/opt/rustup/bin/cargo +1.85.1 install cargo-xwin --version 0.19.2 --locked
+```
+
+Homebrew's `rustup` is keg-only: it does not replace Homebrew's `rust`, and only the script puts it on PATH. `cargo-xwin` 0.19.2 is the last release that works with Rust 1.85. The script sets `LC_ALL=en_US.UTF-8` because `makensis` 3.13 crashes (`std::bad_alloc`) when no locale is set, as in agent shells.
