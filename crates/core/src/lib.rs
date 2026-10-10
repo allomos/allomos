@@ -9,7 +9,10 @@ pub mod ops;
 mod problem;
 mod validate;
 
-pub use model::{Area, FORMAT, Iteration, Project, Seabag, State, Task, default_labels};
+pub use model::{
+    Area, FORMAT, Iteration, Project, Seabag, State, TASK_LANGUAGE_UI, Task, default_labels,
+    valid_language,
+};
 pub use problem::Problem;
 pub use validate::{
     Issue, Loaded, parse_area, parse_iteration, parse_project, parse_task, valid_date,

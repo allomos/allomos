@@ -115,6 +115,7 @@
   "problem.wrong_format": "「{expected}」のはずが「{found}」になっています。このバージョンの FlipHopper が読めるのは「{expected}」だけです。",
   "problem.project_name_missing": "プロジェクトには名前が必要です。",
   "problem.ladder_empty": "ラベルの段階が少なくとも 1 つ必要です。",
+  "problem.invalid_language": "「{value}」は言語ではありません。en、zh-CN、ja のような言語コードか、FlipHopper アプリの言語に合わせる ui を使ってください。",
   "problem.area_name_missing": "エリアには名前が必要です。",
   "problem.task_title_missing": "タスクにはタイトルが必要です。",
   "problem.duplicate_area_id": "ID「{id}」は別のエリアですでに使われています。",

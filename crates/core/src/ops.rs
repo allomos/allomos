@@ -115,6 +115,21 @@ pub fn next_task_id(seabag: &Seabag, area: &str) -> Result<String, Problem> {
     Ok(format!("{prefix}{:0width$}", highest + 1))
 }
 
+/// The project with a new task language (`fh language`): `ui` to follow the FlipHopper app's
+/// language, or a language code. Refused when it is neither.
+pub fn set_task_language(seabag: &Seabag, value: &str) -> Result<Project, Problem> {
+    let value = value.trim();
+    if value != crate::model::TASK_LANGUAGE_UI && !crate::model::valid_language(value) {
+        return Err(Problem::InvalidLanguage {
+            value: value.to_string(),
+        });
+    }
+    Ok(Project {
+        task_language: Some(value.to_string()),
+        ..seabag.project.clone()
+    })
+}
+
 /// The project with a new label ladder, lowest step first (`fh labels`). Refused when it is
 /// empty, or when a task's label is not on it: changing the ladder never strands a task.
 pub fn set_ladder(seabag: &Seabag, labels: &[String]) -> Result<Project, Problem> {
@@ -399,6 +414,7 @@ mod tests {
                 name: "P".into(),
                 labels: default_labels(),
                 project_folder: None,
+                task_language: None,
             },
             areas: vec![],
             iterations: vec![],
@@ -440,6 +456,24 @@ mod tests {
             next_task_id(&s, "A09"),
             Err(Problem::UnknownArea { area: "A09".into() })
         );
+    }
+
+    #[test]
+    fn the_task_language_is_ui_or_a_language_code() {
+        let s = bag();
+        for ok in ["ui", "en", "zh-CN", "ja", "pt-BR", "yue", " fr "] {
+            let p = set_task_language(&s, ok).unwrap();
+            assert_eq!(p.task_language.as_deref(), Some(ok.trim()));
+        }
+        for bad in ["", "chinese!", "z", "zh_CN", "12", "en-"] {
+            assert_eq!(
+                set_task_language(&s, bad),
+                Err(Problem::InvalidLanguage {
+                    value: bad.trim().into()
+                }),
+                "{bad}"
+            );
+        }
     }
 
     #[test]

@@ -14,6 +14,8 @@ export interface Messenger {
   startupFolder(): Promise<string | null>;
   /** The computer's preferred languages, most preferred first. */
   systemLanguages(): Promise<string[]>;
+  /** Saves the interface language, so `fh task-language` can tell agents which language to write tasks in. */
+  saveUiLanguage(language: string): Promise<void>;
   /** Ask the user to pick a folder. Returns null if they cancel. */
   pickFolder(title: string): Promise<string | null>;
   inspectFolder(path: string): Promise<FolderInfo>;
@@ -81,6 +83,7 @@ export interface MenuTexts {
 export const desktopMessenger: Messenger = {
   startupFolder: () => invoke<string | null>("startup_folder"),
   systemLanguages: () => invoke<string[]>("system_languages"),
+  saveUiLanguage: (language) => invoke<void>("save_ui_language", { language }),
   async pickFolder(title) {
     const picked = await open({ directory: true, multiple: false, title });
     return typeof picked === "string" ? picked : null;

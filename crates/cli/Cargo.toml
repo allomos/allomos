@@ -22,6 +22,9 @@ fliphopper-core.workspace = true
 fliphopper-store.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# The computer's languages for `fh task-language` before the app has run (Task-A01-21); the
+# same pinned version as the desktop app.
+sys-locale = "=0.3.2"
 
 [dev-dependencies]
 fliphopper-core.workspace = true

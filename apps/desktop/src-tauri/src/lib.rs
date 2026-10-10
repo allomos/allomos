@@ -195,6 +195,13 @@ fn show_in_file_manager(root: PathBuf) -> Result<(), Problem> {
     })
 }
 
+/// Save the interface language the window shows, so `fh task-language` can tell agents which
+/// language to write tasks in (Task-A01-21). A setting that cannot be saved changes nothing else.
+#[tauri::command]
+fn save_ui_language(language: String) {
+    let _ = fliphopper_store::save_ui_language(&language);
+}
+
 /// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).
 /// Read from the operating system: inside the macOS app window, `navigator.language` is
 /// not a reliable guide to the system's language.
@@ -548,6 +555,7 @@ pub fn run() {
             show_in_file_manager,
             open_task_link,
             system_languages,
+            save_ui_language,
             set_menu_texts,
             set_recent_folders,
             find_agents,

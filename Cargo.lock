@@ -874,6 +874,7 @@ dependencies = [
  "fliphopper-store",
  "serde",
  "serde_json",
+ "sys-locale",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@
 | The setting | `task_language` in the seabag's `project.json`: `"ui"` (follow FlipHopper's interface language), or a language code such as `zh-CN`, `ja`, `en`, `fr`. New seabags get `"ui"`; a seabag without it is read as `"ui"`. | `crates/core` (model, check), `crates/store` |
 | Asking | `fh language` prints the language to write tasks in, and where it comes from. With `"ui"`: the language the FlipHopper app last showed on this computer; before the app has run, the computer's own language, picked the way the app picks (Chinese → zh-CN, Japanese → ja, otherwise en). | `crates/cli`, `crates/store/src/settings.rs` |
 | Changing | `fh language <code>` or `fh language ui`. | `crates/cli`, `crates/core` (rule) |
-| The app tells `fh` | Whenever the interface language is chosen or changes, the app saves it in FlipHopper's per-user settings file, so `fh` can read it. | `apps/desktop`, `apps/web` |
+| The app tells `fh` | Whenever the interface language is chosen or changes, the app saves it in FlipHopper's per-user settings file, so `fh` can read it. **No visible control** in the app at this stage (owner): the setting is changed with `fh language`. | `apps/desktop`, `apps/web` |
 | Agents ask first | The brief (`fh brief`), `fh guide tasks` and `fh guide workflow`, and the task-moving request: before adding a task or changing its title or description, run `fh language` and write in that language (IDs, commands, code and file names stay as they are). | `crates/store` |
 
 **What you can see at the end:** with the app in Chinese, `fh language` says `zh-CN (follows the FlipHopper app's language)`, and an agent asked to add a task writes its title and description in Chinese.
@@ -26,6 +26,6 @@
 
 | Date | What was approved | By |
 |---|---|---|
-| 2026-10-10 | The request above | owner (chat) |
+| 2026-10-10 | The request above; it is the language for **new and modified** tasks; no visible interface at this stage | owner (chat) |
 
 ## Notes

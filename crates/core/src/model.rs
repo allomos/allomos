@@ -18,6 +18,24 @@ pub struct Project {
     /// records it (docs/product/OPEN-FOLDER-FLOW.md).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_folder: Option<String>,
+    /// The language new and changed tasks are written in: [`TASK_LANGUAGE_UI`] (follow the
+    /// FlipHopper app's interface language, the default) or a language code such as `zh-CN`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_language: Option<String>,
+}
+
+/// `task_language` value meaning "the language the FlipHopper app shows" (Task-A01-21).
+pub const TASK_LANGUAGE_UI: &str = "ui";
+
+/// A language code FlipHopper accepts for `task_language`: letters, digits and `-`, starting with
+/// two or three letters (`en`, `zh-CN`, `pt-BR`, `yue`), at most 35 characters.
+pub fn valid_language(code: &str) -> bool {
+    let mut parts = code.split('-');
+    let first = parts.next().unwrap_or_default();
+    code.len() <= 35
+        && (2..=3).contains(&first.len())
+        && first.chars().all(|c| c.is_ascii_alphabetic())
+        && parts.all(|p| (1..=8).contains(&p.len()) && p.chars().all(|c| c.is_ascii_alphanumeric()))
 }
 
 pub fn default_labels() -> Vec<String> {
