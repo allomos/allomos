@@ -19,7 +19,7 @@
 - **Outcome.** Everyone sees the new word, new projects use the new folder, and no existing project breaks.
 - **Decisive unknowns.**
   - ~~Whether the app's name changes too~~ — answered 2026-10-10: **keep FlipHopper for now** ([`A00-20`](./Task-A00-20-app-name-research.md)), so the folder is `.fliphopper/taskcase/`.
-  - Whether FlipHopper's own `.fliphopper/seabag/` is renamed in this card or later (owner; it changes every session's `FLIPHOPPER_SEABAG`).
+  - ~~Whether FlipHopper's own `.fliphopper/seabag/` is renamed~~ — answered 2026-10-10: **yes**, as the last step of this card, after the new `fh` is merged and installed (an older `fh` would not find `taskcase`).
 - **Files owned.** `crates/*` (paths, option, messages, guide, brief), `apps/*` (texts in three languages), `docs/` (current documents; dated history keeps "seabag", as 0013 says for "glidebox"), this card.
 - **External operations.** None.
 - **Done means mechanically.** The usual checks pass; tests open an old `seabag` folder and a new `taskcase` folder; `fh --seabag` still works with a note; the app shows 任务箱 in Chinese.
@@ -28,6 +28,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-10 | Rename FlipHopper's own `.fliphopper/seabag/` too: "yes" | owner (chat) |
 | 2026-10-10 | "taskcase + 任务箱"; rename the folder and the command option too ("yes", keeping old folders readable) | owner (chat) |
 
 ## Notes
