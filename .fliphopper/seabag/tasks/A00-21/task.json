@@ -1,7 +1,7 @@
 {
   "area": "A00",
   "id": "A00-21",
-  "next_dependency": "trademark search result (agent), then the owner says when to start",
+  "next_dependency": "owner: a CNIPA search for China and an attorney's view on ALLMOS/ALOMOS/ALTOMOS; then say when to start",
   "state": "ready",
   "title": "Rename the app to Allomos"
 }
