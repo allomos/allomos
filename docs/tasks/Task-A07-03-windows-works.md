@@ -1,6 +1,6 @@
 # Task-A07-03-windows-works
 
-*Card type: coding. Area A07 (Platform & release), Iteration 2. Written 2026-10-09 at the owner's request for the rest of v0.2 ([PLAN § 9](../product/PLAN.md#9-roadmap--releases): "fixes for Windows differences (paths, line endings, the WebView2 engine)"; [R81](../product/REQUIREMENTS.md)). Needs [`A07-02`](./Task-A07-02-build-pipeline.md), which gives a Windows computer to test on.*
+*Card type: coding. Area A07 (Platform & release), Iteration 2. Written 2026-10-09 at the owner's request for the rest of v0.2 ([PLAN § 9](../product/PLAN.md#9-roadmap--releases): "fixes for Windows differences (paths, line endings, the WebView2 engine)"; [R81](../product/REQUIREMENTS.md)). Needs a Windows computer to test on: since 2026-10-11 [`A07-02`](./Task-A07-02-build-pipeline.md) only builds Windows on the Mac (no GitHub minutes on the Free plan), so this card adds a GitHub job that runs only when started by hand.*
 
 ## What gets built (plain words)
 
@@ -24,7 +24,7 @@ Allomos was written and tested only on macOS. Windows differs in ways that commo
   - Which of the differences above actually break: found by running the suite on the Windows job first, then fixing what fails.
   - How the agent sees the Windows app working without a Windows computer: the pipeline's tests, plus the workmate's check in [`A07-04`](./Task-A07-04-v0-2-exit-check.md).
 - **Files owned.** `crates/store`, `crates/cli`, `apps/desktop/src-tauri` (`lib.rs`, `agents.rs`, `tauri.conf.json`), `apps/web/src/App.tsx` (path handling), `.github/workflows/build.yml` (test steps), tests, `docs/product/FILE-FORMAT.md` (line endings), this card.
-- **External operations.** Runs on the pipeline approved in A07-02; nothing new.
+- **External operations (need the owner's exact approval).** Add a GitHub Actions workflow to `mypals-ml/allomos` that runs only when started by hand (`workflow_dispatch`), Windows job only, about 30 counted minutes per run on the Free plan; keep its builds 14 days. Cleanup: delete the workflow file and stored builds.
 - **Done means mechanically.**
   - The six named checks pass on macOS and on the Windows job.
   - New tests: a taskbag checked out with `\r\n` loads; a path with `\` finds its project; replacing a file that is open for reading succeeds.
