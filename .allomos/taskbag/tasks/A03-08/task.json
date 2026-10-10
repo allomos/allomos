@@ -4,6 +4,6 @@
   "id": "A03-08",
   "label": "owner verified",
   "next_dependency": "owner runs the flow on ~/fliphopper-tests/a03-08-old-project",
-  "state": "in_progress",
+  "state": "done",
   "title": "Each step tells the agent what to commit"
 }
