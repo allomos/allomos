@@ -4,6 +4,7 @@
   "id": "A00-21",
   "label": "implemented",
   "next_dependency": "rename the GitHub repository and the local folder (approved), then the owner's look",
-  "state": "in_progress",
-  "title": "Rename the app to Allomos"
+  "state": "waiting",
+  "title": "Rename the app to Allomos",
+  "waiting_on": "owner: last look at Allomos (name in the app, alm in a terminal, repository and folder renamed)"
 }
