@@ -2,6 +2,7 @@
   "area": "A00",
   "holder": "claude/a00-21-allomos",
   "id": "A00-21",
+  "label": "drafted",
   "next_dependency": "owner: a CNIPA search for China and an attorney's view on ALLMOS/ALOMOS/ALTOMOS; then say when to start",
   "state": "in_progress",
   "title": "Rename the app to Allomos"
