@@ -2,7 +2,7 @@
   "area": "A00",
   "holder": "claude/a00-22-leftover-names",
   "id": "A00-22",
-  "label": "locally verified",
+  "label": "owner verified",
   "next_dependency": "owner: a last look, then done",
   "state": "in_progress",
   "title": "Clear leftover FlipHopper names"
