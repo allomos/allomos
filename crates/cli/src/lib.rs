@@ -171,6 +171,15 @@ enum Command {
     },
     /// Mark an unheld backlog or waiting task ready (for example, the owner approved it).
     Ready { id: String },
+    /// Give a task a new title.
+    Title { id: String, title: String },
+    /// Change the project's name and/or ID; without either, show them.
+    Project {
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        id: Option<String>,
+    },
     /// Drop a task: it will not be done.
     Drop { id: String },
     /// Show the first ready task that no one holds.
@@ -222,10 +231,12 @@ impl Command {
             | Command::Needs { id, .. }
             | Command::Plan { id, .. }
             | Command::Ready { id }
+            | Command::Title { id, .. }
             | Command::Drop { id } => Some(id),
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Init { .. }
             | Command::Labels { .. }
+            | Command::Project { .. }
             | Command::TaskLanguage { .. }
             | Command::Brief
             | Command::Guide { .. }
@@ -237,6 +248,9 @@ impl Command {
 
     /// Whether the command writes to the taskbag.
     fn changes(&self) -> bool {
+        if let Command::Project { name, id } = self {
+            return name.is_some() || id.is_some();
+        }
         if let Command::TaskLanguage { value } = self {
             return value.is_some();
         }
@@ -272,6 +286,8 @@ impl Command {
             Command::Needs { .. } => "needs",
             Command::Plan { .. } => "plan",
             Command::Ready { .. } => "ready",
+            Command::Title { .. } => "title",
+            Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
             Command::Next => "next",
         }
@@ -978,6 +994,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
         Command::Done { id } => change(cli, cwd, |bag| ops::finish(bag, id, me)),
+        Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
+        Command::Project { name, id } => {
+            let root = locate(cli, cwd)?;
+            let lock = Lock::acquire(&root, lock_wait())?;
+            let (bag, issues) = taskbag_of(&root, lock.load())?;
+            let project = ops::rename_project(&bag, name.as_deref(), id.as_deref())?;
+            if name.is_some() || id.is_some() {
+                lock.save_project(&project)?;
+            }
+            let mut done = Done::new(
+                json!({ "taskbag": root, "project": { "id": project.id, "name": project.name } }),
+                format!("Project: {} ({})\n", project.name, project.id),
+            );
+            done.issues = issues;
+            Ok(done)
+        }
         Command::Needs { id, text } => {
             change(cli, cwd, |bag| ops::set_next(bag, id, me, text.as_deref()))
         }

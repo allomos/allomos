@@ -24,7 +24,7 @@ Today the app and `alm` are built by hand on the owner's Mac, and nothing is eve
   - How long builds are kept (GitHub default 90 days; proposed 14).
 - **Files owned.** `.github/workflows/build.yml` (new), `apps/desktop/src-tauri/tauri.conf.json` (Windows bundle settings), `docs/workflow/CODING_RULES.md`, this card.
 - **External operations (need the owner's exact approval).**
-  - Target: GitHub repository `mypals-ml/fliphopper`, GitHub Actions.
+  - Target: GitHub repository `mypals-ml/allomos`, GitHub Actions.
   - Operations: add the workflow (it then runs on GitHub's computers on every push), store build files on GitHub for the chosen number of days.
   - Cleanup: delete the workflow file and the stored builds.
   - No secrets, no signing, no publishing to a public download page.

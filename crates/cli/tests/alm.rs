@@ -933,3 +933,25 @@ fn task_language_follows_the_app_until_set() {
     let (_, v) = fj_settings(&repo, &settings, &["task-language", "ui"]);
     assert_eq!(v["task_language"]["language"], "zh-CN");
 }
+
+#[test]
+fn title_and_project_rename() {
+    let repo = filled();
+    let v = ok(&repo, &["title", "A01-01", "A clearer outcome"]);
+    assert_eq!(v["task"]["title"], "A clearer outcome");
+    refused(&repo, &["title", "A01-01", " "], 1, "task_title_missing");
+    refused(&repo, &["title", "Z99-99", "x"], 1, "task_not_found");
+    let v = ok(&repo, &["project"]);
+    assert_eq!(v["project"]["name"], "Demo");
+    let v = ok(&repo, &["project", "--name", "Allomos", "--id", "allomos"]);
+    assert_eq!(
+        (&v["project"]["name"], &v["project"]["id"]),
+        (&json!("Allomos"), &json!("allomos"))
+    );
+    refused(&repo, &["project", "--id", "bad id"], 1, "invalid_id");
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(project["name"], "Allomos");
+}

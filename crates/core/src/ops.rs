@@ -365,6 +365,38 @@ pub fn set_next(
     Ok(Outcome::plain(task))
 }
 
+/// Give a task a new title (`alm title`). Same holder rule as other changes; an empty title is
+/// refused. Allowed in any state, so an old name can be corrected on a finished task too.
+pub fn set_title(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    title: &str,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    task.title = non_empty(Some(title)).ok_or(Problem::TaskTitleMissing)?;
+    Ok(Outcome::plain(task))
+}
+
+/// The project with a new name and/or ID (`alm project`). An empty name or an invalid ID is
+/// refused; what is not given stays as it is.
+pub fn rename_project(
+    taskbag: &Taskbag,
+    name: Option<&str>,
+    id: Option<&str>,
+) -> Result<Project, Problem> {
+    let mut project = taskbag.project.clone();
+    if let Some(name) = name {
+        project.name = non_empty(Some(name)).ok_or(Problem::ProjectNameMissing)?;
+    }
+    if let Some(id) = id {
+        check_id(id)?;
+        project.id = id.to_string();
+    }
+    Ok(project)
+}
+
 /// Mark an unheld `backlog` or `waiting` task `ready` (for example, the owner approved it).
 /// Its *waiting on* is cleared.
 pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
@@ -485,6 +517,34 @@ mod tests {
                 "{bad}"
             );
         }
+    }
+
+    #[test]
+    fn titles_and_the_project_name_can_change() {
+        let mut s = bag();
+        let t = set_title(&s, "A01-01", None, "  A clearer outcome ").unwrap();
+        assert_eq!(t.task.title, "A clearer outcome");
+        assert_eq!(
+            set_title(&s, "A01-01", None, " "),
+            Err(Problem::TaskTitleMissing)
+        );
+        s.tasks[1].holder = Some("other".into());
+        let held = s.tasks[1].id.clone();
+        assert!(matches!(
+            set_title(&s, &held, Some("me"), "x"),
+            Err(Problem::TaskHeld { .. })
+        ));
+        let p = rename_project(&s, Some("Allomos"), Some("allomos")).unwrap();
+        assert_eq!((p.name.as_str(), p.id.as_str()), ("Allomos", "allomos"));
+        assert_eq!(
+            rename_project(&s, Some(" "), None),
+            Err(Problem::ProjectNameMissing)
+        );
+        assert!(matches!(
+            rename_project(&s, None, Some("bad id")),
+            Err(Problem::InvalidId { .. })
+        ));
+        assert_eq!(rename_project(&s, None, None).unwrap(), s.project);
     }
 
     #[test]
