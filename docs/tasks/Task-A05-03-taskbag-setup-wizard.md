@@ -13,6 +13,7 @@ Today the first screen shows a short text (`welcome.title`, `welcome.body`) and 
 | Step 2 — the `.allomos` folder | If the chosen folder already has `.allomos`, the step says so and offers only a **Change** button (choose another folder). If it does not, the step offers a **Create** button that makes `.allomos/` with an empty taskbag there. | `SetupWizard.tsx`, `apps/desktop/src-tauri/src/lib.rs` |
 | Step 3 — the project source | The person may pick the **project's source folder** (where the code and documents are). It starts as the folder chosen in step 1; another folder can be chosen. It is recorded with `record_project_folder`, as today. | `SetupWizard.tsx`, `lib.rs`, `crates/store/src/setup.rs` |
 | After the wizard | The window opens the taskbag, as opening a folder does today; the existing offers (ask agents to add instructions, move existing tasks in — [`A03-03`](./Task-A03-03-app-asks-agents-to-set-up.md), [`A05-02`](./Task-A05-02-convert-existing-project.md)) follow as they do now. | `App.tsx` |
+| Restart notice | When `AGENTS.md` or `CLAUDE.md` did not exist before and was just created through this setup (by Allomos or by an agent it asked), the app tells the person: only **new** agent sessions will know about the setup; AI agent sessions already running in this project read these files when they start, so they must be restarted. Not shown when the files already existed and were only changed. | `App.tsx`, `AgentsPanel.tsx`, `i18n/*`; existence check in `lib.rs` |
 
 **What the owner can see at the end:** start the app fresh and see only **Open Taskbag**; press it and read what a taskbag is; choose an empty test folder and see **Create**; create it; on the next step see that folder already filled in as the project source, keep it or choose another; finish and see the empty taskbag. Running the wizard on a folder that already has `.allomos` shows **Change** instead of **Create**.
 
@@ -23,13 +24,15 @@ Today the first screen shows a short text (`welcome.title`, `welcome.body`) and 
   - Whether File → Open Folder… (⌘O) and Open Recent open the wizard or keep opening a folder directly — owner; assume an existing taskbag still opens directly and only a folder without `.allomos` goes through the wizard.
   - Whether the wizard replaces today's "create after asking when the folder has other files" step and the separate `folder.pick` control — worker proposes; owner decides. Keep a way to change the project folder later.
   - Whether step 3 may be skipped, leaving no project folder recorded — owner; assume yes, with the step-1 folder as the default.
+  - How the app knows `AGENTS.md` / `CLAUDE.md` was **just created**: note whether each file exists before setup or before asking the agents, and notice when it appears — worker.
   - Whether **Change** in step 2 may point at a folder that already has a different taskbag (then step 3 shows that taskbag's recorded project folder) — worker checks with `project_folder_of`.
 - **Files owned.** New `apps/web/src/SetupWizard.tsx` (and its test); `apps/web/src/App.tsx`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`; `apps/desktop/src-tauri/src/lib.rs`; `crates/store/src/setup.rs` if the store needs a "does this folder have `.allomos`" check. Shared: the welcome and picker strings in `i18n/*`.
 - **External operations.** None.
 - **Done means mechanically.**
   - Web tests: fresh start shows only Open Taskbag; step 2 shows Create for a folder without `.allomos` and only Change for one with it; step 3 defaults to the step-1 folder and records the chosen one.
+  - Web test: the restart notice appears when `AGENTS.md` or `CLAUDE.md` did not exist before setup and exists after; it does not appear when both already existed.
   - Store/desktop tests for any new command (create in a chosen folder; record the project folder).
-  - Manual check in the built app, in test folders under `~/allomos-tests/a05-03-setup-wizard/`: fresh start → Create → keep default source; again with another source folder; again on a folder that already has `.allomos` (Change only); restart reopens the taskbag.
+  - Manual check in the built app, in test folders under `~/allomos-tests/a05-03-setup-wizard/`: fresh start → Create → keep default source; again with another source folder; again on a folder that already has `.allomos` (Change only); restart reopens the taskbag; in a folder without `AGENTS.md` / `CLAUDE.md`, the restart notice appears once they are created.
 
 ## Approvals
 
@@ -40,3 +43,4 @@ Today the first screen shows a short text (`welcome.title`, `welcome.body`) and 
 
 - 2026-10-11 — Card written from the owner's request (first as "open the project folder first").
 - 2026-10-11 — Owner changed the idea: start from the taskbag with a wizard (what a taskbag is → create or change `.allomos` → choose the project source, defaulting to the same folder). Card rewritten and renamed from `Task-A05-03-open-project-first.md`.
+- 2026-10-11 — Owner added: when this setup has just created `AGENTS.md` or `CLAUDE.md`, tell the person that only new agent sessions will know about the setup.
