@@ -31,6 +31,7 @@ Allomos's Windows version can be built on the owner's Mac, without a Windows com
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
 | 2026-10-11 | Install the Windows build tools on the Mac (rustup alongside Homebrew's Rust, cargo-xwin, makensis) and build the installer | owner (chat) |
 | 2026-10-11 | Rewrite the card as a local Windows build script, no GitHub pipeline; start it | owner (chat) |
+| 2026-10-11 | Approve the card; an agent runs the script in a worktree for the owner and closes it | owner (chat) |
 
 ## Notes
 
@@ -41,3 +42,4 @@ Allomos's Windows version can be built on the owner's Mac, without a Windows com
   - `bash apps/desktop/scripts/build-windows.sh` (no locale set) → exit 0; `target/windows/Allomos_0.1.0_x64-setup.exe` (2,192,849 bytes, "Nullsoft Installer self-extracting archive") and `alm.exe` (1,776,640 bytes, "PE32+ executable (console) x86-64") — PASS.
   - `git diff --check`, links — PASS. Running the installer on Windows — NOT RUN (no Windows computer; A07-03/A07-04).
   - Next: the owner runs the script once (owner verified).
+- 2026-10-11 — Taken over from `claude/a07-02-windows-build` (idle, branch merged) by `claude/a07-02-script-run` at the owner's request. The script, run from `main` (now including A07-06) in a fresh worktree, no locale set: exit 0; `target/windows/Allomos_0.1.0_x64-setup.exe` (2,590,165 bytes, "Nullsoft Installer self-extracting archive"; its `installer.nsi` carries `alm.exe`) and `alm.exe` (1,776,640 bytes, "PE32+ executable (console) x86-64") — PASS. The same script's installers were installed and checked by the owner on Windows for A07-05 and A07-06. **Owner verified** (owner approved, 2026-10-11).

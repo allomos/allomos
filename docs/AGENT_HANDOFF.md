@@ -37,12 +37,6 @@ Updated: 2026-10-04
 One block per card that `alm list --state in_progress` shows held.
 
 
-### Task-A07-02 — claude/a07-02-windows-build
-- Checkout: `.claude/worktrees/a07-02` · branch `claude/a07-02-windows-build` · merged into `main` · pushed: yes
-- Approvals in force: local tools and script (owner, 2026-10-11); no GitHub workflow
-- Uncommitted: none · Running: none
-- Unrecorded findings: none (makensis locale crash is on the card and in CODING_RULES)
-- Next action: owner runs `bash apps/desktop/scripts/build-windows.sh`; then `alm label A07-02 "owner verified"`, `alm done`, remove this block and the worktree
 
 ## Live state
 
