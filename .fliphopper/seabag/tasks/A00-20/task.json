@@ -1,7 +1,7 @@
 {
   "area": "A00",
   "id": "A00-20",
-  "label": "drafted",
+  "label": "owner verified",
   "state": "waiting",
   "title": "App name research",
   "waiting_on": "owner: keep FlipHopper, or pick a new name (research/app-name-handoff.md)"
