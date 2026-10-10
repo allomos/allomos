@@ -36,6 +36,13 @@ Updated: 2026-10-04
 
 One block per card that `fh list --state in_progress` shows held.
 
+### Task-A01-21 — claude/a01-21-task-language
+- Checkout: `.claude/worktrees/a01-21` · branch `claude/a01-21-task-language` · **merged into `main` 2026-10-10** · pushed: yes
+- Approvals in force: the card, local work only
+- Running: the built app (this worktree's `target/debug/bundle/macos/FlipHopper.app`) for the owner's check; safe to quit
+- Done here: FlipHopper's own seabag set to `task_language: en` (`fh task-language en`); `fh` in `~/.cargo/bin` reinstalled from `main` with `task-language`
+- Waiting: the owner's check that `fh task-language` follows the app's language
+
 ### Task-A05-02 — claude/a05-02-convert-project
 - Checkout: `.claude/worktrees/a05-02` · branch `claude/a05-02-convert-project` · **merged into `main` 2026-10-10** · pushed: yes
 - Approvals in force: the card and the open-folder flow, local work only. Not approved: any write to the SSR repository.
