@@ -308,20 +308,20 @@ export function App({ messenger }: { messenger: Messenger }) {
           <div className="where">
             <strong>{opened.loaded.seabag.project.name}</strong>
             <code title={opened.root}>{opened.root}</code>
+            {/* Whether the AI agents are told about this project, then Show in Finder at the right (owner, 2026-10-10). */}
             <div className="where-row">
-              <button
-                type="button"
-                className="link"
-                onClick={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
-              >
-                {t(FILE_MANAGER_KEY)}
-              </button>
-              {/* Whether the AI agents are told about this project, beside Show in Finder (owner, 2026-10-10). */}
               <AgentLine
                 messenger={messenger}
                 root={opened.root}
                 onTell={() => setAgentsFor({ project: agentsProject(opened.root), seabag: opened.root })}
               />
+              <button
+                type="button"
+                className="link reveal"
+                onClick={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
+              >
+                {t(FILE_MANAGER_KEY)}
+              </button>
             </div>
           </div>
         )}

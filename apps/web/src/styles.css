@@ -68,6 +68,7 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .where { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.where-row .reveal { margin-left: auto; }
 button.link { align-self: start; border: none; background: none; padding: 0; color: var(--accent); font-size: 0.85em; cursor: pointer; }
 button.link:hover { text-decoration: underline; }
 .top .language { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); }
