@@ -140,3 +140,9 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 ## Change (2026-10-10, owner): agents know how to add a task
 
 **In plain words.** The brief in `AGENTS.md` now says: "Adding a task: read `fh guide tasks` first". That topic tells the agent to look at the existing areas and IDs, use an existing area, leave out the ID so `fh` picks the next free number, write the title as one outcome, write the description as *Outcome / Done means / Notes*, leave the task in backlog for the person to approve with `fh ready`, and plan an iteration only when asked. `fh add task` without an ID now takes the next free number in the area (A01-04 after A01-03).
+
+| Check (2026-10-10) | Result |
+|---|---|
+| All Rust checks (new: `next_task_id`, `fh add task` without an ID, `fh guide tasks`, the brief names it) and web checks | PASS |
+| **Real agent trial, step 1** — Claude Code got the app's "Tell AI agents about FlipHopper" request (English) in `~/fliphopper-tests/a05-02-newtask`: it ran `fh brief`, added the section to `AGENTS.md` (other rules kept) and created `CLAUDE.md` as `@AGENTS.md`. The section is identical to `fh brief`'s output. | PASS |
+| **Step 2** — a fresh session, asked only "Please add a task: customers should be able to see the shop's opening hours on the menu page": it ran `fh guide tasks`, `fh list`, `fh show A01-01`, then `fh add task --area A01 …` with no ID. Result: `A01-02` in the existing Menu area, the title written as an outcome, the description as Outcome / Done means / Notes, left in backlog, and it told the person to approve with `fh ready A01-02`. | PASS |
