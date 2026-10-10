@@ -21,7 +21,7 @@ At the end the owner upgrades Allomos, opens an older project, sees "instruction
 - **Decisive unknowns.**
   - **Where the version is written: in the section's heading** (owner, 2026-10-11), for example `## Tasks: Allomos (v3)`. No marker lines. A heading without a version counts as unknown.
   - **How to find the old section to replace** without markers: from its heading `## Tasks: Allomos` to the next heading of the same level is the proposal; an agent-led renewal can also handle sections the agent merged with other text.
-  - **Dismissing the prompt:** if the person presses "Not now" on the out-of-date line, does it come back the next time they open the project, or stay hidden until Allomos is upgraded again? Owner to choose; asked again in plain words 2026-10-11.
+  - **Dismissing the prompt — decided (owner, 2026-10-11): it comes back.** "Not now" hides the out-of-date line only while the project stays open; the next time the project is opened, the line shows again, until the section is renewed. *Why:* the instructions are important, so the reminder must not be lost.
 - **Files owned.** The section text and the check in `crates/store`; the agent line and renewal panel in `apps/web` and `apps/desktop`; the `alm` command for reporting and renewing; language files; this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -33,8 +33,11 @@ At the end the owner upgrades Allomos, opens an older project, sees "instruction
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-11 | The version goes in the section's heading, e.g. `## Tasks: Allomos (v3)` | owner (chat) |
+| 2026-10-11 | "Not now" comes back each time the project is opened (option A: "A, because it is important") | owner (chat) |
 
 ## Notes
 
 - 2026-10-10 — Asked for by the owner: renew the Allomos section in AGENTS.md when the app is upgraded, and have the interface prompt the person when the section's version does not match. Checked that no existing card covers it: A01-13, A01-14 and A03-03 write or request the section once, and A03-04 checks only that it is present.
 - 2026-10-11 — Owner chose: the version goes in the section's heading. The "Not now" question was unclear and was asked again in plain words.
+- 2026-10-11 — Owner chose option A for "Not now": the reminder comes back each time the project is opened. Recorded after the rename to Allomos finished ([0015](../decisions/0015-product-name-allomos.md)); this card now says Allomos, `alm` and `.allomos/taskbag/`. Its board title still says "FlipHopper" because `alm` cannot change a title. Next: the owner moves it to ready.
