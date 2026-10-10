@@ -26,6 +26,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-10 | Owner check passed ("passed") | owner (chat) |
 | 2026-10-10 | The request above; it is the language for **new and modified** tasks; no visible interface at this stage | owner (chat) |
 
 ## Notes
@@ -36,4 +37,4 @@
 | `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` (new: the setting's values, `fh task-language` from the saved app language / a code / `ui` / a bad code, the brief, guide and request asking for it, `settings.json` saving and the system fallback) | PASS |
 | Web `typecheck`, `build`, `check:i18n` (156 texts, 48 codes) | PASS |
 | **Real agent trial** in `~/fliphopper-tests/a01-21-language` with the app's language saved as Chinese: asked in English "Please add a task: customers can see which teas are in stock", Claude Code ran `fh task-language` (zh-CN) and added A01-01 「顾客能看到哪些茶有现货」 with its description as 结果 / 完成标准 / 备注, in backlog. | PASS |
-| The app saving its language when it changes | owner check |
+| The app saving its language when it changes (owner switched to 日本語; `fh task-language` said ja) | PASS (owner, 2026-10-10) |
