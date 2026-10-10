@@ -1,6 +1,8 @@
 # Task-A01-20-rename-seabag-to-taskcase
 
-*Card type: coding. Area A01 (Tracking). Decided by the owner (2026-10-10): the **seabag** is renamed **taskcase**: Chinese **任务箱**, Japanese **タスクケース**. The folder on disk and the command option are renamed too, and FlipHopper keeps reading old `.fliphopper/seabag/` folders. Recorded in [0013](../decisions/0013-product-name-fliphopper.md#amendment-2026-10-10-the-seabag-becomes-the-taskcase).*
+*Card type: coding. Area A01 (Tracking). **Changed by the owner later on 2026-10-10: the seabag becomes the taskbag** (Chinese **任务包**, Japanese **タスクバッグ**), not the taskcase, and the app becomes Allomos, so the folder is `.allomos/taskbag/` ([0013](../decisions/0013-product-name-fliphopper.md#amendment-2026-10-10-later-the-same-day-allomos-and-the-taskbag)). Do this card together with [`A00-21`](./Task-A00-21-rename-to-allomos.md). The card's file name keeps "taskcase" because card files never move. Below, read "taskbag / 任务包 / タスクバッグ" for "taskcase / 任务箱 / タスクケース", `.allomos/taskbag/` for `.fliphopper/taskcase/`, and `alm --taskbag` / `ALLOMOS_TASKBAG` for `fh --taskcase` / `FLIPHOPPER_TASKCASE`.*
+
+*First decision (2026-10-10): the **seabag** is renamed **taskcase**: Chinese **任务箱**, Japanese **タスクケース**. The folder on disk and the command option are renamed too, and FlipHopper keeps reading old `.fliphopper/seabag/` folders. Recorded in [0013](../decisions/0013-product-name-fliphopper.md#amendment-2026-10-10-the-seabag-becomes-the-taskcase).*
 
 ## What gets built (plain words)
 
@@ -18,7 +20,7 @@
 
 - **Outcome.** Everyone sees the new word, new projects use the new folder, and no existing project breaks.
 - **Decisive unknowns.**
-  - ~~Whether the app's name changes too~~ — answered 2026-10-10: **keep FlipHopper for now** ([`A00-20`](./Task-A00-20-app-name-research.md)), so the folder is `.fliphopper/taskcase/`.
+  - ~~Whether the app's name changes too~~ — answered 2026-10-10: **keep FlipHopper for now** ([`A00-20`](./Task-A00-20-app-name-research.md)), so the folder is `.fliphopper/taskcase/`. **Superseded later that day: the app becomes Allomos ([`A00-21`](./Task-A00-21-rename-to-allomos.md)); the folder is `.allomos/taskbag/`.**
   - ~~Whether FlipHopper's own `.fliphopper/seabag/` is renamed~~ — answered 2026-10-10: **yes**, as the last step of this card, after the new `fh` is merged and installed (an older `fh` would not find `taskcase`).
 - **Files owned.** `crates/*` (paths, option, messages, guide, brief), `apps/*` (texts in three languages), `docs/` (current documents; dated history keeps "seabag", as 0013 says for "glidebox"), this card.
 - **External operations.** None.
@@ -30,5 +32,6 @@
 |---|---|---|
 | 2026-10-10 | Rename FlipHopper's own `.fliphopper/seabag/` too: "yes" | owner (chat) |
 | 2026-10-10 | "taskcase + 任务箱"; rename the folder and the command option too ("yes", keeping old folders readable) | owner (chat) |
+| 2026-10-10 | Taskbag instead of taskcase, Chinese "任务包"; folder `.allomos/taskbag/` with the app rename ("ok") | owner (chat) |
 
 ## Notes
