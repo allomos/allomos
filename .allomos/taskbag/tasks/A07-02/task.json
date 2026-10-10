@@ -5,6 +5,6 @@
   "iteration": "I02",
   "label": "owner verified",
   "next_dependency": "owner runs the Windows build script once",
-  "state": "in_progress",
+  "state": "done",
   "title": "Windows build script on the Mac"
 }
