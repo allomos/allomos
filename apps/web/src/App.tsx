@@ -134,6 +134,10 @@ export function App({ messenger }: { messenger: Messenger }) {
           const o = await messenger.createSeabag(i.suggested_root, folderName(i.folder), languageRef.current);
           show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
         } else if (i.kind === "no_seabag") {
+          // The new folder replaces the open project: the window shows only the question about it.
+          setOpened(null);
+          setSetup(null);
+          setNotices([]);
           setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
           setAgentsFor(null);
         } else {
