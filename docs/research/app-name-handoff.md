@@ -77,3 +77,19 @@ Products and uses found by web search:
 - **Batonhop, Relayhop, Handhop:** no product found ([search](https://apps.apple.com/tj/app/bhop-multiplayer-game/id6444131055?mt=12) found only unrelated "bhop" games).
 
 **Limits:** registries and web search only, US results. No trademark database was searched directly. Before selling under a new name, a proper search in Japan, China and the US is advised (as in [`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md#name-check-2026-10-06-agent)).
+
+## Addendum 2026-10-10: "…Hub" names
+
+The owner liked **HandoffHub** and asked for other "Hub" names. "Hub" also matches how FlipHopper is built: the desktop app is the **hub** that the web and phone companions connect to ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)).
+
+| Name | What it says | crates / npm / GitHub | .com / .io / .dev / .app | Products found |
+|---|---|---|---|---|
+| **HandoffHub** | where work is handed off | free / free / free | taken / free / free / free | none by this name; "Handoff" searches are crowded |
+| **HandoverHub** | the same, in British/Asian English ("handover") | free / free / free | taken / free / free / free | none; a "Handover" reporting product exists ([Capterra](https://www.capterra.ie/software/1094908/Handover)) |
+| **BatonHub** | where the relay baton is passed | free / free / free | taken / free / free / free | none; SofaBaton's remote "hub" is nearby in searches ([SofaBaton](https://www.sofabaton.com/?p=250)) |
+| **HopperHub** | keeps FlipHopper's "hopper" | free / free / free | taken / free / free / free | none checked beyond registries |
+| **CarryOnHub** | carry on where the last one stopped | free / free / free | taken / free / free / free | none checked beyond registries |
+| **TagTeamHub** | partners tagging in and out | free / free / free | **free** / free / free / free | none checked beyond registries |
+| **BatonPassHub** | the pass of the baton | free / free / free | **free** / free / free / free | long |
+| SwapHub, HandHub | swap / hand over | free / free / taken | taken / free / free / taken | — |
+| RelayHub, HopHub, SwitchHub, PassHub, ShiftHub, CrewHub, AgentHub, PickupHub | — | GitHub taken | all four domains taken | — |
