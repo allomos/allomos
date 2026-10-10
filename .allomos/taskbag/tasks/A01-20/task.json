@@ -3,6 +3,6 @@
   "id": "A01-20",
   "label": "owner verified",
   "next_dependency": "do together with A00-21 (Allomos): folder .allomos/taskbag/",
-  "state": "ready",
+  "state": "done",
   "title": "Rename seabag to taskcase"
 }
