@@ -25,6 +25,7 @@
   "agents.codex_app": "Codex（アプリ）",
   "agents.how_link": "依頼が入力済みの状態で開きます",
   "agents.how_paste": "ターミナルが開きます。依頼はクリップボードにあるので貼り付けてください",
+  "agents.claude_app_trust": "Claude アプリが最初にこのフォルダーを信頼するか尋ねることがあります。「Trust workspace」を選んでください。選ばないと、プロジェクトなしでセッションが始まります。",
   "agents.searching": "AI エージェントを探しています…",
   "agents.none": "このコンピューターに AI エージェントが見つかりませんでした。",
   "agents.ask": "依頼する",

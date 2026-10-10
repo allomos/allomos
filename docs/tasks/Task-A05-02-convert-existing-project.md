@@ -182,3 +182,4 @@ In a new agent session in the project folder: "Add a task: …". The agent reads
 
 **E. In a terminal (optional)**
 `fh brief`, `fh guide customize`, `fh guide tasks` print the brief and the guide.
+- 2026-10-10 — Owner's check found sessions from the Claude app starting in "No folder", then switching from Auto to manual after the agent moved itself into the project. A test link (`claude://code/new?folder=…&q=…`, as FlipHopper builds it) showed the cause: the Claude app first asks **"Trust this workspace?"** once per folder; after **Trust workspace** the chat opened in the project folder, on its branch, in Auto mode. The panel now says so under Claude (app). Messages above the list can also be closed one by one (owner).

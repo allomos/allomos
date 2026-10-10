@@ -25,6 +25,7 @@
   "agents.codex_app": "Codex (app)",
   "agents.how_link": "opens with the request typed in",
   "agents.how_paste": "opens a terminal; the request is on the clipboard to paste",
+  "agents.claude_app_trust": "The Claude app may first ask you to trust this folder: choose Trust workspace, or the session starts without the project.",
   "agents.searching": "Looking for AI agents…",
   "agents.none": "No AI agent was found on this computer.",
   "agents.ask": "Ask",

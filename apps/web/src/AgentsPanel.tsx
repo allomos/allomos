@@ -199,6 +199,8 @@ export function AgentsPanel({
                         <span className="muted">
                           — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
                         </span>
+                        {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
+                        {a.id === "claude_app" && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
                       </label>
                     </li>
                   ))}
