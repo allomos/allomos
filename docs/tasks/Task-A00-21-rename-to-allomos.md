@@ -41,6 +41,7 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-11 | Last look passed (folders, app, board, a fresh session using `alm next`); "yes" to close A00-21 and A01-20 | owner (chat) |
 | 2026-10-11 | **External operations approved:** rename the GitHub repository `mypals-ml/fliphopper` to `mypals-ml/allomos` and update `origin`; rename the local folder `…/glidepace/fliphopper` to `…/glidepace/allomos` ("the project folder and the github repository name should also be changed") | owner (chat) |
 | 2026-10-11 | Old FlipHopper projects: no move button; "treat it as standard need to be moved task system" | owner (chat) |
 | 2026-10-10 | Rename approved; alias `alm`; `fh` not kept; owner registers domains; hopper icon kept; taskbag + 任务包 for the folder word | owner (chat) |
@@ -68,3 +69,4 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
 - 2026-10-11 — Owner checked the built app: the name shows correctly ("passed"). **Compatibility removed** at the owner's word: `.fliphopper/seabag/`, `fliphopper/1`, `--seabag`, `FLIPHOPPER_*`, `alm migrate` and the move button are gone; an old FlipHopper project is moved in by an AI agent through the open-folder flow, like any other task system. Checks after the removal: Rust fmt, clippy, all tests; web typecheck, build, `check:i18n` (156 texts): PASS.
 - 2026-10-11 — Merged into `main`; this repository's own taskbag moved with `git mv` to `.allomos/taskbag/` (format `allomos/1`); `alm` installed in `~/.cargo/bin` and the old `fliphopper-cli` (`fh`, `fliphopper`) uninstalled. **GitHub repository renamed** `mypals-ml/fliphopper` → `mypals-ml/allomos` (`gh repo rename`; GitHub redirects the old address) and `origin` updated. Claude Code's memory copied to the new folder's key. Next: rename the local folder `…/glidepace/fliphopper` → `…/glidepace/allomos` and repair the worktrees.
 - 2026-10-11 — **Local folder renamed** `…/glidepace/fliphopper` → `…/glidepace/allomos`; `git worktree repair` fixed both worktrees; `alm list --json` reports no issues. Waiting on the owner's last look.
+- 2026-10-11 — **Owner verified, done.** Checklist: board (57 cards, no issues), `fh` gone, GitHub `mypals-ml/allomos`, folders (owner), the app on the repository (owner), a fresh Claude Code session ran `alm next` by itself without mentioning `fh` or FlipHopper.

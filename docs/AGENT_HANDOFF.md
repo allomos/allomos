@@ -36,12 +36,6 @@ Updated: 2026-10-04
 
 One block per card that `alm list --state in_progress` shows held.
 
-### Task-A00-21 (with A01-20) — claude/a00-21-allomos
-- Checkout: `.claude/worktrees/a00-21-allomos` (inside the main folder) · branch `claude/a00-21-allomos`, merged into `main` · pushed: yes
-- Done: code, documents, own taskbag moved, `alm` installed, `fh` uninstalled, GitHub repository renamed to `mypals-ml/allomos`.
-- Local folder renamed to `/Users/wanghui/coding/glidepace/allomos` (2026-10-11); worktrees repaired. Sessions started at the old path must be reopened at the new one.
-- Next: owner's last look; then label owner verified and finish A00-21 and A01-20.
-
 ## Live state
 
 Checked 2026-10-08.

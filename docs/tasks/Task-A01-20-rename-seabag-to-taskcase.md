@@ -36,3 +36,4 @@
 
 ## Notes
 - 2026-10-11 — Done inside [`A00-21`](./Task-A00-21-rename-to-allomos.md)'s branch `claude/a00-21-allomos`: taskbag / 任务包 / タスクバッグ, `.allomos/taskbag/`, `alm --taskbag`, `ALLOMOS_TASKBAG`. Old names are not read (owner, 2026-10-11). Remaining: move FlipHopper's own `.fliphopper/seabag/` by hand (`git mv`) after the merge.
+- 2026-10-11 — **Owner verified, done** together with A00-21. FlipHopper's own folder moved with `git mv` to `.allomos/taskbag/`.
