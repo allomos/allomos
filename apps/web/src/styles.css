@@ -65,7 +65,8 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .brand .ring { fill: none; stroke-width: 66; }
 .brand .ring.jade { stroke: #2a9d8f; }
 .brand .ring.terracotta { stroke: #e76f51; }
-.where { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+/* As wide as its widest line (the path), so Show in Finder lines up with the path's right end. */
+.where { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
 .where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .where-row .reveal { margin-left: auto; }
