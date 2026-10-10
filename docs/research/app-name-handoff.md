@@ -93,3 +93,17 @@ The owner liked **HandoffHub** and asked for other "Hub" names. "Hub" also match
 | **BatonPassHub** | the pass of the baton | free / free / free | **free** / free / free / free | long |
 | SwapHub, HandHub | swap / hand over | free / free / taken | taken / free / free / taken | — |
 | RelayHub, HopHub, SwitchHub, PassHub, ShiftHub, CrewHub, AgentHub, PickupHub | — | GitHub taken | all four domains taken | — |
+
+### Task and project "…Hub" names (2026-10-10)
+
+The owner asked about **TaskHub, ProjectHub** and similar. All of these have their GitHub account taken; the plain ones have every domain taken too, and both TaskHub and ProjectHub are already used by several to-do and project apps ([TaskHub on the App Store](https://apps.apple.com/ec/app/taskhub-plan-your-tasks/id6740157355), [TaskHub on quickhub.ai](https://www.quickhub.ai/feature), [TaskHub, Bubble](https://forum.bubble.io/t/taskhub-project-management-app/353304), [Taskhub on GitHub](https://github.com/zhangxijing97/Taskhub), [ProjectHub on GitHub](https://github.com/Shinagawa-monkey/ProjectHub-App)).
+
+| Name | crates / npm / GitHub | .com / .io / .dev / .app |
+|---|---|---|
+| TaskHub, ProjectHub, PlanHub, CardHub, TrackHub, SprintHub | free / free / taken | all taken |
+| WorkHub | free / taken / taken | all taken |
+| BoardHub | free / free / taken | taken / taken / free / taken |
+| TodoHub, ProgressHub, MilestoneHub | free / free / taken | taken / free / free / taken |
+| BacklogHub, OutcomeHub | free / free / taken | taken / free / free / free |
+
+They also name what every task tracker does, not what FlipHopper does differently: moving a project between AI agents and teammates without losing its plan ([0014](../decisions/0014-main-purpose-and-three-sets.md)).
