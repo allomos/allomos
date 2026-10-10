@@ -86,6 +86,8 @@ A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-c
 | `alm release <id> [--note <text>]` | Clears the holder; `in_progress` goes back to `ready`. The note replaces the task's handoff note. |
 | `alm needs <id> [<text>]` | Sets the task's next dependency; without text, clears it. |
 | `alm ready <id>` | An unheld `backlog` or `waiting` task becomes `ready`, its *waiting on* cleared. Otherwise refused (`cannot_make_ready`). |
+| `alm title <id> <title>` | Gives a task a new title. Same holder rule as `label`; an empty title is refused (`task_title_missing`); allowed in any state ([`Task-A00-22`](../tasks/Task-A00-22-leftover-fliphopper-names.md)). |
+| `alm project [--name <name>] [--id <id>]` | Changes the project's name and/or ID in `project.json`; without either, shows them. An empty name (`project_name_missing`) or an invalid ID (`invalid_id`) is refused. |
 | `alm drop <id>` | State `dropped`; holder and *waiting on* cleared. Refused (`task_closed`) when done or dropped. |
 | `alm next` | The first `ready` task no one holds (by area order, then ID), with its handoff note. |
 | `alm brief` | Prints Allomos's section for a project's `AGENTS.md`: the short brief (how to work tasks with `alm`, the terms Allomos relies on) that points to `alm guide`. With a taskbag outside the project folder, it names where the taskbag is. The app's requests tell agents to use this output, so `AGENTS.md` matches the installed `alm`. |

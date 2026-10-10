@@ -184,7 +184,7 @@ flowchart TD
 - **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `alm init` in a repository; this creates an empty taskbag. It then adds areas and tasks one by one with `alm` commands. The desktop app can also create the folder.
 - **From Iteration 11 (v0.11).** An agent generates a **whole project at once** from Allomos's prompt, and Allomos validates and previews it before adopting it (R50–R55).
 
-**Taskbag place on disk (owner, 2026-10-04; renamed and made the only place 2026-10-06, [0013](../decisions/0013-product-name-fliphopper.md)):** `.allomos/taskbag/` at the root of the folder the user picks, like `.github/` or `.vscode/`, also when that folder is empty. `alm init` and the app both create it there (R72, R87).
+**Taskbag place on disk (owner, 2026-10-04; renamed and made the only place 2026-10-06, [0013](../decisions/0013-product-name-fliphopper.md); renamed to `.allomos/taskbag/` 2026-10-10, [0015](../decisions/0015-product-name-allomos.md)):** `.allomos/taskbag/` at the root of the folder the user picks, like `.github/` or `.vscode/`, also when that folder is empty. `alm init` and the app both create it there (R72, R87).
 
 **Every release** follows R60: one shared set of rules and commands serves people and agents alike.
 
