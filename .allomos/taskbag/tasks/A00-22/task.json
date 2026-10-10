@@ -1,6 +1,7 @@
 {
   "area": "A00",
+  "holder": "claude/a00-22-leftover-names",
   "id": "A00-22",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Clear leftover FlipHopper names"
 }
