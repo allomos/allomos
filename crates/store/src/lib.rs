@@ -277,7 +277,7 @@ In the project folder:
 
 1. Open AGENTS.md (create it if it is missing).
 2. If AGENTS.md already has FlipHopper instructions (for example a section headed \
-\"{heading}\", or any other text about FlipHopper or `fh`), replace them with the \
+\"{heading}\", or any other text about FlipHopper or `fh`), replace them with \
 FlipHopper's section (see the last line). Otherwise add that section.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
