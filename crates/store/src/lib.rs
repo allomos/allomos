@@ -250,11 +250,13 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 
 在项目文件夹中：
 
-1. 打开 AGENTS.md（如果没有就新建）。
-2. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
-3. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
-4. 确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
-5. 告诉用户你改了什么。
+1. 如果项目是 Git 仓库，而任务包还没有提交，先单独提交它：`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（只提交任务包，不要带上其他文件）。
+2. 打开 AGENTS.md（如果没有就新建）。
+3. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
+4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
+5. 确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
+6. 如果项目是 Git 仓库，只提交 AGENTS.md 和 CLAUDE.md，作为一次提交：`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`。其他改动保持原样；除非用户要求，不要推送。
+7. 告诉用户你改了什么，以及你做的提交。
 
 {source}"
         ),
@@ -266,11 +268,13 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 
 プロジェクトのフォルダーで：
 
-1. AGENTS.md を開きます（なければ作成します）。
-2. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
-3. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
-4. CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
-5. 何を変えたかをユーザーに見せてください。
+1. プロジェクトが Git リポジトリで、タスクバッグがまだコミットされていなければ、先にそれだけをコミットします：`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（タスクバッグだけ。ほかのファイルは入れません）。
+2. AGENTS.md を開きます（なければ作成します）。
+3. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
+4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
+5. CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
+6. プロジェクトが Git リポジトリなら、AGENTS.md と CLAUDE.md だけを一つのコミットにします：`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`。ほかの変更はそのままにし、頼まれない限りプッシュしません。
+7. 何を変えたか、どんなコミットをしたかをユーザーに見せてください。
 
 {source}"
         ),
@@ -282,17 +286,21 @@ Taskbag (Allomos's task files): {taskbag}
 
 In the project folder:
 
-1. Open AGENTS.md (create it if it is missing).
-2. If AGENTS.md already has Allomos instructions (for example a section headed \
+1. If the project is a Git repository and the taskbag is not committed yet, commit it on its own first: `git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` (only the taskbag; never other files).
+2. Open AGENTS.md (create it if it is missing).
+3. If AGENTS.md already has Allomos instructions (for example a section headed \
 \"{heading}\", or any other text about Allomos or `alm`), replace them with \
 Allomos's section (see the last line). Otherwise add that section.
-3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
+4. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to Allomos, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
-4. Make sure CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by \
+5. Make sure CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by \
 AGENTS.md), so Claude Code reads AGENTS.md (create \
 CLAUDE.md with just that line if it is missing). Do not copy the section into CLAUDE.md.
-5. Show the user what you changed.
+6. If the project is a Git repository, commit only AGENTS.md and CLAUDE.md, as one commit: \
+`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- \
+AGENTS.md CLAUDE.md`. Leave every other change as it is; do not push unless the person asks.
+7. Show the user what you changed and the commits you made.
 
 {source}"
         ),
@@ -1053,12 +1061,15 @@ mod tests {
         let (p, b) = (Path::new("/p"), Path::new("/p/.allomos/taskbag"));
         let zh = agent_setup_request_in("zh-CN", p, b);
         let ja = agent_setup_request_in("ja", p, b);
-        assert!(zh.contains("1. 打开 AGENTS.md") && zh.contains("项目文件夹：/p\n"));
+        assert!(zh.contains("2. 打开 AGENTS.md") && zh.contains("项目文件夹：/p\n"));
         assert!(
-            ja.contains("1. AGENTS.md を開きます")
+            ja.contains("2. AGENTS.md を開きます")
                 && ja.contains("タスクバッグ（Allomos のタスクファイル）：/p/.allomos/taskbag")
         );
         for r in [&zh, &ja] {
+            assert!(
+                r.contains("Add Allomos taskbag") && r.contains("Tell AI agents about Allomos")
+            );
             assert!(
                 r.contains("brief`") && !r.contains("alm claim <id>"),
                 "no copy of the section"
@@ -1073,7 +1084,10 @@ mod tests {
     #[test]
     fn agent_setup_request_carries_the_section_and_steps() {
         let r = agent_setup_request(Path::new("/p"), Path::new("/p/.allomos/taskbag"));
-        assert!(r.contains("1. Open AGENTS.md") && r.contains("imports AGENTS.md"));
+        assert!(r.contains("2. Open AGENTS.md") && r.contains("imports AGENTS.md"));
+        // Each step commits its own work, limited to its own paths (Task-A03-08).
+        assert!(r.contains("commit -m \"Add Allomos taskbag\" -- ."));
+        assert!(r.contains("commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md"));
         // The Claude app turns a typed-in "@" into a full-width "＠", so the request avoids it.
         assert!(!r.contains('@'));
         assert!(
