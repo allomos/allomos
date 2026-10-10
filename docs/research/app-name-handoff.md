@@ -107,3 +107,7 @@ The owner asked about **TaskHub, ProjectHub** and similar. All of these have the
 | BacklogHub, OutcomeHub | free / free / taken | taken / free / free / free |
 
 They also name what every task tracker does, not what FlipHopper does differently: moving a project between AI agents and teammates without losing its plan ([0014](../decisions/0014-main-purpose-and-three-sets.md)).
+
+### Allomos trademark search (2026-10-10)
+
+See [`Task-A00-21` Notes](../tasks/Task-A00-21-rename-to-allomos.md#notes): no ALLOMOS, 换肩, 換肩 or アロモス mark in WIPO's Global Brand Database (US, Japan, EU, UK, Madrid and others; China's national register is not in it and needs a CNIPA account). Similar software marks: ALLMOS (US, class 9), ALOMOS (SG/MY/ID, class 9), ALTOMOS (Japan, classes 9 and 42), allmos electronic (DE/EU, class 9). Source: [WIPO Global Brand Database](https://branddb.wipo.int/en/similarname), [coverage](https://branddb.wipo.int/en/coverage).

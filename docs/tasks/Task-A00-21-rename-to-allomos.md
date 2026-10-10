@@ -46,3 +46,12 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
 ## Notes
 
 - 2026-10-10 — Card prepared by the agent; **not started**. Name check: `allomos` free on crates.io, npm and GitHub; `allomos.com`, `.io`, `.dev` and `.app` not registered; no product found by web search (A00-20 research).
+- 2026-10-10 — **Trademark search by the agent** in WIPO's Global Brand Database (89 registers, 77 million records, including **USPTO (US)** and **JPO (Japan)** to October 2026, EUIPO, UKIPO and Madrid international marks). **Not included: China's national register (CNIPA)**; its own search (wcjs.sbj.cnipa.gov.cn) needs an account sign-in, so the agent did not search it.
+  - **No mark** named ALLOMOS (contains the word), 换肩 or 換肩 (exact), or アロモス (exact).
+  - **Similar marks for software** (Nice class 9, downloadable software; class 42, software services), which a trademark examiner or an owner could raise:
+    - **ALLMOS**, class 9, **registered in the USA** on July 28, 2026 (Littlesoho, Korea), and in Korea (another owner);
+    - **ALOMOS**, classes 9 and 35, registered in Singapore, Malaysia and Indonesia (Pointstar Pte. Ltd.);
+    - **ALTOMOS**, classes 9, 42 and others, **registered in Japan** (アルケア株式会社 / Alcare);
+    - **allmos electronic**, class 9, Germany and an international registration across Europe.
+  - Other similar marks are in unrelated classes (clothing, bags, finance).
+  - **In plain words:** nobody owns "Allomos" or "换肩", but three names one letter away are registered for software in the US, Japan and South-East Asia. That does not block Allomos, but a trademark attorney should judge the risk of confusion before you file or sell, and a CNIPA search for China is still needed.
