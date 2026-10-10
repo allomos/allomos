@@ -44,6 +44,13 @@ One block per card that `alm list --state in_progress` shows held.
 - Unrecorded findings: none (makensis locale crash is on the card and in CODING_RULES)
 - Next action: owner runs `bash apps/desktop/scripts/build-windows.sh`; then `alm label A07-02 "owner verified"`, `alm done`, remove this block and the worktree
 
+### Task-A05-03 — claude/a05-03-setup-wizard
+- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` · pushed: yes
+- Approvals in force: card's local work (owner, 2026-10-11); no external operations
+- Uncommitted: none · Running: none
+- Done so far: store `agent_connect_request_in` (+ test); desktop `connect_agents`, `instruction_files`, one File → Connect with the Agents… item (+ test). Interface still calls the old commands.
+- Next action: interface — `SetupWizard.tsx`, `setupFlow.ts` (+ node test), AgentsPanel connect mode, restart notice, i18n; then OPEN-FOLDER-FLOW.md
+
 ## Live state
 
 Checked 2026-10-08.

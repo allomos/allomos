@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use crate::{relative_path, section_source};
+use crate::{relative_path, section_source, setup_steps_in};
 
 /// Changes when the conversion request's steps change, so a report can say which it followed.
 /// 2: the agent finds the tasks itself and asks with `alm confirm` before changing anything.
@@ -16,7 +16,11 @@ use crate::{relative_path, section_source};
 /// with `alm labels`, and card links are relative to the recorded project folder.
 /// 4: one question only (owner, 2026-10-10): no questions in the chat, the plan covers removing
 /// the old status, committing and merging into the person's branch, and Go ahead does it all.
-pub const CONVERT_REQUEST_VERSION: u32 = 5;
+/// 6: starting again is File → Connect with the Agents… (Task-A05-03).
+pub const CONVERT_REQUEST_VERSION: u32 = 6;
+
+/// Changes when the connect request's parts change (Task-A05-03).
+pub const CONNECT_REQUEST_VERSION: u32 = 1;
 
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
@@ -30,6 +34,13 @@ pub fn agent_convert_request_in(
     project_path: &Path,
     taskbag_path: &Path,
 ) -> String {
+    let steps = convert_steps_in(language, project_path, taskbag_path);
+    let source = section_source(language, taskbag_path);
+    format!("{steps}\n\n{source}\n")
+}
+
+/// The conversion request's text without its last line (where Allomos's section comes from).
+fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
     // A card's link, from a task's description.md to the project folder.
     let up = relative_path(&taskbag_path.join("tasks").join("ID"), project_path)
         .map(|p| format!("{}/", p.display()))
@@ -40,8 +51,7 @@ pub fn agent_convert_request_in(
     // Agents' shells often forget exported variables between commands, so every command names
     // the taskbag; the request says so once instead of repeating the path.
     let with_taskbag = format!("alm --taskbag \"{taskbag}\"");
-    let source = section_source(language, taskbag_path);
-    let steps = match language {
+    match language {
         "zh-CN" => format!(
             "请找出这个项目的任务，并把它们搬进 Allomos（转换请求 v{version}）。
 
@@ -56,7 +66,7 @@ pub fn agent_convert_request_in(
 1. 先查看，不要改动。找出这个项目是否、以及在哪里记录任务、状态、负责人、标签、领域和下一步（例如任务看板、卡片文件、待办清单），以及 AGENTS.md / CLAUDE.md 中哪些规则描述了它们。不要运行项目的脚本或钩子。如果没有找到任务，告诉用户，然后停止。
 2. 自己决定，并写进计划：保留项目自己的任务 ID（只去掉 `Task-` 这样的前缀和结尾的描述）；标签阶梯用项目自己的，按顺序；按文件中的用词对应 ready、waiting、done、dropped；还没有卡片的计划工作作为 backlog 任务加入，说明里写“还没有卡片”；任务标题用 `alm task-language` 给出的语言写（原文是别的语言就翻译，卡片链接保留原文）。
 3. 如果项目是 Git 仓库：记下当前分支（原分支）。先把前面 Allomos 步骤留下的未提交改动各自单独提交，不带其他文件：任务包（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`），然后是只含 Allomos 一节改动的 AGENTS.md 和 CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。如果你要改的其他文件（卡片和看板文件，或 AGENTS.md 中其他改动）有未提交的改动，先告诉用户请他们提交或另存，然后停止；不要把它们混进去。
-4. 唯一的问题。把完整计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、你做的决定、AGENTS.md 中要替换的规则、要删除的旧状态（卡片里的状态表、生成的看板段落、会话登记表）、工作分支 `allomos/convert`，以及“完成后提交，并合并到 <原分支>；不推送”。然后运行 `alm confirm --title \"{title}\" --plan <文件>`，它会在应用中显示计划并等待回答。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户：没有任何改动；如果改主意了，可以在这里让你再给他看一次计划，或在 Allomos 中选择“文件 → 把任务搬进 Allomos…”重新开始。
+4. 唯一的问题。把完整计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、你做的决定、AGENTS.md 中要替换的规则、要删除的旧状态（卡片里的状态表、生成的看板段落、会话登记表）、工作分支 `allomos/convert`，以及“完成后提交，并合并到 <原分支>；不推送”。然后运行 `alm confirm --title \"{title}\" --plan <文件>`，它会在应用中显示计划并等待回答。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户：没有任何改动；如果改主意了，可以在这里让你再给他看一次计划，或在 Allomos 中选择“文件 → 连接 AI 智能体…”重新开始。
 5. 从原分支新建分支 `allomos/convert` 并在上面工作。
 6. 只用 `alm` 写任务包，绝不手工编辑它的文件。任务包已经存在（由 Allomos 建立）：不要再建一个，也不要删除它；如果它已经有任务，只添加，不改动那些任务。标签阶梯与任务包的不同时，用 `alm labels \"<阶梯，用逗号分隔>\"` 设置。然后每个领域 `alm add area <id> \"<名称>\"`，每个任务 `alm add task <id> --area <id> --title \"<标题>\" --description \"Card: [<路径>]({up}<从项目文件夹起的路径>)\"`（卡片是大文件中的一节时，链接到 `文件.md#节`）。
 7. 照文件所写原样复制状态：`alm --as <负责人> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。只复制写明的内容：不明的状态、日期或负责人保持不明，并写进报告；绝不编造进度、验证或批准。`alm` 还记不下的值（完成日期、依赖、优先级、批准等）写进报告。
@@ -64,9 +74,7 @@ pub fn agent_convert_request_in(
 9. 切换说明：在 AGENTS.md 中，用 Allomos 的一节（`alm brief` 的输出，见最后一行）替换关于状态存放位置、如何认领和释放、会话登记表、重新生成看板的规则；其他规则一字不改。确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md）。
 10. 删除旧状态：卡片文件里的状态表、生成的看板段落和会话登记表。卡片的结果、批准和备注改成普通文字保留下来。只删除计划里写到的东西；有其他用途的脚本、钩子和 CI 不要动。
 11. 只提交你改动的文件（不要提交 .DS_Store 这类无关文件），用 `git merge --no-ff allomos/convert` 合并到原分支，然后删除 `allomos/convert`。绝不推送。
-12. 告诉用户做了什么、合并提交的编号，以及如何整体撤销：`git revert -m 1 <合并提交>`。
-
-{source}"
+12. 告诉用户做了什么、合并提交的编号，以及如何整体撤销：`git revert -m 1 <合并提交>`。"
         ),
         "ja" => format!(
             "このプロジェクトのタスクを見つけて、Allomos に移してください（移行の依頼 v{version}）。
@@ -82,7 +90,7 @@ pub fn agent_convert_request_in(
 1. まず見るだけで、何も変えません。このプロジェクトがタスク、状況、担当者、ラベル、エリア、次の一歩を記録しているか、どこに記録しているか（タスクボード、カードのファイル、TODO リストなど）、AGENTS.md / CLAUDE.md のどのルールがそれを説明しているかを調べます。プロジェクトのスクリプトやフックは実行しません。タスクが見つからなければ、そう伝えて終わります。
 2. 自分で決めて計画に書きます：プロジェクト自身のタスク ID を残す（`Task-` のような接頭辞と末尾の説明だけを外す）、ラベルの段階はプロジェクト自身のものを順に使う、ファイルの言葉を ready、waiting、done、dropped に対応させる、まだカードのない予定の作業は backlog のタスクにして説明に「まだカードなし」と書く、タスクの題名は `alm task-language` の言語で書く（原文が別の言語なら訳し、原文はカードへのリンクで残す）。
 3. プロジェクトが Git リポジトリなら、今のブランチ（元のブランチ）を控えます。まず、前のアロモスの手順が残したコミットされていない変更を、それぞれ単独でコミットします（ほかのファイルは入れません）：タスクバッグ（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`）、次に Allomos の節の変更だけを含む AGENTS.md と CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。変えるほかのファイル（カードやボードのファイル、AGENTS.md のほかの変更）にコミットされていない変更があれば、コミットするか退避するようユーザーに伝えて終わります。混ぜないでください。
-4. ただ一つの質問。計画全体を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、自分で決めたこと、AGENTS.md で置き換えるルール、消す古い状況（カードの状況表、生成されるボードの節、セッション一覧）、作業ブランチ `allomos/convert`、そして「最後にコミットし、<元のブランチ> にマージする。プッシュはしない」。続いて `alm confirm --title \"{title}\" --plan <ファイル>` を実行すると、アプリに計画が表示され、答えを待ちます。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、ユーザーに伝えます：何も変わっていないこと、考えが変わったらここでもう一度計画を見せるよう頼めること、または Allomos の「ファイル → タスクを Allomos に移す…」からやり直せること。
+4. ただ一つの質問。計画全体を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、自分で決めたこと、AGENTS.md で置き換えるルール、消す古い状況（カードの状況表、生成されるボードの節、セッション一覧）、作業ブランチ `allomos/convert`、そして「最後にコミットし、<元のブランチ> にマージする。プッシュはしない」。続いて `alm confirm --title \"{title}\" --plan <ファイル>` を実行すると、アプリに計画が表示され、答えを待ちます。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、ユーザーに伝えます：何も変わっていないこと、考えが変わったらここでもう一度計画を見せるよう頼めること、または Allomos の「ファイル → AI エージェントとつなぐ…」からやり直せること。
 5. 元のブランチから `allomos/convert` を作り、そこで作業します。
 6. タスクバッグは `alm` だけで書き、ファイルを手で編集しません。タスクバッグはすでにあります（Allomos が作りました）：新しく作ったり削除したりしないでください。すでにタスクがあれば追加だけにし、それらは変えません。ラベルの段階がタスクバッグと違えば `alm labels \"<段階、カンマ区切り>\"` で設定します。続いてエリアごとに `alm add area <id> \"<名前>\"`、タスクごとに `alm add task <id> --area <id> --title \"<題名>\" --description \"Card: [<パス>]({up}<プロジェクトのフォルダーからのパス>)\"`（カードが大きなファイルの一節なら `ファイル.md#節` へリンク）。
 7. 状況はファイルに書かれているとおりに写します：`alm --as <担当者> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。書かれていることだけを写し、わからない状況・日付・担当者はわからないままにしてレポートに書きます。進捗、検証、承認を作り出してはいけません。`alm` がまだ記録できない値（完了日、依存関係、優先度、承認など）はレポートに書きます。
@@ -90,9 +98,7 @@ pub fn agent_convert_request_in(
 9. 説明を切り替えます。AGENTS.md で、状況の置き場所、担当の取り方と手放し方、セッション一覧、ボードの再生成についてのルールを、Allomos の節（`alm brief` の出力。最後の行を参照）で置き換えます。ほかのルールは一字も変えません。CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます。
 10. 古い状況を消します：カードのファイルの状況表、生成されるボードの節、セッション一覧。カードの結果、承認、メモは普通の文として残します。計画に書いたものだけを消し、ほかの役目もあるスクリプト、フック、CI には触れません。
 11. 変えたファイルだけをコミットし（.DS_Store のような関係のないファイルは入れない）、`git merge --no-ff allomos/convert` で元のブランチにマージしてから `allomos/convert` を削除します。プッシュはしません。
-12. 何をしたか、マージコミットの番号、そして全体を元に戻す方法 `git revert -m 1 <マージコミット>` を伝えます。
-
-{source}"
+12. 何をしたか、マージコミットの番号、そして全体を元に戻す方法 `git revert -m 1 <マージコミット>` を伝えます。"
         ),
         _ => format!(
             "Please find this project's tasks and move them into Allomos (conversion request v{version}).
@@ -133,7 +139,7 @@ Then run `alm confirm --title \"{title}\" --plan <file>`. It shows the plan in t
 for the person's answer. Exit code 0 means go ahead with the whole plan; any other exit code \
 means the person cancelled or did not answer: change nothing and stop, and tell the person that \
 nothing changed and that, if they change their mind, they can ask you here to show the plan \
-again, or choose File → Move Tasks Into Allomos… in Allomos to start again.
+again, or choose File → Connect with the Agents… in Allomos to start again.
 5. Create the branch `allomos/convert` from the original branch and work on it.
 6. Write the taskbag only with `alm`; never edit its files by hand. The taskbag already exists \
 (Allomos created it): never create another or delete it; if it already holds tasks, only add \
@@ -161,12 +167,51 @@ plan named; leave scripts, hooks and CI checks that also do other things alone.
 `git merge --no-ff allomos/convert` into the original branch, then delete \
 `allomos/convert`. Never push.
 12. Tell the person what you did, the merge commit, and how to undo the whole move: \
-`git revert -m 1 <merge commit>`.
+`git revert -m 1 <merge commit>`."
+        ),
+    }
+}
 
-{source}"
+/// What **Connect with the agents** asks the first chosen agent (Task-A05-03): first the setup
+/// request (add Allomos's section to `AGENTS.md` and `CLAUDE.md`), then the conversion request
+/// (find the project's tasks; if there are some, offer to move them with `alm confirm`, so the
+/// person still decides). Other agents chosen at the same time get only the setup request: two
+/// agents moving tasks would add every task twice.
+pub fn agent_connect_request_in(
+    language: &str,
+    project_path: &Path,
+    taskbag_path: &Path,
+) -> String {
+    let version = CONNECT_REQUEST_VERSION;
+    let setup = setup_steps_in(language, project_path, taskbag_path);
+    let convert = convert_steps_in(language, project_path, taskbag_path);
+    let source = section_source(language, taskbag_path);
+    let (intro, one, two) = match language {
+        "zh-CN" => (
+            format!(
+                "请按顺序完成两部分（连接请求 v{version}）：第一部分把 Allomos 告诉以后的 AI 智能体；第二部分找出这个项目已有的任务，并询问用户是否把它们搬进 Allomos。"
+            ),
+            "第一部分：告诉 AI 智能体",
+            "第二部分：已有的任务（第一部分完成后再做）",
+        ),
+        "ja" => (
+            format!(
+                "二つの部分を順に進めてください（接続の依頼 v{version}）。第一部では、これからの AI エージェントに Allomos を伝えます。第二部では、このプロジェクトにすでにあるタスクを探し、Allomos に移すかどうかをユーザーに尋ねます。"
+            ),
+            "第一部：AI エージェントに伝える",
+            "第二部：すでにあるタスク（第一部が終わってから）",
+        ),
+        _ => (
+            format!(
+                "Please do two parts, in order (connect request v{version}). Part 1 tells future AI \
+agents about Allomos. Part 2 finds the tasks this project already keeps and asks the person \
+whether to move them into Allomos."
+            ),
+            "Part 1: tell AI agents",
+            "Part 2: existing tasks (after part 1 is done)",
         ),
     };
-    format!("{steps}\n")
+    format!("{intro}\n\n## {one}\n\n{setup}\n\n## {two}\n\n{convert}\n\n{source}\n")
 }
 
 #[cfg(test)]
@@ -243,6 +288,37 @@ mod tests {
         assert!(
             section.contains("--taskbag \"../tasks-home/.allomos/taskbag\""),
             "{section}"
+        );
+    }
+
+    #[test]
+    fn connect_request_tells_agents_then_offers_to_move_tasks() {
+        let project = PathBuf::from("/work/bakery");
+        let taskbag = project.join(DEFAULT_DIR);
+        for language in ["en", "zh-CN", "ja"] {
+            let r = agent_connect_request_in(language, &project, &taskbag);
+            let setup = crate::setup_steps_in(language, &project, &taskbag);
+            let convert = convert_steps_in(language, &project, &taskbag);
+            // Both requests, in order: instructions first, then the tasks.
+            let (a, b) = (r.find(&setup).unwrap(), r.find(&convert).unwrap());
+            assert!(a < b, "{language}");
+            assert!(
+                r.contains(&format!("v{CONNECT_REQUEST_VERSION}")),
+                "{language}"
+            );
+            // The person still decides whether tasks move: the plan goes through `alm confirm`.
+            assert!(r.contains("alm confirm --title"), "{language}");
+            // Where the section comes from is said once, at the end.
+            let source = section_source(language, &taskbag);
+            assert_eq!(r.matches(&source).count(), 1, "{language}");
+            assert!(r.trim_end().ends_with(&source), "{language}");
+            assert!(!r.contains('@'), "{language}");
+            // Starting again names the one menu item.
+            assert!(!r.contains("Move Tasks Into"), "{language}");
+        }
+        assert!(
+            agent_connect_request_in("en", &project, &taskbag)
+                .contains("File → Connect with the Agents…")
         );
     }
 }
