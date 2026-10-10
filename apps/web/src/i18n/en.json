@@ -37,7 +37,7 @@
   "confirm.cancel": "Cancel",
   "confirm.cancelled": "Cancelled: nothing was changed. To ask again, tell the AI agent in its window, for example \"I changed my mind — please show me the plan again\", or choose File → Move Tasks Into FlipHopper… to start again with any agent.",
   "convert.title": "Find this project's tasks and move them into FlipHopper?",
-  "convert.body": "Choose one AI agent. It opens in the project folder with a request already typed in: look for tasks the project already keeps (a task board, card files, a to-do list). If it finds some, it shows you its plan here to go ahead or cancel, then moves them into this seabag with fh and switches AGENTS.md to FlipHopper. Nothing is sent until you send it.",
+  "convert.body": "Choose one AI agent. It opens in the project folder with a request already typed in: look for tasks the project already keeps (a task board, card files, a to-do list). If it finds some, it asks you once, here: its whole plan to go ahead or cancel. Go ahead lets it move the tasks into this seabag, switch AGENTS.md to FlipHopper, remove the old status, commit, and merge into your branch. It never pushes. Nothing is sent until you send it.",
   "convert.none": "No AI agent was found on this computer. Install Claude Code or Codex, then try again.",
   "top.show_in_finder": "Show in Finder",
   "top.show_in_explorer": "Show in Explorer",
