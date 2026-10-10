@@ -4,7 +4,6 @@
   "id": "A05-02",
   "label": "owner verified",
   "next_dependency": "owner checks the panel in the built app (card § Result)",
-  "state": "waiting",
-  "title": "Convert an existing project",
-  "waiting_on": "owner's manual check (card § Owner's manual check), merged into main 2026-10-10"
+  "state": "done",
+  "title": "Convert an existing project"
 }
