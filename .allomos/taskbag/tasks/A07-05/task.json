@@ -4,6 +4,7 @@
   "id": "A07-05",
   "iteration": "I02",
   "label": "locally verified",
-  "state": "in_progress",
-  "title": "Windows: no console flashes, agents found and asked"
+  "state": "waiting",
+  "title": "Windows: no console flashes, agents found and asked",
+  "waiting_on": "owner: install the new Windows build and check no flashing, agents listed, asking opens one"
 }
