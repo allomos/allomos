@@ -19,9 +19,9 @@ At the end the owner upgrades FlipHopper, opens an older project, sees "instruct
 
 - **Outcome.** When a project's FlipHopper section is older than the app's, the app (and `fh`) says so and lets the person renew it in one step, without losing anything else in the file.
 - **Decisive unknowns.**
-  - **Where the version is written.** The owner asked for no marker lines in the file (A01-14, 2026-10-08). Options: a short visible line inside the section (for example "FlipHopper instructions, version 3"); the version in the heading; or the version recorded in the seabag's project settings when the section is written, plus a comparison of the section's text. Owner to choose.
+  - **Where the version is written: in the section's heading** (owner, 2026-10-11), for example `## Tasks: FlipHopper (v3)`. No marker lines. A heading without a version counts as unknown.
   - **How to find the old section to replace** without markers: from its heading `## Tasks: FlipHopper` to the next heading of the same level is the proposal; an agent-led renewal can also handle sections the agent merged with other text.
-  - **Snoozing:** whether "Not now" hides the prompt until the next app version. Owner to choose; proposal: yes.
+  - **Dismissing the prompt:** if the person presses "Not now" on the out-of-date line, does it come back the next time they open the project, or stay hidden until FlipHopper is upgraded again? Owner to choose; asked again in plain words 2026-10-11.
 - **Files owned.** The section text and the check in `crates/store`; the agent line and renewal panel in `apps/web` and `apps/desktop`; the `fh` command for reporting and renewing; language files; this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -37,3 +37,4 @@ At the end the owner upgrades FlipHopper, opens an older project, sees "instruct
 ## Notes
 
 - 2026-10-10 — Asked for by the owner: renew the FlipHopper section in AGENTS.md when the app is upgraded, and have the interface prompt the person when the section's version does not match. Checked that no existing card covers it: A01-13, A01-14 and A03-03 write or request the section once, and A03-04 checks only that it is present.
+- 2026-10-11 — Owner chose: the version goes in the section's heading. The "Not now" question was unclear and was asked again in plain words.
