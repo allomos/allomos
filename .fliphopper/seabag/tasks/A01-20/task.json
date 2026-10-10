@@ -1,7 +1,6 @@
 {
   "area": "A01",
   "id": "A01-20",
-  "next_dependency": "the owner's answer on the app name (A00-20), so projects move only once",
   "state": "ready",
   "title": "Rename seabag to taskcase"
 }
