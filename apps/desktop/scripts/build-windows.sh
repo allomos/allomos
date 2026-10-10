@@ -15,8 +15,12 @@ need clang-cl "Install: brew install llvm"
 rustup target list --installed | grep -qx $T || { echo "build-windows: Rust target $T missing. Install: rustup target add $T" >&2; exit 1; }
 [ -d apps/web/node_modules ] || npm --prefix apps/web ci
 [ -d apps/desktop/node_modules ] || npm --prefix apps/desktop ci
-npm --prefix apps/desktop run tauri build -- --runner cargo-xwin --target $T --bundles nsis
+# alm first: the installer carries it (tauri.windows.conf.json, Task-A07-06), under the name
+# Tauri expects for a bundled program.
 cargo xwin build --release --target $T -p allomos-cli --bin alm
+mkdir -p apps/desktop/src-tauri/binaries
+cp target/$T/release/alm.exe apps/desktop/src-tauri/binaries/alm-$T.exe
+npm --prefix apps/desktop run tauri build -- --runner cargo-xwin --target $T --bundles nsis
 mkdir -p $OUT
 cp target/$T/release/bundle/nsis/*-setup.exe target/$T/release/alm.exe $OUT/
 ls -l $OUT

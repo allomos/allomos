@@ -36,6 +36,13 @@ Updated: 2026-10-04
 
 One block per card that `alm list --state in_progress` shows held.
 
+### Task-A07-06 — claude/a07-06-installer-alm
+- Checkout: `.claude/worktrees/a07-06` · branch `claude/a07-06-installer-alm` · pushed: yes
+- Approvals in force: the card's local work; installer handed to the owner (2026-10-11)
+- Uncommitted: none · Running: none
+- Trial build: `.claude/worktrees/win-trial` (detached, local-only merge of A07-05 + A07-06, never pushed); its `target/windows/Allomos_0.1.0_x64-setup.exe` is what the owner tests. Remove it once both cards are merged.
+- Next action: owner installs it on Windows, opens a new PowerShell, runs `alm --version`; then uninstall check (see card)
+
 ### Task-A07-02 — claude/a07-02-windows-build
 - Checkout: `.claude/worktrees/a07-02` · branch `claude/a07-02-windows-build` · merged into `main` · pushed: yes
 - Approvals in force: local tools and script (owner, 2026-10-11); no GitHub workflow
