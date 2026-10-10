@@ -1,6 +1,7 @@
-// "Do the AI agents know about this project?" (Task-A03-04): one line under the top bar.
-// FlipHopper works it out itself: from the project's instruction files (AGENTS.md, CLAUDE.md)
-// and from who last changed the seabag with `fh`. Agents write no flag.
+// "Do the AI agents know about this project?" (Task-A03-04): a short note beside Show in Finder.
+// FlipHopper works it out itself from the project's instruction files (AGENTS.md, CLAUDE.md);
+// agents write no flag. Since 2026-10-10 (owner) it no longer says who last used `fh` or holds
+// tasks: a holder copied from an old board read as an agent "working now".
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -20,7 +21,7 @@ export function AgentLine({
   /** Opens the "Tell AI agents" panel for this project. */
   onTell: () => void;
 }) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const [status, setStatus] = useState<AgentStatus | null>(null);
 
   useEffect(() => {
@@ -42,22 +43,11 @@ export function AgentLine({
   const { codex, claude } = status.setup;
   const mark = (ok: boolean) => (ok ? "✓" : "✗");
   const agents = `Codex ${mark(codex)}  Claude Code ${mark(claude)}`;
-  let use: string;
-  if (status.last) {
-    const when = new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short" }).format(
-      new Date(status.last.when * 1000),
-    );
-    use = t("agentline.last", { who: status.last.who, when });
-  } else if (status.holders.length > 0) {
-    use = t("agentline.holding", { who: status.holders.join(", ") });
-  } else {
-    use = t("agentline.unused");
-  }
 
   return (
     <div className="agent-line">
       <span>
-        {t("agentline.label")}: {codex || claude ? `${agents} — ${use}` : t("agentline.none")}
+        {t("agentline.label")}: {codex || claude ? agents : t("agentline.none")}
       </span>
       {!(codex && claude) && (
         <button type="button" className="link" onClick={onTell}>

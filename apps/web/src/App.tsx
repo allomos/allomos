@@ -308,13 +308,21 @@ export function App({ messenger }: { messenger: Messenger }) {
           <div className="where">
             <strong>{opened.loaded.seabag.project.name}</strong>
             <code title={opened.root}>{opened.root}</code>
-            <button
-              type="button"
-              className="link"
-              onClick={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
-            >
-              {t(FILE_MANAGER_KEY)}
-            </button>
+            <div className="where-row">
+              <button
+                type="button"
+                className="link"
+                onClick={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
+              >
+                {t(FILE_MANAGER_KEY)}
+              </button>
+              {/* Whether the AI agents are told about this project, beside Show in Finder (owner, 2026-10-10). */}
+              <AgentLine
+                messenger={messenger}
+                root={opened.root}
+                onTell={() => setAgentsFor({ project: agentsProject(opened.root), seabag: opened.root })}
+              />
+            </div>
           </div>
         )}
         <LanguagePicker />
@@ -328,13 +336,6 @@ export function App({ messenger }: { messenger: Messenger }) {
           <Banner kind="error" onClose={() => setError(null)}>
             {noteText(error)}
           </Banner>
-        )}
-        {opened?.loaded.seabag && (
-          <AgentLine
-            messenger={messenger}
-            root={opened.root}
-            onTell={() => setAgentsFor({ project: agentsProject(opened.root), seabag: opened.root })}
-          />
         )}
         {notices.map((n, i) => (
           <Banner key={i} kind="ok" onClose={() => setNotices((list) => list.filter((_, j) => j !== i))}>
