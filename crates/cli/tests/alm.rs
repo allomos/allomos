@@ -614,7 +614,7 @@ fn init_asks_the_agent_or_writes_when_told() {
         v["agent_setup"]
             .as_str()
             .unwrap()
-            .contains("1. Open AGENTS.md")
+            .contains("2. Open AGENTS.md")
     );
     assert!(!dir.join("AGENTS.md").exists() && !dir.join("CLAUDE.md").exists());
     let text = tmp("agent-ask-text");

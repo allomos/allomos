@@ -16,7 +16,7 @@ use crate::{relative_path, section_source};
 /// with `alm labels`, and card links are relative to the recorded project folder.
 /// 4: one question only (owner, 2026-10-10): no questions in the chat, the plan covers removing
 /// the old status, committing and merging into the person's branch, and Go ahead does it all.
-pub const CONVERT_REQUEST_VERSION: u32 = 4;
+pub const CONVERT_REQUEST_VERSION: u32 = 5;
 
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
@@ -55,7 +55,7 @@ pub fn agent_convert_request_in(
 
 1. 先查看，不要改动。找出这个项目是否、以及在哪里记录任务、状态、负责人、标签、领域和下一步（例如任务看板、卡片文件、待办清单），以及 AGENTS.md / CLAUDE.md 中哪些规则描述了它们。不要运行项目的脚本或钩子。如果没有找到任务，告诉用户，然后停止。
 2. 自己决定，并写进计划：保留项目自己的任务 ID（只去掉 `Task-` 这样的前缀和结尾的描述）；标签阶梯用项目自己的，按顺序；按文件中的用词对应 ready、waiting、done、dropped；还没有卡片的计划工作作为 backlog 任务加入，说明里写“还没有卡片”；任务标题用 `alm task-language` 给出的语言写（原文是别的语言就翻译，卡片链接保留原文）。
-3. 如果项目是 Git 仓库：记下当前分支（原分支）。如果你要改的文件（AGENTS.md、CLAUDE.md、卡片和看板文件）有未提交的改动，先告诉用户请他们提交或另存，然后停止；不要把它们混进去。
+3. 如果项目是 Git 仓库：记下当前分支（原分支）。先把前面 Allomos 步骤留下的未提交改动各自单独提交，不带其他文件：任务包（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`），然后是只含 Allomos 一节改动的 AGENTS.md 和 CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。如果你要改的其他文件（卡片和看板文件，或 AGENTS.md 中其他改动）有未提交的改动，先告诉用户请他们提交或另存，然后停止；不要把它们混进去。
 4. 唯一的问题。把完整计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、你做的决定、AGENTS.md 中要替换的规则、要删除的旧状态（卡片里的状态表、生成的看板段落、会话登记表）、工作分支 `allomos/convert`，以及“完成后提交，并合并到 <原分支>；不推送”。然后运行 `alm confirm --title \"{title}\" --plan <文件>`，它会在应用中显示计划并等待回答。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户：没有任何改动；如果改主意了，可以在这里让你再给他看一次计划，或在 Allomos 中选择“文件 → 把任务搬进 Allomos…”重新开始。
 5. 从原分支新建分支 `allomos/convert` 并在上面工作。
 6. 只用 `alm` 写任务包，绝不手工编辑它的文件。任务包已经存在（由 Allomos 建立）：不要再建一个，也不要删除它；如果它已经有任务，只添加，不改动那些任务。标签阶梯与任务包的不同时，用 `alm labels \"<阶梯，用逗号分隔>\"` 设置。然后每个领域 `alm add area <id> \"<名称>\"`，每个任务 `alm add task <id> --area <id> --title \"<标题>\" --description \"Card: [<路径>]({up}<从项目文件夹起的路径>)\"`（卡片是大文件中的一节时，链接到 `文件.md#节`）。
@@ -81,7 +81,7 @@ pub fn agent_convert_request_in(
 
 1. まず見るだけで、何も変えません。このプロジェクトがタスク、状況、担当者、ラベル、エリア、次の一歩を記録しているか、どこに記録しているか（タスクボード、カードのファイル、TODO リストなど）、AGENTS.md / CLAUDE.md のどのルールがそれを説明しているかを調べます。プロジェクトのスクリプトやフックは実行しません。タスクが見つからなければ、そう伝えて終わります。
 2. 自分で決めて計画に書きます：プロジェクト自身のタスク ID を残す（`Task-` のような接頭辞と末尾の説明だけを外す）、ラベルの段階はプロジェクト自身のものを順に使う、ファイルの言葉を ready、waiting、done、dropped に対応させる、まだカードのない予定の作業は backlog のタスクにして説明に「まだカードなし」と書く、タスクの題名は `alm task-language` の言語で書く（原文が別の言語なら訳し、原文はカードへのリンクで残す）。
-3. プロジェクトが Git リポジトリなら、今のブランチ（元のブランチ）を控えます。変えるファイル（AGENTS.md、CLAUDE.md、カードやボードのファイル）にコミットされていない変更があれば、コミットするか退避するようユーザーに伝えて終わります。混ぜないでください。
+3. プロジェクトが Git リポジトリなら、今のブランチ（元のブランチ）を控えます。まず、前のアロモスの手順が残したコミットされていない変更を、それぞれ単独でコミットします（ほかのファイルは入れません）：タスクバッグ（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`）、次に Allomos の節の変更だけを含む AGENTS.md と CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。変えるほかのファイル（カードやボードのファイル、AGENTS.md のほかの変更）にコミットされていない変更があれば、コミットするか退避するようユーザーに伝えて終わります。混ぜないでください。
 4. ただ一つの質問。計画全体を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、自分で決めたこと、AGENTS.md で置き換えるルール、消す古い状況（カードの状況表、生成されるボードの節、セッション一覧）、作業ブランチ `allomos/convert`、そして「最後にコミットし、<元のブランチ> にマージする。プッシュはしない」。続いて `alm confirm --title \"{title}\" --plan <ファイル>` を実行すると、アプリに計画が表示され、答えを待ちます。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、ユーザーに伝えます：何も変わっていないこと、考えが変わったらここでもう一度計画を見せるよう頼めること、または Allomos の「ファイル → タスクを Allomos に移す…」からやり直せること。
 5. 元のブランチから `allomos/convert` を作り、そこで作業します。
 6. タスクバッグは `alm` だけで書き、ファイルを手で編集しません。タスクバッグはすでにあります（Allomos が作りました）：新しく作ったり削除したりしないでください。すでにタスクがあれば追加だけにし、それらは変えません。ラベルの段階がタスクバッグと違えば `alm labels \"<段階、カンマ区切り>\"` で設定します。続いてエリアごとに `alm add area <id> \"<名前>\"`、タスクごとに `alm add task <id> --area <id> --title \"<題名>\" --description \"Card: [<パス>]({up}<プロジェクトのフォルダーからのパス>)\"`（カードが大きなファイルの一節なら `ファイル.md#節` へリンク）。
@@ -116,9 +116,14 @@ project's scripts or hooks. If you find no tasks, tell the person and stop.
 files' words to ready, waiting, done and dropped; add planned work that has no card yet as a \
 backlog task saying \"no card yet\"; write task titles in the language `alm task-language` gives \
 (translate a card's title when it is in another language; the card link keeps the original).
-3. If the project is a Git repository, note the current branch (the original branch). If the \
-files you will change (AGENTS.md, CLAUDE.md, card and board files) have uncommitted changes, \
-tell the person to commit or set them aside first, and stop; never mix them in.
+3. If the project is a Git repository, note the current branch (the original branch). First \
+commit what the earlier Allomos steps left uncommitted, each as its own commit and nothing else: \
+the taskbag (`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`), \
+then AGENTS.md and CLAUDE.md when their only changes are Allomos's section (`git -C \"{project}\" add \
+AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md \
+CLAUDE.md`). If other files you will change (card and board files, or other edits in AGENTS.md) \
+have uncommitted changes, tell the person to commit or set them aside first, and stop; never mix \
+them in.
 4. The one question. Write the whole plan in Markdown to a file outside the project (for \
 example in the system's temporary folder): the mapping table, the label ladder, the decisions \
 you made, the rules you will replace in AGENTS.md, the old status you will remove (status tables \
@@ -191,6 +196,15 @@ mod tests {
             );
             assert!(r.contains("](../../../../"));
             assert!(r.contains("docs/allomos-conversion.md"));
+            // Leftovers of the earlier steps are committed first, each on its own (Task-A03-08).
+            assert!(
+                r.contains("commit -m \"Add Allomos taskbag\" -- ."),
+                "{language}"
+            );
+            assert!(
+                r.contains("commit -m \"Tell AI agents about Allomos\""),
+                "{language}"
+            );
             assert!(r.contains(&format!("v{CONVERT_REQUEST_VERSION}")));
             // The section comes from `alm brief`; the request carries no copy of it.
             assert!(!r.contains("alm claim <id>"), "{language}");
