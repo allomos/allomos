@@ -20,8 +20,8 @@ At the end the owner can open a project, set "quota 5%, context 60%", and see a 
 - **Outcome.** A person can set a project's handoff gates and template; every agent working that project is told them through `alm brief` and writes its handoff accordingly.
 - **Decisive unknowns.**
   - Can an agent read its own quota and context use? (Claude Code shows usage in some tools; Codex is unknown.) Where it cannot, the gate stays a written rule the agent follows as best it can. Overlaps with [`Task-A03-02`](./Task-A03-02-account-quota-idea.md); answerable by reading provider documentation.
-  - Is a handoff one file per session, or the task's handoff note (`alm release --note`)? Owner to decide; the proposal is to keep the task's handoff note, structured by the template, so it travels with the task.
-  - Do gates apply per project only, or also per agent or account? Owner to decide; the proposal is per project first.
+  - ~~Is a handoff one file per session, or the task's handoff note?~~ **Decided (owner, 2026-10-11): one handoff file per session**, written from the template (not the task's handoff note).
+  - ~~Do gates apply per project only, or also per agent or account?~~ **Decided (owner, 2026-10-11): per project, and also per agent or account** (an agent or account setting overrides the project's).
 - **Starting point.** This repository already follows such rules by hand ([AGENTS.md § Handoff](../../AGENTS.md#handoff--write-it-continuously), [AI-WORKFLOW § Handoff timing](../workflow/AI-WORKFLOW.md#handoff-timing-and-contents), [AGENT_HANDOFF.md](../AGENT_HANDOFF.md)); the defaults and template should come from that practice.
 - **Files owned.** The `alm` crate's brief, guide and settings commands; taskbag project settings and a new template file; the app's settings screen and its texts in en, zh-CN and ja (R94); this card. Shared: the taskbag format document, if the settings change it.
 - **External operations.** None.
@@ -35,6 +35,7 @@ At the end the owner can open a project, set "quota 5%, context 60%", and see a 
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-11 | Handoff is one file per session ("per session"); gates per project and also per agent or account ("accept this") | owner (chat) |
 
 ## Notes
 

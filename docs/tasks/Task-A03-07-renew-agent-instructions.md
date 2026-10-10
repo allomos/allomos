@@ -33,6 +33,7 @@ At the end the owner upgrades Allomos, opens an older project, sees "instruction
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-11 | Card approved ("approve"): ready | owner (chat) |
 | 2026-10-11 | The version goes in the section's heading, e.g. `## Tasks: Allomos (v3)` | owner (chat) |
 | 2026-10-11 | "Not now" comes back each time the project is opened (option A: "A, because it is important") | owner (chat) |
 
