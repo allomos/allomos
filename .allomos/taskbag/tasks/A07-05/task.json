@@ -1,7 +1,8 @@
 {
   "area": "A07",
+  "holder": "claude/a07-05-windows-agents",
   "id": "A07-05",
   "iteration": "I02",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Windows: no console flashes, agents found and asked"
 }
