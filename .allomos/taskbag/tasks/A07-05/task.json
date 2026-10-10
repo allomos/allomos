@@ -4,7 +4,6 @@
   "id": "A07-05",
   "iteration": "I02",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "Windows: no console flashes, agents found and asked",
-  "waiting_on": "owner: install the new Windows build and check no flashing, agents listed, asking opens one"
+  "state": "done",
+  "title": "Windows: no console flashes, agents found and asked"
 }
