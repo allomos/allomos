@@ -3,7 +3,7 @@
   "holder": "claude/a00-21-allomos",
   "id": "A00-21",
   "label": "implemented",
-  "next_dependency": "owner: a CNIPA search for China and an attorney's view on ALLMOS/ALOMOS/ALTOMOS; then say when to start",
+  "next_dependency": "rename the GitHub repository and the local folder (approved), then the owner's look",
   "state": "in_progress",
   "title": "Rename the app to Allomos"
 }
