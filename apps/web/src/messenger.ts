@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, Opened, SetupState } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, InstructionFiles, Opened, SetupState } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -44,20 +44,22 @@ export interface Messenger {
   setMenuTexts(texts: MenuTexts): Promise<void>;
   /** Shows these folders, newest first, under File → Open Recent. */
   setRecentFolders(folders: string[]): Promise<void>;
-  /** Calls `handler` when File → Tell AI Agents About This Project… is chosen. */
-  onAgentsMenu(handler: () => void): Promise<() => void>;
+  /** Calls `handler` when File → Connect with the Agents… is chosen. */
+  onConnectMenu(handler: () => void): Promise<() => void>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
   findAgents(): Promise<Agent[]>;
-  /** Opens each agent in `project` with the request typed in; resolves to the ones that opened. Rejects with a Problem. */
-  askAgents(agents: string[], project: string, taskbag: string, language: string): Promise<string[]>;
+  /**
+   * Opens each agent in `project` with its request typed in: the first also looks for the
+   * project's tasks and offers to move them; the others only add Allomos's instructions.
+   * Resolves to the ones that opened. Rejects with a Problem.
+   */
+  connectAgents(agents: string[], project: string, taskbag: string, language: string): Promise<string[]>;
+  /** Whether `project` has AGENTS.md and CLAUDE.md. */
+  instructionFiles(project: string): Promise<InstructionFiles>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
-  /** Calls `handler` when File → Move Tasks Into Allomos… is chosen. */
-  onConvertMenu(handler: () => void): Promise<() => void>;
-  /** Opens one agent in `project` with the request to find its tasks and move them into the taskbag at `taskbag` typed in. Rejects with a Problem. */
-  askAgentToConvert(agent: string, project: string, taskbag: string, language: string): Promise<void>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
   /** The person's answer to one of them. Rejects with a Problem when it is no longer waiting. */
@@ -66,8 +68,8 @@ export interface Messenger {
   projectSetup(root: string): Promise<SetupState>;
   /** Records `folder` as the project folder of the taskbag at `root`. Rejects with a Problem. */
   setProjectFolder(root: string, folder: string): Promise<SetupState>;
-  /** Enables or disables File → Move Tasks Into Allomos…. */
-  setConvertEnabled(enabled: boolean): Promise<void>;
+  /** Enables or disables File → Connect with the Agents…. */
+  setConnectEnabled(enabled: boolean): Promise<void>;
 }
 
 export interface MenuTexts {
@@ -76,8 +78,7 @@ export interface MenuTexts {
   openRecent: string;
   clearMenu: string;
   noRecent: string;
-  agents: string;
-  convert: string;
+  connect: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -99,18 +100,16 @@ export const desktopMessenger: Messenger = {
   onClearRecentMenu: (handler) => listen("menu:clear_recent", () => handler()),
   setMenuTexts: (words) => invoke<void>("set_menu_texts", { words }),
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
-  onAgentsMenu: (handler) => listen("menu:agents", () => handler()),
+  onConnectMenu: (handler) => listen("menu:connect", () => handler()),
   findAgents: () => invoke<Agent[]>("find_agents"),
-  askAgents: (agents, project, taskbag, language) =>
-    invoke<string[]>("ask_agents", { agents, project, taskbag, language }),
+  connectAgents: (agents, project, taskbag, language) =>
+    invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
+  instructionFiles: (project) => invoke<InstructionFiles>("instruction_files", { project }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
-  onConvertMenu: (handler) => listen("menu:convert", () => handler()),
-  askAgentToConvert: (agent, project, taskbag, language) =>
-    invoke<void>("ask_agent_to_convert", { agent, project, taskbag, language }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
   projectSetup: (root) => invoke<SetupState>("project_setup", { root }),
   setProjectFolder: (root, folder) => invoke<SetupState>("set_project_folder", { root, folder }),
-  setConvertEnabled: (enabled) => invoke<void>("set_convert_enabled", { enabled }),
+  setConnectEnabled: (enabled) => invoke<void>("set_connect_enabled", { enabled }),
 };

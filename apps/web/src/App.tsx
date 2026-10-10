@@ -4,11 +4,14 @@ import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
 import { AgentsPanel } from "./AgentsPanel";
+import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { SetupWizard } from "./SetupWizard";
+import { newFiles, offerConnect, stillMissing } from "./setupFlow";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Issue, Iteration, Opened, Problem, SetupState, Task } from "./types";
+import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -45,15 +48,10 @@ function saveRecent(list: string[]) {
 }
 /** How often the window checks whether the taskbag's files changed, for example through `alm`. */
 const FOLLOW_MS = 1000;
-
-function folderName(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  // The project is named after the picked folder, not the `.allomos/taskbag` inside it.
-  if (parts.at(-1) === "taskbag" && parts.at(-2) === ".allomos") parts.splice(-2);
-  return parts.at(-1) ?? "Project";
-}
-
-type Pending = { folder: string; suggestedRoot: string; gitRoot: string | null };
+/** After agents are connected: how often, and for how long, the window looks for a new AGENTS.md
+ * or CLAUDE.md, to say that running agent sessions have not read it (Task-A05-03). */
+const WATCH_FILES_MS = 2000;
+const WATCH_FILES_FOR_MS = 30 * 60 * 1000;
 
 /** A banner's text: an interface message, or a problem sent by Rust. */
 type Note = Message | { problem: Problem } | { text: string };
@@ -63,14 +61,12 @@ function errorNote(e: unknown): Note {
 }
 
 export function App({ messenger }: { messenger: Messenger }) {
-  const { t, rich, problem, language } = useI18n();
-  // Read when a taskbag is created (for its README), without reopening the folder when it changes.
-  const languageRef = useRef(language);
-  languageRef.current = language;
+  const { t, problem, language } = useI18n();
   const [opened, setOpened] = useState<Opened | null>(null);
   const openedRef = useRef(opened);
   openedRef.current = opened;
-  const [pending, setPending] = useState<Pending | null>(null);
+  /** The setup wizard (Task-A05-03), at step 1, or at step 2 for a folder without `.allomos`. */
+  const [wizard, setWizard] = useState<{ folder?: string; n: number } | null>(null);
   const [notices, setNotices] = useState<Note[]>([]);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
@@ -85,11 +81,10 @@ export function App({ messenger }: { messenger: Messenger }) {
 
   const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
-    setPending(null);
     setNotices(message ? [message] : []);
     setAgentsFor(null);
     setSetup(null);
-    setSkipped({ md: false, migrate: false });
+    setSkipped(false);
     setError(null);
     try {
       localStorage.setItem(LAST_ROOT_KEY, o.root);
@@ -100,16 +95,18 @@ export function App({ messenger }: { messenger: Messenger }) {
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
   }, [changeRecent]);
 
-  /** The agents panel: tell AI agents about Allomos (Task-A03-03), or ask one agent to find the
-   * project's tasks and move them into Allomos (`convert`, Task-A05-02). */
-  const [agentsFor, setAgentsFor] = useState<{ project: string; taskbag: string; convert?: boolean } | null>(null);
+  /** The agents panel, Connect with the agents (Task-A05-03): tell AI agents about Allomos, and
+   * let the first one find the project's existing tasks and offer to move them in. */
+  const [agentsFor, setAgentsFor] = useState<{ project: string; taskbag: string } | null>(null);
 
   /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open taskbag's project folder,
-   * agent instructions and tasks, and the steps the person put off with "Not now" this time. */
+   * agent instructions and tasks, and whether the person put off connecting agents this time. */
   const [setup, setSetup] = useState<SetupState | null>(null);
   const setupRef = useRef(setup);
   setupRef.current = setup;
-  const [skipped, setSkipped] = useState({ md: false, migrate: false });
+  const [skipped, setSkipped] = useState(false);
+  /** Instruction files that were missing when agents were connected: watched until they appear. */
+  const [watch, setWatch] = useState<{ project: string; before: InstructionFiles; since: number } | null>(null);
   const refreshSetup = useCallback(
     async (root: string) => {
       try {
@@ -130,16 +127,9 @@ export function App({ messenger }: { messenger: Messenger }) {
         const i = info.inspection;
         if (i.kind === "found") {
           show(await messenger.openTaskbag(i.root), null);
-        } else if (i.kind === "empty") {
-          const o = await messenger.createTaskbag(i.suggested_root, folderName(i.folder), languageRef.current);
-          show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
-        } else if (i.kind === "no_taskbag") {
-          // The new folder replaces the open project: the window shows only the question about it.
-          setOpened(null);
-          setSetup(null);
-          setNotices([]);
-          setPending({ folder: i.folder, suggestedRoot: i.suggested_root, gitRoot: info.git_root });
-          setAgentsFor(null);
+        } else if (i.kind === "empty" || i.kind === "no_taskbag") {
+          // No `.allomos` yet: the wizard asks, starting at step 2 with this folder.
+          setWizard((w) => ({ folder: i.folder, n: (w?.n ?? 0) + 1 }));
         } else {
           setError({ key: "error.not_a_folder", params: { path: i.path } });
         }
@@ -150,27 +140,60 @@ export function App({ messenger }: { messenger: Messenger }) {
     [messenger, show],
   );
 
-  // Steps 2–5 of the flow, one at a time: after opening, and whenever the taskbag's files change.
+  // The rest of the flow after opening a taskbag directly (not through the wizard): the project
+  // folder, then Connect with the agents; checked again whenever the taskbag's files change.
   const root0 = opened?.root;
   const taskCount = opened?.loaded.taskbag?.tasks.length;
   useEffect(() => {
     if (root0) void refreshSetup(root0);
   }, [root0, taskCount, refreshSetup]);
   useEffect(() => {
-    if (!opened || !setup || agentsFor) return;
-    const project = setup.project_folder;
-    if (!project) return; // step 2 asks on the page
-    if (!(setup.agents.codex && setup.agents.claude) && !skipped.md) {
-      setAgentsFor({ project, taskbag: opened.root });
-    } else if (!setup.has_tasks && !skipped.migrate) {
-      setAgentsFor({ project, taskbag: opened.root, convert: true });
+    if (!opened || !setup || agentsFor || wizard) return;
+    // Without a project folder, the page asks for one first.
+    if (setup.project_folder && offerConnect(setup, skipped)) {
+      setAgentsFor({ project: setup.project_folder, taskbag: opened.root });
     }
-  }, [opened, setup, agentsFor, skipped]);
-  // File → Move Tasks Into Allomos… only while the open taskbag has a project folder.
-  const hasProjectFolder = Boolean(opened && setup?.project_folder);
+  }, [opened, setup, agentsFor, skipped, wizard]);
+  // File → Connect with the Agents… only while a taskbag is open.
+  const hasTaskbag = Boolean(opened);
   useEffect(() => {
-    void messenger.setConvertEnabled(hasProjectFolder).catch(() => undefined);
-  }, [messenger, hasProjectFolder]);
+    void messenger.setConnectEnabled(hasTaskbag).catch(() => undefined);
+  }, [messenger, hasTaskbag]);
+
+  /** Connect with the agents closed (from the page or the wizard's last step). */
+  const connected = (result: ConnectResult) => {
+    // Asked or not now: not offered again until the folder is opened again.
+    setSkipped(true);
+    setAgentsFor(null);
+    const message = result.message;
+    if (message) setNotices((list) => [...list, { text: message }]);
+    if (result.watch) setWatch({ ...result.watch, since: Date.now() });
+  };
+
+  // The restart notice: an AGENTS.md or CLAUDE.md that did not exist before agents were connected
+  // has appeared. Agent sessions read these files when they start, so only new ones know.
+  useEffect(() => {
+    if (!watch) return;
+    let live = true;
+    const look = async () => {
+      if (Date.now() - watch.since > WATCH_FILES_FOR_MS) return setWatch(null);
+      const now = await messenger.instructionFiles(watch.project).catch(() => null);
+      if (!live || !now) return;
+      const files = newFiles(watch.before, now);
+      if (files.length > 0) {
+        setNotices((list) => [...list, { key: "notice.restart_agents", params: { files: files.join(", ") } }]);
+        // Each file is told once; keep watching for the other while it is still missing.
+        const before = { agents_md: watch.before.agents_md || now.agents_md, claude_md: watch.before.claude_md || now.claude_md };
+        setWatch(stillMissing(watch.before, now) ? { ...watch, before } : null);
+      }
+    };
+    void look();
+    const timer = window.setInterval(() => void look(), WATCH_FILES_MS);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [messenger, watch]);
   /** The project folder for the agents panel: the recorded one, else the folder holding `.allomos/`. */
   const agentsProject = (root: string) => setupRef.current?.project_folder ?? projectFolder(root);
 
@@ -223,7 +246,13 @@ export function App({ messenger }: { messenger: Messenger }) {
     })();
   }, [messenger, openFolder]);
 
+  /** With nothing open, the wizard from step 1; otherwise pick a folder and open it (the wizard
+   * takes over when it has no `.allomos`). */
   const choose = async () => {
+    if (!openedRef.current) {
+      setWizard((w) => ({ n: (w?.n ?? 0) + 1 }));
+      return;
+    }
     const path = await messenger.pickFolder(t("picker.title"));
     if (path) await openFolder(path);
   };
@@ -251,8 +280,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         openRecent: t("menu.open_recent"),
         clearMenu: t("menu.clear_recent"),
         noRecent: t("menu.no_recent"),
-        agents: t("menu.agents"),
-        convert: t("menu.convert"),
+        connect: t("menu.connect"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -271,33 +299,17 @@ export function App({ messenger }: { messenger: Messenger }) {
       })();
     });
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
-    const stopAgents = messenger.onAgentsMenu(() => {
+    // File → Connect with the Agents… (enabled while a taskbag is open).
+    const stopConnect = messenger.onConnectMenu(() => {
       const root = openedRef.current?.root;
       if (root) setAgentsFor({ project: agentsProject(root), taskbag: root });
-    });
-    // File → Move Tasks Into Allomos… (enabled only with a recorded project folder).
-    const stopConvert = messenger.onConvertMenu(() => {
-      const root = openedRef.current?.root;
-      const project = setupRef.current?.project_folder;
-      if (root && project) setAgentsFor({ project, taskbag: root, convert: true });
     });
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
-      void stopAgents.then((f) => f()).catch(() => undefined);
-      void stopConvert.then((f) => f()).catch(() => undefined);
+      void stopConnect.then((f) => f()).catch(() => undefined);
     };
   }, [messenger, openFolder, changeRecent]);
-
-  const createNested = async () => {
-    if (!pending) return;
-    try {
-      const o = await messenger.createTaskbag(pending.suggestedRoot, folderName(pending.folder), language);
-      show(o, { key: "notice.created_nested" });
-    } catch (e) {
-      setError(errorNote(e));
-    }
-  };
 
   return (
     <div className="app">
@@ -337,7 +349,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         )}
         <LanguagePicker />
         <button type="button" className="primary" onClick={choose}>
-          {opened ? t("top.open_another") : t("top.choose_folder")}
+          {opened ? t("top.open_another") : t("welcome.open")}
         </button>
       </header>
 
@@ -358,21 +370,15 @@ export function App({ messenger }: { messenger: Messenger }) {
             messenger={messenger}
             project={agentsFor.project}
             taskbag={agentsFor.taskbag}
-            convert={agentsFor.convert}
             onProjectChange={async (folder) => {
               const state = await messenger.setProjectFolder(agentsFor.taskbag, folder);
               setSetup(state);
             }}
-            onDone={(message) => {
-              // Asked or not now: this step is done until the folder is opened again.
-              setSkipped((s) => (agentsFor.convert ? { ...s, migrate: true } : { ...s, md: true }));
-              setAgentsFor(null);
-              if (message) setNotices((list) => [...list, { text: message }]);
-            }}
+            onDone={connected}
           />
         )}
 
-        {opened && setup && !setup.project_folder && (
+        {opened && setup && !setup.project_folder && !wizard && (
           <ProjectFolderStep
             allomosFolder={setup.allomos_folder}
             onChoose={async (folder) => {
@@ -386,23 +392,22 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
 
-        {pending && (
-          <section className="card">
-            <h2>{t("pending.title")}</h2>
-            <p>{rich("pending.body", { folder: <code>{pending.folder}</code> })}</p>
-            {pending.gitRoot && <p className="muted">{rich("pending.git", { repo: <code>{pending.gitRoot}</code> })}</p>}
-            <div className="row">
-              <button type="button" className="primary" onClick={createNested}>
-                {t("pending.create")}
-              </button>
-              <button type="button" onClick={() => setPending(null)}>
-                {t("pending.cancel")}
-              </button>
-            </div>
-          </section>
-        )}
+        {!opened && <Welcome onOpen={() => setWizard((w) => ({ n: (w?.n ?? 0) + 1 }))} />}
 
-        {!opened && !pending && <Welcome onChoose={choose} />}
+        {wizard && (
+          <SetupWizard
+            key={wizard.n}
+            messenger={messenger}
+            folder={wizard.folder}
+            onOpened={(o, created) =>
+              show(o, created ? { key: o.readme_added ? "notice.created_here_readme" : "notice.created_nested" } : null)
+            }
+            onClose={(result) => {
+              setWizard(null);
+              if (result) connected(result);
+            }}
+          />
+        )}
 
         {/* Questions an agent asks with `alm confirm` about the folder this window shows (Task-A05-02). */}
         {/* `alm confirm` asks about the folder holding `.allomos/`, where its --taskbag points. */}
@@ -488,15 +493,16 @@ function LanguagePicker() {
   );
 }
 
-function Welcome({ onChoose }: { onChoose: () => void }) {
-  const { t, rich } = useI18n();
+/** The first screen with nothing open: one button, which starts the setup wizard (Task-A05-03). */
+function Welcome({ onOpen }: { onOpen: () => void }) {
+  const { t } = useI18n();
   return (
     <section className="welcome">
       <h1>{t("welcome.title")}</h1>
-      <p>{rich("welcome.body", { dir: <code>.allomos/taskbag/</code> })}</p>
-      <button type="button" className="primary" onClick={onChoose}>
-        {t("top.choose_folder")}
+      <button type="button" className="primary" onClick={onOpen}>
+        {t("welcome.open")}
       </button>
+      <p>{t("welcome.hint")}</p>
     </section>
   );
 }

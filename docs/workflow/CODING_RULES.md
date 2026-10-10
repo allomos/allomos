@@ -33,6 +33,7 @@ cargo test --workspace
 npm --prefix apps/web run typecheck
 npm --prefix apps/web run build
 npm --prefix apps/web run check:i18n
+npm --prefix apps/web test
 ```
 
 All must pass. Report anything not run as NOT RUN.
@@ -43,6 +44,7 @@ All must pass. Report anything not run as NOT RUN.
 - **Never overwrite user content.** Creating a taskbag into a non-empty folder is refused. Writing files keeps the format in [FILE-FORMAT.md](../product/FILE-FORMAT.md).
 - **Tests use temporary folders and synthetic data only**, never the owner's real projects.
 - **Test folders made by hand or by an agent go under `~/allomos-tests/`** (owner, 2026-10-09; renamed from `~/fliphopper-tests/` 2026-10-11): one folder per check, named after the card, for example `~/allomos-tests/a05-02-bakery/`. This covers folders for the owner's manual checks and agent trials, never the system's temporary folder or the repository. Automated tests (`cargo test`) keep using the system's temporary folder and remove what they create. Delete a check's folder once the card is done.
+- **Interface tests** ([`Task-A05-03`](../tasks/Task-A05-03-taskbag-setup-wizard.md)): decisions the interface makes (which step or button to show) live in plain TypeScript modules with only type imports, such as `apps/web/src/setupFlow.ts`, and are tested in `apps/web/tests/*.test.ts` with Node's own test runner (`node --experimental-strip-types --test`, Node 22.6 or newer). No test packages are installed.
 - **Keep interface text short and plain**, and keep its terms consistent with the [glossary](../GLOSSARY.md): taskbag, area, state, label.
 
 ## Interface languages

@@ -1,0 +1,51 @@
+// The setup wizard's choices (Task-A05-03), kept apart from React so they can be tested with
+// Node alone (`npm --prefix apps/web test`). Only type imports here: Node strips them.
+
+import type { InstructionFiles, Inspection, SetupState } from "./types";
+
+/** Step 2 of the wizard: what the person can do with the folder chosen in step 1. */
+export type TaskbagStep =
+  /** The folder has `.allomos` (or is a taskbag): only Change. */
+  | { kind: "found"; root: string; buttons: ["change"] }
+  /** No `.allomos` yet: Create makes one there. */
+  | { kind: "missing"; folder: string; suggestedRoot: string; buttons: ["create"] }
+  | { kind: "not_a_folder"; path: string };
+
+export function taskbagStep(i: Inspection): TaskbagStep {
+  switch (i.kind) {
+    case "found":
+      return { kind: "found", root: i.root, buttons: ["change"] };
+    case "empty":
+    case "no_taskbag":
+      return { kind: "missing", folder: i.folder, suggestedRoot: i.suggested_root, buttons: ["create"] };
+    case "not_a_folder":
+      return { kind: "not_a_folder", path: i.path };
+  }
+}
+
+/** Step 3: the project source folder offered first — the one already recorded, else the folder
+ * chosen in step 1 (the folder holding `.allomos/`). */
+export function defaultSource(setup: SetupState): string {
+  return setup.project_folder ?? setup.allomos_folder;
+}
+
+/** Whether opening a taskbag goes on to Connect with the agents by itself: a project folder is
+ * known, and either an agent is not told about Allomos or the taskbag has no tasks yet. "Not now"
+ * holds until the folder is opened again. */
+export function offerConnect(setup: SetupState, skipped: boolean): boolean {
+  if (skipped || !setup.project_folder) return false;
+  return !(setup.agents.codex && setup.agents.claude) || !setup.has_tasks;
+}
+
+/** The instruction files that were missing before agents were connected and exist now. */
+export function newFiles(before: InstructionFiles, now: InstructionFiles): string[] {
+  const names: string[] = [];
+  if (!before.agents_md && now.agents_md) names.push("AGENTS.md");
+  if (!before.claude_md && now.claude_md) names.push("CLAUDE.md");
+  return names;
+}
+
+/** Whether there is still a file to watch for: one that was missing before and is not there yet. */
+export function stillMissing(before: InstructionFiles, now: InstructionFiles): boolean {
+  return (!before.agents_md && !now.agents_md) || (!before.claude_md && !now.claude_md);
+}

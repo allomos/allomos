@@ -1,17 +1,16 @@
-// "Tell AI agents about Allomos?" (Task-A03-03): lists the AI agents on this computer, lets the
-// person pick one or more and the project folder, then opens each with the request typed in.
-// Allomos never sends the request; the person does.
-//
-// In "convert" mode (Task-A05-02) the request is to find the project's tasks and move them into
-// Allomos: the person picks exactly one agent, because two agents converting at once would add
-// every task twice. The agent asks before changing anything, with `alm confirm`.
+// "Connect with the agents" (Task-A05-03; before it, Task-A03-03 and Task-A05-02 were two
+// panels): lists the AI agents on this computer, lets the person pick one or more and the project
+// folder, then opens each with its request typed in. Every agent adds Allomos's instructions; the
+// first chosen also looks for the project's existing tasks and, if it finds some, asks with
+// `alm confirm` before moving them (only one, because two would add every task twice).
+// Allomos never sends a request; the person does.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Agent } from "./types";
+import type { Agent, InstructionFiles } from "./types";
 
 const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -30,23 +29,29 @@ const GROUPS: { name: string; tools: Agent["id"][] }[] = [
 /** Show "Looking for AI agents…" only when finding them is slow. */
 const SPINNER_AFTER_MS = 200;
 
+/** What happened when the panel closes. */
+export interface ConnectResult {
+  /** The message to show, or null. */
+  message: string | null;
+  /** Agents were asked, or the files were written: which instruction files the project folder
+   * had just before, so the window can say when a new one appears (the restart notice). */
+  watch?: { project: string; before: InstructionFiles };
+}
+
 export function AgentsPanel({
   messenger,
   project: startProject,
   taskbag,
-  convert,
   onProjectChange,
   onDone,
 }: {
   messenger: Messenger;
   project: string;
   taskbag: string;
-  /** The request is to find the project's tasks and move them into Allomos. */
-  convert?: boolean;
   /** Records a project folder the person chose with Change… (the open-folder flow). */
   onProjectChange?: (folder: string) => Promise<void>;
-  /** Closes the panel, with the message to show (or null) and whether an agent was asked. */
-  onDone: (message: string | null, asked: boolean) => void;
+  /** Closes the panel. */
+  onDone: (result: ConnectResult) => void;
 }) {
   const { t, problem, language } = useI18n();
   const [agents, setAgents] = useState<Agent[] | null>(null);
@@ -85,7 +90,6 @@ export function AgentsPanel({
 
   const toggleGroup = (name: string) =>
     setTicked((set) => {
-      if (convert) return new Set([name]);
       const next = new Set(set);
       if (next.has(name)) next.delete(name);
       else next.add(name);
@@ -106,19 +110,21 @@ export function AgentsPanel({
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
+  /** Which instruction files the project folder has now; when unknown, assume both, so no notice. */
+  const filesNow = () =>
+    messenger.instructionFiles(project).catch((): InstructionFiles => ({ agents_md: true, claude_md: true }));
+
   const ask = async () => {
     setBusy(true);
     setError(null);
     try {
-      if (convert) {
-        const agent = chosen[0];
-        await messenger.askAgentToConvert(agent, project, taskbag, language);
-        onDone(t("agents.asked_convert", { agent: t(AGENT_KEY[agent]) }), true);
-        return;
-      }
-      const opened = await messenger.askAgents(chosen, project, taskbag, language);
-      const names = (agents ?? []).filter((a) => opened.includes(a.id)).map((a) => t(AGENT_KEY[a.id]));
-      onDone(t("agents.asked", { agents: names.join(", ") }), true);
+      const before = await filesNow();
+      const opened = await messenger.connectAgents(chosen, project, taskbag, language);
+      const names = chosen.filter((id) => opened.includes(id)).map((id) => t(AGENT_KEY[id]));
+      onDone({
+        message: t("connect.asked", { agents: names.join(", "), first: t(AGENT_KEY[chosen[0]]) }),
+        watch: { project, before },
+      });
     } catch (e) {
       fail(e);
     } finally {
@@ -130,8 +136,12 @@ export function AgentsPanel({
     setBusy(true);
     setError(null);
     try {
+      const before = await filesNow();
       const files = await messenger.writeAgentFiles(project);
-      onDone(files.length > 0 ? t("agents.written", { files: files.join(", ") }) : null, false);
+      onDone({
+        message: files.length > 0 ? t("agents.written", { files: files.join(", ") }) : null,
+        watch: { project, before },
+      });
     } catch (e) {
       fail(e);
     } finally {
@@ -141,8 +151,8 @@ export function AgentsPanel({
 
   return (
     <section className="card agents">
-      <h2>{t(convert ? "convert.title" : "agents.title")}</h2>
-      <p>{t(convert ? "convert.body" : "agents.body")}</p>
+      <h2>{t("connect.title")}</h2>
+      <p>{t("connect.body")}</p>
       <div className="row">
         <span>
           {t("agents.project")}: <code>{project}</code>
@@ -159,7 +169,7 @@ export function AgentsPanel({
           </p>
         )
       ) : agents.length === 0 ? (
-        <p>{t(convert ? "convert.none" : "agents.none")}</p>
+        <p>{t("agents.none")}</p>
       ) : (
         <ul className="agent-list">
           {GROUPS.map((g) => {
@@ -172,8 +182,7 @@ export function AgentsPanel({
               <li key={g.name}>
                 <label>
                   <input
-                    type={convert ? "radio" : "checkbox"}
-                    name={convert ? "agent-group" : undefined}
+                    type="checkbox"
                     checked={on}
                     onChange={() => toggleGroup(g.name)}
                     disabled={busy}
@@ -210,6 +219,7 @@ export function AgentsPanel({
           })}
         </ul>
       )}
+      {chosen.length > 1 && <p className="muted small">{t("connect.first", { agent: t(AGENT_KEY[chosen[0]]) })}</p>}
       {error && <p className="banner error">{error}</p>}
       <div className="row">
         {agents && agents.length > 0 && (
@@ -217,12 +227,12 @@ export function AgentsPanel({
             {t("agents.ask")}
           </button>
         )}
-        {agents && agents.length === 0 && !convert && (
+        {agents && agents.length === 0 && (
           <button type="button" className="primary" onClick={() => void write()} disabled={busy}>
             {t("agents.write")}
           </button>
         )}
-        <button type="button" onClick={() => onDone(null, false)} disabled={busy}>
+        <button type="button" onClick={() => onDone({ message: null })} disabled={busy}>
           {t("agents.later")}
         </button>
       </div>

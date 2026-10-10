@@ -51,3 +51,10 @@ Today the first screen shows a short text (`welcome.title`, `welcome.body`) and 
 - 2026-10-11 — Owner added: after the folders are set up, combine "tell agents about Allomos" and "find and move existing tasks" into one step, **Connect with the agents**; the person still decides whether tasks are moved, as the current UI asks.
 - 2026-10-11 — Owner decided: the first chosen agent gets the combined request, the others only the instructions; File → Connect with the Agents… replaces File → Agents…, and File → Move Tasks Into Allomos… stays but opens the same step.
 - 2026-10-11 — Owner changed the menu decision: only File → Connect with the Agents…; no separate Move Tasks item.
+- 2026-10-11 — Implemented on `claude/a05-03-setup-wizard`. How the open questions were settled in code (owner may change any):
+  - **Open Folder / Open Recent / start-up folder:** a folder with `.allomos` opens directly; one without starts the wizard at step 2. The old "No taskbag in this folder yet" card and the automatic create in an empty folder are gone: the wizard's **Create** does both.
+  - **Step 3 has no separate Skip:** the default folder is filled in, so **Next** keeps it. **Cancel** leaves it unrecorded, and the page then asks "Which folder holds this project?" as before (still used when a taskbag is opened directly).
+  - **Restart notice:** the app notes which of `AGENTS.md` / `CLAUDE.md` exist just before asking agents (or writing the files), then looks every 2 s for 30 min and tells once per new file.
+  - **Connect with the agents** opens by itself after opening a taskbag when an agent is not told **or** there are no tasks (one "Not now" for both). The agent line's button now says "Connect with the agents…".
+  - The conversion request is v6 (its "start again" hint names File → Connect with the Agents…); the connect request is v1.
+  - Contracts updated: [OPEN-FOLDER-FLOW.md](../product/OPEN-FOLDER-FLOW.md), [CODING_RULES.md](../workflow/CODING_RULES.md) (new check `npm --prefix apps/web test`, Node's own test runner, no new packages).

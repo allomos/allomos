@@ -120,3 +120,9 @@ export interface SetupState {
   agents: { codex: boolean; claude: boolean };
   has_tasks: boolean;
 }
+
+/** Whether the project folder has its agent instruction files (apps/desktop: `instruction_files`). */
+export interface InstructionFiles {
+  agents_md: boolean;
+  claude_md: boolean;
+}
