@@ -11,10 +11,10 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
 | Name in text | FlipHopper | **Allomos** (Chinese **换肩**, Japanese **アロモス**) |
 | Lower-case name in code | `fliphopper` | **`allomos`** |
 | Command and short alias | `fliphopper` / `fh` | **`allomos` / `alm`**; `fh` and `fliphopper` are **not kept** (owner) |
-| Hidden folder in every project | `.fliphopper/` | **`.allomos/`**, with the old folder still read |
-| Format tag in `project.json` | `fliphopper/1` | **`allomos/1`**, with `fliphopper/1` still read |
+| Hidden folder in every project | `.fliphopper/` | **`.allomos/`**; old folders are moved in by an agent (owner, 2026-10-11) |
+| Format tag in `project.json` | `fliphopper/1` | **`allomos/1`** |
 | App ID | `io.fliphopper` | **`io.allomos`** (or the domain the owner registers) |
-| Environment variables | `FLIPHOPPER_*` | **`ALLOMOS_*`**, old names still read |
+| Environment variables | `FLIPHOPPER_*` | **`ALLOMOS_*`** |
 | GitHub repository | `mypals-ml/fliphopper` | **`mypals-ml/allomos`** (GitHub redirects the old address) |
 | Local folder | `…/glidepace/fliphopper` | **`…/glidepace/allomos`** |
 | App icon and mark | the hopper | **kept** (owner) |
