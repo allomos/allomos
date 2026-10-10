@@ -2,7 +2,7 @@
   "area": "A03",
   "holder": "claude/a03-08-step-commits",
   "id": "A03-08",
-  "label": "implemented",
+  "label": "owner verified",
   "next_dependency": "owner runs the flow on ~/fliphopper-tests/a03-08-old-project",
   "state": "in_progress",
   "title": "Each step tells the agent what to commit"
