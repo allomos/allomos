@@ -148,3 +148,37 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 | **Step 2** — a fresh session, asked only "Please add a task: customers should be able to see the shop's opening hours on the menu page": it ran `fh guide tasks`, `fh list`, `fh show A01-01`, then `fh add task --area A01 …` with no ID. Result: `A01-02` in the existing Menu area, the title written as an outcome, the description as Outcome / Done means / Notes, left in backlog, and it told the person to approve with `fh ready A01-02`. | PASS |
 
 - 2026-10-10 — Owner: in the agents panel the **app** is now the default choice in each agent's group, before the terminal (changes [`A03-05`](./Task-A03-05-agents-panel-refinements.md)'s default "terminal first"). It applies to both panels, which share one component.
+
+- 2026-10-10 — Owner accepted: when the task-moving agent finds no tasks, or the person presses Cancel, it stops without adding FlipHopper's section to `AGENTS.md`; "Tell AI agents" is offered again when the folder is next opened.
+
+## Owner's manual check (2026-10-10)
+
+Three fresh folders under `~/fliphopper-tests/`, one per path through [OPEN-FOLDER-FLOW](../product/OPEN-FOLDER-FLOW.md). Use File → Open Folder… (⌘O) to switch between them.
+
+**A. `a05-02-check-board`: a project with a Markdown board (the full flow, with task moving)**
+1. "No seabag in this folder yet" → **Create seabag in .fliphopper/seabag/**: a notice says an empty seabag was created; no example tasks.
+2. No project-folder question (`AGENTS.md` is in the folder).
+3. "Tell AI agents about FlipHopper?" opens: **Claude (app)** is pre-selected above the terminal; the project folder has **Change…**.
+4. **Ask** → the Claude app opens with the request; its last line says to run `fh … brief`; there is no copy of the section. Send it: the agent runs `fh brief`, adds the section to `AGENTS.md` (other rules kept), and `CLAUDE.md` has `@AGENTS.md`. The section ends with the terms paragraph pointing to `fh guide`.
+5. "Find this project's tasks and move them into FlipHopper?" opens next: one agent only (round buttons). **Ask**, send.
+6. The agent looks, may ask in chat, then a **popup** in FlipHopper shows its plan, with tables drawn as tables. **Cancel**: the popup closes, a notice says nothing changed and how to ask again; the agent says the same and stops; nothing changed in the folder.
+7. Ask again (in the agent: "I changed my mind — please show me the plan again", or File → **Move Tasks Into FlipHopper…**, which is enabled now). **Go ahead**: the agent works on a branch `fliphopper/convert`, may set the ladder with `fh labels`, and adds 3 areas and 5 tasks; they appear in the window by themselves. `docs/fliphopper-conversion.md` lists every card; nothing is pushed.
+8. Click a moved task: the task pane shows its description; its card link opens the card file.
+
+**B. `a05-02-check-empty`: an empty folder (no project yet)**
+1. Opening it creates the seabag at once, with `README-fliphopper.md`.
+2. "Which folder holds this project?" appears (no `AGENTS.md` here). File → Move Tasks Into FlipHopper… is **greyed out**. **Use this folder**.
+3. "Tell AI agents" opens; **Not now**. Then "Find this project's tasks…" opens; **Ask**, send: the agent finds no tasks, says so and stops (no popup).
+4. **Not now** is remembered while the folder stays open; reopening the folder (File → Open Recent) offers "Tell AI agents" again.
+
+**C. `a05-02-check-sibling`: tasks kept beside the code**
+1. Open `a05-02-check-sibling/tasks-home` → **Create seabag**. "Which folder holds this project?" appears: **Choose another folder…** → pick `a05-02-check-sibling/app`.
+2. In `tasks-home/.fliphopper/seabag/project.json`, `project_folder` is `"../app"`.
+3. "Tell AI agents" (opens in `app`) → **Ask**, send: the section in `app/AGENTS.md` ends with a line saying the seabag is at `../tasks-home/.fliphopper/seabag` and to run `fh` with `--seabag`.
+4. In the agents panel, **Change…** re-records the project folder.
+
+**D. Adding a task (any folder after A or C)**
+In a new agent session in the project folder: "Add a task: …". The agent reads `fh guide tasks`, uses an existing area, lets `fh` choose the next ID, writes the title as an outcome and the description as Outcome / Done means / Notes, and leaves it in backlog for `fh ready`.
+
+**E. In a terminal (optional)**
+`fh brief`, `fh guide customize`, `fh guide tasks` print the brief and the guide.
