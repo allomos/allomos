@@ -130,3 +130,9 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 
 - **Decisions made by the agent, accepted by the owner 2026-10-09:** the app's new seabag is empty (example tasks would always count as "has tasks", so the migration step would never run); the project folder is stored relative to the FlipHopper folder (`"."`, `"../app"`); **Change…** in the agents panel re-records it; the section added to `AGENTS.md` names the seabag's place when it is not inside the project folder.
 - **Added:** `project_folder` in `project.json` (core model), `crates/store/src/setup.rs` (`setup_state`, `record_project_folder`, `relative_path`), `fh labels` (the agent sets the project's own ladder on the existing seabag), desktop commands `project_setup`, `set_project_folder`, `set_convert_enabled`; the request is **version 3** (no `fh init`; card links computed from the recorded project folder).
+
+## Change (2026-10-10, owner): the section comes from `fh brief`, details from `fh guide`
+
+**Owner's request:** instruct the agent to get the brief from the FlipHopper command and write it into the FlipHopper section; the brief tells the agent to get details from `fh` when needed; tell agents these are the terms FlipHopper relies on.
+
+**In plain words.** The FlipHopper section in `AGENTS.md` is now whatever `fh brief` prints: the same short how-to as before, plus the terms FlipHopper relies on (area, iteration, label, state) and where to read more: `fh guide terms`, `fh guide customize` (what a project may change: areas, iterations, ladder, task IDs; what is fixed: the six states, and the words "area" and "iteration" until R90), `fh guide commands`, `fh guide workflow`. Both requests tell the agent to run `fh brief` and use its output; a copy stays in the request for when `fh` cannot run where the agent works.

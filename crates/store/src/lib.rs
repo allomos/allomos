@@ -21,12 +21,14 @@ use serde::Serialize;
 
 mod confirm;
 mod convert;
+mod guide;
 mod setup;
 pub use confirm::{
     ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
     read_answer, requests_dir, was_seen, withdraw_confirm,
 };
 pub use convert::{CONVERT_REQUEST_VERSION, agent_convert_request_in};
+pub use guide::{GUIDE_TOPICS, guide};
 pub use setup::{
     SetupState, fliphopper_folder, project_folder_of, record_project_folder, relative_path,
     setup_state,
@@ -167,8 +169,33 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
 - Finished: `fh done <id> --push`.
 
 `--push` commits only the seabag's files and pushes them, so others see the change.
+
+FlipHopper relies on these terms: **area** (what part of the product a task belongs to),
+**iteration** (when it is planned), **label** (the step of this project's progress ladder a task
+has proven) and **state** (backlog, ready, in progress, waiting, done, dropped). When you need
+more, ask `fh` rather than guessing: `fh guide terms` (what they mean), `fh guide customize`
+(what this project may change and what is fixed), `fh guide commands`, `fh guide workflow`.
 "
     )
+}
+
+/// The line before the section's copy in a request: the agent takes the section from
+/// `fh brief`, so it always matches the installed `fh`; the copy is for when `fh` cannot run
+/// where the agent works.
+pub(crate) fn section_source(language: &str, seabag: &Path) -> String {
+    let brief = format!("fh --seabag \"{}\" brief", seabag.display());
+    match language {
+        "zh-CN" => format!(
+            "这一节的内容：运行 `{brief}`，把它的输出原样（英文）作为这一节。只有在那里无法运行 `fh` 时，才使用下面的副本："
+        ),
+        "ja" => format!(
+            "節の内容：`{brief}` を実行し、その出力をそのまま（英語のまま）この節にします。そこで `fh` を実行できない場合だけ、下の写しを使います："
+        ),
+        _ => format!(
+            "The section's text: run `{brief}` and use its output exactly as it is. Only if `fh` \
+cannot run there, use this copy:"
+        ),
+    }
 }
 
 /// [`agent_section`], plus where the seabag is when it is not inside `project` (written relative
@@ -206,6 +233,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
         seabag_path.display(),
         AGENT_SECTION_HEADING,
     );
+    let source = section_source(language, seabag_path);
     let steps = match language {
         "zh-CN" => format!(
             "FlipHopper 已为这个项目建立了水手袋。现在请把它告诉以后的 AI 智能体。
@@ -221,7 +249,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
 4. 确保 CLAUDE.md 包含一行 @AGENTS.md，让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
 5. 告诉用户你改了什么。
 
-下面这一节请保持英文原样添加："
+{source}"
         ),
         "ja" => format!(
             "FlipHopper がこのプロジェクトのシーバッグを用意しました。これからの AI エージェントにそれを伝えてください。
@@ -237,7 +265,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
 4. CLAUDE.md に @AGENTS.md という行があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
 5. 何を変えたかをユーザーに見せてください。
 
-下の節は英語のまま追加してください："
+{source}"
         ),
         _ => format!(
             "FlipHopper has set up this project's seabag. Please now tell future AI agents about it.
@@ -258,7 +286,7 @@ unrelated text, and do not add the same instructions twice.
 CLAUDE.md with just that line if it is missing). Do not copy the section into CLAUDE.md.
 5. Show the user what you changed.
 
-The section to add:"
+{source}"
         ),
     };
     format!(
@@ -1041,6 +1069,7 @@ mod tests {
         );
         assert!(r.contains("any other text about FlipHopper") && !r.contains("<!--"));
         assert!(r.ends_with(&agent_section()));
+        assert!(r.contains("brief`"), "the section comes from `fh brief`");
         assert_eq!(r.matches(AGENT_SECTION_HEADING).count(), 2);
     }
 

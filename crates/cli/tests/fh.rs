@@ -825,3 +825,32 @@ fn labels_change_the_ladder_without_stranding_a_task() {
     .unwrap();
     assert_eq!(project["labels"][1], "connected");
 }
+
+#[test]
+fn brief_and_guide_tell_agents_about_fliphopper() {
+    let repo = filled();
+    let v = ok(&repo, &["brief"]);
+    let brief = v["brief"].as_str().unwrap();
+    assert!(brief.starts_with("## Tasks: FlipHopper"));
+    assert!(brief.contains("fh guide customize"));
+    // Without a seabag the brief is still printed, as plain text.
+    let out = fh(&tmp("no-seabag"), &["brief"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .contains("fh guide terms")
+    );
+
+    let v = ok(&repo, &["guide", "customize"]);
+    assert!(v["guide"].as_str().unwrap().contains("The six states"));
+    let all = ok(&repo, &["guide"]);
+    assert!(
+        all["guide"]
+            .as_str()
+            .unwrap()
+            .contains("# FlipHopper terms")
+    );
+    let (code, v) = fj(&repo, &["guide", "nope"]);
+    assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
+}

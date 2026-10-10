@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use crate::{agent_section_for, relative_path};
+use crate::{agent_section_for, relative_path, section_source};
 
 /// Changes when the conversion request's steps change, so a report can say which it followed.
 /// 2: the agent finds the tasks itself and asks with `fh confirm` before changing anything.
@@ -33,6 +33,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
     // Agents' shells often forget exported variables between commands, so every command names
     // the seabag; the request says so once instead of repeating the path.
     let with_seabag = format!("fh --seabag \"{seabag}\"");
+    let source = section_source(language, seabag_path);
     let steps = match language {
         "zh-CN" => {
             let create = "水手袋已经存在（由 FlipHopper 建立）：不要再建一个，也不要删除它。如果它已经有任务，只添加，不改动那些任务。如果项目自己的标签阶梯与水手袋的不同（见 project.json 中的 labels），在计划中写明，确认后用 `fh labels \"<阶梯，用逗号分隔>\"` 设置。";
@@ -56,7 +57,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
 9. 列出、但不要执行收尾工作：说出仍然保存旧状态的东西（卡片文件里的状态表、生成的看板段落、生成看板的脚本、强制它们的钩子和 CI 检查），并问用户是否以及何时删除。用户同意之前保持原样。
 10. 告诉用户改了什么，以及还在等他们决定的事。
 
-下面这一节请保持英文原样："
+{source}"
             )
         }
         "ja" => {
@@ -81,7 +82,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
 9. 切り替えの後片付けは、挙げるだけで実行しません：古い状況をまだ持っているもの（カードのファイルの状況表、生成されるボードの節、ボードを生成するスクリプト、それを強制するフックや CI のチェック）を挙げ、消すかどうか、いつ消すかをユーザーに尋ねます。ユーザーが同意するまでそのままにします。
 10. 何を変えたか、何がユーザーの判断を待っているかを伝えます。
 
-下の節は英語のままにしてください："
+{source}"
             )
         }
         _ => {
@@ -138,7 +139,7 @@ files, generated board sections, board-generator scripts, hooks and CI checks th
 them) and ask the person whether and when to remove them. Leave them in place until they agree.
 10. Tell the person what changed and what waits on them.
 
-FlipHopper's section, to add as it is:"
+{source}"
             )
         }
     };
@@ -164,6 +165,10 @@ mod tests {
             assert!(r.contains("fh --seabag \"/work/bakery/.fliphopper/seabag\""));
             assert!(r.contains(&format!("fh confirm --title \"{CONFIRM_TITLE}\" --plan")));
             assert!(r.contains("fh labels"));
+            assert!(
+                r.contains("/work/bakery/.fliphopper/seabag\" brief`"),
+                "{language}"
+            );
             assert!(
                 !r.contains("fh init"),
                 "the app made the seabag: {language}"

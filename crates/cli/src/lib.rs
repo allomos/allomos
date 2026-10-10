@@ -13,8 +13,9 @@ use clap::{Parser, Subcommand, error::ErrorKind};
 use fliphopper_core::ops::{self, Outcome};
 use fliphopper_core::{Issue, Iteration, Problem, Seabag, State, Task};
 use fliphopper_store::{
-    DEFAULT_DIR, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_setup_request, find_seabag,
-    git_root, id_from_name, init_with_labels, load, picked_folder, post_confirm, read_answer,
+    DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
+    agent_section_for, agent_setup_request, find_seabag, git_root, guide, id_from_name,
+    init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
     requests_dir, was_seen, withdraw_confirm,
 };
 use serde_json::{Value, json};
@@ -85,6 +86,14 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
+    /// Print FlipHopper's section for this project's AGENTS.md: the short brief agents read first.
+    Brief,
+    /// Print the details the brief points to: terms, what a project may customize, commands,
+    /// and how to work the tasks. All topics when none is named.
+    Guide {
+        #[arg(value_parser = GUIDE_TOPICS)]
+        topic: Option<String>,
+    },
     /// Set the project's label ladder, lowest step first, separated by commas. Refused when a
     /// task's label would no longer be on it.
     Labels {
@@ -209,6 +218,8 @@ impl Command {
             | Command::Drop { id } => Some(id),
             Command::Init { .. }
             | Command::Labels { .. }
+            | Command::Brief
+            | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
             | Command::Next => None,
@@ -219,7 +230,12 @@ impl Command {
     fn changes(&self) -> bool {
         !matches!(
             self,
-            Command::List { .. } | Command::Show { .. } | Command::Next | Command::Confirm { .. }
+            Command::List { .. }
+                | Command::Show { .. }
+                | Command::Next
+                | Command::Confirm { .. }
+                | Command::Brief
+                | Command::Guide { .. }
         )
     }
 
@@ -228,6 +244,8 @@ impl Command {
             Command::Init { .. } => "init",
             Command::Confirm { .. } => "confirm",
             Command::Labels { .. } => "labels",
+            Command::Brief => "brief",
+            Command::Guide { .. } => "guide",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
             Command::Add(Add::Task { .. }) => "add task",
@@ -671,6 +689,24 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             plan,
             timeout,
         } => confirm(cli, cwd, title, plan, *timeout),
+        Command::Brief => {
+            // With a seabag, the section names it when it is outside the project folder.
+            let text = match locate(cli, cwd) {
+                Ok(root) => {
+                    let project = load(&root)
+                        .seabag
+                        .and_then(|bag| project_folder_of(&root, &bag.project))
+                        .unwrap_or_else(|| picked_folder(&root).unwrap_or(&root).to_path_buf());
+                    agent_section_for(&project, &root)
+                }
+                Err(_) => agent_section(),
+            };
+            Ok(Done::new(json!({ "brief": text }), text))
+        }
+        Command::Guide { topic } => {
+            let text = guide(topic.as_deref()).unwrap_or_default();
+            Ok(Done::new(json!({ "topic": topic, "guide": text }), text))
+        }
         Command::Labels { ladder } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;
