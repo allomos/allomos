@@ -1,0 +1,33 @@
+# Task-A01-20-rename-seabag-to-taskcase
+
+*Card type: coding. Area A01 (Tracking). Decided by the owner (2026-10-10): the **seabag** is renamed **taskcase**: Chinese **任务箱**, Japanese **タスクケース**. The folder on disk and the command option are renamed too, and FlipHopper keeps reading old `.fliphopper/seabag/` folders. Recorded in [0013](../decisions/0013-product-name-fliphopper.md#amendment-2026-10-10-the-seabag-becomes-the-taskcase).*
+
+## What gets built (plain words)
+
+| Piece | Before | After |
+|---|---|---|
+| The word, in every screen, message and document | seabag / 水手袋 / シーバッグ | **taskcase / 任务箱 / タスクケース** |
+| A new project's folder | `.fliphopper/seabag/` | **`.fliphopper/taskcase/`** (the folder name follows the app's name if [`A00-20`](./Task-A00-20-app-name-research.md) changes it) |
+| Opening an old project | — | `.fliphopper/seabag/` still opens; FlipHopper offers to rename the folder to `taskcase` (one Git-visible rename; the person agrees) |
+| Command option and setting | `fh --seabag`, `FLIPHOPPER_SEABAG` | **`fh --taskcase`, `FLIPHOPPER_TASKCASE`**; the old ones keep working, with a note to switch |
+| The section in AGENTS.md (`fh brief`) and `fh guide` | "seabag" | "taskcase"; the section also says that `.fliphopper/seabag/` is the old name |
+
+**What you can see at the end:** the app and `fh` say "taskcase" (任务箱 in Chinese); a new project gets `.fliphopper/taskcase/`; FlipHopper's own repository, still on `.fliphopper/seabag/`, keeps working until its folder is renamed.
+
+## Details for the worker
+
+- **Outcome.** Everyone sees the new word, new projects use the new folder, and no existing project breaks.
+- **Decisive unknowns.**
+  - Whether the app's name changes too (owner, [`A00-20`](./Task-A00-20-app-name-research.md)). **Do this card after that answer**, so projects move only once.
+  - Whether FlipHopper's own `.fliphopper/seabag/` is renamed in this card or later (owner; it changes every session's `FLIPHOPPER_SEABAG`).
+- **Files owned.** `crates/*` (paths, option, messages, guide, brief), `apps/*` (texts in three languages), `docs/` (current documents; dated history keeps "seabag", as 0013 says for "glidebox"), this card.
+- **External operations.** None.
+- **Done means mechanically.** The usual checks pass; tests open an old `seabag` folder and a new `taskcase` folder; `fh --seabag` still works with a note; the app shows 任务箱 in Chinese.
+
+## Approvals
+
+| Date | What was approved | By |
+|---|---|---|
+| 2026-10-10 | "taskcase + 任务箱"; rename the folder and the command option too ("yes", keeping old folders readable) | owner (chat) |
+
+## Notes

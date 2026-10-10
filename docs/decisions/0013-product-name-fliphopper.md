@@ -1,4 +1,4 @@
-# 0013 — The product is called FlipHopper; a project's data is its seabag
+# 0013 — The product is called FlipHopper; a project's data is its seabag (to be renamed taskcase)
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
@@ -25,6 +25,14 @@ The folder that holds a project's tasks, formerly the **task box**, is now the *
 | Local folder | `/Users/wanghui/coding/glidepace/glidebox` | **`/Users/wanghui/coding/glidepace/fliphopper`** |
 
 **No conversion of old data.** FlipHopper does not read `.glidebox/` folders or the `glidebox/1` format. The only seabags that existed were test projects made during Iteration 1.
+
+## Amendment 2026-10-10: the seabag becomes the taskcase
+
+**Decided by the owner, 2026-10-10.** The folder that holds a project's tasks is renamed from **seabag** to **taskcase**: Chinese **任务箱**, Japanese **タスクケース**. The word says what it is (a case full of tasks) and keeps the picture of carrying it from agent to agent.
+
+- The folder on disk and the command option are renamed too: `.fliphopper/taskcase/`, `fh --taskcase`. FlipHopper keeps reading old `.fliphopper/seabag/` folders, so no project breaks.
+- Other names considered: 手提箱 (the owner chose 任务箱 for Chinese), taskfolder (clashes with "FlipHopper folder" and "project folder"), shoulderbag, 背包, 双肩包.
+- **Not built yet.** Until [`Task-A01-20`](../tasks/Task-A01-20-rename-seabag-to-taskcase.md) is done, the product and its documents still say "seabag". That card waits for the answer on the app's name ([`Task-A00-20`](../tasks/Task-A00-20-app-name-research.md)), so projects move only once.
 
 ## Why this name
 
