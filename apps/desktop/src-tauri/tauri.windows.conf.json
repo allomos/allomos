@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/alm"],
+    "windows": {
+      "nsis": { "installerHooks": "windows/hooks.nsh" }
+    }
+  }
+}

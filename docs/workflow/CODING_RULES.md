@@ -104,7 +104,7 @@ A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-c
 - **Exit codes:** `0` done · `1` refused by a rule · `2` wrong usage (`bad_usage`) · `3` the taskbag is busy or could not be read or written.
 - **Never waits for typed input.** Messages are English (Iteration 1); their codes are worded in all three interface languages.
 - `ALLOMOS_LOCK_WAIT_MS` changes how long a writer waits for the lock (default 5000); tests use it.
-- **Install on this Mac:** `cargo install --path crates/cli` puts `allomos` and `alm` in `~/.cargo/bin`. Bundling with the app is a later card.
+- **Install on this Mac:** `cargo install --path crates/cli` puts `allomos` and `alm` in `~/.cargo/bin`. Bundling with the macOS app is a later card. **On Windows the installer installs `alm`** ([`Task-A07-06`](../tasks/Task-A07-06-windows-installer-installs-alm.md)): `alm.exe` goes beside the app, and the app's folder is added to the person's own PATH (removed again on uninstall), so `alm` works in terminals opened after installing.
 
 ## Running the app
 
@@ -128,7 +128,7 @@ The Windows version is built on the Mac; there is no GitHub pipeline, because th
 bash apps/desktop/scripts/build-windows.sh
 ```
 
-It leaves `Allomos_<version>_x64-setup.exe` (the unsigned installer; it needs no administrator rights) and `alm.exe` in `target/windows/`. Windows warns that the publisher is unknown until builds are signed at v1.0. The first build downloads Microsoft's Windows SDK libraries into a local cache and takes a few minutes.
+It leaves `Allomos_<version>_x64-setup.exe` (the unsigned installer; it needs no administrator rights, and it installs `alm` too) and `alm.exe` in `target/windows/`. The installer's Windows-only settings are in `apps/desktop/src-tauri/tauri.windows.conf.json` and `windows/hooks.nsh`; the script copies `alm.exe` to `apps/desktop/src-tauri/binaries/` first, which a Windows `cargo` check of the app also needs. Windows warns that the publisher is unknown until builds are signed at v1.0. The first build downloads Microsoft's Windows SDK libraries into a local cache and takes a few minutes.
 
 One-time tools (the script names any that are missing):
 

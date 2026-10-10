@@ -25,3 +25,5 @@ coverage/
 
 # Rust and Tauri build output
 target/
+# alm copied in for the Windows installer (build-windows.sh)
+apps/desktop/src-tauri/binaries/
