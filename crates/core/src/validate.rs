@@ -118,6 +118,17 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     if project.labels.is_empty() {
         issues.push(Issue::new(file, Some("labels"), Problem::LadderEmpty));
     }
+    if let Some(value) = &project.task_language {
+        if value != crate::model::TASK_LANGUAGE_UI && !crate::model::valid_language(value) {
+            issues.push(Issue::new(
+                file,
+                Some("task_language"),
+                Problem::InvalidLanguage {
+                    value: value.clone(),
+                },
+            ));
+        }
+    }
     if issues.is_empty() {
         Ok(project)
     } else {

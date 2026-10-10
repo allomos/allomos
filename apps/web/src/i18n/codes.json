@@ -46,6 +46,9 @@
   "invalid_id": [
     "id"
   ],
+  "invalid_language": [
+    "value"
+  ],
   "iteration_name_missing": [],
   "label_below_top": [
     "label",

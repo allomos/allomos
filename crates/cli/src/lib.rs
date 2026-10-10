@@ -16,7 +16,7 @@ use fliphopper_store::{
     DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
     agent_section_for, agent_setup_request, find_seabag, git_root, guide, id_from_name,
     init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
-    requests_dir, was_seen, withdraw_confirm,
+    requests_dir, task_language, was_seen, withdraw_confirm,
 };
 use serde_json::{Value, json};
 
@@ -93,6 +93,14 @@ enum Command {
     Guide {
         #[arg(value_parser = GUIDE_TOPICS)]
         topic: Option<String>,
+    },
+    /// The language to write new and changed tasks in. Without a value: show it (run this before
+    /// adding a task or changing its title or description). With one: set it, to a language code
+    /// such as zh-CN, or to ui to follow the FlipHopper app's language.
+    #[command(name = "task-language", alias = "task_language")]
+    TaskLanguage {
+        #[arg(value_name = "CODE|ui")]
+        value: Option<String>,
     },
     /// Set the project's label ladder, lowest step first, separated by commas. Refused when a
     /// task's label would no longer be on it.
@@ -218,6 +226,7 @@ impl Command {
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Init { .. }
             | Command::Labels { .. }
+            | Command::TaskLanguage { .. }
             | Command::Brief
             | Command::Guide { .. }
             | Command::Confirm { .. }
@@ -228,6 +237,9 @@ impl Command {
 
     /// Whether the command writes to the seabag.
     fn changes(&self) -> bool {
+        if let Command::TaskLanguage { value } = self {
+            return value.is_some();
+        }
         !matches!(
             self,
             Command::List { .. }
@@ -244,6 +256,7 @@ impl Command {
             Command::Init { .. } => "init",
             Command::Confirm { .. } => "confirm",
             Command::Labels { .. } => "labels",
+            Command::TaskLanguage { .. } => "task-language",
             Command::Brief => "brief",
             Command::Guide { .. } => "guide",
             Command::Add(Add::Area { .. }) => "add area",
@@ -482,6 +495,21 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
     }
 }
 
+/// One line saying which language to write tasks in, and why.
+fn language_line(l: &fliphopper_store::TaskLanguage) -> String {
+    let why = match l.source {
+        "seabag" => "set in this seabag".to_string(),
+        "app" => "follows the FlipHopper app's language".to_string(),
+        _ => {
+            "follows this computer's language; the FlipHopper app has not saved one yet".to_string()
+        }
+    };
+    format!(
+        "Write new and changed tasks in: {} ({why}). Keep IDs, commands, code and file names as they are.",
+        l.language
+    )
+}
+
 /// The project folder `fh confirm` asks about: the folder holding the seabag given with
 /// `--seabag` (which may not exist yet), else the nearest seabag's, else the Git repository's
 /// root, else `cwd`.
@@ -709,6 +737,37 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Guide { topic } => {
             let text = guide(topic.as_deref()).unwrap_or_default();
             Ok(Done::new(json!({ "topic": topic, "guide": text }), text))
+        }
+        Command::TaskLanguage { value: Some(value) } => {
+            let root = locate(cli, cwd)?;
+            let lock = Lock::acquire(&root, lock_wait())?;
+            let (bag, issues) = seabag_of(&root, lock.load())?;
+            let project = ops::set_task_language(&bag, value)?;
+            lock.save_project(&project)?;
+            let system: Vec<String> = sys_locale::get_locales().collect();
+            let now = task_language(&project, &system);
+            let mut done = Done::new(
+                json!({ "seabag": root, "task_language": now }),
+                format!(
+                    "Task language set to {}. {}\n",
+                    now.setting,
+                    language_line(&now)
+                ),
+            );
+            done.issues = issues;
+            Ok(done)
+        }
+        Command::TaskLanguage { value: None } => {
+            let root = locate(cli, cwd)?;
+            let (bag, issues) = seabag_of(&root, load(&root))?;
+            let system: Vec<String> = sys_locale::get_locales().collect();
+            let now = task_language(&bag.project, &system);
+            let mut done = Done::new(
+                json!({ "seabag": root, "task_language": now }),
+                format!("{}\n", language_line(&now)),
+            );
+            done.issues = issues;
+            Ok(done)
         }
         Command::Labels { ladder } => {
             let root = locate(cli, cwd)?;

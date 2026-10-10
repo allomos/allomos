@@ -52,6 +52,7 @@ FlipHopper never creates a Git repository inside a seabag; the surrounding repos
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `fh labels`. |
 | `project_folder` | no | The project folder (code, `AGENTS.md`, `CLAUDE.md`), relative to the folder holding `.fliphopper/` (`"."` for that folder, `"../app"` for a sibling), or absolute when no relative path exists. Written by the app ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)). Older `fh` builds refuse a seabag that has it (`field_unknown`): reinstall `fh`. |
+| `task_language` | no | The language new and changed tasks are written in: `"ui"` (follow the language the FlipHopper app shows; the default, also when the field is missing) or a language code such as `"zh-CN"`. Read and set with `fh task-language`. The app saves its interface language in FlipHopper's per-user settings (`settings.json` in `~/Library/Application Support/io.fliphopper` on macOS), outside the seabag ([`Task-A01-21`](../tasks/Task-A01-21-task-language.md)). |
 
 ## `areas/<id>.json`
 

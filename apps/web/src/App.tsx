@@ -236,6 +236,12 @@ export function App({ messenger }: { messenger: Messenger }) {
     return () => void stop.then((f) => f()).catch(() => undefined);
   }, [messenger]);
 
+  // Tasks are written in the interface's language unless the seabag says otherwise (Task-A01-21):
+  // `fh task-language` reads the language saved here.
+  useEffect(() => {
+    void messenger.saveUiLanguage(language).catch(() => undefined);
+  }, [messenger, language]);
+
   // The menu's words follow the interface's language.
   useEffect(() => {
     void messenger

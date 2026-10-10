@@ -892,3 +892,50 @@ fn add_task_without_an_id_takes_the_next_in_its_area() {
             .contains("fh guide tasks")
     );
 }
+
+/// `fh --json …` with its own settings folder, so the person's real app settings are never read.
+fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
+    let out = Command::new(FH)
+        .current_dir(dir)
+        .arg("--json")
+        .args(args)
+        .env_remove("FLIPHOPPER_SEABAG")
+        .env_remove("FLIPHOPPER_HOLDER")
+        .env("FLIPHOPPER_SETTINGS_DIR", settings)
+        .output()
+        .unwrap();
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    (out.status.code().unwrap(), v)
+}
+
+#[test]
+fn task_language_follows_the_app_until_set() {
+    let repo = filled();
+    let settings = tmp("settings");
+    // A new seabag says "ui".
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".fliphopper/seabag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(project["task_language"], "ui");
+    // The app saved Chinese: that is the language.
+    fs::write(
+        settings.join("settings.json"),
+        r#"{ "ui_language": "zh-CN" }"#,
+    )
+    .unwrap();
+    let (code, v) = fj_settings(&repo, &settings, &["task-language"]);
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(
+        v["task_language"],
+        json!({ "language": "zh-CN", "setting": "ui", "source": "app" })
+    );
+    // Set a code (the underscore spelling works too), then back to ui.
+    let (_, v) = fj_settings(&repo, &settings, &["task_language", "fr"]);
+    assert_eq!(v["task_language"]["language"], "fr");
+    assert_eq!(v["task_language"]["source"], "seabag");
+    let (code, v) = fj_settings(&repo, &settings, &["task-language", "French!"]);
+    assert_eq!((code, &v["error"]["code"]), (1, &json!("invalid_language")));
+    let (_, v) = fj_settings(&repo, &settings, &["task-language", "ui"]);
+    assert_eq!(v["task_language"]["language"], "zh-CN");
+}

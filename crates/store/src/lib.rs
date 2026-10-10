@@ -22,6 +22,7 @@ use serde::Serialize;
 mod confirm;
 mod convert;
 mod guide;
+mod settings;
 mod setup;
 pub use confirm::{
     ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
@@ -29,6 +30,10 @@ pub use confirm::{
 };
 pub use convert::{CONVERT_REQUEST_VERSION, agent_convert_request_in};
 pub use guide::{GUIDE_TOPICS, guide};
+pub use settings::{
+    TaskLanguage, pick_ui_language, save_ui_language, saved_ui_language, settings_dir,
+    task_language,
+};
 pub use setup::{
     SetupState, fliphopper_folder, project_folder_of, record_project_folder, relative_path,
     setup_state,
@@ -168,6 +173,8 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
 - Stopping before it is done: `fh release <id> --note \"<what the next one needs>\" --push`.
 - Finished: `fh done <id> --push`.
 - Adding a task: read `fh guide tasks` first, then `fh add task --area <area> --title \"<outcome>\" --push`.
+- Before adding a task or changing its title or description, run `fh task-language` and write in
+  that language.
 
 `--push` commits only the seabag's files and pushes them, so others see the change.
 
@@ -649,6 +656,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         name: name.to_string(),
         labels: fliphopper_core::default_labels(),
         project_folder: None,
+        task_language: None,
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -837,6 +845,8 @@ pub fn init_with_labels(
         name: name.to_string(),
         labels,
         project_folder: None,
+        // New seabags follow the app's language until someone sets another (Task-A01-21).
+        task_language: Some(fliphopper_core::TASK_LANGUAGE_UI.to_string()),
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);

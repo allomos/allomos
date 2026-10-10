@@ -61,6 +61,8 @@ problems! {
     WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of FlipHopper reads only \"{expected}\".";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
+    /// `task_language` is neither `ui` nor a language code (Task-A01-21).
+    InvalidLanguage { value } => "invalid_language", "\"{value}\" is not a language. Use a language code such as en, zh-CN or ja, or ui to follow the FlipHopper app's language.";
     AreaNameMissing => "area_name_missing", "The area needs a name.";
     TaskTitleMissing => "task_title_missing", "The task needs a title.";
     DuplicateAreaId { id } => "duplicate_area_id", "Another area already uses the ID \"{id}\".";

@@ -115,6 +115,7 @@
   "problem.wrong_format": "Expected \"{expected}\" but found \"{found}\". This version of FlipHopper reads only \"{expected}\".",
   "problem.project_name_missing": "The project needs a name.",
   "problem.ladder_empty": "The label ladder needs at least one step.",
+  "problem.invalid_language": "\"{value}\" is not a language. Use a language code such as en, zh-CN or ja, or ui to follow the FlipHopper app's language.",
   "problem.area_name_missing": "The area needs a name.",
   "problem.task_title_missing": "The task needs a title.",
   "problem.duplicate_area_id": "Another area already uses the ID \"{id}\".",

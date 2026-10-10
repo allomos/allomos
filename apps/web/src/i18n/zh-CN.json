@@ -115,6 +115,7 @@
   "problem.wrong_format": "应为“{expected}”，但实际为“{found}”。此版本的 FlipHopper 只能读取“{expected}”。",
   "problem.project_name_missing": "项目需要一个名称。",
   "problem.ladder_empty": "标签阶梯至少需要一级。",
+  "problem.invalid_language": "“{value}”不是一种语言。请使用 en、zh-CN、ja 这样的语言代码，或用 ui 表示跟随 FlipHopper 应用的语言。",
   "problem.area_name_missing": "领域需要一个名称。",
   "problem.task_title_missing": "任务需要一个标题。",
   "problem.duplicate_area_id": "另一个领域已在使用 ID“{id}”。",

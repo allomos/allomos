@@ -29,6 +29,9 @@ about the project's tasks.
 - **Holder**: the person or agent session working a task (`--as <name>`). One holder at a time.
 - **Next dependency**: the one thing needed before the task's next label.
 - **Handoff note**: what the next holder needs to know, left when a task is released.
+- **Task language**: the language new and changed tasks are written in (titles, descriptions,
+  notes). `fh task-language` tells you which; by default it follows the language the person
+  uses FlipHopper in.
 ";
 
 const CUSTOMIZE: &str = "# What a project may change, and what is fixed
@@ -40,6 +43,7 @@ const CUSTOMIZE: &str = "# What a project may change, and what is fixed
 | Label ladder | its steps and their order | `fh labels \"<a,b,…>\"` (refused if a task's label would be left off) |
 | Task IDs and titles | any ID of letters, digits, `-` or `_` (for example A01-02) | `fh add task <id> --area <id> --title \"…\"` |
 | Description | free Markdown in description.md | written with `fh add task --description` |
+| Task language | `ui` (follow the FlipHopper app's language, the default) or a language code | `fh task-language <code or ui>`; only when the person asks |
 
 Fixed for every project:
 
@@ -56,6 +60,8 @@ const TASKS: &str = "# How to add a task
 
 Read this before you add a task, so it fits this project.
 
+0. **Language.** Run `fh task-language` and write the title and description in that language.
+   IDs, commands, code and file names stay as they are.
 1. **Look first.** `fh list` shows the areas and the task IDs already used; `fh show <id>` shows
    how an existing task is written. Follow what you see.
 2. **Area.** Use an area that exists. Add a new one (`fh add area <id> \"<name>\"`) only when the
@@ -102,6 +108,8 @@ Plan:
 - `fh add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]`: without
   an ID, the next free one in the area. Read `fh guide tasks` first.
 - `fh plan <id> [<iteration>]`; `fh labels \"<a,b,…>\"`
+- `fh task-language`: the language to write new and changed tasks in (run it first);
+  `fh task-language <code|ui>` sets it.
 
 Ask the person:
 - `fh confirm --title \"<heading>\" --plan <file.md>`: shows your plan in the FlipHopper app and
@@ -127,6 +135,8 @@ const WORKFLOW: &str = "# How to work the tasks
 
 Rules:
 - Never edit the seabag's files by hand, and never invent progress, verification or approvals.
+- Before adding a task or changing its title or description, run `fh task-language` and write in
+  that language.
 - Before a change the person must agree to, show your plan with `fh confirm` and change nothing
   unless it exits 0.
 - `--push` commits only the seabag's files; your other work is committed as usual.
@@ -180,5 +190,7 @@ mod tests {
                 .unwrap()
                 .contains("Do not make it ready yourself")
         );
+        assert!(guide(Some("tasks")).unwrap().contains("fh task-language"));
+        assert!(crate::agent_section().contains("run `fh task-language`"));
     }
 }
