@@ -1,6 +1,6 @@
 # Task-A03-01-agent-launch-research
 
-- **Outcome.** The owner and the W07 worker know, from vendor documentation and local trials, exactly how FlipHopper can **start** a task in Claude Code and in Codex and later **jump into** that session — for each surface (CLI, desktop app, cloud/web) — so the runner design in [decision 0005](../decisions/0005-start-and-open-agent-sessions.md) can be confirmed or corrected.
+- **Outcome.** The owner and the W07 worker know, from vendor documentation and local trials, exactly how Allomos can **start** a task in Claude Code and in Codex and later **jump into** that session — for each surface (CLI, desktop app, cloud/web) — so the runner design in [decision 0005](../decisions/0005-start-and-open-agent-sessions.md) can be confirmed or corrected.
 - **Decisive unknowns** (worker finds out, from official docs and trying the installed tools):
   - How to launch each agent non-interactively with a prompt in a given directory, and get a **session id** back.
   - How to **resume** a given session (command, flags) and whether desktop/web apps offer a **link or URL** to a specific session.
@@ -21,7 +21,7 @@
 
 ## Result (2026-10-07)
 
-**In plain words.** [agent-launch-and-resume.md](../research/agent-launch-and-resume.md) gives, for Claude Code and Codex and for each surface (terminal, desktop app, cloud), how FlipHopper can start a task, where the session ID comes from, how to reopen it, whether there is a link to it, and whether cloud sessions can be created. Both agents can be started by another program and report an ID that can be reopened later, so "Start in agent" and "Open session" need no screen automation. Decision 0005's unknowns are updated to match.
+**In plain words.** [agent-launch-and-resume.md](../research/agent-launch-and-resume.md) gives, for Claude Code and Codex and for each surface (terminal, desktop app, cloud), how Allomos can start a task, where the session ID comes from, how to reopen it, whether there is a link to it, and whether cloud sessions can be created. Both agents can be started by another program and report an ID that can be reopened later, so "Start in agent" and "Open session" need no screen automation. Decision 0005's unknowns are updated to match.
 
 - **Found on the way:** the Homebrew Codex CLI on this Mac (0.130.0) does not run; its platform binary is missing. Claude Code is 2.1.191, older than some documented features (`--cloud`, resuming from another folder).
 

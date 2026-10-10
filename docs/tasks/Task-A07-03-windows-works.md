@@ -4,18 +4,18 @@
 
 ## What gets built (plain words)
 
-FlipHopper was written and tested only on macOS. Windows differs in ways that commonly break such apps: folder paths use `\`, Git may turn line endings into `\r\n`, files cannot always be replaced while another program reads them, and the window's web engine (WebView2) may be missing. After this card, everything FlipHopper does on a Mac also works on Windows: the app, `fh`, the agents panel and opening files and links.
+Allomos was written and tested only on macOS. Windows differs in ways that commonly break such apps: folder paths use `\`, Git may turn line endings into `\r\n`, files cannot always be replaced while another program reads them, and the window's web engine (WebView2) may be missing. After this card, everything Allomos does on a Mac also works on Windows: the app, `alm`, the agents panel and opening files and links.
 
 | Piece | What it is | Where |
 |---|---|---|
-| Paths | Seabag paths shown and stored correctly with `\`; the project folder found from a seabag path on both systems. | `crates/store`, `apps/web` |
-| Line endings | Files read correctly whether Git checked them out with `\n` or `\r\n`; FlipHopper always writes `\n`. A `.gitattributes` rule for seabag files. | `crates/store`, `.fliphopper/seabag` template |
+| Paths | Taskbag paths shown and stored correctly with `\`; the project folder found from a taskbag path on both systems. | `crates/store`, `apps/web` |
+| Line endings | Files read correctly whether Git checked them out with `\n` or `\r\n`; Allomos always writes `\n`. A `.gitattributes` rule for taskbag files. | `crates/store`, `.allomos/taskbag` template |
 | Writing files | Replacing a file while the app reads it does not fail on Windows (retry briefly, as the lock rules allow). | `crates/store` |
 | WebView2 | The installer makes sure the web engine is there. | `apps/desktop/src-tauri/tauri.conf.json` |
-| Opening things | "Show in Explorer", opening a card link, finding Claude Code and Codex on Windows, `fh` installed as `fh.exe`. | `apps/desktop/src-tauri`, `crates/cli` |
+| Opening things | "Show in Explorer", opening a card link, finding Claude Code and Codex on Windows, `alm` installed as `alm.exe`. | `apps/desktop/src-tauri`, `crates/cli` |
 | Tests on Windows | The whole test suite runs on the pipeline's Windows job, plus new Windows-specific tests. | `.github/workflows/build.yml` |
 
-**What you can see at the end:** the pipeline's Windows job passes every test, and the Windows build opens FlipHopper's own repository with the same list, iterations and task pane as on the Mac.
+**What you can see at the end:** the pipeline's Windows job passes every test, and the Windows build opens Allomos's own repository with the same list, iterations and task pane as on the Mac.
 
 ## Details for the worker
 
@@ -27,7 +27,7 @@ FlipHopper was written and tested only on macOS. Windows differs in ways that co
 - **External operations.** Runs on the pipeline approved in A07-02; nothing new.
 - **Done means mechanically.**
   - The six named checks pass on macOS and on the Windows job.
-  - New tests: a seabag checked out with `\r\n` loads; a path with `\` finds its project; replacing a file that is open for reading succeeds.
+  - New tests: a taskbag checked out with `\r\n` loads; a path with `\` finds its project; replacing a file that is open for reading succeeds.
 
 ## Approvals
 

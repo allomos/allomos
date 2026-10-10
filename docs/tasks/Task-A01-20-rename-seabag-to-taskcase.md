@@ -35,3 +35,4 @@
 | 2026-10-10 | Taskbag instead of taskcase, Chinese "任务包"; folder `.allomos/taskbag/` with the app rename ("ok") | owner (chat) |
 
 ## Notes
+- 2026-10-11 — Done inside [`A00-21`](./Task-A00-21-rename-to-allomos.md)'s branch `claude/a00-21-allomos`: taskbag / 任务包 / タスクバッグ, `.allomos/taskbag/`, `alm --taskbag` (`--seabag` still accepted), `ALLOMOS_TASKBAG` (`FLIPHOPPER_SEABAG` still honoured). Remaining: move FlipHopper's own `.fliphopper/seabag/` with `alm migrate` after the merge and install.

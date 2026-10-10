@@ -1,4 +1,4 @@
-# FlipHopper — Claude entry point
+# Allomos — Claude entry point
 
 @AGENTS.md
 

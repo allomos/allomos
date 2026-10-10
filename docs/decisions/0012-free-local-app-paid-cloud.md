@@ -6,7 +6,7 @@
 
 ## In plain words
 
-Developers and team leaders get a real choice. They can **use the FlipHopper desktop app on their own computer for free**, with no account and no payment. People who want what only a hosted service can give, such as a cloud copy or a team working together online, can **pay for that**. Free use is not a trial or a crippled version: it is the owner's own wish to offer it.
+Developers and team leaders get a real choice. They can **use the Allomos desktop app on their own computer for free**, with no account and no payment. People who want what only a hosted service can give, such as a cloud copy or a team working together online, can **pay for that**. Free use is not a trial or a crippled version: it is the owner's own wish to offer it.
 
 ## Owner's statement (2026-10-04)
 
@@ -20,9 +20,9 @@ Developers and team leaders get a real choice. They can **use the FlipHopper des
 
 ## Why this fits
 
-- The architecture is already local-first ([0006](./0006-local-and-cloud-projects.md), [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), [0010](./0010-project-data-folder.md)). Iterations 1–12 need no FlipHopper server.
-- It separates FlipHopper from cloud-first trackers (Linear, Jira, Vibe Kanban cloud): your task data stays on your machine and in your own Git repository.
-- Free local tools for agents already exist, for example Backlog.md (open source, free). "Free and local" is therefore **not unique on its own**. FlipHopper's difference has to come from:
+- The architecture is already local-first ([0006](./0006-local-and-cloud-projects.md), [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), [0010](./0010-project-data-folder.md)). Iterations 1–12 need no Allomos server.
+- It separates Allomos from cloud-first trackers (Linear, Jira, Vibe Kanban cloud): your task data stays on your machine and in your own Git repository.
+- Free local tools for agents already exist, for example Backlog.md (open source, free). "Free and local" is therefore **not unique on its own**. Allomos's difference has to come from:
   - the desktop experience;
   - verified progress and owner decisions;
   - the burndown and forecast;
@@ -37,7 +37,7 @@ Developers and team leaders get a real choice. They can **use the FlipHopper des
 
   This affects:
   - **Iteration 9** (pairing email): the sending service's free tier has a monthly limit.
-  - **Iteration 10** (companions away from home): a relay or tunnel carries traffic. If FlipHopper runs it, every free user costs money.
+  - **Iteration 10** (companions away from home): a relay or tunnel carries traffic. If Allomos runs it, every free user costs money.
   - **Auto-update downloads**: free when hosted on GitHub Releases.
 - **Fixed costs remain even with no revenue:**
   - code signing (Apple about US$99 per year, plus a Windows certificate) from Iteration 15;

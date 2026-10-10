@@ -1,6 +1,6 @@
 # AI workflow and handoff
 
-How agent sessions (Claude Code, Codex) start, hand over and stop on FlipHopper. [AGENTS.md](../../AGENTS.md) holds the short, always-loaded version of these rules; this file holds the detail. Adapted from the owner's SSR migration project (`AI-WORKFLOW.md`, `AGENT_HANDOFF.md`; see [REFERENCES.md](../REFERENCES.md)).
+How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [AGENTS.md](../../AGENTS.md) holds the short, always-loaded version of these rules; this file holds the detail. Adapted from the owner's SSR migration project (`AI-WORKFLOW.md`, `AGENT_HANDOFF.md`; see [REFERENCES.md](../REFERENCES.md)).
 
 ## Roles and effort
 
@@ -12,7 +12,7 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on FlipHopper.
 ## Starting a session
 
 1. Read [AGENTS.md](../../AGENTS.md) (loaded automatically).
-2. Read [TASK_BOARD.md](../TASK_BOARD.md) (**Now**, **Waiting on the owner**), then run `fh list` against the main checkout's seabag ([CARDS.md § Where status lives](./CARDS.md#where-status-lives)).
+2. Read [TASK_BOARD.md](../TASK_BOARD.md) (**Now**, **Waiting on the owner**), then run `alm list` against the main checkout's taskbag ([CARDS.md § Where status lives](./CARDS.md#where-status-lives)).
 3. Resuming a claimed card → open its card file and your block in [AGENT_HANDOFF.md § Active resume](../AGENT_HANDOFF.md#active-resume). Taking a new card → follow the [claiming protocol](./CARDS.md#claiming-protocol).
 4. Read [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) **Live state** and **Pitfalls** — they change what you do.
 5. Check the actual state before trusting notes: `git status`, `git worktree list`, running ports (`lsof -iTCP -sTCP:LISTEN`).
@@ -36,7 +36,7 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on FlipHopper.
 **Keep it short:**
 
 - Evidence goes on the card file, not in the handoff. Write "see card".
-- Status goes in the seabag only, with `fh`.
+- Status goes in the taskbag only, with `alm`.
 - When you release or finish a card, **delete your block** in the same commit. Nothing moves to a history file; git keeps it.
 - Update **Live state** when you start or stop a server, create a hosted resource, or change a remote.
 - Add to **Pitfalls** only a lesson that would change what the next agent does.
@@ -47,9 +47,9 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on FlipHopper.
 The agent raises this itself; the owner should not have to ask.
 
 - Remind the owner when context is **about 70% used** (Claude Code: `get_usage` → `context.percentUsed`; automatic summarising near the limit loses detail), or once past **half** at a natural break (card or task finished, waiting on the owner, nothing running, everything committed), or before a large new card when context is already heavy.
-- **How:** update your handoff block and your task's status with `fh`, commit and push (agents push after every commit — [AGENTS.md § Working procedure](../../AGENTS.md#working-procedure)), then tell the owner briefly: why now, that the handoff is committed, what is still running — and give the exact prompt for the new session, e.g.:
+- **How:** update your handoff block and your task's status with `alm`, commit and push (agents push after every commit — [AGENTS.md § Working procedure](../../AGENTS.md#working-procedure)), then tell the owner briefly: why now, that the handoff is committed, what is still running — and give the exact prompt for the new session, e.g.:
 
-  > Read AGENTS.md, then docs/TASK_BOARD.md, `fh show <card>` and your card, then docs/AGENT_HANDOFF.md (Active resume for `<card>`, Live state, Pitfalls), and continue with `<card>`: `<next action>`.
+  > Read AGENTS.md, then docs/TASK_BOARD.md, `alm show <card>` and your card, then docs/AGENT_HANDOFF.md (Active resume for `<card>`, Live state, Pitfalls), and continue with `<card>`: `<next action>`.
 
 - Do not start the next task in the same message; the owner decides whether to switch.
 
@@ -61,6 +61,6 @@ The agent raises this itself; the owner should not have to ask.
 - For **claude.ai (web) projects**: a local `CLAUDE.md` is not loaded automatically. Add `AGENTS.md`, this file and the current board as project knowledge, and paste an instruction to follow them. Never upload `.env` files, tokens or a whole working directory.
 - A switch preserves decisions, approvals, evidence and consumed attempts; it does not authorize repeating operations.
 
-## After FlipHopper can track itself (dogfooding)
+## After Allomos can track itself (dogfooding)
 
-**Decided by the owner, 2026-10-04:** FlipHopper's own tasks are Iteration 1's first real project. When Iteration 1 (v0.1, macOS) passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), FlipHopper's own cards move from Markdown into a seabag inside this repository. This workflow then changes: claims, labels and waiting-on are written with `fh` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Done 2026-10-06** ([`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md)), slightly ahead of the full exit check, at the owner's request: the seabag is authoritative and the rules are in [CARDS.md](./CARDS.md#where-status-lives).
+**Decided by the owner, 2026-10-04:** Allomos's own tasks are Iteration 1's first real project. When Iteration 1 (v0.1, macOS) passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), Allomos's own cards move from Markdown into a taskbag inside this repository. This workflow then changes: claims, labels and waiting-on are written with `alm` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Done 2026-10-06** ([`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md)), slightly ahead of the full exit check, at the owner's request: the taskbag is authoritative and the rules are in [CARDS.md](./CARDS.md#where-status-lives).

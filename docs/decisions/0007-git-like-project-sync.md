@@ -6,15 +6,15 @@
 
 ## In plain words
 
-The owner asked whether FlipHopper projects could work like code in Git: edit a project on your own machine, then **push** your changes to a shared cloud copy, **pull** other people's changes, and **merge** when you both changed the same thing. FlipHopper does that with real Git, storing each task as small readable text files. A database is only a fast index rebuilt from those files. **The owner approved this on 2026-10-04**, and it replaces decision 0001 (the database is the source of truth). Since [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), the desktop app is the hub, which would own the local Git copy.
+The owner asked whether Allomos projects could work like code in Git: edit a project on your own machine, then **push** your changes to a shared cloud copy, **pull** other people's changes, and **merge** when you both changed the same thing. Allomos does that with real Git, storing each task as small readable text files. A database is only a fast index rebuilt from those files. **The owner approved this on 2026-10-04**, and it replaces decision 0001 (the database is the source of truth). Since [0009](./0009-desktop-hub-with-web-and-mobile-companions.md), the desktop app is the hub, which would own the local Git copy.
 
-*Update 2026-10-04:* [0010](./0010-project-data-folder.md) lets a project's seabag sit inside an existing code repository. That repository's Git versions the task files, rather than FlipHopper creating a nested repository. Commit and push must run the user's installed `git` command (R76), not a separate Git implementation.
+*Update 2026-10-04:* [0010](./0010-project-data-folder.md) lets a project's taskbag sit inside an existing code repository. That repository's Git versions the task files, rather than Allomos creating a nested repository. Commit and push must run the user's installed `git` command (R76), not a separate Git implementation.
 
 ## Decision (owner, 2026-10-04)
 
-- **A project's data is readable text files** in its seabag ([0010](./0010-project-data-folder.md)): JSON for structured fields, Markdown for narrative text, one canonical record per task. **Git is the source of truth** and holds their history.
-- **Any database is only an index**: a cache kept outside the seabag, used for search, charts and speed, and rebuilt from the files at any time. It is never edited on its own.
-- **All Git actions run the user's `git` command** (R76). FlipHopper never commits or pushes unless the user asks (R75).
+- **A project's data is readable text files** in its taskbag ([0010](./0010-project-data-folder.md)): JSON for structured fields, Markdown for narrative text, one canonical record per task. **Git is the source of truth** and holds their history.
+- **Any database is only an index**: a cache kept outside the taskbag, used for search, charts and speed, and rebuilt from the files at any time. It is never edited on its own.
+- **All Git actions run the user's `git` command** (R76). Allomos never commits or pushes unless the user asks (R75).
 - **Accepted here:** this storage foundation. **Still proposals:** the file layout, the push/pull/merge experience, the merge rules, offline claims and approvals, and the cloud remote (sections below). They are to be prototyped with synthetic data in implementation cards, and the owner reviews them there.
 - This **supersedes [0001](./0001-database-source-of-truth.md)**. 0001's goals still hold: structured fields, one home for status, events recorded for every change, and no hand-maintained prose status.
 
@@ -37,7 +37,7 @@ A project remains usable without internet after it is available locally. Offline
 
 ## History and persistence
 
-Git stores the authoritative structured files and their revision history. A local or hosted database may index them for search, charts and UI performance, but it is rebuildable from a known Git revision and must not become an independently writable source of truth. GitHub could host a remote; FlipHopper could also provide its own authenticated Git service. Git is the storage/transport tool, while GitHub is one hosting choice.
+Git stores the authoritative structured files and their revision history. A local or hosted database may index them for search, charts and UI performance, but it is rebuildable from a known Git revision and must not become an independently writable source of truth. GitHub could host a remote; Allomos could also provide its own authenticated Git service. Git is the storage/transport tool, while GitHub is one hosting choice.
 
 Illustrative layout (not a finalized schema):
 
@@ -86,7 +86,7 @@ An approval applies to an exact operation and relevant target/revision, rather t
 
 Start with one shared main history per project, local change recording, explicit push/pull and field-level conflict resolution. Autosave can record local changes without asking users to make a manual commit after every task edit. Offer human-readable differences such as “you marked this verified; Alex added a failing check.” Add branches and proposal/review flows only when a demonstrated workflow requires them.
 
-The owner asked whether Git can be the foundation with structured folders and text files. It can supply version storage and push/pull transport, reducing the custom synchronization engine we would need to build. FlipHopper still needs schema validation, task-aware merge, permissions, atomic local writes and claim/approval handling. Prototype those domain rules first, in the implementation cards. A local runtime is needed to operate local Git and files; a hosted webpage alone does not establish that capability.
+The owner asked whether Git can be the foundation with structured folders and text files. It can supply version storage and push/pull transport, reducing the custom synchronization engine we would need to build. Allomos still needs schema validation, task-aware merge, permissions, atomic local writes and claim/approval handling. Prototype those domain rules first, in the implementation cards. A local runtime is needed to operate local Git and files; a hosted webpage alone does not establish that capability.
 
 ## Evidence and open questions
 

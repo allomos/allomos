@@ -1,6 +1,6 @@
 # AI-generated project setup
 
-**In plain words:** a team leader copies a prompt from FlipHopper and gives it, with their goals, to any AI agent. The agent writes the project's areas and tasks as files. FlipHopper checks the files, shows what it will create, and turns them into a working project. The workflow is accepted (R50–R51); the exact file format and checks are proposed.
+**In plain words:** a team leader copies a prompt from Allomos and gives it, with their goals, to any AI agent. The agent writes the project's areas and tasks as files. Allomos checks the files, shows what it will create, and turns them into a working project. The workflow is accepted (R50–R51); the exact file format and checks are proposed.
 
 Related interface contract: [INTERFACES.md](./INTERFACES.md). Its proposed shared command/validation layer covers generated-file adoption as well as graphical, CLI and MCP task edits.
 
@@ -8,18 +8,18 @@ A feature contract: accepted user workflow and proposed details, recorded 2026-1
 
 ## User outcome — accepted
 
-A team leader copies a prompt supplied by FlipHopper, adds the team's goals and relevant context, and gives it to an AI agent. The agent generates project/task data and files. FlipHopper reads or transforms that output into a usable project with areas, tasks, dependencies and the existing lists/charts.
+A team leader copies a prompt supplied by Allomos, adds the team's goals and relevant context, and gives it to an AI agent. The agent generates project/task data and files. Allomos reads or transforms that output into a usable project with areas, tasks, dependencies and the existing lists/charts.
 
-The team leader can use an external agent they already have. Generating a project is separate from starting an implementation agent session inside FlipHopper. Using the generated output locally must not require a FlipHopper account; publishing to a cloud project requires sign-in and an explicit user choice under [0006](../decisions/0006-local-and-cloud-projects.md).
+The team leader can use an external agent they already have. Generating a project is separate from starting an implementation agent session inside Allomos. Using the generated output locally must not require an Allomos account; publishing to a cloud project requires sign-in and an explicit user choice under [0006](../decisions/0006-local-and-cloud-projects.md).
 
 ## Proposed end-to-end flow
 
-1. **Get the prompt.** FlipHopper supplies a reusable generation prompt with the supported format version, field definitions, folder/file examples and instructions for unknown information. The leader adds goals, scope and source material.
+1. **Get the prompt.** Allomos supplies a reusable generation prompt with the supported format version, field definitions, folder/file examples and instructions for unknown information. The leader adds goals, scope and source material.
 2. **Generate files externally.** The chosen agent produces the documented data bundle. It can ask the leader to clarify missing context. The output is project data, not a generated indexing database.
-3. **Open or import in FlipHopper.** The leader selects the output folder or supported input files. The transport and exact interface are still to be designed.
-4. **Validate and preview.** FlipHopper checks the files and shows the proposed project, areas, tasks and dependencies. Errors identify the file/field and what needs correcting. Supported older formats may be converted explicitly; unsupported formats are reported.
+3. **Open or import in Allomos.** The leader selects the output folder or supported input files. The transport and exact interface are still to be designed.
+4. **Validate and preview.** Allomos checks the files and shows the proposed project, areas, tasks and dependencies. Errors identify the file/field and what needs correcting. Supported older formats may be converted explicitly; unsupported formats are reported.
 5. **Repair if necessary.** The leader can give the error report to the agent to correct the output, then validate again.
-6. **Accept the project.** After review, FlipHopper adopts or transforms the data through the selected storage adapter and builds its views/index. In the proposed Git design, valid native files become tracked project files; the index is derived and stays outside the synchronized content.
+6. **Accept the project.** After review, Allomos adopts or transforms the data through the selected storage adapter and builds its views/index. In the proposed Git design, valid native files become tracked project files; the index is derived and stays outside the synchronized content.
 7. **Share when chosen.** The project can remain local. Publishing is a separate authenticated cloud action; importing files does not publish them.
 
 These steps are a proposed user experience, not approval of UI controls or storage implementation.
@@ -39,7 +39,7 @@ JSON fields with Markdown descriptions in structured folders are the accepted st
 - A generated role name or approval record does not establish authority; permissions and approvals use the applicable authenticated/local trust rules.
 - Preserve the original input during conversion and report every unsupported or omitted field. Avoid partially adopting invalid bundles.
 - Re-importing the same bundle must not duplicate tasks; show a change preview and resolve conflicts with existing edits. Exact update semantics remain to be specified.
-- Local validation and transformation must work without a hosted AI model or FlipHopper cloud connection. The external agent may independently require its provider's network/authentication.
+- Local validation and transformation must work without a hosted AI model or Allomos cloud connection. The external agent may independently require its provider's network/authentication.
 
 ## Acceptance examples for a future implementation card
 

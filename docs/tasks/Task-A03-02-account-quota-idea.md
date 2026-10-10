@@ -4,13 +4,13 @@
 
 ## The idea (plain words)
 
-FlipHopper could show **how much of each AI agent account's quota is left** (Claude Code, Codex, several accounts) and **suggest when to switch** to another agent or account, before a session is cut off in the middle of a task. This serves the main set directly: switching between agents before the quota ends, instead of after.
+Allomos could show **how much of each AI agent account's quota is left** (Claude Code, Codex, several accounts) and **suggest when to switch** to another agent or account, before a session is cut off in the middle of a task. This serves the main set directly: switching between agents before the quota ends, instead of after.
 
 ## What a research card would find out
 
 - What each provider lets a program read: remaining usage, reset time, plan limits (official interfaces only; no scraping of web pages and no use of someone's sign-in cookies).
-- Whether the agent itself can report it (for example a usage command inside the session) so `fh` can record it with the task.
-- What "suggest a switch" would look like: a warning in the app, a note in the handoff, or a line in `fh next`.
+- Whether the agent itself can report it (for example a usage command inside the session) so `alm` can record it with the task.
+- What "suggest a switch" would look like: a warning in the app, a note in the handoff, or a line in `alm next`.
 
 ## Details for the worker
 

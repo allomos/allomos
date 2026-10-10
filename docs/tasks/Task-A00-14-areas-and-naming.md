@@ -1,6 +1,6 @@
 # Task-A00-14-areas-and-naming
 
-- **Outcome.** FlipHopper calls its "what part of the work" grouping an **area** (not a workstream). FlipHopper's own work is grouped into areas named after what users can do. Every card ID, link and document uses the new names. R89 (area and iteration as two axes) and R90 (each project can rename the terms) are accepted.
+- **Outcome.** Allomos calls its "what part of the work" grouping an **area** (not a workstream). Allomos's own work is grouped into areas named after what users can do. Every card ID, link and document uses the new names. R89 (area and iteration as two axes) and R90 (each project can rename the terms) are accepted.
 - **Decisive unknowns.** None. The owner decided on 2026-10-04.
 - **Files owned.** Every document and card file; card files are renamed to the new IDs.
 - **External operations.** None.
@@ -10,7 +10,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
-| 2026-10-04 | Regroup FlipHopper's work by user-facing capability; change the term "workstream" to "area"; accept R90 (renameable terms) | owner (chat) |
+| 2026-10-04 | Regroup Allomos's work by user-facing capability; change the term "workstream" to "area"; accept R90 (renameable terms) | owner (chat) |
 
 ## Notes
 

@@ -1,4 +1,4 @@
-# FlipHopper documentation
+# Allomos documentation
 
 **Agents:** start at [../AGENTS.md](../AGENTS.md). **People:** start with [product/PLAN.md](./product/PLAN.md) and [TASK_BOARD.md](./TASK_BOARD.md).
 
@@ -6,13 +6,13 @@
 
 | Where | What | Kind |
 |---|---|---|
-| [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the seabag (`../.fliphopper/seabag/`, read with `fh list` or the app). | status |
+| [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the taskbag (`../.allomos/taskbag/`, read with `alm list` or the app). | status |
 | [AGENT_HANDOFF.md](./AGENT_HANDOFF.md) | Restart mechanics for the next agent session: active resume, live state, pitfalls, current truth | handoff |
 | [tasks/](./tasks/) | One file per card: outcome, scope, approvals, notes | cards |
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
 | [product/REQUIREMENTS.md](./product/REQUIREMENTS.md) | Numbered requirements (R1…) cited by cards and tests | contract |
-| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → FlipHopper project; proposed validation/adoption rules | contract |
+| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Allomos project; proposed validation/adoption rules | contract |
 | [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
 | [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md) | Agent roles and effort, starting a session, handoff timing and contents, new-session rule, switching providers | contract |
@@ -24,7 +24,7 @@
 | [research/interface-patterns.md](./research/interface-patterns.md) | Internet evidence for human/agent interfaces, adaptive layouts, CLI/MCP, local access and platform packaging options | evidence |
 | [research/desktop-frameworks.md](./research/desktop-frameworks.md) | Detailed comparison of six desktop frameworks for decision 0011 (2026-10-04) | evidence |
 | [research/remote-access.md](./research/remote-access.md) | How companions reach the desktop from outside, and which service sends the pairing email (2026-10-07) | evidence |
-| [research/agent-launch-and-resume.md](./research/agent-launch-and-resume.md) | How FlipHopper can start Claude Code and Codex sessions and reopen them, per surface (2026-10-07) | evidence |
+| [research/agent-launch-and-resume.md](./research/agent-launch-and-resume.md) | How Allomos can start Claude Code and Codex sessions and reopen them, per surface (2026-10-07) | evidence |
 | [pitch/](./pitch/README.md) | Road show deck in English and Chinese: sources and published addresses | pitch |
 | [REFERENCES.md](./REFERENCES.md) | External projects and files to learn from (read-only) | reference |
 | [GLOSSARY.md](./GLOSSARY.md) | Plain meanings of terms | reference |
@@ -39,6 +39,6 @@
 
 ## Rules for documents
 
-- A new file only for a **contract**, **evidence**, a **decision record**, a **discussion record**, or material the owner asks for, such as the [road show deck](./pitch/README.md) ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes in the seabag, with `fh`.
+- A new file only for a **contract**, **evidence**, a **decision record**, a **discussion record**, or material the owner asks for, such as the [road show deck](./pitch/README.md) ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes in the taskbag, with `alm`.
 - Supersede by editing the stale line in place; do not add a companion document.
 - Evidence of what actually ran goes under `docs/research/` or `docs/evidence/`, linked from the card.

@@ -2,7 +2,7 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Accepted** | 2026-10-06 | 2026-10-06 | will.w.hui |
+| **Superseded** by [0015](./0015-product-name-allomos.md) (2026-10-10): the product is now Allomos, the folder the taskbag | 2026-10-06 | 2026-10-06 | will.w.hui |
 
 ## In plain words
 

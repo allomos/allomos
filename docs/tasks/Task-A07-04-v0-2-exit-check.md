@@ -9,7 +9,7 @@ v0.2 is finished when it works for real on both systems. The agent prepares the 
 | Piece | What it is | Where |
 |---|---|---|
 | The builds | The macOS and Windows builds from the pipeline ([`A07-02`](./Task-A07-02-build-pipeline.md)), from the same commit. | GitHub Actions run |
-| The check list | About 10 steps, each with what to do and what should happen: install (including the Windows "unknown publisher" warning), open a folder, see tasks by area and by iteration, open a task, edit it, add a task, see History, use `fh` in a terminal. | this card |
+| The check list | About 10 steps, each with what to do and what should happen: install (including the Windows "unknown publisher" warning), open a folder, see tasks by area and by iteration, open a task, edit it, add a task, see History, use `alm` in a terminal. | this card |
 | The results | Pass or fail for every step on each system, with notes and screenshots where something failed. | this card |
 
 **What you can see at the end:** this card lists every step as passed on the Mac and on Windows, and v0.2 is the first release that runs on both.

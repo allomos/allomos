@@ -4,13 +4,13 @@
 
 ## What gets built (plain words)
 
-Today the app and `fh` are built by hand on the owner's Mac, and nothing is ever built or tested on Windows. After this card, one **build pipeline** (an automatic job on GitHub) builds FlipHopper for **both** macOS and Windows from the same source whenever a branch is pushed: it runs all the checks on both systems and keeps the unsigned builds for download.
+Today the app and `alm` are built by hand on the owner's Mac, and nothing is ever built or tested on Windows. After this card, one **build pipeline** (an automatic job on GitHub) builds Allomos for **both** macOS and Windows from the same source whenever a branch is pushed: it runs all the checks on both systems and keeps the unsigned builds for download.
 
 | Piece | What it is | Where |
 |---|---|---|
-| The pipeline | A GitHub Actions workflow with one macOS and one Windows job. Each runs the six named checks, then builds the app and `fh`. | `.github/workflows/build.yml` |
-| macOS build | The unsigned app (`FlipHopper.app` in a `.dmg`) and `fh`. | download from the pipeline's run |
-| Windows build | The unsigned installer (`.msi` or `.exe`) and `fh.exe`. Windows will warn that the publisher is unknown until v1.0. | download from the pipeline's run |
+| The pipeline | A GitHub Actions workflow with one macOS and one Windows job. Each runs the six named checks, then builds the app and `alm`. | `.github/workflows/build.yml` |
+| macOS build | The unsigned app (`Allomos.app` in a `.dmg`) and `alm`. | download from the pipeline's run |
+| Windows build | The unsigned installer (`.msi` or `.exe`) and `alm.exe`. Windows will warn that the publisher is unknown until v1.0. | download from the pipeline's run |
 | How to get a build | A short section: where to download, how long builds are kept, the expected security warnings. | `docs/workflow/CODING_RULES.md` |
 
 **What you can see at the end:** push a branch; on GitHub, the run shows both systems' checks passing and offers a macOS and a Windows download.

@@ -7,14 +7,14 @@
 ## In plain words
 
 In the desktop app, you decide **where each project's data is stored**. It can be any folder:
-- a **folder of its own**, for example `~/FlipHopper/my-project`;
-- a **subfolder inside an existing project folder**, for example a `FlipHopper/` folder inside a code repository, so the tasks live right next to the code they describe.
+- a **folder of its own**, for example `~/Allomos/my-project`;
+- a **subfolder inside an existing project folder**, for example a `Allomos/` folder inside a code repository, so the tasks live right next to the code they describe.
 
-FlipHopper does not force all projects into one hidden app-data location.
+Allomos does not force all projects into one hidden app-data location.
 
-## Name: "seabag" (owner; "task box" 2026-10-04, renamed "seabag" 2026-10-06)
+## Name: "taskbag" (owner; "task box" 2026-10-04, renamed "taskbag" 2026-10-06)
 
-We call a project's folder the **seabag** — in the documents, the app's screens and the messages of the `fliphopper` command. **On disk, a new seabag always goes in `.fliphopper/seabag/`** inside the folder the user picks, at that folder's root like `.github/` or `.vscode/`. This holds also when the picked folder is empty, so agents, `fh` and the app look in one place only (owner, 2026-10-06, [0013](./0013-product-name-fliphopper.md); until then an empty folder became the seabag itself). `fh init` creates it there. The user still picks any writable folder (R72); a folder that already holds `project.json` directly is opened as it is.
+We call a project's folder the **taskbag** — in the documents, the app's screens and the messages of the `allomos` command. **On disk, a new taskbag always goes in `.allomos/taskbag/`** inside the folder the user picks, at that folder's root like `.github/` or `.vscode/`. This holds also when the picked folder is empty, so agents, `alm` and the app look in one place only (owner, 2026-10-06, [0013](./0013-product-name-fliphopper.md); until then an empty folder became the taskbag itself). `alm init` creates it there. The user still picks any writable folder (R72); a folder that already holds `project.json` directly is opened as it is.
 
 ## Owner's statement (2026-10-04)
 
@@ -24,10 +24,10 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 ## Decision
 
-- When creating or opening a local project, the user **chooses its seabag**. Any folder they can write to is allowed.
+- When creating or opening a local project, the user **chooses its taskbag**. Any folder they can write to is allowed.
 - Supported locations include a **standalone folder** and a **subfolder of an existing project folder**, such as a code repository.
-- The desktop app keeps a list of the projects it knows and their folders. Opening a folder that already holds FlipHopper data opens that project.
-- **Commit and push run the real `git` command** (owner, 2026-10-04). When FlipHopper commits or pushes a project's data, it calls the `git` program installed on the user's machine. It does not reimplement Git or use a separate Git library for these actions. In plain words: it does exactly what typing `git commit` / `git push` in a terminal would do. That means:
+- The desktop app keeps a list of the projects it knows and their folders. Opening a folder that already holds Allomos data opens that project.
+- **Commit and push run the real `git` command** (owner, 2026-10-04). When Allomos commits or pushes a project's data, it calls the `git` program installed on the user's machine. It does not reimplement Git or use a separate Git library for these actions. In plain words: it does exactly what typing `git commit` / `git push` in a terminal would do. That means:
   - the user's own Git settings apply: name and email, SSH keys, credential helpers;
   - the repository's hooks run (for example a pre-commit check), and a refusal from a hook is shown to the user, not bypassed;
   - the resulting history is ordinary Git history that any Git tool can read.
@@ -35,13 +35,13 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 ## Confirmed details (owner, 2026-10-04)
 
 - **Self-contained folder.** Everything that defines the project lives in its folder, so moving or copying the folder moves the project. Caches and indexes that can be rebuilt are kept outside it.
-- **Inside a Git repository** (for example, a subfolder of a code repo): FlipHopper uses that repository's Git and does not create a second repository nested inside.
-- **FlipHopper never commits or pushes unless the user asks.**
+- **Inside a Git repository** (for example, a subfolder of a code repo): Allomos uses that repository's Git and does not create a second repository nested inside.
+- **Allomos never commits or pushes unless the user asks.**
 - **One writer at a time.** Only one running desktop app writes to a folder at a time. A second one opens it read-only, or is refused.
 - **All Git actions use the `git` command**, not only commit and push: pull, status and diff too.
 - **If `git` is not installed**, the desktop app asks the user to install it. Projects stay usable without Git actions until then.
 - **Only standalone folders and subfolders of an existing project folder** are in scope. No special handling is planned for synced folders (Dropbox, iCloud), network drives or removable disks.
-- **One FlipHopper project per repository.** Several FlipHopper projects in different subfolders of one code repository are **out of scope**.
+- **One Allomos project per repository.** Several Allomos projects in different subfolders of one code repository are **out of scope**.
 
 ## Proposed detail (not yet confirmed)
 
