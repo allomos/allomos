@@ -20,10 +20,11 @@ const AGENT_KEY: Record<Agent["id"], Key> = {
   codex_app: "agents.codex_app",
 };
 
-/** The tools of one agent, in the order the first is chosen: the terminal before the app. */
+/** The tools of one agent, in the order the first is chosen: the app before the terminal
+ * (owner, 2026-10-10; until then the terminal came first). */
 const GROUPS: { name: string; tools: Agent["id"][] }[] = [
-  { name: "Claude", tools: ["claude_cli", "claude_app"] },
-  { name: "Codex", tools: ["codex_cli", "codex_app"] },
+  { name: "Claude", tools: ["claude_app", "claude_cli"] },
+  { name: "Codex", tools: ["codex_app", "codex_cli"] },
 ];
 
 /** Show "Looking for AI agents…" only when finding them is slow. */
