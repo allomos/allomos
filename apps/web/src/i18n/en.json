@@ -47,6 +47,7 @@
   "picker.title": "Choose a folder for the seabag",
   "language.label": "Language",
   "language.system": "Same as computer",
+  "banner.close": "Close",
   "notice.created_here": "Created an empty seabag in .fliphopper/seabag/ inside this empty folder.",
   "notice.created_here_readme": "Created an empty seabag in .fliphopper/seabag/ inside this empty folder, and README-fliphopper.md to say what the folder is.",
   "notice.created_nested": "Created an empty seabag in .fliphopper/seabag/.",

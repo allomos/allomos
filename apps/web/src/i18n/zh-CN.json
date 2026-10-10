@@ -47,6 +47,7 @@
   "picker.title": "为水手袋选择文件夹",
   "language.label": "语言",
   "language.system": "跟随系统",
+  "banner.close": "关闭",
   "notice.created_here": "已在这个空文件夹的 .fliphopper/seabag/ 中建立空的水手袋。",
   "notice.created_here_readme": "已在这个空文件夹的 .fliphopper/seabag/ 中建立空的水手袋，并写了 README-fliphopper.md 说明这个文件夹的用途。",
   "notice.created_nested": "已在 .fliphopper/seabag/ 中建立空的水手袋。",

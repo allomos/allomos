@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
@@ -323,7 +324,11 @@ export function App({ messenger }: { messenger: Messenger }) {
       </header>
 
       <main className="main">
-        {error && <p className="banner error">{noteText(error)}</p>}
+        {error && (
+          <Banner kind="error" onClose={() => setError(null)}>
+            {noteText(error)}
+          </Banner>
+        )}
         {opened?.loaded.seabag && (
           <AgentLine
             messenger={messenger}
@@ -332,9 +337,9 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
         {notices.map((n, i) => (
-          <p key={i} className="banner ok">
+          <Banner key={i} kind="ok" onClose={() => setNotices((list) => list.filter((_, j) => j !== i))}>
             {noteText(n)}
-          </p>
+          </Banner>
         ))}
         {agentsFor && (
           <AgentsPanel
@@ -400,6 +405,19 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {opened && <SeabagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
       </main>
+    </div>
+  );
+}
+
+/** A message above the task list, with a button that clears it (owner, 2026-10-10). */
+function Banner({ kind, onClose, children }: { kind: "ok" | "error"; onClose: () => void; children: ReactNode }) {
+  const { t } = useI18n();
+  return (
+    <div className={`banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+      <span>{children}</span>
+      <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={onClose}>
+        ×
+      </button>
     </div>
   );
 }

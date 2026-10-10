@@ -47,6 +47,7 @@
   "picker.title": "シーバッグのフォルダーを選ぶ",
   "language.label": "言語",
   "language.system": "システムに合わせる",
+  "banner.close": "閉じる",
   "notice.created_here": "この空のフォルダーの .fliphopper/seabag/ に空のシーバッグを作りました。",
   "notice.created_here_readme": "この空のフォルダーの .fliphopper/seabag/ に空のシーバッグを作り、フォルダーの説明として README-fliphopper.md を書きました。",
   "notice.created_nested": ".fliphopper/seabag/ に空のシーバッグを作りました。",
