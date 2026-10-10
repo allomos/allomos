@@ -1,7 +1,8 @@
 {
   "area": "A07",
+  "holder": "claude/a07-06-installer-alm",
   "id": "A07-06",
   "iteration": "I02",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Windows installer installs alm"
 }
