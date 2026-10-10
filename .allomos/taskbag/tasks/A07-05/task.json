@@ -1,6 +1,7 @@
 {
   "area": "A07",
   "id": "A07-05",
+  "iteration": "I02",
   "state": "ready",
   "title": "Windows: no console flashes, agents found and asked"
 }
