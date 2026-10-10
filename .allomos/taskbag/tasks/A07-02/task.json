@@ -3,7 +3,7 @@
   "holder": "claude/a07-02-script-run",
   "id": "A07-02",
   "iteration": "I02",
-  "label": "locally verified",
+  "label": "owner verified",
   "next_dependency": "owner runs the Windows build script once",
   "state": "in_progress",
   "title": "Windows build script on the Mac"
