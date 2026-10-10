@@ -28,3 +28,4 @@
 | 2026-10-11 | The request itself | owner (chat) |
 
 ## Notes
+- 2026-10-11 — Built and used: `alm title` and `alm project` (tests: holder rule, empty title, unknown task, invalid ID; Rust fmt, clippy, all tests PASS). Board renamed to **Allomos** (`allomos`); A03-07 → "Renew Allomos's section in AGENTS.md after an upgrade", A07-03 → "Allomos works on Windows"; `.gitignore` comment; A07-02's repository name; FILE-FORMAT, PLAN, REQUIREMENTS R87–R88 and AGENT_HANDOFF now cite 0015. A03-08's finished next-dependency note cleared. Left on purpose on the board: A00-17 "Rename to FlipHopper" (history) and this card's own title. Waiting on the owner: the test-folder path and the old script.
