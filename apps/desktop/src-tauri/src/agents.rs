@@ -4,6 +4,7 @@
 //!
 //! [`Task-A03-03`]: ../../../../docs/tasks/Task-A03-03-app-asks-agents-to-set-up.md
 
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -23,6 +24,30 @@ pub struct Agent {
     pub how: String,
 }
 
+/// A program started without a window. On Windows a windowed app's command-line child (`git`,
+/// `claude --version`) otherwise gets a console window that flashes on screen ([`Task-A07-05`]).
+///
+/// [`Task-A07-05`]: ../../../../docs/tasks/Task-A07-05-windows-agents-no-flash.md
+pub fn command(program: impl AsRef<OsStr>) -> Command {
+    #[allow(unused_mut)]
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
+/// The person's home folder: `HOME`, or `USERPROFILE` on Windows.
+fn home() -> PathBuf {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_default()
+}
+
 /// Folders where command-line tools usually live. A macOS app does not get the person's shell
 /// path, so these are searched besides `PATH`.
 fn tool_dirs(home: &Path) -> Vec<PathBuf> {
@@ -36,25 +61,56 @@ fn tool_dirs(home: &Path) -> Vec<PathBuf> {
         ".bun/bin",
         ".cargo/bin",
     ] {
-        dirs.push(home.join(d));
+        dirs.push(
+            d.split('/')
+                .fold(home.to_path_buf(), |p, part| p.join(part)),
+        );
     }
-    dirs.push("/opt/homebrew/bin".into());
-    dirs.push("/usr/local/bin".into());
+    if cfg!(windows) {
+        // Where npm, pnpm and WinGet put the commands they install.
+        for (var, sub) in [
+            ("APPDATA", &["npm"][..]),
+            ("LOCALAPPDATA", &["pnpm"][..]),
+            ("LOCALAPPDATA", &["Microsoft", "WinGet", "Links"][..]),
+        ] {
+            if let Some(base) = std::env::var_os(var) {
+                dirs.push(sub.iter().fold(PathBuf::from(base), |p, part| p.join(part)));
+            }
+        }
+    } else {
+        dirs.push("/opt/homebrew/bin".into());
+        dirs.push("/usr/local/bin".into());
+    }
     dirs
+}
+
+/// The file names a command called `name` may have: on Windows a program (`claude.exe`) or the
+/// script npm writes for it (`codex.cmd`); elsewhere just the name.
+fn tool_names(name: &str, windows: bool) -> Vec<String> {
+    if windows {
+        ["exe", "cmd", "bat"]
+            .iter()
+            .map(|ext| format!("{name}.{ext}"))
+            .collect()
+    } else {
+        vec![name.to_string()]
+    }
 }
 
 /// The first `name` executable in `dirs` that answers `--version` (so a broken install is not offered).
 fn find_tool(name: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
+    let names = tool_names(name, cfg!(windows));
     dirs.iter()
-        .map(|d| d.join(name))
+        .flat_map(|d| names.iter().map(move |n| d.join(n)))
         .filter(|p| p.is_file())
         // Asked twice: a tool updating itself can fail its first answer (seen once with `claude`).
         .find(|p| runs(p) || runs(p))
 }
 
 fn runs(program: &Path) -> bool {
-    let Ok(mut child) = Command::new(program)
+    let Ok(mut child) = command(program)
         .arg("--version")
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -75,7 +131,7 @@ fn runs(program: &Path) -> bool {
 
 /// The URL schemes an app bundle says it opens (from its `Info.plist`, read with `plutil`).
 fn app_schemes(app: &Path) -> Vec<String> {
-    let Ok(out) = Command::new("/usr/bin/plutil")
+    let Ok(out) = command("/usr/bin/plutil")
         .args(["-convert", "json", "-o", "-"])
         .arg(app.join("Contents/Info.plist"))
         .output()
@@ -134,19 +190,81 @@ fn app_name(app: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// The agents found on this computer. macOS only for now (Windows arrives in Iteration 2).
+/// The app Windows opens `scheme://` links with, as the person would name it (`Claude`), read
+/// from the registry with `reg` (which looks at the person's own and the computer's settings).
+fn registered_app(scheme: &str) -> Option<String> {
+    let out = command("reg")
+        .args([
+            "query",
+            &format!(r"HKCR\{scheme}\shell\open\command"),
+            "/ve",
+        ])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let value = reg_default_value(&String::from_utf8_lossy(&out.stdout))?;
+    let name = program_name(&value)?;
+    let mut chars = name.chars();
+    let first = chars.next()?;
+    Some(first.to_uppercase().chain(chars).collect())
+}
+
+/// The default value in `reg query … /ve` output: the text after its type on the value's line.
+/// The value's own name (`(Default)`) is translated on some systems, so the type is looked for.
+fn reg_default_value(output: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        ["REG_EXPAND_SZ", "REG_SZ"].iter().find_map(|kind| {
+            let (_, rest) = line.split_once(&format!("    {kind}    "))?;
+            let rest = rest.trim();
+            (!rest.is_empty()).then(|| rest.to_string())
+        })
+    })
+}
+
+/// The program's file name without `.exe` in a Windows command line such as
+/// `"C:\Program Files\Claude\claude.exe" --open-url "%1"`.
+fn program_name(command_line: &str) -> Option<String> {
+    let program = match command_line.strip_prefix('"') {
+        Some(rest) => rest.split('"').next()?,
+        None => {
+            let lower = command_line.to_lowercase();
+            match lower.find(".exe") {
+                Some(i) => &command_line[..i + 4],
+                None => command_line.split_whitespace().next()?,
+            }
+        }
+    };
+    let file = program.rsplit(['\\', '/']).next()?;
+    let stem = file
+        .strip_suffix(".exe")
+        .or_else(|| file.strip_suffix(".EXE"))
+        .unwrap_or(file);
+    (!stem.is_empty()).then(|| stem.to_string())
+}
+
+/// The app that opens `scheme://` links, by name: on macOS from the Applications folders, on
+/// Windows from the registry.
+fn link_app(scheme: &str, home: &Path) -> Option<String> {
+    if cfg!(windows) {
+        registered_app(scheme)
+    } else {
+        let apps = [PathBuf::from("/Applications"), home.join("Applications")];
+        find_app(scheme, &apps).map(|app| app_name(&app))
+    }
+}
+
+/// The agents found on this computer (macOS and Windows).
 pub fn find_agents() -> Vec<Agent> {
-    if !cfg!(target_os = "macos") {
+    if !cfg!(any(target_os = "macos", windows)) {
         return Vec::new();
     }
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_default();
+    let home = home();
     let tools = tool_dirs(&home);
-    let apps = [PathBuf::from("/Applications"), home.join("Applications")];
     let mut agents = Vec::new();
     if let Some(claude) = find_tool("claude", &tools) {
-        let how = if find_app("claude-cli", &apps).is_some() {
+        let how = if link_app("claude-cli", &home).is_some() {
             "link"
         } else {
             "paste"
@@ -157,10 +275,10 @@ pub fn find_agents() -> Vec<Agent> {
             how: how.into(),
         });
     }
-    if let Some(app) = find_app("claude", &apps) {
+    if let Some(app) = link_app("claude", &home) {
         agents.push(Agent {
             id: "claude_app".into(),
-            found: app_name(&app),
+            found: app,
             how: "link".into(),
         });
     }
@@ -171,10 +289,10 @@ pub fn find_agents() -> Vec<Agent> {
             how: "paste".into(),
         });
     }
-    if let Some(app) = find_app("codex", &apps) {
+    if let Some(app) = link_app("codex", &home) {
         agents.push(Agent {
             id: "codex_app".into(),
-            found: app_name(&app),
+            found: app,
             how: "link".into(),
         });
     }
@@ -192,7 +310,7 @@ pub struct LastUse {
 
 /// Read the taskbag's Git history (read-only) for the newest commit with an `Agent:` line.
 pub fn last_agent_use(taskbag: &Path) -> Option<LastUse> {
-    let out = Command::new("git")
+    let out = command("git")
         .arg("-C")
         .arg(taskbag)
         .args(["log", "-n", "200", "--format=%ct%x1f%B%x1e", "--", "."])
@@ -295,31 +413,51 @@ fn ask_failed(agent: &str, detail: impl ToString) -> Problem {
     }
 }
 
-/// Open one agent in `project` with `request`: through its link, or in a new Terminal window
-/// with the request on the clipboard.
-pub fn ask(agent: &str, project: &Path, request: &str, how: &str) -> Result<(), Problem> {
-    if !cfg!(target_os = "macos") {
-        return Err(ask_failed(agent, "not available on this system yet"));
+/// PowerShell's quoting: single quotes, with each quote inside doubled (PowerShell also takes
+/// the typographic single quotes as quotes).
+fn powershell_quote(text: &str) -> String {
+    let mut out = String::from("'");
+    for c in text.chars() {
+        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}') {
+            out.push(c);
+        }
+        out.push(c);
     }
-    if how == "link" {
-        if let Some(url) = link(agent, project, request) {
-            return Command::new("open")
-                .arg(url)
-                .status()
-                .map_err(|e| ask_failed(agent, e))
-                .and_then(|s| {
-                    s.success()
-                        .then_some(())
-                        .ok_or_else(|| ask_failed(agent, "the link did not open"))
-                });
+    out.push('\'');
+    out
+}
+
+/// Open one agent in `project` with `request`: through its link, or in a new terminal window
+/// with the request on the clipboard.
+pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> {
+    let id = agent.id.as_str();
+    if !cfg!(any(target_os = "macos", windows)) {
+        return Err(ask_failed(id, "not available on this system yet"));
+    }
+    if agent.how == "link" {
+        if let Some(url) = link(id, project, request) {
+            return open_link(&url).map_err(|e| ask_failed(id, e));
         }
     }
-    let program = match agent {
+    let program = match id {
         "claude_cli" => "claude",
         "codex_cli" => "codex",
-        _ => return Err(ask_failed(agent, "no way to open it")),
+        _ => return Err(ask_failed(id, "no way to open it")),
     };
-    copy_to_clipboard(request).map_err(|e| ask_failed(agent, e))?;
+    copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
+    if cfg!(windows) {
+        // The tool found, by its full path: a new window does not always get the same `PATH`.
+        let script = format!(
+            "Set-Location -LiteralPath {}; & {}",
+            powershell_quote(&project.display().to_string()),
+            powershell_quote(&agent.found)
+        );
+        return new_console("powershell.exe")
+            .args(["-NoExit", "-NoLogo", "-Command", &script])
+            .spawn()
+            .map(drop)
+            .map_err(|e| ask_failed(id, e));
+    }
     let script = format!(
         "tell application \"Terminal\"\nactivate\ndo script {}\nend tell",
         applescript_string(&format!(
@@ -327,27 +465,69 @@ pub fn ask(agent: &str, project: &Path, request: &str, how: &str) -> Result<(), 
             shell_quote(&project.display().to_string())
         ))
     );
-    Command::new("/usr/bin/osascript")
+    command("/usr/bin/osascript")
         .args(["-e", &script])
         .status()
-        .map_err(|e| ask_failed(agent, e))
+        .map_err(|e| ask_failed(id, e))
         .and_then(|s| {
             s.success()
                 .then_some(())
-                .ok_or_else(|| ask_failed(agent, "Terminal did not open"))
+                .ok_or_else(|| ask_failed(id, "Terminal did not open"))
         })
+}
+
+/// Open `url` with the app the system has for its scheme.
+fn open_link(url: &str) -> Result<(), String> {
+    if cfg!(windows) {
+        // Windows' own handler for links; it reports no useful exit status, so starting it counts.
+        return command("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", url])
+            .spawn()
+            .map(drop)
+            .map_err(|e| e.to_string());
+    }
+    let status = command("open")
+        .arg(url)
+        .status()
+        .map_err(|e| e.to_string())?;
+    status
+        .success()
+        .then_some(())
+        .ok_or_else(|| "the link did not open".to_string())
+}
+
+/// A program started in a console window of its own, for the person to use (Windows).
+fn new_console(program: &str) -> Command {
+    #[allow(unused_mut)]
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+        command.creation_flags(CREATE_NEW_CONSOLE);
+    }
+    command
+}
+
+/// `text` as Windows' `clip` reads Unicode: UTF-16 with a byte-order mark. Without the mark it
+/// reads the console's code page, which turns Chinese and Japanese into question marks.
+fn utf16_with_bom(text: &str) -> Vec<u8> {
+    let mut bytes = vec![0xFF, 0xFE];
+    bytes.extend(text.encode_utf16().flat_map(u16::to_le_bytes));
+    bytes
 }
 
 fn copy_to_clipboard(text: &str) -> std::io::Result<()> {
     use std::io::Write;
-    let mut child = Command::new("/usr/bin/pbcopy")
+    let (program, bytes) = if cfg!(windows) {
+        ("clip.exe", utf16_with_bom(text))
+    } else {
+        ("/usr/bin/pbcopy", text.as_bytes().to_vec())
+    };
+    let mut child = command(program)
         .stdin(std::process::Stdio::piped())
         .spawn()?;
-    child
-        .stdin
-        .take()
-        .expect("piped stdin")
-        .write_all(text.as_bytes())?;
+    child.stdin.take().expect("piped stdin").write_all(&bytes)?;
     child.wait().map(drop)
 }
 
@@ -446,6 +626,40 @@ mod tests {
     fn quoting_survives_quotes() {
         assert_eq!(shell_quote("it's"), r"'it'\''s'");
         assert_eq!(applescript_string(r#"a "b" \c"#), r#""a \"b\" \\c""#);
+        assert_eq!(
+            powershell_quote(r"C:\Users\O'Neil\my proj"),
+            r"'C:\Users\O''Neil\my proj'"
+        );
+        assert_eq!(powershell_quote("a\u{2019}b"), "'a\u{2019}\u{2019}b'");
+    }
+
+    #[test]
+    fn windows_tools_are_programs_or_npm_scripts() {
+        assert_eq!(
+            tool_names("codex", true),
+            ["codex.exe", "codex.cmd", "codex.bat"]
+        );
+        assert_eq!(tool_names("codex", false), ["codex"]);
+    }
+
+    #[test]
+    fn link_registrations_name_their_app() {
+        let out = "\r\nHKEY_CLASSES_ROOT\\claude\\shell\\open\\command\r\n    (Default)    REG_SZ    \"C:\\Users\\王\\AppData\\Local\\AnthropicClaude\\claude.exe\" --protocol-launcher \"%1\"\r\n\r\n";
+        let value = reg_default_value(out).unwrap();
+        assert!(value.starts_with("\"C:\\Users\\"));
+        assert_eq!(program_name(&value).as_deref(), Some("claude"));
+        // A translated value name and an unquoted path with spaces.
+        let out =
+            "    (默认)    REG_EXPAND_SZ    %LOCALAPPDATA%\\Programs\\Codex App\\Codex.exe %1\r\n";
+        let value = reg_default_value(out).unwrap();
+        assert_eq!(program_name(&value).as_deref(), Some("Codex"));
+        assert_eq!(reg_default_value("ERROR: not found"), None);
+        assert_eq!(reg_default_value("    (Default)    REG_SZ    \r\n"), None);
+    }
+
+    #[test]
+    fn windows_clipboard_text_is_utf16_with_a_mark() {
+        assert_eq!(utf16_with_bom("a中"), [0xFF, 0xFE, b'a', 0, 0x2D, 0x4E]);
     }
 }
 
