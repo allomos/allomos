@@ -4,7 +4,7 @@
   "id": "A07-02",
   "iteration": "I02",
   "label": "locally verified",
-  "next_dependency": "owner approves the card and running it on GitHub Actions",
+  "next_dependency": "owner runs the Windows build script once",
   "state": "in_progress",
   "title": "Windows build script on the Mac"
 }
