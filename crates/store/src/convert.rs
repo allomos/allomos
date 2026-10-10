@@ -53,7 +53,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
 5. 只用 `fh` 写水手袋，绝不手工编辑它的文件。{create}然后每个领域 `fh add area <id> \"<名称>\"`，每个任务 `fh add task <id> --area <id> --title \"<标题>\" --description \"Card: [<路径>]({up}<从项目文件夹起的路径>)\"`（卡片是大文件中的一节时，链接到 `文件.md#节`）。
 6. 照文件所写原样复制状态：`fh --as <负责人> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。只复制写明的内容：不明的状态、日期或负责人保持不明，并写进报告；绝不编造进度、验证或批准。批准和状态说明留在卡片文件里。`fh` 还记不下的值（完成日期、依赖、优先级等）也写进报告。
 7. 写一份简短报告 `docs/fliphopper-conversion.md`：每个卡片文件和它对应的任务 ID，没有遗漏或重复；每个无法复制的值，注明文件和行；没有搬过来的计划工作。运行 `fh list --json`，确认没有 issues。
-8. 切换说明。在 AGENTS.md 中，用 FlipHopper 的一节（`fh brief` 的输出，见最后一行）替换关于状态存放位置、如何认领和释放、会话登记表、重新生成看板的规则；其他规则一字不改。确保 CLAUDE.md 包含一行 @AGENTS.md。给用户看改动。
+8. 切换说明。在 AGENTS.md 中，用 FlipHopper 的一节（`fh brief` 的输出，见最后一行）替换关于状态存放位置、如何认领和释放、会话登记表、重新生成看板的规则；其他规则一字不改。确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md）。给用户看改动。
 9. 列出、但不要执行收尾工作：说出仍然保存旧状态的东西（卡片文件里的状态表、生成的看板段落、生成看板的脚本、强制它们的钩子和 CI 检查），并问用户是否以及何时删除。用户同意之前保持原样。
 10. 告诉用户改了什么，以及还在等他们决定的事。
 
@@ -78,7 +78,7 @@ pub fn agent_convert_request_in(language: &str, project_path: &Path, seabag_path
 5. シーバッグは `fh` だけで書き、ファイルを手で編集しません。{create}続いてエリアごとに `fh add area <id> \"<名前>\"`、タスクごとに `fh add task <id> --area <id> --title \"<題名>\" --description \"Card: [<パス>]({up}<プロジェクトのフォルダーからのパス>)\"`（カードが大きなファイルの一節なら `ファイル.md#節` へリンク）。
 6. 状況はファイルに書かれているとおりに写します：`fh --as <担当者> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。書かれていることだけを写し、わからない状況・日付・担当者はわからないままにしてレポートに書きます。進捗、検証、承認を作り出してはいけません。承認と状況の説明文はカードのファイルに残します。`fh` がまだ記録できない値（完了日、依存関係、優先度など）もレポートに書きます。
 7. 短いレポート `docs/fliphopper-conversion.md` を書きます：カードのファイルごとに対応するタスク ID（抜けも重複もないこと）、写せなかった値とそのファイルと行、移さなかった予定の作業。`fh list --json` を実行し、issues がないことを確かめます。
-8. 説明を切り替えます。AGENTS.md で、状況の置き場所、担当の取り方と手放し方、セッション一覧、ボードの再生成についてのルールを、FlipHopper の節（`fh brief` の出力。最後の行を参照）で置き換えます。ほかのルールは一字も変えません。CLAUDE.md に @AGENTS.md という行があることを確かめます。差分をユーザーに見せます。
+8. 説明を切り替えます。AGENTS.md で、状況の置き場所、担当の取り方と手放し方、セッション一覧、ボードの再生成についてのルールを、FlipHopper の節（`fh brief` の出力。最後の行を参照）で置き換えます。ほかのルールは一字も変えません。CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます。差分をユーザーに見せます。
 9. 切り替えの後片付けは、挙げるだけで実行しません：古い状況をまだ持っているもの（カードのファイルの状況表、生成されるボードの節、ボードを生成するスクリプト、それを強制するフックや CI のチェック）を挙げ、消すかどうか、いつ消すかをユーザーに尋ねます。ユーザーが同意するまでそのままにします。
 10. 何を変えたか、何がユーザーの判断を待っているかを伝えます。
 
@@ -132,7 +132,8 @@ became, nothing dropped or duplicated; every value that could not be copied, wit
 line; planned work left out. Run `fh list --json` and confirm it reports no issues.
 8. Switch the instructions over. In AGENTS.md, replace the rules about where status lives, how \
 to claim and release, session registries and regenerating the board with FlipHopper's section \
-(the output of `fh brief`, see the last line); keep every other rule word for word. Make sure CLAUDE.md contains the line @AGENTS.md. \
+(the output of `fh brief`, see the last line); keep every other rule word for word. Make sure CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by \
+AGENTS.md). \
 Show the person the diff.
 9. List, do not do, the cut-over: name what still holds the old status (status tables in card \
 files, generated board sections, board-generator scripts, hooks and CI checks that enforce \
@@ -175,6 +176,10 @@ mod tests {
             assert!(r.contains(&format!("v{CONVERT_REQUEST_VERSION}")));
             // The section comes from `fh brief`; the request carries no copy of it.
             assert!(!r.contains("fh claim <id>"), "{language}");
+            assert!(
+                !r.contains('@'),
+                "the Claude app shows a typed-in @ as ＠: {language}"
+            );
         }
         let en = agent_convert_request_in("en", &project, &seabag);
         assert!(en.contains("Look first, change nothing."));

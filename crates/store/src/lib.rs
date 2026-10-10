@@ -246,7 +246,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
 1. 打开 AGENTS.md（如果没有就新建）。
 2. 如果 AGENTS.md 已经有关于 FlipHopper 的说明（例如标题为“{heading}”的一节，或其他关于 FlipHopper 或 `fh` 的文字），用 FlipHopper 的一节（见最后一行）替换它们；否则添加这一节。
 3. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 FlipHopper，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
-4. 确保 CLAUDE.md 包含一行 @AGENTS.md，让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
+4. 确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
 5. 告诉用户你改了什么。
 
 {source}"
@@ -262,7 +262,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
 1. AGENTS.md を開きます（なければ作成します）。
 2. AGENTS.md にすでに FlipHopper の説明（たとえば「{heading}」という見出しの節や、FlipHopper または `fh` についてのほかの文）があれば、FlipHopper の節（最後の行を参照）で置き換えます。なければその節を追加します。
 3. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう FlipHopper を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
-4. CLAUDE.md に @AGENTS.md という行があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
+4. CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
 5. 何を変えたかをユーザーに見せてください。
 
 {source}"
@@ -282,7 +282,8 @@ FlipHopper's section (see the last line). Otherwise add that section.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
-4. Make sure CLAUDE.md contains the line @AGENTS.md, so Claude Code reads AGENTS.md (create \
+4. Make sure CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by \
+AGENTS.md), so Claude Code reads AGENTS.md (create \
 CLAUDE.md with just that line if it is missing). Do not copy the section into CLAUDE.md.
 5. Show the user what you changed.
 
@@ -1062,7 +1063,9 @@ mod tests {
     #[test]
     fn agent_setup_request_carries_the_section_and_steps() {
         let r = agent_setup_request(Path::new("/p"), Path::new("/p/.fliphopper/seabag"));
-        assert!(r.contains("1. Open AGENTS.md") && r.contains("@AGENTS.md"));
+        assert!(r.contains("1. Open AGENTS.md") && r.contains("imports AGENTS.md"));
+        // The Claude app turns a typed-in "@" into a full-width "＠", so the request avoids it.
+        assert!(!r.contains('@'));
         assert!(
             r.contains("Project folder: /p\n")
                 && r.contains("task files): /p/.fliphopper/seabag\n")
