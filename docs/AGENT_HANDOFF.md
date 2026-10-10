@@ -36,14 +36,6 @@ Updated: 2026-10-04
 
 One block per card that `fh list --state in_progress` shows held.
 
-### Task-A05-02 — claude/a05-02-convert-project
-- Checkout: `.claude/worktrees/a05-02` · branch `claude/a05-02-convert-project` · **merged into `main` 2026-10-10** · pushed: yes
-- Approvals in force: the card and the open-folder flow, local work only. Not approved: any write to the SSR repository.
-- Uncommitted: none
-- Running: the built app (this worktree's `target/debug/bundle/macos/FlipHopper.app`) on `~/fliphopper-tests/a05-02-check-board` for the owner's manual check; safe to quit
-- Waiting: the owner's manual check (card § Owner's manual check). The session "Fliphopper app name" (A00-21 Allomos, A01-20 taskbag) was asked to wait for our message before renaming; send it the merge facts when A05-02 is done
-- Pitfall: `project_folder` in project.json needs `fh` from `main` at or after this merge; reinstall with `cargo install --locked --path crates/cli` from a worktree on `main`
-
 ## Live state
 
 Checked 2026-10-08.

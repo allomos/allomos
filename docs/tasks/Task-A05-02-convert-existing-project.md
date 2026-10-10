@@ -81,6 +81,7 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-10 | Owner's manual check passed: open-folder flow, tell agents, moving tasks with one question (v4), tasks beside the code, adding a task, task links, message close buttons, header line, trust hint ("passed") | owner (chat) |
 | 2026-10-09 | Open-folder flow decisions accepted ("ok", "yes"): empty new seabag; "Not now" holds until the folder is opened again; Change… re-records the project folder; the AGENTS.md section names the seabag when it is outside the project folder; `fh labels`; conversion request version 3 | owner (chat) |
 | 2026-10-09 | Open-folder flow specified (now [OPEN-FOLDER-FLOW.md](../product/OPEN-FOLDER-FLOW.md)); the popup lives in the app; the app no longer looks for boards | owner (chat) |
 | 2026-10-08 | Card approved; "drop A05-01 and implement it in a work tree" | owner (chat) |
@@ -189,3 +190,5 @@ In a new agent session in the project folder: "Add a task: …". The agent reads
 |---|---|
 | **Real agent trial** on a fresh copy (`~/fliphopper-tests/a05-02-v4-trial`), with a stand-in answering Go ahead: no questions in the chat; one plan in the popup (mapping, decisions, AGENTS.md change, old status to remove, branch and merge); then 3 areas and 5 tasks (A01-02 "no card yet" in backlog), AGENTS.md switched, old status removed, one commit on `fliphopper/convert` merged into `master` as `50a8a0f` (`--no-ff`), branch deleted, clean tree, nothing pushed, and the undo command given | PASS |
 | Owner: a moved task's card link opens the card file | PASS (owner) |
+
+- 2026-10-10 — **Done.** The owner's manual check passed; merged into `main`.
