@@ -180,21 +180,20 @@ more, ask `fh` rather than guessing: `fh guide terms` (what they mean), `fh guid
     )
 }
 
-/// The line before the section's copy in a request: the agent takes the section from
-/// `fh brief`, so it always matches the installed `fh`; the copy is for when `fh` cannot run
-/// where the agent works.
+/// The last line of a request: the agent takes FlipHopper's section from `fh brief`, so it always
+/// matches the installed `fh`. `fh` must be usable where the agent works (owner, 2026-10-10), so
+/// the request carries no copy of the section.
 pub(crate) fn section_source(language: &str, seabag: &Path) -> String {
     let brief = format!("fh --seabag \"{}\" brief", seabag.display());
     match language {
         "zh-CN" => format!(
-            "这一节的内容：运行 `{brief}`，把它的输出原样（英文）作为这一节。只有在那里无法运行 `fh` 时，才使用下面的副本："
+            "FlipHopper 的一节就是 `{brief}` 的输出：运行它，把输出原样（英文）作为这一节。"
         ),
         "ja" => format!(
-            "節の内容：`{brief}` を実行し、その出力をそのまま（英語のまま）この節にします。そこで `fh` を実行できない場合だけ、下の写しを使います："
+            "FlipHopper の節は `{brief}` の出力です。実行して、その出力をそのまま（英語のまま）節にします。"
         ),
         _ => format!(
-            "The section's text: run `{brief}` and use its output exactly as it is. Only if `fh` \
-cannot run there, use this copy:"
+            "FlipHopper's section is what `{brief}` prints: run it and use its output exactly as it is."
         ),
     }
 }
@@ -245,7 +244,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
 在项目文件夹中：
 
 1. 打开 AGENTS.md（如果没有就新建）。
-2. 如果 AGENTS.md 已经有关于 FlipHopper 的说明（例如标题为“{heading}”的一节，或其他关于 FlipHopper 或 `fh` 的文字），用下面这一节替换它们；否则添加下面这一节。
+2. 如果 AGENTS.md 已经有关于 FlipHopper 的说明（例如标题为“{heading}”的一节，或其他关于 FlipHopper 或 `fh` 的文字），用 FlipHopper 的一节（见最后一行）替换它们；否则添加这一节。
 3. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 FlipHopper，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
 4. 确保 CLAUDE.md 包含一行 @AGENTS.md，让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
 5. 告诉用户你改了什么。
@@ -261,7 +260,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: 
 プロジェクトのフォルダーで：
 
 1. AGENTS.md を開きます（なければ作成します）。
-2. AGENTS.md にすでに FlipHopper の説明（たとえば「{heading}」という見出しの節や、FlipHopper または `fh` についてのほかの文）があれば、下の節で置き換えます。なければ下の節を追加します。
+2. AGENTS.md にすでに FlipHopper の説明（たとえば「{heading}」という見出しの節や、FlipHopper または `fh` についてのほかの文）があれば、FlipHopper の節（最後の行を参照）で置き換えます。なければその節を追加します。
 3. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう FlipHopper を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
 4. CLAUDE.md に @AGENTS.md という行があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
 5. 何を変えたかをユーザーに見せてください。
@@ -279,7 +278,7 @@ In the project folder:
 1. Open AGENTS.md (create it if it is missing).
 2. If AGENTS.md already has FlipHopper instructions (for example a section headed \
 \"{heading}\", or any other text about FlipHopper or `fh`), replace them with the \
-section below. Otherwise add the section below.
+FlipHopper's section (see the last line). Otherwise add that section.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
@@ -290,10 +289,7 @@ CLAUDE.md with just that line if it is missing). Do not copy the section into CL
 {source}"
         ),
     };
-    format!(
-        "{steps}\n\n{}",
-        agent_section_for(project_path, seabag_path)
-    )
+    format!("{steps}\n")
 }
 
 /// Add FlipHopper's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
@@ -1052,7 +1048,10 @@ mod tests {
                 && ja.contains("シーバッグ（FlipHopper のタスクファイル）：/p/.fliphopper/seabag")
         );
         for r in [&zh, &ja] {
-            assert!(r.ends_with(&agent_section()), "the section stays English");
+            assert!(
+                r.contains("brief`") && !r.contains("fh claim <id>"),
+                "no copy of the section"
+            );
         }
         assert_eq!(
             agent_setup_request_in("fr", p, b),
@@ -1069,9 +1068,12 @@ mod tests {
                 && r.contains("task files): /p/.fliphopper/seabag\n")
         );
         assert!(r.contains("any other text about FlipHopper") && !r.contains("<!--"));
-        assert!(r.ends_with(&agent_section()));
-        assert!(r.contains("brief`"), "the section comes from `fh brief`");
-        assert_eq!(r.matches(AGENT_SECTION_HEADING).count(), 2);
+        assert!(
+            r.contains("brief` prints"),
+            "the section comes from `fh brief`"
+        );
+        assert!(!r.contains("fh claim <id>"), "no copy of the section");
+        assert_eq!(r.matches(AGENT_SECTION_HEADING).count(), 1);
     }
 
     #[test]

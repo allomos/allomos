@@ -135,7 +135,7 @@ Until they exist, the prompt tells the agent to put those values in the report, 
 
 **Owner's request:** instruct the agent to get the brief from the FlipHopper command and write it into the FlipHopper section; the brief tells the agent to get details from `fh` when needed; tell agents these are the terms FlipHopper relies on.
 
-**In plain words.** The FlipHopper section in `AGENTS.md` is now whatever `fh brief` prints: the same short how-to as before, plus the terms FlipHopper relies on (area, iteration, label, state) and where to read more: `fh guide terms`, `fh guide customize` (what a project may change: areas, iterations, ladder, task IDs; what is fixed: the six states, and the words "area" and "iteration" until R90), `fh guide commands`, `fh guide workflow`. Both requests tell the agent to run `fh brief` and use its output; a copy stays in the request for when `fh` cannot run where the agent works.
+**In plain words.** The FlipHopper section in `AGENTS.md` is now whatever `fh brief` prints: the same short how-to as before, plus the terms FlipHopper relies on (area, iteration, label, state) and where to read more: `fh guide terms`, `fh guide customize` (what a project may change: areas, iterations, ladder, task IDs; what is fixed: the six states, and the words "area" and "iteration" until R90), `fh guide commands`, `fh guide workflow`. Both requests tell the agent to run `fh brief` and use its output. *(2026-10-10, owner: the requests no longer carry a copy of the section, because `fh` must be usable wherever the agent works.)*
 
 ## Change (2026-10-10, owner): agents know how to add a task
 
