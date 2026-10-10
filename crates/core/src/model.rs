@@ -1,9 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`).
-pub const FORMAT: &str = "fliphopper/1";
+pub const FORMAT: &str = "allomos/1";
 
-/// A project: one seabag.
+/// The format FlipHopper wrote before the app was renamed Allomos (decision 0013, 2026-10-10).
+/// Still read, so no project breaks; `alm migrate` and the app's move rewrite it as [`FORMAT`].
+pub const LEGACY_FORMAT: &str = "fliphopper/1";
+
+/// A project: one taskbag.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Project {
@@ -14,20 +18,20 @@ pub struct Project {
     #[serde(default = "default_labels")]
     pub labels: Vec<String>,
     /// The folder with the project's code and its AGENTS.md / CLAUDE.md, relative to the folder
-    /// holding `.fliphopper/` (`.` when it is that folder), or absolute. Unset until the app
+    /// holding `.allomos/` (`.` when it is that folder), or absolute. Unset until the app
     /// records it (docs/product/OPEN-FOLDER-FLOW.md).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_folder: Option<String>,
     /// The language new and changed tasks are written in: [`TASK_LANGUAGE_UI`] (follow the
-    /// FlipHopper app's interface language, the default) or a language code such as `zh-CN`.
+    /// Allomos app's interface language, the default) or a language code such as `zh-CN`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_language: Option<String>,
 }
 
-/// `task_language` value meaning "the language the FlipHopper app shows" (Task-A01-21).
+/// `task_language` value meaning "the language the Allomos app shows" (Task-A01-21).
 pub const TASK_LANGUAGE_UI: &str = "ui";
 
-/// A language code FlipHopper accepts for `task_language`: letters, digits and `-`, starting with
+/// A language code Allomos accepts for `task_language`: letters, digits and `-`, starting with
 /// two or three letters (`en`, `zh-CN`, `pt-BR`, `yue`), at most 35 characters.
 pub fn valid_language(code: &str) -> bool {
     let mut parts = code.split('-');
@@ -143,9 +147,9 @@ pub struct Task {
     pub description: String,
 }
 
-/// A whole seabag after loading: the project, its areas, iterations and tasks.
+/// A whole taskbag after loading: the project, its areas, iterations and tasks.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Seabag {
+pub struct Taskbag {
     pub project: Project,
     pub areas: Vec<Area>,
     /// Sorted by order, then ID.

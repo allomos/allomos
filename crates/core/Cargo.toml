@@ -1,6 +1,6 @@
 [package]
-name = "fliphopper-core"
-description = "FlipHopper project rules: what a project, an area and a task are, and how their files are checked."
+name = "allomos-core"
+description = "Allomos project rules: what a project, an area and a task are, and how their files are checked."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

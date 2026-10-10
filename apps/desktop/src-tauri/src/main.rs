@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    fliphopper_desktop_lib::run()
+    allomos_desktop_lib::run()
 }

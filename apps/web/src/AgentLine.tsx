@@ -1,6 +1,6 @@
 // "Do the AI agents know about this project?" (Task-A03-04): a short note beside Show in Finder.
-// FlipHopper works it out itself from the project's instruction files (AGENTS.md, CLAUDE.md);
-// agents write no flag. Since 2026-10-10 (owner) it no longer says who last used `fh` or holds
+// Allomos works it out itself from the project's instruction files (AGENTS.md, CLAUDE.md);
+// agents write no flag. Since 2026-10-10 (owner) it no longer says who last used `alm` or holds
 // tasks: a holder copied from an old board read as an agent "working now".
 
 import { useEffect, useState } from "react";
@@ -8,7 +8,7 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import type { AgentStatus } from "./types";
 
-/** How often the line checks again: the instruction files are outside the seabag. */
+/** How often the line checks again: the instruction files are outside the taskbag. */
 const CHECK_MS = 4000;
 
 export function AgentLine({

@@ -10,8 +10,8 @@ license = "UNLICENSED"
 publish = false
 
 [workspace.dependencies]
-fliphopper-core = { path = "crates/core" }
-fliphopper-store = { path = "crates/store" }
+allomos-core = { path = "crates/core" }
+allomos-store = { path = "crates/store" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

@@ -1,12 +1,12 @@
-//! FlipHopper's per-user settings on this computer, outside any seabag (Task-A01-21). For now it
-//! holds one thing: the interface language the app last showed, so `fh language` can tell an
-//! agent which language to write tasks in when the seabag says "follow the app" (`ui`).
+//! Allomos's per-user settings on this computer, outside any taskbag (Task-A01-21). For now it
+//! holds one thing: the interface language the app last showed, so `alm language` can tell an
+//! agent which language to write tasks in when the taskbag says "follow the app" (`ui`).
 
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use fliphopper_core::{Project, TASK_LANGUAGE_UI};
+use allomos_core::{Project, TASK_LANGUAGE_UI};
 use serde::{Deserialize, Serialize};
 
 /// The settings file, in the folder [`settings_dir`] names.
@@ -19,29 +19,45 @@ struct Settings {
     ui_language: Option<String>,
 }
 
-/// FlipHopper's settings folder for this user: `FLIPHOPPER_SETTINGS_DIR` when set (tests), else
-/// the system's place for app settings (`~/Library/Application Support/io.fliphopper` on macOS,
-/// `%APPDATA%\io.fliphopper` on Windows, `$XDG_CONFIG_HOME/fliphopper` or
-/// `~/.config/fliphopper` elsewhere).
+/// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
+/// the system's place for app settings (`~/Library/Application Support/io.allomos` on macOS,
+/// `%APPDATA%\io.allomos` on Windows, `$XDG_CONFIG_HOME/allomos` or
+/// `~/.config/allomos` elsewhere).
 pub fn settings_dir() -> Option<PathBuf> {
-    if let Some(dir) = std::env::var_os("FLIPHOPPER_SETTINGS_DIR") {
+    if let Some(dir) = std::env::var_os("ALLOMOS_SETTINGS_DIR") {
         return Some(PathBuf::from(dir));
     }
     let env = |name: &str| std::env::var_os(name).map(PathBuf::from);
     if cfg!(target_os = "macos") {
-        env("HOME").map(|h| h.join("Library/Application Support/io.fliphopper"))
+        env("HOME").map(|h| h.join("Library/Application Support/io.allomos"))
     } else if cfg!(windows) {
-        env("APPDATA").map(|a| a.join("io.fliphopper"))
+        env("APPDATA").map(|a| a.join("io.allomos"))
     } else {
         env("XDG_CONFIG_HOME")
             .or_else(|| env("HOME").map(|h| h.join(".config")))
-            .map(|c| c.join("fliphopper"))
+            .map(|c| c.join("allomos"))
     }
 }
 
 fn read_settings() -> Settings {
     settings_dir()
-        .and_then(|d| fs::read_to_string(d.join(SETTINGS_FILE)).ok())
+        .and_then(|d| {
+            fs::read_to_string(d.join(SETTINGS_FILE)).ok().or_else(|| {
+                // Before the rename the app was FlipHopper (`io.fliphopper`); read its settings
+                // until Allomos saves its own. Not when a test chose the folder.
+                if std::env::var_os("ALLOMOS_SETTINGS_DIR").is_some() {
+                    return None;
+                }
+                let old = d
+                    .parent()?
+                    .join(if cfg!(any(target_os = "macos", windows)) {
+                        "io.fliphopper"
+                    } else {
+                        "fliphopper"
+                    });
+                fs::read_to_string(old.join(SETTINGS_FILE)).ok()
+            })
+        })
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default()
 }
@@ -90,9 +106,9 @@ pub fn pick_ui_language<S: AsRef<str>>(preferred: &[S]) -> &'static str {
 pub struct TaskLanguage {
     /// The language code to write in.
     pub language: String,
-    /// What the seabag says: `ui` or a language code.
+    /// What the taskbag says: `ui` or a language code.
     pub setting: String,
-    /// Where `language` came from: `seabag` (a code set there), `app` (the app's saved interface
+    /// Where `language` came from: `taskbag` (a code set there), `app` (the app's saved interface
     /// language) or `system` (the computer's language, before the app has run).
     pub source: &'static str,
 }
@@ -109,7 +125,7 @@ pub fn task_language<S: AsRef<str>>(project: &Project, system: &[S]) -> TaskLang
         return TaskLanguage {
             language: setting.clone(),
             setting,
-            source: "seabag",
+            source: "taskbag",
         };
     }
     match saved_ui_language() {
@@ -129,11 +145,11 @@ pub fn task_language<S: AsRef<str>>(project: &Project, system: &[S]) -> TaskLang
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fliphopper_core::{FORMAT, default_labels};
+    use allomos_core::{FORMAT, default_labels};
     use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    /// Tests that set FLIPHOPPER_SETTINGS_DIR run one at a time.
+    /// Tests that set ALLOMOS_SETTINGS_DIR run one at a time.
     static ENV: Mutex<()> = Mutex::new(());
 
     fn project(language: Option<&str>) -> Project {
@@ -154,9 +170,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("fliphopper-settings-{n}"));
+        let dir = std::env::temp_dir().join(format!("allomos-settings-{n}"));
         // SAFETY: the variable is set and read only by these tests, one at a time (the lock).
-        unsafe { std::env::set_var("FLIPHOPPER_SETTINGS_DIR", &dir) };
+        unsafe { std::env::set_var("ALLOMOS_SETTINGS_DIR", &dir) };
 
         // Before the app has run: the computer's language, picked as the app picks.
         let l = task_language(&project(None), &["ja-JP", "en-US"]);
@@ -174,15 +190,15 @@ mod tests {
         let l = task_language(&project(Some("ui")), &["ja-JP"]);
         assert_eq!((l.language.as_str(), l.source), ("zh-CN", "app"));
 
-        // A code in the seabag wins.
+        // A code in the taskbag wins.
         let l = task_language(&project(Some("fr")), &["ja-JP"]);
         assert_eq!(
             (l.language.as_str(), l.setting.as_str(), l.source),
-            ("fr", "fr", "seabag")
+            ("fr", "fr", "taskbag")
         );
 
         // SAFETY: as above.
-        unsafe { std::env::remove_var("FLIPHOPPER_SETTINGS_DIR") };
+        unsafe { std::env::remove_var("ALLOMOS_SETTINGS_DIR") };
         fs::remove_dir_all(&dir).unwrap();
     }
 

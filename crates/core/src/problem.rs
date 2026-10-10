@@ -1,8 +1,8 @@
-//! Problem codes: everything FlipHopper's Rust side can report to a person.
+//! Problem codes: everything Allomos's Rust side can report to a person.
 //!
 //! Rust never sends sentences to the interface. It sends a code plus its details
 //! (`params`), and the interface words the code in the chosen language (R94). Each code
-//! also has one English wording here, for logs and for the `fh` command.
+//! also has one English wording here, for logs and for the `alm` command.
 //!
 //! The list is declared once, through `problems!`, so a new code is always part of
 //! [`Problem::CODES`]; a test writes that list to `apps/web/src/i18n/codes.json`, where
@@ -53,16 +53,16 @@ macro_rules! problems {
 
 problems! {
     /// The file is not valid JSON, or a value has the wrong type. `detail` is the parser's own text.
-    NotJson { detail } => "not_json", "This file could not be read as JSON for FlipHopper: {detail}.";
+    NotJson { detail } => "not_json", "This file could not be read as JSON for Allomos: {detail}.";
     FieldMissing => "field_missing", "This required field is missing.";
-    FieldUnknown => "field_unknown", "FlipHopper does not know this field. Check its spelling, or remove it.";
+    FieldUnknown => "field_unknown", "Allomos does not know this field. Check its spelling, or remove it.";
     InvalidChoice { value, allowed } => "invalid_choice", "{value} is not a valid value here. Use one of: {allowed}.";
     InvalidId { id } => "invalid_id", "\"{id}\" is not a valid ID. Use 1–64 letters, digits, '-' or '_'.";
-    WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of FlipHopper reads only \"{expected}\".";
+    WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of Allomos reads only \"{expected}\".";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     /// `task_language` is neither `ui` nor a language code (Task-A01-21).
-    InvalidLanguage { value } => "invalid_language", "\"{value}\" is not a language. Use a language code such as en, zh-CN or ja, or ui to follow the FlipHopper app's language.";
+    InvalidLanguage { value } => "invalid_language", "\"{value}\" is not a language. Use a language code such as en, zh-CN or ja, or ui to follow the Allomos app's language.";
     AreaNameMissing => "area_name_missing", "The area needs a name.";
     TaskTitleMissing => "task_title_missing", "The task needs a title.";
     DuplicateAreaId { id } => "duplicate_area_id", "Another area already uses the ID \"{id}\".";
@@ -72,48 +72,48 @@ problems! {
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
-    UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `fh add iteration`, or use an existing iteration ID.";
+    UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";
     InvalidDate { value } => "invalid_date", "\"{value}\" is not a date. Write it as YYYY-MM-DD, for example 2026-10-08.";
     /// The file exists but could not be read. `detail` is the system's own text.
     ReadFailed { detail } => "read_failed", "Could not read this file: {detail}.";
     TaskFileMissing => "task_file_missing", "This task folder has no task.json.";
-    /// Creating a seabag was refused because the folder already has files in it.
-    FolderNotEmpty { path } => "folder_not_empty", "{path} is not empty, so no seabag was created there.";
-    CreateFailed { path, detail } => "create_failed", "Could not create the seabag in {path}: {detail}.";
-    SeabagNotFound { path } => "seabag_not_found", "No seabag was found at or above {path}. Run `fh init` first, or pass --seabag <path>.";
-    SeabagExists { path } => "seabag_exists", "A seabag already exists at {path}.";
-    /// The seabag's project file could not be read. `detail` says why.
-    SeabagUnreadable { path, detail } => "seabag_unreadable", "The seabag at {path} could not be read: {detail}";
-    /// Another FlipHopper writer held the seabag's lock for too long.
-    SeabagBusy { path } => "seabag_busy", "Another FlipHopper writer is changing the seabag at {path}. Try again in a moment.";
+    /// Creating a taskbag was refused because the folder already has files in it.
+    FolderNotEmpty { path } => "folder_not_empty", "{path} is not empty, so no taskbag was created there.";
+    CreateFailed { path, detail } => "create_failed", "Could not create the taskbag in {path}: {detail}.";
+    TaskbagNotFound { path } => "taskbag_not_found", "No taskbag was found at or above {path}. Run `alm init` first, or pass --taskbag <path>.";
+    TaskbagExists { path } => "taskbag_exists", "A taskbag already exists at {path}.";
+    /// The taskbag's project file could not be read. `detail` says why.
+    TaskbagUnreadable { path, detail } => "taskbag_unreadable", "The taskbag at {path} could not be read: {detail}";
+    /// Another Allomos writer held the taskbag's lock for too long.
+    TaskbagBusy { path } => "taskbag_busy", "Another Allomos writer is changing the taskbag at {path}. Try again in a moment.";
     WriteFailed { path, detail } => "write_failed", "Could not write {path}: {detail}.";
     TaskNotFound { id } => "task_not_found", "There is no task \"{id}\".";
-    HolderMissing => "holder_missing", "Say who you are with --as <name> or the FLIPHOPPER_HOLDER environment variable.";
+    HolderMissing => "holder_missing", "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
     TaskClosed { id, state } => "task_closed", "Task {id} is {state}, so it cannot be changed this way.";
     /// A warning: the task was finished below the top step of the ladder.
     LabelBelowTop { label, top } => "label_below_top", "Finished with the label \"{label}\", below the top step \"{top}\".";
     /// A warning: the task was taken over from another holder.
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
-    NotASeabag { path } => "not_a_seabag", "{path} is not a seabag folder.";
+    NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
     /// The chosen AI agent is no longer on this computer (Task-A05-02).
     AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
-    /// `fh confirm`: the person chose Cancel in the app (Task-A05-02).
-    ConfirmDeclined => "confirm_declined", "The person chose Cancel in FlipHopper, so nothing should change.";
-    /// `fh confirm`: no answer came in time.
-    ConfirmTimeout { seconds } => "confirm_timeout", "No answer came from the FlipHopper app within {seconds} seconds, so nothing should change. Open the project folder in the app and ask again.";
+    /// `alm confirm`: the person chose Cancel in the app (Task-A05-02).
+    ConfirmDeclined => "confirm_declined", "The person chose Cancel in Allomos, so nothing should change.";
+    /// `alm confirm`: no answer came in time.
+    ConfirmTimeout { seconds } => "confirm_timeout", "No answer came from the Allomos app within {seconds} seconds, so nothing should change. Open the project folder in the app and ask again.";
     /// The app was asked to answer a question that is no longer waiting.
     RequestNotFound { id } => "request_not_found", "The question {id} is no longer waiting for an answer.";
-    /// A link in a task's description that FlipHopper will not open (Task-A01-16).
-    LinkRefused { link } => "link_refused", "FlipHopper opens only web links and text files (.md, .txt) inside this project, so it did not open \"{link}\".";
+    /// A link in a task's description that Allomos will not open (Task-A01-16).
+    LinkRefused { link } => "link_refused", "Allomos opens only web links and text files (.md, .txt) inside this project, so it did not open \"{link}\".";
     LinkNotFound { link } => "link_not_found", "The file \"{link}\" does not exist.";
-    /// FlipHopper was started with a folder that does not exist or is not a folder.
-    StartupNotAFolder { path } => "startup_not_a_folder", "FlipHopper was started with {path}, which is not a folder, so nothing was opened.";
+    /// Allomos was started with a folder that does not exist or is not a folder.
+    StartupNotAFolder { path } => "startup_not_a_folder", "Allomos was started with {path}, which is not a folder, so nothing was opened.";
     /// Only an unheld backlog or waiting task can be made ready.
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
-    /// A warning from `fh --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.
+    /// A warning from `alm --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.
     CommitFailed { detail } => "commit_failed", "The change is saved, but committing it failed: {detail}";
     PushFailed { detail } => "push_failed", "The change is saved and committed, but pushing it failed: {detail}";
     /// The command was used wrongly. `detail` is the parser's own text.
@@ -156,7 +156,7 @@ mod tests {
     }
 
     /// The interface's translation check reads this file. Rewrite it with
-    /// `FLIPHOPPER_WRITE_CODES=1 cargo test -p fliphopper-core`.
+    /// `ALLOMOS_WRITE_CODES=1 cargo test -p allomos-core`.
     #[test]
     fn codes_file_is_up_to_date() {
         let path = concat!(
@@ -169,14 +169,14 @@ mod tests {
         }
         let mut want = serde_json::to_string_pretty(&map).unwrap();
         want.push('\n');
-        if std::env::var_os("FLIPHOPPER_WRITE_CODES").is_some() {
+        if std::env::var_os("ALLOMOS_WRITE_CODES").is_some() {
             std::fs::write(path, &want).unwrap();
         }
         let have = std::fs::read_to_string(path).unwrap_or_default();
         assert!(
             have == want,
             "apps/web/src/i18n/codes.json is out of date. Run \
-             `FLIPHOPPER_WRITE_CODES=1 cargo test -p fliphopper-core`, then add words for any new \
+             `ALLOMOS_WRITE_CODES=1 cargo test -p allomos-core`, then add words for any new \
              code to every language file."
         );
     }

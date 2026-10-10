@@ -1,4 +1,4 @@
-//! FlipHopper desktop app: the Tauri window plus the commands the interface may call.
+//! Allomos desktop app: the Tauri window plus the commands the interface may call.
 //!
 //! The interface never calls these directly; it goes through its messenger module
 //! (`apps/web/src/messenger.ts`), so the same interface can later reach the desktop's
@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 
-use fliphopper_core::{Loaded, Problem};
-use fliphopper_store::{
+use allomos_core::{Loaded, Problem};
+use allomos_store::{
     AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
     add_readme_if_empty, agent_convert_request_in, agent_setup, agent_setup_request_in,
     answer_confirm, git_root, id_from_name, init, inspect, load, pending_confirms, picked_folder,
@@ -33,7 +33,7 @@ struct FolderInfo {
 struct Opened {
     root: PathBuf,
     loaded: Loaded,
-    /// A `README-fliphopper.md` was just written next to `.fliphopper/`.
+    /// A `README-allomos.md` was just written next to `.allomos/`.
     readme_added: bool,
 }
 
@@ -57,7 +57,7 @@ fn folder_argument(args: impl IntoIterator<Item = OsString>) -> Option<PathBuf> 
     None
 }
 
-/// The folder to open at start-up: `FLIPHOPPER_OPEN` if set, else the command line's folder.
+/// The folder to open at start-up: `ALLOMOS_OPEN` if set, else the command line's folder.
 /// A folder that was given but is not one is reported, never silently replaced.
 fn choose_startup_folder(
     env: Option<OsString>,
@@ -75,11 +75,11 @@ fn choose_startup_folder(
     }
 }
 
-/// A folder given at start-up, so `fliphopper ~/my-project` and
-/// `open FlipHopper.app --args ~/my-project` open that folder directly.
+/// A folder given at start-up, so `allomos ~/my-project` and
+/// `open Allomos.app --args ~/my-project` open that folder directly.
 #[tauri::command]
 fn startup_folder() -> Result<Option<PathBuf>, Problem> {
-    choose_startup_folder(std::env::var_os("FLIPHOPPER_OPEN"), std::env::args_os())
+    choose_startup_folder(std::env::var_os("ALLOMOS_OPEN"), std::env::args_os())
 }
 
 /// What is this folder? Changes nothing.
@@ -91,9 +91,9 @@ fn inspect_folder(path: PathBuf) -> FolderInfo {
     }
 }
 
-/// Load the seabag at `root`.
+/// Load the taskbag at `root`.
 #[tauri::command]
-fn open_seabag(root: PathBuf) -> Opened {
+fn open_taskbag(root: PathBuf) -> Opened {
     Opened {
         loaded: load(&root),
         root,
@@ -101,24 +101,36 @@ fn open_seabag(root: PathBuf) -> Opened {
     }
 }
 
-/// A fingerprint of the seabag's files. The window asks for it about once a second and
-/// reloads when it changes, so changes made by `fh` show without reopening the folder.
+/// Move a project's taskbag from FlipHopper's old place, `.fliphopper/seabag/`, to
+/// `.allomos/taskbag/`, then load it from the new place.
+#[tauri::command]
+fn move_legacy_taskbag(root: PathBuf) -> Result<Opened, Problem> {
+    let new = allomos_store::move_legacy_taskbag(&root)?;
+    Ok(Opened {
+        loaded: load(&new),
+        root: new,
+        readme_added: false,
+    })
+}
+
+/// A fingerprint of the taskbag's files. The window asks for it about once a second and
+/// reloads when it changes, so changes made by `alm` show without reopening the folder.
 /// Sent as text: a 64-bit number does not fit a JavaScript number.
 #[tauri::command]
-fn seabag_stamp(root: PathBuf) -> String {
+fn taskbag_stamp(root: PathBuf) -> String {
     stamp(&root).to_string()
 }
 
-/// Create an empty seabag at `root` (normally `<folder>/.fliphopper/seabag/`), then load it.
+/// Create an empty taskbag at `root` (normally `<folder>/.allomos/taskbag/`), then load it.
 /// Empty, with no example tasks, so the open-folder flow can tell whether the project has tasks
 /// yet (docs/product/OPEN-FOLDER-FLOW.md).
-/// When the picked folder looks empty, also write `README-fliphopper.md` there, in the
-/// interface's `language`; a README that cannot be written does not undo the seabag.
+/// When the picked folder looks empty, also write `README-allomos.md` there, in the
+/// interface's `language`; a README that cannot be written does not undo the taskbag.
 /// (Telling AI agents about the project is a separate step: `ask_agents`.)
 #[tauri::command]
-fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
+fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
     init(&root, &id_from_name(&name), &name).map_err(|p| match p {
-        Problem::SeabagExists { path } => Problem::FolderNotEmpty { path },
+        Problem::TaskbagExists { path } => Problem::FolderNotEmpty { path },
         Problem::WriteFailed { path, detail } => Problem::CreateFailed { path, detail },
         other => other,
     })?;
@@ -133,7 +145,7 @@ fn create_seabag(root: PathBuf, name: String, language: String) -> Result<Opened
 }
 
 /// The system program that shows a folder: Finder on macOS, Explorer on Windows, the
-/// desktop's file manager elsewhere. Only a seabag folder is accepted, so the window cannot
+/// desktop's file manager elsewhere. Only a taskbag folder is accepted, so the window cannot
 /// be used to open any other path.
 fn file_manager_command(root: &Path) -> Result<Command, Problem> {
     if inspect(root)
@@ -141,7 +153,7 @@ fn file_manager_command(root: &Path) -> Result<Command, Problem> {
             root: root.to_path_buf(),
         })
     {
-        return Err(Problem::NotASeabag {
+        return Err(Problem::NotATaskbag {
             path: root.display().to_string(),
         });
     }
@@ -184,7 +196,7 @@ fn open_task_link(root: PathBuf, task: String, link: String) -> Result<(), Probl
     })
 }
 
-/// Show the open seabag's folder in Finder or Explorer.
+/// Show the open taskbag's folder in Finder or Explorer.
 #[tauri::command]
 fn show_in_file_manager(root: PathBuf) -> Result<(), Problem> {
     let mut command = file_manager_command(&root)?;
@@ -195,11 +207,11 @@ fn show_in_file_manager(root: PathBuf) -> Result<(), Problem> {
     })
 }
 
-/// Save the interface language the window shows, so `fh task-language` can tell agents which
+/// Save the interface language the window shows, so `alm task-language` can tell agents which
 /// language to write tasks in (Task-A01-21). A setting that cannot be saved changes nothing else.
 #[tauri::command]
 fn save_ui_language(language: String) {
-    let _ = fliphopper_store::save_ui_language(&language);
+    let _ = allomos_store::save_ui_language(&language);
 }
 
 /// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).
@@ -210,19 +222,19 @@ fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
-/// The AI agents on this computer that can be asked to add FlipHopper's instructions.
+/// The AI agents on this computer that can be asked to add Allomos's instructions.
 #[tauri::command]
 async fn find_agents() -> Vec<agents::Agent> {
     agents::find_agents()
 }
 
-/// Open each chosen agent in `project` with the request to add FlipHopper's instructions typed
+/// Open each chosen agent in `project` with the request to add Allomos's instructions typed
 /// in. Nothing is sent: the person sends it. Returns the agents that opened.
 #[tauri::command]
 async fn ask_agents(
     agents: Vec<String>,
     project: PathBuf,
-    seabag: PathBuf,
+    taskbag: PathBuf,
     language: String,
 ) -> Result<Vec<String>, Problem> {
     if !project.is_dir() {
@@ -231,7 +243,7 @@ async fn ask_agents(
         });
     }
     let found = agents::find_agents();
-    let mut request = agent_setup_request_in(&language, &project, &seabag);
+    let mut request = agent_setup_request_in(&language, &project, &taskbag);
     if let Some(note) = agents::shared_note(&agents, &language) {
         request = format!("{note}\n\n{request}");
     }
@@ -247,13 +259,13 @@ async fn ask_agents(
 }
 
 /// Open one chosen agent in `project` with the request to find the project's tasks and move them
-/// into the seabag at `seabag` typed in. One agent only: two would add every task twice. Nothing
+/// into the taskbag at `taskbag` typed in. One agent only: two would add every task twice. Nothing
 /// is sent: the person sends it.
 #[tauri::command]
 async fn ask_agent_to_convert(
     agent: String,
     project: PathBuf,
-    seabag: PathBuf,
+    taskbag: PathBuf,
     language: String,
 ) -> Result<(), Problem> {
     if !project.is_dir() {
@@ -261,36 +273,36 @@ async fn ask_agent_to_convert(
             path: project.display().to_string(),
         });
     }
-    let request = agent_convert_request_in(&language, &project, &seabag);
+    let request = agent_convert_request_in(&language, &project, &taskbag);
     let Some(chosen) = agents::find_agents().into_iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
     agents::ask(&chosen.id, &project, &request, &chosen.how)
 }
 
-/// Steps 2 to 4 of the open-folder flow for the seabag at `root`: its project folder (recorded
-/// here when AGENTS.md or CLAUDE.md sits beside `.fliphopper/`), whether that folder's agent
-/// instructions mention FlipHopper, and whether the seabag has tasks.
+/// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
+/// here when AGENTS.md or CLAUDE.md sits beside `.allomos/`), whether that folder's agent
+/// instructions mention Allomos, and whether the taskbag has tasks.
 #[tauri::command]
 fn project_setup(root: PathBuf) -> Result<SetupState, Problem> {
     setup_state(&root)
 }
 
-/// Record `folder` as the project folder of the seabag at `root`; then the flow's new state.
+/// Record `folder` as the project folder of the taskbag at `root`; then the flow's new state.
 #[tauri::command]
 fn set_project_folder(root: PathBuf, folder: PathBuf) -> Result<SetupState, Problem> {
     record_project_folder(&root, &folder)?;
     setup_state(&root)
 }
 
-/// File → Move Tasks Into FlipHopper… is offered only while the open seabag has a project folder.
+/// File → Move Tasks Into Allomos… is offered only while the open taskbag has a project folder.
 #[tauri::command]
 fn set_convert_enabled(texts: tauri::State<MenuTexts>, enabled: bool) {
     let _ = texts.convert.set_enabled(enabled);
 }
 
-/// Questions an agent is asking about `project` with `fh confirm`, oldest first. Listing them
-/// marks them seen, so `fh` knows this window shows them.
+/// Questions an agent is asking about `project` with `alm confirm`, oldest first. Listing them
+/// marks them seen, so `alm` knows this window shows them.
 #[tauri::command]
 fn confirm_requests(project: PathBuf) -> Vec<ConfirmRequest> {
     pending_confirms(&project)
@@ -307,9 +319,9 @@ fn answer_confirm_request(project: PathBuf, id: String, yes: bool) -> Result<(),
 struct AgentStatus {
     /// The project folder the line is about.
     project: PathBuf,
-    /// Which agents' instruction files tell them about FlipHopper.
+    /// Which agents' instruction files tell them about Allomos.
     setup: AgentSetup,
-    /// The newest seabag change an agent made with `fh --commit` / `--push`.
+    /// The newest taskbag change an agent made with `alm --commit` / `--push`.
     last: Option<agents::LastUse>,
     /// Who holds tasks in progress now.
     holders: Vec<String>,
@@ -317,8 +329,8 @@ struct AgentStatus {
 
 #[tauri::command]
 async fn agent_status(root: PathBuf) -> AgentStatus {
-    let loaded = load(&root).seabag;
-    // The recorded project folder; before one is recorded, the folder holding `.fliphopper/`.
+    let loaded = load(&root).taskbag;
+    // The recorded project folder; before one is recorded, the folder holding `.allomos/`.
     let project = loaded
         .as_ref()
         .and_then(|bag| project_folder_of(&root, &bag.project))
@@ -327,7 +339,7 @@ async fn agent_status(root: PathBuf) -> AgentStatus {
         .map(|bag| {
             bag.tasks
                 .into_iter()
-                .filter(|t| t.state == fliphopper_core::State::InProgress)
+                .filter(|t| t.state == allomos_core::State::InProgress)
                 .filter_map(|t| t.holder)
                 .collect()
         })
@@ -342,7 +354,7 @@ async fn agent_status(root: PathBuf) -> AgentStatus {
     }
 }
 
-/// Write FlipHopper's section into `project`'s AGENTS.md and CLAUDE.md directly, for when no
+/// Write Allomos's section into `project`'s AGENTS.md and CLAUDE.md directly, for when no
 /// agent is available. Returns the files changed.
 #[tauri::command]
 fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem> {
@@ -444,8 +456,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let convert_item = MenuItem::with_id(
         app,
         CONVERT_ID,
-        "Move Tasks Into FlipHopper…",
-        // Enabled by the window once the open seabag has a project folder.
+        "Move Tasks Into Allomos…",
+        // Enabled by the window once the open taskbag has a project folder.
         false,
         None::<&str>,
     )?;
@@ -549,9 +561,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             startup_folder,
             inspect_folder,
-            open_seabag,
-            seabag_stamp,
-            create_seabag,
+            open_taskbag,
+            move_legacy_taskbag,
+            taskbag_stamp,
+            create_taskbag,
             show_in_file_manager,
             open_task_link,
             system_languages,
@@ -570,7 +583,7 @@ pub fn run() {
             set_convert_enabled
         ])
         .run(tauri::generate_context!())
-        .expect("error while running FlipHopper");
+        .expect("error while running Allomos");
 }
 
 #[cfg(test)]
@@ -578,7 +591,7 @@ mod tests {
     use super::*;
 
     fn args(list: &[&str]) -> Vec<OsString> {
-        std::iter::once("fliphopper")
+        std::iter::once("allomos")
             .chain(list.iter().copied())
             .map(OsString::from)
             .collect()
@@ -586,7 +599,7 @@ mod tests {
 
     #[test]
     fn startup_folder_skips_options() {
-        let dir = std::env::temp_dir().join(format!("fliphopper-start-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("allomos-start-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let d = dir.to_str().unwrap();
         let missing = dir.join("no-such-folder");
@@ -618,7 +631,7 @@ mod tests {
         // No arguments, or only options: nothing given.
         assert_eq!(found(&[]), Ok(None));
         assert_eq!(found(&["-AppleLanguages", "(ja)"]), Ok(None));
-        // FLIPHOPPER_OPEN wins over arguments, and is checked the same way.
+        // ALLOMOS_OPEN wins over arguments, and is checked the same way.
         assert_eq!(
             choose_startup_folder(Some(dir.clone().into()), args(&[m])),
             Ok(Some(dir.clone()))
@@ -631,19 +644,19 @@ mod tests {
     }
 
     #[test]
-    fn file_manager_opens_only_a_seabag() {
-        let dir = std::env::temp_dir().join(format!("fliphopper-reveal-{}", std::process::id()));
-        let root = dir.join(fliphopper_store::DEFAULT_DIR);
+    fn file_manager_opens_only_a_taskbag() {
+        let dir = std::env::temp_dir().join(format!("allomos-reveal-{}", std::process::id()));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // The project folder itself, a missing path and a plain file are refused.
         for path in [dir.clone(), dir.join("missing"), root.clone()] {
             assert!(matches!(
                 file_manager_command(&path),
-                Err(Problem::NotASeabag { .. })
+                Err(Problem::NotATaskbag { .. })
             ));
         }
-        fliphopper_store::init(&root, "p", "P").unwrap();
+        allomos_store::init(&root, "p", "P").unwrap();
         let command = file_manager_command(&root).unwrap();
         assert_eq!(command.get_args().collect::<Vec<_>>(), [root.as_os_str()]);
         std::fs::remove_dir_all(&dir).unwrap();

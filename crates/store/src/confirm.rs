@@ -1,6 +1,6 @@
-//! Questions an AI agent asks the person through the FlipHopper app (Task-A05-02).
+//! Questions an AI agent asks the person through the Allomos app (Task-A05-02).
 //!
-//! `fh confirm` leaves a question in `<project>/.fliphopper/requests/<id>.json` and waits. The
+//! `alm confirm` leaves a question in `<project>/.allomos/requests/<id>.json` and waits. The
 //! app, which watches the folder it shows, lists the question as a popup (and marks it seen); the
 //! person's answer is written next to it as `<id>.answer`. These files are working files, never
 //! committed: the folder holds a `.gitignore` that ignores everything in it.
@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use fliphopper_core::Problem;
+use allomos_core::Problem;
 use serde::{Deserialize, Serialize};
 
 /// Where questions wait, inside the project folder.
-pub const REQUESTS_DIR: &str = ".fliphopper/requests";
+pub const REQUESTS_DIR: &str = ".allomos/requests";
 /// A plan longer than this is refused: a popup is for reading, not for a whole report.
 pub const MAX_PLAN_BYTES: usize = 64 * 1024;
 
@@ -75,7 +75,7 @@ pub fn post_confirm(
     if !ignore.exists() {
         fs::write(
             &ignore,
-            "# FlipHopper's questions to the person. Never commit them.\n*\n",
+            "# Allomos's questions to the person. Never commit them.\n*\n",
         )?;
     }
     let request = ConfirmRequest {
@@ -97,7 +97,7 @@ pub fn post_confirm(
 }
 
 /// The questions in `project` still waiting for an answer and still in time, oldest first. Each is marked seen, so
-/// `fh confirm` knows an app is showing it.
+/// `alm confirm` knows an app is showing it.
 pub fn pending_confirms(project: &Path) -> Vec<ConfirmRequest> {
     let dir = requests_dir(project);
     let Ok(entries) = fs::read_dir(&dir) else {
@@ -171,7 +171,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = std::env::temp_dir().join(format!("fliphopper-confirm-{name}-{n}"));
+        let p = std::env::temp_dir().join(format!("allomos-confirm-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
     }

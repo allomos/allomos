@@ -1,4 +1,4 @@
-// A small Markdown reader for task descriptions (Task-A01-16) and agents' plans in the `fh confirm`
+// A small Markdown reader for task descriptions (Task-A01-16) and agents' plans in the `alm confirm`
 // popup (Task-A05-02): headings, paragraphs, lists, code blocks, tables, and inline code, bold,
 // italics and links. It builds React elements, never HTML
 // text, so a description cannot inject markup. Links are handed to `onLink`, which asks the

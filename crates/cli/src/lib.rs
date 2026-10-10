@@ -1,27 +1,27 @@
-//! The `fliphopper` command, also installed as `fh`.
+//! The `allomos` command, also installed as `alm`.
 //!
-//! It reads options, calls the rules in `fliphopper-core` and the writer in
-//! `fliphopper-store`, and prints the result: plain lines for people, or one JSON object
+//! It reads options, calls the rules in `allomos-core` and the writer in
+//! `allomos-store`, and prints the result: plain lines for people, or one JSON object
 //! for agents (`--json`). It never asks for typed input. The contract is in
-//! `docs/workflow/CODING_RULES.md` § The `fh` command.
+//! `docs/workflow/CODING_RULES.md` § The `alm` command.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use clap::{Parser, Subcommand, error::ErrorKind};
-use fliphopper_core::ops::{self, Outcome};
-use fliphopper_core::{Issue, Iteration, Problem, Seabag, State, Task};
-use fliphopper_store::{
+use allomos_core::ops::{self, Outcome};
+use allomos_core::{Issue, Iteration, Problem, State, Task, Taskbag};
+use allomos_store::{
     DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
-    agent_section_for, agent_setup_request, find_seabag, git_root, guide, id_from_name,
+    agent_section_for, agent_setup_request, find_taskbag, git_root, guide, id_from_name,
     init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
     requests_dir, task_language, was_seen, withdraw_confirm,
 };
+use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
 
 /// The version of the `--json` output. A new field is an addition; anything else changes it.
-pub const SCHEMA: &str = "fh/1";
+pub const SCHEMA: &str = "alm/1";
 
 /// Exit codes.
 pub const EXIT_OK: i32 = 0;
@@ -29,35 +29,41 @@ pub const EXIT_REFUSED: i32 = 1;
 pub const EXIT_USAGE: i32 = 2;
 pub const EXIT_BUSY: i32 = 3;
 
-/// How long a writer waits for another one to finish, unless `FLIPHOPPER_LOCK_WAIT_MS` says otherwise.
+/// How long a writer waits for another one to finish, unless `ALLOMOS_LOCK_WAIT_MS` says otherwise.
 const LOCK_WAIT_MS: u64 = 5000;
 
 #[derive(Parser)]
 #[command(
-    name = "fh",
+    name = "alm",
     version,
-    about = "Work a FlipHopper seabag's tasks from a terminal.",
-    after_help = "Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 seabag busy or not writable."
+    about = "Work an Allomos taskbag's tasks from a terminal.",
+    after_help = "Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not writable."
 )]
 struct Cli {
-    /// The seabag folder, or a folder holding .fliphopper/seabag/. Default: search upward from here.
-    #[arg(long, global = true, env = "FLIPHOPPER_SEABAG", value_name = "PATH")]
-    seabag: Option<PathBuf>,
-    /// Who you are, for example claude/a01-03-fh.
+    /// The taskbag folder, or a folder holding .allomos/taskbag/. Default: search upward from here.
+    #[arg(
+        long,
+        global = true,
+        env = "ALLOMOS_TASKBAG",
+        value_name = "PATH",
+        alias = "seabag"
+    )]
+    taskbag: Option<PathBuf>,
+    /// Who you are, for example claude/a01-03-alm.
     #[arg(
         long = "as",
         global = true,
-        env = "FLIPHOPPER_HOLDER",
+        env = "ALLOMOS_HOLDER",
         value_name = "NAME"
     )]
     holder: Option<String>,
     /// Print one JSON result on standard output, and nothing else.
     #[arg(long, global = true)]
     json: bool,
-    /// After a change, commit the seabag's files (only those) with Git.
+    /// After a change, commit the taskbag's files (only those) with Git.
     #[arg(long, global = true)]
     commit: bool,
-    /// After a change, commit the seabag's files and push the current branch.
+    /// After a change, commit the taskbag's files and push the current branch.
     #[arg(long, global = true)]
     push: bool,
     #[command(subcommand)]
@@ -66,7 +72,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Create an empty seabag at the root of this Git repository (or in this folder).
+    /// Create an empty taskbag at the root of this Git repository (or in this folder).
     Init {
         /// The project's name. Default: the folder's name.
         #[arg(long)]
@@ -78,16 +84,19 @@ enum Command {
         /// Default: implemented, locally verified, deployed and verified, owner verified.
         #[arg(long, value_name = "A,B,…")]
         labels: Option<String>,
-        /// Write FlipHopper's section for AI agents into AGENTS.md and CLAUDE.md yourself,
-        /// instead of printing a request for the agent running `fh init` to do it.
+        /// Write Allomos's section for AI agents into AGENTS.md and CLAUDE.md yourself,
+        /// instead of printing a request for the agent running `alm init` to do it.
         #[arg(long)]
         write_agent_files: bool,
     },
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
-    /// Print FlipHopper's section for this project's AGENTS.md: the short brief agents read first.
+    /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
+    /// Move this project's taskbag from FlipHopper's old place, .fliphopper/seabag/, to
+    /// .allomos/taskbag/ (the app was renamed Allomos).
+    Migrate,
     /// Print the details the brief points to: terms, what a project may customize, commands,
     /// and how to work the tasks. All topics when none is named.
     Guide {
@@ -96,7 +105,7 @@ enum Command {
     },
     /// The language to write new and changed tasks in. Without a value: show it (run this before
     /// adding a task or changing its title or description). With one: set it, to a language code
-    /// such as zh-CN, or to ui to follow the FlipHopper app's language.
+    /// such as zh-CN, or to ui to follow the Allomos app's language.
     #[command(name = "task-language", alias = "task_language")]
     TaskLanguage {
         #[arg(value_name = "CODE|ui")]
@@ -108,7 +117,7 @@ enum Command {
         #[arg(value_name = "A,B,…")]
         ladder: String,
     },
-    /// Show a plan to the person in the FlipHopper app and wait for their answer: exit 0 means
+    /// Show a plan to the person in the Allomos app and wait for their answer: exit 0 means
     /// go ahead; exit 1 (confirm_declined, confirm_timeout) means change nothing.
     Confirm {
         /// The popup's heading.
@@ -228,6 +237,7 @@ impl Command {
             | Command::Labels { .. }
             | Command::TaskLanguage { .. }
             | Command::Brief
+            | Command::Migrate
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
@@ -235,7 +245,7 @@ impl Command {
         }
     }
 
-    /// Whether the command writes to the seabag.
+    /// Whether the command writes to the taskbag.
     fn changes(&self) -> bool {
         if let Command::TaskLanguage { value } = self {
             return value.is_some();
@@ -246,6 +256,8 @@ impl Command {
                 | Command::Show { .. }
                 | Command::Next
                 | Command::Confirm { .. }
+                // Moves the whole folder; `--commit` would stage only the new place. Commit by hand.
+                | Command::Migrate
                 | Command::Brief
                 | Command::Guide { .. }
         )
@@ -258,6 +270,7 @@ impl Command {
             Command::Labels { .. } => "labels",
             Command::TaskLanguage { .. } => "task-language",
             Command::Brief => "brief",
+            Command::Migrate => "migrate",
             Command::Guide { .. } => "guide",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
@@ -284,7 +297,7 @@ struct Done {
     text: String,
     warnings: Vec<Problem>,
     issues: Vec<Issue>,
-    /// Files outside the seabag that `--commit` also commits, relative to the seabag.
+    /// Files outside the taskbag that `--commit` also commits, relative to the taskbag.
     extra: Vec<String>,
 }
 
@@ -303,9 +316,9 @@ impl Done {
 pub fn exit_code(problem: &Problem) -> i32 {
     match problem {
         Problem::BadUsage { .. } => EXIT_USAGE,
-        Problem::SeabagBusy { .. }
+        Problem::TaskbagBusy { .. }
         | Problem::WriteFailed { .. }
-        | Problem::SeabagUnreadable { .. }
+        | Problem::TaskbagUnreadable { .. }
         | Problem::CreateFailed { .. }
         | Problem::ReadFailed { .. } => EXIT_BUSY,
         _ => EXIT_REFUSED,
@@ -322,7 +335,7 @@ fn issue_json(i: &Issue) -> Value {
     json!({ "file": i.file, "field": i.field, "problem": problem_json(&i.problem) })
 }
 
-/// Run `fh` with these arguments from `cwd`; print the result and return the exit code.
+/// Run `alm` with these arguments from `cwd`; print the result and return the exit code.
 pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
     let wants_json = args.iter().any(|a| a == "--json");
     let cli = match Cli::try_parse_from(args) {
@@ -352,7 +365,7 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
     match execute(&cli, cwd) {
         Ok(mut done) => {
             if (cli.commit || cli.push) && cli.command.changes() {
-                if let Some(root) = done.fields["seabag"].as_str().map(PathBuf::from) {
+                if let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) {
                     // A task added without an ID: name the one it got.
                     let made = done.fields["task"]["id"].as_str().map(String::from);
                     done.warnings
@@ -374,7 +387,7 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
                 }
                 if !done.issues.is_empty() {
                     eprintln!(
-                        "note: {} problem(s) in the seabag's files; see `fh list --json` or the app.",
+                        "note: {} problem(s) in the taskbag's files; see `alm list --json` or the app.",
                         done.issues.len()
                     );
                 }
@@ -412,16 +425,19 @@ fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
     }
 }
 
-/// `--commit` / `--push`: commit only the seabag's files (other changes are left alone), then
+/// `--commit` / `--push`: commit only the taskbag's files (other changes are left alone), then
 /// push if asked. The change itself is already saved, so a Git failure is a warning, not an error.
-fn share(cli: &Cli, seabag: &Path, extra: &[String], made: Option<&str>) -> Vec<Problem> {
+fn share(cli: &Cli, taskbag: &Path, extra: &[String], made: Option<&str>) -> Vec<Problem> {
     let command = cli.command.name();
     let subject = match cli.command.target().or(made) {
-        Some(id) => format!("fh: {command} {id}"),
-        None => format!("fh: {command}"),
+        Some(id) => format!("alm: {command} {id}"),
+        None => format!("alm: {command}"),
     };
-    let agent = format!("Agent: {}", cli.holder.as_deref().unwrap_or("unknown (fh)"));
-    // The seabag ("."), plus any other files the command wrote (for `init`, AGENTS.md / CLAUDE.md).
+    let agent = format!(
+        "Agent: {}",
+        cli.holder.as_deref().unwrap_or("unknown (alm)")
+    );
+    // The taskbag ("."), plus any other files the command wrote (for `init`, AGENTS.md / CLAUDE.md).
     let paths: Vec<&str> = std::iter::once(".")
         .chain(extra.iter().map(String::as_str))
         .collect();
@@ -432,7 +448,7 @@ fn share(cli: &Cli, seabag: &Path, extra: &[String], made: Option<&str>) -> Vec<
             .chain(["--"])
             .chain(paths.iter().copied())
             .collect();
-        git(seabag, &args)
+        git(taskbag, &args)
     };
     let commit = (|| {
         run(&["add", "--all"])?;
@@ -446,7 +462,7 @@ fn share(cli: &Cli, seabag: &Path, extra: &[String], made: Option<&str>) -> Vec<
     match commit {
         Err(detail) => vec![Problem::CommitFailed { detail }],
         Ok(_) if !cli.push => vec![],
-        Ok(_) => match git(seabag, &["push", "--quiet"]) {
+        Ok(_) => match git(taskbag, &["push", "--quiet"]) {
             Ok(_) => vec![],
             Err(detail) => vec![Problem::PushFailed { detail }],
         },
@@ -462,47 +478,65 @@ fn print_error(command: Option<&str>, problem: &Problem) {
 
 /// The entry point of both programs.
 pub fn main() -> i32 {
+    // Before the rename the settings were FLIPHOPPER_*; honour them when the new ones are unset.
+    for (new, old) in [
+        ("ALLOMOS_TASKBAG", "FLIPHOPPER_SEABAG"),
+        ("ALLOMOS_HOLDER", "FLIPHOPPER_HOLDER"),
+        ("ALLOMOS_SETTINGS_DIR", "FLIPHOPPER_SETTINGS_DIR"),
+        ("ALLOMOS_LOCK_WAIT_MS", "FLIPHOPPER_LOCK_WAIT_MS"),
+    ] {
+        if std::env::var_os(new).is_none() {
+            if let Some(value) = std::env::var_os(old) {
+                // SAFETY: at the very start of the program, before any thread exists.
+                unsafe { std::env::set_var(new, value) };
+            }
+        }
+    }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     run(std::env::args_os().collect(), &cwd)
 }
 
 fn lock_wait() -> Duration {
-    let ms = std::env::var("FLIPHOPPER_LOCK_WAIT_MS")
+    let ms = std::env::var("ALLOMOS_LOCK_WAIT_MS")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(LOCK_WAIT_MS);
     Duration::from_millis(ms)
 }
 
-/// The seabag to work on: `--seabag` / `FLIPHOPPER_SEABAG` (the seabag itself, or a folder
-/// holding `.fliphopper/seabag/`), else the nearest one at or above `cwd`.
+/// The taskbag to work on: `--taskbag` / `ALLOMOS_TASKBAG` (the taskbag itself, or a folder
+/// holding `.allomos/taskbag/`), else the nearest one at or above `cwd`.
 fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
-    let not_found = |p: &Path| Problem::SeabagNotFound {
+    let not_found = |p: &Path| Problem::TaskbagNotFound {
         path: p.display().to_string(),
     };
-    match &cli.seabag {
+    match &cli.taskbag {
         Some(path) => {
             let path = cwd.join(path);
             if path.join("project.json").is_file() {
                 Ok(path)
             } else if path.join(DEFAULT_DIR).join("project.json").is_file() {
                 Ok(path.join(DEFAULT_DIR))
+            } else if path
+                .join(allomos_store::LEGACY_DIR)
+                .join("project.json")
+                .is_file()
+            {
+                Ok(path.join(allomos_store::LEGACY_DIR))
             } else {
                 Err(not_found(&path))
             }
         }
-        None => find_seabag(cwd).ok_or_else(|| not_found(cwd)),
+        None => find_taskbag(cwd).ok_or_else(|| not_found(cwd)),
     }
 }
 
 /// One line saying which language to write tasks in, and why.
-fn language_line(l: &fliphopper_store::TaskLanguage) -> String {
+fn language_line(l: &allomos_store::TaskLanguage) -> String {
     let why = match l.source {
-        "seabag" => "set in this seabag".to_string(),
-        "app" => "follows the FlipHopper app's language".to_string(),
-        _ => {
-            "follows this computer's language; the FlipHopper app has not saved one yet".to_string()
-        }
+        "taskbag" => "set in this taskbag".to_string(),
+        "app" => "follows the Allomos app's language".to_string(),
+        _ => "follows this computer's language; the Allomos app has not saved one yet".to_string(),
     };
     format!(
         "Write new and changed tasks in: {} ({why}). Keep IDs, commands, code and file names as they are.",
@@ -510,40 +544,40 @@ fn language_line(l: &fliphopper_store::TaskLanguage) -> String {
     )
 }
 
-/// The project folder `fh confirm` asks about: the folder holding the seabag given with
-/// `--seabag` (which may not exist yet), else the nearest seabag's, else the Git repository's
+/// The project folder `alm confirm` asks about: the folder holding the taskbag given with
+/// `--taskbag` (which may not exist yet), else the nearest taskbag's, else the Git repository's
 /// root, else `cwd`.
 fn confirm_project(cli: &Cli, cwd: &Path) -> PathBuf {
-    let seabag = match &cli.seabag {
+    let taskbag = match &cli.taskbag {
         Some(path) => cwd.join(path),
-        None => find_seabag(cwd).unwrap_or_else(|| {
+        None => find_taskbag(cwd).unwrap_or_else(|| {
             git_root(cwd)
                 .unwrap_or_else(|| cwd.to_path_buf())
                 .join(DEFAULT_DIR)
         }),
     };
-    picked_folder(&seabag)
+    picked_folder(&taskbag)
         .map(Path::to_path_buf)
-        .unwrap_or(seabag)
+        .unwrap_or(taskbag)
 }
 
-/// How often `fh confirm` looks for the answer, and how long it gives an open app to show the
+/// How often `alm confirm` looks for the answer, and how long it gives an open app to show the
 /// question before opening the app itself.
 const CONFIRM_POLL: Duration = Duration::from_millis(250);
 const CONFIRM_LAUNCH_AFTER: Duration = Duration::from_secs(3);
 
-/// Open the FlipHopper app on `project`, so it can show the question. macOS only for now;
-/// `FLIPHOPPER_NO_LAUNCH` turns it off (tests).
+/// Open the Allomos app on `project`, so it can show the question. macOS only for now;
+/// `ALLOMOS_NO_LAUNCH` turns it off (tests).
 fn open_app(project: &Path) {
-    if cfg!(target_os = "macos") && std::env::var_os("FLIPHOPPER_NO_LAUNCH").is_none() {
+    if cfg!(target_os = "macos") && std::env::var_os("ALLOMOS_NO_LAUNCH").is_none() {
         let _ = std::process::Command::new("open")
-            .args(["-n", "-b", "io.fliphopper", "--args"])
+            .args(["-n", "-b", "io.allomos", "--args"])
             .arg(project)
             .status();
     }
 }
 
-/// `fh confirm`: leave the question, wait for the person's answer in the app, then tidy up.
+/// `alm confirm`: leave the question, wait for the person's answer in the app, then tidy up.
 fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Result<Done, Problem> {
     let project = confirm_project(cli, cwd);
     let path = cwd.join(plan);
@@ -567,7 +601,7 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
         })?;
     if !cli.json {
         eprintln!(
-            "Waiting for the person to answer in the FlipHopper app (project {})…",
+            "Waiting for the person to answer in the Allomos app (project {})…",
             project.display()
         );
     }
@@ -599,13 +633,10 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
     }
 }
 
-fn seabag_of(
-    root: &Path,
-    loaded: fliphopper_core::Loaded,
-) -> Result<(Seabag, Vec<Issue>), Problem> {
-    match loaded.seabag {
+fn taskbag_of(root: &Path, loaded: allomos_core::Loaded) -> Result<(Taskbag, Vec<Issue>), Problem> {
+    match loaded.taskbag {
         Some(bag) => Ok((bag, loaded.issues)),
-        None => Err(Problem::SeabagUnreadable {
+        None => Err(Problem::TaskbagUnreadable {
             path: root.display().to_string(),
             detail: loaded
                 .issues
@@ -657,7 +688,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             labels,
             write_agent_files,
         } => {
-            let root = match &cli.seabag {
+            let root = match &cli.taskbag {
                 Some(p) => cwd.join(p),
                 None => git_root(cwd)
                     .unwrap_or_else(|| cwd.to_path_buf())
@@ -678,12 +709,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .filter(|l| !l.is_empty())
                     .map(String::from)
                     .collect(),
-                None => fliphopper_core::default_labels(),
+                None => allomos_core::default_labels(),
             };
             let root = init_with_labels(&root, &id, &name, labels)?;
-            let mut text = format!("Created an empty seabag at {}\n", root.display());
-            // Tell AI agents about FlipHopper in the project's instruction files: by default ask
-            // the agent running `fh init` to merge the section in; with --write-agent-files, write it.
+            let mut text = format!("Created an empty taskbag at {}\n", root.display());
+            // Tell AI agents about Allomos in the project's instruction files: by default ask
+            // the agent running `alm init` to merge the section in; with --write-agent-files, write it.
             let mut agent_files = Vec::new();
             let mut warnings = Vec::new();
             let project = picked_folder(&root).unwrap_or(&root).to_path_buf();
@@ -699,7 +730,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             }
             if !agent_files.is_empty() {
                 text.push_str(&format!(
-                    "Added FlipHopper's section for AI agents to {}\n",
+                    "Added Allomos's section for AI agents to {}\n",
                     agent_files.join(" and ")
                 ));
             }
@@ -708,7 +739,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(request);
             }
             let mut done = Done::new(
-                json!({ "seabag": root, "agent_files": agent_files, "agent_setup": agent_setup }),
+                json!({ "taskbag": root, "agent_files": agent_files, "agent_setup": agent_setup }),
                 text,
             );
             done.warnings = warnings;
@@ -720,12 +751,29 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             plan,
             timeout,
         } => confirm(cli, cwd, title, plan, *timeout),
+        Command::Migrate => {
+            let root = locate(cli, cwd)?;
+            if !allomos_store::is_legacy_taskbag(&root) {
+                let text = format!("Already in the new place: {}\n", root.display());
+                return Ok(Done::new(json!({ "taskbag": root, "moved": false }), text));
+            }
+            let new = allomos_store::move_legacy_taskbag(&root)?;
+            let text = format!(
+                "Moved {} to {}\nRefresh the AGENTS.md section with `alm brief`.\n",
+                root.display(),
+                new.display()
+            );
+            Ok(Done::new(
+                json!({ "taskbag": new, "moved": true, "from": root }),
+                text,
+            ))
+        }
         Command::Brief => {
-            // With a seabag, the section names it when it is outside the project folder.
+            // With a taskbag, the section names it when it is outside the project folder.
             let text = match locate(cli, cwd) {
                 Ok(root) => {
                     let project = load(&root)
-                        .seabag
+                        .taskbag
                         .and_then(|bag| project_folder_of(&root, &bag.project))
                         .unwrap_or_else(|| picked_folder(&root).unwrap_or(&root).to_path_buf());
                     agent_section_for(&project, &root)
@@ -741,13 +789,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::TaskLanguage { value: Some(value) } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;
-            let (bag, issues) = seabag_of(&root, lock.load())?;
+            let (bag, issues) = taskbag_of(&root, lock.load())?;
             let project = ops::set_task_language(&bag, value)?;
             lock.save_project(&project)?;
             let system: Vec<String> = sys_locale::get_locales().collect();
             let now = task_language(&project, &system);
             let mut done = Done::new(
-                json!({ "seabag": root, "task_language": now }),
+                json!({ "taskbag": root, "task_language": now }),
                 format!(
                     "Task language set to {}. {}\n",
                     now.setting,
@@ -759,11 +807,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         Command::TaskLanguage { value: None } => {
             let root = locate(cli, cwd)?;
-            let (bag, issues) = seabag_of(&root, load(&root))?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
             let system: Vec<String> = sys_locale::get_locales().collect();
             let now = task_language(&bag.project, &system);
             let mut done = Done::new(
-                json!({ "seabag": root, "task_language": now }),
+                json!({ "taskbag": root, "task_language": now }),
                 format!("{}\n", language_line(&now)),
             );
             done.issues = issues;
@@ -772,12 +820,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Labels { ladder } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;
-            let (bag, issues) = seabag_of(&root, lock.load())?;
+            let (bag, issues) = taskbag_of(&root, lock.load())?;
             let labels: Vec<String> = ladder.split(',').map(String::from).collect();
             let project = ops::set_ladder(&bag, &labels)?;
             lock.save_project(&project)?;
             let mut done = Done::new(
-                json!({ "seabag": root, "labels": project.labels }),
+                json!({ "taskbag": root, "labels": project.labels }),
                 format!("Label ladder: {}\n", project.labels.join(" → ")),
             );
             done.issues = issues;
@@ -786,13 +834,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Add(add) => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;
-            let (bag, issues) = seabag_of(&root, lock.load())?;
+            let (bag, issues) = taskbag_of(&root, lock.load())?;
             let mut done = match add {
                 Add::Area { id, name } => {
                     let area = ops::new_area(&bag, id, name)?;
                     lock.create_area(&area)?;
                     let text = format!("Added area {} ({})\n", area.id, area.name);
-                    Done::new(json!({ "seabag": root, "area": area }), text)
+                    Done::new(json!({ "taskbag": root, "area": area }), text)
                 }
                 Add::Iteration {
                     id,
@@ -809,7 +857,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     let iteration = ops::new_iteration(&bag, id, name, details)?;
                     lock.create_iteration(&iteration)?;
                     let text = format!("Added iteration {}\n", iteration_heading(&iteration));
-                    Done::new(json!({ "seabag": root, "iteration": iteration }), text)
+                    Done::new(json!({ "taskbag": root, "iteration": iteration }), text)
                 }
                 Add::Task {
                     id,
@@ -824,7 +872,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     let task = ops::new_task(&bag, &id, area, title, description.as_deref())?;
                     lock.create_task(&task)?;
                     let text = format!("Added {}\n", task_line(&task));
-                    Done::new(json!({ "seabag": root, "task": task_json(&task) }), text)
+                    Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text)
                 }
             };
             done.issues = issues;
@@ -838,7 +886,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             mine,
         } => {
             let root = locate(cli, cwd)?;
-            let (bag, issues) = seabag_of(&root, load(&root))?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
             if *mine && me.is_none() {
                 return Err(Problem::HolderMissing);
             }
@@ -902,7 +950,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     })
                     .collect();
                 group("Unplanned".to_string(), &unplanned);
-                json!({ "seabag": root, "iterations": groups, "unplanned": tasks_json(&unplanned) })
+                json!({ "taskbag": root, "iterations": groups, "unplanned": tasks_json(&unplanned) })
             } else {
                 let mut groups = Vec::new();
                 for a in &bag.areas {
@@ -916,7 +964,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         "tasks": tasks_json(&members),
                     }));
                 }
-                json!({ "seabag": root, "areas": groups })
+                json!({ "taskbag": root, "areas": groups })
             };
             if text.is_empty() {
                 text.push_str("No tasks.\n");
@@ -927,7 +975,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         Command::Show { id } => {
             let root = locate(cli, cwd)?;
-            let (bag, issues) = seabag_of(&root, load(&root))?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
             let task = ops::find_task(&bag, id)?;
             let mut text = String::new();
             let fields = [
@@ -951,13 +999,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push('\n');
                 text.push_str(&task.description);
             }
-            let mut done = Done::new(json!({ "seabag": root, "task": task_json(&task) }), text);
+            let mut done = Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text);
             done.issues = issues;
             Ok(done)
         }
         Command::Next => {
             let root = locate(cli, cwd)?;
-            let (bag, issues) = seabag_of(&root, load(&root))?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
             let task = ops::next(&bag);
             let text = match task {
                 Some(t) => {
@@ -969,7 +1017,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => "No ready task is free.\n".to_string(),
             };
-            let mut done = Done::new(json!({ "seabag": root, "task": task.map(task_json) }), text);
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task.map(task_json) }),
+                text,
+            );
             done.issues = issues;
             Ok(done)
         }
@@ -991,21 +1042,21 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     }
 }
 
-/// One change to one task, under the seabag's lock: load, apply the rule, write.
+/// One change to one task, under the taskbag's lock: load, apply the rule, write.
 fn change(
     cli: &Cli,
     cwd: &Path,
-    rule: impl FnOnce(&Seabag) -> Result<Outcome, Problem>,
+    rule: impl FnOnce(&Taskbag) -> Result<Outcome, Problem>,
 ) -> Result<Done, Problem> {
     let root = locate(cli, cwd)?;
     let lock = Lock::acquire(&root, lock_wait())?;
-    let (bag, issues) = seabag_of(&root, lock.load())?;
+    let (bag, issues) = taskbag_of(&root, lock.load())?;
     let outcome = rule(&bag)?;
     lock.save_task(&outcome.task)?;
     drop(lock);
     let text = format!("{}\n", task_line(&outcome.task));
     let mut done = Done::new(
-        json!({ "seabag": root, "task": task_json(&outcome.task) }),
+        json!({ "taskbag": root, "task": task_json(&outcome.task) }),
         text,
     );
     done.warnings = outcome.warnings;

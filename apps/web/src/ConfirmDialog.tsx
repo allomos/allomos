@@ -1,7 +1,7 @@
-// The popup for `fh confirm` (Task-A05-02): an AI agent asks the person before it changes the
-// project, for example before moving the project's tasks into FlipHopper. The window looks for
+// The popup for `alm confirm` (Task-A05-02): an AI agent asks the person before it changes the
+// project, for example before moving the project's tasks into Allomos. The window looks for
 // questions about the folder it shows about once a second; the person reads the agent's plan and
-// chooses Go ahead or Cancel, and `fh confirm` hands that answer back to the agent.
+// chooses Go ahead or Cancel, and `alm confirm` hands that answer back to the agent.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -10,7 +10,7 @@ import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { ConfirmRequest } from "./types";
 
-/** How often the window looks for questions. `fh confirm` opens the app if none is seen in 3 s. */
+/** How often the window looks for questions. `alm confirm` opens the app if none is seen in 3 s. */
 const LOOK_MS = 1000;
 
 export function ConfirmDialog({

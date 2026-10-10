@@ -1,11 +1,11 @@
 //! Task changes and their rules.
 //!
-//! Each function takes the seabag as it is now and returns the changed item, or the
+//! Each function takes the taskbag as it is now and returns the changed item, or the
 //! [`Problem`] that refuses the change. Nothing here touches the disk: the caller loads
-//! the seabag, applies one change and writes the result, all while holding the
-//! seabag's lock (see `crates/store`).
+//! the taskbag, applies one change and writes the result, all while holding the
+//! taskbag's lock (see `crates/store`).
 
-use crate::model::{Area, Iteration, Project, Seabag, State, Task};
+use crate::model::{Area, Iteration, Project, State, Task, Taskbag};
 use crate::problem::Problem;
 use crate::validate::valid_date;
 
@@ -49,8 +49,8 @@ fn non_empty(text: Option<&str>) -> Option<String> {
 }
 
 /// The task with this ID, cloned for changing.
-pub fn find_task(seabag: &Seabag, id: &str) -> Result<Task, Problem> {
-    seabag
+pub fn find_task(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
+    taskbag
         .tasks
         .iter()
         .find(|t| t.id == id)
@@ -81,13 +81,13 @@ fn check_open(task: &Task, closed: &[State]) -> Result<(), Problem> {
 }
 
 /// A new area. Its ID must be valid and unused, and it needs a name.
-pub fn new_area(seabag: &Seabag, id: &str, name: &str) -> Result<Area, Problem> {
+pub fn new_area(taskbag: &Taskbag, id: &str, name: &str) -> Result<Area, Problem> {
     check_id(id)?;
-    if seabag.areas.iter().any(|a| a.id == id) {
+    if taskbag.areas.iter().any(|a| a.id == id) {
         return Err(Problem::DuplicateAreaId { id: id.to_string() });
     }
     let name = non_empty(Some(name)).ok_or(Problem::AreaNameMissing)?;
-    let order = seabag.areas.iter().map(|a| a.order).max().unwrap_or(0) + 1;
+    let order = taskbag.areas.iter().map(|a| a.order).max().unwrap_or(0) + 1;
     Ok(Area {
         id: id.to_string(),
         name,
@@ -98,14 +98,14 @@ pub fn new_area(seabag: &Seabag, id: &str, name: &str) -> Result<Area, Problem> 
 /// The next free task ID in `area`, following the project's own pattern `<area>-<number>`:
 /// one more than the highest number used, as wide as the widest one (at least two digits).
 /// Child tasks (`A01-03-01`) and other IDs do not count. Refused when the area does not exist.
-pub fn next_task_id(seabag: &Seabag, area: &str) -> Result<String, Problem> {
-    if !seabag.areas.iter().any(|a| a.id == area) {
+pub fn next_task_id(taskbag: &Taskbag, area: &str) -> Result<String, Problem> {
+    if !taskbag.areas.iter().any(|a| a.id == area) {
         return Err(Problem::UnknownArea {
             area: area.to_string(),
         });
     }
     let prefix = format!("{area}-");
-    let (highest, width) = seabag
+    let (highest, width) = taskbag
         .tasks
         .iter()
         .filter_map(|t| t.id.strip_prefix(&prefix))
@@ -115,9 +115,9 @@ pub fn next_task_id(seabag: &Seabag, area: &str) -> Result<String, Problem> {
     Ok(format!("{prefix}{:0width$}", highest + 1))
 }
 
-/// The project with a new task language (`fh language`): `ui` to follow the FlipHopper app's
+/// The project with a new task language (`alm language`): `ui` to follow the Allomos app's
 /// language, or a language code. Refused when it is neither.
-pub fn set_task_language(seabag: &Seabag, value: &str) -> Result<Project, Problem> {
+pub fn set_task_language(taskbag: &Taskbag, value: &str) -> Result<Project, Problem> {
     let value = value.trim();
     if value != crate::model::TASK_LANGUAGE_UI && !crate::model::valid_language(value) {
         return Err(Problem::InvalidLanguage {
@@ -126,13 +126,13 @@ pub fn set_task_language(seabag: &Seabag, value: &str) -> Result<Project, Proble
     }
     Ok(Project {
         task_language: Some(value.to_string()),
-        ..seabag.project.clone()
+        ..taskbag.project.clone()
     })
 }
 
-/// The project with a new label ladder, lowest step first (`fh labels`). Refused when it is
+/// The project with a new label ladder, lowest step first (`alm labels`). Refused when it is
 /// empty, or when a task's label is not on it: changing the ladder never strands a task.
-pub fn set_ladder(seabag: &Seabag, labels: &[String]) -> Result<Project, Problem> {
+pub fn set_ladder(taskbag: &Taskbag, labels: &[String]) -> Result<Project, Problem> {
     let labels: Vec<String> = labels
         .iter()
         .map(|l| l.trim().to_string())
@@ -141,7 +141,7 @@ pub fn set_ladder(seabag: &Seabag, labels: &[String]) -> Result<Project, Problem
     if labels.is_empty() {
         return Err(Problem::LadderEmpty);
     }
-    if let Some(label) = seabag
+    if let Some(label) = taskbag
         .tasks
         .iter()
         .filter_map(|t| t.label.as_ref())
@@ -154,7 +154,7 @@ pub fn set_ladder(seabag: &Seabag, labels: &[String]) -> Result<Project, Problem
     }
     Ok(Project {
         labels,
-        ..seabag.project.clone()
+        ..taskbag.project.clone()
     })
 }
 
@@ -169,13 +169,13 @@ pub struct IterationDetails<'a> {
 /// A new iteration, ordered after the existing ones. Its ID must be valid and unused, it needs a
 /// name, and its dates must be `YYYY-MM-DD`.
 pub fn new_iteration(
-    seabag: &Seabag,
+    taskbag: &Taskbag,
     id: &str,
     name: &str,
     details: IterationDetails,
 ) -> Result<Iteration, Problem> {
     check_id(id)?;
-    if seabag.iterations.iter().any(|i| i.id == id) {
+    if taskbag.iterations.iter().any(|i| i.id == id) {
         return Err(Problem::DuplicateIterationId { id: id.to_string() });
     }
     let name = non_empty(Some(name)).ok_or(Problem::IterationNameMissing)?;
@@ -183,7 +183,13 @@ pub fn new_iteration(
         Some(d) if !valid_date(&d) => Err(Problem::InvalidDate { value: d }),
         d => Ok(d),
     };
-    let order = seabag.iterations.iter().map(|i| i.order).max().unwrap_or(0) + 1;
+    let order = taskbag
+        .iterations
+        .iter()
+        .map(|i| i.order)
+        .max()
+        .unwrap_or(0)
+        + 1;
     Ok(Iteration {
         id: id.to_string(),
         name,
@@ -197,11 +203,11 @@ pub fn new_iteration(
 /// Plan the task in an iteration, or take it out of its iteration with `None`. Planning is not
 /// progress, so anyone may do it, whoever holds the task and in any state (a finished task can
 /// still be placed in the iteration it was finished in).
-pub fn plan(seabag: &Seabag, id: &str, iteration: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+pub fn plan(taskbag: &Taskbag, id: &str, iteration: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
     let iteration = non_empty(iteration);
     if let Some(it) = &iteration {
-        if !seabag.iterations.iter().any(|i| &i.id == it) {
+        if !taskbag.iterations.iter().any(|i| &i.id == it) {
             return Err(Problem::UnknownIteration {
                 iteration: it.clone(),
             });
@@ -214,17 +220,17 @@ pub fn plan(seabag: &Seabag, id: &str, iteration: Option<&str>) -> Result<Outcom
 /// A new task in `backlog`. Its ID must be valid and unused, its area must exist, and it
 /// needs a title.
 pub fn new_task(
-    seabag: &Seabag,
+    taskbag: &Taskbag,
     id: &str,
     area: &str,
     title: &str,
     description: Option<&str>,
 ) -> Result<Task, Problem> {
     check_id(id)?;
-    if seabag.tasks.iter().any(|t| t.id == id) {
+    if taskbag.tasks.iter().any(|t| t.id == id) {
         return Err(Problem::DuplicateTaskId { id: id.to_string() });
     }
-    if !seabag.areas.iter().any(|a| a.id == area) {
+    if !taskbag.areas.iter().any(|a| a.id == area) {
         return Err(Problem::UnknownArea {
             area: area.to_string(),
         });
@@ -251,9 +257,14 @@ pub fn new_task(
 
 /// `me` takes the task and starts it. Refused without a name, when someone else holds it
 /// (unless `take` is set, which takes it over with a warning), or when it is done or dropped.
-pub fn claim(seabag: &Seabag, id: &str, me: Option<&str>, take: bool) -> Result<Outcome, Problem> {
+pub fn claim(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    take: bool,
+) -> Result<Outcome, Problem> {
     let me = non_empty(me).ok_or(Problem::HolderMissing)?;
-    let mut task = find_task(seabag, id)?;
+    let mut task = find_task(taskbag, id)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     let mut warnings = Vec::new();
     if let Err(held) = check_holder(&task, Some(&me)) {
@@ -273,18 +284,18 @@ pub fn claim(seabag: &Seabag, id: &str, me: Option<&str>, take: bool) -> Result<
 
 /// Set the task's label. It must be a step on the project's ladder.
 pub fn set_label(
-    seabag: &Seabag,
+    taskbag: &Taskbag,
     id: &str,
     me: Option<&str>,
     label: &str,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Dropped])?;
-    if !seabag.project.labels.iter().any(|l| l == label) {
+    if !taskbag.project.labels.iter().any(|l| l == label) {
         return Err(Problem::LabelNotOnLadder {
             label: label.to_string(),
-            ladder: seabag.project.labels.join(" → "),
+            ladder: taskbag.project.labels.join(" → "),
         });
     }
     task.label = Some(label.to_string());
@@ -292,8 +303,8 @@ pub fn set_label(
 }
 
 /// Park the task as `waiting`, saying what it waits on.
-pub fn wait(seabag: &Seabag, id: &str, me: Option<&str>, on: &str) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+pub fn wait(taskbag: &Taskbag, id: &str, me: Option<&str>, on: &str) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     task.waiting_on = Some(non_empty(Some(on)).ok_or(Problem::WaitingOnMissing)?);
@@ -302,12 +313,12 @@ pub fn wait(seabag: &Seabag, id: &str, me: Option<&str>, on: &str) -> Result<Out
 }
 
 /// Finish the task. Allowed below the top label, with a warning (owner, 2026-10-06).
-pub fn finish(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+pub fn finish(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Dropped])?;
     let mut warnings = Vec::new();
-    if let Some(top) = seabag.project.labels.last() {
+    if let Some(top) = taskbag.project.labels.last() {
         if task.label.as_ref() != Some(top) {
             warnings.push(Problem::LabelBelowTop {
                 label: task.label.clone().unwrap_or_else(|| "none".to_string()),
@@ -324,12 +335,12 @@ pub fn finish(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome, Pr
 /// replaced by `note`, or removed when there is none, so it always describes the latest
 /// release.
 pub fn release(
-    seabag: &Seabag,
+    taskbag: &Taskbag,
     id: &str,
     me: Option<&str>,
     note: Option<&str>,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     task.holder = None;
     if task.state == State::InProgress {
@@ -342,12 +353,12 @@ pub fn release(
 /// Set the task's next dependency: the one thing needed for its next label. `None` (or empty
 /// text) clears it.
 pub fn set_next(
-    seabag: &Seabag,
+    taskbag: &Taskbag,
     id: &str,
     me: Option<&str>,
     text: Option<&str>,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Dropped])?;
     task.next_dependency = non_empty(text);
@@ -356,8 +367,8 @@ pub fn set_next(
 
 /// Mark an unheld `backlog` or `waiting` task `ready` (for example, the owner approved it).
 /// Its *waiting on* is cleared.
-pub fn make_ready(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     if task.holder.is_some() || !matches!(task.state, State::Backlog | State::Waiting) {
         return Err(Problem::CannotMakeReady {
@@ -371,8 +382,8 @@ pub fn make_ready(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome
 }
 
 /// Drop the task: it will not be done. Its holder and *waiting on* are cleared.
-pub fn drop_task(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(seabag, id)?;
+pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     task.state = State::Dropped;
@@ -382,15 +393,15 @@ pub fn drop_task(seabag: &Seabag, id: &str, me: Option<&str>) -> Result<Outcome,
 }
 
 /// The first task that is `ready` and held by no one: by area order, then area ID, then task ID.
-pub fn next(seabag: &Seabag) -> Option<&Task> {
+pub fn next(taskbag: &Taskbag) -> Option<&Task> {
     let area_rank = |area: &str| {
-        seabag
+        taskbag
             .areas
             .iter()
             .position(|a| a.id == area)
             .unwrap_or(usize::MAX)
     };
-    seabag
+    taskbag
         .tasks
         .iter()
         .filter(|t| t.state == State::Ready && t.holder.is_none())
@@ -406,8 +417,8 @@ mod tests {
     use super::*;
     use crate::model::default_labels;
 
-    fn bag() -> Seabag {
-        let mut s = Seabag {
+    fn bag() -> Taskbag {
+        let mut s = Taskbag {
             project: Project {
                 format: crate::FORMAT.into(),
                 id: "p".into(),
@@ -430,7 +441,7 @@ mod tests {
         s
     }
 
-    /// Store a changed task back into the seabag, as writing and reloading would.
+    /// Store a changed task back into the taskbag, as writing and reloading would.
     macro_rules! put {
         ($s:ident, $task:expr $(,)?) => {{
             let t: Task = $task;

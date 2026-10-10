@@ -1,10 +1,10 @@
-// "Tell AI agents about FlipHopper?" (Task-A03-03): lists the AI agents on this computer, lets the
+// "Tell AI agents about Allomos?" (Task-A03-03): lists the AI agents on this computer, lets the
 // person pick one or more and the project folder, then opens each with the request typed in.
-// FlipHopper never sends the request; the person does.
+// Allomos never sends the request; the person does.
 //
 // In "convert" mode (Task-A05-02) the request is to find the project's tasks and move them into
-// FlipHopper: the person picks exactly one agent, because two agents converting at once would add
-// every task twice. The agent asks before changing anything, with `fh confirm`.
+// Allomos: the person picks exactly one agent, because two agents converting at once would add
+// every task twice. The agent asks before changing anything, with `alm confirm`.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -33,15 +33,15 @@ const SPINNER_AFTER_MS = 200;
 export function AgentsPanel({
   messenger,
   project: startProject,
-  seabag,
+  taskbag,
   convert,
   onProjectChange,
   onDone,
 }: {
   messenger: Messenger;
   project: string;
-  seabag: string;
-  /** The request is to find the project's tasks and move them into FlipHopper. */
+  taskbag: string;
+  /** The request is to find the project's tasks and move them into Allomos. */
   convert?: boolean;
   /** Records a project folder the person chose with Change… (the open-folder flow). */
   onProjectChange?: (folder: string) => Promise<void>;
@@ -112,11 +112,11 @@ export function AgentsPanel({
     try {
       if (convert) {
         const agent = chosen[0];
-        await messenger.askAgentToConvert(agent, project, seabag, language);
+        await messenger.askAgentToConvert(agent, project, taskbag, language);
         onDone(t("agents.asked_convert", { agent: t(AGENT_KEY[agent]) }), true);
         return;
       }
-      const opened = await messenger.askAgents(chosen, project, seabag, language);
+      const opened = await messenger.askAgents(chosen, project, taskbag, language);
       const names = (agents ?? []).filter((a) => opened.includes(a.id)).map((a) => t(AGENT_KEY[a.id]));
       onDone(t("agents.asked", { agents: names.join(", ") }), true);
     } catch (e) {
@@ -151,7 +151,7 @@ export function AgentsPanel({
           {t("agents.change")}
         </button>
       </div>
-      <p className="muted">{t("agents.seabag", { path: seabag })}</p>
+      <p className="muted">{t("agents.taskbag", { path: taskbag })}</p>
       {agents === null ? (
         slow && (
           <p className="muted searching" role="status">

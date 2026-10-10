@@ -65,7 +65,7 @@
   "link_refused": [
     "link"
   ],
-  "not_a_seabag": [
+  "not_a_taskbag": [
     "path"
   ],
   "not_json": [
@@ -85,19 +85,6 @@
   "request_not_found": [
     "id"
   ],
-  "seabag_busy": [
-    "path"
-  ],
-  "seabag_exists": [
-    "path"
-  ],
-  "seabag_not_found": [
-    "path"
-  ],
-  "seabag_unreadable": [
-    "path",
-    "detail"
-  ],
   "startup_not_a_folder": [
     "path"
   ],
@@ -114,6 +101,19 @@
     "id"
   ],
   "task_title_missing": [],
+  "taskbag_busy": [
+    "path"
+  ],
+  "taskbag_exists": [
+    "path"
+  ],
+  "taskbag_not_found": [
+    "path"
+  ],
+  "taskbag_unreadable": [
+    "path",
+    "detail"
+  ],
   "took_over": [
     "id",
     "previous"

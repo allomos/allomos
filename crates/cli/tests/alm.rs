@@ -1,4 +1,4 @@
-//! `fh` run as a real program, the way agents run it: every command's success, its
+//! `alm` run as a real program, the way agents run it: every command's success, its
 //! refusals, its `--json` output and its exit codes, plus the race between two agents.
 //! Tests use temporary folders only.
 
@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
-const FH: &str = env!("CARGO_BIN_EXE_fh");
+const ALM: &str = env!("CARGO_BIN_EXE_alm");
 
 fn tmp(name: &str) -> PathBuf {
     static N: AtomicU32 = AtomicU32::new(0);
@@ -19,34 +19,34 @@ fn tmp(name: &str) -> PathBuf {
         .unwrap()
         .as_nanos();
     let p = std::env::temp_dir().join(format!(
-        "fh-test-{name}-{n}-{}",
+        "alm-test-{name}-{n}-{}",
         N.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir_all(&p).unwrap();
     p
 }
 
-/// `fh` in `dir`, with no FlipHopper settings inherited from the test's own environment.
-fn fh(dir: &Path, args: &[&str]) -> Output {
-    Command::new(FH)
+/// `alm` in `dir`, with no Allomos settings inherited from the test's own environment.
+fn alm(dir: &Path, args: &[&str]) -> Output {
+    Command::new(ALM)
         .current_dir(dir)
         .args(args)
-        .env_remove("FLIPHOPPER_SEABAG")
-        .env_remove("FLIPHOPPER_HOLDER")
-        .env_remove("FLIPHOPPER_LOCK_WAIT_MS")
+        .env_remove("ALLOMOS_TASKBAG")
+        .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .output()
         .unwrap()
 }
 
-/// `fh --json ...`: the exit code and the one JSON object on standard output.
+/// `alm --json ...`: the exit code and the one JSON object on standard output.
 fn fj(dir: &Path, args: &[&str]) -> (i32, Value) {
     let mut all = vec!["--json"];
     all.extend_from_slice(args);
-    let out = fh(dir, &all);
+    let out = alm(dir, &all);
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert_eq!(stdout.lines().count(), 1, "one line of JSON: {stdout:?}");
     let v: Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(v["schema"], "fh/1");
+    assert_eq!(v["schema"], "alm/1");
     assert!(out.stderr.is_empty(), "nothing for people with --json");
     (out.status.code().unwrap(), v)
 }
@@ -66,7 +66,7 @@ fn refused(dir: &Path, args: &[&str], want_code: i32, problem: &str) -> Value {
     v
 }
 
-/// A fresh Git-like repository (a `.git` folder is enough for `fh init`) with a seabag
+/// A fresh Git-like repository (a `.git` folder is enough for `alm init`) with a taskbag
 /// holding two areas and three tasks.
 fn filled() -> PathBuf {
     let repo = tmp("repo");
@@ -83,7 +83,7 @@ fn filled() -> PathBuf {
             "--area",
             "A01",
             "--title",
-            "Open a seabag",
+            "Open a taskbag",
             "--description",
             "A person opens a folder.",
         ],
@@ -101,15 +101,14 @@ fn filled() -> PathBuf {
 
 fn task_file(repo: &Path, id: &str) -> Value {
     let text =
-        fs::read_to_string(repo.join(format!(".fliphopper/seabag/tasks/{id}/task.json"))).unwrap();
+        fs::read_to_string(repo.join(format!(".allomos/taskbag/tasks/{id}/task.json"))).unwrap();
     serde_json::from_str(&text).unwrap()
 }
 
 #[test]
 fn both_names_run() {
-    let fliphopper =
-        Path::new(FH).with_file_name(format!("fliphopper{}", std::env::consts::EXE_SUFFIX));
-    let out = Command::new(fliphopper).arg("--version").output().unwrap();
+    let allomos = Path::new(ALM).with_file_name(format!("allomos{}", std::env::consts::EXE_SUFFIX));
+    let out = Command::new(allomos).arg("--version").output().unwrap();
     assert!(out.status.success());
     assert!(String::from_utf8_lossy(&out.stdout).contains("0.1.0"));
 }
@@ -118,20 +117,20 @@ fn both_names_run() {
 fn init_refuses_twice_and_needs_no_git() {
     let dir = tmp("plain");
     let v = ok(&dir, &["init"]);
-    let root = dir.join(".fliphopper/seabag");
+    let root = dir.join(".allomos/taskbag");
     // The command reports the real path (on macOS, /var is /private/var).
-    let reported = PathBuf::from(v["seabag"].as_str().unwrap());
+    let reported = PathBuf::from(v["taskbag"].as_str().unwrap());
     assert_eq!(reported, root.canonicalize().unwrap());
     assert!(!root.join(".git").exists() && !dir.join(".git").exists());
-    refused(&dir, &["init"], 1, "seabag_exists");
-    // From a subfolder of a repository, the seabag goes at the repository's root.
+    refused(&dir, &["init"], 1, "taskbag_exists");
+    // From a subfolder of a repository, the taskbag goes at the repository's root.
     let repo = tmp("sub");
     fs::create_dir_all(repo.join(".git")).unwrap();
     fs::create_dir_all(repo.join("src/deep")).unwrap();
     ok(&repo.join("src/deep"), &["init"]);
-    assert!(repo.join(".fliphopper/seabag/project.json").is_file());
+    assert!(repo.join(".allomos/taskbag/project.json").is_file());
     let project: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".fliphopper/seabag/project.json")).unwrap(),
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
     )
     .unwrap();
     assert_eq!(project["name"], repo.file_name().unwrap().to_str().unwrap());
@@ -186,9 +185,9 @@ fn work_one_task_from_claim_to_done() {
     assert_eq!(v["areas"].as_array().unwrap().len(), 1);
 
     // Text output for people.
-    let out = fh(&repo, &["list"]);
+    let out = alm(&repo, &["list"]);
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("A01  Tracking\n  A01-01  done  implemented  agent-a  Open a seabag"));
+    assert!(text.contains("A01  Tracking\n  A01-01  done  implemented  agent-a  Open a taskbag"));
 }
 
 #[test]
@@ -217,7 +216,7 @@ fn release_leaves_a_note_that_next_shows() {
         task_file(&repo, "A01-02")["handoff_note"],
         "tests pass; docs left"
     );
-    let text = String::from_utf8(fh(&repo, &["show", "A01-02"]).stdout).unwrap();
+    let text = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
     assert!(text.contains("handoff note: tests pass; docs left"));
     // A new agent resumes in one step.
     let v = ok(&repo, &["--as", "b", "claim", "A01-02"]);
@@ -275,22 +274,22 @@ fn refusals_have_codes_and_exit_codes() {
     refused(&repo, &["claim"], 2, "bad_usage");
     refused(&repo, &["list", "--state", "finished"], 2, "bad_usage");
     refused(&repo, &["frobnicate"], 2, "bad_usage");
-    refused(&tmp("none"), &["list"], 1, "seabag_not_found");
+    refused(&tmp("none"), &["list"], 1, "taskbag_not_found");
 }
 
 #[test]
-fn a_busy_seabag_exits_3() {
+fn a_busy_taskbag_exits_3() {
     let repo = filled();
-    let root = repo.join(".fliphopper/seabag");
-    let lock = fliphopper_store::Lock::acquire(&root, Duration::ZERO).unwrap();
-    let out = Command::new(FH)
+    let root = repo.join(".allomos/taskbag");
+    let lock = allomos_store::Lock::acquire(&root, Duration::ZERO).unwrap();
+    let out = Command::new(ALM)
         .current_dir(&repo)
         .args(["--json", "--as", "a", "claim", "A01-01"])
-        .env("FLIPHOPPER_LOCK_WAIT_MS", "50")
+        .env("ALLOMOS_LOCK_WAIT_MS", "50")
         .output()
         .unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(v["error"]["code"], "seabag_busy");
+    assert_eq!(v["error"]["code"], "taskbag_busy");
     assert_eq!(out.status.code(), Some(3));
     // Reading does not need the lock.
     ok(&repo, &["show", "A01-01"]);
@@ -299,33 +298,33 @@ fn a_busy_seabag_exits_3() {
 }
 
 #[test]
-fn seabag_found_by_option_variable_or_search() {
+fn taskbag_found_by_option_variable_or_search() {
     let repo = filled();
     let elsewhere = tmp("elsewhere");
-    // --seabag: the seabag itself, or the folder holding it.
+    // --taskbag: the taskbag itself, or the folder holding it.
     ok(
         &elsewhere,
-        &["--seabag", repo.to_str().unwrap(), "show", "A01-01"],
+        &["--taskbag", repo.to_str().unwrap(), "show", "A01-01"],
     );
-    let root = repo.join(".fliphopper/seabag");
+    let root = repo.join(".allomos/taskbag");
     ok(
         &elsewhere,
-        &["--seabag", root.to_str().unwrap(), "show", "A01-01"],
+        &["--taskbag", root.to_str().unwrap(), "show", "A01-01"],
     );
-    let out = Command::new(FH)
+    let out = Command::new(ALM)
         .current_dir(&elsewhere)
         .args(["--json", "claim", "A01-01"])
-        .env("FLIPHOPPER_SEABAG", &repo)
-        .env("FLIPHOPPER_HOLDER", "from-env")
+        .env("ALLOMOS_TASKBAG", &repo)
+        .env("ALLOMOS_HOLDER", "from-env")
         .output()
         .unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["task"]["holder"], "from-env");
     refused(
         &elsewhere,
-        &["--seabag", elsewhere.to_str().unwrap(), "list"],
+        &["--taskbag", elsewhere.to_str().unwrap(), "list"],
         1,
-        "seabag_not_found",
+        "taskbag_not_found",
     );
 }
 
@@ -343,16 +342,16 @@ fn racing_claims_have_exactly_one_winner() {
             &["add", "task", &id, "--area", "A02", "--title", "Race"],
         );
     }
-    let root = repo.join(".fliphopper/seabag");
+    let root = repo.join(".allomos/taskbag");
     let stop = AtomicBool::new(false);
     std::thread::scope(|s| {
         // A reader that keeps loading while the agents write.
         let reader = s.spawn(|| {
             let mut loads = 0;
             while !stop.load(Ordering::Relaxed) {
-                let loaded = fliphopper_store::load(&root);
+                let loaded = allomos_store::load(&root);
                 assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-                assert_eq!(loaded.seabag.unwrap().tasks.len(), 3 + ROUNDS);
+                assert_eq!(loaded.taskbag.unwrap().tasks.len(), 3 + ROUNDS);
                 loads += 1;
             }
             loads
@@ -361,10 +360,10 @@ fn racing_claims_have_exactly_one_winner() {
             let id = format!("R-{i:02}");
             let children: Vec<_> = (0..AGENTS)
                 .map(|a| {
-                    Command::new(FH)
+                    Command::new(ALM)
                         .current_dir(&repo)
                         .args(["--json", "--as", &format!("agent-{a}"), "claim", &id])
-                        .env_remove("FLIPHOPPER_LOCK_WAIT_MS")
+                        .env_remove("ALLOMOS_LOCK_WAIT_MS")
                         .stdout(std::process::Stdio::piped())
                         .spawn()
                         .unwrap()
@@ -418,7 +417,7 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     all
 }
 
-/// In a real Git repository, `git status` shows only the seabag's text files: never the lock.
+/// In a real Git repository, `git status` shows only the taskbag's text files: never the lock.
 #[test]
 fn git_sees_only_text_files() {
     let repo = tmp("git");
@@ -434,7 +433,7 @@ fn git_sees_only_text_files() {
         &["add", "task", "A01-01", "--area", "A01", "--title", "T"],
     );
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    assert!(repo.join(".fliphopper/seabag/.lock").exists());
+    assert!(repo.join(".allomos/taskbag/.lock").exists());
     let out = git(&["status", "--porcelain", "-uall"]).unwrap();
     let files: Vec<String> = String::from_utf8(out.stdout)
         .unwrap()
@@ -444,12 +443,12 @@ fn git_sees_only_text_files() {
     assert_eq!(
         files,
         [
-            ".fliphopper/seabag/.gitignore",
-            ".fliphopper/seabag/areas/.keep",
-            ".fliphopper/seabag/areas/A01.json",
-            ".fliphopper/seabag/project.json",
-            ".fliphopper/seabag/tasks/.keep",
-            ".fliphopper/seabag/tasks/A01-01/task.json",
+            ".allomos/taskbag/.gitignore",
+            ".allomos/taskbag/areas/.keep",
+            ".allomos/taskbag/areas/A01.json",
+            ".allomos/taskbag/project.json",
+            ".allomos/taskbag/tasks/.keep",
+            ".allomos/taskbag/tasks/A01-01/task.json",
         ]
     );
 }
@@ -464,7 +463,7 @@ fn needs_ready_drop_and_init_options() {
         task_file(&repo, "A01-01")["next_dependency"],
         "owner review"
     );
-    let out = fh(&repo, &["show", "A01-01"]);
+    let out = alm(&repo, &["show", "A01-01"]);
     assert!(String::from_utf8_lossy(&out.stdout).contains("next dependency: owner review"));
     ok(&repo, &["needs", "A01-01"]);
     assert!(task_file(&repo, "A01-01").get("next_dependency").is_none());
@@ -488,20 +487,20 @@ fn needs_ready_drop_and_init_options() {
         &[
             "init",
             "--id",
-            "fliphopper",
+            "allomos",
             "--labels",
             "drafted, owner verified",
         ],
     );
     let project: Value = serde_json::from_str(
-        &fs::read_to_string(dir.join(".fliphopper/seabag/project.json")).unwrap(),
+        &fs::read_to_string(dir.join(".allomos/taskbag/project.json")).unwrap(),
     )
     .unwrap();
-    assert_eq!(project["id"], "fliphopper");
+    assert_eq!(project["id"], "allomos");
     assert_eq!(project["labels"], json!(["drafted", "owner verified"]));
     let empty = tmp("init-empty-ladder");
     refused(&empty, &["init", "--labels", " , "], 1, "ladder_empty");
-    assert!(!empty.join(".fliphopper/seabag").exists());
+    assert!(!empty.join(".allomos/taskbag").exists());
 }
 
 fn git(dir: &Path, args: &[&str]) -> String {
@@ -544,13 +543,13 @@ fn real_repo() -> (PathBuf, PathBuf) {
 }
 
 #[test]
-fn commit_and_push_share_only_the_seabag() {
+fn commit_and_push_share_only_the_taskbag() {
     let (repo, remote) = real_repo();
     let v = ok(&repo, &["init", "--write-agent-files", "--commit"]);
     assert_eq!(v["warnings"], json!([]));
     assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
-    assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "fh: init");
-    // The agent files went into the same commit as the new seabag.
+    assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "alm: init");
+    // The agent files went into the same commit as the new taskbag.
     let files = git(&repo, &["show", "--name-only", "--format=", "HEAD"]);
     assert!(
         files.contains("AGENTS.md") && files.contains("CLAUDE.md"),
@@ -563,23 +562,23 @@ fn commit_and_push_share_only_the_seabag() {
             "add", "task", "A01-01", "--area", "A01", "--title", "T", "--commit",
         ],
     );
-    // Another changed file stays out of fh's commit.
+    // Another changed file stays out of alm's commit.
     fs::write(repo.join("README.md"), "changed\n").unwrap();
     let v = ok(&repo, &["--as", "agent-a", "claim", "A01-01", "--push"]);
     assert_eq!(v["warnings"], json!([]), "{v}");
     assert_eq!(
         git(&repo, &["log", "-1", "--format=%s%n%b"]),
-        "fh: claim A01-01\nAgent: agent-a"
+        "alm: claim A01-01\nAgent: agent-a"
     );
     assert_eq!(
         git(&repo, &["show", "--name-only", "--format=", "HEAD"]),
-        ".fliphopper/seabag/tasks/A01-01/task.json"
+        ".allomos/taskbag/tasks/A01-01/task.json"
     );
     assert_eq!(git(&repo, &["status", "--porcelain"]), "M README.md");
     // The push landed on the remote.
     assert_eq!(
         git(&remote, &["log", "-1", "--format=%s", "main"]),
-        "fh: claim A01-01"
+        "alm: claim A01-01"
     );
     // A change that changes nothing makes no commit.
     let before = git(&repo, &["rev-parse", "HEAD"]);
@@ -600,7 +599,7 @@ fn commit_outside_git_warns_and_keeps_the_change() {
     );
     assert_eq!(v["warnings"][0]["code"], "commit_failed", "{v}");
     assert!(
-        dir.join(".fliphopper/seabag/tasks/A01-01/task.json")
+        dir.join(".allomos/taskbag/tasks/A01-01/task.json")
             .is_file()
     );
 }
@@ -619,7 +618,7 @@ fn init_asks_the_agent_or_writes_when_told() {
     );
     assert!(!dir.join("AGENTS.md").exists() && !dir.join("CLAUDE.md").exists());
     let text = tmp("agent-ask-text");
-    let out = fh(&text, &["init"]);
+    let out = alm(&text, &["init"]);
     assert!(String::from_utf8_lossy(&out.stdout).contains("Next step for the AI agent"));
 
     // --write-agent-files: written directly, existing text kept.
@@ -629,7 +628,7 @@ fn init_asks_the_agent_or_writes_when_told() {
     assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
     assert_eq!(v["agent_setup"], Value::Null);
     let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
-    assert!(agents.starts_with("# Ours\n\n## Tasks: FlipHopper") && agents.contains("fh next"));
+    assert!(agents.starts_with("# Ours\n\n## Tasks: Allomos") && agents.contains("alm next"));
     assert_eq!(
         fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
         "@AGENTS.md\n"
@@ -678,7 +677,7 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
         "iteration_name_missing",
     );
     let file: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".fliphopper/seabag/iterations/I01.json")).unwrap(),
+        &fs::read_to_string(repo.join(".allomos/taskbag/iterations/I01.json")).unwrap(),
     )
     .unwrap();
     assert_eq!(
@@ -714,7 +713,7 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
     );
     refused(&repo, &["list", "--by", "week"], 2, "bad_usage");
 
-    let text = String::from_utf8(fh(&repo, &["list", "--by", "iteration"]).stdout).unwrap();
+    let text = String::from_utf8(alm(&repo, &["list", "--by", "iteration"]).stdout).unwrap();
     assert!(
         text.starts_with("I01  v0.1  (v0.1, until 2026-10-07)\n  A01-01  done"),
         "{text}"
@@ -723,7 +722,7 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
         text.ends_with("Unplanned\n  A01-02  backlog  -  -  List\n"),
         "{text}"
     );
-    let text = String::from_utf8(fh(&repo, &["show", "A02-01"]).stdout).unwrap();
+    let text = String::from_utf8(alm(&repo, &["show", "A02-01"]).stdout).unwrap();
     assert!(text.contains("iteration: I02\n"), "{text}");
 
     // No iteration given: the task is taken out and becomes unplanned; its file loses the field.
@@ -732,26 +731,26 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
     assert!(task_file(&repo, "A02-01").get("iteration").is_none());
 }
 
-/// `fh confirm` in `project` (which has no seabag yet), answered by a stand-in for the app.
+/// `alm confirm` in `project` (which has no taskbag yet), answered by a stand-in for the app.
 fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32, Value) {
     let plan = project.join("plan.md");
     fs::write(&plan, "## Plan\n\n- 3 areas\n- 5 tasks\n").unwrap();
-    let seabag = project.join(".fliphopper/seabag");
-    let child = Command::new(FH)
+    let taskbag = project.join(".allomos/taskbag");
+    let child = Command::new(ALM)
         .current_dir(project)
-        .args(["--json", "--as", "claude/test", "--seabag"])
-        .arg(&seabag)
+        .args(["--json", "--as", "claude/test", "--taskbag"])
+        .arg(&taskbag)
         .args([
             "confirm",
             "--title",
-            "Move tasks into FlipHopper",
+            "Move tasks into Allomos",
             "--plan",
             "plan.md",
         ])
         .args(["--timeout", timeout])
-        .env_remove("FLIPHOPPER_SEABAG")
-        .env_remove("FLIPHOPPER_HOLDER")
-        .env("FLIPHOPPER_NO_LAUNCH", "1")
+        .env_remove("ALLOMOS_TASKBAG")
+        .env_remove("ALLOMOS_HOLDER")
+        .env("ALLOMOS_NO_LAUNCH", "1")
         .stdout(std::process::Stdio::piped())
         .spawn()
         .unwrap();
@@ -760,23 +759,23 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
         let asked = (0..100)
             .find_map(|_| {
                 std::thread::sleep(Duration::from_millis(100));
-                fliphopper_store::pending_confirms(project).pop()
+                allomos_store::pending_confirms(project).pop()
             })
             .expect("the question appears");
-        assert_eq!(asked.title, "Move tasks into FlipHopper");
+        assert_eq!(asked.title, "Move tasks into Allomos");
         assert!(asked.plan.contains("- 5 tasks"));
         assert_eq!(asked.from.as_deref(), Some("claude/test"));
-        fliphopper_store::answer_confirm(project, &asked.id, yes).unwrap();
+        allomos_store::answer_confirm(project, &asked.id, yes).unwrap();
     }
     let out = child.wait_with_output().unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
     // Settled questions are tidied away; only the folder's .gitignore stays.
-    let left: Vec<_> = fs::read_dir(project.join(".fliphopper/requests"))
+    let left: Vec<_> = fs::read_dir(project.join(".allomos/requests"))
         .unwrap()
         .map(|e| e.unwrap().file_name())
         .collect();
     assert_eq!(left, [".gitignore"]);
-    assert!(!seabag.exists(), "asking never creates the seabag");
+    assert!(!taskbag.exists(), "asking never creates the taskbag");
     (out.status.code().unwrap(), v)
 }
 
@@ -805,7 +804,7 @@ fn confirm_waits_for_the_answer_in_the_app() {
         3,
         "read_failed",
     );
-    assert!(!project.join(".fliphopper").exists());
+    assert!(!project.join(".allomos").exists());
 }
 
 #[test]
@@ -820,37 +819,32 @@ fn labels_change_the_ladder_without_stranding_a_task() {
     refused(&repo, &["labels", "implemented"], 1, "label_not_on_ladder");
     refused(&repo, &["labels", " , "], 1, "ladder_empty");
     let project: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".fliphopper/seabag/project.json")).unwrap(),
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
     )
     .unwrap();
     assert_eq!(project["labels"][1], "connected");
 }
 
 #[test]
-fn brief_and_guide_tell_agents_about_fliphopper() {
+fn brief_and_guide_tell_agents_about_allomos() {
     let repo = filled();
     let v = ok(&repo, &["brief"]);
     let brief = v["brief"].as_str().unwrap();
-    assert!(brief.starts_with("## Tasks: FlipHopper"));
-    assert!(brief.contains("fh guide customize"));
-    // Without a seabag the brief is still printed, as plain text.
-    let out = fh(&tmp("no-seabag"), &["brief"]);
+    assert!(brief.starts_with("## Tasks: Allomos"));
+    assert!(brief.contains("alm guide customize"));
+    // Without a taskbag the brief is still printed, as plain text.
+    let out = alm(&tmp("no-taskbag"), &["brief"]);
     assert_eq!(out.status.code(), Some(0));
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("fh guide terms")
+            .contains("alm guide terms")
     );
 
     let v = ok(&repo, &["guide", "customize"]);
     assert!(v["guide"].as_str().unwrap().contains("The six states"));
     let all = ok(&repo, &["guide"]);
-    assert!(
-        all["guide"]
-            .as_str()
-            .unwrap()
-            .contains("# FlipHopper terms")
-    );
+    assert!(all["guide"].as_str().unwrap().contains("# Allomos terms"));
     let (code, v) = fj(&repo, &["guide", "nope"]);
     assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
 }
@@ -889,19 +883,19 @@ fn add_task_without_an_id_takes_the_next_in_its_area() {
         ok(&repo, &["brief"])["brief"]
             .as_str()
             .unwrap()
-            .contains("fh guide tasks")
+            .contains("alm guide tasks")
     );
 }
 
-/// `fh --json …` with its own settings folder, so the person's real app settings are never read.
+/// `alm --json …` with its own settings folder, so the person's real app settings are never read.
 fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
-    let out = Command::new(FH)
+    let out = Command::new(ALM)
         .current_dir(dir)
         .arg("--json")
         .args(args)
-        .env_remove("FLIPHOPPER_SEABAG")
-        .env_remove("FLIPHOPPER_HOLDER")
-        .env("FLIPHOPPER_SETTINGS_DIR", settings)
+        .env_remove("ALLOMOS_TASKBAG")
+        .env_remove("ALLOMOS_HOLDER")
+        .env("ALLOMOS_SETTINGS_DIR", settings)
         .output()
         .unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -912,9 +906,9 @@ fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
 fn task_language_follows_the_app_until_set() {
     let repo = filled();
     let settings = tmp("settings");
-    // A new seabag says "ui".
+    // A new taskbag says "ui".
     let project: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".fliphopper/seabag/project.json")).unwrap(),
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
     )
     .unwrap();
     assert_eq!(project["task_language"], "ui");
@@ -933,9 +927,67 @@ fn task_language_follows_the_app_until_set() {
     // Set a code (the underscore spelling works too), then back to ui.
     let (_, v) = fj_settings(&repo, &settings, &["task_language", "fr"]);
     assert_eq!(v["task_language"]["language"], "fr");
-    assert_eq!(v["task_language"]["source"], "seabag");
+    assert_eq!(v["task_language"]["source"], "taskbag");
     let (code, v) = fj_settings(&repo, &settings, &["task-language", "French!"]);
     assert_eq!((code, &v["error"]["code"]), (1, &json!("invalid_language")));
     let (_, v) = fj_settings(&repo, &settings, &["task-language", "ui"]);
     assert_eq!(v["task_language"]["language"], "zh-CN");
+}
+
+#[test]
+fn a_fliphopper_project_still_opens_and_migrate_moves_it() {
+    // A project made by FlipHopper: `.fliphopper/seabag/` with format `fliphopper/1`.
+    let repo = tmp("legacy");
+    fs::create_dir(repo.join(".git")).unwrap();
+    ok(&repo, &["init", "--name", "Old"]);
+    ok(&repo, &["add", "area", "A01", "Area"]);
+    ok(&repo, &["add", "task", "--area", "A01", "--title", "Kept"]);
+    let new = repo.join(".allomos/taskbag");
+    let old = repo.join(".fliphopper/seabag");
+    fs::create_dir_all(old.parent().unwrap()).unwrap();
+    fs::rename(&new, &old).unwrap();
+    fs::remove_dir(repo.join(".allomos")).unwrap();
+    let project = old.join("project.json");
+    let text = fs::read_to_string(&project)
+        .unwrap()
+        .replace("allomos/1", "fliphopper/1");
+    fs::write(&project, text).unwrap();
+
+    // Found from the folder, by the old option name and by the old environment setting.
+    assert_eq!(
+        ok(&repo, &["list"])["areas"][0]["tasks"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    ok(
+        &repo,
+        &["--seabag", repo.to_str().unwrap(), "show", "A01-01"],
+    );
+    let out = Command::new(ALM)
+        .current_dir(std::env::temp_dir())
+        .args(["--json", "show", "A01-01"])
+        .env_remove("ALLOMOS_TASKBAG")
+        .env("FLIPHOPPER_SEABAG", &repo)
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    // `alm migrate` moves it, rewrites the format, and removes the empty old folder.
+    let v = ok(&repo, &["migrate"]);
+    assert_eq!(v["moved"], true);
+    assert!(new.join("project.json").is_file() && !repo.join(".fliphopper").exists());
+    assert!(
+        fs::read_to_string(new.join("project.json"))
+            .unwrap()
+            .contains("\"allomos/1\"")
+    );
+    assert_eq!(ok(&repo, &["show", "A01-01"])["task"]["title"], "Kept");
+    assert_eq!(ok(&repo, &["migrate"])["moved"], false);
 }

@@ -1,5 +1,5 @@
-//! Find the AI agents on this computer and ask them to add FlipHopper's instructions to a
-//! project ([`Task-A03-03`]). FlipHopper only **opens** each agent with the request typed in;
+//! Find the AI agents on this computer and ask them to add Allomos's instructions to a
+//! project ([`Task-A03-03`]). Allomos only **opens** each agent with the request typed in;
 //! the person reads it and sends it, so nothing runs or uses their plan without them.
 //!
 //! [`Task-A03-03`]: ../../../../docs/tasks/Task-A03-03-app-asks-agents-to-set-up.md
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use fliphopper_core::Problem;
+use allomos_core::Problem;
 use serde::Serialize;
 
 /// One agent the person can ask.
@@ -181,7 +181,7 @@ pub fn find_agents() -> Vec<Agent> {
     agents
 }
 
-/// The newest change to a seabag made by an agent through `fh --commit` / `--push`.
+/// The newest change to a taskbag made by an agent through `alm --commit` / `--push`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LastUse {
     /// The agent's name from the commit's `Agent:` line.
@@ -190,11 +190,11 @@ pub struct LastUse {
     pub when: i64,
 }
 
-/// Read the seabag's Git history (read-only) for the newest commit with an `Agent:` line.
-pub fn last_agent_use(seabag: &Path) -> Option<LastUse> {
+/// Read the taskbag's Git history (read-only) for the newest commit with an `Agent:` line.
+pub fn last_agent_use(taskbag: &Path) -> Option<LastUse> {
     let out = Command::new("git")
         .arg("-C")
-        .arg(seabag)
+        .arg(taskbag)
         .args(["log", "-n", "200", "--format=%ct%x1f%B%x1e", "--", "."])
         .output()
         .ok()?;
@@ -254,17 +254,17 @@ pub fn shared_note(agents: &[String], language: &str) -> Option<String> {
     Some(match language {
         "zh-CN" => format!(
             "注意：{} 同时收到了这个请求。请先阅读 AGENTS.md 和 CLAUDE.md；\
-如果其中已经有 FlipHopper 的说明，只需检查，不要做其他改动。",
+如果其中已经有 Allomos 的说明，只需检查，不要做其他改动。",
             names.join("和")
         ),
         "ja" => format!(
             "注意：{} にも同時に同じ依頼をしています。まず AGENTS.md と CLAUDE.md を読み、\
-FlipHopper の説明がすでにあれば確認だけにして、ほかは変えないでください。",
+Allomos の説明がすでにあれば確認だけにして、ほかは変えないでください。",
             names.join("と")
         ),
         _ => format!(
             "Note: {} were asked to do this at the same time. Read AGENTS.md and CLAUDE.md first; \
-if FlipHopper's instructions are already there, only check them and change nothing else.",
+if Allomos's instructions are already there, only check them and change nothing else.",
             names.join(" and ")
         ),
     })
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn tools_that_do_not_run_are_not_offered() {
-        let dir = std::env::temp_dir().join(format!("fliphopper-agents-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("allomos-agents-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         // A file named like the tool that is not a working program.
         std::fs::write(dir.join("codex"), "not a program").unwrap();
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn last_use_is_the_newest_commit_naming_an_agent() {
-        let log = "1700000300\u{1f}fix typo\n\u{1e}\n1700000200\u{1f}fh: claim A01-02\n\nAgent: unknown (fh)\n\u{1e}\n1700000100\u{1f}fh: label A01-01\n\nAgent: claude/a01-run\n\u{1e}\n";
+        let log = "1700000300\u{1f}fix typo\n\u{1e}\n1700000200\u{1f}alm: claim A01-02\n\nAgent: unknown (alm)\n\u{1e}\n1700000100\u{1f}alm: label A01-01\n\nAgent: claude/a01-run\n\u{1e}\n";
         assert_eq!(
             parse_last_use(log),
             Some(LastUse {
@@ -414,10 +414,10 @@ mod tests {
 
     #[test]
     fn last_use_comes_from_a_real_repository() {
-        let dir = std::env::temp_dir().join(format!("fliphopper-lastuse-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("allomos-lastuse-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let seabag = dir.join(".fliphopper/seabag");
-        std::fs::create_dir_all(&seabag).unwrap();
+        let taskbag = dir.join(".allomos/taskbag");
+        std::fs::create_dir_all(&taskbag).unwrap();
         let git = |args: &[&str]| {
             let ok = Command::new("git")
                 .arg("-C")
@@ -434,11 +434,11 @@ mod tests {
         git(&["init", "-q"]);
         git(&["config", "user.name", "T"]);
         git(&["config", "user.email", "t@example.com"]);
-        assert_eq!(last_agent_use(&seabag), None);
-        std::fs::write(seabag.join("project.json"), "{}").unwrap();
+        assert_eq!(last_agent_use(&taskbag), None);
+        std::fs::write(taskbag.join("project.json"), "{}").unwrap();
         git(&["add", "."]);
-        git(&["commit", "-q", "-m", "fh: init", "-m", "Agent: codex/s1"]);
-        assert_eq!(last_agent_use(&seabag).unwrap().who, "codex/s1");
+        git(&["commit", "-q", "-m", "alm: init", "-m", "Agent: codex/s1"]);
+        assert_eq!(last_agent_use(&taskbag).unwrap().who, "codex/s1");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

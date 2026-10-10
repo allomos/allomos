@@ -1,10 +1,10 @@
-//! The checks the app makes after opening a seabag (docs/product/OPEN-FOLDER-FLOW.md): which
-//! project folder the seabag belongs to, whether that folder's agent instructions mention
-//! FlipHopper, and whether the seabag has tasks yet.
+//! The checks the app makes after opening a taskbag (docs/product/OPEN-FOLDER-FLOW.md): which
+//! project folder the taskbag belongs to, whether that folder's agent instructions mention
+//! Allomos, and whether the taskbag has tasks yet.
 
 use std::path::{Component, Path, PathBuf};
 
-use fliphopper_core::{Problem, Project, parse_project};
+use allomos_core::{Problem, Project, parse_project};
 use serde::Serialize;
 
 use crate::{AgentSetup, Lock, PROJECT_FILE, agent_setup, json_text, picked_folder, write_atomic};
@@ -12,9 +12,9 @@ use crate::{AgentSetup, Lock, PROJECT_FILE, agent_setup, json_text, picked_folde
 /// How long recording the project folder waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// The folder holding `.fliphopper/` for a seabag at `root`; the seabag itself when it lives
+/// The folder holding `.allomos/` for a taskbag at `root`; the taskbag itself when it lives
 /// somewhere else.
-pub fn fliphopper_folder(root: &Path) -> PathBuf {
+pub fn allomos_folder(root: &Path) -> PathBuf {
     picked_folder(root).unwrap_or(root).to_path_buf()
 }
 
@@ -41,13 +41,13 @@ pub fn relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
     })
 }
 
-/// The project folder recorded in `project`, as an absolute path, for a seabag at `root`.
+/// The project folder recorded in `project`, as an absolute path, for a taskbag at `root`.
 pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
     let recorded = project.project_folder.as_deref()?.trim();
     if recorded.is_empty() {
         return None;
     }
-    let path = fliphopper_folder(root).join(recorded);
+    let path = allomos_folder(root).join(recorded);
     // Tidy `.` and `..` without asking the disk, so a moved folder still gives a clear path.
     let mut clean = PathBuf::new();
     for part in path.components() {
@@ -62,7 +62,7 @@ pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
     Some(clean)
 }
 
-/// Record `folder` as the project folder of the seabag at `root`, relative to the FlipHopper
+/// Record `folder` as the project folder of the taskbag at `root`, relative to the Allomos
 /// folder when it can be. Returns what was written.
 pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Problem> {
     if !folder.is_dir() {
@@ -71,8 +71,7 @@ pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Probl
         });
     }
     let folder = std::path::absolute(folder).unwrap_or_else(|_| folder.to_path_buf());
-    let base =
-        std::path::absolute(fliphopper_folder(root)).unwrap_or_else(|_| fliphopper_folder(root));
+    let base = std::path::absolute(allomos_folder(root)).unwrap_or_else(|_| allomos_folder(root));
     let recorded = relative_path(&base, &folder)
         .unwrap_or(folder)
         .to_string_lossy()
@@ -89,25 +88,25 @@ pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Probl
     Ok(recorded)
 }
 
-/// Where the opened seabag stands in the flow.
+/// Where the opened taskbag stands in the flow.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SetupState {
-    /// The FlipHopper folder (holding `.fliphopper/`).
-    pub fliphopper_folder: PathBuf,
+    /// The Allomos folder (holding `.allomos/`).
+    pub allomos_folder: PathBuf,
     /// The project folder, once known. `None`: the app asks the person.
     pub project_folder: Option<PathBuf>,
-    /// Which agents' instruction files in the project folder mention FlipHopper.
+    /// Which agents' instruction files in the project folder mention Allomos.
     pub agents: AgentSetup,
-    /// Whether the seabag has any task.
+    /// Whether the taskbag has any task.
     pub has_tasks: bool,
 }
 
-/// Step 2 to 4 of the flow for the seabag at `root`. When no project folder is recorded and
-/// `AGENTS.md` or `CLAUDE.md` sits beside `.fliphopper/`, that folder is recorded here.
+/// Step 2 to 4 of the flow for the taskbag at `root`. When no project folder is recorded and
+/// `AGENTS.md` or `CLAUDE.md` sits beside `.allomos/`, that folder is recorded here.
 pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
     let loaded = crate::load(root);
-    let Some(bag) = loaded.seabag else {
-        return Err(Problem::SeabagUnreadable {
+    let Some(bag) = loaded.taskbag else {
+        return Err(Problem::TaskbagUnreadable {
             path: root.display().to_string(),
             detail: loaded
                 .issues
@@ -116,7 +115,7 @@ pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
                 .unwrap_or_default(),
         });
     };
-    let home = fliphopper_folder(root);
+    let home = allomos_folder(root);
     let mut project_folder = project_folder_of(root, &bag.project);
     if project_folder.is_none()
         && (home.join("AGENTS.md").is_file() || home.join("CLAUDE.md").is_file())
@@ -133,7 +132,7 @@ pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
                 claude: false,
             }),
         project_folder,
-        fliphopper_folder: home,
+        allomos_folder: home,
         has_tasks: !bag.tasks.is_empty(),
     })
 }
@@ -150,7 +149,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = std::env::temp_dir().join(format!("fliphopper-setup-{name}-{n}"));
+        let p = std::env::temp_dir().join(format!("allomos-setup-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
     }
@@ -165,17 +164,17 @@ mod tests {
     }
 
     #[test]
-    fn the_project_folder_is_found_beside_fliphopper_or_left_to_ask() {
+    fn the_project_folder_is_found_beside_allomos_or_left_to_ask() {
         let home = tmp("home");
         let root = home.join(DEFAULT_DIR);
         init(&root, "p", "P").unwrap();
-        // Nothing beside .fliphopper: the app asks.
+        // Nothing beside .allomos: the app asks.
         let s = setup_state(&root).unwrap();
         assert_eq!(s.project_folder, None);
         assert!(!s.has_tasks);
-        assert_eq!(s.fliphopper_folder, home);
+        assert_eq!(s.allomos_folder, home);
 
-        // AGENTS.md beside .fliphopper: recorded as "." and used.
+        // AGENTS.md beside .allomos: recorded as "." and used.
         fs::write(home.join("AGENTS.md"), "# Guide\n").unwrap();
         let s = setup_state(&root).unwrap();
         assert_eq!(s.project_folder.as_deref(), Some(home.as_path()));
@@ -189,7 +188,7 @@ mod tests {
         let text = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert!(text.contains("\"project_folder\": \".\""), "{text}");
 
-        // FlipHopper's section in AGENTS.md: Codex is told.
+        // Allomos's section in AGENTS.md: Codex is told.
         fs::write(home.join("AGENTS.md"), crate::agent_section()).unwrap();
         assert!(setup_state(&root).unwrap().agents.codex);
         fs::remove_dir_all(&home).unwrap();

@@ -17,14 +17,19 @@ const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
     ? "top.show_in_explorer"
     : "top.show_in_files";
 
-const LAST_ROOT_KEY = "fliphopper.lastRoot";
+const LAST_ROOT_KEY = "allomos.lastRoot";
 /** Recently opened project folders, newest first, for File → Open Recent. */
-const RECENT_KEY = "fliphopper.recentFolders";
+const RECENT_KEY = "allomos.recentFolders";
 const RECENT_MAX = 10;
 
-/** The project folder the user picked, from a seabag root (`<folder>/.fliphopper/seabag`). */
+/** The project folder the user picked, from a taskbag root (`<folder>/.allomos/taskbag`). */
 function projectFolder(root: string): string {
-  return root.replace(/[\\/]\.fliphopper[\\/]seabag[\\/]?$/, "");
+  return root.replace(/[\\/](\.allomos[\\/]taskbag|\.fliphopper[\\/]seabag)[\\/]?$/, "");
+}
+
+/** A taskbag still in FlipHopper's old place, `.fliphopper/seabag/` (before the rename to Allomos). */
+function isLegacyTaskbag(root: string): boolean {
+  return /[\\/]\.fliphopper[\\/]seabag[\\/]?$/.test(root);
 }
 
 function readRecent(): string[] {
@@ -43,13 +48,17 @@ function saveRecent(list: string[]) {
     /* storage unavailable: the menu still shows this session's list */
   }
 }
-/** How often the window checks whether the seabag's files changed, for example through `fh`. */
+/** How often the window checks whether the taskbag's files changed, for example through `alm`. */
 const FOLLOW_MS = 1000;
 
 function folderName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
-  // The project is named after the picked folder, not the `.fliphopper/seabag` inside it.
-  if (parts.at(-1) === "seabag" && parts.at(-2) === ".fliphopper") parts.splice(-2);
+  // The project is named after the picked folder, not the `.allomos/taskbag` inside it.
+  if (
+    (parts.at(-1) === "taskbag" && parts.at(-2) === ".allomos") ||
+    (parts.at(-1) === "seabag" && parts.at(-2) === ".fliphopper")
+  )
+    parts.splice(-2);
   return parts.at(-1) ?? "Project";
 }
 
@@ -64,7 +73,7 @@ function errorNote(e: unknown): Note {
 
 export function App({ messenger }: { messenger: Messenger }) {
   const { t, rich, problem, language } = useI18n();
-  // Read when a seabag is created (for its README), without reopening the folder when it changes.
+  // Read when a taskbag is created (for its README), without reopening the folder when it changes.
   const languageRef = useRef(language);
   languageRef.current = language;
   const [opened, setOpened] = useState<Opened | null>(null);
@@ -100,11 +109,11 @@ export function App({ messenger }: { messenger: Messenger }) {
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
   }, [changeRecent]);
 
-  /** The agents panel: tell AI agents about FlipHopper (Task-A03-03), or ask one agent to find the
-   * project's tasks and move them into FlipHopper (`convert`, Task-A05-02). */
-  const [agentsFor, setAgentsFor] = useState<{ project: string; seabag: string; convert?: boolean } | null>(null);
+  /** The agents panel: tell AI agents about Allomos (Task-A03-03), or ask one agent to find the
+   * project's tasks and move them into Allomos (`convert`, Task-A05-02). */
+  const [agentsFor, setAgentsFor] = useState<{ project: string; taskbag: string; convert?: boolean } | null>(null);
 
-  /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open seabag's project folder,
+  /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open taskbag's project folder,
    * agent instructions and tasks, and the steps the person put off with "Not now" this time. */
   const [setup, setSetup] = useState<SetupState | null>(null);
   const setupRef = useRef(setup);
@@ -129,11 +138,11 @@ export function App({ messenger }: { messenger: Messenger }) {
         const info = await messenger.inspectFolder(path);
         const i = info.inspection;
         if (i.kind === "found") {
-          show(await messenger.openSeabag(i.root), null);
+          show(await messenger.openTaskbag(i.root), null);
         } else if (i.kind === "empty") {
-          const o = await messenger.createSeabag(i.suggested_root, folderName(i.folder), languageRef.current);
+          const o = await messenger.createTaskbag(i.suggested_root, folderName(i.folder), languageRef.current);
           show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_here" });
-        } else if (i.kind === "no_seabag") {
+        } else if (i.kind === "no_taskbag") {
           // The new folder replaces the open project: the window shows only the question about it.
           setOpened(null);
           setSetup(null);
@@ -150,9 +159,9 @@ export function App({ messenger }: { messenger: Messenger }) {
     [messenger, show],
   );
 
-  // Steps 2–5 of the flow, one at a time: after opening, and whenever the seabag's files change.
+  // Steps 2–5 of the flow, one at a time: after opening, and whenever the taskbag's files change.
   const root0 = opened?.root;
-  const taskCount = opened?.loaded.seabag?.tasks.length;
+  const taskCount = opened?.loaded.taskbag?.tasks.length;
   useEffect(() => {
     if (root0) void refreshSetup(root0);
   }, [root0, taskCount, refreshSetup]);
@@ -161,20 +170,20 @@ export function App({ messenger }: { messenger: Messenger }) {
     const project = setup.project_folder;
     if (!project) return; // step 2 asks on the page
     if (!(setup.agents.codex && setup.agents.claude) && !skipped.md) {
-      setAgentsFor({ project, seabag: opened.root });
+      setAgentsFor({ project, taskbag: opened.root });
     } else if (!setup.has_tasks && !skipped.migrate) {
-      setAgentsFor({ project, seabag: opened.root, convert: true });
+      setAgentsFor({ project, taskbag: opened.root, convert: true });
     }
   }, [opened, setup, agentsFor, skipped]);
-  // File → Move Tasks Into FlipHopper… only while the open seabag has a project folder.
+  // File → Move Tasks Into Allomos… only while the open taskbag has a project folder.
   const hasProjectFolder = Boolean(opened && setup?.project_folder);
   useEffect(() => {
     void messenger.setConvertEnabled(hasProjectFolder).catch(() => undefined);
   }, [messenger, hasProjectFolder]);
-  /** The project folder for the agents panel: the recorded one, else the folder holding `.fliphopper/`. */
+  /** The project folder for the agents panel: the recorded one, else the folder holding `.allomos/`. */
   const agentsProject = (root: string) => setupRef.current?.project_folder ?? projectFolder(root);
 
-  // Follow changes made outside the window (by `fh` or by hand): reload when the files change.
+  // Follow changes made outside the window (by `alm` or by hand): reload when the files change.
   const root = opened?.root;
   useEffect(() => {
     if (!root) return;
@@ -184,9 +193,9 @@ export function App({ messenger }: { messenger: Messenger }) {
       if (busy) return;
       busy = true;
       try {
-        const now = await messenger.seabagStamp(root);
+        const now = await messenger.taskbagStamp(root);
         if (last !== null && now !== last) {
-          const fresh = await messenger.openSeabag(root);
+          const fresh = await messenger.openTaskbag(root);
           setOpened((o) => (o?.root === root ? fresh : o));
         }
         last = now;
@@ -236,8 +245,8 @@ export function App({ messenger }: { messenger: Messenger }) {
     return () => void stop.then((f) => f()).catch(() => undefined);
   }, [messenger]);
 
-  // Tasks are written in the interface's language unless the seabag says otherwise (Task-A01-21):
-  // `fh task-language` reads the language saved here.
+  // Tasks are written in the interface's language unless the taskbag says otherwise (Task-A01-21):
+  // `alm task-language` reads the language saved here.
   useEffect(() => {
     void messenger.saveUiLanguage(language).catch(() => undefined);
   }, [messenger, language]);
@@ -273,13 +282,13 @@ export function App({ messenger }: { messenger: Messenger }) {
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
     const stopAgents = messenger.onAgentsMenu(() => {
       const root = openedRef.current?.root;
-      if (root) setAgentsFor({ project: agentsProject(root), seabag: root });
+      if (root) setAgentsFor({ project: agentsProject(root), taskbag: root });
     });
-    // File → Move Tasks Into FlipHopper… (enabled only with a recorded project folder).
+    // File → Move Tasks Into Allomos… (enabled only with a recorded project folder).
     const stopConvert = messenger.onConvertMenu(() => {
       const root = openedRef.current?.root;
       const project = setupRef.current?.project_folder;
-      if (root && project) setAgentsFor({ project, seabag: root, convert: true });
+      if (root && project) setAgentsFor({ project, taskbag: root, convert: true });
     });
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
@@ -292,7 +301,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   const createNested = async () => {
     if (!pending) return;
     try {
-      const o = await messenger.createSeabag(pending.suggestedRoot, folderName(pending.folder), language);
+      const o = await messenger.createTaskbag(pending.suggestedRoot, folderName(pending.folder), language);
       show(o, { key: "notice.created_nested" });
     } catch (e) {
       setError(errorNote(e));
@@ -302,8 +311,8 @@ export function App({ messenger }: { messenger: Messenger }) {
   return (
     <div className="app">
       <header className="top">
-        <div className="brand" aria-label="FlipHopper">
-          {/* The FlipHopper mark (owner's choice: layout Y2, colours D4): a ring where a ball was, a solid ball where it
+        <div className="brand" aria-label="Allomos">
+          {/* The Allomos mark (owner's choice: layout Y2, colours D4): a ring where a ball was, a solid ball where it
               arrived, a spark for the jump. Same drawing as the app icon's small form. */}
           <svg viewBox="100 100 824 824" aria-hidden="true">
             <circle className="ring jade" cx="265" cy="512" r="105" />
@@ -312,18 +321,18 @@ export function App({ messenger }: { messenger: Messenger }) {
             <circle className="terracotta" cx="512" cy="759" r="138" />
             <path className="spark" d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" />
           </svg>
-          <span>FlipHopper</span>
+          <span>Allomos</span>
         </div>
-        {opened?.loaded.seabag && (
+        {opened?.loaded.taskbag && (
           <div className="where">
-            <strong>{opened.loaded.seabag.project.name}</strong>
+            <strong>{opened.loaded.taskbag.project.name}</strong>
             <code title={opened.root}>{opened.root}</code>
             {/* Whether the AI agents are told about this project, then Show in Finder at the right (owner, 2026-10-10). */}
             <div className="where-row">
               <AgentLine
                 messenger={messenger}
                 root={opened.root}
-                onTell={() => setAgentsFor({ project: agentsProject(opened.root), seabag: opened.root })}
+                onTell={() => setAgentsFor({ project: agentsProject(opened.root), taskbag: opened.root })}
               />
               <button
                 type="button"
@@ -354,13 +363,13 @@ export function App({ messenger }: { messenger: Messenger }) {
         ))}
         {agentsFor && (
           <AgentsPanel
-            key={agentsFor.seabag}
+            key={agentsFor.taskbag}
             messenger={messenger}
             project={agentsFor.project}
-            seabag={agentsFor.seabag}
+            taskbag={agentsFor.taskbag}
             convert={agentsFor.convert}
             onProjectChange={async (folder) => {
-              const state = await messenger.setProjectFolder(agentsFor.seabag, folder);
+              const state = await messenger.setProjectFolder(agentsFor.taskbag, folder);
               setSetup(state);
             }}
             onDone={(message) => {
@@ -372,9 +381,30 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
 
+        {opened && isLegacyTaskbag(opened.root) && (
+          <section className="card">
+            <h2>{t("legacy.title")}</h2>
+            <p>{rich("legacy.body", { old: <code>.fliphopper/seabag/</code>, new: <code>.allomos/taskbag/</code> })}</p>
+            <div className="row">
+              <button
+                type="button"
+                className="primary"
+                onClick={() =>
+                  void messenger
+                    .moveLegacyTaskbag(opened.root)
+                    .then((o) => show(o, { key: "legacy.moved" }))
+                    .catch((e) => setError(errorNote(e)))
+                }
+              >
+                {t("legacy.move")}
+              </button>
+            </div>
+          </section>
+        )}
+
         {opened && setup && !setup.project_folder && (
           <ProjectFolderStep
-            fliphopperFolder={setup.fliphopper_folder}
+            allomosFolder={setup.allomos_folder}
             onChoose={async (folder) => {
               try {
                 setSetup(await messenger.setProjectFolder(opened.root, folder));
@@ -404,8 +434,8 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {!opened && !pending && <Welcome onChoose={choose} />}
 
-        {/* Questions an agent asks with `fh confirm` about the folder this window shows (Task-A05-02). */}
-        {/* `fh confirm` asks about the folder holding `.fliphopper/`, where its --seabag points. */}
+        {/* Questions an agent asks with `alm confirm` about the folder this window shows (Task-A05-02). */}
+        {/* `alm confirm` asks about the folder holding `.allomos/`, where its --taskbag points. */}
         {opened && (
           <ConfirmDialog
             messenger={messenger}
@@ -414,7 +444,7 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
 
-        {opened && <SeabagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
+        {opened && <TaskbagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
       </main>
     </div>
   );
@@ -433,13 +463,13 @@ function Banner({ kind, onClose, children }: { kind: "ok" | "error"; onClose: ()
   );
 }
 
-/** Step 2 of the flow: no project folder is recorded and none was found beside `.fliphopper/`. */
+/** Step 2 of the flow: no project folder is recorded and none was found beside `.allomos/`. */
 function ProjectFolderStep({
-  fliphopperFolder,
+  allomosFolder,
   onChoose,
   pick,
 }: {
-  fliphopperFolder: string;
+  allomosFolder: string;
   onChoose: (folder: string) => Promise<void>;
   pick: () => Promise<string | null>;
 }) {
@@ -454,9 +484,9 @@ function ProjectFolderStep({
   return (
     <section className="card">
       <h2>{t("folder.title")}</h2>
-      <p>{rich("folder.body", { folder: <code>{fliphopperFolder}</code> })}</p>
+      <p>{rich("folder.body", { folder: <code>{allomosFolder}</code> })}</p>
       <div className="row">
-        <button type="button" className="primary" disabled={busy} onClick={() => void choose(fliphopperFolder)}>
+        <button type="button" className="primary" disabled={busy} onClick={() => void choose(allomosFolder)}>
           {t("folder.this")}
         </button>
         <button type="button" disabled={busy} onClick={() => void pick().then(choose)}>
@@ -493,7 +523,7 @@ function Welcome({ onChoose }: { onChoose: () => void }) {
   return (
     <section className="welcome">
       <h1>{t("welcome.title")}</h1>
-      <p>{rich("welcome.body", { dir: <code>.fliphopper/seabag/</code> })}</p>
+      <p>{rich("welcome.body", { dir: <code>.allomos/taskbag/</code> })}</p>
       <button type="button" className="primary" onClick={onChoose}>
         {t("top.choose_folder")}
       </button>
@@ -503,7 +533,7 @@ function Welcome({ onChoose }: { onChoose: () => void }) {
 
 /** How the task list is grouped; remembered in the window's storage (Task-A01-15). */
 type GroupBy = "area" | "iteration";
-const GROUP_BY_KEY = "fliphopper.groupBy";
+const GROUP_BY_KEY = "allomos.groupBy";
 
 function readGroupBy(): GroupBy {
   try {
@@ -516,7 +546,7 @@ function readGroupBy(): GroupBy {
 /** One group of the list as shown: an area or an iteration with its tasks. */
 type Group = { key: string; id: string; name: string; sub?: string; empty: string; tasks: Task[] };
 
-function SeabagView({
+function TaskbagView({
   opened,
   messenger,
   onError,
@@ -526,7 +556,7 @@ function SeabagView({
   onError: (e: unknown) => void;
 }) {
   const { t, rich } = useI18n();
-  const { seabag: box, issues } = opened.loaded;
+  const { taskbag: box, issues } = opened.loaded;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
   const choose = (g: GroupBy) => {
     setGroupBy(g);
@@ -570,7 +600,7 @@ function SeabagView({
   }
   const shown = groups.flatMap((g) => g.tasks);
 
-  // The task shown in the pane, by ID, so it stays selected when the seabag reloads.
+  // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
   const shownRef = useRef(shown);
@@ -624,7 +654,7 @@ function SeabagView({
             <div className="areas">
               {groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
-                  {rich("box.no_iterations", { add: <code>fh add iteration</code>, plan: <code>fh plan</code> })}
+                  {rich("box.no_iterations", { add: <code>alm add iteration</code>, plan: <code>alm plan</code> })}
                 </p>
               )}
               {groups.map((g) => (

@@ -33,6 +33,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "allomos-cli"
+version = "0.1.0"
+dependencies = [
+ "allomos-core",
+ "allomos-store",
+ "clap",
+ "serde",
+ "serde_json",
+ "sys-locale",
+]
+
+[[package]]
+name = "allomos-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "allomos-desktop"
+version = "0.1.0"
+dependencies = [
+ "allomos-core",
+ "allomos-store",
+ "serde",
+ "serde_json",
+ "sys-locale",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+]
+
+[[package]]
+name = "allomos-store"
+version = "0.1.0"
+dependencies = [
+ "allomos-core",
+ "fs4",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -863,50 +907,6 @@ dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
  "zlib-rs",
-]
-
-[[package]]
-name = "fliphopper-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "fliphopper-core",
- "fliphopper-store",
- "serde",
- "serde_json",
- "sys-locale",
-]
-
-[[package]]
-name = "fliphopper-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "fliphopper-desktop"
-version = "0.1.0"
-dependencies = [
- "fliphopper-core",
- "fliphopper-store",
- "serde",
- "serde_json",
- "sys-locale",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
-]
-
-[[package]]
-name = "fliphopper-store"
-version = "0.1.0"
-dependencies = [
- "fliphopper-core",
- "fs4",
- "serde",
- "serde_json",
 ]
 
 [[package]]

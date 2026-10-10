@@ -56,14 +56,14 @@ export interface Issue {
 }
 
 export interface Loaded {
-  seabag: { project: Project; areas: Area[]; iterations: Iteration[]; tasks: Task[] } | null;
+  taskbag: { project: Project; areas: Area[]; iterations: Iteration[]; tasks: Task[] } | null;
   issues: Issue[];
 }
 
 export type Inspection =
   | { kind: "found"; root: string }
   | { kind: "empty"; folder: string; suggested_root: string }
-  | { kind: "no_seabag"; folder: string; suggested_root: string }
+  | { kind: "no_taskbag"; folder: string; suggested_root: string }
   | { kind: "not_a_folder"; path: string };
 
 export interface FolderInfo {
@@ -74,7 +74,7 @@ export interface FolderInfo {
 export interface Opened {
   root: string;
   loaded: Loaded;
-  /** README-fliphopper.md was just written next to .fliphopper/ (only when creating). */
+  /** README-allomos.md was just written next to .allomos/ (only when creating). */
   readme_added: boolean;
 }
 
@@ -90,15 +90,15 @@ export interface Agent {
 /** Do the AI agents know about this project? (apps/desktop: `agent_status`) */
 export interface AgentStatus {
   project: string;
-  /** Which agents' instruction files tell them about FlipHopper. */
+  /** Which agents' instruction files tell them about Allomos. */
   setup: { codex: boolean; claude: boolean };
-  /** The newest seabag change an agent made with `fh --commit` / `--push`. `when` is in seconds. */
+  /** The newest taskbag change an agent made with `alm --commit` / `--push`. `when` is in seconds. */
   last: { who: string; when: number } | null;
   /** Who holds tasks in progress now. */
   holders: string[];
 }
 
-/** A question an agent asks with `fh confirm` (crates/store/src/confirm.rs). */
+/** A question an agent asks with `alm confirm` (crates/store/src/confirm.rs). */
 export interface ConfirmRequest {
   id: string;
   title: string;
@@ -110,13 +110,13 @@ export interface ConfirmRequest {
   until: number;
 }
 
-/** Where the open seabag stands in the open-folder flow (crates/store/src/setup.rs). */
+/** Where the open taskbag stands in the open-folder flow (crates/store/src/setup.rs). */
 export interface SetupState {
-  /** The folder holding `.fliphopper/`. */
-  fliphopper_folder: string;
+  /** The folder holding `.allomos/`. */
+  allomos_folder: string;
   /** The recorded project folder; null until known. */
   project_folder: string | null;
-  /** Which agents' instruction files in the project folder mention FlipHopper. */
+  /** Which agents' instruction files in the project folder mention Allomos. */
   agents: { codex: boolean; claude: boolean };
   has_tasks: boolean;
 }

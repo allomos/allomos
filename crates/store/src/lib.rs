@@ -1,8 +1,8 @@
-//! Reads and creates seabags on disk.
+//! Reads and creates taskbags on disk.
 //!
-//! A *seabag* is a folder holding `project.json`, `areas/<id>.json`, optionally
+//! A *taskbag* is a folder holding `project.json`, `areas/<id>.json`, optionally
 //! `iterations/<id>.json`, and `tasks/<id>/task.json` (+ `description.md`). See `docs/product/FILE-FORMAT.md`.
-//! This crate never runs `git`: a seabag inside a repository is versioned by that
+//! This crate never runs `git`: a taskbag inside a repository is versioned by that
 //! repository, and nothing here creates a nested one.
 
 use std::fs;
@@ -13,9 +13,9 @@ use std::time::{Duration, Instant};
 
 use fs4::{FileExt, TryLockError};
 
-use fliphopper_core::{
-    Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Seabag, Task, parse_area,
-    parse_iteration, parse_project, parse_task, validate_seabag,
+use allomos_core::{
+    Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Task, Taskbag, parse_area,
+    parse_iteration, parse_project, parse_task, validate_taskbag,
 };
 use serde::Serialize;
 
@@ -35,35 +35,38 @@ pub use settings::{
     task_language,
 };
 pub use setup::{
-    SetupState, fliphopper_folder, project_folder_of, record_project_folder, relative_path,
+    SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
     setup_state,
 };
 
-/// Where a project's seabag lives inside the folder the user picked.
-/// Always used for a new seabag, also in an empty folder, so every tool looks in one place.
-pub const DEFAULT_DIR: &str = ".fliphopper/seabag";
+/// Where a project's taskbag lives inside the folder the user picked.
+/// Always used for a new taskbag, also in an empty folder, so every tool looks in one place.
+pub const DEFAULT_DIR: &str = ".allomos/taskbag";
+/// Where FlipHopper kept a project's tasks before the app was renamed Allomos (decision 0013,
+/// 2026-10-10). Still found and opened; [`move_legacy_taskbag`] moves it to [`DEFAULT_DIR`].
+pub const LEGACY_DIR: &str = ".fliphopper/seabag";
 const PROJECT_FILE: &str = "project.json";
 /// The file every writer locks for the length of one change. Never committed.
 pub const LOCK_FILE: &str = ".lock";
 /// Prefix of the temporary files and folders a writer renames into place.
 const TMP_PREFIX: &str = ".tmp-";
-/// Written into every new seabag, so Git never sees FlipHopper's working files.
-const GITIGNORE: &str = "# FlipHopper's own working files. Never commit them.\n.lock\n.tmp-*\n";
+/// Written into every new taskbag, so Git never sees Allomos's working files.
+const GITIGNORE: &str = "# Allomos's own working files. Never commit them.\n.lock\n.tmp-*\n";
 
 /// What a folder the user picked turns out to be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Inspection {
-    /// The folder is a seabag, or contains one in `.fliphopper/seabag/`.
+    /// The folder is a taskbag, or contains one in `.allomos/taskbag/`.
     Found { root: PathBuf },
     /// The folder looks empty (nothing, or only hidden entries such as `.DS_Store` or `.git`):
-    /// a starter seabag can be created in its `.fliphopper/seabag/` without asking.
+    /// a starter taskbag can be created in its `.allomos/taskbag/` without asking.
     Empty {
         folder: PathBuf,
         suggested_root: PathBuf,
     },
-    /// The folder has other content but no seabag: one can be created in `.fliphopper/seabag/`.
-    NoSeabag {
+    /// The folder has other content but no taskbag: one can be created in `.allomos/taskbag/`.
+    NoTaskbag {
         folder: PathBuf,
         suggested_root: PathBuf,
     },
@@ -71,12 +74,12 @@ pub enum Inspection {
     NotAFolder { path: PathBuf },
 }
 
-/// Name of the short introduction FlipHopper leaves in a folder it fills from empty.
+/// Name of the short introduction Allomos leaves in a folder it fills from empty.
 /// Never `README.md`, so it cannot clash with the user's own README (owner, 2026-10-06).
-pub const README_FILE: &str = "README-fliphopper.md";
+pub const README_FILE: &str = "README-allomos.md";
 
 /// A folder looks empty when it has no entries, or only hidden ones (names starting with
-/// `.`, such as `.DS_Store`, `.git` or `.fliphopper`). A folder that cannot be read does not.
+/// `.`, such as `.DS_Store`, `.git` or `.allomos`). A folder that cannot be read does not.
 pub fn looks_empty(folder: &Path) -> bool {
     fs::read_dir(folder)
         .map(|entries| {
@@ -96,46 +99,46 @@ pub fn readme_text(language: &str) -> &'static str {
     }
 }
 
-const README_EN: &str = "# FlipHopper project
+const README_EN: &str = "# Allomos project
 
-This folder is a FlipHopper project. Its tasks, areas and progress are in
-`.fliphopper/seabag/`, a hidden folder.
+This folder is an Allomos project. Its tasks, areas and progress are in
+`.allomos/taskbag/`, a hidden folder.
 
-- Open this folder in the FlipHopper app to see the tasks by area.
-- AI agents and people can also work the tasks from a terminal with the `fh` command
-  (`fh list`, `fh next`, `fh claim <task>`).
+- Open this folder in the Allomos app to see the tasks by area.
+- AI agents and people can also work the tasks from a terminal with the `alm` command
+  (`alm list`, `alm next`, `alm claim <task>`).
 - The files are plain JSON and Markdown, so Git can track every change.
 
-FlipHopper wrote this file because the folder was empty. You may edit or delete it.
+Allomos wrote this file because the folder was empty. You may edit or delete it.
 ";
 
-const README_ZH_CN: &str = "# FlipHopper 项目
+const README_ZH_CN: &str = "# 换肩项目
 
-此文件夹是一个 FlipHopper 项目。它的任务、领域和进度保存在隐藏文件夹
-`.fliphopper/seabag/` 中。
+此文件夹是一个换肩项目。它的任务、领域和进度保存在隐藏文件夹
+`.allomos/taskbag/` 中。
 
-- 在 FlipHopper 应用中打开此文件夹，即可按领域查看任务。
-- AI 智能体和人也可以在终端中用 `fh` 命令处理任务
-  （`fh list`、`fh next`、`fh claim <任务>`）。
+- 在换肩应用中打开此文件夹，即可按领域查看任务。
+- AI 智能体和人也可以在终端中用 `alm` 命令处理任务
+  （`alm list`、`alm next`、`alm claim <任务>`）。
 - 这些文件是普通的 JSON 和 Markdown，Git 可以记录每一处更改。
 
-此文件夹原本是空的，所以 FlipHopper 写了这个文件。你可以修改或删除它。
+此文件夹原本是空的，所以换肩写了这个文件。你可以修改或删除它。
 ";
 
-const README_JA: &str = "# FlipHopper プロジェクト
+const README_JA: &str = "# アロモスプロジェクト
 
-このフォルダーは FlipHopper のプロジェクトです。タスク、エリア、進捗は隠しフォルダー
-`.fliphopper/seabag/` に入っています。
+このフォルダーはアロモスのプロジェクトです。タスク、エリア、進捗は隠しフォルダー
+`.allomos/taskbag/` に入っています。
 
-- FlipHopper アプリでこのフォルダーを開くと、タスクをエリアごとに見られます。
-- AI エージェントや人は、ターミナルの `fh` コマンドでもタスクを扱えます
-  （`fh list`、`fh next`、`fh claim <タスク>`）。
+- アロモスアプリでこのフォルダーを開くと、タスクをエリアごとに見られます。
+- AI エージェントや人は、ターミナルの `alm` コマンドでもタスクを扱えます
+  （`alm list`、`alm next`、`alm claim <タスク>`）。
 - ファイルはただの JSON と Markdown なので、Git ですべての変更を記録できます。
 
-このフォルダーが空だったので、FlipHopper がこのファイルを書きました。編集や削除は自由です。
+このフォルダーが空だったので、アロモスがこのファイルを書きました。編集や削除は自由です。
 ";
 
-/// Write `README-fliphopper.md` into `folder` when the folder looks empty (see
+/// Write `README-allomos.md` into `folder` when the folder looks empty (see
 /// [`looks_empty`]). Never overwrites a file. Returns whether the README was written.
 pub fn add_readme_if_empty(folder: &Path, language: &str) -> io::Result<bool> {
     if !looks_empty(folder) {
@@ -155,139 +158,139 @@ pub fn add_readme_if_empty(folder: &Path, language: &str) -> io::Result<bool> {
     }
 }
 
-/// The heading of FlipHopper's section in a project's `AGENTS.md` / `CLAUDE.md`.
-pub const AGENT_SECTION_HEADING: &str = "## Tasks: FlipHopper";
+/// The heading of Allomos's section in a project's `AGENTS.md` / `CLAUDE.md`.
+pub const AGENT_SECTION_HEADING: &str = "## Tasks: Allomos";
 
-/// The section that tells an AI agent this project's tasks are in FlipHopper. English: it is
+/// The section that tells an AI agent this project's tasks are in Allomos. English: it is
 /// read by agents, not shown in the app.
 pub fn agent_section() -> String {
     format!(
         "{AGENT_SECTION_HEADING}
 
-This project's tasks, progress and handoff notes live in FlipHopper's seabag
-(`.fliphopper/seabag/`). Work them with the `fh` command; never edit those files by hand.
+This project's tasks, progress and handoff notes live in Allomos's taskbag
+(`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
 
-- Start a session with `fh next` (the next ready task and its handoff note), or `fh list`.
-- Take a task: `fh claim <id> --as <your session name> --push`.
-- Report progress: `fh label <id> \"<label>\" --push`; when blocked: `fh wait <id> --on \"<what>\" --push`.
-- Stopping before it is done: `fh release <id> --note \"<what the next one needs>\" --push`.
-- Finished: `fh done <id> --push`.
-- Adding a task: read `fh guide tasks` first, then `fh add task --area <area> --title \"<outcome>\" --push`.
-- Before adding a task or changing its title or description, run `fh task-language` and write in
+- Start a session with `alm next` (the next ready task and its handoff note), or `alm list`.
+- Take a task: `alm claim <id> --as <your session name> --push`.
+- Report progress: `alm label <id> \"<label>\" --push`; when blocked: `alm wait <id> --on \"<what>\" --push`.
+- Stopping before it is done: `alm release <id> --note \"<what the next one needs>\" --push`.
+- Finished: `alm done <id> --push`.
+- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --push`.
+- Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 
-`--push` commits only the seabag's files and pushes them, so others see the change.
+`--push` commits only the taskbag's files and pushes them, so others see the change.
 
-FlipHopper relies on these terms: **area** (what part of the product a task belongs to),
+Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
 has proven) and **state** (backlog, ready, in progress, waiting, done, dropped). When you need
-more, ask `fh` rather than guessing: `fh guide terms` (what they mean), `fh guide customize`
-(what this project may change and what is fixed), `fh guide commands`, `fh guide workflow`.
+more, ask `alm` rather than guessing: `alm guide terms` (what they mean), `alm guide customize`
+(what this project may change and what is fixed), `alm guide commands`, `alm guide workflow`.
 "
     )
 }
 
-/// The last line of a request: the agent takes FlipHopper's section from `fh brief`, so it always
-/// matches the installed `fh`. `fh` must be usable where the agent works (owner, 2026-10-10), so
+/// The last line of a request: the agent takes Allomos's section from `alm brief`, so it always
+/// matches the installed `alm`. `alm` must be usable where the agent works (owner, 2026-10-10), so
 /// the request carries no copy of the section.
-pub(crate) fn section_source(language: &str, seabag: &Path) -> String {
-    let brief = format!("fh --seabag \"{}\" brief", seabag.display());
+pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
+    let brief = format!("alm --taskbag \"{}\" brief", taskbag.display());
     match language {
-        "zh-CN" => format!(
-            "FlipHopper 的一节就是 `{brief}` 的输出：运行它，把输出原样（英文）作为这一节。"
-        ),
+        "zh-CN" => {
+            format!("Allomos 的一节就是 `{brief}` 的输出：运行它，把输出原样（英文）作为这一节。")
+        }
         "ja" => format!(
-            "FlipHopper の節は `{brief}` の出力です。実行して、その出力をそのまま（英語のまま）節にします。"
+            "Allomos の節は `{brief}` の出力です。実行して、その出力をそのまま（英語のまま）節にします。"
         ),
         _ => format!(
-            "FlipHopper's section is what `{brief}` prints: run it and use its output exactly as it is."
+            "Allomos's section is what `{brief}` prints: run it and use its output exactly as it is."
         ),
     }
 }
 
-/// [`agent_section`], plus where the seabag is when it is not inside `project` (written relative
+/// [`agent_section`], plus where the taskbag is when it is not inside `project` (written relative
 /// to `project`, so the file works on every computer that has both folders side by side).
-pub fn agent_section_for(project: &Path, seabag: &Path) -> String {
+pub fn agent_section_for(project: &Path, taskbag: &Path) -> String {
     let section = agent_section();
-    if seabag.starts_with(project) {
+    if taskbag.starts_with(project) {
         return section;
     }
-    let at = relative_path(project, seabag)
-        .unwrap_or_else(|| seabag.to_path_buf())
+    let at = relative_path(project, taskbag)
+        .unwrap_or_else(|| taskbag.to_path_buf())
         .display()
         .to_string();
     format!(
         "{section}
-This project's seabag is not inside this folder: it is at `{at}`. Run every `fh` command with
-`--seabag \"{at}\"` (or set `FLIPHOPPER_SEABAG` to that path).
+This project's taskbag is not inside this folder: it is at `{at}`. Run every `alm` command with
+`--taskbag \"{at}\"` (or set `ALLOMOS_TASKBAG` to that path).
 "
     )
 }
 
-/// What `fh init` (and later the app) asks an AI agent to do: add [`agent_section`] to the
+/// What `alm init` (and later the app) asks an AI agent to do: add [`agent_section`] to the
 /// project's instruction files, merged with what is already there. Plain numbered steps, so any
 /// agent can follow them.
-pub fn agent_setup_request(project: &Path, seabag: &Path) -> String {
-    agent_setup_request_in("en", project, seabag)
+pub fn agent_setup_request(project: &Path, taskbag: &Path) -> String {
+    agent_setup_request_in("en", project, taskbag)
 }
 
 /// [`agent_setup_request`] in an interface language (`en`, `zh-CN`, `ja`; English otherwise).
 /// The steps follow the language; the section itself stays English, so every agent and teammate
 /// reads the same rules.
-pub fn agent_setup_request_in(language: &str, project_path: &Path, seabag_path: &Path) -> String {
-    let (project, seabag, heading) = (
+pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
+    let (project, taskbag, heading) = (
         project_path.display(),
-        seabag_path.display(),
+        taskbag_path.display(),
         AGENT_SECTION_HEADING,
     );
-    let source = section_source(language, seabag_path);
+    let source = section_source(language, taskbag_path);
     let steps = match language {
         "zh-CN" => format!(
-            "FlipHopper 已为这个项目建立了水手袋。现在请把它告诉以后的 AI 智能体。
+            "Allomos 已为这个项目建立了任务包。现在请把它告诉以后的 AI 智能体。
 
 项目文件夹：{project}
-水手袋（FlipHopper 的任务文件）：{seabag}
+任务包（Allomos 的任务文件）：{taskbag}
 
 在项目文件夹中：
 
 1. 打开 AGENTS.md（如果没有就新建）。
-2. 如果 AGENTS.md 已经有关于 FlipHopper 的说明（例如标题为“{heading}”的一节，或其他关于 FlipHopper 或 `fh` 的文字），用 FlipHopper 的一节（见最后一行）替换它们；否则添加这一节。
-3. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 FlipHopper，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
+2. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
+3. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
 4. 确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
 5. 告诉用户你改了什么。
 
 {source}"
         ),
         "ja" => format!(
-            "FlipHopper がこのプロジェクトのシーバッグを用意しました。これからの AI エージェントにそれを伝えてください。
+            "Allomos がこのプロジェクトのタスクバッグを用意しました。これからの AI エージェントにそれを伝えてください。
 
 プロジェクトのフォルダー：{project}
-シーバッグ（FlipHopper のタスクファイル）：{seabag}
+タスクバッグ（Allomos のタスクファイル）：{taskbag}
 
 プロジェクトのフォルダーで：
 
 1. AGENTS.md を開きます（なければ作成します）。
-2. AGENTS.md にすでに FlipHopper の説明（たとえば「{heading}」という見出しの節や、FlipHopper または `fh` についてのほかの文）があれば、FlipHopper の節（最後の行を参照）で置き換えます。なければその節を追加します。
-3. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう FlipHopper を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
+2. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
+3. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
 4. CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
 5. 何を変えたかをユーザーに見せてください。
 
 {source}"
         ),
         _ => format!(
-            "FlipHopper has set up this project's seabag. Please now tell future AI agents about it.
+            "Allomos has set up this project's taskbag. Please now tell future AI agents about it.
 
 Project folder: {project}
-Seabag (FlipHopper's task files): {seabag}
+Taskbag (Allomos's task files): {taskbag}
 
 In the project folder:
 
 1. Open AGENTS.md (create it if it is missing).
-2. If AGENTS.md already has FlipHopper instructions (for example a section headed \
-\"{heading}\", or any other text about FlipHopper or `fh`), replace them with \
-FlipHopper's section (see the last line). Otherwise add that section.
+2. If AGENTS.md already has Allomos instructions (for example a section headed \
+\"{heading}\", or any other text about Allomos or `alm`), replace them with \
+Allomos's section (see the last line). Otherwise add that section.
 3. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
-board), change them to point to FlipHopper, so the rules do not conflict. Do not change \
+board), change them to point to Allomos, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
 4. Make sure CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by \
 AGENTS.md), so Claude Code reads AGENTS.md (create \
@@ -300,7 +303,7 @@ CLAUDE.md with just that line if it is missing). Do not copy the section into CL
     format!("{steps}\n")
 }
 
-/// Add FlipHopper's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
+/// Add Allomos's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
 /// changing what is already there. `AGENTS.md`: created with the section, or the section is
 /// appended unless it is there. `CLAUDE.md`: created as `@AGENTS.md` (Claude Code then reads
 /// AGENTS.md); an existing one is left alone if it imports `@AGENTS.md` or holds the section,
@@ -337,16 +340,16 @@ pub fn add_agent_instructions(folder: &Path) -> io::Result<Vec<String>> {
     Ok(changed)
 }
 
-/// Whether an instruction file's text tells AI agents about FlipHopper: a Markdown heading names
-/// it, or the text mentions `fh next` or `fh claim`, or `.fliphopper/seabag`. Agents may merge the
+/// Whether an instruction file's text tells AI agents about Allomos: a Markdown heading names
+/// it, or the text mentions `alm next` or `alm claim`, or `.allomos/taskbag`. Agents may merge the
 /// section in their own words, so any of these counts.
 pub fn tells_agents(text: &str) -> bool {
-    text.contains("fh next")
-        || text.contains("fh claim")
-        || text.contains(".fliphopper/seabag")
+    text.contains("alm next")
+        || text.contains("alm claim")
+        || text.contains(".allomos/taskbag")
         || text.lines().any(|l| {
             let l = l.trim_start();
-            l.starts_with('#') && l.to_lowercase().contains("fliphopper")
+            l.starts_with('#') && l.to_lowercase().contains("allomos")
         })
 }
 
@@ -354,7 +357,7 @@ fn imports_agents_md(text: &str) -> bool {
     text.lines().any(|l| l.trim() == "@AGENTS.md")
 }
 
-/// Which AI agents' instruction files in `project` tell them about FlipHopper.
+/// Which AI agents' instruction files in `project` tell them about Allomos.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct AgentSetup {
     /// Codex reads `AGENTS.md`.
@@ -363,7 +366,7 @@ pub struct AgentSetup {
     pub claude: bool,
 }
 
-/// Read `project`'s `AGENTS.md` and `CLAUDE.md` and say which agents are told about FlipHopper.
+/// Read `project`'s `AGENTS.md` and `CLAUDE.md` and say which agents are told about Allomos.
 pub fn agent_setup(project: &Path) -> AgentSetup {
     let agents = fs::read_to_string(project.join("AGENTS.md")).unwrap_or_default();
     let claude = fs::read_to_string(project.join("CLAUDE.md")).unwrap_or_default();
@@ -387,7 +390,7 @@ fn append(path: &Path, text: &str, section: &str) -> io::Result<()> {
     file.write_all(format!("{gap}{section}").as_bytes())
 }
 
-/// Where a link in a task's description leads, once FlipHopper has agreed to open it.
+/// Where a link in a task's description leads, once Allomos has agreed to open it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinkTarget {
     /// An `http` or `https` address, for the web browser.
@@ -399,10 +402,10 @@ pub enum LinkTarget {
 /// File types a description link may open: text the user reads or edits, never a program.
 const LINKABLE: &[&str] = &["md", "markdown", "txt"];
 
-/// Check a link from task `task`'s `description.md` in the seabag at `root`. Web addresses
+/// Check a link from task `task`'s `description.md` in the taskbag at `root`. Web addresses
 /// (`http`, `https`) are allowed. A relative path is read from the task's folder, the way a
 /// Markdown viewer would, and must lead to an existing `.md`, `.markdown` or `.txt` file inside
-/// the project folder (the folder holding `.fliphopper/`, or the seabag itself when it stands
+/// the project folder (the folder holding `.allomos/`, or the taskbag itself when it stands
 /// alone). Everything else is refused, so a description cannot be used to start a program.
 pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarget, Problem> {
     let refused = || Problem::LinkRefused {
@@ -416,7 +419,7 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
     if link.is_empty() || link.contains(':') || link.starts_with('/') || link.starts_with('\\') {
         return Err(refused());
     }
-    if !fliphopper_core::ops::valid_id(task) {
+    if !allomos_core::ops::valid_id(task) {
         return Err(refused());
     }
     // A link may point into a file (`card.md#approvals`); the part after `#` is not a file name.
@@ -438,10 +441,10 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
     Ok(LinkTarget::File(target))
 }
 
-/// The folder the user picked, for a seabag at `<folder>/.fliphopper/seabag`; `None` for a
-/// seabag anywhere else.
+/// The folder the user picked, for a taskbag at `<folder>/.allomos/taskbag`; `None` for a
+/// taskbag anywhere else.
 pub fn picked_folder(root: &Path) -> Option<&Path> {
-    if root.ends_with(DEFAULT_DIR) {
+    if root.ends_with(DEFAULT_DIR) || root.ends_with(LEGACY_DIR) {
         root.parent()?.parent()
     } else {
         None
@@ -464,13 +467,17 @@ pub fn inspect(folder: &Path) -> Inspection {
     if nested.join(PROJECT_FILE).is_file() {
         return Inspection::Found { root: nested };
     }
+    let legacy = folder.join(LEGACY_DIR);
+    if legacy.join(PROJECT_FILE).is_file() {
+        return Inspection::Found { root: legacy };
+    }
     if looks_empty(folder) {
         Inspection::Empty {
             folder: folder.to_path_buf(),
             suggested_root: nested,
         }
     } else {
-        Inspection::NoSeabag {
+        Inspection::NoTaskbag {
             folder: folder.to_path_buf(),
             suggested_root: nested,
         }
@@ -528,7 +535,7 @@ fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
     v
 }
 
-/// Load a seabag. Valid parts are returned even when other files have problems,
+/// Load a taskbag. Valid parts are returned even when other files have problems,
 /// so the user sees their tasks plus a list of what to fix.
 pub fn load(root: &Path) -> Loaded {
     let mut issues = Vec::new();
@@ -545,7 +552,7 @@ pub fn load(root: &Path) -> Loaded {
     };
     let Some(project) = project else {
         return Loaded {
-            seabag: None,
+            taskbag: None,
             issues,
         };
     };
@@ -564,7 +571,7 @@ pub fn load(root: &Path) -> Loaded {
         }
     }
 
-    // Optional: a seabag without an `iterations/` folder simply has none.
+    // Optional: a taskbag without an `iterations/` folder simply has none.
     let mut iterations: Vec<(String, Iteration)> = Vec::new();
     for path in sorted_entries(&root.join("iterations")) {
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -602,14 +609,14 @@ pub fn load(root: &Path) -> Loaded {
         }
     }
 
-    issues.extend(validate_seabag(&project, &areas, &iterations, &tasks));
+    issues.extend(validate_taskbag(&project, &areas, &iterations, &tasks));
     let mut areas: Vec<Area> = areas.into_iter().map(|(_, a)| a).collect();
     areas.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
     let mut iterations: Vec<Iteration> = iterations.into_iter().map(|(_, i)| i).collect();
     iterations.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
     let tasks = tasks.into_iter().map(|(_, t)| t).collect();
     Loaded {
-        seabag: Some(Seabag {
+        taskbag: Some(Taskbag {
             project,
             areas,
             iterations,
@@ -654,7 +661,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         format: FORMAT.to_string(),
         id: "project".to_string(),
         name: name.to_string(),
-        labels: fliphopper_core::default_labels(),
+        labels: allomos_core::default_labels(),
         project_folder: None,
         task_language: None,
     };
@@ -673,25 +680,25 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     let tasks = [
         (
             "A01-01",
-            "Open this seabag in FlipHopper",
+            "Open this taskbag in Allomos",
             "A01",
-            fliphopper_core::State::Done,
+            allomos_core::State::Done,
             Some("owner verified"),
-            "You picked a folder and FlipHopper created this starter project in it.\n",
+            "You picked a folder and Allomos created this starter project in it.\n",
         ),
         (
             "A01-02",
             "Rename the areas and tasks to your project's",
             "A01",
-            fliphopper_core::State::Ready,
+            allomos_core::State::Ready,
             None,
-            "Edit the files in this folder, or use the `fh` command once it is available.\n",
+            "Edit the files in this folder, or use the `alm` command once it is available.\n",
         ),
         (
             "A02-01",
             "Describe the first outcome you want",
             "A02",
-            fliphopper_core::State::Backlog,
+            allomos_core::State::Backlog,
             None,
             "One sentence about what a person can do when this task is done.\n",
         ),
@@ -717,13 +724,55 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     Ok(root.to_path_buf())
 }
 
-/// Find the seabag for `start`: the nearest `.fliphopper/seabag/` at or above it,
+/// Find the taskbag for `start`: the nearest `.allomos/taskbag/` at or above it,
 /// the way Git finds its repository.
-pub fn find_seabag(start: &Path) -> Option<PathBuf> {
-    start
-        .ancestors()
-        .map(|p| p.join(DEFAULT_DIR))
-        .find(|p| p.join(PROJECT_FILE).is_file())
+pub fn find_taskbag(start: &Path) -> Option<PathBuf> {
+    start.ancestors().find_map(|p| {
+        [DEFAULT_DIR, LEGACY_DIR]
+            .into_iter()
+            .map(|dir| p.join(dir))
+            .find(|root| root.join(PROJECT_FILE).is_file())
+    })
+}
+
+/// Whether the taskbag at `root` is still in FlipHopper's old place, `.fliphopper/seabag/`.
+pub fn is_legacy_taskbag(root: &Path) -> bool {
+    root.ends_with(LEGACY_DIR)
+}
+
+/// Move a taskbag from FlipHopper's old place (`<folder>/.fliphopper/seabag/`) to
+/// `<folder>/.allomos/taskbag/`, and mark its `project.json` with the current format. Holds the
+/// lock while it moves, so no writer is half-way through. An empty `.fliphopper/` left behind is
+/// removed. Returns the new root. Refused when a taskbag is already at the new place.
+pub fn move_legacy_taskbag(root: &Path) -> Result<PathBuf, Problem> {
+    let Some(folder) = picked_folder(root).filter(|_| is_legacy_taskbag(root)) else {
+        return Err(Problem::NotATaskbag {
+            path: root.display().to_string(),
+        });
+    };
+    let target = folder.join(DEFAULT_DIR);
+    if target.exists() {
+        return Err(Problem::TaskbagExists {
+            path: target.display().to_string(),
+        });
+    }
+    let lock = Lock::acquire(root, Duration::from_secs(5))?;
+    let parent = target.parent().expect("the new place has a parent");
+    fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
+    fs::rename(root, &target).map_err(|e| write_failed(&target, e))?;
+    drop(lock);
+    // The format tag says which program wrote the folder; now it is Allomos's.
+    let path = target.join(PROJECT_FILE);
+    if let Ok(text) = fs::read_to_string(&path) {
+        if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&text) {
+            value["format"] = serde_json::Value::String(FORMAT.to_string());
+            write_atomic(&path, &json_text(&value))?;
+        }
+    }
+    let old = folder.join(".fliphopper");
+    let _ = fs::remove_dir(old.join("requests"));
+    let _ = fs::remove_dir(&old);
+    Ok(target)
 }
 
 /// A project ID made from a folder name: letters, digits, `-` and `_` kept, anything else
@@ -764,7 +813,7 @@ fn write_failed(path: &Path, e: impl std::fmt::Display) -> Problem {
 }
 
 fn json_text<T: Serialize>(value: &T) -> String {
-    let mut text = serde_json::to_string_pretty(value).expect("seabag values always serialize");
+    let mut text = serde_json::to_string_pretty(value).expect("taskbag values always serialize");
     text.push('\n');
     text
 }
@@ -773,7 +822,7 @@ fn json_text<T: Serialize>(value: &T) -> String {
 /// disk, and is then renamed over `path`. A reader sees either the old file or the new one,
 /// never a part-written one.
 fn write_atomic(path: &Path, text: &str) -> Result<(), Problem> {
-    let dir = path.parent().expect("seabag files are inside a folder");
+    let dir = path.parent().expect("taskbag files are inside a folder");
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
     let tmp = tmp_path(dir, name);
     let result = (|| {
@@ -819,11 +868,11 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
     })
 }
 
-/// Create an empty seabag at `root` (normally `<repository>/.fliphopper/seabag/`): `project.json`,
+/// Create an empty taskbag at `root` (normally `<repository>/.allomos/taskbag/`): `project.json`,
 /// empty `areas/` and `tasks/`, and a `.gitignore` for the lock. Refused when `root` exists.
 /// Never creates a Git repository.
 pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
-    init_with_labels(root, id, name, fliphopper_core::default_labels())
+    init_with_labels(root, id, name, allomos_core::default_labels())
 }
 
 /// [`init`] with the project's own label ladder, lowest step first. An empty ladder is
@@ -835,7 +884,7 @@ pub fn init_with_labels(
     labels: Vec<String>,
 ) -> Result<PathBuf, Problem> {
     if root.exists() {
-        return Err(Problem::SeabagExists {
+        return Err(Problem::TaskbagExists {
             path: root.display().to_string(),
         });
     }
@@ -845,15 +894,15 @@ pub fn init_with_labels(
         name: name.to_string(),
         labels,
         project_folder: None,
-        // New seabags follow the app's language until someone sets another (Task-A01-21).
-        task_language: Some(fliphopper_core::TASK_LANGUAGE_UI.to_string()),
+        // New taskbags follow the app's language until someone sets another (Task-A01-21).
+        task_language: Some(allomos_core::TASK_LANGUAGE_UI.to_string()),
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);
     if let Err(issues) = parse_project(PROJECT_FILE, &text) {
         return Err(issues[0].problem.clone());
     }
-    let parent = root.parent().expect("a seabag root has a parent");
+    let parent = root.parent().expect("a taskbag root has a parent");
     fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
     create_dir_atomic(
         root,
@@ -865,7 +914,7 @@ pub fn init_with_labels(
         ],
     )
     .map_err(|p| match p {
-        Problem::WriteFailed { .. } if root.exists() => Problem::SeabagExists {
+        Problem::WriteFailed { .. } if root.exists() => Problem::TaskbagExists {
             path: root.display().to_string(),
         },
         p => p,
@@ -873,8 +922,8 @@ pub fn init_with_labels(
     Ok(root.to_path_buf())
 }
 
-/// The seabag's lock, held for one change: load, check the rules, write, then drop it.
-/// Every write goes through a `Lock`, so two FlipHopper writers never change the seabag at
+/// The taskbag's lock, held for one change: load, check the rules, write, then drop it.
+/// Every write goes through a `Lock`, so two Allomos writers never change the taskbag at
 /// the same moment. The operating system releases the lock if the process dies.
 pub struct Lock {
     root: PathBuf,
@@ -885,7 +934,7 @@ impl Lock {
     /// Take the lock, waiting up to `wait` for another writer to finish.
     pub fn acquire(root: &Path, wait: Duration) -> Result<Lock, Problem> {
         if !root.join(PROJECT_FILE).is_file() {
-            return Err(Problem::SeabagNotFound {
+            return Err(Problem::TaskbagNotFound {
                 path: root.display().to_string(),
             });
         }
@@ -909,7 +958,7 @@ impl Lock {
                     std::thread::sleep(Duration::from_millis(5));
                 }
                 Err(TryLockError::WouldBlock) => {
-                    return Err(Problem::SeabagBusy {
+                    return Err(Problem::TaskbagBusy {
                         path: root.display().to_string(),
                     });
                 }
@@ -922,7 +971,7 @@ impl Lock {
         &self.root
     }
 
-    /// Load the seabag while holding the lock, so what is read is what the change builds on.
+    /// Load the taskbag while holding the lock, so what is read is what the change builds on.
     pub fn load(&self) -> Loaded {
         load(&self.root)
     }
@@ -970,7 +1019,7 @@ impl Lock {
         create_dir_atomic(&target, &files)
     }
 
-    /// Rewrite `project.json` (`fh labels`).
+    /// Rewrite `project.json` (`alm labels`).
     pub fn save_project(&self, project: &Project) -> Result<(), Problem> {
         write_atomic(&self.root.join(PROJECT_FILE), &json_text(project))
     }
@@ -982,7 +1031,7 @@ impl Lock {
     }
 }
 
-/// A fingerprint of the seabag's files (names, sizes and change times). It changes when any
+/// A fingerprint of the taskbag's files (names, sizes and change times). It changes when any
 /// file is written, so a window can reload only when something changed.
 pub fn stamp(root: &Path) -> u64 {
     use std::hash::{Hash, Hasher};
@@ -1019,7 +1068,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = std::env::temp_dir().join(format!("fliphopper-test-{name}-{n}"));
+        let p = std::env::temp_dir().join(format!("allomos-test-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
     }
@@ -1029,11 +1078,11 @@ mod tests {
         let dir = tmp("init-ladder");
         let root = dir.join(DEFAULT_DIR);
         let ladder = vec!["drafted".to_string(), "owner verified".to_string()];
-        init_with_labels(&root, "fliphopper", "FlipHopper", ladder.clone()).unwrap();
-        let bag = load(&root).seabag.unwrap();
+        init_with_labels(&root, "allomos", "Allomos", ladder.clone()).unwrap();
+        let bag = load(&root).taskbag.unwrap();
         assert_eq!(
             (bag.project.id.as_str(), bag.project.labels),
-            ("fliphopper", ladder)
+            ("allomos", ladder)
         );
         let other = dir.join("other");
         assert_eq!(
@@ -1050,17 +1099,17 @@ mod tests {
 
     #[test]
     fn agent_setup_request_follows_the_language_but_keeps_the_section_english() {
-        let (p, b) = (Path::new("/p"), Path::new("/p/.fliphopper/seabag"));
+        let (p, b) = (Path::new("/p"), Path::new("/p/.allomos/taskbag"));
         let zh = agent_setup_request_in("zh-CN", p, b);
         let ja = agent_setup_request_in("ja", p, b);
         assert!(zh.contains("1. 打开 AGENTS.md") && zh.contains("项目文件夹：/p\n"));
         assert!(
             ja.contains("1. AGENTS.md を開きます")
-                && ja.contains("シーバッグ（FlipHopper のタスクファイル）：/p/.fliphopper/seabag")
+                && ja.contains("タスクバッグ（Allomos のタスクファイル）：/p/.allomos/taskbag")
         );
         for r in [&zh, &ja] {
             assert!(
-                r.contains("brief`") && !r.contains("fh claim <id>"),
+                r.contains("brief`") && !r.contains("alm claim <id>"),
                 "no copy of the section"
             );
         }
@@ -1072,20 +1121,19 @@ mod tests {
 
     #[test]
     fn agent_setup_request_carries_the_section_and_steps() {
-        let r = agent_setup_request(Path::new("/p"), Path::new("/p/.fliphopper/seabag"));
+        let r = agent_setup_request(Path::new("/p"), Path::new("/p/.allomos/taskbag"));
         assert!(r.contains("1. Open AGENTS.md") && r.contains("imports AGENTS.md"));
         // The Claude app turns a typed-in "@" into a full-width "＠", so the request avoids it.
         assert!(!r.contains('@'));
         assert!(
-            r.contains("Project folder: /p\n")
-                && r.contains("task files): /p/.fliphopper/seabag\n")
+            r.contains("Project folder: /p\n") && r.contains("task files): /p/.allomos/taskbag\n")
         );
-        assert!(r.contains("any other text about FlipHopper") && !r.contains("<!--"));
+        assert!(r.contains("any other text about Allomos") && !r.contains("<!--"));
         assert!(
             r.contains("brief` prints"),
-            "the section comes from `fh brief`"
+            "the section comes from `alm brief`"
         );
-        assert!(!r.contains("fh claim <id>"), "no copy of the section");
+        assert!(!r.contains("alm claim <id>"), "no copy of the section");
         assert_eq!(r.matches(AGENT_SECTION_HEADING).count(), 1);
     }
 
@@ -1100,8 +1148,8 @@ mod tests {
         // Unrelated instructions do not count.
         fs::write(dir.join("AGENTS.md"), "# Rules\nRun the tests.\n").unwrap();
         assert_eq!(agent_setup(&dir), none);
-        // Merged in other words: `fh next` counts; CLAUDE.md importing AGENTS.md follows it.
-        fs::write(dir.join("AGENTS.md"), "## Workflow\nStart with fh next.\n").unwrap();
+        // Merged in other words: `alm next` counts; CLAUDE.md importing AGENTS.md follows it.
+        fs::write(dir.join("AGENTS.md"), "## Workflow\nStart with alm next.\n").unwrap();
         fs::write(dir.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
         assert_eq!(
             agent_setup(&dir),
@@ -1110,9 +1158,9 @@ mod tests {
                 claude: true
             }
         );
-        // CLAUDE.md alone, mentioning the seabag; AGENTS.md without it.
+        // CLAUDE.md alone, mentioning the taskbag; AGENTS.md without it.
         fs::write(dir.join("AGENTS.md"), "# Rules\n").unwrap();
-        fs::write(dir.join("CLAUDE.md"), "Tasks are in .fliphopper/seabag/.\n").unwrap();
+        fs::write(dir.join("CLAUDE.md"), "Tasks are in .allomos/taskbag/.\n").unwrap();
         assert_eq!(
             agent_setup(&dir),
             AgentSetup {
@@ -1120,8 +1168,8 @@ mod tests {
                 claude: true
             }
         );
-        // A heading naming FlipHopper.
-        fs::write(dir.join("AGENTS.md"), "### Using FlipHopper\n").unwrap();
+        // A heading naming Allomos.
+        fs::write(dir.join("AGENTS.md"), "### Using Allomos\n").unwrap();
         assert!(agent_setup(&dir).codex);
         fs::remove_dir_all(dir).unwrap();
     }
@@ -1135,7 +1183,7 @@ mod tests {
             ["AGENTS.md", "CLAUDE.md"]
         );
         let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
-        assert!(agents.contains(AGENT_SECTION_HEADING) && agents.contains("fh next"));
+        assert!(agents.contains(AGENT_SECTION_HEADING) && agents.contains("alm next"));
         assert!(!agents.contains("<!--"));
         assert_eq!(
             fs::read_to_string(dir.join("CLAUDE.md")).unwrap(),
@@ -1155,18 +1203,18 @@ mod tests {
             ["AGENTS.md", "CLAUDE.md"]
         );
         let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
-        assert!(agents.starts_with("# Ours\nKeep this.\n\n## Tasks: FlipHopper"));
+        assert!(agents.starts_with("# Ours\nKeep this.\n\n## Tasks: Allomos"));
         let claude = fs::read_to_string(dir.join("CLAUDE.md")).unwrap();
-        assert!(claude.starts_with("Claude rules\n\n## Tasks: FlipHopper"));
+        assert!(claude.starts_with("Claude rules\n\n## Tasks: Allomos"));
         assert_eq!(agents.matches(AGENT_SECTION_HEADING).count(), 1);
         assert!(add_agent_instructions(&dir).unwrap().is_empty());
         fs::remove_dir_all(dir).unwrap();
 
-        // A FlipHopper section under another heading (no markers) is recognised too.
+        // An Allomos section under another heading (no markers) is recognised too.
         let dir = tmp("agents-own-heading");
         fs::write(
             dir.join("AGENTS.md"),
-            "# Ours\n\n## Using FlipHopper\nRun fh next.\n",
+            "# Ours\n\n## Using Allomos\nRun alm next.\n",
         )
         .unwrap();
         assert_eq!(add_agent_instructions(&dir).unwrap(), ["CLAUDE.md"]);
@@ -1199,13 +1247,13 @@ mod tests {
         );
         fs::write(dir.join("notes.txt"), "x").unwrap();
         assert!(!looks_empty(&dir));
-        assert!(matches!(inspect(&dir), Inspection::NoSeabag { .. }));
+        assert!(matches!(inspect(&dir), Inspection::NoTaskbag { .. }));
         fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
     fn readme_goes_only_into_a_folder_that_looks_empty() {
-        // Empty, and only `.DS_Store`: the seabag and the README both arrive.
+        // Empty, and only `.DS_Store`: the taskbag and the README both arrive.
         for extra in [None, Some(".DS_Store")] {
             let dir = tmp("readme-empty");
             if let Some(name) = extra {
@@ -1216,7 +1264,7 @@ mod tests {
             assert_eq!(picked_folder(&root), Some(dir.as_path()));
             assert!(add_readme_if_empty(&dir, "en").unwrap());
             let text = fs::read_to_string(dir.join(README_FILE)).unwrap();
-            assert!(text.contains(".fliphopper/seabag/"));
+            assert!(text.contains(".allomos/taskbag/"));
             assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
             // Now the folder has a visible file: a second call writes nothing.
             assert!(!add_readme_if_empty(&dir, "ja").unwrap());
@@ -1246,21 +1294,21 @@ mod tests {
 
     #[test]
     fn readme_speaks_three_languages() {
-        assert!(readme_text("en").starts_with("# FlipHopper project"));
-        assert!(readme_text("zh-CN").contains("此文件夹是一个 FlipHopper 项目"));
-        assert!(readme_text("ja").contains("このフォルダーは FlipHopper のプロジェクトです"));
+        assert!(readme_text("en").starts_with("# Allomos project"));
+        assert!(readme_text("zh-CN").contains("此文件夹是一个换肩项目"));
+        assert!(readme_text("ja").contains("このフォルダーはアロモスのプロジェクトです"));
         assert_eq!(readme_text("fr"), readme_text("en"));
         for lang in ["en", "zh-CN", "ja"] {
-            assert!(readme_text(lang).contains("`.fliphopper/seabag/`"));
-            assert!(readme_text(lang).contains("`fh"));
+            assert!(readme_text(lang).contains("`.allomos/taskbag/`"));
+            assert!(readme_text(lang).contains("`alm"));
         }
-        assert_eq!(picked_folder(Path::new("/x/seabag")), None);
+        assert_eq!(picked_folder(Path::new("/x/taskbag")), None);
     }
 
     #[test]
-    fn empty_folder_gets_starter_seabag_in_default_dir() {
+    fn empty_folder_gets_starter_taskbag_in_default_dir() {
         let dir = tmp("empty");
-        let root = dir.join(".fliphopper/seabag");
+        let root = dir.join(".allomos/taskbag");
         assert_eq!(
             inspect(&dir),
             Inspection::Empty {
@@ -1271,12 +1319,9 @@ mod tests {
         create_starter(&root, "Demo").unwrap();
         assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
         let loaded = load(&root);
-        assert_eq!(
-            loaded.seabag.as_ref().unwrap().project.format,
-            "fliphopper/1"
-        );
+        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/1");
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-        let tb = loaded.seabag.unwrap();
+        let tb = loaded.taskbag.unwrap();
         assert_eq!(tb.project.name, "Demo");
         assert_eq!(tb.areas.len(), 2);
         assert_eq!(tb.tasks.len(), 3);
@@ -1285,19 +1330,19 @@ mod tests {
     }
 
     #[test]
-    fn repo_folder_gets_nested_seabag_without_nested_git() {
+    fn repo_folder_gets_nested_taskbag_without_nested_git() {
         let repo = tmp("repo");
         fs::create_dir(repo.join(".git")).unwrap();
         fs::write(repo.join("README.md"), "code").unwrap();
-        let Inspection::NoSeabag { suggested_root, .. } = inspect(&repo) else {
-            panic!("expected NoSeabag")
+        let Inspection::NoTaskbag { suggested_root, .. } = inspect(&repo) else {
+            panic!("expected NoTaskbag")
         };
-        assert_eq!(suggested_root, repo.join(".fliphopper/seabag"));
+        assert_eq!(suggested_root, repo.join(".allomos/taskbag"));
         create_starter(&suggested_root, "Repo").unwrap();
         assert_eq!(
             inspect(&repo),
             Inspection::Found {
-                root: repo.join(".fliphopper/seabag")
+                root: repo.join(".allomos/taskbag")
             }
         );
         assert!(!suggested_root.join(".git").exists());
@@ -1330,7 +1375,7 @@ mod tests {
         assert_eq!(loaded.issues.len(), 1);
         assert_eq!(loaded.issues[0].file, "tasks/A01-02/task.json");
         assert_eq!(loaded.issues[0].field.as_deref(), Some("title"));
-        assert_eq!(loaded.seabag.unwrap().tasks.len(), 2);
+        assert_eq!(loaded.taskbag.unwrap().tasks.len(), 2);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -1338,7 +1383,7 @@ mod tests {
     fn missing_project_file_is_an_issue_not_a_crash() {
         let dir = tmp("noproject");
         let loaded = load(&dir);
-        assert!(loaded.seabag.is_none());
+        assert!(loaded.taskbag.is_none());
         assert_eq!(loaded.issues[0].file, "project.json");
         fs::remove_dir_all(dir).unwrap();
     }
@@ -1350,19 +1395,19 @@ mod tests {
     }
 
     #[test]
-    fn init_makes_an_empty_seabag_found_from_below() {
+    fn init_makes_an_empty_taskbag_found_from_below() {
         let repo = tmp("init");
         let root = repo.join(DEFAULT_DIR);
         init(&root, &id_from_name("my repo!"), "My repo").unwrap();
         assert_eq!(
             init(&root, "x", "X"),
-            Err(Problem::SeabagExists {
+            Err(Problem::TaskbagExists {
                 path: root.display().to_string()
             })
         );
         let loaded = load(&root);
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-        let bag = loaded.seabag.unwrap();
+        let bag = loaded.taskbag.unwrap();
         assert_eq!(bag.project.id, "my-repo");
         assert!(bag.areas.is_empty() && bag.tasks.is_empty());
         assert!(
@@ -1372,17 +1417,17 @@ mod tests {
         );
         let deep = repo.join("src/a/b");
         fs::create_dir_all(&deep).unwrap();
-        assert_eq!(find_seabag(&deep), Some(root.clone()));
-        assert_eq!(find_seabag(&std::env::temp_dir()), None);
-        // No temporary folder is left next to the seabag.
-        let left: Vec<_> = fs::read_dir(repo.join(".fliphopper")).unwrap().collect();
+        assert_eq!(find_taskbag(&deep), Some(root.clone()));
+        assert_eq!(find_taskbag(&std::env::temp_dir()), None);
+        // No temporary folder is left next to the taskbag.
+        let left: Vec<_> = fs::read_dir(repo.join(".allomos")).unwrap().collect();
         assert_eq!(left.len(), 1);
         fs::remove_dir_all(repo).unwrap();
     }
 
     #[test]
     fn id_from_name_keeps_ids_valid() {
-        assert_eq!(id_from_name("fliphopper"), "fliphopper");
+        assert_eq!(id_from_name("allomos"), "allomos");
         assert_eq!(id_from_name("我的"), "project");
         assert_eq!(id_from_name(&"a".repeat(80)).len(), 64);
     }
@@ -1393,7 +1438,7 @@ mod tests {
         let root = dir.join(DEFAULT_DIR);
         assert!(matches!(
             Lock::acquire(&root, Duration::ZERO),
-            Err(Problem::SeabagNotFound { .. })
+            Err(Problem::TaskbagNotFound { .. })
         ));
         init(&root, "p", "P").unwrap();
         let before = stamp(&root);
@@ -1401,25 +1446,25 @@ mod tests {
         // A second writer waits, then gives up while the first holds the lock.
         assert!(matches!(
             Lock::acquire(&root, Duration::from_millis(20)),
-            Err(Problem::SeabagBusy { .. })
+            Err(Problem::TaskbagBusy { .. })
         ));
-        let bag = lock.load().seabag.unwrap();
-        let area = fliphopper_core::ops::new_area(&bag, "A01", "First").unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        let area = allomos_core::ops::new_area(&bag, "A01", "First").unwrap();
         lock.create_area(&area).unwrap();
         assert!(matches!(
             lock.create_area(&area),
             Err(Problem::DuplicateAreaId { .. })
         ));
-        let bag = lock.load().seabag.unwrap();
+        let bag = lock.load().taskbag.unwrap();
         let task =
-            fliphopper_core::ops::new_task(&bag, "A01-01", "A01", "Do it", Some("Why")).unwrap();
+            allomos_core::ops::new_task(&bag, "A01-01", "A01", "Do it", Some("Why")).unwrap();
         lock.create_task(&task).unwrap();
         assert!(matches!(
             lock.create_task(&task),
             Err(Problem::DuplicateTaskId { .. })
         ));
-        let bag = lock.load().seabag.unwrap();
-        let claimed = fliphopper_core::ops::claim(&bag, "A01-01", Some("me"), false)
+        let bag = lock.load().taskbag.unwrap();
+        let claimed = allomos_core::ops::claim(&bag, "A01-01", Some("me"), false)
             .unwrap()
             .task;
         lock.save_task(&claimed).unwrap();
@@ -1428,13 +1473,13 @@ mod tests {
 
         let loaded = load(&root);
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-        let t = &loaded.seabag.unwrap().tasks[0];
+        let t = &loaded.taskbag.unwrap().tasks[0];
         assert_eq!(t.holder.as_deref(), Some("me"));
         assert_eq!(t.description, "Why\n");
         let json = fs::read_to_string(root.join("tasks/A01-01/task.json")).unwrap();
         assert!(!json.contains("null") && !json.contains("description"));
         assert_ne!(stamp(&root), before);
-        // Only the lock and the seabag's own files: no temporary files left behind.
+        // Only the lock and the taskbag's own files: no temporary files left behind.
         let hidden: Vec<_> = fs::read_dir(&root)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -1446,18 +1491,18 @@ mod tests {
 
     #[test]
     fn iterations_are_written_read_and_sorted() {
-        use fliphopper_core::ops::{self, IterationDetails};
+        use allomos_core::ops::{self, IterationDetails};
         let dir = tmp("iterations");
         let root = dir.join(DEFAULT_DIR);
         init(&root, "p", "P").unwrap();
-        // A seabag made before iterations existed has no `iterations/` folder: still valid.
+        // A taskbag made before iterations existed has no `iterations/` folder: still valid.
         assert!(!root.join("iterations").exists());
         let loaded = load(&root);
-        assert!(loaded.issues.is_empty() && loaded.seabag.unwrap().iterations.is_empty());
+        assert!(loaded.issues.is_empty() && loaded.taskbag.unwrap().iterations.is_empty());
 
         let before = stamp(&root);
         let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
-        let bag = lock.load().seabag.unwrap();
+        let bag = lock.load().taskbag.unwrap();
         let two = ops::new_iteration(
             &bag,
             "I02",
@@ -1479,13 +1524,13 @@ mod tests {
             r#"{"id":"I01","name":"v0.1","order":0}"#,
         )
         .unwrap();
-        let bag = lock.load().seabag.unwrap();
+        let bag = lock.load().taskbag.unwrap();
         lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
             .unwrap();
-        let bag = lock.load().seabag.unwrap();
+        let bag = lock.load().taskbag.unwrap();
         lock.create_task(&ops::new_task(&bag, "A01-01", "A01", "Do it", None).unwrap())
             .unwrap();
-        let bag = lock.load().seabag.unwrap();
+        let bag = lock.load().taskbag.unwrap();
         lock.save_task(&ops::plan(&bag, "A01-01", Some("I02")).unwrap().task)
             .unwrap();
         drop(lock);
@@ -1494,7 +1539,7 @@ mod tests {
         assert!(!json.contains("null") && !json.contains("start"), "{json}");
         let loaded = load(&root);
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-        let bag = loaded.seabag.unwrap();
+        let bag = loaded.taskbag.unwrap();
         let ids: Vec<_> = bag.iterations.iter().map(|i| i.id.as_str()).collect();
         assert_eq!(ids, ["I01", "I02"]);
         assert_eq!(bag.tasks[0].iteration.as_deref(), Some("I02"));
@@ -1504,7 +1549,7 @@ mod tests {
         fs::remove_file(root.join("iterations/I02.json")).unwrap();
         let loaded = load(&root);
         assert_eq!(loaded.issues[0].problem.code(), "unknown_iteration");
-        assert_eq!(loaded.seabag.unwrap().tasks.len(), 1);
+        assert_eq!(loaded.taskbag.unwrap().tasks.len(), 1);
         fs::remove_dir_all(dir).unwrap();
     }
 
