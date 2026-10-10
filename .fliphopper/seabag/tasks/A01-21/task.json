@@ -2,6 +2,8 @@
   "area": "A01",
   "holder": "claude/a01-21-task-language",
   "id": "A01-21",
-  "state": "in_progress",
-  "title": "Task language"
+  "label": "locally verified",
+  "state": "waiting",
+  "title": "Task language",
+  "waiting_on": "owner checks in the app: change FlipHopper's language, then fh task-language follows it"
 }
