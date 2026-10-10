@@ -45,11 +45,12 @@ One block per card that `alm list --state in_progress` shows held.
 - Next action: owner runs `bash apps/desktop/scripts/build-windows.sh`; then `alm label A07-02 "owner verified"`, `alm done`, remove this block and the worktree
 
 ### Task-A05-03 — claude/a05-03-setup-wizard
-- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` · pushed: yes
+- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` (not merged) · pushed: yes
 - Approvals in force: card's local work (owner, 2026-10-11); no external operations
-- Uncommitted: none · Running: none
-- Done: store connect request, desktop `connect_agents` / `instruction_files` / one menu item, `SetupWizard.tsx`, `setupFlow.ts` + node tests, restart notice, i18n, OPEN-FOLDER-FLOW + CODING_RULES. All named checks pass (see card).
-- Next action: build the app (`npx --prefix apps/desktop tauri build --debug --bundles app`) and run the manual check in `~/allomos-tests/a05-03-setup-wizard/`; then label "locally verified"
+- Uncommitted: none
+- Running: the debug app from this worktree, opened on `~/allomos-tests/a05-03-setup-wizard/code-app` (safe to quit)
+- Label: implemented. All named checks pass; the manual check in the app is NOT RUN (window access declined) — see card.
+- Next action: owner runs the manual check; then label "locally verified", merge into `main`
 
 ## Live state
 
