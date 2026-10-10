@@ -4,6 +4,6 @@
   "id": "A00-22",
   "label": "owner verified",
   "next_dependency": "owner: a last look, then done",
-  "state": "in_progress",
+  "state": "done",
   "title": "Clear leftover FlipHopper names"
 }
