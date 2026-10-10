@@ -2,6 +2,7 @@
   "area": "A01",
   "holder": "claude/a01-21-task-language",
   "id": "A01-21",
+  "label": "locally verified",
   "state": "in_progress",
   "title": "Task language"
 }
