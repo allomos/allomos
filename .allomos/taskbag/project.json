@@ -9,5 +9,6 @@
     "deployed and verified",
     "owner verified"
   ],
+  "project_folder": ".",
   "task_language": "en"
 }
