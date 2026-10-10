@@ -37,12 +37,12 @@ Updated: 2026-10-04
 One block per card that `fh list --state in_progress` shows held.
 
 ### Task-A05-02 — claude/a05-02-convert-project
-- Checkout: `.claude/worktrees/a05-02` · branch `claude/a05-02-convert-project` · pushed: yes
-- Approvals in force: the card and the owner's open-folder flow (2026-10-09), local work only. Not approved: any write to the SSR repository.
+- Checkout: `.claude/worktrees/a05-02` · branch `claude/a05-02-convert-project` · **merged into `main` 2026-10-10** · pushed: yes
+- Approvals in force: the card and the open-folder flow, local work only. Not approved: any write to the SSR repository.
 - Uncommitted: none
-- Running: the built app (this worktree's `target/debug/bundle/macos/FlipHopper.app`) on `~/fliphopper-tests/a05-02-bakery` for the owner's manual test; safe to quit
-- **Pitfall:** the app now writes `project_folder` into `project.json` when it opens a seabag. `fh` builds from before this branch refuse such a seabag (`field_unknown`). `fh` in `~/.cargo/bin` is installed from this branch (2026-10-09); reinstall from `main` only after this branch is merged
-- Next: owner's manual test of the flow (OPEN-FOLDER-FLOW.md); then merge into `main`
+- Running: the built app (this worktree's `target/debug/bundle/macos/FlipHopper.app`) on `~/fliphopper-tests/a05-02-check-board` for the owner's manual check; safe to quit
+- Waiting: the owner's manual check (card § Owner's manual check). The session "Fliphopper app name" (A00-21 Allomos, A01-20 taskbag) was asked to wait for our message before renaming; send it the merge facts when A05-02 is done
+- Pitfall: `project_folder` in project.json needs `fh` from `main` at or after this merge; reinstall with `cargo install --locked --path crates/cli` from a worktree on `main`
 
 ## Live state
 
