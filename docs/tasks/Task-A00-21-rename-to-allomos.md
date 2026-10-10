@@ -55,3 +55,8 @@ The app is renamed from **FlipHopper** to **Allomos**. The name is Greek *állos
     - **allmos electronic**, class 9, Germany and an international registration across Europe.
   - Other similar marks are in unrelated classes (clothing, bags, finance).
   - **In plain words:** nobody owns "Allomos" or "换肩", but three names one letter away are registered for software in the US, Japan and South-East Asia. That does not block Allomos, but a trademark attorney should judge the risk of confusion before you file or sell, and a CNIPA search for China is still needed.
+- 2026-10-11 — **What the close marks actually cover** (agent):
+  - **ALLMOS, USA** (reg. 8363417, Littlesoho): "covers for smartphones; grip holders for smartphones" only. These are phone cases: a physical product, not software ([USPTO TSDR](https://tsdr.uspto.gov/#caseNumber=8363417&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch)).
+  - **ALTOMOS, Japan** (reg. 6757026, アルケア株式会社 / Alcare, a medical-supplies maker): ostomy supplies, wound dressings and skin care, plus a broad defensive list that includes software (class 9) and SaaS/PaaS (class 42).
+  - **ALOMOS, Singapore/Malaysia/Indonesia** (Pointstar Pte. Ltd.): class 9 (and 35), no product found on the web; not in the owner's main markets.
+  - **Agent's view (not legal advice):** low risk in the US (different goods); low-to-moderate in Japan (Alcare's list includes software, but the names sound different, アルトモス against アロモス, and the businesses differ); low in South-East Asia. An attorney still decides.
