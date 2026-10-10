@@ -4,7 +4,7 @@
 //! agents read it, the app does not show it.
 
 /// The topics, in the order `fh guide` prints them.
-pub const GUIDE_TOPICS: [&str; 4] = ["terms", "customize", "commands", "workflow"];
+pub const GUIDE_TOPICS: [&str; 5] = ["terms", "customize", "tasks", "commands", "workflow"];
 
 const TERMS: &str = "# FlipHopper terms
 
@@ -52,6 +52,30 @@ Read the project's current areas, iterations and tasks with `fh list` (`--by ite
 ladder in the seabag's project.json.
 ";
 
+const TASKS: &str = "# How to add a task
+
+Read this before you add a task, so it fits this project.
+
+1. **Look first.** `fh list` shows the areas and the task IDs already used; `fh show <id>` shows
+   how an existing task is written. Follow what you see.
+2. **Area.** Use an area that exists. Add a new one (`fh add area <id> \"<name>\"`) only when the
+   person asks for it or agrees to it.
+3. **ID.** Leave it out: `fh add task --area <area> --title \"…\"` takes the next free number in
+   the area (A01-04 after A01-03). Give an ID only to follow a pattern the project already uses,
+   for example a child task `A01-03-01` under `A01-03`.
+4. **Title.** One observable outcome: what a person can do or see when it is done (\"A customer
+   orders a cake for a pick-up day\"), not a technical step (\"add an orders table\").
+5. **Description** (`--description`, Markdown), in three short parts:
+   - **Outcome.** One or two plain sentences.
+   - **Done means.** The checks or demonstrations that prove it.
+   - **Notes.** Anything the next person needs: links, open questions, who must decide.
+6. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
+   (`fh ready <id>`). Plan it in an iteration (`fh plan <id> <iteration>`) only when asked.
+7. **One outcome per task.** If it is really two outcomes, add two tasks.
+
+Add it with `--push` when the project shares its tasks through Git, so others see it.
+";
+
 const COMMANDS: &str = "# fh commands
 
 Every command takes `--seabag <path>` (or FLIPHOPPER_SEABAG; default: the nearest
@@ -75,7 +99,8 @@ Work a task:
 
 Plan:
 - `fh add area <id> \"<name>\"`, `fh add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`
-- `fh add task <id> --area <id> --title \"<title>\" [--description \"<markdown>\"]`
+- `fh add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]`: without
+  an ID, the next free one in the area. Read `fh guide tasks` first.
 - `fh plan <id> [<iteration>]`; `fh labels \"<a,b,…>\"`
 
 Ask the person:
@@ -83,7 +108,8 @@ Ask the person:
   waits; exit 0 means go ahead, anything else means change nothing.
 
 About FlipHopper:
-- `fh brief`: the section for AGENTS.md. `fh guide [terms|customize|commands|workflow]`: this guide.
+- `fh brief`: the section for AGENTS.md. `fh guide [terms|customize|tasks|commands|workflow]`:
+  this guide.
 - `fh init`: create a seabag (only when there is none).
 ";
 
@@ -111,6 +137,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
     let text = |t: &str| match t {
         "terms" => Some(TERMS),
         "customize" => Some(CUSTOMIZE),
+        "tasks" => Some(TASKS),
         "commands" => Some(COMMANDS),
         "workflow" => Some(WORKFLOW),
         _ => None,
@@ -148,5 +175,10 @@ mod tests {
         assert!(all.contains("# FlipHopper terms") && all.contains("# How to work the tasks"));
         // The fixed parts are said plainly.
         assert!(guide(Some("customize")).unwrap().contains("The six states"));
+        assert!(
+            guide(Some("tasks"))
+                .unwrap()
+                .contains("Do not make it ready yourself")
+        );
     }
 }

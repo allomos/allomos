@@ -189,7 +189,8 @@ enum Add {
     },
     /// Add a task in backlog.
     Task {
-        id: String,
+        /// The task's ID. Default: the next free one in the area, like A01-04.
+        id: Option<String>,
         #[arg(long)]
         area: String,
         #[arg(long)]
@@ -203,9 +204,7 @@ impl Command {
     /// The task or area a command acts on, for the commit message.
     fn target(&self) -> Option<&str> {
         match self {
-            Command::Add(
-                Add::Area { id, .. } | Add::Iteration { id, .. } | Add::Task { id, .. },
-            )
+            Command::Add(Add::Area { id, .. } | Add::Iteration { id, .. })
             | Command::Show { id }
             | Command::Claim { id, .. }
             | Command::Label { id, .. }
@@ -216,6 +215,7 @@ impl Command {
             | Command::Plan { id, .. }
             | Command::Ready { id }
             | Command::Drop { id } => Some(id),
+            Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Init { .. }
             | Command::Labels { .. }
             | Command::Brief
@@ -340,7 +340,10 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
         Ok(mut done) => {
             if (cli.commit || cli.push) && cli.command.changes() {
                 if let Some(root) = done.fields["seabag"].as_str().map(PathBuf::from) {
-                    done.warnings.extend(share(&cli, &root, &done.extra));
+                    // A task added without an ID: name the one it got.
+                    let made = done.fields["task"]["id"].as_str().map(String::from);
+                    done.warnings
+                        .extend(share(&cli, &root, &done.extra, made.as_deref()));
                 }
             }
             if cli.json {
@@ -398,9 +401,9 @@ fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
 
 /// `--commit` / `--push`: commit only the seabag's files (other changes are left alone), then
 /// push if asked. The change itself is already saved, so a Git failure is a warning, not an error.
-fn share(cli: &Cli, seabag: &Path, extra: &[String]) -> Vec<Problem> {
+fn share(cli: &Cli, seabag: &Path, extra: &[String], made: Option<&str>) -> Vec<Problem> {
     let command = cli.command.name();
-    let subject = match cli.command.target() {
+    let subject = match cli.command.target().or(made) {
         Some(id) => format!("fh: {command} {id}"),
         None => format!("fh: {command}"),
     };
@@ -755,7 +758,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     title,
                     description,
                 } => {
-                    let task = ops::new_task(&bag, id, area, title, description.as_deref())?;
+                    let id = match id {
+                        Some(id) => id.clone(),
+                        None => ops::next_task_id(&bag, area)?,
+                    };
+                    let task = ops::new_task(&bag, &id, area, title, description.as_deref())?;
                     lock.create_task(&task)?;
                     let text = format!("Added {}\n", task_line(&task));
                     Done::new(json!({ "seabag": root, "task": task_json(&task) }), text)

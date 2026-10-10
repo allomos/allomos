@@ -167,6 +167,7 @@ This project's tasks, progress and handoff notes live in FlipHopper's seabag
 - Report progress: `fh label <id> \"<label>\" --push`; when blocked: `fh wait <id> --on \"<what>\" --push`.
 - Stopping before it is done: `fh release <id> --note \"<what the next one needs>\" --push`.
 - Finished: `fh done <id> --push`.
+- Adding a task: read `fh guide tasks` first, then `fh add task --area <area> --title \"<outcome>\" --push`.
 
 `--push` commits only the seabag's files and pushes them, so others see the change.
 

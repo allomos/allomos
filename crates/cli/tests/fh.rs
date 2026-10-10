@@ -854,3 +854,41 @@ fn brief_and_guide_tell_agents_about_fliphopper() {
     let (code, v) = fj(&repo, &["guide", "nope"]);
     assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
 }
+
+#[test]
+fn add_task_without_an_id_takes_the_next_in_its_area() {
+    let repo = filled();
+    // filled() has A01-01, A01-02 and A02-01.
+    let v = ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "--area",
+            "A01",
+            "--title",
+            "A customer orders a cake",
+        ],
+    );
+    assert_eq!(v["task"]["id"], "A01-03");
+    assert_eq!(v["task"]["state"], "backlog");
+    let v = ok(
+        &repo,
+        &["add", "task", "--area", "A02", "--title", "Charts"],
+    );
+    assert_eq!(v["task"]["id"], "A02-02");
+    refused(
+        &repo,
+        &["add", "task", "--area", "A09", "--title", "x"],
+        1,
+        "unknown_area",
+    );
+    let (_, v) = fj(&repo, &["guide", "tasks"]);
+    assert!(v["guide"].as_str().unwrap().contains("# How to add a task"));
+    assert!(
+        ok(&repo, &["brief"])["brief"]
+            .as_str()
+            .unwrap()
+            .contains("fh guide tasks")
+    );
+}

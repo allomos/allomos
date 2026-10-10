@@ -95,6 +95,26 @@ pub fn new_area(seabag: &Seabag, id: &str, name: &str) -> Result<Area, Problem> 
     })
 }
 
+/// The next free task ID in `area`, following the project's own pattern `<area>-<number>`:
+/// one more than the highest number used, as wide as the widest one (at least two digits).
+/// Child tasks (`A01-03-01`) and other IDs do not count. Refused when the area does not exist.
+pub fn next_task_id(seabag: &Seabag, area: &str) -> Result<String, Problem> {
+    if !seabag.areas.iter().any(|a| a.id == area) {
+        return Err(Problem::UnknownArea {
+            area: area.to_string(),
+        });
+    }
+    let prefix = format!("{area}-");
+    let (highest, width) = seabag
+        .tasks
+        .iter()
+        .filter_map(|t| t.id.strip_prefix(&prefix))
+        .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+        .filter_map(|n| n.parse::<u64>().ok().map(|v| (v, n.len())))
+        .fold((0, 2), |(h, w), (v, len)| (h.max(v), w.max(len)));
+    Ok(format!("{prefix}{:0width$}", highest + 1))
+}
+
 /// The project with a new label ladder, lowest step first (`fh labels`). Refused when it is
 /// empty, or when a task's label is not on it: changing the ladder never strands a task.
 pub fn set_ladder(seabag: &Seabag, labels: &[String]) -> Result<Project, Problem> {
@@ -401,6 +421,25 @@ mod tests {
             let i = $s.tasks.iter().position(|x| x.id == t.id).unwrap();
             $s.tasks[i] = t;
         }};
+    }
+
+    #[test]
+    fn the_next_task_id_follows_the_area_pattern() {
+        let mut s = bag();
+        // bag() has A01-01, A01-02 and A02-01.
+        assert_eq!(next_task_id(&s, "A01").unwrap(), "A01-03");
+        assert_eq!(next_task_id(&s, "A02").unwrap(), "A02-02");
+        // Children and other IDs do not count; a wider number keeps its width.
+        for id in ["A01-02-07", "A01-x", "A02-009"] {
+            let area = &id[..3];
+            s.tasks.push(new_task(&s, id, area, "t", None).unwrap());
+        }
+        assert_eq!(next_task_id(&s, "A01").unwrap(), "A01-03");
+        assert_eq!(next_task_id(&s, "A02").unwrap(), "A02-010");
+        assert_eq!(
+            next_task_id(&s, "A09"),
+            Err(Problem::UnknownArea { area: "A09".into() })
+        );
     }
 
     #[test]
