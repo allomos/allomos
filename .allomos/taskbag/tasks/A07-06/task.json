@@ -4,7 +4,6 @@
   "id": "A07-06",
   "iteration": "I02",
   "label": "owner verified",
-  "state": "waiting",
-  "title": "Windows installer installs alm",
-  "waiting_on": "owner: install on Windows, new PowerShell runs alm --version; uninstall removes it"
+  "state": "done",
+  "title": "Windows installer installs alm"
 }
