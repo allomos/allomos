@@ -36,6 +36,12 @@ Updated: 2026-10-04
 
 One block per card that `alm list --state in_progress` shows held.
 
+### Task-A07-05 — claude/a07-05-windows-agents
+- Checkout: `.claude/worktrees/a07-05` · branch `claude/a07-05-windows-agents` · pushed: yes
+- Approvals in force: the card's local work and a Mac-built Windows installer for the owner (2026-10-11); no GitHub pipeline (A07-02 not approved)
+- Uncommitted: none · Running: none
+- Next action: the owner installs `target/x86_64-pc-windows-msvc/release/bundle/nsis/Allomos_0.1.0_x64-setup.exe` from this worktree on Windows and reports (see card); fix what they find, then merge
+
 ## Live state
 
 Checked 2026-10-08.
@@ -59,6 +65,7 @@ Lessons that change what you do.
 - **Use `--push` on every `alm` status change** (A01-12): it commits only the taskbag and pushes; check for a `commit_failed` / `push_failed` warning.
 - **The Codex CLI on this Mac is broken** (`/opt/homebrew/bin/codex` 0.130.0: its platform binary is missing). The app does not offer it; reinstalling is the owner's call.
 - **Change status only on `main`.** From a card worktree, `alm` finds the worktree's stale copy of the taskbag; set `ALLOMOS_TASKBAG=<main checkout>` first ([CARDS.md](./workflow/CARDS.md#where-status-lives)).
+- **Windows builds can be made on this Mac** (2026-10-11): Homebrew `rustup` (keg-only, so the Homebrew `cargo` stays the default) holds Rust 1.85.1 with `x86_64-pc-windows-msvc`; `cargo-xwin` 0.19.2 (the newest for Rust 1.85) is in `~/.cargo/bin`. Build: `LC_ALL=en_US.UTF-8 PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/opt/homebrew/opt/llvm/bin:$PATH npm --prefix apps/desktop run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis`. Without `LC_ALL`, Homebrew's `makensis` 3.13 crashes (`std::bad_alloc`) when the shell's `LANG` is empty. The build proves it compiles, not that it runs.
 - **zsh expands a word starting with `=`** (e.g. `echo =====`) as a command lookup and fails; quote such strings in shell commands.
 
 ## Current truth

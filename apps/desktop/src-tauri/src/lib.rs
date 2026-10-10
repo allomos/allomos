@@ -152,14 +152,14 @@ fn file_manager_command(root: &Path) -> Result<Command, Problem> {
     } else {
         "xdg-open"
     };
-    let mut command = Command::new(program);
+    let mut command = agents::command(program);
     command.arg(root);
     Ok(command)
 }
 
 /// The system program that opens a file or web address with the user's own app for it.
 fn opener() -> Command {
-    Command::new(if cfg!(target_os = "macos") {
+    agents::command(if cfg!(target_os = "macos") {
         "open"
     } else if cfg!(windows) {
         "explorer"
@@ -240,7 +240,7 @@ async fn ask_agents(
         let Some(agent) = found.iter().find(|a| &a.id == id) else {
             continue;
         };
-        agents::ask(&agent.id, &project, &request, &agent.how)?;
+        agents::ask(agent, &project, &request)?;
         opened.push(agent.id.clone());
     }
     Ok(opened)
@@ -265,7 +265,7 @@ async fn ask_agent_to_convert(
     let Some(chosen) = agents::find_agents().into_iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    agents::ask(&chosen.id, &project, &request, &chosen.how)
+    agents::ask(&chosen, &project, &request)
 }
 
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
