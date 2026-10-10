@@ -2,6 +2,7 @@
   "area": "A05",
   "holder": "claude/a05-03-setup-wizard",
   "id": "A05-03",
+  "label": "implemented",
   "state": "in_progress",
   "title": "Taskbag setup wizard"
 }
