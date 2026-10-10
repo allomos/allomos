@@ -27,7 +27,7 @@ At the end the owner upgrades Allomos, opens an older project, sees "instruction
 - **Done means mechanically.**
   - Tests: section at the current version → current; older version → older; no version → unknown; renewing replaces only the section and keeps the file's other text byte for byte; renewing twice changes nothing.
   - The app shows the out-of-date line and **Update…** for an older project, and ✓ after renewal; language files pass the missing-text test.
-  - A trial in `~/allomos-tests/A03-07-renew-instructions/`: a project set up with an older section is renewed by an agent through **Update…**.
+  - A trial in `~/fliphopper-tests/A03-07-renew-instructions/`: a project set up with an older section is renewed by an agent through **Update…**.
 
 ## Approvals
 

@@ -29,7 +29,7 @@ At the end the owner can open a project, set "quota 5%, context 60%", and see a 
   - `alm` shows and changes the quota gate, context gate and template; tests cover defaults, changes and refusals of invalid values (for example a percentage over 100).
   - `alm init` creates the default template; `alm brief` includes the gates and the template's path.
   - The app shows and edits the same settings; language files pass the missing-text test.
-  - A trial in `~/allomos-tests/A03-06-handoff-rules/`: an agent session started in a project with non-default gates writes a handoff in the template's shape.
+  - A trial in `~/fliphopper-tests/A03-06-handoff-rules/`: an agent session started in a project with non-default gates writes a handoff in the template's shape.
 
 ## Approvals
 

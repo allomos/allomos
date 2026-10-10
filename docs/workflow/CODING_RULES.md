@@ -42,7 +42,7 @@ All must pass. Report anything not run as NOT RUN.
 - **Problems are values, not crashes.** Reading a taskbag returns what could be read plus a list of problems. Each problem names the file and field, and explains it in plain words: what is wrong and how to fix it.
 - **Never overwrite user content.** Creating a taskbag into a non-empty folder is refused. Writing files keeps the format in [FILE-FORMAT.md](../product/FILE-FORMAT.md).
 - **Tests use temporary folders and synthetic data only**, never the owner's real projects.
-- **Test folders made by hand or by an agent go under `~/allomos-tests/`** (owner, 2026-10-09): one folder per check, named after the card, for example `~/allomos-tests/a05-02-bakery/`. This covers folders for the owner's manual checks and agent trials, never the system's temporary folder or the repository. Automated tests (`cargo test`) keep using the system's temporary folder and remove what they create. Delete a check's folder once the card is done.
+- **Test folders made by hand or by an agent go under `~/fliphopper-tests/`** (owner, 2026-10-09): one folder per check, named after the card, for example `~/fliphopper-tests/a05-02-bakery/`. This covers folders for the owner's manual checks and agent trials, never the system's temporary folder or the repository. Automated tests (`cargo test`) keep using the system's temporary folder and remove what they create. Delete a check's folder once the card is done.
 - **Keep interface text short and plain**, and keep its terms consistent with the [glossary](../GLOSSARY.md): taskbag, area, state, label.
 
 ## Interface languages
