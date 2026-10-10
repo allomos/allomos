@@ -4,5 +4,5 @@
   "iteration": "I02",
   "next_dependency": "owner approves the card and running it on GitHub Actions",
   "state": "backlog",
-  "title": "Build pipeline for macOS and Windows"
+  "title": "Windows build script on the Mac"
 }
