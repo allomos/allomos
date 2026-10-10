@@ -24,7 +24,9 @@ The app itself still never commits (decision [0010](../decisions/0010-project-da
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-11 | Owner ran the flow on `~/fliphopper-tests/a03-08-old-project`: "passed" | owner (chat) |
 | 2026-10-11 | The request itself ("should have their own commit instructions") | owner (chat) |
 
 ## Notes
 - 2026-10-11 — Built: both requests carry the commit instructions (three languages; tests check the exact commands and that only the step's own paths are committed). Rust fmt, clippy, all tests: PASS. App rebuilt from this branch and `alm` installed from it. Test project for the owner: `~/fliphopper-tests/a03-08-old-project`, a committed FlipHopper project (`.fliphopper/seabag/`, `fliphopper/1`; A01-01 done, A02-01 held by claude/order-form, A02-02 waiting) with an AGENTS.md that still mentions `fh`. Waiting on the owner's run through the flow.
+- 2026-10-11 — **Owner verified.** Run: Create taskbag → Tell AI agents → Move tasks, with no hand commits. History: `d3ab4d9` Add Allomos taskbag, `9ab6fd7` Tell AI agents about Allomos, `188b03f` + merge `5567c3e` (the move). The three cards kept their states; `.fliphopper/` removed by the agent; AGENTS.md no longer mentions `fh`.
