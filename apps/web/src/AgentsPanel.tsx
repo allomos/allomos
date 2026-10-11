@@ -42,12 +42,15 @@ export function AgentsPanel({
   messenger,
   project: startProject,
   taskbag,
+  projectFixed,
   onProjectChange,
   onDone,
 }: {
   messenger: Messenger;
   project: string;
   taskbag: string;
+  /** The project folder was just chosen (the wizard's step 3): shown, without Change…. */
+  projectFixed?: boolean;
   /** Records a project folder the person chose with Change… (the open-folder flow). */
   onProjectChange?: (folder: string) => Promise<void>;
   /** Closes the panel. */
@@ -153,13 +156,16 @@ export function AgentsPanel({
     <section className="card agents">
       <h2>{t("connect.title")}</h2>
       <p>{t("connect.body")}</p>
+      <p>{t("connect.tasks")}</p>
       <div className="row">
         <span>
           {t("agents.project")}: <code>{project}</code>
         </span>
-        <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
-          {t("agents.change")}
-        </button>
+        {!projectFixed && (
+          <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
+            {t("agents.change")}
+          </button>
+        )}
       </div>
       <p className="muted">{t("agents.taskbag", { path: taskbag })}</p>
       {agents === null ? (

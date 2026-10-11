@@ -402,9 +402,13 @@ export function App({ messenger }: { messenger: Messenger }) {
             onOpened={(o, created) =>
               show(o, created ? { key: o.readme_added ? "notice.created_here_readme" : "notice.created_nested" } : null)
             }
+            onSetup={setSetup}
             onClose={(result) => {
               setWizard(null);
               if (result) connected(result);
+              // Read again: the wizard may have recorded the project folder.
+              const root = openedRef.current?.root;
+              if (root) void refreshSetup(root);
             }}
           />
         )}

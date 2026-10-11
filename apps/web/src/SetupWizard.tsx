@@ -13,7 +13,7 @@ import type { Messenger } from "./messenger";
 import { defaultSource, taskbagStep } from "./setupFlow";
 import type { TaskbagStep } from "./setupFlow";
 import { isProblem } from "./types";
-import type { Opened } from "./types";
+import type { Opened, SetupState } from "./types";
 
 type Step =
   | { n: 1 }
@@ -32,6 +32,7 @@ export function SetupWizard({
   messenger,
   folder: startFolder,
   onOpened,
+  onSetup,
   onClose,
 }: {
   messenger: Messenger;
@@ -39,6 +40,8 @@ export function SetupWizard({
   folder?: string;
   /** A taskbag is ready: the window shows it behind the dialog. `created`: it was just made. */
   onOpened: (o: Opened, created: boolean) => void;
+  /** The project folder was recorded: the window's copy of the setup state is out of date. */
+  onSetup: (state: SetupState) => void;
   /** The dialog closes. `connected`: step 4 was reached and closed (asked, or Not now). */
   onClose: (connected: ConnectResult | null) => void;
 }) {
@@ -118,6 +121,7 @@ export function SetupWizard({
     run(async () => {
       if (step.n !== 3) return;
       const setup = await messenger.setProjectFolder(step.opened.root, step.source);
+      onSetup(setup);
       setStep({ n: 4, opened: step.opened, project: setup.project_folder ?? step.source });
     });
 
@@ -145,8 +149,8 @@ export function SetupWizard({
 
           {step.n === 2 && step.at.kind === "found" && (
             <>
-              <h3>{t("wizard.found_title")}</h3>
-              <p>{rich("wizard.found_body", { path: <code>{step.at.root}</code> })}</p>
+              <h3>{t(step.created ? "wizard.created_title" : "wizard.found_title")}</h3>
+              <p>{rich(step.created ? "wizard.created_body" : "wizard.found_body", { path: <code>{step.at.root}</code> })}</p>
               <div className="row start">
                 <button type="button" onClick={() => void choose()} disabled={busy}>
                   {t("wizard.change")}
@@ -173,7 +177,7 @@ export function SetupWizard({
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
               <p>
-                <code>{step.source}</code>
+                {t("wizard.source_label")}: <code>{step.source}</code>
               </p>
               <div className="row start">
                 <button type="button" onClick={() => void pickSource()} disabled={busy}>
@@ -188,9 +192,7 @@ export function SetupWizard({
               messenger={messenger}
               project={step.project}
               taskbag={step.opened.root}
-              onProjectChange={async (folder) => {
-                await messenger.setProjectFolder(step.opened.root, folder);
-              }}
+              projectFixed
               onDone={(result) => onClose(result)}
             />
           )}

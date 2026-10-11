@@ -33,7 +33,7 @@ A dialog of four steps ("Step n of 4"). **Cancel** closes it at steps 1–3; a t
 1. **What a taskbag is.** A short explanation, and **Choose a folder…**: the folder where `.allomos` will be.
 2. **The `.allomos` folder.** If the chosen folder already has `.allomos/taskbag/` (or is a taskbag), the step says so and offers only **Change…** (choose another folder) and **Next**. If not, it offers **Create**, which makes an **empty** taskbag in `<folder>/.allomos/taskbag/` (and `README-allomos.md` when the folder looks empty); then the step shows **Change…** and **Next** like a found one. When the folder is inside a Git repository, the step says the task files will be versioned by it. *Why empty:* the connect step asks whether the taskbag has tasks; example tasks would always answer yes. (Until 2026-10-09 the app wrote a starter project with three example tasks.)
 3. **The project source folder.** Offered first: the project folder already recorded in the taskbag, else the folder from step 1. **Choose another folder…** changes it; **Next** records it.
-4. **Connect with the agents** — the panel below, inside the dialog. Asking or **Not now** closes the wizard.
+4. **Connect with the agents** — the panel below, inside the dialog. The project folder from step 3 is shown there without **Change…**. Asking or **Not now** closes the wizard, and the window shows the taskbag with the recorded project folder (it does not ask for it again).
 
 Opening a folder that has no `.allomos` (File → Open Folder…, Open Recent, the start-up folder) starts the wizard at step 2 with that folder. A folder that has one opens directly.
 
