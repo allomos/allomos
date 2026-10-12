@@ -16,7 +16,7 @@ use allomos_store::{
     AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
     add_readme_if_empty, agent_connect_request_in, agent_setup, agent_setup_request_in,
     answer_confirm, git_root, id_from_name, init, inspect, load, pending_confirms, picked_folder,
-    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp,
+    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -228,11 +228,15 @@ fn connect_plan(
     taskbag: &Path,
 ) -> Vec<(String, String)> {
     let note = agents::shared_note(agents, language);
+    // Something is out of date (Task-A01-25): the first agent is asked to update it instead.
+    let update = versions::check_connected(taskbag).filter(|c| c.needs_update());
     agents
         .iter()
         .enumerate()
         .map(|(i, id)| {
-            let request = if i == 0 {
+            let request = if let (0, Some(check)) = (i, &update) {
+                versions::agent_update_request_in(language, project, taskbag, check)
+            } else if i == 0 {
                 agent_connect_request_in(language, project, taskbag)
             } else {
                 agent_setup_request_in(language, project, taskbag)
@@ -270,6 +274,48 @@ async fn connect_agents(
         opened.push(id);
     }
     Ok(opened)
+}
+
+/// Is the project up to date with this Allomos (Task-A01-25)? `None` until an agent is connected
+/// with it. The window asks when a folder is opened and every few seconds while it is open, so
+/// an agent's update shows without reopening.
+#[tauri::command]
+fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
+    versions::check_connected(&root)
+}
+
+/// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
+/// while it is private). A fixed address: the window cannot ask to open any other.
+const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos/releases";
+
+/// Open the download page in the web browser, for a taskbag that needs a newer Allomos.
+#[tauri::command]
+fn open_download_page() -> Result<(), Problem> {
+    opener()
+        .arg(DOWNLOAD_URL)
+        .spawn()
+        .map(drop)
+        .map_err(|e| Problem::OpenFailed {
+            path: DOWNLOAD_URL.to_string(),
+            detail: e.to_string(),
+        })
+}
+
+/// The taskbag's format compared with this Allomos's, whether or not an agent is connected: the
+/// wizard's step 2 does not go on with a newer taskbag (owner, 2026-10-12).
+#[derive(Serialize)]
+struct TaskbagFormat {
+    format: versions::FormatState,
+    /// What this Allomos writes, for the message: `allomos/1`.
+    current: &'static str,
+}
+
+#[tauri::command]
+fn taskbag_format(root: PathBuf) -> TaskbagFormat {
+    TaskbagFormat {
+        format: versions::format_state(&root),
+        current: allomos_core::FORMAT,
+    }
 }
 
 /// Whether `project` has an `AGENTS.md` and a `CLAUDE.md`. The window notes which were missing
@@ -421,9 +467,19 @@ fn keep_taskbag_in_git(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Pr
     }
 }
 
+/// One commit at a time: two `git add`/`git commit` runs at once fail on Git's `index.lock`. The
+/// wizard can ask twice for one opening (React runs a starting effect twice in development, and a
+/// quick second opening does too); the second then waits and finds nothing new to commit.
+static KEEP_IN_GIT: Mutex<()> = Mutex::new(());
+
+fn keep_one_at_a_time(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Problem> {
+    let _one = KEEP_IN_GIT.lock().unwrap_or_else(|e| e.into_inner());
+    keep_taskbag_in_git(root, envs)
+}
+
 #[tauri::command]
 async fn keep_in_git(root: PathBuf) -> Result<GitKept, Problem> {
-    keep_taskbag_in_git(&root, &[])
+    keep_one_at_a_time(&root, &[])
 }
 
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
@@ -691,6 +747,9 @@ pub fn run() {
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
+            version_check,
+            taskbag_format,
+            open_download_page,
             create_taskbag,
             show_in_file_manager,
             open_task_link,
@@ -791,6 +850,33 @@ mod tests {
     }
 
     #[test]
+    fn an_out_of_date_project_gets_the_update_request() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-update-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let taskbag = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&taskbag, "p", "P").unwrap();
+        // A section from before versions: connected, but out of date.
+        std::fs::write(dir.join("AGENTS.md"), "## Tasks: Allomos\n\nalm next\n").unwrap();
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert!(
+            plan[0]
+                .1
+                .starts_with("This project was set up by an older Allomos")
+        );
+        assert!(plan[0].1.contains("brief`"));
+        assert!(version_check(taskbag.clone()).unwrap().needs_update());
+
+        // Renewed: the usual connect request again.
+        std::fs::write(dir.join("AGENTS.md"), allomos_store::agent_section()).unwrap();
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
+        assert!(!version_check(taskbag).unwrap().needs_update());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn the_first_agent_also_looks_for_tasks() {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(allomos_store::DEFAULT_DIR);
@@ -884,6 +970,21 @@ mod tests {
             )
             .is_err()
         );
+
+        // Two openings at once (React's double start in development): one commits, the other
+        // waits and finds nothing new, instead of failing on Git's index.lock.
+        let twice = base.join("twice");
+        std::fs::create_dir_all(&twice).unwrap();
+        run_git(&twice, &["init", "--quiet"], &me).unwrap();
+        let root = twice.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "t", "T").unwrap();
+        let results: Vec<_> = std::thread::scope(|s| {
+            let a = s.spawn(|| keep_one_at_a_time(&root, &me));
+            let b = s.spawn(|| keep_one_at_a_time(&root, &me));
+            vec![a.join().unwrap(), b.join().unwrap()]
+        });
+        let committed: Vec<bool> = results.into_iter().map(|r| r.unwrap().committed).collect();
+        assert_eq!(committed.iter().filter(|c| **c).count(), 1, "{committed:?}");
         std::fs::remove_dir_all(&base).unwrap();
     }
 

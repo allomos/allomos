@@ -37,7 +37,6 @@ Updated: 2026-10-04
 One block per card that `alm list --state in_progress` shows held.
 
 
-
 ## Live state
 
 Checked 2026-10-08.

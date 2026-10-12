@@ -57,6 +57,14 @@ The page has no setup cards of its own (owner, 2026-10-12): when something is mi
 - In part 2, an agent that finds no tasks says so and stops. One that finds some asks the person whether to move them: it writes its plan and runs `alm confirm`, and the app shows the plan in a popup with **Go ahead** and **Cancel** ([CODING_RULES § The `alm` command](../workflow/CODING_RULES.md#the-fh-command)). Only after **Go ahead** does it move the tasks, with `alm` commands only.
 - With no agent found, **Write the files for me** writes the section into `AGENTS.md` and `CLAUDE.md` directly.
 
+### Update notice
+
+Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md) (owner, 2026-10-12). Once an agent is connected with the project, the window checks whether the taskbag's format and Allomos's section in `AGENTS.md` / `CLAUDE.md` are current ([FILE-FORMAT § Format versions](./FILE-FORMAT.md#format-versions)): when a folder is opened (File → Open Folder…, Open Recent, at start, through the wizard) and every few seconds while it is open (so a `git pull` or the agent's own update shows without reopening).
+
+- Out of date: a notice above the task list, "This taskbag uses an older format" or "Allomos's instructions in AGENTS.md are out of date", with **Update the taskbag…**. It opens the wizard at step 4, which then says **Update the taskbag**: the chosen agent opens with the **update request** typed in (run `alm upgrade`; replace the section with `alm brief`'s output; commit only those files). **File → Connect with the Agents…** does the same while something is out of date.
+- Allomos changes none of these files itself: in update mode there is no **Write the files for me**; with no agent found, the panel says to start one and choose File → Connect with the Agents… again.
+- A taskbag in a newer format cannot be read: the problem list says to update Allomos now.
+
 ### Restart notice
 
 - Just before asking agents (or writing the files), the app notes whether the project folder has `AGENTS.md` and `CLAUDE.md`. For the next 30 minutes it looks every 2 seconds; when one that was missing appears, it says: just created, AI agent sessions already running in this project have not read it, only new sessions know about Allomos.

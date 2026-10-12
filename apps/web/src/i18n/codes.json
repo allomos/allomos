@@ -41,6 +41,10 @@
   ],
   "git_missing": [],
   "holder_missing": [],
+  "instructions_outdated": [
+    "files",
+    "current"
+  ],
   "invalid_choice": [
     "value",
     "allowed"
@@ -112,8 +116,16 @@
   "taskbag_exists": [
     "path"
   ],
+  "taskbag_newer": [
+    "found",
+    "supported"
+  ],
   "taskbag_not_found": [
     "path"
+  ],
+  "taskbag_older": [
+    "found",
+    "current"
   ],
   "taskbag_unreadable": [
     "path",
@@ -128,6 +140,10 @@
   ],
   "unknown_iteration": [
     "iteration"
+  ],
+  "upgrade_missing": [
+    "found",
+    "current"
   ],
   "waiting_on_missing": [],
   "write_failed": [

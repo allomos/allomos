@@ -24,6 +24,7 @@ mod convert;
 mod guide;
 mod settings;
 mod setup;
+pub mod versions;
 pub use confirm::{
     ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
     read_answer, requests_dir, was_seen, withdraw_confirm,
@@ -164,8 +165,9 @@ pub const AGENT_SECTION_HEADING: &str = "## Tasks: Allomos";
 /// The section that tells an AI agent this project's tasks are in Allomos. English: it is
 /// read by agents, not shown in the app.
 pub fn agent_section() -> String {
+    let version = versions::SECTION_VERSION;
     format!(
-        "{AGENT_SECTION_HEADING}
+        "{AGENT_SECTION_HEADING} (v{version})
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.

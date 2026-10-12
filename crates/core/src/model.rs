@@ -1,7 +1,22 @@
 use serde::{Deserialize, Serialize};
 
-/// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`).
+/// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
+/// `allomos/<FORMAT_VERSION>`.
 pub const FORMAT: &str = "allomos/1";
+
+/// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; a newer Allomos
+/// upgrades an older taskbag, and an older one refuses a newer taskbag (Task-A01-25).
+pub const FORMAT_VERSION: u32 = 1;
+
+/// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
+/// FlipHopper's `fliphopper/1`).
+pub fn format_version(format: &str) -> Option<u32> {
+    let n = format.strip_prefix("allomos/")?;
+    if n.is_empty() || !n.chars().all(|c| c.is_ascii_digit()) || n.starts_with('0') {
+        return None;
+    }
+    n.parse().ok()
+}
 
 /// A project: one taskbag.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

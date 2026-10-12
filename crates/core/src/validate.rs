@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::model::{Area, FORMAT, Iteration, Project, State, Task, Taskbag};
+use crate::model::{
+    Area, FORMAT, FORMAT_VERSION, Iteration, Project, State, Task, Taskbag, format_version,
+};
 use crate::problem::Problem;
 
 /// One problem found in a taskbag, tied to the file (and field, when known) that caused it.
@@ -99,6 +101,36 @@ fn check_id(file: &str, field: &str, id: &str, issues: &mut Vec<Issue>) {
 }
 
 pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
+    // The format first: a newer taskbag may have fields this Allomos does not know, and an older
+    // one must be upgraded before anything else (Task-A01-25).
+    if let Some(found) = serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|v| v.get("format").and_then(|f| f.as_str()).map(String::from))
+    {
+        match format_version(&found) {
+            Some(n) if n > FORMAT_VERSION => {
+                return Err(vec![Issue::new(
+                    file,
+                    Some("format"),
+                    Problem::TaskbagNewer {
+                        found,
+                        supported: FORMAT.to_string(),
+                    },
+                )]);
+            }
+            Some(n) if n < FORMAT_VERSION => {
+                return Err(vec![Issue::new(
+                    file,
+                    Some("format"),
+                    Problem::TaskbagOlder {
+                        found,
+                        current: FORMAT.to_string(),
+                    },
+                )]);
+            }
+            _ => {}
+        }
+    }
     let project: Project = parse(file, text).map_err(|i| vec![i])?;
     let mut issues = Vec::new();
     if project.format != FORMAT {
@@ -327,13 +359,41 @@ mod tests {
     }
 
     #[test]
+    fn a_newer_format_is_reported_before_unknown_fields() {
+        let err = parse_project(
+            "project.json",
+            r#"{"format":"allomos/2","id":"d","name":"D","handoff":{"context":90}}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err.len(), 1);
+        assert_eq!(err[0].field.as_deref(), Some("format"));
+        assert_eq!(err[0].problem.code(), "taskbag_newer");
+    }
+
+    #[test]
+    fn format_numbers() {
+        assert_eq!(format_version("allomos/1"), Some(1));
+        assert_eq!(format_version("allomos/12"), Some(12));
+        for other in [
+            "allomos/",
+            "allomos/01",
+            "allomos/x",
+            "fliphopper/1",
+            "allomos/0",
+        ] {
+            assert_eq!(format_version(other), None, "{other}");
+        }
+    }
+
+    #[test]
     fn wrong_format_is_reported_on_its_field() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/9","id":"d","name":"D"}"#,
+            r#"{"format":"glidebox/1","id":"d","name":"D"}"#,
         )
         .unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("format"));
+        assert_eq!(err[0].problem.code(), "wrong_format");
     }
 
     #[test]
