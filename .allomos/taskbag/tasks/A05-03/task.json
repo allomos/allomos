@@ -2,6 +2,8 @@
   "area": "A05",
   "holder": "claude/a05-03-setup-wizard",
   "id": "A05-03",
+  "label": "implemented",
+  "next_dependency": "manual check of the wizard in the built app (owner): ~/allomos-tests/a05-03-setup-wizard/",
   "state": "in_progress",
   "title": "Taskbag setup wizard"
 }

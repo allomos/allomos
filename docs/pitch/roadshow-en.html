@@ -1,9 +1,9 @@
-<title>FlipHopper Road Show</title>
+<title>Allomos Road Show</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a stack of 16:9 slides on a sky ground, organized as three sets: the main set (switch, amber), AI skills (teal) and progress management (blue). A hop arc between agents and people is the recurring motif. Present mode shows one slide at a time. */
+/* Layout: a stack of 16:9 slides on a sky ground, organized as three sets: the main set (switch, amber), AI skills (teal) and progress management (blue). A shift arc between agents and people is the recurring motif. Present mode shows one slide at a time. */
 :root{
   --sky:#E9EFF5;        /* page ground */
   --paper:#FBFCFE;      /* slide surface */
@@ -202,7 +202,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 .handover b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .hop .toggle{fill:var(--amber)}
 .hop .seam{fill:none;stroke:var(--amber);stroke-width:1.2;stroke-dasharray:3 4}
-.hop .stencil{fill:var(--amber-ink);font:700 14px var(--mono);letter-spacing:.14em}
+.hop .stencil{fill:var(--amber-ink);font:700 14px var(--mono);letter-spacing:.06em}
 .hop .sub2{fill:var(--muted)}
 .brand svg{width:34px;height:34px}
 </style>
@@ -210,7 +210,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 <header class="bar">
   <div class="brand">
     <svg viewBox="100 100 824 824" aria-hidden="true"><circle cx="265" cy="512" r="105" fill="none" stroke="#2a9d8f" stroke-width="66"/><circle cx="759" cy="512" r="138" fill="#2a9d8f"/><circle cx="512" cy="265" r="105" fill="none" stroke="#e76f51" stroke-width="66"/><circle cx="512" cy="759" r="138" fill="#e76f51"/><path d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" fill="#e9c46a"/></svg>
-    FlipHopper
+    Allomos
   </div>
   <span class="bar-note">ROAD SHOW · OCTOBER 2026 · IN DEVELOPMENT</span>
   <button class="btn" id="present-btn" type="button">Present ▸</button>
@@ -219,12 +219,12 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 <main class="deck" id="deck">
 
   <!-- 1 -->
-  <section class="slide hero" aria-label="FlipHopper">
+  <section class="slide hero" aria-label="Allomos">
     <div class="hero-grid">
       <div>
-        <p class="eyebrow">Hop between AI agents and teammates</p>
+        <p class="eyebrow">Shift between AI agents and teammates</p>
         <h1 style="font-size:clamp(38px,5vw,66px)">Switch agents. Switch teammates. <em>Keep the project.</em></h1>
-        <p class="lede">When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its seabag: plain files in your own repository.</p>
+        <p class="lede">When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its taskbag: plain files in your own repository.</p>
         <div class="pill-row">
           <span class="pill free">Local app · free</span>
           <span class="pill">macOS · Windows</span>
@@ -234,7 +234,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
       </div>
       <figure style="margin:0">
         <svg class="hop" viewBox="0 0 560 330" role="img" aria-labelledby="hop-t" style="width:100%;height:auto;display:block">
-          <title id="hop-t">A task hops from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same seabag in the repository.</title>
+          <title id="hop-t">A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.</title>
           <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
           <path class="arc" d="M120,92 Q187,14 250,92" marker-end="url(#ah)"/>
           <path class="arc" d="M310,92 Q373,14 440,92" marker-end="url(#ah)"/>
@@ -259,13 +259,13 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
           <path class="cord" d="M265,208 Q280,214 295,208"/>
           <path class="cord" d="M293,210 Q301,220 298,231"/>
           <rect class="toggle" x="294" y="230" width="8" height="12" rx="3"/>
-          <text class="stencil" x="283" y="268" text-anchor="middle">SEABAG</text>
-          <text class="bagp" x="330" y="268">.fliphopper/seabag/</text>
+          <text class="stencil" x="283" y="268" text-anchor="middle">TASKBAG</text>
+          <text class="bagp" x="330" y="268">.allomos/taskbag/</text>
           <text class="bagp sub2" x="330" y="285">in your repository</text>
         </svg>
       </figure>
     </div>
-    <div class="foot"><span>FlipHopper</span><span>01 / 10</span></div>
+    <div class="foot"><span>Allomos</span><span>01 / 10</span></div>
   </section>
 
   <!-- 2 -->
@@ -284,12 +284,12 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
 
   <!-- 3 -->
   <section class="slide" aria-label="Three sets">
-    <p class="eyebrow">What FlipHopper does</p>
+    <p class="eyebrow">What Allomos does</p>
     <h2>One main job. Two that make it better.</h2>
     <div class="sets">
       <div class="set main"><span class="k">Main set</span><h3>Switch</h3>
-        <p>Hop between AI agents and teammates without losing the project.</p>
-        <ul><li>A seabag in your repository</li><li>The same commands for every agent</li><li>Handoff and resume in one step</li><li>Hand the project to a teammate</li></ul></div>
+        <p>Shift the project between AI agents and teammates without losing anything.</p>
+        <ul><li>A taskbag in your repository</li><li>The same commands for every agent</li><li>Handoff and resume in one step</li><li>Hand the project to a teammate</li></ul></div>
       <div class="set skills"><span class="k">Set 2</span><h3>AI skills</h3>
         <p>Get better at working with AI agents.</p>
         <ul><li>Learn each agent</li><li>Switch cleanly</li><li>Run the vibe-coding process</li><li>Improve the results</li></ul></div>
@@ -297,7 +297,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
         <p>See where the project stands and when it will land.</p>
         <ul><li>Progress by area</li><li>What waits on you</li><li>Burndown and finish date</li><li>Desktop, browser and phone</li></ul></div>
     </div>
-    <div class="foot"><span>All three sets work on the same seabag</span><span>03 / 10</span></div>
+    <div class="foot"><span>All three sets work on the same taskbag</span><span>03 / 10</span></div>
   </section>
 
   <!-- 4 -->
@@ -306,21 +306,21 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
     <h2>Claude runs out. Codex picks up.</h2>
     <div class="cols">
       <ul class="ticks">
-        <li><span><b>A seabag in your repo.</b> Tasks, proven steps and handoff notes live as readable files in <span class="mono">.fliphopper/seabag/</span>, versioned by your own Git, not inside one agent's memory or one account.</span></li>
-        <li><span><b>The same commands for every agent.</b> Claude Code, Codex and others claim, update and release tasks through the <span class="mono">fliphopper</span> command and MCP.</span></li>
+        <li><span><b>A taskbag in your repo.</b> Tasks, proven steps and handoff notes live as readable files in <span class="mono">.allomos/taskbag/</span>, versioned by your own Git, not inside one agent's memory or one account.</span></li>
+        <li><span><b>The same commands for every agent.</b> Claude Code, Codex and others claim, update and release tasks through the <span class="mono">alm</span> command and MCP.</span></li>
         <li><span><b>Resume in one step.</b> A new session asks for the next task and gets its step and the last handoff note.</span></li>
         <li><span><b>Start or reopen a session</b> in the agent you choose, straight from the task.</span></li>
       </ul>
       <div style="display:grid;gap:14px;min-width:0">
         <div class="term" aria-label="Example commands"><span class="c"># Claude Code · account 1 · quota nearly used</span>
-fh label A01-03 "implemented"
-fh release A01-03 --note "form done; tests next"
+alm label A01-03 "implemented"
+alm release A01-03 --note "form done; tests next"
 
 <span class="c"># Codex · account 2 · a minute later</span>
-fh next
+alm next
 <span class="ok">A01-03</span>  Sign-in page  ready · note: tests next
-fh claim A01-03</div>
-        <p class="tiny">Commands are illustrative; names may change before release.</p>
+alm claim A01-03</div>
+        <p class="tiny">An example session with <span class="mono">alm</span>, the taskbag's command line; output shortened.</p>
       </div>
     </div>
     <div class="foot"><span>Main set · local, no account needed</span><span>04 / 10</span></div>
@@ -330,7 +330,7 @@ fh claim A01-03</div>
   <section class="slide" aria-label="Switch between teammates">
     <p class="eyebrow">Main set · Switch between teammates</p>
     <h2>Hand over the project, not a pile of notes.</h2>
-    <p class="lede">The same seabag carries the work from you to a teammate and back. Each of you keeps your own agents, and everyone sees the same tasks.</p>
+    <p class="lede">The same taskbag carries the work from you to a teammate and back. Each of you keeps your own agents, and everyone sees the same tasks.</p>
     <div class="flow" aria-label="How a project passes between people">
       <div class="node"><b>You</b>hand over a task</div>
       <span class="arrow">→</span>
@@ -346,7 +346,7 @@ fh claim A01-03</div>
       <div><b>Waiting on</b>the one thing that blocks it</div>
       <div><b>Handoff note</b>where to pick up</div>
     </div>
-    <p class="tiny">In a shared repository the seabag travels with Git at no cost. A cloud project adds live sharing, email invitations and roles.</p>
+    <p class="tiny">In a shared repository the taskbag travels with Git at no cost. A cloud project adds live sharing, email invitations and roles.</p>
     <div class="foot"><span>Main set · cloud projects optional</span><span>05 / 10</span></div>
   </section>
 
@@ -368,7 +368,7 @@ fh claim A01-03</div>
           <div class="rung"><i>3</i>Deployed and verified</div>
           <div class="rung"><i>4</i>Owner verified</div>
         </div>
-        <div class="node"><b>AI-generated project setup</b>An agent drafts a whole project; FlipHopper checks and previews it before you adopt it.</div>
+        <div class="node"><b>AI-generated project setup</b>An agent drafts a whole project; Allomos checks and previews it before you adopt it.</div>
         <p class="tiny">Set 2 is being designed; its contents may change.</p>
       </div>
     </div>
@@ -460,19 +460,19 @@ fh claim A01-03</div>
       <div class="leg"><span class="when">Then</span><h3>Team</h3>
         <ol><li><span>v0.13</span><em style="font-style:normal">Cloud copy <i class="tag main">switch</i></em></li><li><span>v0.14</span><em style="font-style:normal">Teams <i class="tag main">switch</i></em></li><li><span>v1.0</span><em style="font-style:normal">Public release</em></li></ol></div>
     </div>
-    <div class="foot"><span>Selected releases · tags show the set · FlipHopper tracks its own development from v0.1</span><span>09 / 10</span></div>
+    <div class="foot"><span>Selected releases · tags show the set · Allomos tracks its own development from v0.1</span><span>09 / 10</span></div>
   </section>
 
   <!-- 10 -->
   <section class="slide close" aria-label="Closing">
-    <p class="eyebrow">FlipHopper</p>
+    <p class="eyebrow">Allomos</p>
     <h2>Switch agents. Switch teammates.<br><em>Keep the project.</em></h2>
-    <p class="lede">The main set moves your project between AI agents and people. AI skills and progress management work on the same seabag. Free on your machine; pay only if you want the cloud.</p>
+    <p class="lede">The main set moves your project between AI agents and people. AI skills and progress management work on the same taskbag. Free on your machine; pay only if you want the cloud.</p>
     <div class="pill-row">
       <span class="pill free">Local app · free</span>
       <span class="pill">Early development · first release: macOS</span>
     </div>
-    <div class="foot"><span>FlipHopper · October 2026</span><span>10 / 10</span></div>
+    <div class="foot"><span>Allomos · October 2026</span><span>10 / 10</span></div>
   </section>
 
   <nav class="nav" aria-label="Slide controls">
