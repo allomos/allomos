@@ -29,3 +29,17 @@ The English and Chinese road show decks use the product's current names: **Allom
 ## Notes
 
 - 2026-10-12 — Card written by the agent from the owner's request.
+- 2026-10-12 — Done in `claude/a00-24-decks` and republished.
+
+## Result (2026-10-12)
+
+**In plain words.** Both decks now say **Allomos** (the Chinese deck says **换肩**, with "换肩 Allomos" in the top bar and page title) and **taskbag** / **任务包** in `.allomos/taskbag/`. The example commands on slide 4 use `alm`, and the note under them now says it is an example session with output shortened, because `alm` is the real command. The bag on the first slide keeps its shape; its label reads TASKBAG (letter spacing tightened from .14em to .06em so the longer word stays inside the bag) or 任务包.
+
+| Check | Result |
+|---|---|
+| `grep -i "fliphopper\|seabag\|水手袋"` and `^fh ` in both decks | PASS: nothing found |
+| `git diff --check`; README links | PASS |
+| Both decks, light theme, in the browser pane: slide 1 bag label fits; top bar shows the new name | PASS |
+| Dark theme | not seen: the pane renders local files in light only — owner check |
+| Republish at existing addresses | PASS: English → version 6 (`1791768229-7e4f`), 中文 → version 6 (`1791768231-168b`). The live pages were read first and matched the repo source (version 5), so nothing else was overwritten. |
+| Owner opens both addresses and checks | waiting |
