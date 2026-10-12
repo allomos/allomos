@@ -1,8 +1,0 @@
-{
-  "area": "A01",
-  "id": "A01-20",
-  "label": "owner verified",
-  "next_dependency": "do together with A00-21 (Allomos): folder .allomos/taskbag/",
-  "state": "done",
-  "title": "Rename seabag to taskcase"
-}

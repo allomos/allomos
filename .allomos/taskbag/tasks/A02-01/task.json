@@ -1,8 +1,0 @@
-{
-  "area": "A02",
-  "id": "A02-01",
-  "iteration": "I05",
-  "next_dependency": "Iteration 5 (burndown and forecast)",
-  "state": "backlog",
-  "title": "Burndown and forecast"
-}

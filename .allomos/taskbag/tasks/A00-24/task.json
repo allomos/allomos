@@ -1,9 +1,0 @@
-{
-  "area": "A00",
-  "holder": "claude/a00-24-decks",
-  "id": "A00-24",
-  "label": "deployed and verified",
-  "next_dependency": "owner opens both deck addresses and checks the names",
-  "state": "in_progress",
-  "title": "Decks say Allomos and taskbag"
-}

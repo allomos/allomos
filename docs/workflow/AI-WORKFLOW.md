@@ -12,7 +12,7 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [A
 ## Starting a session
 
 1. Read [AGENTS.md](../../AGENTS.md) (loaded automatically).
-2. Read [TASK_BOARD.md](../TASK_BOARD.md) (**Now**, **Waiting on the owner**), then run `alm list` against the main checkout's taskbag ([CARDS.md § Where status lives](./CARDS.md#where-status-lives)).
+2. Read [TASK_BOARD.md](../TASK_BOARD.md) (**Now**, **Waiting on the owner**), then run `alm list` against the taskbag at `../allomos-taskbag/.allomos/taskbag` ([CARDS.md § Where status lives](./CARDS.md#where-status-lives)).
 3. Resuming a claimed card → open its card file and your block in [AGENT_HANDOFF.md § Active resume](../AGENT_HANDOFF.md#active-resume). Taking a new card → follow the [claiming protocol](./CARDS.md#claiming-protocol).
 4. Read [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) **Live state** and **Pitfalls** — they change what you do.
 5. Check the actual state before trusting notes: `git status`, `git worktree list`, running ports (`lsof -iTCP -sTCP:LISTEN`).

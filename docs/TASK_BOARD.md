@@ -2,7 +2,7 @@
 
 > **Last updated:** 2026-10-06
 
-**Card status no longer lives here.** Since [`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md) (2026-10-06) Allomos tracks itself: every card is a task in this repository's taskbag (`.allomos/taskbag/`), changed only with the `alm` command on `main`. See it with `alm list` (who holds what: `alm list --state in_progress`; what to pick up: `alm next`) or by opening this folder in the Allomos app. Rules: [workflow/CARDS.md](./workflow/CARDS.md#where-status-lives). Card detail stays in [docs/tasks/](./tasks/).
+**Card status no longer lives here.** Since [`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md) (2026-10-06) Allomos tracks itself: every card is a task in Allomos's taskbag (since 2026-10-12 at `../allomos-taskbag/.allomos/taskbag`, outside this repository; [report](./allomos-conversion.md)), changed only with the `alm` command. See it with `alm list` (who holds what: `alm list --state in_progress`; what to pick up: `alm next`) or by opening this folder in the Allomos app. Rules: [workflow/CARDS.md](./workflow/CARDS.md#where-status-lives). Card detail stays in [docs/tasks/](./tasks/).
 
 This page keeps only **Now** and **Waiting on the owner**, until it is removed or generated from the taskbag (owner, 2026-10-06).
 

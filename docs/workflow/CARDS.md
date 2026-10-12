@@ -1,6 +1,6 @@
 # Cards, labels and claiming
 
-A **contract** for how work is recorded on Allomos. Since [`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md) (2026-10-06) Allomos tracks itself: **status lives in this repository's taskbag** (`.allomos/taskbag/` on `main`), changed with the `alm` command ([CODING_RULES § The `alm` command](./CODING_RULES.md#the-fh-command)). Each card's detail is its own file in [docs/tasks/](../tasks/). [TASK_BOARD.md](../TASK_BOARD.md) keeps only **Now** and **Waiting on the owner**, until it is removed or generated from the taskbag (owner, 2026-10-06).
+A **contract** for how work is recorded on Allomos. Since [`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md) (2026-10-06) Allomos tracks itself: **status lives in Allomos's taskbag** (since 2026-10-12 outside this repository, at `../allomos-taskbag/.allomos/taskbag`; [report](../allomos-conversion.md)), changed with the `alm` command ([CODING_RULES § The `alm` command](./CODING_RULES.md#the-fh-command)). Each card's detail is its own file in [docs/tasks/](../tasks/). [TASK_BOARD.md](../TASK_BOARD.md) keeps only **Now** and **Waiting on the owner**, until it is removed or generated from the taskbag (owner, 2026-10-06).
 
 ## Areas
 
@@ -42,9 +42,9 @@ Add an area by editing this table and the board in the same commit.
 
 ## Where status lives
 
-**Only in the taskbag on `main`**: each card is a task with the card's number as its ID (`A01-07`), and its state, label, holder and waiting-on are that task's fields. The card file holds the outcome, scope, approvals and dated progress notes — never a copy of the state. The task's `description.md` links to the card file.
+**Only in the taskbag** (`../allomos-taskbag/.allomos/taskbag`, its own Git repository next to this one): each card is a task with the card's number as its ID (`A01-07`), and its state, label, holder and waiting-on are that task's fields. The card file holds the outcome, scope, approvals and dated progress notes — never a copy of the state. The task's `description.md` links to the card file.
 
-- **Change status only with `alm`, only on `main`.** Card branches hold an old copy of the taskbag; never change it there. From a card's worktree, point `alm` at the main checkout: `export ALLOMOS_TASKBAG=<main checkout>` (for example `/Users/wanghui/coding/glidepace/allomos`). Add `--push` to every status change: `alm` then commits only the taskbag's files on `main` and pushes them (`alm label A01-05 "locally verified" --push`). Check the output for a `commit_failed` or `push_failed` warning; if one appears, commit or push by hand.
+- **Change status only with `alm`.** Every checkout and worktree shares the one taskbag outside this repository; point `alm` at it: `export ALLOMOS_TASKBAG=/Users/wanghui/coding/glidepace/allomos-taskbag/.allomos/taskbag` (or `--taskbag` on each command). Branches made before 2026-10-12 still hold an old copy at `.allomos/taskbag/`; never change it. Add `--push` to every status change: `alm` then commits only the taskbag's files in the taskbag's repository and pushes them (`alm label A01-05 "locally verified" --push`). Check the output for a `commit_failed` or `push_failed` warning; if one appears, commit or push by hand.
 - **Who you are:** `export ALLOMOS_HOLDER=<your branch>` (for example `claude/a01-05-readme`), or `--as <branch>` on each command.
 - **Next dependency:** `alm needs <ID> "<the one thing needed for the next label>"`. For a waiting task, its *waiting on* says it.
 - **Seeing status:** `alm list` (all, by area), `alm list --state in_progress` (who holds what — this replaces the old Sessions table), `alm list --state done`, `alm show <ID>`, `alm next`. The app shows the same when it opens this repository.
@@ -69,17 +69,17 @@ Add an area by editing this table and the board in the same commit.
 
 ## Claiming protocol
 
-One card is worked by exactly one session at a time. The taskbag on `main`, not memory or chat, records who holds what. Every step below is run against the main checkout's taskbag (see [Where status lives](#where-status-lives)).
+One card is worked by exactly one session at a time. The taskbag, not memory or chat, records who holds what. Every step below is run against that taskbag (see [Where status lives](#where-status-lives)).
 
-1. **Pull before claiming:** `git -C <main checkout> pull --ff-only`, then `alm next` (or `alm list --state ready`).
+1. **Pull before claiming:** `git -C <taskbag> pull --ff-only` once the taskbag's repository has a remote, then `alm next` (or `alm list --state ready`).
 2. **Claim in a commit of its own.** `alm claim <ID> --as <branch> --push`, then start work. `alm claim` refuses a task someone else holds (`task_held`), and the lock stops two sessions on this computer from both winning.
 3. **A card held by another session is read-only to you.** If its card file holds a stale fact, correct only that fact. `alm claim --take` is only for a session whose holder has stopped (for example its quota ran out) and says so in the handoff.
 4. **Two claims from different computers:** the second to push gets a merge conflict in that task's `task.json` — keep whichever landed first and claim a different card.
-5. **Labels and waiting:** `alm label <ID> "<label>" --push` and `alm wait <ID> --on "<what>" --push` on `main`.
+5. **Labels and waiting:** `alm label <ID> "<label>" --push` and `alm wait <ID> --on "<what>" --push`.
 6. **Finish** after the owner's check: `alm label <ID> "owner verified" --push`, `alm done <ID> --push`.
 7. **Release** a card you stop short of Done: `alm release <ID> --note "<what the next session needs>" --push`, then remove your handoff block, commit and push.
 8. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
-9. **A new card:** write its file in `docs/tasks/`, then `alm add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../docs/tasks/<file>)"` on `main`; it starts in `backlog`. When the owner approves it: `alm ready <ID>`. A card that will not be done: `alm drop <ID>`.
+9. **A new card:** write its file in `docs/tasks/`, then `alm add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../../allomos/docs/tasks/<file>)"`; it starts in `backlog`. When the owner approves it: `alm ready <ID>`. A card that will not be done: `alm drop <ID>`.
 10. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
 
 ## Now — rules

@@ -1,9 +1,0 @@
-{
-  "area": "A05",
-  "holder": "claude/a05-02-convert-project",
-  "id": "A05-02",
-  "label": "owner verified",
-  "next_dependency": "owner checks the panel in the built app (card § Result)",
-  "state": "done",
-  "title": "Convert an existing project"
-}

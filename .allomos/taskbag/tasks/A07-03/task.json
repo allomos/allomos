@@ -1,8 +1,0 @@
-{
-  "area": "A07",
-  "id": "A07-03",
-  "iteration": "I02",
-  "next_dependency": "owner approves the card; then A07-02",
-  "state": "backlog",
-  "title": "Allomos works on Windows"
-}

@@ -1,8 +1,0 @@
-{
-  "area": "A01",
-  "id": "A01-19",
-  "iteration": "I02",
-  "next_dependency": "owner approves the card; then A01-18",
-  "state": "backlog",
-  "title": "Create tasks, areas and iterations in the app"
-}
