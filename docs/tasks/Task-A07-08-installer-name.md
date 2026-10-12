@@ -1,6 +1,6 @@
 # Task-A07-08-installer-name
 
-*Card type: coding. Area A07 (Platform & release). Written 2026-10-12 at the owner's request: "make the exe name the {full app name}_setup.exe".*
+*Card type: coding. Area A07 (Platform & release). Written 2026-10-12 at the owner's request: "make the exe name the {full app name}_setup.exe". **Dropped** the same day: the owner meant to keep the current name.*
 
 ## What gets built (plain words)
 
@@ -23,3 +23,4 @@ The Windows build script (`apps/desktop/scripts/build-windows.sh`, [`A07-02`](./
 ## Notes
 
 - 2026-10-12 — Card written from the owner's request.
+- 2026-10-12 — **Dropped.** The owner confirmed that the current name, `Allomos_0.1.0_x64-setup.exe`, is the one wanted ("this name is good"); "{full app name}" meant that full name. The script and CODING_RULES changes were taken back before merging, so `main` is unchanged; only this card is kept. The proof build was stopped before it finished.
