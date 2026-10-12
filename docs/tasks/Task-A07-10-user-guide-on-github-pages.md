@@ -21,7 +21,7 @@ At the end the owner can open the guide in a browser locally, and, once they app
 - **Decisive unknowns.**
   - Which site builder: recommended **Astro Starlight** (built-in language switcher; runs on Node, which `apps/web` and `apps/desktop` already use). Waits on the owner's choice. Pin its version in this card.
   - Languages: **English, Simplified Chinese and Japanese**, like the README (owner, 2026-10-12). Every page exists in all three.
-  - Whether the app later shows the same pages as offline help: a separate card, not this one.
+  - Offline help inside the app: **not wanted** (owner, 2026-10-12). The guide lives only on the website; the app may link to it.
 - **Files owned.** `docs/guide/**`, the site builder's config file, `.github/workflows/guide.yml`; one line in `docs/README.md` pointing to the guide.
 - **External operations** (each needs the owner's exact approval in the table below before it runs):
   - Turn on GitHub Pages for `mypals-ml/allomos` with "GitHub Actions" as the source. Cleanup: turn Pages off in the repository settings.
@@ -41,3 +41,4 @@ At the end the owner can open the guide in a browser locally, and, once they app
 
 - 2026-10-12 — Card written at the owner's request after a talk about which GitHub features suit user documentation: Markdown in the repository plus GitHub Pages (chosen), the wiki (not used: no review, edited apart from the code), Releases for release notes, and Discussions and issue templates later.
 - 2026-10-12 — Owner approved the card and chose three languages: English, Chinese and Japanese.
+- 2026-10-12 — Owner decided against help pages built into the app: the guide is online only.
