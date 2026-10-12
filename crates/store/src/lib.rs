@@ -114,15 +114,15 @@ Allomos wrote this file because the folder was empty. You may edit or delete it.
 
 const README_ZH_CN: &str = "# 换肩项目
 
-此文件夹是一个换肩项目。它的任务、领域和进度保存在隐藏文件夹
+此文件夹是一个「换肩」项目。它的任务、领域和进度保存在隐藏文件夹
 `.allomos/taskbag/` 中。
 
-- 在换肩应用中打开此文件夹，即可按领域查看任务。
+- 在「换肩」应用中打开此文件夹，即可按领域查看任务。
 - AI 智能体和人也可以在终端中用 `alm` 命令处理任务
   （`alm list`、`alm next`、`alm claim <任务>`）。
 - 这些文件是普通的 JSON 和 Markdown，Git 可以记录每一处更改。
 
-此文件夹原本是空的，所以换肩写了这个文件。你可以修改或删除它。
+此文件夹原本是空的，所以「换肩」写了这个文件。你可以修改或删除它。
 ";
 
 const README_JA: &str = "# アロモスプロジェクト
@@ -1263,7 +1263,7 @@ mod tests {
     #[test]
     fn readme_speaks_three_languages() {
         assert!(readme_text("en").starts_with("# Allomos project"));
-        assert!(readme_text("zh-CN").contains("此文件夹是一个换肩项目"));
+        assert!(readme_text("zh-CN").contains("此文件夹是一个「换肩」项目"));
         assert!(readme_text("ja").contains("このフォルダーはアロモスのプロジェクトです"));
         assert_eq!(readme_text("fr"), readme_text("en"));
         for lang in ["en", "zh-CN", "ja"] {

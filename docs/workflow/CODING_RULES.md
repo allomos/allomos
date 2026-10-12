@@ -52,6 +52,7 @@ All must pass. Report anything not run as NOT RUN.
 The interface speaks English, Simplified Chinese and Japanese (R94). English is the reference.
 
 - **No interface text in the code.** Every text the interface shows is a key in `apps/web/src/i18n/en.json`, `zh-CN.json` and `ja.json`, shown with `t()` (or `rich()` when a placeholder holds an element). The user's own data, file paths and field names are not translated.
+- **The product's name in Chinese text** (owner, 2026-10-12): in a Chinese sentence that explains something, write it as 「换肩」, in corner brackets; where the name stands alone (the top bar, a label, a heading) it is 换肩 without them.
 - **Write English first, and add Chinese and Japanese in the same edit.** Keep each text short and plain, and keep the same `{placeholders}` in every language.
 - **Rust sends codes, not sentences.** A problem is a `Problem` in `crates/core/src/problem.rs`: a code, its details, and one English wording for logs and `alm`. After adding or changing a code, run `ALLOMOS_WRITE_CODES=1 cargo test -p allomos-core` to update `apps/web/src/i18n/codes.json`, then add `problem.<code>` to every language file.
 - **The checks catch slips:** `typecheck` fails when a language file misses a key; `check:i18n` also fails on extra or empty texts, different placeholders, and Rust codes without words; `cargo test` fails when `codes.json` is out of date.
