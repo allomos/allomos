@@ -136,6 +136,11 @@ pub fn check(root: &Path, project: &Path) -> VersionCheck {
     let mut sections = Vec::new();
     for file in ["AGENTS.md", "CLAUDE.md"] {
         let text = fs::read_to_string(project.join(file)).unwrap_or_default();
+        // A file that imports `@AGENTS.md` follows it; it is checked only when it holds its own
+        // copy of the section (a heading such as "# Allomos — Claude entry point" is not one).
+        if crate::imports_agents_md(&text) && !text.contains(AGENT_SECTION_HEADING) {
+            continue;
+        }
         if let Some(version) = section_version(&text) {
             sections.push(SectionState {
                 file: file.to_string(),
@@ -477,6 +482,14 @@ mod tests {
         let c = check_connected(&root).unwrap();
         assert!(!c.needs_update());
         assert_eq!(c.instructions_warning(), None);
+
+        // A CLAUDE.md that imports AGENTS.md under a title naming Allomos follows AGENTS.md.
+        fs::write(
+            dir.join("CLAUDE.md"),
+            "# Allomos — Claude entry point\n\n@AGENTS.md\n",
+        )
+        .unwrap();
+        assert!(!check_connected(&root).unwrap().needs_update());
 
         // A CLAUDE.md with its own old copy is listed too.
         fs::write(
