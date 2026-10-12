@@ -156,7 +156,7 @@
   "wizard.found_body": "Allomos will use the taskbag in {path}. To use another one, choose a different folder.",
   "wizard.missing_title": "No taskbag in this folder yet",
   "wizard.missing_body": "Allomos will create {dir} in {folder}, with an empty taskbag inside. Nothing else in the folder changes.",
-  "wizard.git": "This folder is inside the Git repository {repo}, so the taskbag's files can be committed with your project. Allomos creates no repository and runs no Git commands.",
+  "wizard.git": "This folder is inside the Git repository {repo}. Allomos commits the taskbag there (only the taskbag's files; nothing is pushed).",
   "wizard.create": "Create taskbag",
   "wizard.change": "Change…",
   "wizard.source_title": "Connect the folder that holds your project",
@@ -179,5 +179,9 @@
   "fig.teammate": "Teammate",
   "fig.their_agents": "and their agents",
   "fig.taskbag": "TASKBAG",
-  "fig.in_repo": "in your repository"
+  "fig.in_repo": "in your repository",
+  "wizard.no_git": "This folder is not under Git yet. Allomos makes it a Git repository and commits the taskbag there, so the taskbag's history is kept. Nothing is pushed.",
+  "wizard.git_init": "Made {folder} a Git repository and committed the taskbag to it.",
+  "wizard.git_committed": "Committed the taskbag to the Git repository {repo}.",
+  "problem.git_init_failed": "The taskbag is saved, but {path} could not be put under Git: {detail}"
 }

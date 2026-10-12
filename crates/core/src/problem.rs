@@ -116,6 +116,8 @@ problems! {
     /// A warning from `alm --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.
     CommitFailed { detail } => "commit_failed", "The change is saved, but committing it failed: {detail}";
     PushFailed { detail } => "push_failed", "The change is saved and committed, but pushing it failed: {detail}";
+    /// The setup wizard could not make the taskbag's folder a Git repository (Task-A05-03). `detail` is Git's own text.
+    GitInitFailed { path, detail } => "git_init_failed", "The taskbag is saved, but {path} could not be put under Git: {detail}";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

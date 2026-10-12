@@ -289,6 +289,117 @@ fn instruction_files(project: PathBuf) -> InstructionFiles {
     }
 }
 
+/// Where the setup wizard keeps the taskbag in Git (Task-A05-03).
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct GitKept {
+    /// The repository that holds the taskbag.
+    repo: PathBuf,
+    /// The folder was not in a repository, so the wizard made it one (`git init`).
+    initialized: bool,
+    /// A commit was made; false when the taskbag was already committed as it is.
+    committed: bool,
+}
+
+/// The commit message for the taskbag's first commit, the same as the agents' setup request uses;
+/// later commits by the wizard (the project folder, step 3) say "Update".
+const TASKBAG_COMMIT: &str = "Add Allomos taskbag";
+const TASKBAG_UPDATE: &str = "Update Allomos taskbag";
+
+/// Run `git -C dir …` with extra environment (tests set an author): its output, or Git's own
+/// message on failure.
+fn run_git(dir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Result<String, String> {
+    let out = agents::command("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .envs(envs.iter().copied())
+        .output()
+        .map_err(|e| format!("git: {e}"))?;
+    if out.status.success() {
+        return Ok(String::from_utf8_lossy(&out.stdout).into_owned());
+    }
+    let text = String::from_utf8_lossy(&out.stderr).trim().to_string();
+    Err(if text.is_empty() {
+        format!("git {} failed", args.join(" "))
+    } else {
+        text
+    })
+}
+
+/// After the wizard's step 2 (owner, 2026-10-12): make sure the folder holding `.allomos/` is in a
+/// Git repository, making it one with `git init` when it is not, without asking; then commit the
+/// taskbag (and `README-allomos.md`, when Allomos left one) to that repository, and nothing else.
+/// Never pushes. The person's own Git settings and hooks apply (decision 0010).
+fn keep_taskbag_in_git(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Problem> {
+    let folder = std::path::absolute(picked_folder(root).unwrap_or(root))
+        .unwrap_or_else(|_| picked_folder(root).unwrap_or(root).to_path_buf());
+    let (repo, initialized) = match git_root(&folder) {
+        Some(repo) => (repo, false),
+        None => {
+            run_git(&folder, &["init", "--quiet"], envs).map_err(|detail| {
+                Problem::GitInitFailed {
+                    path: folder.display().to_string(),
+                    detail,
+                }
+            })?;
+            (folder.clone(), true)
+        }
+    };
+    let root = std::path::absolute(root).unwrap_or_else(|_| root.to_path_buf());
+    let mut paths = vec![root.display().to_string()];
+    let readme = folder.join(allomos_store::README_FILE);
+    if readme.is_file() {
+        paths.push(readme.display().to_string());
+    }
+    let with_paths = |head: &[&str]| -> Vec<String> {
+        head.iter()
+            .map(|s| s.to_string())
+            .chain(std::iter::once("--".to_string()))
+            .chain(paths.iter().cloned())
+            .collect()
+    };
+    let git = |args: Vec<String>| {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        run_git(&repo, &args, envs)
+    };
+    let commit = (|| {
+        git(with_paths(&["add", "--all"]))?;
+        // Nothing new to commit: the taskbag is already in the repository as it is.
+        if git(with_paths(&["diff", "--cached", "--quiet"])).is_ok() {
+            return Ok(false);
+        }
+        // Already in the history (an earlier step committed it): this one updates it.
+        let before = git(vec![
+            "log".into(),
+            "-1".into(),
+            "--format=%H".into(),
+            "--".into(),
+            paths[0].clone(),
+        ]);
+        let known = before.as_ref().is_ok_and(|out| !out.trim().is_empty());
+        let message = if known {
+            TASKBAG_UPDATE
+        } else {
+            TASKBAG_COMMIT
+        };
+        git(with_paths(&["commit", "--quiet", "-m", message]))?;
+        Ok(true)
+    })();
+    match commit {
+        Ok(committed) => Ok(GitKept {
+            repo,
+            initialized,
+            committed,
+        }),
+        Err(detail) => Err(Problem::CommitFailed { detail }),
+    }
+}
+
+#[tauri::command]
+async fn keep_in_git(root: PathBuf) -> Result<GitKept, Problem> {
+    keep_taskbag_in_git(&root, &[])
+}
+
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
 /// here when AGENTS.md or CLAUDE.md sits beside `.allomos/`), whether that folder's agent
 /// instructions mention Allomos, and whether the taskbag has tasks.
@@ -564,6 +675,7 @@ pub fn run() {
             find_agents,
             connect_agents,
             instruction_files,
+            keep_in_git,
             write_agent_files,
             agent_status,
             confirm_requests,
@@ -678,5 +790,74 @@ mod tests {
         assert!(two[1].1.ends_with(&setup) && two[1].1.starts_with("Note: "));
         assert!(!two[1].1.contains("alm confirm"));
         assert!(connect_plan(&[], "en", &project, &taskbag).is_empty());
+    }
+
+    #[test]
+    fn the_taskbag_is_put_under_git_and_committed_alone() {
+        let me = [
+            ("GIT_AUTHOR_NAME", "Test"),
+            ("GIT_AUTHOR_EMAIL", "test@example.com"),
+            ("GIT_COMMITTER_NAME", "Test"),
+            ("GIT_COMMITTER_EMAIL", "test@example.com"),
+        ];
+        let base = std::env::temp_dir().join(format!("allomos-keep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let log = |repo: &Path| {
+            let out = agents::command("git")
+                .arg("-C")
+                .arg(repo)
+                .args(["log", "--format=%s", "--name-only"])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).into_owned()
+        };
+
+        // A folder outside Git: made a repository, and only the taskbag is committed.
+        let plain = base.join("plain");
+        std::fs::create_dir_all(&plain).unwrap();
+        std::fs::write(plain.join("notes.txt"), "mine").unwrap();
+        let root = plain.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "p", "P").unwrap();
+        let kept = keep_taskbag_in_git(&root, &me).unwrap();
+        assert!(kept.initialized && kept.committed);
+        assert_eq!(kept.repo, plain);
+        let history = log(&plain);
+        assert!(history.starts_with(TASKBAG_COMMIT), "{history}");
+        assert!(
+            history.contains(".allomos/taskbag/project.json"),
+            "{history}"
+        );
+        assert!(!history.contains("notes.txt"), "{history}");
+        // Again: nothing new, no second commit.
+        let again = keep_taskbag_in_git(&root, &me).unwrap();
+        assert!(!again.initialized && !again.committed);
+        // Step 3 records the project folder: committed before the agent is connected, as an update.
+        allomos_store::record_project_folder(&root, &plain).unwrap();
+        assert!(keep_taskbag_in_git(&root, &me).unwrap().committed);
+        assert!(log(&plain).starts_with(TASKBAG_UPDATE), "{}", log(&plain));
+
+        // Inside an existing repository: no new repository; the person's staged work stays staged.
+        let repo = base.join("repo");
+        let sub = repo.join("app");
+        std::fs::create_dir_all(&sub).unwrap();
+        run_git(&repo, &["init", "--quiet"], &me).unwrap();
+        std::fs::write(repo.join("work.txt"), "staged").unwrap();
+        run_git(&repo, &["add", "work.txt"], &me).unwrap();
+        let root = sub.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "q", "Q").unwrap();
+        let kept = keep_taskbag_in_git(&root, &me).unwrap();
+        assert_eq!(kept.repo, repo);
+        assert!(!kept.initialized && kept.committed);
+        assert!(!sub.join(".git").exists(), "no nested repository");
+        assert!(!log(&repo).contains("work.txt"));
+        assert!(
+            run_git(
+                &repo,
+                &["diff", "--cached", "--quiet", "--", "work.txt"],
+                &me
+            )
+            .is_err()
+        );
+        std::fs::remove_dir_all(&base).unwrap();
     }
 }

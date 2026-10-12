@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, InstructionFiles, Opened, SetupState } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -56,6 +56,11 @@ export interface Messenger {
   connectAgents(agents: string[], project: string, taskbag: string, language: string): Promise<string[]>;
   /** Whether `project` has AGENTS.md and CLAUDE.md. */
   instructionFiles(project: string): Promise<InstructionFiles>;
+  /**
+   * Puts the folder holding the taskbag at `root` under Git (`git init` when it is in no
+   * repository) and commits the taskbag there, nothing else; never pushes. Rejects with a Problem.
+   */
+  keepInGit(root: string): Promise<GitKept>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
@@ -105,6 +110,7 @@ export const desktopMessenger: Messenger = {
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
   instructionFiles: (project) => invoke<InstructionFiles>("instruction_files", { project }),
+  keepInGit: (root) => invoke<GitKept>("keep_in_git", { root }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),

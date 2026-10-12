@@ -35,6 +35,10 @@
   "folder_not_empty": [
     "path"
   ],
+  "git_init_failed": [
+    "path",
+    "detail"
+  ],
   "holder_missing": [],
   "invalid_choice": [
     "value",
