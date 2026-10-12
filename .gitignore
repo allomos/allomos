@@ -4,6 +4,7 @@ dist/
 build/
 coverage/
 .turbo/
+.astro/
 
 # Local environment and credentials — never commit
 .env

@@ -1,0 +1,46 @@
+# Builds the user guide (docs/guide) and publishes it on GitHub Pages (Task-A07-10).
+# Needs Pages turned on for this repository with "GitHub Actions" as the source.
+name: User guide
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/guide/**', '.github/workflows/guide.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/guide/package-lock.json
+      - run: npm ci
+        working-directory: docs/guide
+      - run: npm run build
+        working-directory: docs/guide
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/guide/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
