@@ -310,3 +310,4 @@ button.link:hover { text-decoration: underline; }
 .dialog .form legend { font-size: 13px; padding: 0 4px; }
 .dialog .form .task-checks { display: grid; gap: 2px; max-height: 140px; overflow: auto; }
 .dialog .form .task-checks label { display: block; }
+.handoffs .write-handoff { justify-self: end; }

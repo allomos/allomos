@@ -107,8 +107,8 @@ export function HandoffsView({
           ))}
         </ul>
       )}
-      {/* A link below the list, outside it (owner, 2026-10-12). */}
-      <button type="button" className="link" onClick={onWrite}>
+      {/* A link below the list, outside it, at the far right (owner, 2026-10-12). */}
+      <button type="button" className="link write-handoff" onClick={onWrite}>
         {t("handoffs.write")}
       </button>
     </section>
