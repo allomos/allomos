@@ -23,3 +23,4 @@ The taskbag repository gets a private home on GitHub, `mypals-ml/allomos-taskbag
 ## Notes
 
 - 2026-10-12 — Card written; approval recorded.
+- 2026-10-12 — Done the approved operation: `gh repo create mypals-ml/allomos-taskbag --private --source ../allomos-taskbag --remote origin --push`. `git remote -v` shows `origin https://github.com/mypals-ml/allomos-taskbag.git`; `master` pushed and tracking `origin/master`, `git status -sb` shows no "ahead"; `gh repo view` reports PRIVATE. The stray untracked `.DS_Store` there was not committed. Status changes now use `alm … --push`. Label: deployed and verified; next: the owner's look at the repository.

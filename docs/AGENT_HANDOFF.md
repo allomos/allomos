@@ -38,14 +38,6 @@ One block per card that `alm list --state in_progress` shows held.
 
 
 
-### Task-A05-03 — claude/a05-03-setup-wizard
-- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` · merged into `main` 2026-10-12 · pushed: yes
-- Approvals in force: card's local work (owner, 2026-10-11); the owner's wizard Git rule (git init + local commit, never push; decision 0010)
-- Uncommitted: none · Running: none started by this session
-- Label: locally verified; the owner ran the whole check list in the app and it passed (see card).
-- Test data: `~/allomos-tests/a05-03-steps-9-12/` (`reset.sh`), `~/allomos-tests/a05-03-setup-wizard/` (owner's items 1–8). Delete both once the card is done.
-- Next action: owner says whether this counts as "owner verified"; then `alm label A05-03 "owner verified"`, `alm done`, remove this block, the worktree and the test folders
-
 ## Live state
 
 Checked 2026-10-08.
@@ -83,7 +75,7 @@ Decisions and boundaries the board does not carry. If a bullet contradicts the t
 - **Main purpose** ([0014](./decisions/0014-main-purpose-and-three-sets.md), 2026-10-06): switch between AI agents and teammates and keep the project; sets 2 and 3 are AI skills and progress management.
 - **Name** ([0015](./decisions/0015-product-name-allomos.md), 2026-10-10; before that [0013](./decisions/0013-product-name-fliphopper.md)): the product is **Allomos** (换肩, アロモス; `allomos`, command `alm`); a project's data is its **taskbag**, always in `.allomos/taskbag/`. Dated history keeps "FlipHopper" and "glidebox".
 - **Business model** ([0012](./decisions/0012-free-local-app-paid-cloud.md), 2026-10-04): the local app is free, with no account; payment is only for cloud features. Free users must cost (almost) nothing to serve. The source licence is undecided.
-- **Allomos tracks itself** (since 2026-10-06, [`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md)): card status is in the taskbag at `../allomos-taskbag/.allomos/taskbag` (moved out of this repository on 2026-10-12, [report](./allomos-conversion.md)), changed only with `alm`. `alm` must be on your PATH: `cargo install --path crates/cli` from any checkout. See [CARDS.md § Where status lives](./workflow/CARDS.md#where-status-lives).
+- **Allomos tracks itself** (since 2026-10-06, [`Task-A01-07`](./tasks/Task-A01-07-own-cards-in-seabag.md)): card status is in the taskbag at `../allomos-taskbag/.allomos/taskbag` (moved out of this repository on 2026-10-12, [report](./allomos-conversion.md)), its own private repository `mypals-ml/allomos-taskbag` on GitHub since 2026-10-12 ([`Task-A01-24`](./tasks/Task-A01-24-taskbag-on-github.md)), changed only with `alm … --push`. `alm` must be on your PATH: `cargo install --path crates/cli` from any checkout. See [CARDS.md § Where status lives](./workflow/CARDS.md#where-status-lives).
 - **Credentials:** none are used by this project yet. When one is introduced, record its *location* here (never its value) and ignore its file in `.gitignore`.
 
 ## Do not assume
