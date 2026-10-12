@@ -257,8 +257,9 @@ button.link:hover { text-decoration: underline; }
 .wizard-body p { margin: 0; }
 .wizard .row.start { justify-content: flex-start; }
 .wizard .card { border: 0; padding: 0; background: none; }
-/* Chinese and Japanese have no spaces: break the slogan only after its commas, not inside words. */
-:root:lang(zh-CN) .welcome h1, :root:lang(ja) .welcome h1 { word-break: keep-all; line-break: strict; }
+/* Chinese and Japanese have no spaces: each phrase of the slogan stays whole, and lines break
+   only between phrases (inside one only when it is wider than the column). */
+:root:lang(zh-CN) .welcome h1 .phrase, :root:lang(ja) .welcome h1 .phrase { display: inline-block; max-width: 100%; }
 :root:lang(ja) .hop .stencil { font-size: 11px; }
 /* Japanese phrases are longer: small enough that "エージェントを替えても、" fits on one line. */
 :root:lang(ja) .welcome h1 { font-size: clamp(24px, 2.9vw, 38px); }

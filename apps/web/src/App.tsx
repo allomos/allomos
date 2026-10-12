@@ -504,13 +504,19 @@ function LanguagePicker() {
  * agents and a teammate around the taskbag), with one button, Start, which opens the setup
  * wizard (Task-A05-03). */
 function Welcome({ onOpen }: { onOpen: () => void }) {
-  const { t, rich } = useI18n();
+  const { t } = useI18n();
   return (
     <section className="welcome">
       <div className="welcome-grid">
         <div className="welcome-text">
           <p className="eyebrow">{t("welcome.eyebrow")}</p>
-          <h1>{rich("welcome.title", { keep: <em>{t("welcome.keep")}</em> })}</h1>
+          {/* Three phrases: Chinese and Japanese break only between them (Safari's engine, which
+              draws the macOS window, will not break a run of CJK text marked keep-all at all). */}
+          <h1>
+            <span className="phrase">{t("welcome.title1")}</span>
+            <span className="phrase">{t("welcome.title2")}</span>
+            <em className="phrase">{t("welcome.keep")}</em>
+          </h1>
           <p className="lede">{t("welcome.lede")}</p>
           <div className="welcome-start">
             <button type="button" className="primary start" onClick={onOpen}>
