@@ -273,3 +273,5 @@ button.link:hover { text-decoration: underline; }
 .dialog .row.project-row { justify-content: flex-start; }
 /* Under the chosen agent when it takes the request from the clipboard. */
 .agent-tools .paste-tip { color: var(--warn); font-weight: 500; }
+/* The agents panel's buttons sit at the far right, on the page as in the wizard's dialog. */
+.agents .row.actions { justify-content: flex-end; }

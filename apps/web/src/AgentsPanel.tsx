@@ -228,7 +228,7 @@ export function AgentsPanel({
         </ul>
       )}
       {error && <p className="banner error">{error}</p>}
-      <div className="row">
+      <div className="row actions">
         {agents && agents.length > 0 && (
           <button type="button" className="primary" onClick={() => void ask()} disabled={busy || chosen.length === 0}>
             {t("agents.ask")}
