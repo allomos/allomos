@@ -89,3 +89,7 @@ Allomos tracks its own development with Allomos.
 - Product plan: [docs/product/PLAN.md](docs/product/PLAN.md) · requirements: [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · the three sets: [decision 0014](docs/decisions/0014-main-purpose-and-three-sets.md).
 - What is being worked on: open this repository in the Allomos app, or run `alm list` (this repository's taskbag is at `../allomos-taskbag/.allomos/taskbag`, so add `--taskbag "../allomos-taskbag/.allomos/taskbag"`). Now and the owner's open questions: [docs/TASK_BOARD.md](docs/TASK_BOARD.md).
 - All documentation: [docs/README.md](docs/README.md). AI agents start at [AGENTS.md](AGENTS.md).
+
+## License
+
+[MIT](LICENSE) © 2026 will.w.hui
