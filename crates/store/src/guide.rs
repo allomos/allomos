@@ -139,8 +139,7 @@ Rules:
   that language.
 - Before a change the person must agree to, show your plan with `alm confirm` and change nothing
   unless it exits 0.
-- `--push` commits only the taskbag's files; your other work is committed as usual. When the
-  taskbag's Git repository has no remote (`git remote` prints nothing), use `--commit` instead.
+- `--push` commits only the taskbag's files; your other work is committed as usual.
 ";
 
 /// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.

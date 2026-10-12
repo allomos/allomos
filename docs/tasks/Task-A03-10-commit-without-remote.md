@@ -1,6 +1,8 @@
 # Task-A03-10-commit-without-remote
 
-*Card type: coding. Area A03 (Agents). Written 2026-10-12 at the owner's request. Allomos's instructions tell agents to add `--push` to every status change; in a repository with no remote (for example one the setup wizard just made with `git init`, [`A05-03`](./Task-A05-03-taskbag-setup-wizard.md)), every such change ends with a `push_failed` warning.*
+*Card type: coding. Area A03 (Agents). Written 2026-10-12 at the owner's request. **Dropped** the same day: the sentence was taken back out.*
+
+*Background:* Allomos's instructions tell agents to add `--push` to every status change; in a repository with no remote (for example one the setup wizard just made with `git init`, [`A05-03`](./Task-A05-03-taskbag-setup-wizard.md)), every such change ends with a `push_failed` warning.*
 
 ## What gets built (plain words)
 
@@ -30,3 +32,4 @@ The instructions agents read say one more thing: **when the taskbag's Git reposi
 
 - 2026-10-12 — Card written from the owner's request.
 - 2026-10-12 — Done: the sentence "When the taskbag's Git repository has no remote (`git remote` prints nothing), use `--commit` instead" is in `agent_section` (`alm brief`), in the guide's rules (`alm guide workflow`) and in this repository's `AGENTS.md`. Test `agents_are_told_to_commit_when_there_is_no_remote`. Checks: `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` — PASS. Projects whose `AGENTS.md` already has the older section get the new sentence when their section is renewed ([`A03-07`](./Task-A03-07-renew-agent-instructions.md)).
+- 2026-10-12 — **Dropped.** On reading `alm brief`, the owner judged the sentence unnecessary: without it nothing breaks (`alm … --push` still commits, then only warns `push_failed`), and a capable agent adapts by itself; every line of the section is read by every session. The sentence and its test were removed from `crates/store/src/lib.rs`, `crates/store/src/guide.rs` and `AGENTS.md` (restored as before the merge `cbcfcef`). Not chosen: making `alm --push` stay quiet when there is no remote.
