@@ -217,7 +217,7 @@ export function SetupWizard({
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
               <p>
-                {t("wizard.source_label")}: <code>{step.source}</code>
+                {rich("project.line", { path: <code>{step.source}</code> })}
               </p>
               <div className="row start">
                 <button type="button" onClick={() => void pickSource()} disabled={busy}>

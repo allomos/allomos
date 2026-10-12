@@ -269,3 +269,5 @@ button.link:hover { text-decoration: underline; }
 .git-note strong { color: var(--ok); }
 .git-note.warn { border-color: var(--warn); background: var(--warn-bg); }
 .git-note.warn strong { color: var(--warn); }
+/* The project folder line is text, not buttons: on the left, also inside the wizard's dialog. */
+.dialog .row.project-row { justify-content: flex-start; }

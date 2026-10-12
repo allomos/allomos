@@ -55,7 +55,7 @@ export function AgentsPanel({
   /** Closes the panel. */
   onDone: (result: ConnectResult) => void;
 }) {
-  const { t, problem, language } = useI18n();
+  const { t, rich, problem, language } = useI18n();
   const [agents, setAgents] = useState<Agent[] | null>(null);
   const [slow, setSlow] = useState(false);
   /** Per group (by name): the chosen tool, or none when the group is not ticked. */
@@ -151,10 +151,8 @@ export function AgentsPanel({
       <h2>{t("connect.title")}</h2>
       <p>{t("connect.body")}</p>
       <p>{t("connect.tasks")}</p>
-      <div className="row">
-        <span>
-          {t("agents.project")}: <code>{project}</code>
-        </span>
+      <div className="row project-row">
+        <span>{rich("project.line", { path: <code>{project}</code> })}</span>
         {!projectFixed && (
           <button type="button" className="link" onClick={() => void changeProject()} disabled={busy}>
             {t("agents.change")}
