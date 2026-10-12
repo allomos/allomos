@@ -147,7 +147,7 @@
   "notice.restart_agents": "New in the project folder: {files}. AI agents read these files only when a session starts, so sessions that were already open in this project don't know about Allomos yet. Start a new session to use it.",
   "welcome.open": "Start",
   "welcome.hint": "Select a folder where you want to keep your tasks.",
-  "wizard.title": "Set up a taskbag",
+  "wizard.title": "Set up the taskbag",
   "wizard.step": "Step {n} of 4",
   "wizard.what_title": "What is a taskbag?",
   "wizard.what_body": "A taskbag holds your project's tasks: what is planned, who is working on what, how far each task has got, and the notes one person or AI agent leaves for the next. It is a folder of plain text files named {dir}, so you can keep it in Git with your project. You see it here in Allomos; AI agents use it through the alm command.",
