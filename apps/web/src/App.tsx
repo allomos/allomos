@@ -694,7 +694,7 @@ function TaskbagView({
 
   return (
     <>
-      {issues.length > 0 && <Issues issues={issues} />}
+      {issues.length > 0 && <Issues issues={issues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
           {box.tasks.length > 0 && (
@@ -759,7 +759,7 @@ function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string
   return parts.join(" · ");
 }
 
-function Issues({ issues }: { issues: Issue[] }) {
+function Issues({ issues, onDownload }: { issues: Issue[]; onDownload: () => void }) {
   const { t, rich, problem } = useI18n();
   return (
     <section className="issues" aria-label={t("issues.label")}>
@@ -770,6 +770,12 @@ function Issues({ issues }: { issues: Issue[] }) {
             <code>{i.file}</code>
             {i.field && <> · {rich("issues.field", { field: <code>{i.field}</code> })}</>}
             <span>{problem(i.problem)}</span>
+            {/* A newer taskbag: where to get the newer Allomos (owner, 2026-10-12). */}
+            {i.problem.code === "taskbag_newer" && (
+              <button type="button" className="link" onClick={onDownload}>
+                {t("update.download")}
+              </button>
+            )}
           </li>
         ))}
       </ul>

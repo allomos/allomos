@@ -67,6 +67,8 @@ export interface Messenger {
   versionCheck(root: string): Promise<VersionCheck | null>;
   /** The taskbag's format compared with this Allomos's, connected or not. */
   taskbagFormat(root: string): Promise<{ format: FormatState; current: string }>;
+  /** Opens the page where a newer Allomos is downloaded, in the web browser. */
+  openDownloadPage(): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
@@ -118,6 +120,7 @@ export const desktopMessenger: Messenger = {
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
+  openDownloadPage: () => invoke<void>("open_download_page"),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),

@@ -284,6 +284,23 @@ fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
     versions::check_connected(&root)
 }
 
+/// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub repository for now, even
+/// while it is private). A fixed address: the window cannot ask to open any other.
+const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos";
+
+/// Open the download page in the web browser, for a taskbag that needs a newer Allomos.
+#[tauri::command]
+fn open_download_page() -> Result<(), Problem> {
+    opener()
+        .arg(DOWNLOAD_URL)
+        .spawn()
+        .map(drop)
+        .map_err(|e| Problem::OpenFailed {
+            path: DOWNLOAD_URL.to_string(),
+            detail: e.to_string(),
+        })
+}
+
 /// The taskbag's format compared with this Allomos's, whether or not an agent is connected: the
 /// wizard's step 2 does not go on with a newer taskbag (owner, 2026-10-12).
 #[derive(Serialize)]
@@ -732,6 +749,7 @@ pub fn run() {
             taskbag_stamp,
             version_check,
             taskbag_format,
+            open_download_page,
             create_taskbag,
             show_in_file_manager,
             open_task_link,

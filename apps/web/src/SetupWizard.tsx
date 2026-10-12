@@ -226,7 +226,10 @@ export function SetupWizard({
               <GitLine repo={step.gitRoot} />
               {step.newer && (
                 <p className="banner error" role="alert">
-                  {problem({ code: "taskbag_newer", params: step.newer })}
+                  {problem({ code: "taskbag_newer", params: step.newer })}{" "}
+                  <button type="button" className="link" onClick={() => messenger.openDownloadPage().catch(fail)}>
+                    {t("update.download")}
+                  </button>
                 </p>
               )}
             </>
