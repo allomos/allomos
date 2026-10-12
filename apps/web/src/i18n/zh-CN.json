@@ -58,6 +58,8 @@
   "group.label": "任务分组",
   "group.by_area": "按领域",
   "group.by_iteration": "按迭代",
+  "fold.collapse_all": "全部折叠",
+  "fold.expand_all": "全部展开",
   "box.unplanned": "未排期",
   "box.no_iterations": "此项目还没有迭代。用 {add} 添加迭代，再用 {plan} 把任务排进去。",
   "iteration.no_tasks": "此迭代中没有任务。",

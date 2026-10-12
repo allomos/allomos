@@ -58,6 +58,8 @@
   "group.label": "Group tasks",
   "group.by_area": "By area",
   "group.by_iteration": "By iteration",
+  "fold.collapse_all": "Collapse all",
+  "fold.expand_all": "Expand all",
   "box.unplanned": "Unplanned",
   "box.no_iterations": "This project has no iterations yet. Add them with {add}, then place tasks in them with {plan}.",
   "iteration.no_tasks": "No tasks in this iteration.",

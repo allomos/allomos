@@ -58,6 +58,8 @@
   "group.label": "タスクのまとめ方",
   "group.by_area": "エリア別",
   "group.by_iteration": "イテレーション別",
+  "fold.collapse_all": "すべて折りたたむ",
+  "fold.expand_all": "すべて展開",
   "box.unplanned": "未計画",
   "box.no_iterations": "このプロジェクトにはまだイテレーションがありません。{add} で追加し、{plan} でタスクを割り当ててください。",
   "iteration.no_tasks": "このイテレーションにはタスクがありません。",
