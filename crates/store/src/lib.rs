@@ -179,7 +179,9 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 
-`--push` commits only the taskbag's files and pushes them, so others see the change.
+`--push` commits only the taskbag's files and pushes them, so others see the change. When the
+taskbag's Git repository has no remote (`git remote` prints nothing), use `--commit` instead: it
+commits the same files without trying to push.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
@@ -1589,5 +1591,16 @@ mod tests {
         let loaded = load(&root);
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn agents_are_told_to_commit_when_there_is_no_remote() {
+        // A repository without a remote (one the setup wizard just made) would warn on every
+        // `--push` (Task-A03-10).
+        let section = agent_section();
+        assert!(section.contains("has no remote"), "{section}");
+        assert!(section.contains("use `--commit` instead"), "{section}");
+        let guide = crate::guide(Some("workflow")).unwrap();
+        assert!(guide.contains("use `--commit` instead"), "{guide}");
     }
 }
