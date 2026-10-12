@@ -201,5 +201,7 @@
   "update.asked": "已打开 {agent}。请在那里阅读请求并发送。智能体更新项目后，这条提示就会消失。",
   "update.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体更新项目后，这条提示就会消失。",
   "update.download": "下载最新版「换肩」",
-  "update.newer_title": "请更新「换肩」"
+  "update.newer_title": "请更新「换肩」",
+  "problem.invalid_percent": "“{value}”不是百分比。请填 0 到 100 之间的整数。",
+  "problem.template_empty": "交接模板不能为空。"
 }

@@ -17,7 +17,9 @@ use crate::{AGENT_SECTION_HEADING, Lock, PROJECT_FILE, picked_folder, tells_agen
 
 /// The version of Allomos's section that this Allomos writes. Raise it whenever the section's
 /// wording changes, so projects with the older wording are asked to renew it.
-pub const SECTION_VERSION: u32 = 1;
+///
+/// 2: the handoff lines (Task-A03-06).
+pub const SECTION_VERSION: u32 = 2;
 
 /// How long `alm upgrade` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);

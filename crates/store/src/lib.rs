@@ -181,6 +181,9 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --push`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
+- Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
+  `alm handoff --tasks <ids> --as <your session name> --push`, for any reader, agent or person.
+  Whoever continues reads it with `alm next` or `alm show <id>`.
 
 `--push` commits only the taskbag's files and pushes them, so others see the change.
 

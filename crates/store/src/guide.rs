@@ -111,6 +111,16 @@ Plan:
 - `alm task-language`: the language to write new and changed tasks in (run it first);
   `alm task-language <code|ui>` sets it.
 
+Handoffs (the note a session leaves so whoever continues does not start blind):
+- `alm handoff-rules`: when to write one (quota and context gates, with any override for you);
+  `--quota <n> --context <n> [--write-when \"<text>\"] [--agent <name>] [--clear]` change them.
+- `alm handoff --tasks <id,id> --as <your session name>`: this session's handoff file, made from
+  the template the first time (later calls update the same file); fill it in, or pass
+  `--from <file.md>`. It prints the file's path.
+- `alm handoffs [--task <id>] [--latest]`: handoffs, newest first. `alm next` and `alm show <id>`
+  show a task's latest one.
+- `alm handoff-template [--set <file.md>]`: show or replace the project's template.
+
 Ask the person:
 - `alm confirm --title \"<heading>\" --plan <file.md>`: shows your plan in the Allomos app and
   waits; exit 0 means go ahead, anything else means change nothing.
@@ -129,12 +139,17 @@ const WORKFLOW: &str = "# How to work the tasks
 3. As you prove each step, `alm label <id> \"<label>\" --push`, and keep its next dependency
    current with `alm needs`.
 4. Blocked on a person or another task: `alm wait <id> --on \"<what>\" --push`.
-5. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
+5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
+   every meaningful step): `alm handoff --tasks <id> --as <your session name>`, then fill in the
+   file it names, in plain words first, for any reader: you do not know who takes over, an agent
+   or a person. Evidence goes on the task's card, not in the handoff.
+6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\" --push`.
-6. Finished: the top label, then `alm done <id> --push`.
+7. Finished: the top label, then `alm done <id> --push`.
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
+  The one exception: fill in your own handoff file, the one `alm handoff` names.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Before a change the person must agree to, show your plan with `alm confirm` and change nothing
