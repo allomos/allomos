@@ -131,7 +131,9 @@ To build a local, unsigned app: `npx --prefix apps/desktop tauri build --debug -
 
 ## Building for Windows
 
-The Windows version is built on the Mac; there is no GitHub pipeline, because the repository is private on GitHub's Free plan and every run would use up its free minutes (owner, 2026-10-11, [`Task-A07-02`](../tasks/Task-A07-02-build-pipeline.md)). The Mac can only *build* the Windows version, not run it: nothing is tested on Windows this way.
+**Releases are built by GitHub** ([`Task-A07-11`](../tasks/Task-A07-11-github-builds-releases.md), 2026-10-13): pushing a version tag such as `v0.2.0` runs `.github/workflows/release.yml`, which builds the macOS (Apple Silicon) `.dmg`, the Windows installer and `alm` for both on GitHub's computers and attaches them, unsigned, to that version's release. The tag must match `version` in `tauri.conf.json` and `Cargo.toml`, or the run stops. GitHub charges no build time since the repository became public; it was private when [`Task-A07-02`](../tasks/Task-A07-02-build-pipeline.md) chose to build on the Mac (owner, 2026-10-11).
+
+The Mac script below stays as a backup (owner, 2026-10-13). The Mac can only *build* the Windows version, not run it: nothing is tested on Windows this way.
 
 ```bash
 bash apps/desktop/scripts/build-windows.sh

@@ -9,7 +9,17 @@ This page takes you from a first start to an AI agent working from your taskbag.
 
 ## 1. Get the app
 
-Allomos 0.1 runs on macOS; Windows is coming in 0.2. There is no download yet: downloads will appear on the [releases page](https://github.com/mypals-ml/allomos/releases). Until then, the app is run from its source code ([instructions for developers](https://github.com/mypals-ml/allomos/blob/main/docs/workflow/CODING_RULES.md#running-the-app)).
+Download the newest version from the [releases page](https://github.com/mypals-ml/allomos/releases/latest):
+
+- **macOS** (Apple Silicon Macs: M1 or newer): `Allomos_<version>_aarch64.dmg`. Open it and drag Allomos into Applications.
+- **Windows**: `Allomos_<version>_x64-setup.exe`. Run it; it needs no administrator rights, and it installs the `alm` command too.
+
+Until version 1.0 these downloads are not signed, so the first time you open Allomos the system warns you:
+
+- **macOS** says it cannot check Allomos for malware. Choose **Done**, open **System Settings › Privacy & Security**, scroll down and choose **Open Anyway** next to Allomos.
+- **Windows** shows "Windows protected your PC". Choose **More info**, then **Run anyway**.
+
+On macOS the `alm` command is a separate download, `alm_<version>_macos_arm64.tar.gz`: open it and move `alm` into a folder on your PATH, such as `/usr/local/bin`.
 
 ## 2. Start
 

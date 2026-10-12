@@ -9,7 +9,17 @@ sidebar:
 
 ## 1. アプリを手に入れる
 
-アロモス 0.1 は macOS で動きます。Windows 版は 0.2 で出ます。ダウンロードはまだありません。今後[リリースページ](https://github.com/mypals-ml/allomos/releases)に置かれます。それまでは、ソースコードからアプリを動かします（[開発者向けの説明](https://github.com/mypals-ml/allomos/blob/main/docs/workflow/CODING_RULES.md#running-the-app)）。
+[リリースページ](https://github.com/mypals-ml/allomos/releases/latest)から最新版をダウンロードします。
+
+- **macOS**（Apple シリコンの Mac：M1 以降）：`Allomos_<バージョン>_aarch64.dmg`。開いて、Allomos を「アプリケーション」にドラッグします。
+- **Windows**：`Allomos_<バージョン>_x64-setup.exe`。実行するだけです。管理者の権限はいりません。`alm` コマンドも一緒に入ります。
+
+バージョン 1.0 までは署名がないため、はじめてアロモスを開くときにシステムが警告します。
+
+- **macOS** は、アロモスにマルウェアがないか確認できないと表示します。**完了** を選び、**システム設定 › プライバシーとセキュリティ** を開き、下へスクロールして、アロモスの横の **このまま開く** を選びます。
+- **Windows** は「Windows によって PC が保護されました」と表示します。**詳細情報** を選び、**実行** を選びます。
+
+macOS では `alm` コマンドは別のダウンロードです：`alm_<バージョン>_macos_arm64.tar.gz`。開いて、`alm` を PATH の通ったフォルダー（たとえば `/usr/local/bin`）に移します。
 
 ## 2. はじめる
 
