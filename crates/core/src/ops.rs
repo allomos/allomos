@@ -130,6 +130,77 @@ pub fn set_task_language(taskbag: &Taskbag, value: &str) -> Result<Project, Prob
     })
 }
 
+/// A change to the project's handoff rules (`alm handoff-rules`, the app's Handoff settings).
+/// `agent`: the change is that agent's or account's override instead of the project's own rules.
+/// `clear`: remove that override (with `agent`) or go back to the defaults (without).
+#[derive(Debug, Clone, Default)]
+pub struct HandoffChange<'a> {
+    pub quota_gate: Option<&'a str>,
+    pub context_gate: Option<&'a str>,
+    pub write_when: Option<&'a str>,
+    pub agent: Option<&'a str>,
+    pub clear: bool,
+}
+
+fn percent(value: &str) -> Result<u8, Problem> {
+    value
+        .trim()
+        .trim_end_matches('%')
+        .parse::<u8>()
+        .ok()
+        .filter(|v| *v <= 100)
+        .ok_or_else(|| Problem::InvalidPercent {
+            value: value.to_string(),
+        })
+}
+
+/// The project with changed handoff rules (Task-A03-06). Percentages must be whole numbers from 0
+/// to 100; an override is named like a holder (`codex`, `claude/work`).
+pub fn set_handoff_rules(taskbag: &Taskbag, change: &HandoffChange) -> Result<Project, Problem> {
+    let quota = change.quota_gate.map(percent).transpose()?;
+    let context = change.context_gate.map(percent).transpose()?;
+    let mut rules = taskbag.project.handoff.clone().unwrap_or_default();
+    match change.agent.map(str::trim) {
+        Some("") => return Err(Problem::HolderMissing),
+        Some(agent) => {
+            if change.clear {
+                rules.overrides.remove(agent);
+            } else {
+                let gates = rules.overrides.entry(agent.to_string()).or_default();
+                if quota.is_some() {
+                    gates.quota_gate = quota;
+                }
+                if context.is_some() {
+                    gates.context_gate = context;
+                }
+            }
+        }
+        None => {
+            if change.clear {
+                rules = crate::model::HandoffRules {
+                    overrides: rules.overrides,
+                    ..Default::default()
+                };
+            }
+            if quota.is_some() {
+                rules.quota_gate = quota;
+            }
+            if context.is_some() {
+                rules.context_gate = context;
+            }
+            if let Some(text) = change.write_when {
+                let text = text.trim();
+                rules.write_when = (!text.is_empty()).then(|| text.to_string());
+            }
+        }
+    }
+    let empty = rules == crate::model::HandoffRules::default();
+    Ok(Project {
+        handoff: (!empty).then_some(rules),
+        ..taskbag.project.clone()
+    })
+}
+
 /// The project with a new label ladder, lowest step first (`alm labels`). Refused when it is
 /// empty, or when a task's label is not on it: changing the ladder never strands a task.
 pub fn set_ladder(taskbag: &Taskbag, labels: &[String]) -> Result<Project, Problem> {
@@ -458,6 +529,7 @@ mod tests {
                 labels: default_labels(),
                 project_folder: None,
                 task_language: None,
+                handoff: None,
             },
             areas: vec![],
             iterations: vec![],

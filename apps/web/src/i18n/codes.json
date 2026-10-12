@@ -58,6 +58,9 @@
   "invalid_language": [
     "value"
   ],
+  "invalid_percent": [
+    "value"
+  ],
   "iteration_name_missing": [],
   "label_below_top": [
     "label",
@@ -131,6 +134,7 @@
     "path",
     "detail"
   ],
+  "template_empty": [],
   "took_over": [
     "id",
     "previous"

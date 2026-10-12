@@ -67,6 +67,10 @@ problems! {
     InstructionsOutdated { files, current } => "instructions_outdated", "Allomos's section in {files} is out of date (this Allomos writes version {current}). Update it now: replace that section with the output of `alm brief`, keep the rest of the file, and commit only those files.";
     /// `alm upgrade` found no way from the taskbag's format to this Allomos's (Task-A01-25).
     UpgradeMissing { found, current } => "upgrade_missing", "This Allomos cannot upgrade a taskbag from \"{found}\" to \"{current}\".";
+    /// A handoff gate is not a percentage (Task-A03-06).
+    InvalidPercent { value } => "invalid_percent", "\"{value}\" is not a percentage. Use a whole number from 0 to 100.";
+    /// The handoff template may not be empty (Task-A03-06).
+    TemplateEmpty => "template_empty", "The handoff template cannot be empty.";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     /// `task_language` is neither `ui` nor a language code (Task-A01-21).

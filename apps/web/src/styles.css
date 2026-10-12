@@ -277,3 +277,37 @@ button.link:hover { text-decoration: underline; }
 /* A card's buttons sit at the far right, main button first (the agents panel, "Which folder holds
    this project?"), on the page as in the wizard's dialog. */
 .card .row.actions { justify-content: flex-end; }
+
+/* Handoffs (Task-A03-06): the tab after Iterations, the task pane's latest one, settings and form. */
+.group-by button + button { margin-left: -1px; }
+.handoffs { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.handoff-tools { align-items: center; font-size: 13px; }
+.handoff-tools select { font: 13px var(--font); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; max-width: 220px; }
+.handoff-tools .spacer { flex: 1; }
+.handoff-tools button.link { align-self: center; }
+.handoff-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.handoff-list > li { border-top: 1px solid var(--line); padding: 8px 12px; display: grid; gap: 4px; }
+.handoff-list > li:first-child { border-top: none; }
+.handoff-head { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 12px; text-align: left; border: none; background: none; padding: 0; cursor: pointer; }
+.handoff-head .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.handoff-head .who { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--muted); }
+.handoff-head .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.handoff-list > li.open .what { white-space: normal; }
+.handoff-tasks { display: flex; gap: 10px; flex-wrap: wrap; }
+.handoff-body { border-top: 1px dashed var(--line); padding-top: 8px; }
+.dialog .form { display: grid; gap: 10px; align-content: start; }
+.dialog .form label { display: grid; gap: 4px; font-size: 13px; }
+.dialog .form h3 { margin: 6px 0 0; font-size: 14px; }
+.dialog .form input[type="text"], .dialog .form input[type="number"], .dialog .form textarea {
+  font: 13px var(--font); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+}
+.dialog .form textarea { font-family: var(--mono, ui-monospace, monospace); resize: vertical; }
+.dialog .form .inline { display: flex; align-items: center; gap: 6px; }
+.dialog .form .inline input { width: 72px; }
+.dialog .form .override-row input[type="number"] { width: 96px; }
+.dialog .form .overrides { margin: 0; padding-left: 18px; font-size: 13px; }
+.dialog .form fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0; padding: 6px 10px; }
+.dialog .form legend { font-size: 13px; padding: 0 4px; }
+.dialog .form .task-checks { display: grid; gap: 2px; max-height: 140px; overflow: auto; }
+.dialog .form .task-checks label { display: block; }
+.handoffs .write-handoff { justify-self: end; }

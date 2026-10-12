@@ -446,6 +446,9 @@ fn git_sees_only_text_files() {
             ".allomos/taskbag/.gitignore",
             ".allomos/taskbag/areas/.keep",
             ".allomos/taskbag/areas/A01.json",
+            ".allomos/taskbag/handoff-template.md",
+            ".allomos/taskbag/handoffs/.keep",
+            ".allomos/taskbag/project-notes.md",
             ".allomos/taskbag/project.json",
             ".allomos/taskbag/tasks/.keep",
             ".allomos/taskbag/tasks/A01-01/task.json",
@@ -971,7 +974,7 @@ fn set_format(repo: &Path, format: &str) {
 #[test]
 fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
     let repo = filled();
-    set_format(&repo, "allomos/2");
+    set_format(&repo, "allomos/9");
     // A field this Allomos does not know, as a newer one might add.
     let path = repo.join(".allomos/taskbag/project.json");
     let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
@@ -989,7 +992,7 @@ fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
         let message = v["error"]["message"].as_str().unwrap();
         assert!(message.contains("update Allomos now"), "{message}");
         assert!(message.contains("your own understanding"), "{message}");
-        assert_eq!(v["error"]["params"]["found"], "allomos/2");
+        assert_eq!(v["error"]["params"]["found"], "allomos/9");
     }
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
@@ -1040,7 +1043,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v1)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v2)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -1054,7 +1057,114 @@ fn upgrade_on_a_current_taskbag_changes_nothing() {
     let v = ok(&repo, &["upgrade"]);
     assert_eq!(
         v["upgrade"],
-        json!({ "from": "allomos/1", "to": "allomos/1", "changed": false })
+        json!({ "from": "allomos/2", "to": "allomos/2", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
+}
+
+#[test]
+fn handoff_rules_have_defaults_overrides_and_refusals() {
+    let repo = filled();
+    let v = ok(&repo, &["handoff-rules"]);
+    assert_eq!(v["applied"]["quota_gate"], 3);
+    assert_eq!(v["applied"]["context_gate"], 90);
+
+    ok(&repo, &["handoff-rules", "--quota", "5", "--context", "80"]);
+    ok(
+        &repo,
+        &["handoff-rules", "--agent", "codex", "--context", "70"],
+    );
+    let v = ok(&repo, &["handoff-rules", "--as", "codex/a01-01"]);
+    assert_eq!(v["applied"]["quota_gate"], 5);
+    assert_eq!(v["applied"]["context_gate"], 70);
+    assert_eq!(v["applied"]["override_for"], "codex");
+    let v = ok(&repo, &["handoff-rules", "--as", "claude/x"]);
+    assert_eq!(v["applied"]["context_gate"], 80);
+
+    // `alm next` tells the agent its own gates.
+    let v = ok(&repo, &["next", "--as", "codex/a01-01"]);
+    assert_eq!(v["handoff_rules"]["context_gate"], 70);
+    let out = alm(&repo, &["next", "--as", "codex/a01-01"]);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("at 70% context used"));
+
+    refused(
+        &repo,
+        &["handoff-rules", "--quota", "150"],
+        1,
+        "invalid_percent",
+    );
+    refused(
+        &repo,
+        &["handoff-rules", "--context", "lots"],
+        1,
+        "invalid_percent",
+    );
+    ok(&repo, &["handoff-rules", "--clear"]);
+    let v = ok(&repo, &["handoff-rules", "--as", "codex/a01-01"]);
+    assert_eq!(v["applied"]["quota_gate"], 3);
+    assert_eq!(v["applied"]["context_gate"], 70, "the override stays");
+    ok(&repo, &["handoff-rules", "--agent", "codex", "--clear"]);
+    let project = fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(!project.contains("handoff"), "{project}");
+}
+
+#[test]
+fn a_session_writes_one_handoff_that_the_next_one_finds() {
+    let repo = filled();
+    let ids: Vec<String> = ok(&repo, &["list"])["areas"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|a| a["tasks"].as_array().unwrap().clone())
+        .map(|t| t["id"].as_str().unwrap().to_string())
+        .collect();
+    let (one, two) = (&ids[0], &ids[1]);
+    refused(&repo, &["handoff"], 1, "holder_missing");
+
+    let tasks = format!("{one},{two}");
+    let v = ok(&repo, &["handoff", "--as", "claude/run", "--tasks", &tasks]);
+    assert_eq!(v["created"], true);
+    let path = PathBuf::from(v["path"].as_str().unwrap());
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("## For anyone, in plain words"), "{text}");
+
+    // The agent fills it in; a second call is the same file.
+    let draft = repo.join("draft.md");
+    fs::write(&draft, "# Handoff\n\n- **What was being done:** baking\n").unwrap();
+    let v = ok(
+        &repo,
+        &["handoff", "--as", "claude/run", "--from", "draft.md"],
+    );
+    assert_eq!(v["created"], false);
+    assert_eq!(v["path"].as_str().unwrap(), path.to_str().unwrap());
+    assert_eq!(v["handoff"]["tasks"], json!([one, two]));
+
+    let v = ok(&repo, &["show", two]);
+    assert_eq!(v["handoff"]["writer"], "claude/run");
+    assert_eq!(v["handoff"]["summary"], "What was being done: baking");
+    let v = ok(&repo, &["handoffs", "--task", one]);
+    assert_eq!(v["handoffs"].as_array().unwrap().len(), 1);
+    refused(
+        &repo,
+        &["handoff", "--as", "x", "--tasks", "Z9-99"],
+        1,
+        "task_not_found",
+    );
+}
+
+#[test]
+fn the_template_can_be_shown_and_replaced() {
+    let repo = filled();
+    let v = ok(&repo, &["handoff-template"]);
+    assert!(v["template"].as_str().unwrap().starts_with("# Handoff"));
+    fs::write(repo.join("t.md"), "# Ours\n").unwrap();
+    let v = ok(&repo, &["handoff-template", "--set", "t.md"]);
+    assert_eq!(v["template"], "# Ours\n");
+    fs::write(repo.join("empty.md"), "\n").unwrap();
+    refused(
+        &repo,
+        &["handoff-template", "--set", "empty.md"],
+        1,
+        "template_empty",
+    );
 }

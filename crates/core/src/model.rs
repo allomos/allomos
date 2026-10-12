@@ -1,12 +1,17 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/1";
+pub const FORMAT: &str = "allomos/2";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; a newer Allomos
 /// upgrades an older taskbag, and an older one refuses a newer taskbag (Task-A01-25).
-pub const FORMAT_VERSION: u32 = 1;
+///
+/// 2: handoff rules in `project.json`, `handoff-template.md`, `project-notes.md` and `handoffs/`
+/// (Task-A03-06).
+pub const FORMAT_VERSION: u32 = 2;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
 /// FlipHopper's `fliphopper/1`).
@@ -37,6 +42,86 @@ pub struct Project {
     /// Allomos app's interface language, the default) or a language code such as `zh-CN`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_language: Option<String>,
+    /// When a handoff must be written (Task-A03-06). Missing: the defaults.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff: Option<HandoffRules>,
+}
+
+/// Default quota gate: with this percentage of the 5-hour quota left, start nothing new; write the
+/// handoff and stop.
+pub const DEFAULT_QUOTA_GATE: u8 = 3;
+/// Default context gate: at this percentage of context used, finish the current step, write the
+/// handoff, commit, and give the person the exact prompt for a new session (owner, 2026-10-12).
+pub const DEFAULT_CONTEXT_GATE: u8 = 90;
+/// Default for when else to write a handoff.
+pub const DEFAULT_WRITE_WHEN: &str = "after every meaningful step: a task finished, a finding, a commit, a process started or stopped";
+
+/// A project's handoff rules (Task-A03-06). Every field is optional; a missing one takes its
+/// default. `overrides` give an agent or account its own gates, which win over the project's.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HandoffRules {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_gate: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_gate: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_when: Option<String>,
+    /// By agent or account name, for example `codex` or `claude/work`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub overrides: BTreeMap<String, Gates>,
+}
+
+/// An agent's or account's own gates; a missing one follows the project.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Gates {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_gate: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_gate: Option<u8>,
+}
+
+/// The rules that apply to one agent: the project's, with its override, and the defaults filled in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AppliedRules {
+    pub quota_gate: u8,
+    pub context_gate: u8,
+    pub write_when: String,
+    /// The override that applied, if any.
+    pub override_for: Option<String>,
+}
+
+impl HandoffRules {
+    /// The rules for `who` (a holder such as `codex/a01-03` or `claude`): an override named exactly
+    /// `who`, or the longest one `who` starts with followed by `/`, wins over the project's gates.
+    pub fn applied(&self, who: Option<&str>) -> AppliedRules {
+        let over = who.and_then(|who| {
+            self.overrides
+                .iter()
+                .filter(|(name, _)| who == name.as_str() || who.starts_with(&format!("{name}/")))
+                .max_by_key(|(name, _)| name.len())
+        });
+        let pick =
+            |own: Option<u8>, project: Option<u8>, default: u8| own.or(project).unwrap_or(default);
+        AppliedRules {
+            quota_gate: pick(
+                over.and_then(|(_, g)| g.quota_gate),
+                self.quota_gate,
+                DEFAULT_QUOTA_GATE,
+            ),
+            context_gate: pick(
+                over.and_then(|(_, g)| g.context_gate),
+                self.context_gate,
+                DEFAULT_CONTEXT_GATE,
+            ),
+            write_when: self
+                .write_when
+                .clone()
+                .unwrap_or_else(|| DEFAULT_WRITE_WHEN.to_string()),
+            override_for: over.map(|(name, _)| name.clone()),
+        }
+    }
 }
 
 /// `task_language` value meaning "the language the Allomos app shows" (Task-A01-21).

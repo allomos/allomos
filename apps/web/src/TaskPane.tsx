@@ -4,7 +4,8 @@
 import { useEffect, useRef } from "react";
 import { useI18n } from "./i18n";
 import { Markdown } from "./Markdown";
-import type { Area, Iteration, Task } from "./types";
+import { LatestHandoff } from "./Handoffs";
+import type { Area, Handoff, Iteration, Task } from "./types";
 
 export function TaskPane({
   task,
@@ -12,12 +13,18 @@ export function TaskPane({
   iteration,
   onClose,
   onLink,
+  latest,
+  onAllHandoffs,
 }: {
   task: Task;
   area: Area | undefined;
   iteration: Iteration | undefined;
   onClose: () => void;
   onLink: (href: string) => void;
+  /** The task's latest handoff (Task-A03-06). */
+  latest: Handoff | null;
+  /** Opens the Handoffs tab on this task. */
+  onAllHandoffs: () => void;
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLElement>(null);
@@ -70,6 +77,7 @@ export function TaskPane({
           <p className="muted small">{t("pane.no_description")}</p>
         )}
       </section>
+      <LatestHandoff handoff={latest} onAll={onAllHandoffs} />
       <section>
         <h3>{t("pane.history")}</h3>
         <p className="muted small">{t("pane.history_none")}</p>

@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -67,6 +67,19 @@ export interface Messenger {
   versionCheck(root: string): Promise<VersionCheck | null>;
   /** The taskbag's format compared with this Allomos's, connected or not. */
   taskbagFormat(root: string): Promise<{ format: FormatState; current: string }>;
+  /** The project's handoff rules and template (Task-A03-06). */
+  handoffSettings(root: string): Promise<HandoffSettings>;
+  /** Changes the project's handoff rules, or one agent's override; resolves to the settings as saved. Rejects with a Problem. */
+  setHandoffRules(
+    root: string,
+    change: { quota?: string; context?: string; writeWhen?: string; agent?: string; clear?: boolean },
+  ): Promise<HandoffSettings>;
+  /** Replaces the handoff template. Rejects with a Problem. */
+  setHandoffTemplate(root: string, text: string): Promise<HandoffSettings>;
+  /** Every handoff, newest first. */
+  listHandoffs(root: string): Promise<Handoff[]>;
+  /** Writes a new handoff by a person. Rejects with a Problem. */
+  writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
@@ -121,6 +134,19 @@ export const desktopMessenger: Messenger = {
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
+  handoffSettings: (root) => invoke<HandoffSettings>("handoff_settings", { root }),
+  setHandoffRules: (root, c) =>
+    invoke<HandoffSettings>("set_handoff_rules", {
+      root,
+      quota: c.quota ?? null,
+      context: c.context ?? null,
+      writeWhen: c.writeWhen ?? null,
+      agent: c.agent ?? null,
+      clear: c.clear ?? false,
+    }),
+  setHandoffTemplate: (root, text) => invoke<HandoffSettings>("set_handoff_template", { root, text }),
+  listHandoffs: (root) => invoke<Handoff[]>("list_handoffs", { root }),
+  writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),

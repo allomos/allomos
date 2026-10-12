@@ -8,10 +8,12 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
+import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
+import { latestFor } from "./handoffFlow";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck } from "./types";
+import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -75,6 +77,8 @@ export function App({ messenger }: { messenger: Messenger }) {
     [],
   );
   const [notices, setNotices] = useState<Note[]>([]);
+  // The update notice says the taskbag is older; the problem list then leaves it out.
+  const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
   const changeRecent = useCallback((change: (list: string[]) => string[]) => {
@@ -387,6 +391,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             messenger={messenger}
             root={opened.root}
             onUpdate={() => openWizard({ resume: { root: opened.root, at: 4 } })}
+            onOlder={setOlderShown}
           />
         )}
         {!opened && <Welcome onOpen={() => openWizard({})} />}
@@ -437,7 +442,14 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
 
-        {opened && <TaskbagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
+        {opened && (
+          <TaskbagView
+            opened={opened}
+            messenger={messenger}
+            onError={(e) => setError(errorNote(e))}
+            hideOlder={olderShown}
+          />
+        )}
       </main>
     </div>
   );
@@ -449,7 +461,18 @@ const VERSION_CHECK_MS = 4000;
 /** "This taskbag uses an older format" or "Allomos's instructions are out of date", with
  * **Update the taskbag…** (owner, 2026-10-12). Asked when the folder opens (every way of opening
  * one) and every few seconds while it is open. Allomos never updates the files itself. */
-function VersionNotice({ messenger, root, onUpdate }: { messenger: Messenger; root: string; onUpdate: () => void }) {
+function VersionNotice({
+  messenger,
+  root,
+  onUpdate,
+  onOlder,
+}: {
+  messenger: Messenger;
+  root: string;
+  onUpdate: () => void;
+  /** Whether this notice says the taskbag is older, so the problem list does not say it again. */
+  onOlder: (shown: boolean) => void;
+}) {
   const { t } = useI18n();
   const [check, setCheck] = useState<VersionCheck | null>(null);
   useEffect(() => {
@@ -468,6 +491,11 @@ function VersionNotice({ messenger, root, onUpdate }: { messenger: Messenger; ro
     };
   }, [messenger, root]);
   const notice = updateNotice(check);
+  const older = notice?.kind === "taskbag";
+  useEffect(() => {
+    onOlder(older);
+    return () => onOlder(false);
+  }, [older, onOlder]);
   if (!notice) return null;
   return (
     <div className="banner update" role="status">
@@ -588,13 +616,15 @@ function HopFigure() {
   );
 }
 
-/** How the task list is grouped; remembered in the window's storage (Task-A01-15). */
-type GroupBy = "area" | "iteration";
+/** How the task list is grouped, or the Handoffs tab after Iterations (Task-A03-06); remembered
+ * in the window's storage (Task-A01-15). */
+type GroupBy = "area" | "iteration" | "handoffs";
 const GROUP_BY_KEY = "allomos.groupBy";
 
 function readGroupBy(): GroupBy {
   try {
-    return localStorage.getItem(GROUP_BY_KEY) === "iteration" ? "iteration" : "area";
+    const g = localStorage.getItem(GROUP_BY_KEY);
+    return g === "iteration" || g === "handoffs" ? g : "area";
   } catch {
     return "area";
   }
@@ -607,13 +637,17 @@ function TaskbagView({
   opened,
   messenger,
   onError,
+  hideOlder,
 }: {
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
+  /** The update notice already says the taskbag is older. */
+  hideOlder: boolean;
 }) {
   const { t, rich } = useI18n();
   const { taskbag: box, issues } = opened.loaded;
+  const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_older") : issues;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
   const choose = (g: GroupBy) => {
     setGroupBy(g);
@@ -623,6 +657,20 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
+  // Handoffs (Task-A03-06), read again whenever the taskbag reloads (their files are in its stamp).
+  const [handoffs, setHandoffs] = useState<Handoff[]>([]);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .listHandoffs(opened.root)
+      .then((list) => live && setHandoffs(list))
+      .catch(() => live && setHandoffs([]));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened]);
+  const [handoffTask, setHandoffTask] = useState<string | null>(null);
+  const [handoffDialog, setHandoffDialog] = useState<"settings" | "write" | null>(null);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
 
@@ -694,20 +742,36 @@ function TaskbagView({
 
   return (
     <>
-      {issues.length > 0 && <Issues issues={issues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
+      {/* The update notice above already says the taskbag is older (owner, 2026-10-12: once only). */}
+      {shownIssues.length > 0 && <Issues issues={shownIssues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
-          {box.tasks.length > 0 && (
+          {(box.tasks.length > 0 || handoffs.length > 0) && (
             <div className="group-by" role="group" aria-label={t("group.label")}>
-              {(["area", "iteration"] as const).map((g) => (
+              {(["area", "iteration", "handoffs"] as const).map((g) => (
                 <button key={g} type="button" aria-pressed={groupBy === g} onClick={() => choose(g)}>
-                  {t(g === "area" ? "group.by_area" : "group.by_iteration")}
+                  {t(g === "area" ? "group.by_area" : g === "iteration" ? "group.by_iteration" : "group.handoffs")}
                 </button>
               ))}
             </div>
           )}
           {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
           <div className={selected ? "list-layout with-pane" : "list-layout"}>
+            {groupBy === "handoffs" ? (
+              <HandoffsView
+                handoffs={handoffs}
+                tasks={box.tasks}
+                task={handoffTask}
+                onTask={setHandoffTask}
+                onOpenTask={(id) => {
+                  choose("area");
+                  setSelectedId(id);
+                }}
+                onWrite={() => setHandoffDialog("write")}
+                onSettings={() => setHandoffDialog("settings")}
+                onLink={openLink}
+              />
+            ) : (
             <div className="areas">
               {groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
@@ -731,6 +795,7 @@ function TaskbagView({
                 <p className="muted">{t("box.empty")}</p>
               )}
             </div>
+            )}
             {selected && (
               <TaskPane
                 task={selected}
@@ -738,12 +803,37 @@ function TaskbagView({
                 iteration={iterations.find((i) => i.id === selected.iteration)}
                 onClose={() => setSelectedId(null)}
                 onLink={openLink}
+                latest={latestFor(handoffs, selected.id)}
+                onAllHandoffs={() => {
+                  setHandoffTask(selected.id);
+                  choose("handoffs");
+                }}
+              />
+            )}
+            {handoffDialog === "settings" && (
+              <HandoffSettingsDialog messenger={messenger} root={opened.root} onClose={() => setHandoffDialog(null)} />
+            )}
+            {handoffDialog === "write" && (
+              <HandoffForm
+                messenger={messenger}
+                root={opened.root}
+                tasks={box.tasks}
+                task={handoffTask ?? selectedId}
+                onClose={() => setHandoffDialog(null)}
               />
             )}
           </div>
         </>
       ) : (
-        <p className="muted">{t("box.no_project")}</p>
+        <p className="muted">
+          {t(
+            issues.some((i) => i.problem.code === "taskbag_older")
+              ? "box.needs_update"
+              : issues.some((i) => i.problem.code === "taskbag_newer")
+                ? "box.needs_newer_app"
+                : "box.no_project",
+          )}
+        </p>
       )}
     </>
   );

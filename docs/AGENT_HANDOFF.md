@@ -36,6 +36,13 @@ Updated: 2026-10-04
 
 One block per card that `alm list --state in_progress` shows held.
 
+### Task-A03-06 — claude/a03-06-handoffs
+- Checkout: `.claude/worktrees/a03-06-handoffs` · branch `claude/a03-06-handoffs` · pushed: yes
+- Approvals in force: the card's local work (owner: "proceed with a03-06"). Not approved yet: upgrading Allomos's own taskbag to `allomos/2`, retiring `docs/AGENT_HANDOFF.md` (both asked).
+- Uncommitted: none
+- Running: none (the owner's A01-25 app may still hold port 1420; stop it before starting this one)
+- Unrecorded findings: none; trial data in `~/allomos-tests/A03-06-handoffs/` (`bakery`: gates 5%/60%, codex 50%, two handoffs; `old-format`: allomos/1 with a v1 section).
+- Next action: owner checks the app (Handoffs tab, task pane, settings, form, upgrade notice); then merge, reinstall `alm`, and the two asked steps.
 
 ## Live state
 

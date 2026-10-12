@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use allomos_core::ops::{self, Outcome};
 use allomos_core::{Issue, Iteration, Problem, State, Task, Taskbag};
+use allomos_store::handoff;
 use allomos_store::{
     DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
     agent_section_for, agent_setup_request, find_taskbag, git_root, guide, id_from_name,
@@ -189,6 +190,51 @@ enum Command {
     /// Bring a taskbag written by an older Allomos up to this one's format. Run it when `alm`
     /// says the taskbag is older; it adds only what the newer format has.
     Upgrade,
+    /// When to write a handoff: the quota and context gates (with any override for you, --as).
+    /// With options, change them.
+    #[command(name = "handoff-rules")]
+    HandoffRules {
+        /// Quota gate: with this percentage of the 5-hour quota left, write the handoff and stop.
+        #[arg(long, value_name = "PERCENT")]
+        quota: Option<String>,
+        /// Context gate: at this percentage of context used, write the handoff and hand over.
+        #[arg(long, value_name = "PERCENT")]
+        context: Option<String>,
+        /// When else to write a handoff, in plain words.
+        #[arg(long, value_name = "TEXT")]
+        write_when: Option<String>,
+        /// Change this agent's or account's own gates (for example codex) instead of the project's.
+        #[arg(long, value_name = "NAME")]
+        agent: Option<String>,
+        /// Back to the defaults (with --agent: remove that agent's own gates).
+        #[arg(long)]
+        clear: bool,
+    },
+    /// Show the project's handoff template, or replace it with --set.
+    #[command(name = "handoff-template")]
+    HandoffTemplate {
+        #[arg(long, value_name = "FILE")]
+        set: Option<PathBuf>,
+    },
+    /// Write this session's handoff (--as): made from the template the first time, the same file
+    /// later. Prints its path; fill it in, or pass --from.
+    Handoff {
+        /// The tasks it covers, separated by commas.
+        #[arg(long, value_name = "ID,ID")]
+        tasks: Option<String>,
+        /// A Markdown file with the handoff's text.
+        #[arg(long, value_name = "FILE")]
+        from: Option<PathBuf>,
+    },
+    /// List handoffs, newest first.
+    Handoffs {
+        /// Only those that name this task.
+        #[arg(long, value_name = "ID")]
+        task: Option<String>,
+        /// Only the newest one.
+        #[arg(long)]
+        latest: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -248,6 +294,10 @@ impl Command {
             | Command::Confirm { .. }
             | Command::List { .. }
             | Command::Upgrade
+            | Command::HandoffRules { .. }
+            | Command::HandoffTemplate { .. }
+            | Command::Handoff { .. }
+            | Command::Handoffs { .. }
             | Command::Next => None,
         }
     }
@@ -260,6 +310,19 @@ impl Command {
         if let Command::TaskLanguage { value } = self {
             return value.is_some();
         }
+        if let Command::HandoffRules {
+            quota,
+            context,
+            write_when,
+            clear,
+            ..
+        } = self
+        {
+            return quota.is_some() || context.is_some() || write_when.is_some() || *clear;
+        }
+        if let Command::HandoffTemplate { set } = self {
+            return set.is_some();
+        }
         !matches!(
             self,
             Command::List { .. }
@@ -268,6 +331,7 @@ impl Command {
                 | Command::Confirm { .. }
                 | Command::Brief
                 | Command::Guide { .. }
+                | Command::Handoffs { .. }
         )
     }
 
@@ -297,6 +361,10 @@ impl Command {
             Command::Drop { .. } => "drop",
             Command::Next => "next",
             Command::Upgrade => "upgrade",
+            Command::HandoffRules { .. } => "handoff-rules",
+            Command::HandoffTemplate { .. } => "handoff-template",
+            Command::Handoff { .. } => "handoff",
+            Command::Handoffs { .. } => "handoffs",
         }
     }
 }
@@ -708,6 +776,37 @@ fn iteration_heading(it: &Iteration) -> String {
     s
 }
 
+/// One line about a handoff: file, writer, when, tasks, and its first line.
+fn handoff_line(h: &handoff::Handoff) -> String {
+    let tasks = if h.tasks.is_empty() {
+        "no task".to_string()
+    } else {
+        h.tasks.join(", ")
+    };
+    format!(
+        "handoff: {} ({}, {}, {}): {}\n",
+        h.file, h.writer, h.updated, tasks, h.summary
+    )
+}
+
+/// A handoff for `--json` lists: everything but its text.
+fn handoff_brief(h: &handoff::Handoff) -> Value {
+    json!({ "file": h.file, "writer": h.writer, "tasks": h.tasks, "written": h.written, "updated": h.updated, "summary": h.summary })
+}
+
+/// When to write a handoff, for the agent that asked.
+fn rules_line(r: &allomos_core::AppliedRules) -> String {
+    let whose = r
+        .override_for
+        .as_ref()
+        .map(|n| format!(" (override for {n})"))
+        .unwrap_or_default();
+    format!(
+        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}.\n",
+        r.quota_gate, r.context_gate, r.write_when
+    )
+}
+
 /// One line about a task: ID, state, label, holder, title.
 fn task_line(t: &Task) -> String {
     format!(
@@ -805,6 +904,135 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 Err(_) => agent_section(),
             };
             Ok(Done::new(json!({ "brief": text }), text))
+        }
+        Command::HandoffRules {
+            quota,
+            context,
+            write_when,
+            agent,
+            clear,
+        } => {
+            let root = locate(cli, cwd)?;
+            let changing = quota.is_some() || context.is_some() || write_when.is_some() || *clear;
+            let (bag, issues) = if changing {
+                let lock = Lock::acquire(&root, lock_wait())?;
+                let (bag, issues) = taskbag_of(&root, lock.load())?;
+                let change = ops::HandoffChange {
+                    quota_gate: quota.as_deref(),
+                    context_gate: context.as_deref(),
+                    write_when: write_when.as_deref(),
+                    agent: agent.as_deref(),
+                    clear: *clear,
+                };
+                let project = ops::set_handoff_rules(&bag, &change)?;
+                lock.save_project(&project)?;
+                (Taskbag { project, ..bag }, issues)
+            } else {
+                taskbag_of(&root, load(&root))?
+            };
+            let rules = bag.project.handoff.clone().unwrap_or_default();
+            let applied = rules.applied(me.or(agent.as_deref()));
+            let mut text = rules_line(&applied);
+            for (name, g) in &rules.overrides {
+                let part = |v: Option<u8>| {
+                    v.map(|v| format!("{v}%"))
+                        .unwrap_or_else(|| "project's".into())
+                };
+                text.push_str(&format!(
+                    "  override for {name}: quota gate {}, context gate {}\n",
+                    part(g.quota_gate),
+                    part(g.context_gate)
+                ));
+            }
+            text.push_str(&format!(
+                "Template: {}\n",
+                root.join(handoff::TEMPLATE_FILE).display()
+            ));
+            let mut done = Done::new(
+                json!({ "taskbag": root, "handoff_rules": rules, "applied": applied }),
+                text,
+            );
+            done.issues = issues;
+            Ok(done)
+        }
+        Command::HandoffTemplate { set } => {
+            let root = locate(cli, cwd)?;
+            if let Some(file) = set {
+                let file = cwd.join(file);
+                let text = std::fs::read_to_string(&file).map_err(|e| Problem::ReadFailed {
+                    detail: format!("{}: {e}", file.display()),
+                })?;
+                handoff::set_template(&root, &text)?;
+            }
+            let text = handoff::template(&root);
+            Ok(Done::new(
+                json!({ "taskbag": root, "template": text, "path": root.join(handoff::TEMPLATE_FILE) }),
+                text,
+            ))
+        }
+        Command::Handoff { tasks, from } => {
+            let root = locate(cli, cwd)?;
+            let me = me.ok_or(Problem::HolderMissing)?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
+            let known: Vec<String> = bag.tasks.iter().map(|t| t.id.clone()).collect();
+            let tasks: Option<Vec<String>> = tasks.as_ref().map(|list| {
+                list.split(',')
+                    .map(str::trim)
+                    .filter(|t| !t.is_empty())
+                    .map(String::from)
+                    .collect()
+            });
+            let body = match from {
+                Some(file) => {
+                    let file = cwd.join(file);
+                    Some(
+                        std::fs::read_to_string(&file).map_err(|e| Problem::ReadFailed {
+                            detail: format!("{}: {e}", file.display()),
+                        })?,
+                    )
+                }
+                None => None,
+            };
+            let w = handoff::write(&root, me, tasks.as_deref(), body.as_deref(), &known, false)?;
+            let text = format!(
+                "{} {}\n{}",
+                if w.created {
+                    "Started this session's handoff:"
+                } else {
+                    "Updated this session's handoff:"
+                },
+                w.path.display(),
+                if body.is_none() {
+                    "Fill it in, in plain words first, for any reader. Evidence goes on the task's card.\n"
+                } else {
+                    ""
+                }
+            );
+            let mut done = Done::new(
+                json!({ "taskbag": root, "handoff": w.handoff, "path": w.path, "created": w.created }),
+                text,
+            );
+            done.issues = issues;
+            Ok(done)
+        }
+        Command::Handoffs { task, latest } => {
+            let root = locate(cli, cwd)?;
+            let mut all = handoff::list(&root);
+            if let Some(task) = task {
+                all.retain(|h| h.tasks.iter().any(|t| t == task));
+            }
+            if *latest {
+                all.truncate(1);
+            }
+            let text = if all.is_empty() {
+                "No handoffs.\n".to_string()
+            } else {
+                all.iter().map(handoff_line).collect()
+            };
+            Ok(Done::new(
+                json!({ "taskbag": root, "handoffs": all.iter().map(handoff_brief).collect::<Vec<_>>() }),
+                text,
+            ))
         }
         Command::Upgrade => {
             let root = locate(cli, cwd)?;
@@ -1029,11 +1257,18 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     text.push_str(&format!("{name}: {v}\n"));
                 }
             }
+            let latest = handoff::latest_for(&root, &task.id);
+            if let Some(h) = &latest {
+                text.push_str(&handoff_line(h));
+            }
             if !task.description.is_empty() {
                 text.push('\n');
                 text.push_str(&task.description);
             }
-            let mut done = Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text);
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task_json(&task), "handoff": latest.as_ref().map(handoff_brief) }),
+                text,
+            );
             done.issues = issues;
             Ok(done)
         }
@@ -1041,18 +1276,30 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             let task = ops::next(&bag);
-            let text = match task {
+            let latest = task.and_then(|t| handoff::latest_for(&root, &t.id));
+            let mut text = match task {
                 Some(t) => {
                     let mut s = format!("{}\n", task_line(t));
                     if let Some(note) = &t.handoff_note {
                         s.push_str(&format!("  handoff note: {note}\n"));
                     }
+                    if let Some(h) = &latest {
+                        s.push_str(&format!("  {}", handoff_line(h)));
+                    }
                     s
                 }
                 None => "No ready task is free.\n".to_string(),
             };
+            // At the start of a session: when this agent must write its handoff (Task-A03-06).
+            let rules = bag.project.handoff.clone().unwrap_or_default().applied(me);
+            text.push_str(&rules_line(&rules));
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task.map(task_json) }),
+                json!({
+                    "taskbag": root,
+                    "task": task.map(task_json),
+                    "handoff": latest.as_ref().map(handoff_brief),
+                    "handoff_rules": rules,
+                }),
                 text,
             );
             done.issues = issues;

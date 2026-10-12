@@ -17,7 +17,9 @@ use crate::{AGENT_SECTION_HEADING, Lock, PROJECT_FILE, picked_folder, tells_agen
 
 /// The version of Allomos's section that this Allomos writes. Raise it whenever the section's
 /// wording changes, so projects with the older wording are asked to renew it.
-pub const SECTION_VERSION: u32 = 1;
+///
+/// 2: the handoff lines (Task-A03-06).
+pub const SECTION_VERSION: u32 = 2;
 
 /// How long `alm upgrade` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -209,9 +211,13 @@ pub struct Step {
     pub apply: fn(&Path) -> io::Result<()>,
 }
 
-/// The upgrade steps this Allomos knows, oldest first. Empty while `allomos/1` is the only format;
-/// the first card that changes the taskbag's shape adds the step from 1 to 2.
-pub const STEPS: &[Step] = &[];
+/// The upgrade steps this Allomos knows, oldest first.
+pub const STEPS: &[Step] = &[Step {
+    // 1 → 2 (Task-A03-06): the handoff template, project notes and `handoffs/`. The handoff rules
+    // in `project.json` are optional, so nothing is added there.
+    from: 1,
+    apply: crate::handoff::add_missing_files,
+}];
 
 /// What `alm upgrade` did.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -518,34 +524,34 @@ mod tests {
     fn format_states() {
         let (_, root) = project("formats");
         assert_eq!(format_state(&root), FormatState::Current);
-        set_project_format(&root, "allomos/2");
+        set_project_format(&root, "allomos/3");
         assert_eq!(
             format_state(&root),
             FormatState::Newer {
-                found: "allomos/2".into()
+                found: "allomos/3".into()
             }
         );
         assert_eq!(
-            format_state_against(&root, 3),
+            format_state_against(&root, 4),
             FormatState::Older {
-                found: "allomos/2".into()
+                found: "allomos/3".into()
             }
         );
         set_project_format(&root, "fliphopper/1");
         assert_eq!(format_state(&root), FormatState::Unknown);
     }
 
-    /// A made-up step from 1 to 2, standing in for the first real one (A03-06): it adds a file
-    /// with a default, and leaves it alone when it is already there.
+    /// A made-up step from 2 to 3, standing in for a later one: it adds a file with a default,
+    /// and leaves it alone when it is already there.
     fn add_template(root: &Path) -> io::Result<()> {
-        let path = root.join("handoff-template.md");
+        let path = root.join("later.md");
         if !path.exists() {
-            fs::write(path, "# Handoff\n")?;
+            fs::write(path, "# Later\n")?;
         }
         Ok(())
     }
     const TEST_STEPS: &[Step] = &[Step {
-        from: 1,
+        from: 2,
         apply: add_template,
     }];
 
@@ -555,34 +561,34 @@ mod tests {
         let before = load(&root).taskbag.unwrap();
         let project_before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
 
-        let done = upgrade_with(&root, TEST_STEPS, 2).unwrap();
+        let done = upgrade_with(&root, TEST_STEPS, 3).unwrap();
         assert_eq!(
             done,
             Upgraded {
-                from: "allomos/1".into(),
-                to: "allomos/2".into(),
+                from: "allomos/2".into(),
+                to: "allomos/3".into(),
                 changed: true
             }
         );
-        assert!(root.join("handoff-template.md").is_file());
+        assert!(root.join("later.md").is_file());
         let project_after = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
             project_after,
-            project_before.replace("\"allomos/1\"", "\"allomos/2\""),
+            project_before.replace("\"allomos/2\"", "\"allomos/3\""),
             "only the format line changes"
         );
-        assert_eq!(format_state_against(&root, 2), FormatState::Current);
+        assert_eq!(format_state_against(&root, 3), FormatState::Current);
 
         // Upgrading again changes nothing.
-        let again = upgrade_with(&root, TEST_STEPS, 2).unwrap();
+        let again = upgrade_with(&root, TEST_STEPS, 3).unwrap();
         assert!(!again.changed);
         assert_eq!(
             fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
             project_after
         );
 
-        // Every task is as it was (read back as allomos/1, the format this build knows).
-        set_project_format(&root, "allomos/1");
+        // Every task is as it was (read back as allomos/2, the format this build knows).
+        set_project_format(&root, "allomos/2");
         assert_eq!(load(&root).taskbag.unwrap().tasks, before.tasks);
     }
 
@@ -591,17 +597,17 @@ mod tests {
         let (_, root) = project("refused");
         let text = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
-            upgrade_with(&root, &[], 2).unwrap_err().code(),
+            upgrade_with(&root, &[], 3).unwrap_err().code(),
             "upgrade_missing"
         );
-        set_project_format(&root, "allomos/3");
+        set_project_format(&root, "allomos/4");
         let newer = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
-            upgrade_with(&root, TEST_STEPS, 2).unwrap_err().code(),
+            upgrade_with(&root, TEST_STEPS, 3).unwrap_err().code(),
             "taskbag_newer"
         );
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), newer);
-        assert!(!root.join("handoff-template.md").exists());
+        assert!(!root.join("later.md").exists());
         assert_ne!(text, newer);
     }
 
@@ -621,7 +627,7 @@ mod tests {
         for language in ["en", "zh-CN", "ja"] {
             let both = check(
                 FormatState::Older {
-                    found: "allomos/1".into(),
+                    found: "allomos/2".into(),
                 },
                 None,
             );
@@ -646,7 +652,7 @@ mod tests {
 
             let format = check(
                 FormatState::Older {
-                    found: "allomos/1".into(),
+                    found: "allomos/2".into(),
                 },
                 Some(SECTION_VERSION),
             );
@@ -656,6 +662,38 @@ mod tests {
                 "{language}"
             );
         }
+    }
+
+    #[test]
+    fn the_real_upgrade_from_1_adds_the_handoff_files() {
+        let (_, root) = project("from-1");
+        for f in ["handoff-template.md", "project-notes.md", "handoffs/.keep"] {
+            fs::remove_file(root.join(f)).unwrap();
+        }
+        fs::remove_dir(root.join("handoffs")).unwrap();
+        set_project_format(&root, "allomos/1");
+        let before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+        assert_eq!(
+            format_state(&root),
+            FormatState::Older {
+                found: "allomos/1".into()
+            }
+        );
+        let done = upgrade(&root).unwrap();
+        assert_eq!(
+            (done.from.as_str(), done.to.as_str(), done.changed),
+            ("allomos/1", "allomos/2", true)
+        );
+        assert_eq!(
+            crate::handoff::template(&root),
+            crate::handoff::DEFAULT_TEMPLATE
+        );
+        assert!(root.join("project-notes.md").is_file() && root.join("handoffs/.keep").is_file());
+        assert_eq!(
+            fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
+            before.replace("\"allomos/1\"", "\"allomos/2\"")
+        );
+        assert!(load(&root).issues.is_empty());
     }
 
     #[test]

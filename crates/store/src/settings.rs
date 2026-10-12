@@ -160,6 +160,7 @@ mod tests {
             labels: default_labels(),
             project_folder: None,
             task_language: language.map(String::from),
+            handoff: None,
         }
     }
 
