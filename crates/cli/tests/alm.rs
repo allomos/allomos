@@ -971,7 +971,7 @@ fn set_format(repo: &Path, format: &str) {
 #[test]
 fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
     let repo = filled();
-    set_format(&repo, "allomos/2");
+    set_format(&repo, "allomos/9");
     // A field this Allomos does not know, as a newer one might add.
     let path = repo.join(".allomos/taskbag/project.json");
     let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
@@ -989,7 +989,7 @@ fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
         let message = v["error"]["message"].as_str().unwrap();
         assert!(message.contains("update Allomos now"), "{message}");
         assert!(message.contains("your own understanding"), "{message}");
-        assert_eq!(v["error"]["params"]["found"], "allomos/2");
+        assert_eq!(v["error"]["params"]["found"], "allomos/9");
     }
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
@@ -1054,7 +1054,7 @@ fn upgrade_on_a_current_taskbag_changes_nothing() {
     let v = ok(&repo, &["upgrade"]);
     assert_eq!(
         v["upgrade"],
-        json!({ "from": "allomos/1", "to": "allomos/1", "changed": false })
+        json!({ "from": "allomos/2", "to": "allomos/2", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
 }

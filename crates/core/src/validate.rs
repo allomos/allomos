@@ -150,6 +150,30 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     if project.labels.is_empty() {
         issues.push(Issue::new(file, Some("labels"), Problem::LadderEmpty));
     }
+    if let Some(rules) = &project.handoff {
+        let mut gates = vec![
+            ("handoff.quota_gate".to_string(), rules.quota_gate),
+            ("handoff.context_gate".to_string(), rules.context_gate),
+        ];
+        for (name, g) in &rules.overrides {
+            gates.push((format!("handoff.overrides.{name}.quota_gate"), g.quota_gate));
+            gates.push((
+                format!("handoff.overrides.{name}.context_gate"),
+                g.context_gate,
+            ));
+        }
+        for (field, value) in gates {
+            if let Some(v) = value.filter(|v| *v > 100) {
+                issues.push(Issue::new(
+                    file,
+                    Some(&field),
+                    Problem::InvalidPercent {
+                        value: v.to_string(),
+                    },
+                ));
+            }
+        }
+    }
     if let Some(value) = &project.task_language {
         if value != crate::model::TASK_LANGUAGE_UI && !crate::model::valid_language(value) {
             issues.push(Issue::new(
@@ -347,7 +371,7 @@ pub fn validate_taskbag(
 mod tests {
     use super::*;
 
-    const PROJECT: &str = r#"{"format":"allomos/1","id":"demo","name":"Demo"}"#;
+    const PROJECT: &str = r#"{"format":"allomos/2","id":"demo","name":"Demo"}"#;
 
     fn project() -> Project {
         parse_project("project.json", PROJECT).unwrap()
@@ -362,12 +386,40 @@ mod tests {
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/2","id":"d","name":"D","handoff":{"context":90}}"#,
+            r#"{"format":"allomos/3","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);
         assert_eq!(err[0].field.as_deref(), Some("format"));
         assert_eq!(err[0].problem.code(), "taskbag_newer");
+    }
+
+    #[test]
+    fn handoff_gates_must_be_percentages() {
+        let ok = parse_project(
+            "project.json",
+            r#"{"format":"allomos/2","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
+        )
+        .unwrap();
+        let rules = ok.handoff.unwrap();
+        assert_eq!(rules.applied(None).quota_gate, 5);
+        assert_eq!(rules.applied(None).context_gate, 90);
+        assert_eq!(rules.applied(Some("codex/a01-03")).context_gate, 80);
+        assert_eq!(
+            rules.applied(Some("codex/a01-03")).override_for.as_deref(),
+            Some("codex")
+        );
+        assert_eq!(rules.applied(Some("codexy")).context_gate, 90);
+        let err = parse_project(
+            "project.json",
+            r#"{"format":"allomos/2","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err[0].problem.code(), "invalid_percent");
+        assert_eq!(
+            err[0].field.as_deref(),
+            Some("handoff.overrides.codex.quota_gate")
+        );
     }
 
     #[test]

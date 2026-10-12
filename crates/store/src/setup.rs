@@ -182,7 +182,7 @@ mod tests {
         crate::init(&root, "p", "P").unwrap();
         let path = root.join(PROJECT_FILE);
         let text = std::fs::read_to_string(&path).unwrap();
-        std::fs::write(&path, text.replace("allomos/1", "allomos/2")).unwrap();
+        std::fs::write(&path, text.replace(allomos_core::FORMAT, "allomos/9")).unwrap();
         assert_eq!(setup_state(&root).unwrap_err().code(), "taskbag_newer");
         std::fs::remove_dir_all(&dir).unwrap();
     }

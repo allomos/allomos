@@ -22,6 +22,7 @@ use serde::Serialize;
 mod confirm;
 mod convert;
 mod guide;
+pub mod handoff;
 mod settings;
 mod setup;
 pub mod versions;
@@ -689,6 +690,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         labels: allomos_core::default_labels(),
         project_folder: None,
         task_language: None,
+        handoff: None,
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -879,6 +881,7 @@ pub fn init_with_labels(
         project_folder: None,
         // New taskbags follow the app's language until someone sets another (Task-A01-21).
         task_language: Some(allomos_core::TASK_LANGUAGE_UI.to_string()),
+        handoff: None,
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);
@@ -894,6 +897,12 @@ pub fn init_with_labels(
             (".gitignore", GITIGNORE.to_string()),
             ("areas/.keep", String::new()),
             ("tasks/.keep", String::new()),
+            (
+                handoff::TEMPLATE_FILE,
+                handoff::DEFAULT_TEMPLATE.to_string(),
+            ),
+            (handoff::NOTES_FILE, handoff::DEFAULT_NOTES.to_string()),
+            ("handoffs/.keep", String::new()),
         ],
     )
     .map_err(|p| match p {
@@ -1323,7 +1332,7 @@ mod tests {
         create_starter(&root, "Demo").unwrap();
         assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
         let loaded = load(&root);
-        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/1");
+        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/2");
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         let tb = loaded.taskbag.unwrap();
         assert_eq!(tb.project.name, "Demo");
