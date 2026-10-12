@@ -8,6 +8,7 @@
 |---|---|---|
 | [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the taskbag (`../allomos-taskbag/.allomos/taskbag/`, read with `alm list` or the app). | status |
 | taskbag `handoffs/` and `project-notes.md` (in `../allomos-taskbag/.allomos/taskbag/`, outside this repository) | Each session's handoff (`alm handoffs`), and what every session must know: running, pitfalls, where credentials live, current truth. Replaced `AGENT_HANDOFF.md` on 2026-10-12 | handoff |
+| [guide/](./guide/) | The user guide in English, Chinese and Japanese, built with Astro Starlight; published at https://mypals-ml.github.io/allomos/ once approved ([`A07-10`](./tasks/Task-A07-10-user-guide-on-github-pages.md)) | user guide |
 | [tasks/](./tasks/) | One file per card: outcome, scope, approvals, notes | cards |
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
