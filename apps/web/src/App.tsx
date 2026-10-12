@@ -23,6 +23,8 @@ const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
     : "top.show_in_files";
 
 const LAST_ROOT_KEY = "allomos.lastRoot";
+/** This window was opened with New window… (Task-A01-27): it starts on the start page. */
+const NEW_WINDOW = new URLSearchParams(window.location.search).has("new");
 /** Recently opened project folders, newest first, for File → Open Recent. */
 const RECENT_KEY = "allomos.recentFolders";
 const RECENT_MAX = 10;
@@ -92,6 +94,7 @@ export function App({ messenger }: { messenger: Messenger }) {
 
   /** Back to the start page: no taskbag open, and none to reopen at the next start. */
   const closeTaskbag = () => {
+    void messenger.setWindowProject(null, null).catch(() => undefined);
     setOpened(null);
     setSetup(null);
     setNotices([]);
@@ -119,7 +122,9 @@ export function App({ messenger }: { messenger: Messenger }) {
     }
     const folder = projectFolder(o.root);
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
-  }, [changeRecent]);
+    // The app knows which window shows which project, and the window is named after it (Task-A01-27).
+    void messenger.setWindowProject(o.root, o.loaded.taskbag?.project.name ?? null).catch(() => undefined);
+  }, [changeRecent, messenger]);
 
   /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open taskbag's project folder,
    * agent instructions and tasks, and whether the person put off connecting agents this time. */
@@ -148,6 +153,8 @@ export function App({ messenger }: { messenger: Messenger }) {
         const info = await messenger.inspectFolder(path);
         const i = info.inspection;
         if (i.kind === "found") {
+          // Already open in another window: that window comes forward instead (owner, 2026-10-12).
+          if (await messenger.showProjectElsewhere(i.root).catch(() => false)) return;
           show(await messenger.openTaskbag(i.root), null);
         } else if (i.kind === "empty" || i.kind === "no_taskbag") {
           // No `.allomos` yet: the wizard asks, starting at step 2 with this folder.
@@ -178,6 +185,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   // File → Connect with the Agents… only while a taskbag is open.
   const hasTaskbag = Boolean(opened);
   useEffect(() => {
+    hasTaskbagRef.current = hasTaskbag;
     void messenger.setConnectEnabled(hasTaskbag).catch(() => undefined);
   }, [messenger, hasTaskbag]);
 
@@ -240,8 +248,10 @@ export function App({ messenger }: { messenger: Messenger }) {
     return () => window.clearInterval(timer);
   }, [messenger, root]);
 
-  // On start: a folder given on the command line wins; otherwise reopen the last one.
+  // On start: a folder given on the command line wins; otherwise reopen the last one. A window
+  // from New window… starts on the start page (Task-A01-27).
   useEffect(() => {
+    if (NEW_WINDOW) return;
     void (async () => {
       let start: string | null;
       try {
@@ -262,22 +272,14 @@ export function App({ messenger }: { messenger: Messenger }) {
     })();
   }, [messenger, openFolder]);
 
-  /** With nothing open, the wizard from step 1; otherwise pick a folder and open it (the wizard
-   * takes over when it has no `.allomos`). */
-  const choose = async () => {
-    if (!openedRef.current) {
-      openWizard({});
-      return;
-    }
-    const path = await messenger.pickFolder(t("picker.title"));
-    if (path) await openFolder(path);
-  };
-
-  // File → Open Folder… (⌘O / Ctrl+O) does what the "choose a folder" button does.
-  const chooseRef = useRef(choose);
-  chooseRef.current = choose;
+  // The menu is shared by every window: the window in front sets Connect with the Agents… and
+  // Open Recent (which other windows may have changed) whenever it comes forward.
+  const hasTaskbagRef = useRef(false);
   useEffect(() => {
-    const stop = messenger.onOpenFolderMenu(() => void chooseRef.current());
+    const stop = messenger.onWindowFocus(() => {
+      void messenger.setConnectEnabled(hasTaskbagRef.current).catch(() => undefined);
+      setRecent(readRecent());
+    });
     return () => void stop.then((f) => f()).catch(() => undefined);
   }, [messenger]);
 
@@ -292,7 +294,7 @@ export function App({ messenger }: { messenger: Messenger }) {
     void messenger
       .setMenuTexts({
         file: t("menu.file"),
-        openFolder: t("menu.open_folder"),
+        newWindow: t("menu.new_window"),
         openRecent: t("menu.open_recent"),
         clearMenu: t("menu.clear_recent"),
         noRecent: t("menu.no_recent"),
@@ -366,10 +368,11 @@ export function App({ messenger }: { messenger: Messenger }) {
           </div>
         )}
         <LanguagePicker />
-        {/* With nothing open, the welcome page's Start button is the only way in. */}
+        {/* With nothing open, the welcome page's Start button is the only way in. New window… opens
+            another window on the start page (owner, 2026-10-12). */}
         {opened && (
-          <button type="button" className="primary" onClick={choose}>
-            {t("top.open_another")}
+          <button type="button" className="primary" onClick={() => void messenger.newWindow().catch((e) => setError(errorNote(e)))}>
+            {t("top.new_window")}
           </button>
         )}
       </header>
@@ -406,6 +409,7 @@ export function App({ messenger }: { messenger: Messenger }) {
               show(o, created ? { key: o.readme_added ? "notice.created_here_readme" : "notice.created_nested" } : null)
             }
             onSetup={setSetup}
+            onElsewhere={() => setWizard(null)}
             onClose={(result) => {
               setWizard(null);
               if (!result) {

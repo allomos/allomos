@@ -1,8 +1,8 @@
 {
   "brand.name": "Allomos",
-  "top.open_another": "Open another folder…",
+  "top.new_window": "New window…",
   "menu.file": "File",
-  "menu.open_folder": "Open Folder…",
+  "menu.new_window": "New Window…",
   "menu.open_recent": "Open Recent",
   "menu.clear_recent": "Clear Menu",
   "menu.no_recent": "No recent folders",
