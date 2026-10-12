@@ -120,3 +120,18 @@ export interface SetupState {
   agents: { codex: boolean; claude: boolean };
   has_tasks: boolean;
 }
+
+/** Where the setup wizard keeps the taskbag in Git (apps/desktop: `keep_in_git`). */
+export interface GitKept {
+  repo: string;
+  /** The folder was not in a repository, so it was made one. */
+  initialized: boolean;
+  /** A commit was made (false: already committed as it is). */
+  committed: boolean;
+}
+
+/** Whether the project folder has its agent instruction files (apps/desktop: `instruction_files`). */
+export interface InstructionFiles {
+  agents_md: boolean;
+  claude_md: boolean;
+}

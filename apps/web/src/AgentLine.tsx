@@ -47,7 +47,7 @@ export function AgentLine({
   return (
     <div className="agent-line">
       <span>
-        {t("agentline.label")}: {codex || claude ? agents : t("agentline.none")}
+        {t("agentline.line", { state: codex || claude ? agents : t("agentline.none") })}
       </span>
       {!(codex && claude) && (
         <button type="button" className="link" onClick={onTell}>

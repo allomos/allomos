@@ -28,7 +28,10 @@ pub use confirm::{
     ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
     read_answer, requests_dir, was_seen, withdraw_confirm,
 };
-pub use convert::{CONVERT_REQUEST_VERSION, agent_convert_request_in};
+pub use convert::{
+    CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, agent_connect_request_in,
+    agent_convert_request_in,
+};
 pub use guide::{GUIDE_TOPICS, guide};
 pub use settings::{
     TaskLanguage, pick_ui_language, save_ui_language, saved_ui_language, settings_dir,
@@ -111,15 +114,15 @@ Allomos wrote this file because the folder was empty. You may edit or delete it.
 
 const README_ZH_CN: &str = "# 换肩项目
 
-此文件夹是一个换肩项目。它的任务、领域和进度保存在隐藏文件夹
+此文件夹是一个「换肩」项目。它的任务、领域和进度保存在隐藏文件夹
 `.allomos/taskbag/` 中。
 
-- 在换肩应用中打开此文件夹，即可按领域查看任务。
+- 在「换肩」应用中打开此文件夹，即可按领域查看任务。
 - AI 智能体和人也可以在终端中用 `alm` 命令处理任务
   （`alm list`、`alm next`、`alm claim <任务>`）。
 - 这些文件是普通的 JSON 和 Markdown，Git 可以记录每一处更改。
 
-此文件夹原本是空的，所以换肩写了这个文件。你可以修改或删除它。
+此文件夹原本是空的，所以「换肩」写了这个文件。你可以修改或删除它。
 ";
 
 const README_JA: &str = "# アロモスプロジェクト
@@ -235,13 +238,20 @@ pub fn agent_setup_request(project: &Path, taskbag: &Path) -> String {
 /// The steps follow the language; the section itself stays English, so every agent and teammate
 /// reads the same rules.
 pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
+    let steps = setup_steps_in(language, project_path, taskbag_path);
+    let source = section_source(language, taskbag_path);
+    format!("{steps}\n\n{source}\n")
+}
+
+/// The setup request's text without its last line (where Allomos's section comes from), so the
+/// connect request can carry it as its first part.
+pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
     let (project, taskbag, heading) = (
         project_path.display(),
         taskbag_path.display(),
         AGENT_SECTION_HEADING,
     );
-    let source = section_source(language, taskbag_path);
-    let steps = match language {
+    match language {
         "zh-CN" => format!(
             "Allomos 已为这个项目建立了任务包。现在请把它告诉以后的 AI 智能体。
 
@@ -256,9 +266,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
 5. 确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
 6. 如果项目是 Git 仓库，只提交 AGENTS.md 和 CLAUDE.md，作为一次提交：`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`。其他改动保持原样；除非用户要求，不要推送。
-7. 告诉用户你改了什么，以及你做的提交。
-
-{source}"
+7. 告诉用户你改了什么，以及你做的提交。"
         ),
         "ja" => format!(
             "Allomos がこのプロジェクトのタスクバッグを用意しました。これからの AI エージェントにそれを伝えてください。
@@ -274,9 +282,7 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
 5. CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
 6. プロジェクトが Git リポジトリなら、AGENTS.md と CLAUDE.md だけを一つのコミットにします：`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`。ほかの変更はそのままにし、頼まれない限りプッシュしません。
-7. 何を変えたか、どんなコミットをしたかをユーザーに見せてください。
-
-{source}"
+7. 何を変えたか、どんなコミットをしたかをユーザーに見せてください。"
         ),
         _ => format!(
             "Allomos has set up this project's taskbag. Please now tell future AI agents about it.
@@ -300,12 +306,9 @@ CLAUDE.md with just that line if it is missing). Do not copy the section into CL
 6. If the project is a Git repository, commit only AGENTS.md and CLAUDE.md, as one commit: \
 `git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- \
 AGENTS.md CLAUDE.md`. Leave every other change as it is; do not push unless the person asks.
-7. Show the user what you changed and the commits you made.
-
-{source}"
+7. Show the user what you changed and the commits you made."
         ),
-    };
-    format!("{steps}\n")
+    }
 }
 
 /// Add Allomos's section for AI agents to `folder`'s `AGENTS.md` and `CLAUDE.md`, never
@@ -1260,7 +1263,7 @@ mod tests {
     #[test]
     fn readme_speaks_three_languages() {
         assert!(readme_text("en").starts_with("# Allomos project"));
-        assert!(readme_text("zh-CN").contains("此文件夹是一个换肩项目"));
+        assert!(readme_text("zh-CN").contains("此文件夹是一个「换肩」项目"));
         assert!(readme_text("ja").contains("このフォルダーはアロモスのプロジェクトです"));
         assert_eq!(readme_text("fr"), readme_text("en"));
         for lang in ["en", "zh-CN", "ja"] {

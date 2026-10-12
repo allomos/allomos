@@ -38,6 +38,14 @@ One block per card that `alm list --state in_progress` shows held.
 
 
 
+### Task-A05-03 — claude/a05-03-setup-wizard
+- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` · merged into `main` 2026-10-12 · pushed: yes
+- Approvals in force: card's local work (owner, 2026-10-11); the owner's wizard Git rule (git init + local commit, never push; decision 0010)
+- Uncommitted: none · Running: none started by this session
+- Label: locally verified; the owner ran the whole check list in the app and it passed (see card).
+- Test data: `~/allomos-tests/a05-03-steps-9-12/` (`reset.sh`), `~/allomos-tests/a05-03-setup-wizard/` (owner's items 1–8). Delete both once the card is done.
+- Next action: owner says whether this counts as "owner verified"; then `alm label A05-03 "owner verified"`, `alm done`, remove this block, the worktree and the test folders
+
 ## Live state
 
 Checked 2026-10-08.
