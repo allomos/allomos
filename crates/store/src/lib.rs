@@ -214,6 +214,8 @@ pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
 /// to `project`, so the file works on every computer that has both folders side by side).
 pub fn agent_section_for(project: &Path, taskbag: &Path) -> String {
     let section = agent_section();
+    // Tidy `.` and `..` first: `/work/app/../tasks` is not inside `/work/app`.
+    let (project, taskbag) = (&tidy(project), &tidy(taskbag));
     if taskbag.starts_with(project) {
         return section;
     }
@@ -227,6 +229,23 @@ This project's taskbag is not inside this folder: it is at `{at}`. Run every `al
 `--taskbag \"{at}\"` (or set `ALLOMOS_TASKBAG` to that path).
 "
     )
+}
+
+/// `path` without `.` and `..` parts, worked out from the text alone (the disk is not asked).
+fn tidy(path: &Path) -> PathBuf {
+    let mut clean = PathBuf::new();
+    for part in path.components() {
+        match part {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !clean.pop() {
+                    clean.push("..");
+                }
+            }
+            other => clean.push(other),
+        }
+    }
+    clean
 }
 
 /// What `alm init` (and later the app) asks an AI agent to do: add [`agent_section`] to the
@@ -1035,6 +1054,21 @@ mod tests {
         let p = std::env::temp_dir().join(format!("allomos-test-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn a_sibling_taskbag_named_through_dot_dot_is_outside_the_project() {
+        let project = PathBuf::from("/work/app");
+        let taskbag = PathBuf::from("/work/app/../tasks/.allomos/taskbag");
+        let section = agent_section_for(&project, &taskbag);
+        assert!(
+            section.contains("`--taskbag \"../tasks/.allomos/taskbag\"`"),
+            "{section}"
+        );
+        assert_eq!(
+            agent_section_for(&project, &project.join("./.allomos/taskbag")),
+            agent_section()
+        );
     }
 
     #[test]
