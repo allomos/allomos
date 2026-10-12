@@ -1,4 +1,4 @@
-# Taskbag file format — `allomos/1`
+# Taskbag file format — `allomos/2`
 
 A **contract**: the files inside a taskbag. The Allomos app, the `alm` command and AI agents must all read and write exactly this. Code: `crates/core` (rules) and `crates/store` (reading and writing). Decided by [0007](../decisions/0007-git-like-project-sync.md) and [0010](../decisions/0010-project-data-folder.md).
 
@@ -37,6 +37,10 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
     A01-02/
       task.json
       description.md
+  handoff-template.md   the outline every handoff follows (allomos/2)
+  project-notes.md      what every session must know: running, pitfalls, where credentials live
+  handoffs/             one file per session (allomos/2)
+    2026-10-12-1130-claude-a03-06.md
 ```
 
 - File and folder names use the item's ID.
@@ -47,12 +51,34 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | `"allomos/1"` for this version: `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
+| `format` | yes | `"allomos/2"` for this version (`"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `alm labels`. |
 | `project_folder` | no | The project folder (code, `AGENTS.md`, `CLAUDE.md`), relative to the folder holding `.allomos/` (`"."` for that folder, `"../app"` for a sibling), or absolute when no relative path exists. Written by the app ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)). Older `alm` builds refuse a taskbag that has it (`field_unknown`): reinstall `alm`. |
 | `task_language` | no | The language new and changed tasks are written in: `"ui"` (follow the language the Allomos app shows; the default, also when the field is missing) or a language code such as `"zh-CN"`. Read and set with `alm task-language`. The app saves its interface language in Allomos's per-user settings (`settings.json` in `~/Library/Application Support/io.allomos` on macOS), outside the taskbag ([`Task-A01-21`](../tasks/Task-A01-21-task-language.md)). |
+
+- `handoff` (no, `allomos/2`): when a handoff must be written ([`Task-A03-06`](../tasks/Task-A03-06-agent-handoff-rules.md)). Every field is optional and missing ones take their defaults: `quota_gate` (percentage of the 5-hour quota left; default 3), `context_gate` (percentage of context used; default 90), `write_when` (text; default "after every meaningful step: a task finished, a finding, a commit, a process started or stopped"), and `overrides`: an agent's or account's own `quota_gate` / `context_gate`, by name (`codex`, `claude/work`); a holder `codex/a01-03` gets the override `codex`. Gates are whole numbers from 0 to 100 (`invalid_percent`). Changed with `alm handoff-rules` or the app's Handoff settings.
+
+## Handoffs (`allomos/2`)
+
+Added by [`Task-A03-06`](../tasks/Task-A03-06-agent-handoff-rules.md). A handoff is the short note a session leaves so whoever continues, an agent or a person, does not start blind; it is written for any reader, because the writer does not know who takes over (owner, 2026-10-12).
+
+- **`handoffs/<date>-<time>-<writer>.md`**: one file per session (`alm handoff --as <session>` updates the same file; a person writing in the app makes a new one each time). It starts with a header, then the text:
+
+  ```text
+  ---
+  writer: claude/a03-06-handoffs
+  tasks: A03-06, A01-27
+  written: 2026-10-12T11:30Z
+  updated: 2026-10-12T13:05Z
+  ---
+  ```
+
+  `tasks` lists the tasks it covers (empty for a session with no task). Times are UTC. `alm show`, `alm next`, the task pane and the Handoffs tab find a task's handoffs through this list. Agents fill in their own file directly: the one exception to "never edit the taskbag by hand".
+- **`handoff-template.md`**: the outline. Part 1, for anyone in plain words; part 2, restart details. Replaced with `alm handoff-template --set` or in the app.
+- **`project-notes.md`**: what every session must know whatever its task: what is running, pitfalls, where credentials live (never their values).
+- A task's `handoff_note` stays: the one line left on release.
 
 ## `areas/<id>.json`
 
@@ -125,10 +151,10 @@ Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md). Allomo
 
 - **Newer** than this Allomos (`allomos/2` read by an Allomos that writes `allomos/1`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
 - **Older**: `alm` refuses every command that works on the taskbag with `taskbag_older`, telling the agent to run `alm upgrade` and then repeat the command. The app shows **Update the taskbag…**.
-- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). There are no steps yet: `allomos/1` is the only format.
+- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). Steps: `allomos/1` → `allomos/2` adds `handoff-template.md`, `project-notes.md` and `handoffs/` (the rules in `project.json` are optional).
 - **Allomos never upgrades by itself** (owner, 2026-10-12): the running AI agent does, with `alm upgrade`, when `alm` or the app's request tells it to.
 
-Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v1)`. A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
+Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v2)` (v2: the handoff lines, A03-06). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
 
 ## Not yet in this version
 

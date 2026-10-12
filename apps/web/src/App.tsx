@@ -8,10 +8,12 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
+import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
+import { latestFor } from "./handoffFlow";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck } from "./types";
+import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -588,13 +590,15 @@ function HopFigure() {
   );
 }
 
-/** How the task list is grouped; remembered in the window's storage (Task-A01-15). */
-type GroupBy = "area" | "iteration";
+/** How the task list is grouped, or the Handoffs tab after Iterations (Task-A03-06); remembered
+ * in the window's storage (Task-A01-15). */
+type GroupBy = "area" | "iteration" | "handoffs";
 const GROUP_BY_KEY = "allomos.groupBy";
 
 function readGroupBy(): GroupBy {
   try {
-    return localStorage.getItem(GROUP_BY_KEY) === "iteration" ? "iteration" : "area";
+    const g = localStorage.getItem(GROUP_BY_KEY);
+    return g === "iteration" || g === "handoffs" ? g : "area";
   } catch {
     return "area";
   }
@@ -623,6 +627,20 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
+  // Handoffs (Task-A03-06), read again whenever the taskbag reloads (their files are in its stamp).
+  const [handoffs, setHandoffs] = useState<Handoff[]>([]);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .listHandoffs(opened.root)
+      .then((list) => live && setHandoffs(list))
+      .catch(() => live && setHandoffs([]));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened]);
+  const [handoffTask, setHandoffTask] = useState<string | null>(null);
+  const [handoffDialog, setHandoffDialog] = useState<"settings" | "write" | null>(null);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
 
@@ -697,17 +715,32 @@ function TaskbagView({
       {issues.length > 0 && <Issues issues={issues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
-          {box.tasks.length > 0 && (
+          {(box.tasks.length > 0 || handoffs.length > 0) && (
             <div className="group-by" role="group" aria-label={t("group.label")}>
-              {(["area", "iteration"] as const).map((g) => (
+              {(["area", "iteration", "handoffs"] as const).map((g) => (
                 <button key={g} type="button" aria-pressed={groupBy === g} onClick={() => choose(g)}>
-                  {t(g === "area" ? "group.by_area" : "group.by_iteration")}
+                  {t(g === "area" ? "group.by_area" : g === "iteration" ? "group.by_iteration" : "group.handoffs")}
                 </button>
               ))}
             </div>
           )}
           {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
           <div className={selected ? "list-layout with-pane" : "list-layout"}>
+            {groupBy === "handoffs" ? (
+              <HandoffsView
+                handoffs={handoffs}
+                tasks={box.tasks}
+                task={handoffTask}
+                onTask={setHandoffTask}
+                onOpenTask={(id) => {
+                  choose("area");
+                  setSelectedId(id);
+                }}
+                onWrite={() => setHandoffDialog("write")}
+                onSettings={() => setHandoffDialog("settings")}
+                onLink={openLink}
+              />
+            ) : (
             <div className="areas">
               {groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
@@ -731,6 +764,7 @@ function TaskbagView({
                 <p className="muted">{t("box.empty")}</p>
               )}
             </div>
+            )}
             {selected && (
               <TaskPane
                 task={selected}
@@ -738,6 +772,23 @@ function TaskbagView({
                 iteration={iterations.find((i) => i.id === selected.iteration)}
                 onClose={() => setSelectedId(null)}
                 onLink={openLink}
+                latest={latestFor(handoffs, selected.id)}
+                onAllHandoffs={() => {
+                  setHandoffTask(selected.id);
+                  choose("handoffs");
+                }}
+              />
+            )}
+            {handoffDialog === "settings" && (
+              <HandoffSettingsDialog messenger={messenger} root={opened.root} onClose={() => setHandoffDialog(null)} />
+            )}
+            {handoffDialog === "write" && (
+              <HandoffForm
+                messenger={messenger}
+                root={opened.root}
+                tasks={box.tasks}
+                task={handoffTask ?? selectedId}
+                onClose={() => setHandoffDialog(null)}
               />
             )}
           </div>

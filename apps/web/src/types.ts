@@ -98,6 +98,36 @@ export interface AgentStatus {
   holders: string[];
 }
 
+/** One handoff file (crates/store/src/handoff.rs, Task-A03-06). Times are `YYYY-MM-DDTHH:MMZ`, UTC. */
+export interface Handoff {
+  file: string;
+  writer: string;
+  tasks: string[];
+  written: string;
+  updated: string;
+  summary: string;
+  body: string;
+}
+
+export interface Gates {
+  quota_gate?: number;
+  context_gate?: number;
+}
+
+/** The project's handoff rules as written in project.json; a missing field takes its default. */
+export interface HandoffRules extends Gates {
+  write_when?: string;
+  overrides?: Record<string, Gates>;
+}
+
+/** The handoff settings as the dialog shows them. */
+export interface HandoffSettings {
+  rules: HandoffRules;
+  /** With the defaults filled in. */
+  applied: { quota_gate: number; context_gate: number; write_when: string; override_for: string | null };
+  template: string;
+}
+
 /** A taskbag's format compared with this Allomos's (crates/store/src/versions.rs). */
 export type FormatState =
   | { state: "current" }
