@@ -170,7 +170,7 @@
   "wizard.created_body": "The new, empty taskbag is in {path}.",
   "wizard.source_label": "Project folder",
   "connect.tasks": "The agent you choose will also look for tasks the project already keeps, such as a task board, card files or a to-do list. If it finds some, it shows you its plan here and moves them into the taskbag only if you choose Go ahead.",
-  "welcome.eyebrow": "Shift between AI agents and teammates",
+  "welcome.eyebrow": "{name} · Shift between AI agents and teammates",
   "welcome.keep": "Keep the project.",
   "welcome.lede": "When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its taskbag: plain files in your own repository.",
   "fig.title": "A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.",

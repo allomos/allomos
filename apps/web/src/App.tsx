@@ -510,7 +510,7 @@ function Welcome({ onOpen }: { onOpen: () => void }) {
     <section className="welcome">
       <div className="welcome-grid">
         <div className="welcome-text">
-          <p className="eyebrow">{t("welcome.eyebrow")}</p>
+          <p className="eyebrow">{t("welcome.eyebrow", { name: t("brand.name") })}</p>
           {/* Three phrases: Chinese and Japanese break only between them (Safari's engine, which
               draws the macOS window, will not break a run of CJK text marked keep-all at all). */}
           <h1>
