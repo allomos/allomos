@@ -85,8 +85,11 @@ export function App({ messenger }: { messenger: Messenger }) {
   }, []);
   const noteText = (n: Note) => ("problem" in n ? problem(n.problem) : "text" in n ? n.text : t(n.key, n.params));
 
+  /** Counts openings, so opening the same folder again reads its setup again (the wizard may be due). */
+  const [openings, setOpenings] = useState(0);
   const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
+    setOpenings((n) => n + 1);
     setNotices(message ? [message] : []);
     setSetup(null);
     setSkipped(false);
@@ -146,7 +149,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   const taskCount = opened?.loaded.taskbag?.tasks.length;
   useEffect(() => {
     if (root0) void refreshSetup(root0);
-  }, [root0, taskCount, refreshSetup]);
+  }, [root0, taskCount, openings, refreshSetup]);
   useEffect(() => {
     if (!opened || !setup || wizard) return;
     const at = directStep(setup, skipped);
