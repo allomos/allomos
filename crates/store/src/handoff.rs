@@ -33,10 +33,10 @@ pub const DEFAULT_TEMPLATE: &str = "# Handoff
 
 ## Restart details
 
-- **Checkout:** worktree, branch, last commit, pushed or not
-- **Uncommitted changes:** file, and why (or none)
-- **Running:** what, port, how to restart it, safe to stop? (or none)
-- **Approvals in force:** what is approved, and what is not
+- **Checkout:** <!-- worktree, branch, last commit, pushed or not -->
+- **Uncommitted changes:** <!-- file, and why; or none -->
+- **Running:** <!-- what, port, how to restart it, safe to stop; or none -->
+- **Approvals in force:** <!-- what is approved, and what is not -->
 
 <!-- Keep each line short. Evidence (numbers, logs, versions) goes on the task's card, not here. -->
 ";
@@ -185,11 +185,13 @@ pub fn parse(file: &str, text: &str) -> Handoff {
     h
 }
 
-/// The first line with something in it: not a heading, not a comment, not an empty template field.
+/// The first line with something in it: not a heading, not a comment, not an empty template field
+/// (a hint in `<!-- -->` does not count).
 fn summary(body: &str) -> String {
     body.lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("<!--"))
+        .map(without_comments)
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .map(|l| l.trim_start_matches(['-', '*', ' ']).to_string())
         .map(|l| {
             // "**What was being done:** baking" → "What was being done: baking"
@@ -197,6 +199,21 @@ fn summary(body: &str) -> String {
         })
         .find(|l| !l.ends_with(':'))
         .unwrap_or_default()
+}
+
+/// `line` without `<!-- … -->` parts.
+fn without_comments(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(start) = rest.find("<!--") {
+        out.push_str(&rest[..start]);
+        match rest[start..].find("-->") {
+            Some(end) => rest = &rest[start + end + 3..],
+            None => return out,
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 fn header(h: &Handoff) -> String {
@@ -453,6 +470,13 @@ mod tests {
         assert!(a.created && b.created);
         assert_ne!(a.path, b.path);
         assert_eq!(list(&root).len(), 2);
+    }
+
+    #[test]
+    fn an_unfilled_template_has_no_summary() {
+        assert_eq!(summary(DEFAULT_TEMPLATE), "");
+        let half = DEFAULT_TEMPLATE.replace("- **Running:** <!--", "- **Running:** oven on <!--");
+        assert_eq!(summary(&half), "Running: oven on");
     }
 
     #[test]
