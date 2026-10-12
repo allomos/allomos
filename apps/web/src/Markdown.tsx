@@ -1,10 +1,11 @@
 // A small Markdown reader for task descriptions (Task-A01-16) and agents' plans in the `alm confirm`
 // popup (Task-A05-02): headings, paragraphs, lists, code blocks, tables, and inline code, bold,
-// italics and links. It builds React elements, never HTML
+// italics and links. Comments (`<!-- … -->`) are hidden (Task-A03-11). It builds React elements, never HTML
 // text, so a description cannot inject markup. Links are handed to `onLink`, which asks the
 // desktop app to open them; the app decides what may be opened.
 
 import type { ReactNode } from "react";
+import { stripComments } from "./markdownComments";
 
 type Block =
   | { kind: "heading"; level: number; text: string }
@@ -140,7 +141,7 @@ function inline(text: string, onLink: (href: string) => void, key: string): Reac
 export function Markdown({ source, onLink }: { source: string; onLink: (href: string) => void }) {
   return (
     <div className="markdown">
-      {blocks(source).map((b, i) => {
+      {blocks(stripComments(source)).map((b, i) => {
         const k = String(i);
         switch (b.kind) {
           case "heading": {
