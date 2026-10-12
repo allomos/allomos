@@ -36,6 +36,7 @@ At the end the owner can open the guide in a browser locally, and, once they app
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-12 | The card (local work only; Pages and the publish workflow still need their own approval) | owner |
+| 2026-10-13 | Turn on GitHub Pages for `mypals-ml/allomos` (source: GitHub Actions), and merge `claude/a07-10-user-guide` into `main`, which publishes the guide at https://mypals-ml.github.io/allomos/. Cleanup: delete `.github/workflows/guide.yml` and turn Pages off | owner |
 
 ## Notes
 
