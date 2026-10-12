@@ -47,6 +47,7 @@ export function SetupWizard({
   onOpened,
   onSetup,
   onClose,
+  onElsewhere,
 }: {
   messenger: Messenger;
   /** Start at step 2 with this folder (it has no `.allomos` yet). */
@@ -59,6 +60,8 @@ export function SetupWizard({
   onSetup: (state: SetupState) => void;
   /** The dialog closes. `connected`: step 4 was reached and closed (asked, or Not now). */
   onClose: (connected: ConnectResult | null) => void;
+  /** The chosen taskbag is already open in another window, which came forward (Task-A01-27). */
+  onElsewhere: () => void;
 }) {
   const { t, rich, problem, language } = useI18n();
   const [step, setStep] = useState<Step>(resume ? { n: 0 } : { n: 1 });
@@ -77,6 +80,11 @@ export function SetupWizard({
         const at = taskbagStep(info.inspection);
         if (at.kind === "not_a_folder") {
           setError(t("error.not_a_folder", { path: at.path }));
+          return;
+        }
+        // Already open in another window: that window comes forward instead (owner, 2026-10-12).
+        if (at.kind === "found" && (await messenger.showProjectElsewhere(at.root).catch(() => false))) {
+          onElsewhere();
           return;
         }
         let newer: { found: string; supported: string } | null = null;

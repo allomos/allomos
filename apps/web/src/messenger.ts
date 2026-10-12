@@ -5,7 +5,7 @@
 // local server instead; the rest of the interface does not change.
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings } from "./types";
 
@@ -34,8 +34,14 @@ export interface Messenger {
    * looks empty it also writes README-allomos.md in `language` (`readme_added` says so).
    */
   createTaskbag(root: string, name: string, language: string): Promise<Opened>;
-  /** Calls `handler` whenever File → Open Folder… is chosen. Resolves to a function that stops listening. */
-  onOpenFolderMenu(handler: () => void): Promise<() => void>;
+  /** Opens another window on the start page (Task-A01-27). */
+  newWindow(): Promise<void>;
+  /** Tells the app which project this window shows (null: none), and names the window after it. */
+  setWindowProject(root: string | null, name: string | null): Promise<void>;
+  /** When another window already shows `root`, brings it forward and resolves to true. */
+  showProjectElsewhere(root: string): Promise<boolean>;
+  /** Calls `handler` when this window comes to the front. */
+  onWindowFocus(handler: () => void): Promise<() => void>;
   /** Calls `handler` with the folder chosen under File → Open Recent. */
   onOpenRecentMenu(handler: (folder: string) => void): Promise<() => void>;
   /** Calls `handler` when File → Open Recent → Clear Menu is chosen. */
@@ -98,7 +104,7 @@ export interface Messenger {
 
 export interface MenuTexts {
   file: string;
-  openFolder: string;
+  newWindow: string;
   openRecent: string;
   clearMenu: string;
   noRecent: string;
@@ -119,12 +125,19 @@ export const desktopMessenger: Messenger = {
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
   createTaskbag: (root, name, language) => invoke<Opened>("create_taskbag", { root, name, language }),
-  onOpenFolderMenu: (handler) => listen("menu:open_folder", () => handler()),
-  onOpenRecentMenu: (handler) => listen<string>("menu:open_recent", (e) => handler(e.payload)),
-  onClearRecentMenu: (handler) => listen("menu:clear_recent", () => handler()),
+  newWindow: () => invoke<void>("new_window"),
+  setWindowProject: (root, name) => invoke<void>("set_window_project", { root, name }),
+  showProjectElsewhere: (root) => invoke<boolean>("show_project_elsewhere", { root }),
+  onWindowFocus: (handler) =>
+    getCurrentWebviewWindow().onFocusChanged(({ payload }) => {
+      if (payload) handler();
+    }),
+  // Menu events are sent to the window in front only (Task-A01-27), so each window listens for its own.
+  onOpenRecentMenu: (handler) => getCurrentWebviewWindow().listen<string>("menu:open_recent", (e) => handler(e.payload)),
+  onClearRecentMenu: (handler) => getCurrentWebviewWindow().listen("menu:clear_recent", () => handler()),
   setMenuTexts: (words) => invoke<void>("set_menu_texts", { words }),
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
-  onConnectMenu: (handler) => listen("menu:connect", () => handler()),
+  onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),

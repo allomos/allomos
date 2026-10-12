@@ -41,3 +41,4 @@ At the end the owner has one project open, chooses **New window…**, picks anot
 ## Notes
 
 - 2026-10-12 — Written as its own card (one outcome per card), not added to A01-25. The owner answered every unknown the same day and queued it after A03-06.
+- 2026-10-12 — Built on `claude/a01-27-new-window`: File → New Window… (⌘N) and the top bar's **New window…** open a window on the start page (`index.html?new`, which skips reopening the last folder); ⌘O and File → Open Folder… are gone. Menu commands go to the window in front (`emit_to`), and each window listens for its own; when a window comes forward it sets the shared menu (Connect, Open Recent). The desktop side keeps which project each window shows; opening one that another window shows brings that window forward (also from the wizard). A window's title is its project's name. Capabilities apply to every window. Next: the owner's check.

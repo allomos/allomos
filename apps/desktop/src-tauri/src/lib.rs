@@ -654,9 +654,133 @@ fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem> {
     })
 }
 
+/// Which project each window shows (Task-A01-27), by window label: a project already open in
+/// another window is brought forward instead of opening twice (owner, 2026-10-12).
+#[derive(Default)]
+struct Windows {
+    projects: Mutex<std::collections::HashMap<String, PathBuf>>,
+    /// The number in the next new window's label (`window-<n>`).
+    next: std::sync::atomic::AtomicU32,
+}
+
+impl Windows {
+    fn forget(&self, label: &str) {
+        self.projects
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(label);
+    }
+}
+
+/// A folder as it is on disk, so `/a/./b` and `/a/b` are the same project.
+fn same_place(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// The other window that shows `root`, if any.
+fn window_showing(
+    projects: &std::collections::HashMap<String, PathBuf>,
+    root: &Path,
+    not: &str,
+) -> Option<String> {
+    let root = same_place(root);
+    projects
+        .iter()
+        .find(|(label, shown)| label.as_str() != not && **shown == root)
+        .map(|(label, _)| label.clone())
+}
+
+/// The label of the window in front, else the first one.
+fn focused_window(app: &AppHandle) -> Option<String> {
+    let windows = app.webview_windows();
+    windows
+        .iter()
+        .find(|(_, w)| w.is_focused().unwrap_or(false))
+        .or_else(|| windows.iter().next())
+        .map(|(label, _)| label.clone())
+}
+
+/// Open another window on the start page. `?new` tells it not to reopen the last folder.
+fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
+    let n = app
+        .state::<Windows>()
+        .next
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        + 2;
+    tauri::WebviewWindowBuilder::new(
+        app,
+        format!("window-{n}"),
+        tauri::WebviewUrl::App("index.html?new".into()),
+    )
+    .title("Allomos")
+    .inner_size(1100.0, 720.0)
+    .min_inner_size(720.0, 480.0)
+    .build()
+    .map(drop)
+}
+
+/// The top bar's **New window…** (Task-A01-27).
+#[tauri::command]
+fn new_window(app: AppHandle) -> Result<(), Problem> {
+    open_new_window(&app).map_err(|e| Problem::OpenFailed {
+        path: "New window".into(),
+        detail: e.to_string(),
+    })
+}
+
+/// The calling window now shows `root` (or nothing); its title names the project.
+#[tauri::command]
+fn set_window_project(
+    window: tauri::WebviewWindow,
+    windows: tauri::State<Windows>,
+    root: Option<PathBuf>,
+    name: Option<String>,
+) {
+    let mut projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
+    match root {
+        Some(root) => {
+            projects.insert(window.label().to_string(), same_place(&root));
+        }
+        None => {
+            projects.remove(window.label());
+        }
+    }
+    let title = match name {
+        Some(name) if !name.trim().is_empty() => format!("{name} — Allomos"),
+        _ => "Allomos".to_string(),
+    };
+    let _ = window.set_title(&title);
+}
+
+/// Another window already shows `root`: bring it forward and say so, so the calling window does
+/// not open the project a second time.
+#[tauri::command]
+fn show_project_elsewhere(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    windows: tauri::State<Windows>,
+    root: PathBuf,
+) -> bool {
+    let projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(label) = window_showing(&projects, &root, window.label()) else {
+        return false;
+    };
+    drop(projects);
+    match app.get_webview_window(&label) {
+        Some(other) => {
+            let _ = other.unminimize();
+            let _ = other.show();
+            let _ = other.set_focus();
+            true
+        }
+        None => false,
+    }
+}
+
 /// The menu items' IDs, and the events the interface hears when they are chosen.
-const OPEN_FOLDER_ID: &str = "open_folder";
-const OPEN_FOLDER_EVENT: &str = "menu:open_folder";
+/// File → New Window… (⌘N): another window on the start page (Task-A01-27). It replaces
+/// File → Open Folder… (⌘O, removed; owner 2026-10-12).
+const NEW_WINDOW_ID: &str = "new_window";
 /// A recent folder's item is `recent:<position in the list>`.
 const RECENT_PREFIX: &str = "recent:";
 const OPEN_RECENT_EVENT: &str = "menu:open_recent";
@@ -668,7 +792,7 @@ const CONNECT_EVENT: &str = "menu:connect";
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
     file: Submenu<Wry>,
-    open_folder: MenuItem<Wry>,
+    new_window: MenuItem<Wry>,
     connect: MenuItem<Wry>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
@@ -725,13 +849,8 @@ fn fill_recent(app: &AppHandle, submenu: &Submenu<Wry>, recent: &Recent) -> taur
 /// Words start in English; the interface sends its own with `set_menu_texts`.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let menu = Menu::default(app)?;
-    let open_folder = MenuItem::with_id(
-        app,
-        OPEN_FOLDER_ID,
-        "Open Folder…",
-        true,
-        Some("CmdOrCtrl+O"),
-    )?;
+    let new_window =
+        MenuItem::with_id(app, NEW_WINDOW_ID, "New Window…", true, Some("CmdOrCtrl+N"))?;
     let recent = Submenu::new(app, "Open Recent", true)?;
     // One item for telling agents about Allomos and moving existing tasks in (owner, 2026-10-11).
     let connect_item = MenuItem::with_id(
@@ -750,13 +869,13 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .find(|s| s.text().is_ok_and(|t| t == "File"));
     let file = match existing {
         Some(file) => {
-            file.prepend_items(&[&open_folder, &recent, &connect_item])?;
+            file.prepend_items(&[&new_window, &recent, &connect_item])?;
             file.insert(&PredefinedMenuItem::separator(app)?, 3)?;
             file
         }
         None => {
             let file =
-                Submenu::with_items(app, "File", true, &[&open_folder, &recent, &connect_item])?;
+                Submenu::with_items(app, "File", true, &[&new_window, &recent, &connect_item])?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
             file
@@ -764,7 +883,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     };
     app.manage(MenuTexts {
         file,
-        open_folder,
+        new_window,
         connect: connect_item,
         recent,
         state: Mutex::new(Recent::default()),
@@ -777,7 +896,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 #[serde(rename_all = "camelCase")]
 struct MenuWords {
     file: String,
-    open_folder: String,
+    new_window: String,
     open_recent: String,
     clear_menu: String,
     no_recent: String,
@@ -789,7 +908,7 @@ struct MenuWords {
 fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWords) {
     // A menu that cannot be renamed keeps its previous words; nothing else depends on them.
     let _ = texts.file.set_text(words.file);
-    let _ = texts.open_folder.set_text(words.open_folder);
+    let _ = texts.new_window.set_text(words.new_window);
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -818,20 +937,40 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
+        .manage(Windows::default())
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
-            if id == OPEN_FOLDER_ID {
-                let _ = app.emit(OPEN_FOLDER_EVENT, ());
+            // Menu commands act on the window in front, not on every window (Task-A01-27).
+            let target = focused_window(app);
+            let send = |name: &str, payload: Option<String>| {
+                if let Some(label) = &target {
+                    let _ = match payload {
+                        Some(p) => app.emit_to(label.as_str(), name, p),
+                        None => app.emit_to(label.as_str(), name, ()),
+                    };
+                }
+            };
+            if id == NEW_WINDOW_ID {
+                let _ = open_new_window(app);
             } else if id == CONNECT_ID {
-                let _ = app.emit(CONNECT_EVENT, ());
+                send(CONNECT_EVENT, None);
             } else if id == CLEAR_RECENT_ID {
-                let _ = app.emit(CLEAR_RECENT_EVENT, ());
+                send(CLEAR_RECENT_EVENT, None);
             } else if let Some(folder) = recent_folder(&app.state::<MenuTexts>(), id) {
-                let _ = app.emit(OPEN_RECENT_EVENT, folder);
+                // In the current window (owner, 2026-10-12).
+                send(OPEN_RECENT_EVENT, Some(folder));
+            }
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                window.state::<Windows>().forget(window.label());
             }
         })
         .invoke_handler(tauri::generate_handler![
             startup_folder,
+            new_window,
+            set_window_project,
+            show_project_elsewhere,
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
@@ -966,6 +1105,24 @@ mod tests {
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
         assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
         assert!(!version_check(taskbag).unwrap().needs_update());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_project_shown_in_another_window_is_found() {
+        let dir = std::env::temp_dir().join(format!("allomos-windows-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("a")).unwrap();
+        let mut projects = std::collections::HashMap::new();
+        projects.insert("main".to_string(), same_place(&dir.join("a")));
+        // The same folder written another way is the same project.
+        let other = dir.join("a").join(".").join("..").join("a");
+        assert_eq!(
+            window_showing(&projects, &other, "window-2"),
+            Some("main".to_string())
+        );
+        // A window does not count itself, and another folder is not shown anywhere.
+        assert_eq!(window_showing(&projects, &dir.join("a"), "main"), None);
+        assert_eq!(window_showing(&projects, &dir.join("b"), "window-2"), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
