@@ -348,9 +348,12 @@ export function App({ messenger }: { messenger: Messenger }) {
           </div>
         )}
         <LanguagePicker />
-        <button type="button" className="primary" onClick={choose}>
-          {opened ? t("top.open_another") : t("welcome.open")}
-        </button>
+        {/* With nothing open, the welcome page's Start button is the only way in. */}
+        {opened && (
+          <button type="button" className="primary" onClick={choose}>
+            {t("top.open_another")}
+          </button>
+        )}
       </header>
 
       <main className="main">
@@ -497,17 +500,72 @@ function LanguagePicker() {
   );
 }
 
-/** The first screen with nothing open: one button, which starts the setup wizard (Task-A05-03). */
+/** The first screen with nothing open: the road show's opening slide (slogan, the hop between
+ * agents and a teammate around the taskbag), with one button, Start, which opens the setup
+ * wizard (Task-A05-03). */
 function Welcome({ onOpen }: { onOpen: () => void }) {
-  const { t } = useI18n();
+  const { t, rich } = useI18n();
   return (
     <section className="welcome">
-      <h1>{t("welcome.title")}</h1>
-      <button type="button" className="primary" onClick={onOpen}>
-        {t("welcome.open")}
-      </button>
-      <p>{t("welcome.hint")}</p>
+      <div className="welcome-grid">
+        <div className="welcome-text">
+          <p className="eyebrow">{t("welcome.eyebrow")}</p>
+          <h1>{rich("welcome.title", { keep: <em>{t("welcome.keep")}</em> })}</h1>
+          <p className="lede">{t("welcome.lede")}</p>
+          <div className="welcome-start">
+            <button type="button" className="primary start" onClick={onOpen}>
+              {t("welcome.open")}
+            </button>
+            <span className="muted">{t("welcome.hint")}</span>
+          </div>
+        </div>
+        <HopFigure />
+      </div>
     </section>
+  );
+}
+
+/** The road show's drawing: a task hops from one agent to another when a quota runs out, then to
+ * a teammate; all of them use the same taskbag. */
+function HopFigure() {
+  const { t } = useI18n();
+  return (
+    <figure className="hop-figure">
+      <svg className="hop" viewBox="0 0 560 330" role="img" aria-labelledby="hop-title">
+        <title id="hop-title">{t("fig.title")}</title>
+        <defs>
+          <marker id="hop-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path className="head" d="M0,0 L10,5 L0,10 z" />
+          </marker>
+        </defs>
+        <path className="arc" d="M120,92 Q187,14 250,92" markerEnd="url(#hop-head)" />
+        <path className="arc" d="M310,92 Q373,14 440,92" markerEnd="url(#hop-head)" />
+        <text className="why" x="185" y="40" textAnchor="middle">{t("fig.quota")}</text>
+        <text className="why" x="375" y="40" textAnchor="middle">{t("fig.handoff")}</text>
+        <line className="tie" x1="95" y1="148" x2="246" y2="242" />
+        <line className="tie" x1="280" y1="148" x2="280" y2="188" />
+        <line className="tie" x1="465" y1="148" x2="314" y2="242" />
+        <rect className="who" x="20" y="96" width="150" height="52" rx="10" />
+        <rect className="who" x="205" y="96" width="150" height="52" rx="10" />
+        <rect className="who person" x="390" y="96" width="150" height="52" rx="10" />
+        <text className="name" x="95" y="119" textAnchor="middle">Claude Code</text>
+        <text className="sub" x="95" y="137" textAnchor="middle">{t("fig.account", { n: 1 })}</text>
+        <text className="name" x="280" y="119" textAnchor="middle">Codex</text>
+        <text className="sub" x="280" y="137" textAnchor="middle">{t("fig.account", { n: 2 })}</text>
+        <text className="name" x="465" y="119" textAnchor="middle">{t("fig.teammate")}</text>
+        <text className="sub" x="465" y="137" textAnchor="middle">{t("fig.their_agents")}</text>
+        <path className="bag" d="M246,226 Q240,262 241,300 C241,320 319,320 319,300 Q320,262 314,226 Q300,218 292,207 L268,207 Q260,218 246,226 Z" />
+        <path className="bag" d="M268,207 Q260,192 273,190 Q280,197 287,190 Q300,192 292,207 Z" />
+        <path className="seam" d="M241,300 C241,310 319,310 319,300" />
+        <path className="cord" d="M252,224 C246,252 246,282 252,310" />
+        <path className="cord" d="M265,208 Q280,214 295,208" />
+        <path className="cord" d="M293,210 Q301,220 298,231" />
+        <rect className="toggle" x="294" y="230" width="8" height="12" rx="3" />
+        <text className="stencil" x="283" y="268" textAnchor="middle">{t("fig.taskbag")}</text>
+        <text className="bagp" x="330" y="268">.allomos/taskbag/</text>
+        <text className="bagp faint" x="330" y="285">{t("fig.in_repo")}</text>
+      </svg>
+    </figure>
   );
 }
 

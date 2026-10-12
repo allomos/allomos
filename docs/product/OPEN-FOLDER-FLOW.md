@@ -24,7 +24,7 @@ A folder **with** `.allomos` opens directly, and the app walks the same checks i
 
 ### The first screen
 
-- With nothing open (the first start, or the last folder is gone), the window shows one button, **Open Taskbag**, with the hint "Select a folder where you want to keep your tasks". It starts the wizard at step 1.
+- With nothing open (the first start, or the last folder is gone), the window shows the road show's opening slide: the slogan "Switch agents. Switch teammates. *Keep the project.*", its short explanation and the drawing of a task hopping between agents and a teammate around the taskbag, and one button, **Start**, with the hint "Select a folder where you want to keep your tasks". **Start** opens the wizard at step 1. The top bar has no folder button on this page.
 
 ### The setup wizard
 
