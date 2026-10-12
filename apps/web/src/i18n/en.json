@@ -22,7 +22,7 @@
   "agents.claude_app_trust": "The Claude app may first ask you to trust this folder: choose Trust workspace, or the session starts without the project.",
   "agents.searching": "Looking for AI agents…",
   "agents.none": "No AI agent was found on this computer. Allomos can add its instructions to AGENTS.md and CLAUDE.md itself.",
-  "agents.ask": "Ask",
+  "agents.ask": "Connect",
   "agents.write": "Add the instructions for me",
   "agents.later": "Not now",
   "agents.written": "Added Allomos's instructions to {files}.",

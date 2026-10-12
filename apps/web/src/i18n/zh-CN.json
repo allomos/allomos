@@ -22,7 +22,7 @@
   "agents.claude_app_trust": "Claude 应用可能会先请你信任这个文件夹：请选择“Trust workspace”，否则会话会在没有项目的情况下开始。",
   "agents.searching": "正在查找 AI 智能体…",
   "agents.none": "这台电脑上没有找到 AI 智能体。「换肩」可以自己把说明加到 AGENTS.md 和 CLAUDE.md。",
-  "agents.ask": "询问",
+  "agents.ask": "连接",
   "agents.write": "替我添加说明",
   "agents.later": "以后再说",
   "agents.written": "已把「换肩」的说明加到 {files}。",

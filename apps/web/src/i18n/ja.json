@@ -22,7 +22,7 @@
   "agents.claude_app_trust": "Claude アプリが最初にこのフォルダーを信頼するか尋ねることがあります。「Trust workspace」を選んでください。選ばないと、プロジェクトなしでセッションが始まります。",
   "agents.searching": "AI エージェントを探しています…",
   "agents.none": "このコンピューターに AI エージェントが見つかりませんでした。アロモスが AGENTS.md と CLAUDE.md に説明を加えることもできます。",
-  "agents.ask": "依頼する",
+  "agents.ask": "つなぐ",
   "agents.write": "説明を加えてもらう",
   "agents.later": "今はしない",
   "agents.written": "{files} にアロモスの説明を加えました。",
