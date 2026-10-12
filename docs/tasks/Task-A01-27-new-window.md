@@ -17,12 +17,13 @@ At the end the owner has one project open, chooses **New window…**, picks anot
 ## Details for the worker
 
 - **Outcome.** **New window…** (top bar and File menu) opens a new window on the start page; each window shows its own project.
-- **Decisive unknowns** (owner to decide).
-  - The keyboard shortcut: ⌘N (the usual one for a new window), or keep ⌘O.
-  - **File → Open Recent**: opens the folder in the current window (as now), or in a new window.
-  - When the app starts: reopen only the last project (as now), or every window that was open.
-  - Opening a project that another window already shows: bring that window forward, or open it twice.
-  - The start page's **Choose a folder…** in a window that already shows a project (after Cancel goes back to the start page) stays as it is.
+- **Decided (owner, 2026-10-12).**
+  - **Shortcut ⌘N** for New window…; **⌘O is removed** (there is no Open Folder item any more).
+  - **File → Open Recent** opens the folder in the **current window**, as now.
+  - **When the app starts**, it reopens **only the last project**, as now.
+  - **A project another window already shows**: that window is **brought forward**; it is not opened twice.
+  - The start page's **Choose a folder…** stays as it is.
+- **Queued** after [`A03-06`](./Task-A03-06-agent-handoff-rules.md) in iteration I02 (owner, 2026-10-12).
 - **Files owned.** Window creation and the File menu in `apps/desktop/src-tauri`; the top bar and per-window state in `apps/web/src/App.tsx`; language files; [OPEN-FOLDER-FLOW.md](../product/OPEN-FOLDER-FLOW.md) and the "Running the app" part of [CODING_RULES](../workflow/CODING_RULES.md); this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -35,7 +36,8 @@ At the end the owner has one project open, chooses **New window…**, picks anot
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-12 | Asked for: "New window…" replaces "Open another folder…" and File → Open Folder… | owner (chat) |
+| 2026-10-12 | ⌘N ("use this"); ⌘O removed ("remove this"); Open Recent in the current window; reopen only the last project; bring an already-open project's window forward; queued after A03-06 in this iteration | owner (chat) |
 
 ## Notes
 
-- 2026-10-12 — Written as its own card (one outcome per card), not added to A01-25. Next: the owner answers the unknowns and approves the card.
+- 2026-10-12 — Written as its own card (one outcome per card), not added to A01-25. The owner answered every unknown the same day and queued it after A03-06.
