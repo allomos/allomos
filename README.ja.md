@@ -101,7 +101,7 @@ Claude Code と Codex それぞれの得意なことと、プロジェクトに�
 
 - ソースからアプリを動かす：[docs/workflow/CODING_RULES.md § Running the app](docs/workflow/CODING_RULES.md#running-the-app)（英語）。
 - プロダクト計画：[docs/product/PLAN.md](docs/product/PLAN.md) · 要件：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 三つのセット：[決定 0014](docs/decisions/0014-main-purpose-and-three-sets.md)（いずれも英語）。
-- いま何に取り組んでいるか：このリポジトリをアロモスのアプリで開くか、`alm list` を実行します（このリポジトリのタスクバッグは `../allomos-taskbag/.allomos/taskbag` にあるので、`--taskbag "../allomos-taskbag/.allomos/taskbag"` を付けてください）。いまの作業とオーナーへの質問：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。
+- いま取り組んでいることと、オーナーへの質問：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。タスクの一覧はアロモス自身のタスクバッグにあり、別のリポジトリで管理しています（いまは非公開）。アクセスできるメンテナーは、それをこのリポジトリの隣（`../allomos-taskbag`）にクローンして `alm list --taskbag "../allomos-taskbag/.allomos/taskbag"` を実行するか、このリポジトリをアロモスのアプリで開きます。
 - すべてのドキュメント：[docs/README.md](docs/README.md)。AI エージェントは [AGENTS.md](AGENTS.md) から始めます。
 
 ## ライセンス
