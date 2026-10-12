@@ -433,9 +433,19 @@ fn keep_taskbag_in_git(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Pr
     }
 }
 
+/// One commit at a time: two `git add`/`git commit` runs at once fail on Git's `index.lock`. The
+/// wizard can ask twice for one opening (React runs a starting effect twice in development, and a
+/// quick second opening does too); the second then waits and finds nothing new to commit.
+static KEEP_IN_GIT: Mutex<()> = Mutex::new(());
+
+fn keep_one_at_a_time(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Problem> {
+    let _one = KEEP_IN_GIT.lock().unwrap_or_else(|e| e.into_inner());
+    keep_taskbag_in_git(root, envs)
+}
+
 #[tauri::command]
 async fn keep_in_git(root: PathBuf) -> Result<GitKept, Problem> {
-    keep_taskbag_in_git(&root, &[])
+    keep_one_at_a_time(&root, &[])
 }
 
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
@@ -924,6 +934,21 @@ mod tests {
             )
             .is_err()
         );
+
+        // Two openings at once (React's double start in development): one commits, the other
+        // waits and finds nothing new, instead of failing on Git's index.lock.
+        let twice = base.join("twice");
+        std::fs::create_dir_all(&twice).unwrap();
+        run_git(&twice, &["init", "--quiet"], &me).unwrap();
+        let root = twice.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "t", "T").unwrap();
+        let results: Vec<_> = std::thread::scope(|s| {
+            let a = s.spawn(|| keep_one_at_a_time(&root, &me));
+            let b = s.spawn(|| keep_one_at_a_time(&root, &me));
+            vec![a.join().unwrap(), b.join().unwrap()]
+        });
+        let committed: Vec<bool> = results.into_iter().map(|r| r.unwrap().committed).collect();
+        assert_eq!(committed.iter().filter(|c| **c).count(), 1, "{committed:?}");
         std::fs::remove_dir_all(&base).unwrap();
     }
 

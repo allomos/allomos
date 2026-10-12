@@ -93,14 +93,15 @@ export function SetupWizard({
 
   /** Keep the taskbag in Git without asking (owner, 2026-10-12): what was done, to tell on the
    * page. A failure is said, not a stop. */
-  const keep = async (root: string, folder: string): Promise<GitNote | null> => {
+  const keep = async (root: string, folder: string, live: () => boolean = () => true): Promise<GitNote | null> => {
     try {
       const kept = await messenger.keepInGit(root);
       if (kept.initialized) return { kind: "init", folder: kept.repo };
       if (kept.committed) return { kind: "committed", repo: kept.repo };
     } catch (e) {
       if (isProblem(e) && e.code === "git_missing") return { kind: "missing", folder };
-      fail(e);
+      // An opening that was replaced by a newer one says nothing.
+      if (live()) fail(e);
     }
     return null;
   };
@@ -117,7 +118,7 @@ export function SetupWizard({
       try {
         const o = await messenger.openTaskbag(resumeRoot);
         const setup = await messenger.projectSetup(resumeRoot);
-        const git = await keepRef.current(resumeRoot, setup.allomos_folder);
+        const git = await keepRef.current(resumeRoot, setup.allomos_folder, () => live);
         if (!live) return;
         if (resumeAt(setup, resumeWanted) === 4 && setup.project_folder) {
           setStep({ n: 4, opened: o, project: setup.project_folder, git, change: true });
