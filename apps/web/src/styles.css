@@ -267,3 +267,5 @@ button.link:hover { text-decoration: underline; }
 /* The wizard's note after Allomos made the folder a Git repository (Task-A05-03). */
 .git-note { display: grid; gap: 6px; border: 1px solid var(--ok); background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; }
 .git-note strong { color: var(--ok); }
+.git-note.warn { border-color: var(--warn); background: var(--warn-bg); }
+.git-note.warn strong { color: var(--warn); }

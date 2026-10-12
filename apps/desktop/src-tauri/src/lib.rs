@@ -326,11 +326,37 @@ fn run_git(dir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Result<String, S
     })
 }
 
+/// Whether a `git --version` run shows that Git is missing: the program is not found, or it is the
+/// macOS stand-in that only offers to install the developer tools.
+fn git_missing(started: bool, succeeded: bool, stderr: &str) -> bool {
+    let stub = stderr.contains("xcrun: error") || stderr.contains("developer tools");
+    !started || stub || !succeeded
+}
+
+/// Is there a working `git` program?
+fn git_works(envs: &[(&str, &str)]) -> bool {
+    match agents::command("git")
+        .arg("--version")
+        .envs(envs.iter().copied())
+        .output()
+    {
+        Ok(out) => !git_missing(
+            true,
+            out.status.success(),
+            &String::from_utf8_lossy(&out.stderr),
+        ),
+        Err(_) => !git_missing(false, false, ""),
+    }
+}
+
 /// After the wizard's step 2 (owner, 2026-10-12): make sure the folder holding `.allomos/` is in a
 /// Git repository, making it one with `git init` when it is not, without asking; then commit the
 /// taskbag (and `README-allomos.md`, when Allomos left one) to that repository, and nothing else.
 /// Never pushes. The person's own Git settings and hooks apply (decision 0010).
 fn keep_taskbag_in_git(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Problem> {
+    if !git_works(envs) {
+        return Err(Problem::GitMissing);
+    }
     let folder = std::path::absolute(picked_folder(root).unwrap_or(root))
         .unwrap_or_else(|_| picked_folder(root).unwrap_or(root).to_path_buf());
     let (repo, initialized) = match git_root(&folder) {
@@ -859,5 +885,21 @@ mod tests {
             .is_err()
         );
         std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn missing_git_is_recognized() {
+        assert!(git_missing(false, false, ""), "no program");
+        assert!(git_missing(
+            true,
+            false,
+            "xcrun: error: invalid active developer path (/Library/Developer/CommandLineTools)"
+        ));
+        assert!(git_missing(
+            true,
+            true,
+            "No developer tools were found, requesting install."
+        ));
+        assert!(!git_missing(true, true, ""), "git version 2.50.1");
     }
 }

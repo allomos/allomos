@@ -185,5 +185,9 @@
   "wizard.git_committed": "タスクバッグを Git リポジトリ {repo} にコミットしました。",
   "problem.git_init_failed": "タスクバッグは保存されましたが、{path} を Git で管理できませんでした：{detail}",
   "wizard.git_init_title": "タスクバッグを Git で管理するようにしました",
-  "wizard.git_help": "Git をよく知らなければ、AI エージェントに「Git とは何ですか？何に使うのですか？」と聞いてみてください。"
+  "wizard.git_help": "Git をよく知らなければ、AI エージェントに「Git とは何ですか？何に使うのですか？」と聞いてみてください。",
+  "wizard.git_missing_title": "Git が入っていません",
+  "wizard.git_missing": "アロモスはタスクバッグを Git で管理しますが、このコンピューターには Git が入っていないため、タスクバッグは今のところ履歴なしで保存されています。Git を入れてから、AI エージェントに {folder} を Git リポジトリにしてタスクバッグをコミットするよう頼んでください。",
+  "wizard.git_missing_help": "わからなければ、AI エージェントに「Git とは何ですか？何に使うのですか？Git はどうやって入れるのですか？」と聞いてみてください。",
+  "problem.git_missing": "このコンピューターには Git が入っていないため、タスクバッグは保存されましたが、まだ Git で管理されていません。"
 }

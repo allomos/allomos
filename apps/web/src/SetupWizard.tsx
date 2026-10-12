@@ -16,7 +16,10 @@ import { isProblem } from "./types";
 import type { Opened, SetupState } from "./types";
 
 /** What the wizard did with Git on step 2's Next, told on step 3. */
-type GitNote = { kind: "init"; folder: string } | { kind: "committed"; repo: string };
+type GitNote =
+  | { kind: "init"; folder: string }
+  | { kind: "committed"; repo: string }
+  | { kind: "missing"; folder: string };
 
 type Step =
   | { n: 1 }
@@ -117,7 +120,8 @@ export function SetupWizard({
         if (kept.initialized) git = { kind: "init", folder: kept.repo };
         else if (kept.committed) git = { kind: "committed", repo: kept.repo };
       } catch (e) {
-        fail(e);
+        if (isProblem(e) && e.code === "git_missing") git = { kind: "missing", folder: setup.allomos_folder };
+        else fail(e);
       }
       setStep({ n: 3, opened: o, source: defaultSource(setup), git });
     });
@@ -135,7 +139,10 @@ export function SetupWizard({
       const setup = await messenger.setProjectFolder(step.opened.root, step.source);
       onSetup(setup);
       // Commit the recorded project folder before the agent is connected (owner, 2026-10-12).
-      await messenger.keepInGit(step.opened.root).catch(fail);
+      // Without Git, step 3 has already said so.
+      await messenger.keepInGit(step.opened.root).catch((e) => {
+        if (!(isProblem(e) && e.code === "git_missing")) fail(e);
+      });
       setStep({ n: 4, opened: step.opened, project: setup.project_folder ?? step.source });
     });
 
@@ -195,6 +202,13 @@ export function SetupWizard({
                   <strong>{t("wizard.git_init_title")}</strong>
                   <p>{rich("wizard.git_init", { folder: <code>{step.git.folder}</code> })}</p>
                   <p className="muted">{t("wizard.git_help")}</p>
+                </div>
+              )}
+              {step.git?.kind === "missing" && (
+                <div className="git-note warn" role="status">
+                  <strong>{t("wizard.git_missing_title")}</strong>
+                  <p>{rich("wizard.git_missing", { folder: <code>{step.git.folder}</code> })}</p>
+                  <p className="muted">{t("wizard.git_missing_help")}</p>
                 </div>
               )}
               {step.git?.kind === "committed" && (

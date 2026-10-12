@@ -185,5 +185,9 @@
   "wizard.git_committed": "已把任务包提交到 Git 仓库 {repo}。",
   "problem.git_init_failed": "任务包已保存，但无法用 Git 管理 {path}：{detail}",
   "wizard.git_init_title": "任务包现在由 Git 管理",
-  "wizard.git_help": "不了解 Git？可以问你的 AI 智能体：“Git 是什么？它有什么用？”"
+  "wizard.git_help": "不了解 Git？可以问你的 AI 智能体：“Git 是什么？它有什么用？”",
+  "wizard.git_missing_title": "没有安装 Git",
+  "wizard.git_missing": "换肩用 Git 保存任务包，但这台电脑上没有安装 Git，所以任务包暂时保存了，但没有历史记录。请安装 Git，然后让你的 AI 智能体把 {folder} 设为 Git 仓库并提交任务包。",
+  "wizard.git_missing_help": "不清楚怎么做？可以问你的 AI 智能体：“Git 是什么？它有什么用？怎样安装 Git？”",
+  "problem.git_missing": "这台电脑上没有安装 Git，所以任务包已保存，但还没有用 Git 管理。"
 }

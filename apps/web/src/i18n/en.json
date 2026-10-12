@@ -185,5 +185,9 @@
   "wizard.git_committed": "Committed the taskbag to the Git repository {repo}.",
   "problem.git_init_failed": "The taskbag is saved, but {path} could not be put under Git: {detail}",
   "wizard.git_init_title": "Your taskbag is now kept in Git",
-  "wizard.git_help": "New to Git? Ask your AI agent: “What is Git? What is it used for?”"
+  "wizard.git_help": "New to Git? Ask your AI agent: “What is Git? What is it used for?”",
+  "wizard.git_missing_title": "Git is not installed",
+  "wizard.git_missing": "Allomos keeps the taskbag in Git, but Git is not installed on this computer, so the taskbag is saved without its history for now. Install Git, then ask your AI agent to make {folder} a Git repository and commit the taskbag.",
+  "wizard.git_missing_help": "Not sure how? Ask your AI agent: “What is Git? What is it used for? How do I install Git?”",
+  "problem.git_missing": "Git is not installed on this computer, so the taskbag is saved but not kept in Git yet."
 }
