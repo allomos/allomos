@@ -33,3 +33,4 @@ After this card, comments are hidden wherever Allomos shows Markdown: handoffs i
 - 2026-10-12 — Built and locally verified. Comments are removed before Markdown is shown; a line that held only a comment is dropped so a list stays one list. Next: the owner tries it.
 
   Evidence: `typecheck` PASS; `check:i18n` PASS; `npm --prefix apps/web test` PASS, 31 tests (8 new in `tests/markdownComments.test.ts`). Debug build on `~/allomos-tests/a03-11-hide-hints`, checked by hand: a fresh `alm handoff` opened in the Handoffs tab shows the template's headings and field names without hints; task A01-01's description hides its comment and still shows `<!-- inline code stays -->` in inline code.
+- 2026-10-12 — Owner checked it in the debug build: "passed". Merged into main; card done.
