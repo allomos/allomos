@@ -36,6 +36,14 @@ Updated: 2026-10-04
 
 One block per card that `alm list --state in_progress` shows held.
 
+### Task-A01-25 — claude/a01-25-format-upgrade
+- Checkout: `.claude/worktrees/a01-25-format-upgrade` · branch `claude/a01-25-format-upgrade` · main merged in 2026-10-12 · pushed: yes
+- Approvals in force: the card's local work (owner: "run this first"); nothing external. Not approved: renewing this repo's own `AGENTS.md` section (an agent does it when `alm` warns, after merge).
+- Uncommitted: none
+- Running: `npm --prefix apps/desktop run dev` (Vite on 1420 + app window) on `~/allomos-tests/A01-25-format-upgrade/5-app-check`; safe to stop.
+- Unrecorded findings: after merge, every `alm` call in this repo will warn `instructions_outdated` (AGENTS.md's heading has no version) until an agent renews it from `alm brief`.
+- Next action: owner checks the notice and **Update the taskbag…** in the running app; then merge to `main` and reinstall `alm`.
+
 
 
 ## Live state
