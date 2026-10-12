@@ -142,7 +142,7 @@
   "problem.push_failed": "The change is saved and committed, but pushing it failed: {detail}",
   "menu.connect": "Connect with the Agents…",
   "connect.title": "Connect with the agents",
-  "connect.body": "Use one of your AI agents to connect the taskbag with your project folder. It opens in the project folder with a request already typed in; nothing is sent until you send it there. The request asks the agent to add Allomos's instructions to AGENTS.md and CLAUDE.md (and to create a file that is missing), so every new session knows how to work with the taskbag.",
+  "connect.body": "Use one of your AI agents to connect the taskbag with your project folder. The AI agent opens, working in your project folder, with a request already typed in; nothing is sent until you send it there. The request asks the agent to add Allomos's instructions to AGENTS.md and CLAUDE.md (and to create a file that is missing), so every new session knows how to work with the taskbag.",
   "connect.asked": "Opened {agents}. Read the request there and send it. If {first} finds existing tasks, its plan appears here, and you choose Go ahead or Cancel.",
   "notice.restart_agents": "New in the project folder: {files}. AI agents read these files only when a session starts, so sessions that were already open in this project don't know about Allomos yet. Start a new session to use it.",
   "welcome.open": "Start",
