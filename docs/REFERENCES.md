@@ -10,7 +10,7 @@ External material Allomos learns from. **All of it is read-only**: read and quot
 |---|---|
 | `TASK_BOARD.md` | The board: Now, session registry, waiting on the owner, card index, timeline. Import target (W02). |
 | `workstreams/Task-*.md`, `workstreams/readme.md`, `workstreams/W00…W15-*.md` | Card files and workstream index — the data model Allomos must represent. |
-| `AGENT_HANDOFF.md` | Handoff format Allomos's own [AGENT_HANDOFF.md](./AGENT_HANDOFF.md) is modeled on. |
+| `AGENT_HANDOFF.md` | Handoff format Allomos's handoff template and project notes are modeled on (A03-06). |
 | `AI-WORKFLOW.md` | Roles, effort, handoff timing, new-session rule — adapted in [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md). |
 | `ESTIMATE.md` §4 | Workstream estimates in person-weeks — shows why card-level forecasting was missing. |
 | repo root `AGENTS.md`, `CLAUDE.md` | Working procedure, gates and labels — adapted in [AGENTS.md](../AGENTS.md). |

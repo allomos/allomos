@@ -21,7 +21,7 @@ Plain meanings of the words used in Allomos's documents and product.
 | **Throughput** | How many tasks were finished per week. |
 | **Monte Carlo forecast** | Repeating a simulated future many times, drawing weekly throughput from past weeks, to get a range of likely finish dates (e.g. 50% and 85% confidence). |
 | **Runner** | A small Allomos program on a person's machine that can start and reopen agent sessions when asked from the app. |
-| **Handoff** | The short note a session leaves so whoever continues, an agent or a person, can: in plain words what was done and what is next, then restart details (checkout, uncommitted work, what is running). In a project's taskbag, one file per session in `handoffs/` ([FILE-FORMAT](./product/FILE-FORMAT.md#handoffs-allomos2)); Allomos's own project still keeps `docs/AGENT_HANDOFF.md` until it moves over. |
+| **Handoff** | The short note a session leaves so whoever continues, an agent or a person, can: in plain words what was done and what is next, then restart details (checkout, uncommitted work, what is running). In a project's taskbag, one file per session in `handoffs/` ([FILE-FORMAT](./product/FILE-FORMAT.md#handoffs-allomos2)). What every session must know is in the taskbag's `project-notes.md`. |
 | **Owner** | will.w.hui — decides, approves, and verifies finished work. Also the top project role in the product. |
 | **Glidelines** | The owner's earlier Gantt dashboard app (`glidepace-vibe-cc`), with a task-file format and burndown code. Allomos is a separate product that learns from its ideas ([0003](./decisions/0003-relationship-to-glidelines.md)). |
 | **SSR board** | The owner's Joyns SSR migration task board — the real multi-agent project that motivated Allomos. |

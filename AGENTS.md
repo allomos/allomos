@@ -7,7 +7,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the owner, **
 ## Always-on boundaries
 
 - **No external effect without the owner's exact approval**, recorded on the card: creating or changing hosted resources (Supabase projects, databases, hosting, DNS), applying SQL to a real target, deployments, secrets, sending email, creating GitHub repositories, adding or changing a remote, and anything touching other people's data. Approving a card authorizes only its local work.
-- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in [docs/AGENT_HANDOFF.md § Current truth](docs/AGENT_HANDOFF.md#current-truth).
+- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live).
 - **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
 - **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
@@ -39,7 +39,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v1)
+## Tasks: Allomos (v2)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
@@ -52,6 +52,9 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --push`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
+- Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
+  `alm handoff --tasks <ids> --as <your session name> --push`, for any reader, agent or person.
+  Whoever continues reads it with `alm next` or `alm show <id>`.
 
 `--push` commits only the taskbag's files and pushes them, so others see the change.
 
@@ -66,18 +69,18 @@ This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.
 
 ## Handoff — write it continuously
 
-Quota can end a session without warning. After every meaningful step (a task finished, a finding, a commit, a process started or stopped), update your block in [docs/AGENT_HANDOFF.md](docs/AGENT_HANDOFF.md#active-resume) and commit it with the work. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). Near **3% left** in the 5-hour window, start nothing new: finish the handoff and stop. At about **70% context used** (or past half at a natural break), bring the handoff up to date, commit, and give the owner the exact prompt for a new session. Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
+Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids> --push`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template; fill it in, plain words first, for any reader (evidence goes on the card). Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the owner the exact prompt for a new session. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). What every session must know (what is running, pitfalls, where credentials live, current truth) is in the taskbag's `project-notes.md`; change its lines in place. Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
 
 ## Read by activity
 
 | Activity | Read |
 |---|---|
-| Orient / resume | [docs/TASK_BOARD.md](docs/TASK_BOARD.md) and `alm list` / `alm next` → your card in [docs/tasks/](docs/tasks/) → [docs/AGENT_HANDOFF.md](docs/AGENT_HANDOFF.md) (your block, Live state, Pitfalls). New to the project: [docs/README.md](docs/README.md) |
+| Orient / resume | [docs/TASK_BOARD.md](docs/TASK_BOARD.md) and `alm list` / `alm next` → your card in [docs/tasks/](docs/tasks/) → its latest handoff (`alm show <id>`) → the taskbag's `project-notes.md` (Running, Pitfalls). New to the project: [docs/README.md](docs/README.md) |
 | Plan a card | [REQUIREMENTS.md](docs/product/REQUIREMENTS.md), [PLAN.md](docs/product/PLAN.md), the relevant [decisions](docs/decisions/README.md) |
 | Implement / test | the card, affected source and tests; coding rules once they exist (`docs/workflow/CODING_RULES.md`, created by the first code card) |
 | Look at prior art | [docs/REFERENCES.md](docs/REFERENCES.md) — read only the named files |
 | Record a decision or discussion | [docs/decisions/README.md](docs/decisions/README.md), [docs/discussions/](docs/discussions/) |
-| Handoff | actual diff and results; your handoff block; the board row |
+| Handoff | actual diff and results; your handoff file (`alm handoff`); the task's label |
 
 Reuse context you already have; do not re-read unchanged documents. **The measure:** how many documents must be read before the next change. If it falls, this is working.
 
