@@ -271,3 +271,5 @@ button.link:hover { text-decoration: underline; }
 .git-note.warn strong { color: var(--warn); }
 /* The project folder line is text, not buttons: on the left, also inside the wizard's dialog. */
 .dialog .row.project-row { justify-content: flex-start; }
+/* Under the chosen agent when it takes the request from the clipboard. */
+.agent-tools .paste-tip { color: var(--warn); font-weight: 500; }

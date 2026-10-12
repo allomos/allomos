@@ -25,6 +25,9 @@ const GROUPS: { name: string; tools: Agent["id"][] }[] = [
   { name: "Codex", tools: ["codex_app", "codex_cli"] },
 ];
 
+/** The keys that paste in a terminal on this computer. */
+const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";
+
 /** Show "Looking for AI agents…" only when finding them is slow. */
 const SPINNER_AFTER_MS = 200;
 
@@ -116,10 +119,12 @@ export function AgentsPanel({
     setError(null);
     try {
       const before = await filesNow();
-      const opened = await messenger.connectAgents(chosen, project, taskbag, language);
-      const names = chosen.filter((id) => opened.includes(id)).map((id) => t(AGENT_KEY[id]));
+      await messenger.connectAgents(chosen, project, taskbag, language);
       onDone({
-        message: t("connect.asked", { agents: names.join(", "), first: t(AGENT_KEY[chosen[0]]) }),
+        // One agent (owner, 2026-10-12); a terminal that takes the request from the clipboard is told so.
+        message: (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")
+          ? t("connect.asked_paste", { agent: t(AGENT_KEY[chosen[0]]), keys: PASTE_KEYS })
+          : t("connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
         watch: { project, before },
       });
     } catch (e) {
@@ -209,6 +214,10 @@ export function AgentsPanel({
                         </span>
                         {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
                         {a.id === "claude_app" && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
+                        {/* The chosen tool takes the request from the clipboard: say how, right here. */}
+                        {on && picked[g.name] === a.id && a.how === "paste" && (
+                          <span className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</span>
+                        )}
                       </label>
                     </li>
                   ))}
