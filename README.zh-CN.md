@@ -1,10 +1,17 @@
 [English](README.md) · **简体中文** · [日本語](README.ja.md)
 
+<img src="docs/images/readme/logo.svg" alt="" width="72">
+
 # 换肩 Allomos
 
 **换智能体，换队友，项目不断线。**
 
 一个 AI 智能体或账号的额度用完了，另一个从停下的地方接着做。把工作交给队友时，也不会有东西落在聊天记录里。项目装在它的**任务包**里：就是你自己代码仓库里的普通文件。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/hop-zh-CN-dark.svg">
+  <img src="docs/images/readme/hop-zh-CN-light.svg" alt="任务在额度用完时从 Claude Code（账号 1）转到 Codex（账号 2），交接时再转到队友手里；三方读写的是代码仓库里的同一个任务包。" width="560">
+</picture>
 
 `本地应用免费` · `macOS · Windows` · `Claude Code · Codex` · `云端服务按需付费`
 
@@ -58,6 +65,13 @@ alm claim A01-03
 ### 进度管理：走到哪了，何时落地，一目了然 *（计划中，v0.4–v0.10）*
 
 按领域看进度，每个任务处在哪一级验证都清清楚楚；只有你能拍板的事项，连同依据一起列出来；按真实速度给出两个交付日期：有五成把握的，和有八成五把握的；在电脑前、浏览器里或手机上，连上你的桌面应用就能看。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/glide-path-zh-CN-dark.svg">
+  <img src="docs/images/readme/glide-path-zh-CN-light.svg" alt="把燃尽图画成滑翔进近路线：第 0 周剩余 60 个任务，第 6 周剩余 34 个；第 14 周前完成的把握约五成，第 15 周前约八成五。" width="612">
+</picture>
+
+*这是将来预测功能的示意图，不是真实数据。*
 
 ## 价格：本地免费用，用云端才收费
 

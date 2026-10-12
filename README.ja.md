@@ -1,10 +1,17 @@
 [English](README.md) · [简体中文](README.zh-CN.md) · **日本語**
 
+<img src="docs/images/readme/logo.svg" alt="" width="72">
+
 # アロモス（Allomos）
 
 **エージェントを替えても、チームメイトに渡しても、プロジェクトは途切れない。**
 
 ある AI エージェントやアカウントの使用量が尽きたら、別のエージェントが止まったところから続けます。仕事をチームメイトに渡しても、チャットの中に置き去りになるものはありません。プロジェクトは**タスクバッグ**に入って移動します。あなた自身のリポジトリにある、ただのファイルです。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/hop-ja-dark.svg">
+  <img src="docs/images/readme/hop-ja-light.svg" alt="使用量が尽きると、タスクは Claude Code（アカウント 1）から Codex（アカウント 2）へ、引き継ぎでチームメイトへ移ります。三者ともリポジトリにある同じタスクバッグを読み書きします。" width="560">
+</picture>
 
 `ローカルアプリ・無料` · `macOS · Windows` · `Claude Code · Codex` · `クラウド・任意、有料`
 
@@ -58,6 +65,13 @@ Claude Code と Codex それぞれの得意なことと、プロジェクトに�
 ### 進捗管理：どこまで進み、いつ着くか *（予定、v0.4〜v0.10）*
 
 エリアごとの進捗と、各タスクの確かめた段階。あなたにしか決められないことを、根拠と一緒に。実際のペースから出す完了日：50% の見込みで間に合う日と、85% の見込みで間に合う日。机でも、ブラウザーでも、スマートフォンでも、デスクトップのアプリにつないで見られます。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/glide-path-ja-dark.svg">
+  <img src="docs/images/readme/glide-path-ja-light.svg" alt="バーンダウンを着陸の進入経路として描いた図：第 0 週に残り 60 タスク、第 6 週に残り 34。第 14 週までに終わる見込みは 50%、第 15 週までなら 85%。" width="612">
+</picture>
+
+*これから作る予測機能のイメージで、実際のデータではありません。*
 
 ## 料金：手元では無料、払うのはクラウドだけ
 
