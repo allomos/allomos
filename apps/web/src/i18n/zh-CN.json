@@ -160,7 +160,7 @@
   "wizard.git": "这个文件夹位于 Git 仓库 {repo} 中，任务包的文件可以和项目一起提交。换肩不会创建仓库，也不会运行 Git 命令。",
   "wizard.create": "建立任务包",
   "wizard.change": "更改…",
-  "wizard.source_title": "项目在哪个文件夹？",
+  "wizard.source_title": "连接存放项目的文件夹",
   "wizard.source_body": "项目文件夹存放项目的代码和文档，以及 AI 智能体在会话开始时读取的说明文件（AGENTS.md 和 CLAUDE.md）。智能体在这个文件夹中工作。通常就是你在第 1 步选择的文件夹；如果任务包和项目分开存放，请选择另一个。",
   "wizard.source_other": "选择其他文件夹…",
   "wizard.back": "上一步",

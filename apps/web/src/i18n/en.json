@@ -160,7 +160,7 @@
   "wizard.git": "This folder is inside the Git repository {repo}, so the taskbag's files can be committed with your project. Allomos creates no repository and runs no Git commands.",
   "wizard.create": "Create taskbag",
   "wizard.change": "Change…",
-  "wizard.source_title": "Which folder holds the project?",
+  "wizard.source_title": "Connect the folder that holds your project",
   "wizard.source_body": "The project folder holds the project's code and documents, and the instruction files AI agents read when a session starts (AGENTS.md and CLAUDE.md). Agents work in this folder. It is usually the folder you chose in step 1; choose another one if the taskbag is kept apart from the project.",
   "wizard.source_other": "Choose another folder…",
   "wizard.back": "Back",
