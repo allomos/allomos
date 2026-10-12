@@ -50,6 +50,11 @@ At the end the owner opens a project, sets "quota 5%, context 80%" in the app (o
   - **A Handoffs tab after the Iterations tab** (owner, 2026-10-12).
   - **Built in, not left as advice** (owner, 2026-10-12): one small file per session; short template fields, evidence goes on the card; only the latest shown by default, older ones kept as history.
   - **One card** for rules, template, storage and display (owner, 2026-10-12).
+  - **The gate numbers are not written into `AGENTS.md`**: they would make the section out of date whenever a gate changes. The section says how to ask; `alm next` tells each agent its current gates (with its override) at the start of every session (worker, 2026-10-12).
+  - **A session is identified by its claim name (`--as`)**: `alm handoff` updates that session's newest file. A person writing in the app makes a new file each time. The task's one-line `handoff_note` stays.
+  - **Our own taskbag is upgraded to `allomos/2` right after the merge** (owner, 2026-10-12).
+  - **This repository moves off `docs/AGENT_HANDOFF.md` now** (owner, 2026-10-12): Live state, Pitfalls and Current truth go to `project-notes.md`, each session writes `alm handoff`, the file is retired.
+  - **The setup wizard's "existing tasks" step moves a project's handoffs too** (owner, 2026-10-12): the conversion request (v7) asks the agent to turn each current handoff into a handoff file, project-wide notes into `project-notes.md`, and stated rules into `alm handoff-rules`.
 - **Decisive unknowns.**
   - Can an agent read its own quota and context use? Claude Code can (`get_usage`); Codex is unknown. Where it cannot, the gate stays a written rule the agent follows as best it can. Overlaps with [`Task-A03-02`](./Task-A03-02-account-quota-idea.md); answerable by reading provider documentation.
   - How a session is identified for "update this session's file instead of making a new one": the claim name used with `alm claim --as`, or a session name given to `alm handoff`.
@@ -73,6 +78,7 @@ At the end the owner opens a project, sets "quota 5%, context 80%" in the app (o
 | 2026-10-12 | Settings page in the app and settings in `alm` ("both gui and cli"); default context gate 90% ("accept this"); "we don't know who will take over when we write a handoff" | owner (chat) |
 | 2026-10-12 | Handoffs stored under the taskbag in a folder beside `tasks` ("a session run multiple tasks"); a Handoffs tab after the Iterations tab; the built-in short handoffs ("i accept these designs") | owner (chat) |
 | 2026-10-12 | A03-09 merged into this card ("combine them into 1 task") | owner (chat) |
+| 2026-10-12 | Proceed with the card ("proceed with a03-06"); upgrade our taskbag right after merge; move AGENT_HANDOFF.md now and "add this feature to the move current task step of the wizard process" | owner (chat) |
 
 ## Notes
 
