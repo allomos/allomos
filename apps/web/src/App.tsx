@@ -500,8 +500,8 @@ function LanguagePicker() {
   );
 }
 
-/** The first screen with nothing open: the road show's opening slide (slogan, the hop between
- * agents and a teammate around the taskbag), with one button, Start, which opens the setup
+/** The first screen with nothing open: the road show's opening slide (slogan, a task shifting
+ * between agents and a teammate around the taskbag), with one button, Start, which opens the setup
  * wizard (Task-A05-03). */
 function Welcome({ onOpen }: { onOpen: () => void }) {
   const { t } = useI18n();
@@ -531,7 +531,7 @@ function Welcome({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-/** The road show's drawing: a task hops from one agent to another when a quota runs out, then to
+/** The road show's drawing: a task shifts from one agent to another when a quota runs out, then to
  * a teammate; all of them use the same taskbag. */
 function HopFigure() {
   const { t } = useI18n();
