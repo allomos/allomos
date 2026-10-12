@@ -1,10 +1,17 @@
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
+<img src="docs/images/readme/logo.svg" alt="" width="72">
+
 # Allomos
 
 **Switch agents. Switch teammates. Keep the project.**
 
 When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its **taskbag**: plain files in your own repository.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/hop-en-dark.svg">
+  <img src="docs/images/readme/hop-en-light.svg" alt="A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository." width="560">
+</picture>
 
 `Local app · free` · `macOS · Windows` · `Claude Code · Codex` · `Cloud · optional, paid`
 
@@ -58,6 +65,13 @@ Learn what Claude Code and Codex are each good at and how to set one up for your
 ### Progress management: know where it stands and when it lands *(planned, v0.4–v0.10)*
 
 Progress by area with each task's proven step; the decisions only you can make, with the evidence; a finish date from your real pace (the date you have a 50% chance of hitting, and the date you have an 85% chance of hitting); at your desk, in a browser or on your phone, connected to your desktop app.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/glide-path-en-dark.svg">
+  <img src="docs/images/readme/glide-path-en-light.svg" alt="Burndown drawn as a glide path: 60 tasks left at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15." width="612">
+</picture>
+
+*An example of the forecast to come, not real data.*
 
 ## Pricing: free on your machine, pay only for the cloud
 
