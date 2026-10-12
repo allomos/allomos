@@ -1,8 +1,0 @@
-{
-  "area": "A03",
-  "holder": "claude/a03-08-step-commits",
-  "id": "A03-08",
-  "label": "owner verified",
-  "state": "done",
-  "title": "Each step tells the agent what to commit"
-}

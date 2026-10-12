@@ -1,9 +1,0 @@
-{
-  "area": "A01",
-  "handoff_note": "Done by the agent; only the owner's look in the app is left (see the card's Result).",
-  "id": "A01-07",
-  "iteration": "I01",
-  "label": "owner verified",
-  "state": "done",
-  "title": "Own cards in seabag"
-}

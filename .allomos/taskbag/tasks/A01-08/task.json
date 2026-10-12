@@ -1,9 +1,0 @@
-{
-  "area": "A01",
-  "handoff_note": "All checks pass; this repository's next dependencies now use fh needs.",
-  "id": "A01-08",
-  "iteration": "I01",
-  "label": "owner verified",
-  "state": "done",
-  "title": "fh fills the gaps found in the move"
-}

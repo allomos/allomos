@@ -1,9 +1,0 @@
-{
-  "area": "A01",
-  "handoff_note": "Agent checks pass; owner's look in the app is left (see the card's Result).",
-  "id": "A01-05",
-  "iteration": "I01",
-  "label": "owner verified",
-  "state": "done",
-  "title": "Readme in new folder"
-}
