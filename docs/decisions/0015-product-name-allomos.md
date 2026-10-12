@@ -38,6 +38,8 @@ Checked on 2026-10-10 and 2026-10-11 ([research](../research/app-name-handoff.md
 
 Names compared on the way: Handoff, HandoffHub, TagTeamHub, Batonhop, TaskHub, ProjectHub, OtherShoulder, ShoulderShift, Spallio, Ombroca, Cambro, Allom (an exact French mark for software), Allamos (reads as "Los Alamos"), Alagomos, Omalagi.
 
+**Chinese name kept as 换肩 (owner, 2026-10-12).** The owner asked whether a noun would suit better than the verb 换肩 and compared, in chat: the literal 另肩 and 轮肩; transliterations of Allomos (阿洛摩斯, 艾洛模; avoid 罗摩, 阿罗, 傲罗); wild-geese names (雁序, 轮雁, 雁迹, 雁痕, 鸿迹; 雁痕 sounds like 厌恨, and 鸿迹 sits close to 鸿蒙); carrying names (棒棒, 褡裢, 锦囊). None was searched for marks. 换肩 stays.
+
 ## Where the old name stays
 
 As [0013](./0013-product-name-fliphopper.md#where-the-old-name-stays) did for "glidebox": dated history keeps "FlipHopper" and "seabag" (discussion records, research, analysis, finished cards, dated notes, decks), and so do file names, which never change. Current documents use Allomos.
