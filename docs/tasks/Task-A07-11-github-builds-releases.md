@@ -9,7 +9,7 @@ Today a GitHub release of Allomos (`v0.1.0`, `v0.1.1`) is only a name on the cod
 | Piece | What it is in everyday words | Where |
 |---|---|---|
 | Release workflow | When a new version tag such as `v0.2.0` is pushed, GitHub builds Allomos on its own Mac and Windows computers and attaches the results to that version's release page | `.github/workflows/release.yml` |
-| macOS download | `Allomos_<version>_aarch64.dmg` (Apple Silicon), unsigned; Intel Macs: worker checks whether a universal build is wanted | release page |
+| macOS download | `Allomos_<version>_aarch64.dmg`, for Apple Silicon Macs only (owner, 2026-10-13), unsigned | release page |
 | Windows download | `Allomos_<version>_x64-setup.exe`, unsigned, with `alm` inside (as the Mac script builds it today) | release page |
 | `alm` downloads | `alm` for macOS and `alm.exe` for Windows, for people who use only the command | release page |
 | Guide | "Get the app" links to the newest downloads and says how to open an unsigned app (macOS: right-click › Open; Windows: More info › Run anyway) | `docs/guide/` (three languages) |
@@ -21,9 +21,9 @@ At the end the owner pushes a tag, and a few minutes later the release page has 
 - **Outcome.** Anyone can download and install the newest Allomos from its GitHub release page, without building it.
 - **Decisive unknowns.**
   - Whether builds start on a pushed tag only, or also by hand (`workflow_dispatch`) — owner; assume both.
-  - Whether `v0.1.0` and `v0.1.1` get files too (built from their tags) — owner.
-  - Apple Silicon only, or also Intel (a universal `.dmg`) — owner.
-  - Whether the Mac build script (`build-windows.sh`) stays as a fallback — owner; assume yes.
+  - *Decided (owner, 2026-10-13):* `v0.1.0` and `v0.1.1` stay without files; only new versions get them.
+  - *Decided (owner, 2026-10-13):* Apple Silicon Macs only; no Intel build.
+  - *Decided (owner, 2026-10-13):* the Mac script `build-windows.sh` stays as a backup.
 - **Files owned.** `.github/workflows/release.yml`; `docs/guide/src/content/docs/**/getting-started.md`; the "Building for Windows" section of `docs/workflow/CODING_RULES.md`; `apps/desktop/src-tauri/tauri.conf.json` only if the bundle targets must change (`dmg`).
 - **External operations** (each needs the owner's exact approval below):
   - Merging the workflow into `main`, and each workflow run that attaches files to a release (publishing downloads). Cleanup: delete the files from the release, delete the workflow.
@@ -37,7 +37,9 @@ At the end the owner pushes a tag, and a few minutes later the release page has 
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-13 | The card (local work only; merging the workflow, pushing a tag and publishing files still need their own approval) | owner |
 
 ## Notes
 
 - 2026-10-13 — Card written after the owner asked why the `v0.1.0` release had no files, and whether GitHub can build releases.
+- 2026-10-13 — Owner approved the card and decided: no files for `v0.1.0` and `v0.1.1`; Apple Silicon only; keep `build-windows.sh` as a backup.
