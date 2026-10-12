@@ -247,9 +247,12 @@ export function AgentsPanel({
                           </>
                         )}
                         {t(AGENT_KEY[a.id])}{" "}
-                        <span className="muted">
-                          — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
-                        </span>
+                        {/* How it will open: only for the chosen tool (owner, 2026-10-12). */}
+                        {on && picked[g.name] === a.id && (
+                          <span className="muted">
+                            — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
+                          </span>
+                        )}
                         {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
                         {a.id === "claude_app" && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
                         {/* The chosen tool takes the request from the clipboard: say how, right here. */}
