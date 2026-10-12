@@ -181,7 +181,9 @@
   "fig.taskbag": "TASKBAG",
   "fig.in_repo": "in your repository",
   "wizard.no_git": "This folder is not under Git yet. Allomos makes it a Git repository and commits the taskbag there, so the taskbag's history is kept. Nothing is pushed.",
-  "wizard.git_init": "Made {folder} a Git repository and committed the taskbag to it.",
+  "wizard.git_init": "{folder} was not under Git, so Allomos made it a Git repository (git init) and committed the taskbag to it. Git keeps every version of the taskbag's files, so you can see what changed and when, and undo a change. Nothing was sent anywhere: the repository is only on this computer.",
   "wizard.git_committed": "Committed the taskbag to the Git repository {repo}.",
-  "problem.git_init_failed": "The taskbag is saved, but {path} could not be put under Git: {detail}"
+  "problem.git_init_failed": "The taskbag is saved, but {path} could not be put under Git: {detail}",
+  "wizard.git_init_title": "Your taskbag is now kept in Git",
+  "wizard.git_help": "New to Git? Ask your AI agent: “What is Git? What is it used for?”"
 }

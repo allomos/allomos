@@ -181,7 +181,9 @@
   "fig.taskbag": "任务包",
   "fig.in_repo": "在你的代码仓库里",
   "wizard.no_git": "这个文件夹还没有用 Git 管理。换肩会把它设为 Git 仓库并提交任务包，以保留任务包的历史。不会推送。",
-  "wizard.git_init": "已把 {folder} 设为 Git 仓库，并提交了任务包。",
+  "wizard.git_init": "{folder} 原来没有用 Git 管理，所以换肩把它设为 Git 仓库（git init），并提交了任务包。Git 会保存任务包文件的每个版本，你可以看到改了什么、什么时候改的，也可以撤销改动。没有发送任何内容：这个仓库只在这台电脑上。",
   "wizard.git_committed": "已把任务包提交到 Git 仓库 {repo}。",
-  "problem.git_init_failed": "任务包已保存，但无法用 Git 管理 {path}：{detail}"
+  "problem.git_init_failed": "任务包已保存，但无法用 Git 管理 {path}：{detail}",
+  "wizard.git_init_title": "任务包现在由 Git 管理",
+  "wizard.git_help": "不了解 Git？可以问你的 AI 智能体：“Git 是什么？它有什么用？”"
 }

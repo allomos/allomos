@@ -263,3 +263,7 @@ button.link:hover { text-decoration: underline; }
 :root:lang(ja) .hop .stencil { font-size: 11px; }
 /* Japanese phrases are longer: small enough that "エージェントを替えても、" fits on one line. */
 :root:lang(ja) .welcome h1 { font-size: clamp(24px, 2.9vw, 38px); }
+
+/* The wizard's note after Allomos made the folder a Git repository (Task-A05-03). */
+.git-note { display: grid; gap: 6px; border: 1px solid var(--ok); background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; }
+.git-note strong { color: var(--ok); }

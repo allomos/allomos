@@ -181,7 +181,9 @@
   "fig.taskbag": "タスクバッグ",
   "fig.in_repo": "あなたのリポジトリに",
   "wizard.no_git": "このフォルダーはまだ Git で管理されていません。アロモスがここを Git リポジトリにしてタスクバッグをコミットし、タスクバッグの履歴が残るようにします。プッシュはしません。",
-  "wizard.git_init": "{folder} を Git リポジトリにし、タスクバッグをコミットしました。",
+  "wizard.git_init": "{folder} は Git で管理されていなかったので、アロモスが Git リポジトリにして（git init）、タスクバッグをコミットしました。Git はタスクバッグのファイルのすべての版を残すので、いつ何が変わったかを確かめたり、変更を取り消したりできます。どこにも何も送っていません。リポジトリはこのコンピューターの中だけにあります。",
   "wizard.git_committed": "タスクバッグを Git リポジトリ {repo} にコミットしました。",
-  "problem.git_init_failed": "タスクバッグは保存されましたが、{path} を Git で管理できませんでした：{detail}"
+  "problem.git_init_failed": "タスクバッグは保存されましたが、{path} を Git で管理できませんでした：{detail}",
+  "wizard.git_init_title": "タスクバッグを Git で管理するようにしました",
+  "wizard.git_help": "Git をよく知らなければ、AI エージェントに「Git とは何ですか？何に使うのですか？」と聞いてみてください。"
 }

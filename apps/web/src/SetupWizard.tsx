@@ -15,10 +15,13 @@ import type { TaskbagStep } from "./setupFlow";
 import { isProblem } from "./types";
 import type { Opened, SetupState } from "./types";
 
+/** What the wizard did with Git on step 2's Next, told on step 3. */
+type GitNote = { kind: "init"; folder: string } | { kind: "committed"; repo: string };
+
 type Step =
   | { n: 1 }
   | { n: 2; folder: string; at: TaskbagStep; gitRoot: string | null; created: Opened | null }
-  | { n: 3; opened: Opened; source: string; git: string | null }
+  | { n: 3; opened: Opened; source: string; git: GitNote | null }
   | { n: 4; opened: Opened; project: string };
 
 /** The project's name: the folder holding `.allomos/`. */
@@ -108,11 +111,11 @@ export function SetupWizard({
       if (!step.created) onOpened(o, false);
       const setup = await messenger.projectSetup(o.root);
       // Keep the taskbag in Git without asking (owner, 2026-10-12): a failure is said, not a stop.
-      let git: string | null = null;
+      let git: GitNote | null = null;
       try {
         const kept = await messenger.keepInGit(o.root);
-        if (kept.initialized) git = t("wizard.git_init", { folder: kept.repo });
-        else if (kept.committed) git = t("wizard.git_committed", { repo: kept.repo });
+        if (kept.initialized) git = { kind: "init", folder: kept.repo };
+        else if (kept.committed) git = { kind: "committed", repo: kept.repo };
       } catch (e) {
         fail(e);
       }
@@ -186,7 +189,17 @@ export function SetupWizard({
 
           {step.n === 3 && (
             <>
-              {step.git && <p className="banner ok">{step.git}</p>}
+              {step.git?.kind === "init" && (
+                // Allomos made a repository without asking: say what happened and how to learn more.
+                <div className="git-note" role="status">
+                  <strong>{t("wizard.git_init_title")}</strong>
+                  <p>{rich("wizard.git_init", { folder: <code>{step.git.folder}</code> })}</p>
+                  <p className="muted">{t("wizard.git_help")}</p>
+                </div>
+              )}
+              {step.git?.kind === "committed" && (
+                <p className="banner ok">{rich("wizard.git_committed", { repo: <code>{step.git.repo}</code> })}</p>
+              )}
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
               <p>
