@@ -21,6 +21,10 @@ cargo xwin build --release --target $T -p allomos-cli --bin alm
 mkdir -p apps/desktop/src-tauri/binaries
 cp target/$T/release/alm.exe apps/desktop/src-tauri/binaries/alm-$T.exe
 npm --prefix apps/desktop run tauri build -- --runner cargo-xwin --target $T --bundles nsis
-mkdir -p $OUT
-cp target/$T/release/bundle/nsis/*-setup.exe target/$T/release/alm.exe $OUT/
+# The installer is named after the app alone, "<productName>_setup.exe" (owner, 2026-10-12,
+# Task-A07-08); Tauri names it "<productName>_<version>_x64-setup.exe".
+NAME=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').productName")
+rm -rf $OUT && mkdir -p $OUT
+cp target/$T/release/bundle/nsis/*-setup.exe "$OUT/${NAME}_setup.exe"
+cp target/$T/release/alm.exe $OUT/
 ls -l $OUT

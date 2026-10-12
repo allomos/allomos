@@ -131,7 +131,7 @@ The Windows version is built on the Mac; there is no GitHub pipeline, because th
 bash apps/desktop/scripts/build-windows.sh
 ```
 
-It leaves `Allomos_<version>_x64-setup.exe` (the unsigned installer; it needs no administrator rights, and it installs `alm` too) and `alm.exe` in `target/windows/`. The installer's Windows-only settings are in `apps/desktop/src-tauri/tauri.windows.conf.json` and `windows/hooks.nsh`; the script copies `alm.exe` to `apps/desktop/src-tauri/binaries/` first, which a Windows `cargo` check of the app also needs. Windows warns that the publisher is unknown until builds are signed at v1.0. The first build downloads Microsoft's Windows SDK libraries into a local cache and takes a few minutes.
+It leaves `Allomos_setup.exe` (the unsigned installer, named after the app's `productName` in `tauri.conf.json`, [`Task-A07-08`](../tasks/Task-A07-08-installer-name.md); it needs no administrator rights, and it installs `alm` too) and `alm.exe` in `target/windows/`. The installer's Windows-only settings are in `apps/desktop/src-tauri/tauri.windows.conf.json` and `windows/hooks.nsh`; the script copies `alm.exe` to `apps/desktop/src-tauri/binaries/` first, which a Windows `cargo` check of the app also needs. Windows warns that the publisher is unknown until builds are signed at v1.0. The first build downloads Microsoft's Windows SDK libraries into a local cache and takes a few minutes.
 
 One-time tools (the script names any that are missing):
 
