@@ -63,3 +63,9 @@ export function directStep(setup: SetupState, skipped: boolean): 3 | 4 | null {
 export function resumeAt(setup: SetupState, wanted: 3 | 4): 3 | 4 {
   return setup.project_folder ? wanted : 3;
 }
+
+/** Not now on step 4 goes back to the start page when no agent has ever been told about Allomos
+ * (neither AGENTS.md nor CLAUDE.md mentions it); otherwise the taskbag stays open (owner, 2026-10-12). */
+export function neverConnected(setup: SetupState): boolean {
+  return !setup.agents.codex && !setup.agents.claude;
+}

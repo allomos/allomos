@@ -6,7 +6,7 @@ import { AgentLine } from "./AgentLine";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
-import { directStep, newFiles, stillMissing } from "./setupFlow";
+import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
@@ -402,9 +402,16 @@ export function App({ messenger }: { messenger: Messenger }) {
               // again until the folder is opened again.
               setSkipped(true);
               connected(result);
-              // Read again: the wizard may have recorded the project folder.
               const root = openedRef.current?.root;
-              if (root) void refreshSetup(root);
+              if (!root) return;
+              void (async () => {
+                // Not now while no agent was ever told about Allomos: back to the start page,
+                // as Cancel (owner, 2026-10-12).
+                const now = await messenger.projectSetup(root).catch(() => null);
+                if (!result.watch && now && neverConnected(now)) closeTaskbag();
+                // Otherwise read again: the wizard may have recorded the project folder.
+                else if (now && openedRef.current?.root === root) setSetup(now);
+              })();
             }}
           />
         )}

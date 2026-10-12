@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultSource, directStep, newFiles, offerConnect, resumeAt, stillMissing, taskbagStep } from "../src/setupFlow.ts";
+import { defaultSource, directStep, neverConnected, newFiles, offerConnect, resumeAt, stillMissing, taskbagStep } from "../src/setupFlow.ts";
 import type { SetupState } from "../src/types.ts";
 
 test("a folder with .allomos goes on with Next (no Change)", () => {
@@ -67,4 +67,11 @@ test("File → Connect with the Agents… opens step 4, or step 3 without a proj
   assert.equal(resumeAt(setup({ project_folder: "/p" }), 4), 4);
   assert.equal(resumeAt(setup(), 4), 3);
   assert.equal(resumeAt(setup({ project_folder: "/p" }), 3), 3);
+});
+
+test("Not now goes back to the start page only when no agent was ever told", () => {
+  assert.equal(neverConnected(setup()), true);
+  assert.equal(neverConnected(setup({ agents: { codex: true, claude: false } })), false);
+  assert.equal(neverConnected(setup({ agents: { codex: false, claude: true } })), false);
+  assert.equal(neverConnected(setup({ agents: { codex: true, claude: true } })), false);
 });

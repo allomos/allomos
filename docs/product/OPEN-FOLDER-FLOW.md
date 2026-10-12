@@ -46,7 +46,7 @@ The page has no setup cards of its own (owner, 2026-10-12): when something is mi
 - Still no project folder: the wizard opens at **step 3**. (Until 2026-10-12 a card on the page asked "Which folder holds this project?".)
 - A project folder, but an agent is not told about Allomos or the taskbag has no tasks: the wizard opens at **step 4**.
 - Before showing step 3 or 4 this way, the wizard keeps the taskbag in Git and commits it (as step 2's **Next** does), and that page says what it did.
-- **Connect** or **Not now** (step 4) keeps the taskbag open, and the wizard does not open by itself again until the folder is opened again (opening the same folder again counts). **Cancel** goes back to the start page.
+- **Connect** keeps the taskbag open. **Not now** (step 4) goes back to the **start page** when no agent has ever been told about Allomos (neither `AGENTS.md` nor `CLAUDE.md` mentions it), like **Cancel**; when one has, it keeps the taskbag open (owner, 2026-10-12). With the taskbag open, the wizard does not open by itself again until the folder is opened again (opening the same folder again counts). **Cancel** goes back to the start page.
 - **Recorded as** a path relative to the Allomos folder (`"."` when they are the same, `"../app"` for a sibling), so moving or cloning both folders together keeps it working; an absolute path only when no relative one exists (another disk).
 
 ### Connect with the agents
