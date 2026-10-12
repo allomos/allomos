@@ -44,7 +44,7 @@ One block per card that `alm list --state in_progress` shows held.
 - Uncommitted: none · Running: none started by this session
 - Label: implemented. Owner is checking the app step by step; the check list is on the card ("Done means mechanically").
 - Fresh first page: `H=~/allomos-tests/a05-03-setup-wizard/fresh-home; rm -rf "$H" && mkdir -p "$H" && CFFIXED_USER_HOME="$H" <worktree>/target/debug/bundle/macos/Allomos.app/Contents/MacOS/allomos-desktop &`
-- Direct open without project folder: `T=~/allomos-tests/a05-03-setup-wizard/no-project-folder; rm -rf "$T" && mkdir -p "$T" && (cd "$T" && ~/.cargo/bin/alm init --name "No project folder") && open -n <worktree>/target/debug/bundle/macos/Allomos.app --args "$T"`
+- Test data for check items 9–12: `~/allomos-tests/a05-03-steps-9-12/` (`bakery-board`, `no-project-folder`, `all-set`), rebuilt by its `reset.sh`. Do not use `~/allomos-tests/a05-03-setup-wizard/` for new data: the owner's items 1–8 made it a Git repository with its own taskbag.
 - Next action: owner finishes the check list; then label "locally verified", merge into `main`
 
 ## Live state

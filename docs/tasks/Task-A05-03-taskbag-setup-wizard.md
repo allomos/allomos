@@ -43,7 +43,7 @@ Today the first screen shows a short text (`welcome.title`, `welcome.body`) and 
     7. **Step 4.** The text says Allomos opens the agent with the request typed in and the plan comes back to Allomos; one agent can be chosen; the project folder line is on the left without **Change…**; **Not now** and **Connect** are in the bottom row, **Connect** where **Next** was. Choosing Codex (terminal) shows the paste tip under it.
     8. **Connect.** The chosen agent opens in the project folder with the request typed in; nothing is sent until you send it. After it adds `AGENTS.md` / `CLAUDE.md`, the window says they are new and that only new agent sessions know about Allomos.
     9. **Existing tasks.** In a test copy of a project with a Markdown task board, the agent adds the instructions, finds the board, and changes nothing until its plan is confirmed in the app with **Go ahead**.
-    10. **Direct open.** Opening a taskbag with no project folder (the `alm init` command in the handoff) opens the wizard at step 3; no "Which folder holds this project?" card on the page.
+    10. **Direct open.** Opening `~/allomos-tests/a05-03-steps-9-12/no-project-folder` (a taskbag with no project folder) opens the wizard at step 3; no "Which folder holds this project?" card on the page.
     11. **File → Connect with the Agents…** (and the top bar's "Connect with the agents…") opens the wizard at step 4, with **Change…** for the project folder.
     12. **Closing.** After **Not now** or **Cancel**, the wizard does not open again by itself until the folder is opened again; reopening the app returns to the same taskbag.
   - **Not checked by anyone yet:** Git not installed (the amber note; this Mac has Git); Windows (Ctrl+V in the paste tip).
