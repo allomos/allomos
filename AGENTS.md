@@ -28,9 +28,9 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 
 ## Working procedure
 
-1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in this repository's taskbag (`.allomos/taskbag/`, worked with `alm`). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
+1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
 2. **Several sessions may work at once**, each in its own git worktree and branch (`claude/…`, `codex/…`), each holding **one** card. Claim before you work, following the [claiming protocol](docs/workflow/CARDS.md#claiming-protocol).
-3. **Status has one home: the task in the taskbag on `main`**, changed only with `alm` (`alm list`, `alm next`, `alm claim`, `alm label`, `alm wait`, `alm done`, `alm release`). Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the owner's open questions.
+3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the owner's open questions.
 4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → owner verified (Done). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
 6. **One card per outcome, including research and decision records.** Do not keep adding unrelated work to an existing card; open a new card, so each piece can be finished and reviewed on its own.
@@ -38,6 +38,31 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 8. **Say who made each commit.** End every commit message with a line naming the agent, for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`, so history shows which agent and session did the work.
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
+
+## Tasks: Allomos
+
+This project's tasks, progress and handoff notes live in Allomos's taskbag
+(`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
+
+- Start a session with `alm next` (the next ready task and its handoff note), or `alm list`.
+- Take a task: `alm claim <id> --as <your session name> --push`.
+- Report progress: `alm label <id> "<label>" --push`; when blocked: `alm wait <id> --on "<what>" --push`.
+- Stopping before it is done: `alm release <id> --note "<what the next one needs>" --push`.
+- Finished: `alm done <id> --push`.
+- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --push`.
+- Before adding a task or changing its title or description, run `alm task-language` and write in
+  that language.
+
+`--push` commits only the taskbag's files and pushes them, so others see the change.
+
+Allomos relies on these terms: **area** (what part of the product a task belongs to),
+**iteration** (when it is planned), **label** (the step of this project's progress ladder a task
+has proven) and **state** (backlog, ready, in progress, waiting, done, dropped). When you need
+more, ask `alm` rather than guessing: `alm guide terms` (what they mean), `alm guide customize`
+(what this project may change and what is fixed), `alm guide commands`, `alm guide workflow`.
+
+This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
+`--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).
 
 ## Handoff — write it continuously
 
