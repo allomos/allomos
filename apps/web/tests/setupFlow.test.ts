@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 import { defaultSource, directStep, newFiles, offerConnect, resumeAt, stillMissing, taskbagStep } from "../src/setupFlow.ts";
 import type { SetupState } from "../src/types.ts";
 
-test("a folder with .allomos offers only Change", () => {
+test("a folder with .allomos goes on with Next (no Change)", () => {
   const step = taskbagStep({ kind: "found", root: "/p/.allomos/taskbag" });
-  assert.deepEqual(step, { kind: "found", root: "/p/.allomos/taskbag", buttons: ["change"] });
+  assert.deepEqual(step, { kind: "found", root: "/p/.allomos/taskbag", buttons: ["next"] });
 });
 
 test("a folder without .allomos offers Create, empty or not", () => {

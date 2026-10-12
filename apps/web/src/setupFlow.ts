@@ -5,8 +5,8 @@ import type { InstructionFiles, Inspection, SetupState } from "./types";
 
 /** Step 2 of the wizard: what the person can do with the folder chosen in step 1. */
 export type TaskbagStep =
-  /** The folder has `.allomos` (or is a taskbag): only Change. */
-  | { kind: "found"; root: string; buttons: ["change"] }
+  /** The folder has `.allomos` (or is a taskbag): go on with Next (Previous to choose another). */
+  | { kind: "found"; root: string; buttons: ["next"] }
   /** No `.allomos` yet: Create makes one there. */
   | { kind: "missing"; folder: string; suggestedRoot: string; buttons: ["create"] }
   | { kind: "not_a_folder"; path: string };
@@ -14,7 +14,7 @@ export type TaskbagStep =
 export function taskbagStep(i: Inspection): TaskbagStep {
   switch (i.kind) {
     case "found":
-      return { kind: "found", root: i.root, buttons: ["change"] };
+      return { kind: "found", root: i.root, buttons: ["next"] };
     case "empty":
     case "no_taskbag":
       return { kind: "missing", folder: i.folder, suggestedRoot: i.suggested_root, buttons: ["create"] };

@@ -1,6 +1,6 @@
 // The setup wizard (Task-A05-03): a dialog that sets up a taskbag in four steps.
 //   1. What a taskbag is, and choose the folder where `.allomos` goes.
-//   2. That folder has `.allomos`: only Change. It has none: Create.
+//   2. That folder has `.allomos` (or Create made it): Next. It has none: Create. Previous goes back.
 //   3. The project source folder, starting as the folder from step 1.
 //   4. Connect with the agents (the agents panel).
 // Opening a folder that has no `.allomos` starts at step 2 with that folder. A taskbag opened
@@ -156,7 +156,7 @@ export function SetupWizard({
       if (step.n !== 2 || step.at.kind !== "missing") return;
       const o = await messenger.createTaskbag(step.at.suggestedRoot, folderName(step.folder), language);
       onOpened(o, true);
-      setStep({ ...step, at: { kind: "found", root: o.root, buttons: ["change"] }, created: o });
+      setStep({ ...step, at: { kind: "found", root: o.root, buttons: ["next"] }, created: o });
     });
 
   /** Step 2 → 3: open the taskbag, and offer its recorded project folder or the step-1 folder. */
@@ -215,12 +215,8 @@ export function SetupWizard({
             <>
               <h3>{t(step.created ? "wizard.created_title" : "wizard.found_title")}</h3>
               <p>{rich(step.created ? "wizard.created_body" : "wizard.found_body", { path: <code>{step.at.root}</code> })}</p>
+              {/* No Change… here (owner, 2026-10-12): Previous goes back to choose another folder. */}
               <GitLine repo={step.gitRoot} />
-              <div className="row start">
-                <button type="button" onClick={() => void choose()} disabled={busy}>
-                  {t("wizard.change")}
-                </button>
-              </div>
             </>
           )}
 
@@ -279,7 +275,7 @@ export function SetupWizard({
             <button type="button" onClick={() => onClose(null)} disabled={busy}>
               {t("wizard.cancel")}
             </button>
-            {step.n === 2 && !step.created && (
+            {step.n === 2 && (
               <button type="button" onClick={() => setStep({ n: 1 })} disabled={busy}>
                 {t("wizard.back")}
               </button>
