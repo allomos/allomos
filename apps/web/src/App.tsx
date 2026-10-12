@@ -468,7 +468,7 @@ function ProjectFolderStep({
     <section className="card">
       <h2>{t("folder.title")}</h2>
       <p>{rich("folder.body", { folder: <code>{allomosFolder}</code> })}</p>
-      <div className="row">
+      <div className="row actions">
         <button type="button" className="primary" disabled={busy} onClick={() => void choose(allomosFolder)}>
           {t("folder.this")}
         </button>
