@@ -245,5 +245,7 @@
   "handoff_form.cancel": "取消",
   "handoff_form.save": "保存交接",
   "handoff_settings.quota_label": "额度",
-  "handoff_settings.context_label": "上下文"
+  "handoff_settings.context_label": "上下文",
+  "box.needs_update": "任务包更新后，任务就会显示出来。",
+  "box.needs_newer_app": "「换肩」更新后，任务就会显示出来。"
 }

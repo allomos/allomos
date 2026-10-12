@@ -245,5 +245,7 @@
   "handoff_form.cancel": "Cancel",
   "handoff_form.save": "Save handoff",
   "handoff_settings.quota_label": "quota",
-  "handoff_settings.context_label": "context"
+  "handoff_settings.context_label": "context",
+  "box.needs_update": "The tasks show once the taskbag is updated.",
+  "box.needs_newer_app": "The tasks show once Allomos is updated."
 }

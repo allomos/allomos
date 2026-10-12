@@ -77,6 +77,8 @@ export function App({ messenger }: { messenger: Messenger }) {
     [],
   );
   const [notices, setNotices] = useState<Note[]>([]);
+  // The update notice says the taskbag is older; the problem list then leaves it out.
+  const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
   const changeRecent = useCallback((change: (list: string[]) => string[]) => {
@@ -389,6 +391,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             messenger={messenger}
             root={opened.root}
             onUpdate={() => openWizard({ resume: { root: opened.root, at: 4 } })}
+            onOlder={setOlderShown}
           />
         )}
         {!opened && <Welcome onOpen={() => openWizard({})} />}
@@ -439,7 +442,14 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
 
-        {opened && <TaskbagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
+        {opened && (
+          <TaskbagView
+            opened={opened}
+            messenger={messenger}
+            onError={(e) => setError(errorNote(e))}
+            hideOlder={olderShown}
+          />
+        )}
       </main>
     </div>
   );
@@ -451,7 +461,18 @@ const VERSION_CHECK_MS = 4000;
 /** "This taskbag uses an older format" or "Allomos's instructions are out of date", with
  * **Update the taskbag…** (owner, 2026-10-12). Asked when the folder opens (every way of opening
  * one) and every few seconds while it is open. Allomos never updates the files itself. */
-function VersionNotice({ messenger, root, onUpdate }: { messenger: Messenger; root: string; onUpdate: () => void }) {
+function VersionNotice({
+  messenger,
+  root,
+  onUpdate,
+  onOlder,
+}: {
+  messenger: Messenger;
+  root: string;
+  onUpdate: () => void;
+  /** Whether this notice says the taskbag is older, so the problem list does not say it again. */
+  onOlder: (shown: boolean) => void;
+}) {
   const { t } = useI18n();
   const [check, setCheck] = useState<VersionCheck | null>(null);
   useEffect(() => {
@@ -470,6 +491,11 @@ function VersionNotice({ messenger, root, onUpdate }: { messenger: Messenger; ro
     };
   }, [messenger, root]);
   const notice = updateNotice(check);
+  const older = notice?.kind === "taskbag";
+  useEffect(() => {
+    onOlder(older);
+    return () => onOlder(false);
+  }, [older, onOlder]);
   if (!notice) return null;
   return (
     <div className="banner update" role="status">
@@ -611,13 +637,17 @@ function TaskbagView({
   opened,
   messenger,
   onError,
+  hideOlder,
 }: {
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
+  /** The update notice already says the taskbag is older. */
+  hideOlder: boolean;
 }) {
   const { t, rich } = useI18n();
   const { taskbag: box, issues } = opened.loaded;
+  const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_older") : issues;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
   const choose = (g: GroupBy) => {
     setGroupBy(g);
@@ -712,7 +742,8 @@ function TaskbagView({
 
   return (
     <>
-      {issues.length > 0 && <Issues issues={issues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
+      {/* The update notice above already says the taskbag is older (owner, 2026-10-12: once only). */}
+      {shownIssues.length > 0 && <Issues issues={shownIssues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
           {(box.tasks.length > 0 || handoffs.length > 0) && (
@@ -794,7 +825,15 @@ function TaskbagView({
           </div>
         </>
       ) : (
-        <p className="muted">{t("box.no_project")}</p>
+        <p className="muted">
+          {t(
+            issues.some((i) => i.problem.code === "taskbag_older")
+              ? "box.needs_update"
+              : issues.some((i) => i.problem.code === "taskbag_newer")
+                ? "box.needs_newer_app"
+                : "box.no_project",
+          )}
+        </p>
       )}
     </>
   );

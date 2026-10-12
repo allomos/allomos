@@ -245,5 +245,7 @@
   "handoff_form.cancel": "キャンセル",
   "handoff_form.save": "引き継ぎを保存",
   "handoff_settings.quota_label": "使用量",
-  "handoff_settings.context_label": "コンテキスト"
+  "handoff_settings.context_label": "コンテキスト",
+  "box.needs_update": "タスクバッグを更新すると、タスクが表示されます。",
+  "box.needs_newer_app": "アロモスを更新すると、タスクが表示されます。"
 }
