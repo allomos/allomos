@@ -3,29 +3,34 @@
 //   2. That folder has `.allomos`: only Change. It has none: Create.
 //   3. The project source folder, starting as the folder from step 1.
 //   4. Connect with the agents (the agents panel).
-// Opening a folder that has no `.allomos` starts at step 2 with that folder.
+// Opening a folder that has no `.allomos` starts at step 2 with that folder. A taskbag opened
+// directly, or File → Connect with the Agents…, starts at step 3 or 4 (owner, 2026-10-12: the
+// wizard replaces the page's own setup cards).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { AgentsPanel } from "./AgentsPanel";
 import type { ConnectResult } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
-import { defaultSource, taskbagStep } from "./setupFlow";
+import { defaultSource, resumeAt, taskbagStep } from "./setupFlow";
 import type { TaskbagStep } from "./setupFlow";
 import { isProblem } from "./types";
 import type { Opened, SetupState } from "./types";
 
-/** What the wizard did with Git on step 2's Next, told on step 3. */
+/** What the wizard did with Git before connecting an agent, told on the next page. */
 type GitNote =
   | { kind: "init"; folder: string }
   | { kind: "committed"; repo: string }
   | { kind: "missing"; folder: string };
 
 type Step =
+  /** Opening an existing taskbag at step 3 or 4: reading it first. */
+  | { n: 0 }
   | { n: 1 }
   | { n: 2; folder: string; at: TaskbagStep; gitRoot: string | null; created: Opened | null }
   | { n: 3; opened: Opened; source: string; git: GitNote | null }
-  | { n: 4; opened: Opened; project: string };
+  /** `change`: the project folder was not just chosen in step 3, so it may be changed here. */
+  | { n: 4; opened: Opened; project: string; git: GitNote | null; change: boolean };
 
 /** The project's name: the folder holding `.allomos/`. */
 function folderName(path: string): string {
@@ -37,6 +42,7 @@ function folderName(path: string): string {
 export function SetupWizard({
   messenger,
   folder: startFolder,
+  resume,
   onOpened,
   onSetup,
   onClose,
@@ -44,6 +50,8 @@ export function SetupWizard({
   messenger: Messenger;
   /** Start at step 2 with this folder (it has no `.allomos` yet). */
   folder?: string;
+  /** Start at step 3 or 4 for the open taskbag at `root` (step 3 while no project folder is known). */
+  resume?: { root: string; at: 3 | 4 };
   /** A taskbag is ready: the window shows it behind the dialog. `created`: it was just made. */
   onOpened: (o: Opened, created: boolean) => void;
   /** The project folder was recorded: the window's copy of the setup state is out of date. */
@@ -52,7 +60,7 @@ export function SetupWizard({
   onClose: (connected: ConnectResult | null) => void;
 }) {
   const { t, rich, problem, language } = useI18n();
-  const [step, setStep] = useState<Step>({ n: 1 });
+  const [step, setStep] = useState<Step>(resume ? { n: 0 } : { n: 1 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
@@ -80,6 +88,49 @@ export function SetupWizard({
   useEffect(() => {
     if (startFolder) void look(startFolder);
   }, [startFolder, look]);
+
+  /** Keep the taskbag in Git without asking (owner, 2026-10-12): what was done, to tell on the
+   * page. A failure is said, not a stop. */
+  const keep = async (root: string, folder: string): Promise<GitNote | null> => {
+    try {
+      const kept = await messenger.keepInGit(root);
+      if (kept.initialized) return { kind: "init", folder: kept.repo };
+      if (kept.committed) return { kind: "committed", repo: kept.repo };
+    } catch (e) {
+      if (isProblem(e) && e.code === "git_missing") return { kind: "missing", folder };
+      fail(e);
+    }
+    return null;
+  };
+  const keepRef = useRef(keep);
+  keepRef.current = keep;
+
+  // An open taskbag: commit it before connecting an agent, then show step 3 or 4.
+  const resumeRoot = resume?.root;
+  const resumeWanted = resume?.at;
+  useEffect(() => {
+    if (!resumeRoot || !resumeWanted) return;
+    let live = true;
+    void (async () => {
+      try {
+        const o = await messenger.openTaskbag(resumeRoot);
+        const setup = await messenger.projectSetup(resumeRoot);
+        const git = await keepRef.current(resumeRoot, setup.allomos_folder);
+        if (!live) return;
+        if (resumeAt(setup, resumeWanted) === 4 && setup.project_folder) {
+          setStep({ n: 4, opened: o, project: setup.project_folder, git, change: true });
+        } else {
+          setStep({ n: 3, opened: o, source: defaultSource(setup), git });
+        }
+      } catch (e) {
+        if (live) setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // Read once per opening; the language only words an error.
+  }, [messenger, resumeRoot, resumeWanted]);
 
   const choose = async () => {
     const path = await messenger.pickFolder(t("picker.title"));
@@ -113,16 +164,7 @@ export function SetupWizard({
       const o = step.created ?? (await messenger.openTaskbag(step.at.root));
       if (!step.created) onOpened(o, false);
       const setup = await messenger.projectSetup(o.root);
-      // Keep the taskbag in Git without asking (owner, 2026-10-12): a failure is said, not a stop.
-      let git: GitNote | null = null;
-      try {
-        const kept = await messenger.keepInGit(o.root);
-        if (kept.initialized) git = { kind: "init", folder: kept.repo };
-        else if (kept.committed) git = { kind: "committed", repo: kept.repo };
-      } catch (e) {
-        if (isProblem(e) && e.code === "git_missing") git = { kind: "missing", folder: setup.allomos_folder };
-        else fail(e);
-      }
+      const git = await keep(o.root, setup.allomos_folder);
       setStep({ n: 3, opened: o, source: defaultSource(setup), git });
     });
 
@@ -139,11 +181,10 @@ export function SetupWizard({
       const setup = await messenger.setProjectFolder(step.opened.root, step.source);
       onSetup(setup);
       // Commit the recorded project folder before the agent is connected (owner, 2026-10-12).
-      // Without Git, step 3 has already said so.
-      await messenger.keepInGit(step.opened.root).catch((e) => {
-        if (!(isProblem(e) && e.code === "git_missing")) fail(e);
-      });
-      setStep({ n: 4, opened: step.opened, project: setup.project_folder ?? step.source });
+      // What happened with Git was told on step 3 already, unless Git started only now.
+      const git = await keep(step.opened.root, setup.allomos_folder);
+      const tell = git?.kind === "init" ? git : null;
+      setStep({ n: 4, opened: step.opened, project: setup.project_folder ?? step.source, git: tell, change: false });
     });
 
   const dir = <code>.allomos</code>;
@@ -152,7 +193,7 @@ export function SetupWizard({
     <div className="overlay" role="presentation">
       <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
         <h2 id="wizard-title">{t("wizard.title")}</h2>
-        <p className="muted small">{t("wizard.step", { n: step.n })}</p>
+        {step.n > 0 && <p className="muted small">{t("wizard.step", { n: step.n })}</p>}
 
         <div className="dialog-body wizard-body">
           {step.n === 1 && (
@@ -196,24 +237,7 @@ export function SetupWizard({
 
           {step.n === 3 && (
             <>
-              {step.git?.kind === "init" && (
-                // Allomos made a repository without asking: say what happened and how to learn more.
-                <div className="git-note" role="status">
-                  <strong>{t("wizard.git_init_title")}</strong>
-                  <p>{rich("wizard.git_init", { folder: <code>{step.git.folder}</code> })}</p>
-                  <p className="muted">{t("wizard.git_help")}</p>
-                </div>
-              )}
-              {step.git?.kind === "missing" && (
-                <div className="git-note warn" role="status">
-                  <strong>{t("wizard.git_missing_title")}</strong>
-                  <p>{rich("wizard.git_missing", { folder: <code>{step.git.folder}</code> })}</p>
-                  <p className="muted">{t("wizard.git_missing_help")}</p>
-                </div>
-              )}
-              {step.git?.kind === "committed" && (
-                <p className="banner ok">{rich("wizard.git_committed", { repo: <code>{step.git.repo}</code> })}</p>
-              )}
+              <GitNoteView note={step.git} />
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
               <p>
@@ -228,13 +252,17 @@ export function SetupWizard({
           )}
 
           {step.n === 4 && (
-            <AgentsPanel
-              messenger={messenger}
-              project={step.project}
-              taskbag={step.opened.root}
-              projectFixed
-              onDone={(result) => onClose(result)}
-            />
+            <>
+              <GitNoteView note={step.git} />
+              <AgentsPanel
+                messenger={messenger}
+                project={step.project}
+                taskbag={step.opened.root}
+                projectFixed={!step.change}
+                onProjectChange={async (folder) => onSetup(await messenger.setProjectFolder(step.opened.root, folder))}
+                onDone={(result) => onClose(result)}
+              />
+            </>
           )}
         </div>
 
@@ -270,6 +298,32 @@ export function SetupWizard({
       </section>
     </div>
   );
+}
+
+/** What the wizard did with Git: made a repository (say what Git is for), found none, or committed. */
+function GitNoteView({ note }: { note: GitNote | null }) {
+  const { t, rich } = useI18n();
+  if (!note) return null;
+  if (note.kind === "init") {
+    // Allomos made a repository without asking: say what happened and how to learn more.
+    return (
+      <div className="git-note" role="status">
+        <strong>{t("wizard.git_init_title")}</strong>
+        <p>{rich("wizard.git_init", { folder: <code>{note.folder}</code> })}</p>
+        <p className="muted">{t("wizard.git_help")}</p>
+      </div>
+    );
+  }
+  if (note.kind === "missing") {
+    return (
+      <div className="git-note warn" role="status">
+        <strong>{t("wizard.git_missing_title")}</strong>
+        <p>{rich("wizard.git_missing", { folder: <code>{note.folder}</code> })}</p>
+        <p className="muted">{t("wizard.git_missing_help")}</p>
+      </div>
+    );
+  }
+  return <p className="banner ok">{rich("wizard.git_committed", { repo: <code>{note.repo}</code> })}</p>;
 }
 
 /** What happens with Git when the wizard goes on from step 2 (owner, 2026-10-12). */

@@ -38,18 +38,21 @@ A dialog of four steps ("Step n of 4"). **Cancel** closes it at steps 1–3; a t
 
 Opening a folder that has no `.allomos` (File → Open Folder…, Open Recent, the start-up folder) starts the wizard at step 2 with that folder. A folder that has one opens directly.
 
-### Project folder (opening directly)
+### Opening a taskbag directly
 
-- If `project.json` records a project folder, use it.
-- Otherwise, if `AGENTS.md` or `CLAUDE.md` is in the Allomos folder (beside `.allomos/`), that folder is the project folder: record it.
-- Otherwise, ask the person: **"Which folder holds this project?"** with **Use this folder** and **Choose another folder…**. Nothing else is offered until a project folder is recorded.
+The page has no setup cards of its own (owner, 2026-10-12): when something is missing, the **wizard** opens at that step.
+
+- If `project.json` records a project folder, use it. Otherwise, if `AGENTS.md` or `CLAUDE.md` is in the Allomos folder (beside `.allomos/`), that folder is the project folder: record it.
+- Still no project folder: the wizard opens at **step 3**. (Until 2026-10-12 a card on the page asked "Which folder holds this project?".)
+- A project folder, but an agent is not told about Allomos or the taskbag has no tasks: the wizard opens at **step 4**.
+- Before showing step 3 or 4 this way, the wizard keeps the taskbag in Git and commits it (as step 2's **Next** does), and that page says what it did.
+- Closing the wizard (**Connect**, **Not now** or **Cancel**) holds until the folder is opened again.
 - **Recorded as** a path relative to the Allomos folder (`"."` when they are the same, `"../app"` for a sibling), so moving or cloning both folders together keeps it working; an absolute path only when no relative one exists (another disk).
-- The project folder can be changed later with **Change…** beside it in the agents panel; the change is recorded the same way.
 
 ### Connect with the agents
 
 - Offered by itself after opening when either agent is not told about Allomos (the app looks for Allomos's section — `## Tasks: Allomos`, any heading naming Allomos, or `alm` commands — in the project folder's `AGENTS.md` and `CLAUDE.md`; a `CLAUDE.md` that imports `@AGENTS.md` counts when `AGENTS.md` has it) **or** the taskbag has no tasks. **Not now** holds until the folder is opened again.
-- Also at any time from **File → Connect with the Agents…** (enabled while a taskbag is open) and from the agent line's button. This one item replaces the earlier File → Tell AI Agents About This Project… and File → Move Tasks Into Allomos… (owner, 2026-10-11).
+- Also at any time from **File → Connect with the Agents…** (enabled while a taskbag is open) and from the agent line's button: both open the **wizard at step 4** (step 3 while no project folder is known), where the project folder can be changed with **Change…**. This one item replaces the earlier File → Tell AI Agents About This Project… and File → Move Tasks Into Allomos… (owner, 2026-10-11).
 - The person chooses **one** agent (owner, 2026-10-12; until then several could be ticked). It opens in the project folder with the **connect request** typed in ([`agent_connect_request_in`](../../crates/store/src/convert.rs)): part 1 adds Allomos's section to `AGENTS.md` and `CLAUDE.md`; part 2 looks for tasks the project already keeps. (`connect_agents` still accepts several and gives the others only part 1, but the panel no longer offers that.)
 - In part 2, an agent that finds no tasks says so and stops. One that finds some asks the person whether to move them: it writes its plan and runs `alm confirm`, and the app shows the plan in a popup with **Go ahead** and **Cancel** ([CODING_RULES § The `alm` command](../workflow/CODING_RULES.md#the-fh-command)). Only after **Go ahead** does it move the tasks, with `alm` commands only.
 - With no agent found, **Write the files for me** writes the section into `AGENTS.md` and `CLAUDE.md` directly.

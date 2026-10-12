@@ -49,3 +49,17 @@ export function newFiles(before: InstructionFiles, now: InstructionFiles): strin
 export function stillMissing(before: InstructionFiles, now: InstructionFiles): boolean {
   return (!before.agents_md && !now.agents_md) || (!before.claude_md && !now.claude_md);
 }
+
+/** Opening a taskbag directly (not through the wizard): the wizard step to open by itself, or
+ * none. No project folder known: step 3. Known, but an agent is not told or there are no tasks:
+ * step 4 (owner, 2026-10-12: the wizard replaces the page's own setup cards). */
+export function directStep(setup: SetupState, skipped: boolean): 3 | 4 | null {
+  if (skipped) return null;
+  if (!setup.project_folder) return 3;
+  return offerConnect(setup, false) ? 4 : null;
+}
+
+/** Where a wizard asked to open at `wanted` really opens: step 3 while no project folder is known. */
+export function resumeAt(setup: SetupState, wanted: 3 | 4): 3 | 4 {
+  return setup.project_folder ? wanted : 3;
+}

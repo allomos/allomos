@@ -3,11 +3,10 @@ import type { ReactNode } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
-import { AgentsPanel } from "./AgentsPanel";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
-import { newFiles, offerConnect, stillMissing } from "./setupFlow";
+import { directStep, newFiles, stillMissing } from "./setupFlow";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
@@ -65,8 +64,15 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [opened, setOpened] = useState<Opened | null>(null);
   const openedRef = useRef(opened);
   openedRef.current = opened;
-  /** The setup wizard (Task-A05-03), at step 1, or at step 2 for a folder without `.allomos`. */
-  const [wizard, setWizard] = useState<{ folder?: string; n: number } | null>(null);
+  /** The setup wizard (Task-A05-03): at step 1, at step 2 for a folder without `.allomos`, or at
+   * step 3 or 4 for the open taskbag. `n` counts openings, so each starts fresh. */
+  const [wizard, setWizard] = useState<{ folder?: string; resume?: { root: string; at: 3 | 4 }; n: number } | null>(
+    null,
+  );
+  const openWizard = useCallback(
+    (how: { folder?: string; resume?: { root: string; at: 3 | 4 } }) => setWizard((w) => ({ ...how, n: (w?.n ?? 0) + 1 })),
+    [],
+  );
   const [notices, setNotices] = useState<Note[]>([]);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
@@ -82,7 +88,6 @@ export function App({ messenger }: { messenger: Messenger }) {
   const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
     setNotices(message ? [message] : []);
-    setAgentsFor(null);
     setSetup(null);
     setSkipped(false);
     setError(null);
@@ -95,15 +100,9 @@ export function App({ messenger }: { messenger: Messenger }) {
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
   }, [changeRecent]);
 
-  /** The agents panel, Connect with the agents (Task-A05-03): tell AI agents about Allomos, and
-   * let the first one find the project's existing tasks and offer to move them in. */
-  const [agentsFor, setAgentsFor] = useState<{ project: string; taskbag: string } | null>(null);
-
   /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open taskbag's project folder,
    * agent instructions and tasks, and whether the person put off connecting agents this time. */
   const [setup, setSetup] = useState<SetupState | null>(null);
-  const setupRef = useRef(setup);
-  setupRef.current = setup;
   const [skipped, setSkipped] = useState(false);
   /** Instruction files that were missing when agents were connected: watched until they appear. */
   const [watch, setWatch] = useState<{ project: string; before: InstructionFiles; since: number } | null>(null);
@@ -129,7 +128,7 @@ export function App({ messenger }: { messenger: Messenger }) {
           show(await messenger.openTaskbag(i.root), null);
         } else if (i.kind === "empty" || i.kind === "no_taskbag") {
           // No `.allomos` yet: the wizard asks, starting at step 2 with this folder.
-          setWizard((w) => ({ folder: i.folder, n: (w?.n ?? 0) + 1 }));
+          openWizard({ folder: i.folder });
         } else {
           setError({ key: "error.not_a_folder", params: { path: i.path } });
         }
@@ -137,34 +136,30 @@ export function App({ messenger }: { messenger: Messenger }) {
         setError(errorNote(e));
       }
     },
-    [messenger, show],
+    [messenger, show, openWizard],
   );
 
-  // The rest of the flow after opening a taskbag directly (not through the wizard): the project
-  // folder, then Connect with the agents; checked again whenever the taskbag's files change.
+  // The rest of the flow after opening a taskbag directly (not through the wizard): the wizard opens
+  // at the step that is missing, step 3 (project folder) or 4 (connect with the agents); checked
+  // again whenever the taskbag's files change (owner, 2026-10-12: no setup cards on the page).
   const root0 = opened?.root;
   const taskCount = opened?.loaded.taskbag?.tasks.length;
   useEffect(() => {
     if (root0) void refreshSetup(root0);
   }, [root0, taskCount, refreshSetup]);
   useEffect(() => {
-    if (!opened || !setup || agentsFor || wizard) return;
-    // Without a project folder, the page asks for one first.
-    if (setup.project_folder && offerConnect(setup, skipped)) {
-      setAgentsFor({ project: setup.project_folder, taskbag: opened.root });
-    }
-  }, [opened, setup, agentsFor, skipped, wizard]);
+    if (!opened || !setup || wizard) return;
+    const at = directStep(setup, skipped);
+    if (at) openWizard({ resume: { root: opened.root, at } });
+  }, [opened, setup, skipped, wizard, openWizard]);
   // File → Connect with the Agents… only while a taskbag is open.
   const hasTaskbag = Boolean(opened);
   useEffect(() => {
     void messenger.setConnectEnabled(hasTaskbag).catch(() => undefined);
   }, [messenger, hasTaskbag]);
 
-  /** Connect with the agents closed (from the page or the wizard's last step). */
+  /** Connect with the agents closed (the wizard's last step). */
   const connected = (result: ConnectResult) => {
-    // Asked or not now: not offered again until the folder is opened again.
-    setSkipped(true);
-    setAgentsFor(null);
     const message = result.message;
     if (message) setNotices((list) => [...list, { text: message }]);
     if (result.watch) setWatch({ ...result.watch, since: Date.now() });
@@ -194,8 +189,6 @@ export function App({ messenger }: { messenger: Messenger }) {
       window.clearInterval(timer);
     };
   }, [messenger, watch]);
-  /** The project folder for the agents panel: the recorded one, else the folder holding `.allomos/`. */
-  const agentsProject = (root: string) => setupRef.current?.project_folder ?? projectFolder(root);
 
   // Follow changes made outside the window (by `alm` or by hand): reload when the files change.
   const root = opened?.root;
@@ -250,7 +243,7 @@ export function App({ messenger }: { messenger: Messenger }) {
    * takes over when it has no `.allomos`). */
   const choose = async () => {
     if (!openedRef.current) {
-      setWizard((w) => ({ n: (w?.n ?? 0) + 1 }));
+      openWizard({});
       return;
     }
     const path = await messenger.pickFolder(t("picker.title"));
@@ -299,17 +292,18 @@ export function App({ messenger }: { messenger: Messenger }) {
       })();
     });
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
-    // File → Connect with the Agents… (enabled while a taskbag is open).
+    // File → Connect with the Agents… (enabled while a taskbag is open): the wizard at step 4, or
+    // step 3 while no project folder is known.
     const stopConnect = messenger.onConnectMenu(() => {
       const root = openedRef.current?.root;
-      if (root) setAgentsFor({ project: agentsProject(root), taskbag: root });
+      if (root) openWizard({ resume: { root, at: 4 } });
     });
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
     };
-  }, [messenger, openFolder, changeRecent]);
+  }, [messenger, openFolder, changeRecent, openWizard]);
 
   return (
     <div className="app">
@@ -336,7 +330,7 @@ export function App({ messenger }: { messenger: Messenger }) {
               <AgentLine
                 messenger={messenger}
                 root={opened.root}
-                onTell={() => setAgentsFor({ project: agentsProject(opened.root), taskbag: opened.root })}
+                onTell={() => openWizard({ resume: { root: opened.root, at: 4 } })}
               />
               <button
                 type="button"
@@ -368,47 +362,23 @@ export function App({ messenger }: { messenger: Messenger }) {
             {noteText(n)}
           </Banner>
         ))}
-        {agentsFor && (
-          <AgentsPanel
-            key={agentsFor.taskbag}
-            messenger={messenger}
-            project={agentsFor.project}
-            taskbag={agentsFor.taskbag}
-            onProjectChange={async (folder) => {
-              const state = await messenger.setProjectFolder(agentsFor.taskbag, folder);
-              setSetup(state);
-            }}
-            onDone={connected}
-          />
-        )}
-
-        {opened && setup && !setup.project_folder && !wizard && (
-          <ProjectFolderStep
-            allomosFolder={setup.allomos_folder}
-            onChoose={async (folder) => {
-              try {
-                setSetup(await messenger.setProjectFolder(opened.root, folder));
-              } catch (e) {
-                setError(errorNote(e));
-              }
-            }}
-            pick={() => messenger.pickFolder(t("folder.pick"))}
-          />
-        )}
-
-        {!opened && <Welcome onOpen={() => setWizard((w) => ({ n: (w?.n ?? 0) + 1 }))} />}
+        {!opened && <Welcome onOpen={() => openWizard({})} />}
 
         {wizard && (
           <SetupWizard
             key={wizard.n}
             messenger={messenger}
             folder={wizard.folder}
+            resume={wizard.resume}
             onOpened={(o, created) =>
               show(o, created ? { key: o.readme_added ? "notice.created_here_readme" : "notice.created_nested" } : null)
             }
             onSetup={setSetup}
             onClose={(result) => {
               setWizard(null);
+              // Closed (connected, Not now or Cancel): not opened by itself again until the
+              // folder is opened again.
+              setSkipped(true);
               if (result) connected(result);
               // Read again: the wizard may have recorded the project folder.
               const root = openedRef.current?.root;
@@ -443,40 +413,6 @@ function Banner({ kind, onClose, children }: { kind: "ok" | "error"; onClose: ()
         ×
       </button>
     </div>
-  );
-}
-
-/** Step 2 of the flow: no project folder is recorded and none was found beside `.allomos/`. */
-function ProjectFolderStep({
-  allomosFolder,
-  onChoose,
-  pick,
-}: {
-  allomosFolder: string;
-  onChoose: (folder: string) => Promise<void>;
-  pick: () => Promise<string | null>;
-}) {
-  const { t, rich } = useI18n();
-  const [busy, setBusy] = useState(false);
-  const choose = async (folder: string | null) => {
-    if (!folder) return;
-    setBusy(true);
-    await onChoose(folder);
-    setBusy(false);
-  };
-  return (
-    <section className="card">
-      <h2>{t("folder.title")}</h2>
-      <p>{rich("folder.body", { folder: <code>{allomosFolder}</code> })}</p>
-      <div className="row actions">
-        <button type="button" className="primary" disabled={busy} onClick={() => void choose(allomosFolder)}>
-          {t("folder.this")}
-        </button>
-        <button type="button" disabled={busy} onClick={() => void pick().then(choose)}>
-          {t("folder.other")}
-        </button>
-      </div>
-    </section>
   );
 }
 

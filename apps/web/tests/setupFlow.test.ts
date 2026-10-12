@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultSource, newFiles, offerConnect, stillMissing, taskbagStep } from "../src/setupFlow.ts";
+import { defaultSource, directStep, newFiles, offerConnect, resumeAt, stillMissing, taskbagStep } from "../src/setupFlow.ts";
 import type { SetupState } from "../src/types.ts";
 
 test("a folder with .allomos offers only Change", () => {
@@ -52,4 +52,19 @@ test("the restart notice names only files that were missing and now exist", () =
   assert.equal(stillMissing(none, { agents_md: true, claude_md: false }), true);
   assert.equal(stillMissing(none, both), false);
   assert.equal(stillMissing(both, both), false);
+});
+
+test("opening a taskbag directly opens the wizard at the step that is missing", () => {
+  const told = { codex: true, claude: true };
+  assert.equal(directStep(setup(), false), 3, "no project folder: step 3");
+  assert.equal(directStep(setup({ project_folder: "/p" }), false), 4, "agents not told: step 4");
+  assert.equal(directStep(setup({ project_folder: "/p", agents: told }), false), 4, "no tasks: step 4");
+  assert.equal(directStep(setup({ project_folder: "/p", agents: told, has_tasks: true }), false), null, "all set");
+  assert.equal(directStep(setup(), true), null, "closed this time: not again until reopened");
+});
+
+test("File → Connect with the Agents… opens step 4, or step 3 without a project folder", () => {
+  assert.equal(resumeAt(setup({ project_folder: "/p" }), 4), 4);
+  assert.equal(resumeAt(setup(), 4), 3);
+  assert.equal(resumeAt(setup({ project_folder: "/p" }), 3), 3);
 });
