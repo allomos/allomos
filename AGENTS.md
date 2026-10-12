@@ -39,7 +39,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos
+## Tasks: Allomos (v1)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
