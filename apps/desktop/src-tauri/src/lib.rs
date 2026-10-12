@@ -284,9 +284,9 @@ fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
     versions::check_connected(&root)
 }
 
-/// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub repository for now, even
+/// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
 /// while it is private). A fixed address: the window cannot ask to open any other.
-const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos";
+const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos/releases";
 
 /// Open the download page in the web browser, for a taskbag that needs a newer Allomos.
 #[tauri::command]
