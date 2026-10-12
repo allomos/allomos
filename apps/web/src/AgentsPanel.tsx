@@ -5,6 +5,7 @@
 // moving them. Allomos never sends a request; the person does.
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
@@ -45,6 +46,7 @@ export function AgentsPanel({
   project: startProject,
   taskbag,
   projectFixed,
+  actionsIn,
   onProjectChange,
   onDone,
 }: {
@@ -53,6 +55,8 @@ export function AgentsPanel({
   taskbag: string;
   /** The project folder was just chosen (the wizard's step 3): shown, without Change…. */
   projectFixed?: boolean;
+  /** Where the buttons go: the wizard's bottom row, where Next is on the other steps. */
+  actionsIn?: HTMLElement | null;
   /** Records a project folder the person chose with Change… (the open-folder flow). */
   onProjectChange?: (folder: string) => Promise<void>;
   /** Closes the panel. */
@@ -151,6 +155,25 @@ export function AgentsPanel({
     }
   };
 
+  // Not now on the left, the main button on the right, as Cancel and Next on the wizard's other steps.
+  const actions = (
+    <>
+      <button type="button" onClick={() => onDone({ message: null })} disabled={busy}>
+        {t("agents.later")}
+      </button>
+      {agents && agents.length > 0 && (
+        <button type="button" className="primary" onClick={() => void ask()} disabled={busy || chosen.length === 0}>
+          {t("agents.ask")}
+        </button>
+      )}
+      {agents && agents.length === 0 && (
+        <button type="button" className="primary" onClick={() => void write()} disabled={busy}>
+          {t("agents.write")}
+        </button>
+      )}
+    </>
+  );
+
   return (
     <section className="card agents">
       <h2>{t("connect.title")}</h2>
@@ -228,21 +251,7 @@ export function AgentsPanel({
         </ul>
       )}
       {error && <p className="banner error">{error}</p>}
-      <div className="row actions">
-        {agents && agents.length > 0 && (
-          <button type="button" className="primary" onClick={() => void ask()} disabled={busy || chosen.length === 0}>
-            {t("agents.ask")}
-          </button>
-        )}
-        {agents && agents.length === 0 && (
-          <button type="button" className="primary" onClick={() => void write()} disabled={busy}>
-            {t("agents.write")}
-          </button>
-        )}
-        <button type="button" onClick={() => onDone({ message: null })} disabled={busy}>
-          {t("agents.later")}
-        </button>
-      </div>
+      {actionsIn ? createPortal(actions, actionsIn) : <div className="row actions">{actions}</div>}
     </section>
   );
 }

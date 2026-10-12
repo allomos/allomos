@@ -62,6 +62,8 @@ export function SetupWizard({
   const { t, rich, problem, language } = useI18n();
   const [step, setStep] = useState<Step>(resume ? { n: 0 } : { n: 1 });
   const [busy, setBusy] = useState(false);
+  /** The bottom row of step 4, where the agents panel puts its buttons. */
+  const [footer, setFooter] = useState<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
@@ -259,6 +261,7 @@ export function SetupWizard({
                 project={step.project}
                 taskbag={step.opened.root}
                 projectFixed={!step.change}
+                actionsIn={footer}
                 onProjectChange={async (folder) => onSetup(await messenger.setProjectFolder(step.opened.root, folder))}
                 onDone={(result) => onClose(result)}
               />
@@ -267,6 +270,9 @@ export function SetupWizard({
         </div>
 
         {error && <p className="banner error">{error}</p>}
+
+        {/* Step 4's buttons (Not now, Connect) sit where Cancel and Next are on the other steps. */}
+        {step.n === 4 && <div className="row" ref={setFooter} />}
 
         {step.n !== 4 && (
           <div className="row">
