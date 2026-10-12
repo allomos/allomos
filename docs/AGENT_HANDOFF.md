@@ -36,6 +36,14 @@ Updated: 2026-10-04
 
 One block per card that `alm list --state in_progress` shows held.
 
+### Task-A03-06 — claude/a03-06-handoffs
+- Checkout: `.claude/worktrees/a03-06-handoffs` · branch `claude/a03-06-handoffs` · pushed: yes
+- Approvals in force: the card's local work (owner: "proceed with a03-06"). Not approved yet: upgrading Allomos's own taskbag to `allomos/2`, retiring `docs/AGENT_HANDOFF.md` (ask first).
+- Uncommitted: none
+- Running: none
+- Unrecorded findings: format is now `allomos/2`; once merged and `alm` reinstalled, every older `alm` and app build in other worktrees stops on this repo's taskbag after it is upgraded.
+- Next action: app — Handoffs tab, task-pane link, Handoff settings dialog, person's form; then trial in `~/allomos-tests/A03-06-handoffs/`.
+
 
 ## Live state
 

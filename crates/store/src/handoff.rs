@@ -220,7 +220,8 @@ pub struct Written {
 }
 
 /// Write `writer`'s handoff (`alm handoff`, the app's form). The session's newest file is updated
-/// when it has one, otherwise a new file is made from the template. `tasks`: replaces the list of
+/// when it has one, otherwise a new file is made from the template. `fresh`: always a new file (a
+/// person writing in the app has no session; each handoff is its own). `tasks`: replaces the list of
 /// tasks it covers (each must exist); `body`: replaces the text. With neither, a new file gets the
 /// template and an existing one only its time.
 pub fn write(
@@ -229,6 +230,7 @@ pub fn write(
     tasks: Option<&[String]>,
     body: Option<&str>,
     known_tasks: &[String],
+    fresh: bool,
 ) -> Result<Written, Problem> {
     let writer = writer.trim();
     if writer.is_empty() {
@@ -245,12 +247,17 @@ pub fn write(
     }
     let lock = Lock::acquire(root, LOCK_WAIT)?;
     let now = utc_now();
-    let existing = list(lock.root()).into_iter().find(|h| h.writer == writer);
+    let existing = list(lock.root())
+        .into_iter()
+        .find(|h| !fresh && h.writer == writer);
     let created = existing.is_none();
     let mut h = match existing {
         Some(h) => h,
         None => Handoff {
-            file: format!("{HANDOFFS_DIR}/{}-{}.md", file_stamp(&now), slug(writer)),
+            file: free_name(
+                lock.root(),
+                &format!("{}-{}", file_stamp(&now), slug(writer)),
+            ),
             writer: writer.to_string(),
             tasks: Vec::new(),
             written: now.clone(),
@@ -279,6 +286,22 @@ pub fn write(
         path,
         created,
     })
+}
+
+/// `handoffs/<base>.md`, or `<base>-2.md`, … when that is taken.
+fn free_name(root: &Path, base: &str) -> String {
+    let mut n = 1;
+    loop {
+        let name = if n == 1 {
+            format!("{base}.md")
+        } else {
+            format!("{base}-{n}.md")
+        };
+        if !root.join(HANDOFFS_DIR).join(&name).exists() {
+            return format!("{HANDOFFS_DIR}/{name}");
+        }
+        n += 1;
+    }
 }
 
 /// A writer's name as part of a file name: `claude/a03-06` → `claude-a03-06`.
@@ -377,7 +400,7 @@ mod tests {
         let root = tmp("write");
         init(&root, "p", "P").unwrap();
         let known = vec!["A1-01".to_string(), "A1-02".to_string()];
-        let first = write(&root, "claude/run", None, None, &known).unwrap();
+        let first = write(&root, "claude/run", None, None, &known, false).unwrap();
         assert!(first.created);
         assert!(
             first.handoff.file.starts_with("handoffs/")
@@ -392,7 +415,7 @@ mod tests {
 
         // The same session again: the same file, now covering two tasks with its own words.
         let body = "# Handoff\n\n- **What was being done:** baking bread\n";
-        let again = write(&root, "claude/run", Some(&known), Some(body), &known).unwrap();
+        let again = write(&root, "claude/run", Some(&known), Some(body), &known, false).unwrap();
         assert!(!again.created);
         assert_eq!(again.path, first.path);
         assert_eq!(again.handoff.summary, "What was being done: baking bread");
@@ -400,7 +423,7 @@ mod tests {
         assert_eq!(latest_for(&root, "A1-02").unwrap().writer, "claude/run");
 
         // Another session: its own file; a task it does not name keeps the older handoff.
-        write(&root, "codex/x", Some(&known[..1]), None, &known).unwrap();
+        write(&root, "codex/x", Some(&known[..1]), None, &known, false).unwrap();
         assert_eq!(list(&root).len(), 2);
         assert_eq!(latest_for(&root, "A1-02").unwrap().writer, "claude/run");
         assert_eq!(latest_for(&root, "A9-99"), None);
@@ -408,15 +431,28 @@ mod tests {
         // Unknown tasks and nameless writers are refused.
         let bad = ["A9-99".to_string()];
         assert_eq!(
-            write(&root, "codex/x", Some(&bad), None, &known)
+            write(&root, "codex/x", Some(&bad), None, &known, false)
                 .unwrap_err()
                 .code(),
             "task_not_found"
         );
         assert_eq!(
-            write(&root, " ", None, None, &known).unwrap_err().code(),
+            write(&root, " ", None, None, &known, false)
+                .unwrap_err()
+                .code(),
             "holder_missing"
         );
+    }
+
+    #[test]
+    fn a_person_writes_a_new_handoff_each_time() {
+        let root = tmp("fresh");
+        init(&root, "p", "P").unwrap();
+        let a = write(&root, "will", None, Some("one"), &[], true).unwrap();
+        let b = write(&root, "will", None, Some("two"), &[], true).unwrap();
+        assert!(a.created && b.created);
+        assert_ne!(a.path, b.path);
+        assert_eq!(list(&root).len(), 2);
     }
 
     #[test]

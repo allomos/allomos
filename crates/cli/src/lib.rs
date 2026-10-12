@@ -993,7 +993,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => None,
             };
-            let w = handoff::write(&root, me, tasks.as_deref(), body.as_deref(), &known)?;
+            let w = handoff::write(&root, me, tasks.as_deref(), body.as_deref(), &known, false)?;
             let text = format!(
                 "{} {}\n{}",
                 if w.created {

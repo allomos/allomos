@@ -284,6 +284,94 @@ fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
     versions::check_connected(&root)
 }
 
+/// The project's handoff rules (as written, and with the defaults filled in) and its template
+/// (Task-A03-06), for the Handoff settings dialog.
+#[derive(Serialize)]
+struct HandoffSettings {
+    rules: allomos_core::HandoffRules,
+    applied: allomos_core::AppliedRules,
+    template: String,
+}
+
+fn handoff_settings_of(root: &Path) -> Result<HandoffSettings, Problem> {
+    let loaded = load(root);
+    let Some(bag) = loaded.taskbag else {
+        return Err(loaded.issues.first().map(|i| i.problem.clone()).unwrap_or(
+            Problem::NotATaskbag {
+                path: root.display().to_string(),
+            },
+        ));
+    };
+    let rules = bag.project.handoff.unwrap_or_default();
+    Ok(HandoffSettings {
+        applied: rules.applied(None),
+        rules,
+        template: allomos_store::handoff::template(root),
+    })
+}
+
+#[tauri::command]
+fn handoff_settings(root: PathBuf) -> Result<HandoffSettings, Problem> {
+    handoff_settings_of(&root)
+}
+
+/// Change the handoff rules, as `alm handoff-rules` does: the project's own (no `agent`), or one
+/// agent's or account's override. Returns the settings as saved.
+#[tauri::command]
+fn set_handoff_rules(
+    root: PathBuf,
+    quota: Option<String>,
+    context: Option<String>,
+    write_when: Option<String>,
+    agent: Option<String>,
+    clear: bool,
+) -> Result<HandoffSettings, Problem> {
+    let lock = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let change = allomos_core::ops::HandoffChange {
+        quota_gate: quota.as_deref(),
+        context_gate: context.as_deref(),
+        write_when: write_when.as_deref(),
+        agent: agent.as_deref(),
+        clear,
+    };
+    let project = allomos_core::ops::set_handoff_rules(&bag, &change)?;
+    lock.save_project(&project)?;
+    drop(lock);
+    handoff_settings_of(&root)
+}
+
+#[tauri::command]
+fn set_handoff_template(root: PathBuf, text: String) -> Result<HandoffSettings, Problem> {
+    allomos_store::handoff::set_template(&root, &text)?;
+    handoff_settings_of(&root)
+}
+
+/// Every handoff in the taskbag, newest first (the Handoffs tab and the task pane).
+#[tauri::command]
+fn list_handoffs(root: PathBuf) -> Vec<allomos_store::handoff::Handoff> {
+    allomos_store::handoff::list(&root)
+}
+
+/// A handoff written by a person in the app: the same file an agent writes with `alm handoff`.
+#[tauri::command]
+fn write_handoff(
+    root: PathBuf,
+    writer: String,
+    tasks: Vec<String>,
+    body: String,
+) -> Result<allomos_store::handoff::Handoff, Problem> {
+    let known: Vec<String> = load(&root)
+        .taskbag
+        .map(|b| b.tasks.into_iter().map(|t| t.id).collect())
+        .unwrap_or_default();
+    allomos_store::handoff::write(&root, &writer, Some(&tasks), Some(&body), &known, true)
+        .map(|w| w.handoff)
+}
+
 /// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
 /// while it is private). A fixed address: the window cannot ask to open any other.
 const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos/releases";
@@ -750,6 +838,11 @@ pub fn run() {
             version_check,
             taskbag_format,
             open_download_page,
+            handoff_settings,
+            set_handoff_rules,
+            set_handoff_template,
+            list_handoffs,
+            write_handoff,
             create_taskbag,
             show_in_file_manager,
             open_task_link,

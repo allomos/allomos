@@ -1039,7 +1039,9 @@ pub fn stamp(root: &Path) -> u64 {
         }
     };
     add(&root.join(PROJECT_FILE));
-    for folder in ["areas", "iterations"] {
+    add(&root.join(handoff::TEMPLATE_FILE));
+    add(&root.join(handoff::NOTES_FILE));
+    for folder in ["areas", "iterations", handoff::HANDOFFS_DIR] {
         for p in sorted_entries(&root.join(folder)) {
             add(&p);
         }
