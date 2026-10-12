@@ -106,6 +106,26 @@ pub struct SetupState {
 pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
     let loaded = crate::load(root);
     let Some(bag) = loaded.taskbag else {
+        // An older taskbag is still connected: its project folder is known without reading it, so
+        // the Connect panel can hand the update to an agent (Task-A01-25). Tasks are assumed, so
+        // the wizard does not open by itself to look for them.
+        if let crate::versions::FormatState::Older { .. } = crate::versions::format_state(root) {
+            if let Some(project) = crate::versions::connected_project(root) {
+                return Ok(SetupState {
+                    agents: agent_setup(&project),
+                    project_folder: Some(project),
+                    allomos_folder: allomos_folder(root),
+                    has_tasks: true,
+                });
+            }
+        }
+        // A newer or older format is said as itself, so the app words it in the person's language
+        // instead of quoting the English meant for agents.
+        if let Some(problem @ (Problem::TaskbagNewer { .. } | Problem::TaskbagOlder { .. })) =
+            loaded.issues.first().map(|i| &i.problem)
+        {
+            return Err(problem.clone());
+        }
         return Err(Problem::TaskbagUnreadable {
             path: root.display().to_string(),
             detail: loaded
@@ -152,6 +172,19 @@ mod tests {
         let p = std::env::temp_dir().join(format!("allomos-setup-{name}-{n}"));
         fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn a_newer_taskbag_is_reported_as_itself() {
+        let dir = std::env::temp_dir().join(format!("allomos-setup-newer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join(crate::DEFAULT_DIR);
+        crate::init(&root, "p", "P").unwrap();
+        let path = root.join(PROJECT_FILE);
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, text.replace("allomos/1", "allomos/2")).unwrap();
+        assert_eq!(setup_state(&root).unwrap_err().code(), "taskbag_newer");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

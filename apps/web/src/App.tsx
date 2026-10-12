@@ -129,6 +129,8 @@ export function App({ messenger }: { messenger: Messenger }) {
         const state = await messenger.projectSetup(root);
         if (openedRef.current?.root === root) setSetup(state);
       } catch (e) {
+        // A newer or older format is already in the problem list above the tasks (Task-A01-25).
+        if (isProblem(e) && (e.code === "taskbag_newer" || e.code === "taskbag_older")) return;
         setError(errorNote(e));
       }
     },
