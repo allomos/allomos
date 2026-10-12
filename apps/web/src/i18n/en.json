@@ -229,7 +229,7 @@
   "handoff_settings.overrides_body": "A name such as codex or claude/work. Its gates win over the project's; an empty one follows the project.",
   "handoff_settings.quota_short": "Quota %",
   "handoff_settings.context_short": "Context %",
-  "handoff_settings.project_value": "the project's",
+  "handoff_settings.project_value": "{value}% (the project's)",
   "handoff_settings.remove": "Remove",
   "handoff_settings.agent_placeholder": "Agent or account",
   "handoff_settings.add": "Add",
@@ -243,5 +243,7 @@
   "handoff_form.tasks": "Tasks it covers",
   "handoff_form.text": "Handoff",
   "handoff_form.cancel": "Cancel",
-  "handoff_form.save": "Save handoff"
+  "handoff_form.save": "Save handoff",
+  "handoff_settings.quota_label": "quota",
+  "handoff_settings.context_label": "context"
 }

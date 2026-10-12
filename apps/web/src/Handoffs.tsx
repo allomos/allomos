@@ -68,11 +68,12 @@ export function HandoffsView({
           {t("handoffs.latest_only")}
         </label>
         <span className="spacer" />
-        <button type="button" className="link" onClick={onSettings}>
-          {t("handoffs.settings")}
-        </button>
         <button type="button" className="primary" onClick={onWrite}>
           {t("handoffs.write")}
+        </button>
+        {/* At the far right (owner, 2026-10-12). */}
+        <button type="button" className="link" onClick={onSettings}>
+          {t("handoffs.settings")}
         </button>
       </div>
       {shown.length === 0 ? (
@@ -201,7 +202,9 @@ export function HandoffSettingsDialog({ messenger, root, onClose }: { messenger:
       }
     });
   const overrides = Object.entries(settings?.rules.overrides ?? {});
-  const gate = (v: number | undefined) => (v === undefined ? t("handoff_settings.project_value") : `${v}%`);
+  // An override's empty gate follows the project's: show that value too, so 5% is not a mystery.
+  const gate = (v: number | undefined, project: number | undefined) =>
+    v === undefined ? t("handoff_settings.project_value", { value: project ?? "—" }) : `${v}%`;
 
   return (
     <div className="overlay" role="presentation">
@@ -231,7 +234,8 @@ export function HandoffSettingsDialog({ messenger, root, onClose }: { messenger:
             <ul className="overrides">
               {overrides.map(([name, g]) => (
                 <li key={name}>
-                  <code>{name}</code> · {t("handoff_settings.quota_short")} {gate(g.quota_gate)} · {t("handoff_settings.context_short")} {gate(g.context_gate)}{" "}
+                  <code>{name}</code> · {t("handoff_settings.quota_label")} {gate(g.quota_gate, settings?.applied.quota_gate)} · {t("handoff_settings.context_label")}{" "}
+                  {gate(g.context_gate, settings?.applied.context_gate)}{" "}
                   <button type="button" className="link small" onClick={() => void run(() => messenger.setHandoffRules(root, { agent: name, clear: true }))} disabled={busy}>
                     {t("handoff_settings.remove")}
                   </button>

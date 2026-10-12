@@ -229,7 +229,7 @@
   "handoff_settings.overrides_body": "codex や claude/work のような名前。その関門がプロジェクトのものより優先されます。空欄はプロジェクトに従います。",
   "handoff_settings.quota_short": "使用量 %",
   "handoff_settings.context_short": "コンテキスト %",
-  "handoff_settings.project_value": "プロジェクトどおり",
+  "handoff_settings.project_value": "{value}%（プロジェクトどおり）",
   "handoff_settings.remove": "削除",
   "handoff_settings.agent_placeholder": "エージェントまたはアカウント",
   "handoff_settings.add": "追加",
@@ -243,5 +243,7 @@
   "handoff_form.tasks": "対象のタスク",
   "handoff_form.text": "引き継ぎ",
   "handoff_form.cancel": "キャンセル",
-  "handoff_form.save": "引き継ぎを保存"
+  "handoff_form.save": "引き継ぎを保存",
+  "handoff_settings.quota_label": "使用量",
+  "handoff_settings.context_label": "コンテキスト"
 }

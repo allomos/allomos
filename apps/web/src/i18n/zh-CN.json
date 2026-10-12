@@ -229,7 +229,7 @@
   "handoff_settings.overrides_body": "名称如 codex 或 claude/work。它的关口优先于项目的；留空的一项沿用项目的。",
   "handoff_settings.quota_short": "额度 %",
   "handoff_settings.context_short": "上下文 %",
-  "handoff_settings.project_value": "沿用项目",
+  "handoff_settings.project_value": "{value}%（沿用项目）",
   "handoff_settings.remove": "移除",
   "handoff_settings.agent_placeholder": "智能体或账号",
   "handoff_settings.add": "添加",
@@ -243,5 +243,7 @@
   "handoff_form.tasks": "涉及的任务",
   "handoff_form.text": "交接内容",
   "handoff_form.cancel": "取消",
-  "handoff_form.save": "保存交接"
+  "handoff_form.save": "保存交接",
+  "handoff_settings.quota_label": "额度",
+  "handoff_settings.context_label": "上下文"
 }
