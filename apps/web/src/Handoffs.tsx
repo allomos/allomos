@@ -68,11 +68,8 @@ export function HandoffsView({
           {t("handoffs.latest_only")}
         </label>
         <span className="spacer" />
-        <button type="button" className="primary" onClick={onWrite}>
-          {t("handoffs.write")}
-        </button>
-        {/* At the far right (owner, 2026-10-12). */}
-        <button type="button" className="link" onClick={onSettings}>
+        {/* A button at the far right (owner, 2026-10-12). */}
+        <button type="button" onClick={onSettings}>
           {t("handoffs.settings")}
         </button>
       </div>
@@ -110,6 +107,10 @@ export function HandoffsView({
           ))}
         </ul>
       )}
+      {/* A link below the list, outside it (owner, 2026-10-12). */}
+      <button type="button" className="link" onClick={onWrite}>
+        {t("handoffs.write")}
+      </button>
     </section>
   );
 }
