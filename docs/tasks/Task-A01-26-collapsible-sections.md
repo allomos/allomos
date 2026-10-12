@@ -1,6 +1,6 @@
 # Task-A01-26-collapsible-sections
 
-*Card type: coding. Area A01 (Tracking). Written 2026-10-12 at the owner's request ("both desktop and web"). The handoff part needs [`A03-06`](./Task-A03-06-agent-handoff-rules.md)'s Handoffs tab. **Not started: waits for A03-06, then the owner's approval.***
+*Card type: coding. Area A01 (Tracking). Written 2026-10-12 at the owner's request ("both desktop and web"). The handoff part needs [`A03-06`](./Task-A03-06-agent-handoff-rules.md)'s Handoffs tab. **Not started: A03-06 is done; waits for the owner's approval.***
 
 ## What gets built (plain words)
 
@@ -18,7 +18,7 @@ It works the same in the desktop app and in the browser: both use the same inter
   - Where the collapsed state is kept: browser storage per project (like `GROUP_BY_KEY` today) or per viewer in the taskbag. Proposed: browser storage, because it's a per-viewer convenience, not project data.
 - **Decided.** "Handoff section" means the handoff view A03-06 adds, the Handoffs tab, not the handoff note in task rows or the task pane (owner, 2026-10-12).
   - Build it all in one go, after A03-06 is finished, not in two parts (owner, 2026-10-12).
-- **Files owned.** `apps/web/src/App.tsx` (`AreaSection`, list header), the Handoffs tab's sections (after A03-06), `apps/web/src/styles.css`, language files (en, zh-CN, ja), tests; this card.
+- **Files owned.** `apps/web/src/App.tsx` (`AreaSection`, list header), the Handoffs tab's sections (`apps/web/src/Handoffs.tsx`), `apps/web/src/styles.css`, language files (en, zh-CN, ja), tests; this card.
 - **External operations.** None.
 - **Done means mechanically.**
   - Tests: collapsing a section hides its tasks and keeps its header, count and progress bar; collapse all / expand all; the state survives a reload for the same project and doesn't leak to another project; the toggle can be used with the keyboard and announces its state (`aria-expanded`).
@@ -36,3 +36,4 @@ It works the same in the desktop app and in the browser: both use the same inter
 ## Notes
 
 - 2026-10-12 — Asked for by the owner. Checked that no card covers it: the closest, [`A01-19`](./Task-A01-19-create-in-app.md) (create in app) and A04-02 (companion viewing), don't collapse sections, and no code does it yet. Owner confirmed the handoff section is A03-06's Handoffs tab. Owner chose to wait for A03-06 and build it all together. Next: A03-06 is finished, then the owner approves this card.
+- 2026-10-12 — A03-06 is done (owner verified); its Handoffs tab is in `apps/web/src/Handoffs.tsx`. Next: the owner approves this card (`alm ready A01-26`).
