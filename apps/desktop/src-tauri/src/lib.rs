@@ -284,6 +284,23 @@ fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
     versions::check_connected(&root)
 }
 
+/// The taskbag's format compared with this Allomos's, whether or not an agent is connected: the
+/// wizard's step 2 does not go on with a newer taskbag (owner, 2026-10-12).
+#[derive(Serialize)]
+struct TaskbagFormat {
+    format: versions::FormatState,
+    /// What this Allomos writes, for the message: `allomos/1`.
+    current: &'static str,
+}
+
+#[tauri::command]
+fn taskbag_format(root: PathBuf) -> TaskbagFormat {
+    TaskbagFormat {
+        format: versions::format_state(&root),
+        current: allomos_core::FORMAT,
+    }
+}
+
 /// Whether `project` has an `AGENTS.md` and a `CLAUDE.md`. The window notes which were missing
 /// before agents are connected, and says when one appears that running agent sessions have not
 /// read it (Task-A05-03).
@@ -714,6 +731,7 @@ pub fn run() {
             open_taskbag,
             taskbag_stamp,
             version_check,
+            taskbag_format,
             create_taskbag,
             show_in_file_manager,
             open_task_link,

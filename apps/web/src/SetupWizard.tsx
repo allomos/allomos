@@ -27,7 +27,8 @@ type Step =
   /** Opening an existing taskbag at step 3 or 4: reading it first. */
   | { n: 0 }
   | { n: 1 }
-  | { n: 2; folder: string; at: TaskbagStep; gitRoot: string | null; created: Opened | null }
+  /** `newer`: the found taskbag needs a newer Allomos; Next is disabled (Task-A01-25). */
+  | { n: 2; folder: string; at: TaskbagStep; gitRoot: string | null; created: Opened | null; newer?: { found: string; supported: string } | null }
   | { n: 3; opened: Opened; source: string; git: GitNote | null }
   /** `change`: the project folder was not just chosen in step 3, so it may be changed here. */
   | { n: 4; opened: Opened; project: string; git: GitNote | null; change: boolean };
@@ -78,7 +79,12 @@ export function SetupWizard({
           setError(t("error.not_a_folder", { path: at.path }));
           return;
         }
-        setStep({ n: 2, folder, at, gitRoot: info.git_root, created: null });
+        let newer: { found: string; supported: string } | null = null;
+        if (at.kind === "found") {
+          const f = await messenger.taskbagFormat(at.root).catch(() => null);
+          if (f?.format.state === "newer") newer = { found: f.format.found, supported: f.current };
+        }
+        setStep({ n: 2, folder, at, gitRoot: info.git_root, created: null, newer });
       } catch (e) {
         fail(e);
       }
@@ -218,6 +224,11 @@ export function SetupWizard({
               <p>{rich(step.created ? "wizard.created_body" : "wizard.found_body", { path: <code>{step.at.root}</code> })}</p>
               {/* No Change… here (owner, 2026-10-12): Previous goes back to choose another folder. */}
               <GitLine repo={step.gitRoot} />
+              {step.newer && (
+                <p className="banner error" role="alert">
+                  {problem({ code: "taskbag_newer", params: step.newer })}
+                </p>
+              )}
             </>
           )}
 
@@ -287,7 +298,7 @@ export function SetupWizard({
               </button>
             )}
             {step.n === 2 && step.at.kind === "found" && (
-              <button type="button" className="primary" onClick={() => void toSource()} disabled={busy}>
+              <button type="button" className="primary" onClick={() => void toSource()} disabled={busy || Boolean(step.newer)}>
                 {t("wizard.next")}
               </button>
             )}
