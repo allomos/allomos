@@ -10,6 +10,8 @@ import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow"
 import { updateNotice } from "./versionFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
+import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
+import { useFold } from "./useFold";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
@@ -670,6 +672,11 @@ function TaskbagView({
     };
   }, [messenger, opened]);
   const [handoffTask, setHandoffTask] = useState<string | null>(null);
+  // Collapsed groups and open handoffs, remembered per project (Task-A01-26).
+  const [collapsed, setCollapsed] = useFold(opened.root, "groups");
+  const [openHandoffs, setOpenHandoffs] = useFold(opened.root, "handoffs");
+  // The handoffs the tab shows now, for Collapse all / Expand all.
+  const [shownHandoffs, setShownHandoffs] = useState<string[]>([]);
   const [handoffDialog, setHandoffDialog] = useState<"settings" | "write" | null>(null);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
@@ -703,7 +710,12 @@ function TaskbagView({
     const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
     if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
   }
-  const shown = groups.flatMap((g) => g.tasks);
+  // Tasks in collapsed groups are hidden, so the arrow keys skip them.
+  const shown = visibleItems(groups, collapsed);
+  const foldAll = (on: boolean) => {
+    if (groupBy === "handoffs") setOpenHandoffs((keys) => setKeys(keys, shownHandoffs, !on));
+    else setCollapsed((keys) => setKeys(keys, groups.map((g) => g.key), on));
+  };
 
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -747,12 +759,23 @@ function TaskbagView({
       {box ? (
         <>
           {(box.tasks.length > 0 || handoffs.length > 0) && (
-            <div className="group-by" role="group" aria-label={t("group.label")}>
-              {(["area", "iteration", "handoffs"] as const).map((g) => (
-                <button key={g} type="button" aria-pressed={groupBy === g} onClick={() => choose(g)}>
-                  {t(g === "area" ? "group.by_area" : g === "iteration" ? "group.by_iteration" : "group.handoffs")}
+            <div className="list-tools">
+              <div className="group-by" role="group" aria-label={t("group.label")}>
+                {(["area", "iteration", "handoffs"] as const).map((g) => (
+                  <button key={g} type="button" aria-pressed={groupBy === g} onClick={() => choose(g)}>
+                    {t(g === "area" ? "group.by_area" : g === "iteration" ? "group.by_iteration" : "group.handoffs")}
+                  </button>
+                ))}
+              </div>
+              {/* Task-A01-26: for the list shown now. */}
+              <span className="fold-all">
+                <button type="button" className="link small" onClick={() => foldAll(true)}>
+                  {t("fold.collapse_all")}
                 </button>
-              ))}
+                <button type="button" className="link small" onClick={() => foldAll(false)}>
+                  {t("fold.expand_all")}
+                </button>
+              </span>
             </div>
           )}
           {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
@@ -765,8 +788,17 @@ function TaskbagView({
                 onTask={setHandoffTask}
                 onOpenTask={(id) => {
                   choose("area");
+                  // Its area may be collapsed: open it, so the task is seen in the list.
+                  const task = box.tasks.find((x) => x.id === id);
+                  if (task) {
+                    const key = box.areas.some((a) => a.id === task.area) ? `a-${task.area}` : "lost";
+                    setCollapsed((keys) => withoutKey(keys, key));
+                  }
                   setSelectedId(id);
                 }}
+                openKeys={openHandoffs}
+                onToggle={(file) => setOpenHandoffs((keys) => toggleKey(keys, file))}
+                onShown={setShownHandoffs}
                 onWrite={() => setHandoffDialog("write")}
                 onSettings={() => setHandoffDialog("settings")}
                 onLink={openLink}
@@ -789,6 +821,8 @@ function TaskbagView({
                   iterationName={groupBy === "area" ? iterationName : undefined}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
+                  collapsed={collapsed.includes(g.key)}
+                  onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
                 />
               ))}
               {groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
@@ -896,6 +930,8 @@ function TaskGroup({
   iterationName,
   selectedId,
   onSelect,
+  collapsed,
+  onToggle,
 }: {
   id: string;
   name: string;
@@ -907,15 +943,20 @@ function TaskGroup({
   selectedId: string | null;
   /** Clicking a task opens it in the task pane; clicking it again closes the pane. */
   onSelect: (id: string) => void;
+  /** Only the header shows: name, count and progress (Task-A01-26). */
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
   const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   return (
-    <section className="area">
+    <section className={collapsed ? "area collapsed" : "area"}>
       <header className="area-head">
         <h2>
-          {id && <span className="id">{id}</span>} {name}
+          <button type="button" className="fold" aria-expanded={!collapsed} onClick={onToggle}>
+            {id && <span className="id">{id}</span>} {name}
+          </button>
         </h2>
         <span className="count">{t("area.count", { done, total: tasks.length })}</span>
         {sub && <span className="sub">{sub}</span>}
@@ -923,7 +964,7 @@ function TaskGroup({
           <div style={{ width: `${pct}%` }} />
         </div>
       </header>
-      {tasks.length === 0 ? (
+      {collapsed ? null : tasks.length === 0 ? (
         <p className="muted small">{empty}</p>
       ) : (
         <ul className="tasks">

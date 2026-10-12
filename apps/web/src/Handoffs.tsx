@@ -20,6 +20,9 @@ export function HandoffsView({
   onWrite,
   onSettings,
   onLink,
+  openKeys,
+  onToggle,
+  onShown,
 }: {
   handoffs: Handoff[];
   tasks: Task[];
@@ -30,12 +33,19 @@ export function HandoffsView({
   onWrite: () => void;
   onSettings: () => void;
   onLink: (href: string) => void;
+  /** The open handoffs, by file; each opens and closes on its own, remembered per project
+   * (Task-A01-26). */
+  openKeys: string[];
+  onToggle: (file: string) => void;
+  /** The handoffs shown now, so Collapse all / Expand all act on them. */
+  onShown: (files: string[]) => void;
 }) {
   const { t } = useI18n();
   const [writer, setWriter] = useState<string | null>(null);
   const [latestOnly, setLatestOnly] = useState(true);
-  const [open, setOpen] = useState<string | null>(null);
   const shown = filterHandoffs(handoffs, { task, writer, latestOnly });
+  const shownFiles = shown.map((h) => h.file).join("\n");
+  useEffect(() => onShown(shownFiles ? shownFiles.split("\n") : []), [shownFiles]);
   const titleOf = (id: string) => tasks.find((x) => x.id === id)?.title ?? "";
 
   return (
@@ -77,9 +87,11 @@ export function HandoffsView({
         <p className="muted">{handoffs.length === 0 ? t("handoffs.none") : t("handoffs.none_match")}</p>
       ) : (
         <ul className="handoff-list">
-          {shown.map((h) => (
-            <li key={h.file} className={open === h.file ? "open" : undefined}>
-              <button type="button" className="handoff-head" aria-expanded={open === h.file} onClick={() => setOpen(open === h.file ? null : h.file)}>
+          {shown.map((h) => {
+            const open = openKeys.includes(h.file);
+            return (
+            <li key={h.file} className={open ? "open" : undefined}>
+              <button type="button" className="handoff-head" aria-expanded={open} onClick={() => onToggle(h.file)}>
                 <span className="when">{localTime(h.updated)}</span>
                 <span className="who">{h.writer || t("handoffs.unknown_writer")}</span>
                 <span className="what">{h.summary || t("handoffs.empty")}</span>
@@ -95,7 +107,7 @@ export function HandoffsView({
                   ))
                 )}
               </div>
-              {open === h.file && (
+              {open && (
                 <div className="handoff-body">
                   <Markdown source={h.body} onLink={onLink} />
                   <p className="muted small">
@@ -104,7 +116,8 @@ export function HandoffsView({
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       {/* A link below the list, outside it, at the far right (owner, 2026-10-12). */}
