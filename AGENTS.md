@@ -53,7 +53,9 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 
-`--push` commits only the taskbag's files and pushes them, so others see the change.
+`--push` commits only the taskbag's files and pushes them, so others see the change. When the
+taskbag's Git repository has no remote (`git remote` prints nothing), use `--commit` instead: it
+commits the same files without trying to push.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
