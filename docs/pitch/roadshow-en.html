@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a stack of 16:9 slides on a sky ground, organized as three sets: the main set (switch, amber), AI skills (teal) and progress management (blue). A hop arc between agents and people is the recurring motif. Present mode shows one slide at a time. */
+/* Layout: a stack of 16:9 slides on a sky ground, organized as three sets: the main set (switch, amber), AI skills (teal) and progress management (blue). A shift arc between agents and people is the recurring motif. Present mode shows one slide at a time. */
 :root{
   --sky:#E9EFF5;        /* page ground */
   --paper:#FBFCFE;      /* slide surface */
@@ -222,7 +222,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
   <section class="slide hero" aria-label="Allomos">
     <div class="hero-grid">
       <div>
-        <p class="eyebrow">Hop between AI agents and teammates</p>
+        <p class="eyebrow">Shift between AI agents and teammates</p>
         <h1 style="font-size:clamp(38px,5vw,66px)">Switch agents. Switch teammates. <em>Keep the project.</em></h1>
         <p class="lede">When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its taskbag: plain files in your own repository.</p>
         <div class="pill-row">
@@ -234,7 +234,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
       </div>
       <figure style="margin:0">
         <svg class="hop" viewBox="0 0 560 330" role="img" aria-labelledby="hop-t" style="width:100%;height:auto;display:block">
-          <title id="hop-t">A task hops from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.</title>
+          <title id="hop-t">A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.</title>
           <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
           <path class="arc" d="M120,92 Q187,14 250,92" marker-end="url(#ah)"/>
           <path class="arc" d="M310,92 Q373,14 440,92" marker-end="url(#ah)"/>
@@ -288,7 +288,7 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
     <h2>One main job. Two that make it better.</h2>
     <div class="sets">
       <div class="set main"><span class="k">Main set</span><h3>Switch</h3>
-        <p>Hop between AI agents and teammates without losing the project.</p>
+        <p>Shift the project between AI agents and teammates without losing anything.</p>
         <ul><li>A taskbag in your repository</li><li>The same commands for every agent</li><li>Handoff and resume in one step</li><li>Hand the project to a teammate</li></ul></div>
       <div class="set skills"><span class="k">Set 2</span><h3>AI skills</h3>
         <p>Get better at working with AI agents.</p>

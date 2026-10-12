@@ -42,4 +42,5 @@ The English and Chinese road show decks use the product's current names: **Allom
 | Both decks, light theme, in the browser pane: slide 1 bag label fits; top bar shows the new name | PASS |
 | Dark theme | not seen: the pane renders local files in light only — owner check |
 | Republish at existing addresses | PASS: English → version 6 (`1791768229-7e4f`), 中文 → version 6 (`1791768231-168b`). The live pages were read first and matched the repo source (version 5), so nothing else was overwritten. |
+| Owner's comment on the English deck (2026-10-12): a better word than "hop"? Agent offered shift / pass / hand over; owner chose the recommended **shift** ("yes"). "Hop" → "Shift" in the hero eyebrow, set 1 text and the drawing's description; Chinese description 跳到 → 转到. Republished: English version 7 (`1791768422-0778`), 中文 version 7 (`1791768424-8f86`). | PASS |
 | Owner opens both addresses and checks | waiting |
