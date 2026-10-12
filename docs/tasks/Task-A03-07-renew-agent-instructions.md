@@ -1,6 +1,6 @@
 # Task-A03-07-renew-agent-instructions
 
-*Card type: coding. Area A03 (Agents). Recorded for the owner, 2026-10-10.*
+*Card type: coding. Area A03 (Agents). Recorded for the owner, 2026-10-10. **Dropped 2026-10-12: merged into [`A01-25`](./Task-A01-25-taskbag-format-upgrade.md)** at the owner's request; its decisions (version in the heading) carry over there, and the app now only hands the update to an agent.*
 
 ## What gets built (plain words)
 
@@ -35,6 +35,7 @@ At the end the owner upgrades Allomos, opens an older project, sees "instruction
 |---|---|---|
 | 2026-10-11 | Card approved ("approve"): ready | owner (chat) |
 | 2026-10-11 | The version goes in the section's heading, e.g. `## Tasks: Allomos (v3)` | owner (chat) |
+| 2026-10-12 | Merged into A01-25 ("Merge A03-07 into A01-25") | owner (chat) |
 | 2026-10-11 | "Not now" comes back each time the project is opened (option A: "A, because it is important") | owner (chat) |
 
 ## Notes
