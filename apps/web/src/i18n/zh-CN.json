@@ -200,5 +200,6 @@
   "update.no_agent": "这台电脑上没有找到 AI 智能体。「换肩」自己不会修改这些文件：请先启动一个 AI 智能体，再选择「文件 › 连接 AI 智能体…」。",
   "update.asked": "已打开 {agent}。请在那里阅读请求并发送。智能体更新项目后，这条提示就会消失。",
   "update.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体更新项目后，这条提示就会消失。",
-  "update.download": "下载最新版换肩"
+  "update.download": "下载最新版换肩",
+  "update.newer_title": "请更新换肩"
 }

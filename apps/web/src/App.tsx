@@ -761,14 +761,27 @@ function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string
 
 function Issues({ issues, onDownload }: { issues: Issue[]; onDownload: () => void }) {
   const { t, rich, problem } = useI18n();
+  // A taskbag from a newer Allomos is not a broken file: same look, but titled "Please update
+  // Allomos" and without the file and field (owner, 2026-10-12).
+  const newer = issues.some((i) => i.problem.code === "taskbag_newer");
   return (
     <section className="issues" aria-label={t("issues.label")}>
-      <h2>{issues.length === 1 ? t("issues.title_one") : t("issues.title_other", { count: issues.length })}</h2>
+      <h2>
+        {newer
+          ? t("update.newer_title")
+          : issues.length === 1
+            ? t("issues.title_one")
+            : t("issues.title_other", { count: issues.length })}
+      </h2>
       <ul>
         {issues.map((i, n) => (
           <li key={n}>
-            <code>{i.file}</code>
-            {i.field && <> · {rich("issues.field", { field: <code>{i.field}</code> })}</>}
+            {i.problem.code !== "taskbag_newer" && (
+              <>
+                <code>{i.file}</code>
+                {i.field && <> · {rich("issues.field", { field: <code>{i.field}</code> })}</>}
+              </>
+            )}
             <span>{problem(i.problem)}</span>
             {/* A newer taskbag: where to get the newer Allomos (owner, 2026-10-12). */}
             {i.problem.code === "taskbag_newer" && (
