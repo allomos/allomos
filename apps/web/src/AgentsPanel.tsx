@@ -1,9 +1,8 @@
 // "Connect with the agents" (Task-A05-03; before it, Task-A03-03 and Task-A05-02 were two
-// panels): lists the AI agents on this computer, lets the person pick one or more and the project
-// folder, then opens each with its request typed in. Every agent adds Allomos's instructions; the
-// first chosen also looks for the project's existing tasks and, if it finds some, asks with
-// `alm confirm` before moving them (only one, because two would add every task twice).
-// Allomos never sends a request; the person does.
+// panels): lists the AI agents on this computer, lets the person pick one (owner, 2026-10-12) and
+// the project folder, then opens it with the request typed in: add Allomos's instructions, then
+// look for the project's existing tasks and, if it finds some, ask with `alm confirm` before
+// moving them. Allomos never sends a request; the person does.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -91,13 +90,8 @@ export function AgentsPanel({
     };
   }, [messenger]);
 
-  const toggleGroup = (name: string) =>
-    setTicked((set) => {
-      const next = new Set(set);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+  // One agent (owner, 2026-10-12): choosing a group replaces the choice.
+  const toggleGroup = (name: string) => setTicked(new Set([name]));
   const chosen = GROUPS.filter((g) => ticked.has(g.name) && picked[g.name]).map((g) => picked[g.name]);
 
   const changeProject = async () => {
@@ -188,7 +182,8 @@ export function AgentsPanel({
               <li key={g.name}>
                 <label>
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="agent-group"
                     checked={on}
                     onChange={() => toggleGroup(g.name)}
                     disabled={busy}
@@ -225,7 +220,6 @@ export function AgentsPanel({
           })}
         </ul>
       )}
-      {chosen.length > 1 && <p className="muted small">{t("connect.first", { agent: t(AGENT_KEY[chosen[0]]) })}</p>}
       {error && <p className="banner error">{error}</p>}
       <div className="row">
         {agents && agents.length > 0 && (
