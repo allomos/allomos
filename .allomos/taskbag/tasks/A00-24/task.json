@@ -1,6 +1,7 @@
 {
   "area": "A00",
+  "holder": "claude/a00-24-decks",
   "id": "A00-24",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Decks say Allomos and taskbag"
 }
