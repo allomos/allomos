@@ -89,3 +89,7 @@ Claude Code と Codex それぞれの得意なことと、プロジェクトに�
 - プロダクト計画：[docs/product/PLAN.md](docs/product/PLAN.md) · 要件：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 三つのセット：[決定 0014](docs/decisions/0014-main-purpose-and-three-sets.md)（いずれも英語）。
 - いま何に取り組んでいるか：このリポジトリをアロモスのアプリで開くか、`alm list` を実行します（このリポジトリのタスクバッグは `../allomos-taskbag/.allomos/taskbag` にあるので、`--taskbag "../allomos-taskbag/.allomos/taskbag"` を付けてください）。いまの作業とオーナーへの質問：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。
 - すべてのドキュメント：[docs/README.md](docs/README.md)。AI エージェントは [AGENTS.md](AGENTS.md) から始めます。
+
+## ライセンス
+
+[MIT](LICENSE) © 2026 will.w.hui（ライセンスの本文は英語です）
