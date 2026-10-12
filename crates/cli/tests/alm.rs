@@ -955,3 +955,106 @@ fn title_and_project_rename() {
     .unwrap();
     assert_eq!(project["name"], "Allomos");
 }
+
+/// Set `project.json`'s format, as a newer (or older) Allomos would have written it.
+fn set_format(repo: &Path, format: &str) {
+    let path = repo.join(".allomos/taskbag/project.json");
+    let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    v["format"] = json!(format);
+    fs::write(
+        &path,
+        format!("{}\n", serde_json::to_string_pretty(&v).unwrap()),
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
+    let repo = filled();
+    set_format(&repo, "allomos/2");
+    // A field this Allomos does not know, as a newer one might add.
+    let path = repo.join(".allomos/taskbag/project.json");
+    let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    v["handoff"] = json!({ "context": 90 });
+    fs::write(&path, v.to_string()).unwrap();
+    let before = fs::read_to_string(&path).unwrap();
+
+    for args in [
+        &["next"][..],
+        &["list"],
+        &["claim", "A01-01", "--as", "a"],
+        &["upgrade"],
+    ] {
+        let v = refused(&repo, args, 4, "taskbag_newer");
+        let message = v["error"]["message"].as_str().unwrap();
+        assert!(message.contains("update Allomos now"), "{message}");
+        assert!(message.contains("your own understanding"), "{message}");
+        assert_eq!(v["error"]["params"]["found"], "allomos/2");
+    }
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        before,
+        "nothing written"
+    );
+    // The brief and the guide still work: they do not read the taskbag's tasks.
+    ok(&repo, &["brief"]);
+    ok(&repo, &["guide", "terms"]);
+
+    // People see the same message, and the exit code.
+    let out = alm(&repo, &["next"]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("error [taskbag_newer]"));
+}
+
+#[test]
+fn an_out_of_date_section_warns_the_agent_on_every_call() {
+    let repo = filled();
+    // Not connected yet (no section anywhere): no warning.
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["warnings"], json!([]));
+
+    // A section from before versions: every command works, and warns.
+    fs::write(
+        repo.join("AGENTS.md"),
+        "# Rules\n\n## Tasks: Allomos\n\nStart with `alm next`.\n",
+    )
+    .unwrap();
+    fs::write(repo.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
+    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["upgrade"]] {
+        let v = ok(&repo, args);
+        assert_eq!(
+            v["warnings"][0]["code"], "instructions_outdated",
+            "{args:?}"
+        );
+        assert_eq!(v["warnings"][0]["params"]["files"], "AGENTS.md");
+        assert!(
+            v["warnings"][0]["message"]
+                .as_str()
+                .unwrap()
+                .contains("`alm brief`")
+        );
+    }
+    let out = alm(&repo, &["next"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("warning [instructions_outdated]"));
+
+    // The agent renews it from `alm brief`: no more warning.
+    let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
+    assert!(brief.starts_with("## Tasks: Allomos (v1)"), "{brief}");
+    fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["warnings"], json!([]));
+}
+
+#[test]
+fn upgrade_on_a_current_taskbag_changes_nothing() {
+    let repo = filled();
+    let path = repo.join(".allomos/taskbag/project.json");
+    let before = fs::read_to_string(&path).unwrap();
+    let v = ok(&repo, &["upgrade"]);
+    assert_eq!(
+        v["upgrade"],
+        json!({ "from": "allomos/1", "to": "allomos/1", "changed": false })
+    );
+    assert_eq!(fs::read_to_string(&path).unwrap(), before);
+}

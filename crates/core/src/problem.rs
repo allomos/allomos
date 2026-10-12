@@ -59,6 +59,14 @@ problems! {
     InvalidChoice { value, allowed } => "invalid_choice", "{value} is not a valid value here. Use one of: {allowed}.";
     InvalidId { id } => "invalid_id", "\"{id}\" is not a valid ID. Use 1–64 letters, digits, '-' or '_'.";
     WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of Allomos reads only \"{expected}\".";
+    /// The taskbag was written by a newer Allomos (Task-A01-25). The person chooses what happens.
+    TaskbagNewer { found, supported } => "taskbag_newer", "This taskbag is written in the format \"{found}\", newer than this Allomos understands (\"{supported}\"). Stop and let the person choose: update Allomos now, or let you go on working with the taskbag's files directly, from your own understanding of the newer format.";
+    /// The taskbag was written by an older Allomos and must be upgraded first (Task-A01-25).
+    TaskbagOlder { found, current } => "taskbag_older", "This taskbag is written in the older format \"{found}\"; this Allomos writes \"{current}\". Update it now: run `alm upgrade`, then run your command again.";
+    /// A warning: Allomos's section in AGENTS.md / CLAUDE.md is out of date (Task-A01-25).
+    InstructionsOutdated { files, current } => "instructions_outdated", "Allomos's section in {files} is out of date (this Allomos writes version {current}). Update it now: replace that section with the output of `alm brief`, keep the rest of the file, and commit only those files.";
+    /// `alm upgrade` found no way from the taskbag's format to this Allomos's (Task-A01-25).
+    UpgradeMissing { found, current } => "upgrade_missing", "This Allomos cannot upgrade a taskbag from \"{found}\" to \"{current}\".";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     /// `task_language` is neither `ui` nor a language code (Task-A01-21).

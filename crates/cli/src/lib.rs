@@ -15,7 +15,7 @@ use allomos_store::{
     DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
     agent_section_for, agent_setup_request, find_taskbag, git_root, guide, id_from_name,
     init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
-    requests_dir, task_language, was_seen, withdraw_confirm,
+    requests_dir, task_language, versions, was_seen, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -28,6 +28,8 @@ pub const EXIT_OK: i32 = 0;
 pub const EXIT_REFUSED: i32 = 1;
 pub const EXIT_USAGE: i32 = 2;
 pub const EXIT_BUSY: i32 = 3;
+/// The taskbag was written by a newer Allomos: the person chooses what happens (Task-A01-25).
+pub const EXIT_NEWER: i32 = 4;
 
 /// How long a writer waits for another one to finish, unless `ALLOMOS_LOCK_WAIT_MS` says otherwise.
 const LOCK_WAIT_MS: u64 = 5000;
@@ -37,7 +39,7 @@ const LOCK_WAIT_MS: u64 = 5000;
     name = "alm",
     version,
     about = "Work an Allomos taskbag's tasks from a terminal.",
-    after_help = "Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not writable."
+    after_help = "Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not writable, 4 the taskbag needs a newer Allomos."
 )]
 struct Cli {
     /// The taskbag folder, or a folder holding .allomos/taskbag/. Default: search upward from here.
@@ -184,6 +186,9 @@ enum Command {
     Drop { id: String },
     /// Show the first ready task that no one holds.
     Next,
+    /// Bring a taskbag written by an older Allomos up to this one's format. Run it when `alm`
+    /// says the taskbag is older; it adds only what the newer format has.
+    Upgrade,
 }
 
 #[derive(Subcommand)]
@@ -242,6 +247,7 @@ impl Command {
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
+            | Command::Upgrade
             | Command::Next => None,
         }
     }
@@ -290,6 +296,7 @@ impl Command {
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
             Command::Next => "next",
+            Command::Upgrade => "upgrade",
         }
     }
 }
@@ -318,6 +325,7 @@ impl Done {
 
 pub fn exit_code(problem: &Problem) -> i32 {
     match problem {
+        Problem::TaskbagNewer { .. } => EXIT_NEWER,
         Problem::BadUsage { .. } => EXIT_USAGE,
         Problem::TaskbagBusy { .. }
         | Problem::WriteFailed { .. }
@@ -365,7 +373,11 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
         }
     };
     let command = cli.command.name();
-    match execute(&cli, cwd) {
+    match check_versions(&cli, cwd).and_then(|outdated| {
+        let mut done = execute(&cli, cwd)?;
+        done.warnings.extend(outdated);
+        Ok(done)
+    }) {
         Ok(mut done) => {
             if (cli.commit || cli.push) && cli.command.changes() {
                 if let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) {
@@ -406,6 +418,52 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
             exit_code(&problem)
         }
     }
+}
+
+/// Before a command: is the taskbag in this Allomos's format, and is Allomos's section in the
+/// project's instruction files current (Task-A01-25)? A newer or older taskbag stops the command;
+/// an out-of-date section gives a warning telling the agent to renew it. Commands that do not work
+/// on a taskbag (`init`, `brief`, `guide`, `confirm`), and `upgrade` itself, skip the format check.
+fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
+    let skips_format = matches!(
+        cli.command,
+        Command::Init { .. }
+            | Command::Brief
+            | Command::Guide { .. }
+            | Command::Confirm { .. }
+            | Command::Upgrade
+    );
+    if matches!(
+        cli.command,
+        Command::Init { .. } | Command::Brief | Command::Guide { .. } | Command::Confirm { .. }
+    ) {
+        return Ok(Vec::new());
+    }
+    // No taskbag here: the command itself says so.
+    let Ok(root) = locate(cli, cwd) else {
+        return Ok(Vec::new());
+    };
+    if !skips_format {
+        match versions::format_state(&root) {
+            versions::FormatState::Newer { found } => {
+                return Err(Problem::TaskbagNewer {
+                    found,
+                    supported: allomos_core::FORMAT.to_string(),
+                });
+            }
+            versions::FormatState::Older { found } => {
+                return Err(Problem::TaskbagOlder {
+                    found,
+                    current: allomos_core::FORMAT.to_string(),
+                });
+            }
+            versions::FormatState::Current | versions::FormatState::Unknown => {}
+        }
+    }
+    Ok(versions::check_connected(&root)
+        .and_then(|c| c.instructions_warning())
+        .into_iter()
+        .collect())
 }
 
 /// Run `git` in `dir`; on failure, Git's own message.
@@ -747,6 +805,16 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 Err(_) => agent_section(),
             };
             Ok(Done::new(json!({ "brief": text }), text))
+        }
+        Command::Upgrade => {
+            let root = locate(cli, cwd)?;
+            let up = versions::upgrade(&root)?;
+            let text = if up.changed {
+                format!("Upgraded the taskbag from {} to {}.\n", up.from, up.to)
+            } else {
+                format!("The taskbag is already in {}; nothing to upgrade.\n", up.to)
+            };
+            Ok(Done::new(json!({ "taskbag": root, "upgrade": up }), text))
         }
         Command::Guide { topic } => {
             let text = guide(topic.as_deref()).unwrap_or_default();
