@@ -28,7 +28,7 @@ A folder **with** `.allomos` opens directly, and the app walks the same checks i
 
 ### The setup wizard
 
-A dialog of four steps ("Step n of 4"). **Cancel** closes it at steps 1–3; a taskbag created or chosen by then stays open, and the page goes on with the checks below.
+A dialog of four steps ("Step n of 4"). **Cancel** (steps 1–3) closes it and goes back to the **start page**: no taskbag is open, and the next start shows the start page too (owner, 2026-10-12). A taskbag created by then stays on disk.
 
 1. **What a taskbag is.** A short explanation, and **Choose a folder…**: the folder where `.allomos` will be.
 2. **The `.allomos` folder.** If the chosen folder already has `.allomos/taskbag/` (or is a taskbag), the step says so and offers **Next**; **Previous** goes back to step 1 to choose another folder (owner, 2026-10-12: no **Change…** here). If not, it offers **Create**, which makes an **empty** taskbag in `<folder>/.allomos/taskbag/` (and `README-allomos.md` when the folder looks empty); then the step says "Taskbag created" and offers **Next** like a found one. The step also says what happens with Git: the folder's repository, or that the folder will be made one. *Why empty:* the connect step asks whether the taskbag has tasks; example tasks would always answer yes. (Until 2026-10-09 the app wrote a starter project with three example tasks.)
@@ -46,7 +46,7 @@ The page has no setup cards of its own (owner, 2026-10-12): when something is mi
 - Still no project folder: the wizard opens at **step 3**. (Until 2026-10-12 a card on the page asked "Which folder holds this project?".)
 - A project folder, but an agent is not told about Allomos or the taskbag has no tasks: the wizard opens at **step 4**.
 - Before showing step 3 or 4 this way, the wizard keeps the taskbag in Git and commits it (as step 2's **Next** does), and that page says what it did.
-- Closing the wizard (**Connect**, **Not now** or **Cancel**) holds until the folder is opened again.
+- **Connect** or **Not now** (step 4) keeps the taskbag open, and the wizard does not open by itself again until the folder is opened again (opening the same folder again counts). **Cancel** goes back to the start page.
 - **Recorded as** a path relative to the Allomos folder (`"."` when they are the same, `"../app"` for a sibling), so moving or cloning both folders together keeps it working; an absolute path only when no relative one exists (another disk).
 
 ### Connect with the agents

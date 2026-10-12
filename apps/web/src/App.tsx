@@ -85,6 +85,19 @@ export function App({ messenger }: { messenger: Messenger }) {
   }, []);
   const noteText = (n: Note) => ("problem" in n ? problem(n.problem) : "text" in n ? n.text : t(n.key, n.params));
 
+  /** Back to the start page: no taskbag open, and none to reopen at the next start. */
+  const closeTaskbag = () => {
+    setOpened(null);
+    setSetup(null);
+    setNotices([]);
+    setError(null);
+    try {
+      localStorage.removeItem(LAST_ROOT_KEY);
+    } catch {
+      /* storage unavailable: nothing to forget */
+    }
+  };
+
   /** Counts openings, so opening the same folder again reads its setup again (the wizard may be due). */
   const [openings, setOpenings] = useState(0);
   const show = useCallback((o: Opened, message: Note | null) => {
@@ -379,10 +392,16 @@ export function App({ messenger }: { messenger: Messenger }) {
             onSetup={setSetup}
             onClose={(result) => {
               setWizard(null);
-              // Closed (connected, Not now or Cancel): not opened by itself again until the
-              // folder is opened again.
+              if (!result) {
+                // Cancel (steps 1–3, owner 2026-10-12): back to the start page, and the next start
+                // shows it too. The taskbag stays on disk.
+                closeTaskbag();
+                return;
+              }
+              // Connect or Not now: the taskbag stays open; the wizard does not open by itself
+              // again until the folder is opened again.
               setSkipped(true);
-              if (result) connected(result);
+              connected(result);
               // Read again: the wizard may have recorded the project folder.
               const root = openedRef.current?.root;
               if (root) void refreshSetup(root);
