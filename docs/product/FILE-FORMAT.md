@@ -47,7 +47,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | Always `"allomos/1"` for this version. Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
+| `format` | yes | `"allomos/1"` for this version: `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `alm labels`. |
@@ -118,6 +118,17 @@ Each problem names the **file** and, where it can, the **field**, with a plain e
   - every `label` is on the project's ladder;
   - every `waiting` task says what it waits on;
   - an iteration's `start` and `end` are real dates written `YYYY-MM-DD`.
+
+## Format versions
+
+Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md). Allomos reads `format` before anything else in `project.json`, because a newer taskbag may have fields this Allomos does not know.
+
+- **Newer** than this Allomos (`allomos/2` read by an Allomos that writes `allomos/1`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
+- **Older**: `alm` refuses every command that works on the taskbag with `taskbag_older`, telling the agent to run `alm upgrade` and then repeat the command. The app shows **Update the taskbag…**.
+- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). There are no steps yet: `allomos/1` is the only format.
+- **Allomos never upgrades by itself** (owner, 2026-10-12): the running AI agent does, with `alm upgrade`, when `alm` or the app's request tells it to.
+
+Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v1)`. A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
 
 ## Not yet in this version
 

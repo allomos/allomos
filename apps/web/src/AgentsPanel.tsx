@@ -11,6 +11,7 @@ import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Agent, InstructionFiles } from "./types";
+import { updateNotice } from "./versionFlow";
 
 const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -71,6 +72,20 @@ export function AgentsPanel({
   const [project, setProject] = useState(startProject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Something is out of date with this Allomos (Task-A01-25): the request is the update request,
+   * and Allomos offers no "write the files for me" (owner, 2026-10-12: the agent updates them). */
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    messenger
+      .versionCheck(taskbag)
+      .then((c) => live && setUpdating(updateNotice(c) !== null))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [messenger, taskbag]);
 
   useEffect(() => {
     let live = true;
@@ -127,8 +142,8 @@ export function AgentsPanel({
       onDone({
         // One agent (owner, 2026-10-12); a terminal that takes the request from the clipboard is told so.
         message: (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")
-          ? t("connect.asked_paste", { agent: t(AGENT_KEY[chosen[0]]), keys: PASTE_KEYS })
-          : t("connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
+          ? t(updating ? "update.asked_paste" : "connect.asked_paste", { agent: t(AGENT_KEY[chosen[0]]), keys: PASTE_KEYS })
+          : t(updating ? "update.asked" : "connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
         watch: { project, before },
       });
     } catch (e) {
@@ -166,7 +181,7 @@ export function AgentsPanel({
           {t("agents.ask")}
         </button>
       )}
-      {agents && agents.length === 0 && (
+      {agents && agents.length === 0 && !updating && (
         <button type="button" className="primary" onClick={() => void write()} disabled={busy}>
           {t("agents.write")}
         </button>
@@ -176,9 +191,9 @@ export function AgentsPanel({
 
   return (
     <section className="card agents">
-      <h2>{t("connect.title")}</h2>
-      <p>{t("connect.body")}</p>
-      <p>{t("connect.tasks")}</p>
+      <h2>{t(updating ? "update.title" : "connect.title")}</h2>
+      <p>{t(updating ? "update.body" : "connect.body")}</p>
+      {!updating && <p>{t("connect.tasks")}</p>}
       <div className="row project-row">
         <span>{rich("project.line", { path: <code>{project}</code> })}</span>
         {!projectFixed && (
@@ -195,7 +210,7 @@ export function AgentsPanel({
           </p>
         )
       ) : agents.length === 0 ? (
-        <p>{t("agents.none")}</p>
+        <p>{t(updating ? "update.no_agent" : "agents.none")}</p>
       ) : (
         <ul className="agent-list">
           {GROUPS.map((g) => {

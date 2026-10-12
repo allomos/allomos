@@ -187,5 +187,17 @@
   "wizard.git_missing_title": "没有安装 Git",
   "wizard.git_missing": "「换肩」用 Git 保存任务包，但这台电脑上没有安装 Git，所以任务包暂时保存了，但没有历史记录。请安装 Git，然后让你的 AI 智能体把 {folder} 设为 Git 仓库并提交任务包。",
   "wizard.git_missing_help": "不清楚怎么做？可以问你的 AI 智能体：“Git 是什么？它有什么用？怎样安装 Git？”",
-  "problem.git_missing": "这台电脑上没有安装 Git，所以任务包已保存，但还没有用 Git 管理。"
+  "problem.git_missing": "这台电脑上没有安装 Git，所以任务包已保存，但还没有用 Git 管理。",
+  "problem.taskbag_newer": "这个任务包是由更新版本的「换肩」写的（格式 {found}）；这个版本只能读取 {supported}。请现在更新「换肩」再使用它。",
+  "problem.taskbag_older": "这个任务包使用旧格式 {found}；这个版本的「换肩」写的是 {current}。请选择「更新任务包…」，让 AI 智能体把它更新。",
+  "problem.instructions_outdated": "{files} 里「换肩」的说明已过时（这个版本写的是第 {current} 版）。",
+  "problem.upgrade_missing": "这个版本的「换肩」无法把任务包从 {found} 升级到 {current}。",
+  "update.notice_taskbag": "这个任务包使用旧格式。AI 智能体可以把它更新。",
+  "update.notice_section": "{files} 里「换肩」的说明已过时。AI 智能体可以更新它们。",
+  "update.button": "更新任务包…",
+  "update.title": "更新任务包",
+  "update.body": "选择一个 AI 智能体。「换肩」会在你的项目文件夹中打开它，并预先填好请求，让它把这个项目更新到当前版本的「换肩」：任务包的格式，以及 AGENTS.md 和 CLAUDE.md 中「换肩」的说明。在你亲自发送之前，什么都不会发送。「换肩」自己不会修改这些文件。",
+  "update.no_agent": "这台电脑上没有找到 AI 智能体。「换肩」自己不会修改这些文件：请先启动一个 AI 智能体，再选择「文件 › 连接 AI 智能体…」。",
+  "update.asked": "已打开 {agent}。请在那里阅读请求并发送。智能体更新项目后，这条提示就会消失。",
+  "update.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体更新项目后，这条提示就会消失。"
 }

@@ -7,10 +7,11 @@ import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
+import { updateNotice } from "./versionFlow";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task } from "./types";
+import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -378,6 +379,14 @@ export function App({ messenger }: { messenger: Messenger }) {
             {noteText(n)}
           </Banner>
         ))}
+        {/* Out of date with this Allomos (Task-A01-25): the agent updates it, from the Connect panel. */}
+        {opened && (
+          <VersionNotice
+            messenger={messenger}
+            root={opened.root}
+            onUpdate={() => openWizard({ resume: { root: opened.root, at: 4 } })}
+          />
+        )}
         {!opened && <Welcome onOpen={() => openWizard({})} />}
 
         {wizard && (
@@ -428,6 +437,42 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {opened && <TaskbagView opened={opened} messenger={messenger} onError={(e) => setError(errorNote(e))} />}
       </main>
+    </div>
+  );
+}
+
+/** How often the update notice checks again: an agent's update shows without reopening. */
+const VERSION_CHECK_MS = 4000;
+
+/** "This taskbag uses an older format" or "Allomos's instructions are out of date", with
+ * **Update the taskbag…** (owner, 2026-10-12). Asked when the folder opens (every way of opening
+ * one) and every few seconds while it is open. Allomos never updates the files itself. */
+function VersionNotice({ messenger, root, onUpdate }: { messenger: Messenger; root: string; onUpdate: () => void }) {
+  const { t } = useI18n();
+  const [check, setCheck] = useState<VersionCheck | null>(null);
+  useEffect(() => {
+    let live = true;
+    setCheck(null);
+    const look = () =>
+      messenger
+        .versionCheck(root)
+        .then((c) => live && setCheck(c))
+        .catch(() => undefined);
+    void look();
+    const timer = window.setInterval(() => void look(), VERSION_CHECK_MS);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [messenger, root]);
+  const notice = updateNotice(check);
+  if (!notice) return null;
+  return (
+    <div className="banner update" role="status">
+      <span>{notice.kind === "taskbag" ? t("update.notice_taskbag") : t("update.notice_section", { files: notice.files })}</span>
+      <button type="button" className="primary" onClick={onUpdate}>
+        {t("update.button")}
+      </button>
     </div>
   );
 }

@@ -187,5 +187,17 @@
   "wizard.git_missing_title": "Git is not installed",
   "wizard.git_missing": "Allomos keeps the taskbag in Git, but Git is not installed on this computer, so the taskbag is saved without its history for now. Install Git, then ask your AI agent to make {folder} a Git repository and commit the taskbag.",
   "wizard.git_missing_help": "Not sure how? Ask your AI agent: “What is Git? What is it used for? How do I install Git?”",
-  "problem.git_missing": "Git is not installed on this computer, so the taskbag is saved but not kept in Git yet."
+  "problem.git_missing": "Git is not installed on this computer, so the taskbag is saved but not kept in Git yet.",
+  "problem.taskbag_newer": "This taskbag was written by a newer Allomos (format {found}); this one reads {supported}. Update Allomos now to work with it.",
+  "problem.taskbag_older": "This taskbag uses the older format {found}; this Allomos writes {current}. Choose Update the taskbag… to have an AI agent bring it up to date.",
+  "problem.instructions_outdated": "Allomos's instructions in {files} are out of date (this Allomos writes version {current}).",
+  "problem.upgrade_missing": "This Allomos cannot upgrade a taskbag from {found} to {current}.",
+  "update.notice_taskbag": "This taskbag uses an older format. An AI agent can bring it up to date.",
+  "update.notice_section": "Allomos's instructions in {files} are out of date. An AI agent can renew them.",
+  "update.button": "Update the taskbag…",
+  "update.title": "Update the taskbag",
+  "update.body": "Choose one of your AI agents. Allomos opens it in your project folder with a request already typed in, asking it to bring this project up to date with this Allomos: the taskbag's format, and Allomos's instructions in AGENTS.md and CLAUDE.md. Nothing is sent until you send it yourself. Allomos does not change these files itself.",
+  "update.no_agent": "No AI agent was found on this computer. Allomos does not change these files itself: start an AI agent, then choose File → Connect with the Agents… again.",
+  "update.asked": "Opened {agent}. Read the request there and send it. The notice goes away once the agent has updated the project.",
+  "update.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The notice goes away once the agent has updated the project."
 }

@@ -16,7 +16,7 @@ use allomos_store::{
     AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
     add_readme_if_empty, agent_connect_request_in, agent_setup, agent_setup_request_in,
     answer_confirm, git_root, id_from_name, init, inspect, load, pending_confirms, picked_folder,
-    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp,
+    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -228,11 +228,15 @@ fn connect_plan(
     taskbag: &Path,
 ) -> Vec<(String, String)> {
     let note = agents::shared_note(agents, language);
+    // Something is out of date (Task-A01-25): the first agent is asked to update it instead.
+    let update = versions::check_connected(taskbag).filter(|c| c.needs_update());
     agents
         .iter()
         .enumerate()
         .map(|(i, id)| {
-            let request = if i == 0 {
+            let request = if let (0, Some(check)) = (i, &update) {
+                versions::agent_update_request_in(language, project, taskbag, check)
+            } else if i == 0 {
                 agent_connect_request_in(language, project, taskbag)
             } else {
                 agent_setup_request_in(language, project, taskbag)
@@ -270,6 +274,14 @@ async fn connect_agents(
         opened.push(id);
     }
     Ok(opened)
+}
+
+/// Is the project up to date with this Allomos (Task-A01-25)? `None` until an agent is connected
+/// with it. The window asks when a folder is opened and every few seconds while it is open, so
+/// an agent's update shows without reopening.
+#[tauri::command]
+fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
+    versions::check_connected(&root)
 }
 
 /// Whether `project` has an `AGENTS.md` and a `CLAUDE.md`. The window notes which were missing
@@ -691,6 +703,7 @@ pub fn run() {
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
+            version_check,
             create_taskbag,
             show_in_file_manager,
             open_task_link,
@@ -787,6 +800,33 @@ mod tests {
         allomos_store::init(&root, "p", "P").unwrap();
         let command = file_manager_command(&root).unwrap();
         assert_eq!(command.get_args().collect::<Vec<_>>(), [root.as_os_str()]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_out_of_date_project_gets_the_update_request() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-update-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let taskbag = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&taskbag, "p", "P").unwrap();
+        // A section from before versions: connected, but out of date.
+        std::fs::write(dir.join("AGENTS.md"), "## Tasks: Allomos\n\nalm next\n").unwrap();
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert!(
+            plan[0]
+                .1
+                .starts_with("This project was set up by an older Allomos")
+        );
+        assert!(plan[0].1.contains("brief`"));
+        assert!(version_check(taskbag.clone()).unwrap().needs_update());
+
+        // Renewed: the usual connect request again.
+        std::fs::write(dir.join("AGENTS.md"), allomos_store::agent_section()).unwrap();
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
+        assert!(!version_check(taskbag).unwrap().needs_update());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

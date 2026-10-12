@@ -98,6 +98,19 @@ export interface AgentStatus {
   holders: string[];
 }
 
+/** Is the project up to date with this Allomos? (crates/store/src/versions.rs, Task-A01-25) */
+export interface VersionCheck {
+  format_current: string;
+  section_current: number;
+  format:
+    | { state: "current" }
+    | { state: "older"; found: string }
+    | { state: "newer"; found: string }
+    | { state: "unknown" };
+  /** Instruction files holding Allomos's section; `version` null when its heading has none. */
+  sections: { file: string; version: number | null }[];
+}
+
 /** A question an agent asks with `alm confirm` (crates/store/src/confirm.rs). */
 export interface ConfirmRequest {
   id: string;

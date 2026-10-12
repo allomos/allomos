@@ -300,6 +300,86 @@ fn set_format(path: &Path, version: u32) -> Result<(), Problem> {
     crate::write_atomic(path, &out)
 }
 
+/// What **Update the taskbag…** (and File → Connect with the Agents… while something is out of
+/// date) asks the chosen agent, in an interface language (`en`, `zh-CN`, `ja`; English
+/// otherwise): run `alm upgrade` when the taskbag is older, and replace Allomos's section with
+/// `alm brief`'s output in each out-of-date file. The agent does the work; the person sends the
+/// request (owner, 2026-10-12: Allomos never updates these files itself).
+pub fn agent_update_request_in(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    check: &VersionCheck,
+) -> String {
+    let alm = format!("alm --taskbag \"{}\"", taskbag.display());
+    let (p, t) = (project.display(), taskbag.display());
+    let older = matches!(check.format, FormatState::Older { .. });
+    let files = check.outdated_files();
+    let list = files.join(", ");
+    let mut steps: Vec<String> = Vec::new();
+    match language {
+        "zh-CN" => {
+            if older {
+                steps.push(format!("运行 `{alm} upgrade`，把任务包升级到这个版本的 Allomos 的格式。它只添加新格式需要的部分；不要手动编辑任务包的文件。"));
+            }
+            if !files.is_empty() {
+                steps.push(format!("在项目文件夹中，把 {list} 里 Allomos 的一节（标题以“{AGENT_SECTION_HEADING}”开头，或其他关于 Allomos 或 `alm` 的说明）替换为 `{alm} brief` 的输出，原样（英文）使用。文件的其他内容保持不变。"));
+            }
+            steps.push(format!("如果项目是 Git 仓库，只提交这些改动：任务包的文件和 {}。其他改动保持原样；除非用户要求，不要推送。", if files.is_empty() { "（无）".to_string() } else { list.clone() }));
+            steps.push("告诉用户你改了什么，以及你做的提交。".to_string());
+            let numbered: Vec<String> = steps
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("{}. {s}", i + 1))
+                .collect();
+            format!(
+                "这个项目是用旧版的 Allomos 设置的，请把它更新到当前版本。\n\n项目文件夹：{p}\n任务包（Allomos 的任务文件）：{t}\n\n{}\n",
+                numbered.join("\n")
+            )
+        }
+        "ja" => {
+            if older {
+                steps.push(format!("`{alm} upgrade` を実行して、タスクバッグをこのバージョンの Allomos の形式に更新します。新しい形式に必要な部分だけが追加されます。タスクバッグのファイルを手で編集しないでください。"));
+            }
+            if !files.is_empty() {
+                steps.push(format!("プロジェクトのフォルダーで、{list} の Allomos の節（見出しが「{AGENT_SECTION_HEADING}」で始まるもの、または Allomos や `alm` についてのほかの説明）を `{alm} brief` の出力で置き換え、そのまま（英語のまま）使います。ファイルのほかの部分は変えません。"));
+            }
+            steps.push(format!("プロジェクトが Git リポジトリなら、これらの変更だけをコミットします：タスクバッグのファイルと {}。ほかの変更はそのままにし、頼まれない限りプッシュしません。", if files.is_empty() { "（なし）".to_string() } else { list.clone() }));
+            steps.push(
+                "何を変えたか、どんなコミットをしたかをユーザーに見せてください。".to_string(),
+            );
+            let numbered: Vec<String> = steps
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("{}. {s}", i + 1))
+                .collect();
+            format!(
+                "このプロジェクトは古いバージョンの Allomos で設定されました。今のバージョンに更新してください。\n\nプロジェクトのフォルダー：{p}\nタスクバッグ（Allomos のタスクファイル）：{t}\n\n{}\n",
+                numbered.join("\n")
+            )
+        }
+        _ => {
+            if older {
+                steps.push(format!("Run `{alm} upgrade` to bring the taskbag up to this Allomos's format. It adds only what the newer format has; never edit the taskbag's files by hand."));
+            }
+            if !files.is_empty() {
+                steps.push(format!("In the project folder, replace Allomos's section in {list} (headed \"{AGENT_SECTION_HEADING}…\", or any other text about Allomos or `alm`) with the output of `{alm} brief`, exactly as it is. Keep the rest of each file as it is."));
+            }
+            steps.push(format!("If the project is a Git repository, commit only these changes: the taskbag's files{}. Leave every other change as it is; do not push unless the person asks.", if files.is_empty() { String::new() } else { format!(" and {list}") }));
+            steps.push("Show the user what you changed and the commits you made.".to_string());
+            let numbered: Vec<String> = steps
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("{}. {s}", i + 1))
+                .collect();
+            format!(
+                "This project was set up by an older Allomos. Please update it to this version.\n\nProject folder: {p}\nTaskbag (Allomos's task files): {t}\n\n{}\n",
+                numbered.join("\n")
+            )
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -510,6 +590,59 @@ mod tests {
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), newer);
         assert!(!root.join("handoff-template.md").exists());
         assert_ne!(text, newer);
+    }
+
+    #[test]
+    fn the_update_request_names_only_what_is_out_of_date() {
+        let project = PathBuf::from("/work/bakery");
+        let taskbag = project.join(DEFAULT_DIR);
+        let check = |format: FormatState, version: Option<u32>| VersionCheck {
+            format_current: FORMAT.into(),
+            section_current: SECTION_VERSION,
+            format,
+            sections: vec![SectionState {
+                file: "AGENTS.md".into(),
+                version,
+            }],
+        };
+        for language in ["en", "zh-CN", "ja"] {
+            let both = check(
+                FormatState::Older {
+                    found: "allomos/1".into(),
+                },
+                None,
+            );
+            let r = agent_update_request_in(language, &project, &taskbag, &both);
+            assert!(
+                r.contains("alm --taskbag \"/work/bakery/.allomos/taskbag\" upgrade"),
+                "{language}"
+            );
+            assert!(
+                r.contains("/work/bakery/.allomos/taskbag\" brief`"),
+                "{language}"
+            );
+            assert!(r.contains("AGENTS.md"), "{language}");
+
+            let section = check(FormatState::Current, None);
+            let r = agent_update_request_in(language, &project, &taskbag, &section);
+            assert!(
+                !r.contains("upgrade`"),
+                "{language}: no upgrade when the format is current"
+            );
+            assert!(r.contains("brief`"), "{language}");
+
+            let format = check(
+                FormatState::Older {
+                    found: "allomos/1".into(),
+                },
+                Some(SECTION_VERSION),
+            );
+            let r = agent_update_request_in(language, &project, &taskbag, &format);
+            assert!(
+                r.contains("upgrade`") && !r.contains("brief`"),
+                "{language}"
+            );
+        }
     }
 
     #[test]

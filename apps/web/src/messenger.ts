@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -63,6 +63,8 @@ export interface Messenger {
   keepInGit(root: string): Promise<GitKept>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
+  /** Whether the project of the taskbag at `root` is up to date with this Allomos; null until an agent is connected. */
+  versionCheck(root: string): Promise<VersionCheck | null>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
@@ -113,6 +115,7 @@ export const desktopMessenger: Messenger = {
   keepInGit: (root) => invoke<GitKept>("keep_in_git", { root }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
+  versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
   projectSetup: (root) => invoke<SetupState>("project_setup", { root }),
