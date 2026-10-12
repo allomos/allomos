@@ -39,11 +39,13 @@ One block per card that `alm list --state in_progress` shows held.
 
 
 ### Task-A05-03 — claude/a05-03-setup-wizard
-- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` (not merged) · pushed: yes
-- Approvals in force: card's local work (owner, 2026-10-11); no external operations
-- Uncommitted: none · Running: none started by this session since the rebuild (owner may have the app open)
-- Label: implemented. Owner's first check led to the wording and stale-setup fixes (see card); app rebuilt 10:13 with them. Fresh test folder: `~/allomos-tests/a05-03-setup-wizard/code-app-2` (`code-app` was used in the first check and now holds a converted taskbag).
-- Next action: owner checks again; then label "locally verified", merge into `main`
+- Checkout: `.claude/worktrees/a05-03-setup-wizard` · branch `claude/a05-03-setup-wizard` (not merged; `main` merged in 2026-10-12) · pushed: yes
+- Approvals in force: card's local work (owner, 2026-10-11); the owner's wizard Git rule (git init + local commit, never push; decision 0010)
+- Uncommitted: none · Running: none started by this session
+- Label: implemented. Owner is checking the app step by step; the check list is on the card ("Done means mechanically").
+- Fresh first page: `H=~/allomos-tests/a05-03-setup-wizard/fresh-home; rm -rf "$H" && mkdir -p "$H" && CFFIXED_USER_HOME="$H" <worktree>/target/debug/bundle/macos/Allomos.app/Contents/MacOS/allomos-desktop &`
+- Direct open without project folder: `T=~/allomos-tests/a05-03-setup-wizard/no-project-folder; rm -rf "$T" && mkdir -p "$T" && (cd "$T" && ~/.cargo/bin/alm init --name "No project folder") && open -n <worktree>/target/debug/bundle/macos/Allomos.app --args "$T"`
+- Next action: owner finishes the check list; then label "locally verified", merge into `main`
 
 ## Live state
 

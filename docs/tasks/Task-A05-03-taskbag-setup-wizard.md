@@ -31,12 +31,22 @@ Today the first screen shows a short text (`welcome.title`, `welcome.body`) and 
   - Whether **Change** in step 2 may point at a folder that already has a different taskbag (then step 3 shows that taskbag's recorded project folder) — worker checks with `project_folder_of`.
 - **Files owned.** New `apps/web/src/SetupWizard.tsx` (and its test); `apps/web/src/App.tsx`, `apps/web/src/AgentsPanel.tsx`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`; `apps/desktop/src-tauri/src/lib.rs`; `crates/store/src/lib.rs` (the combined request); `crates/store/src/setup.rs` if the store needs a "does this folder have `.allomos`" check. Shared: the welcome and picker strings in `i18n/*`.
 - **External operations.** None.
-- **Done means mechanically.**
-  - Web tests: fresh start shows only Open Taskbag; step 2 shows Create for a folder without `.allomos` and only Change for one with it; step 3 defaults to the step-1 folder and records the chosen one.
-  - Store test: the combined request contains the instructions part and the find-and-move part, in each app language, and the move part still requires `alm confirm` before any change. Web test: step 4 gives the combined request to the first chosen agent and the instructions request to the others, and Not now skips it; File → Connect with the Agents… opens the same step, and the menu no longer has Agents… or Move Tasks Into Allomos….
-  - Web test: the restart notice appears when `AGENTS.md` or `CLAUDE.md` did not exist before setup and exists after; it does not appear when both already existed.
-  - Store/desktop tests for any new command (create in a chosen folder; record the project folder).
-  - Manual check in the built app, in test folders under `~/allomos-tests/a05-03-setup-wizard/`: fresh start → Create → keep default source; again with another source folder; again on a folder that already has `.allomos` (Change only); restart reopens the taskbag; in a folder without `AGENTS.md` / `CLAUDE.md`, the restart notice appears once they are created; in a test copy of a project with a Markdown task board, step 4's agent adds the instructions, finds the board, and changes nothing until the plan is confirmed in the app.
+- **Done means mechanically** (list rewritten 2026-10-12 to match what was built).
+  - **Automated checks, all must pass:** `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings`, `cargo test --workspace` (among them `connect_request_tells_agents_then_offers_to_move_tasks`, `the_first_agent_also_looks_for_tasks`, `the_taskbag_is_put_under_git_and_committed_alone`, `missing_git_is_recognized`), `npm --prefix apps/web run typecheck`, `build`, `check:i18n`, `test` (7 tests of the wizard's choices in `apps/web/tests/setupFlow.test.ts`).
+  - **Owner's check in the built app** (`target/debug/bundle/macos/Allomos.app` in this card's worktree; test folders under `~/allomos-tests/a05-03-setup-wizard/`, which is in no Git repository):
+    1. **First page.** A fresh start (the `CFFIXED_USER_HOME` command in the handoff) shows the road show slogan, the drawing and one **Start** button with the hint; no folder button in the top bar; in Chinese and Japanese the slogan breaks only between phrases and does not run into the drawing; the top bar says Allomos / 换肩 / アロモス.
+    2. **Step 1.** **Start** opens the wizard: what a taskbag is, and **Choose a folder…**.
+    3. **Step 2, new folder.** An empty folder shows "No taskbag in this folder yet", says it is not under Git yet, and offers **Create taskbag**; after it, "Taskbag created" with **Change…** and **Next**.
+    4. **Step 2, existing taskbag.** A folder that has `.allomos` shows only **Change…** and **Next**.
+    5. **Git.** **Next** on step 2: step 3 opens with "Your taskbag is now kept in Git" and the hint to ask the agent "What is Git? What is it used for?"; `git log` in the folder shows "Add Allomos taskbag" with only the taskbag's files. A folder already in a repository gets one line "Committed the taskbag to …" and no new repository.
+    6. **Step 3.** Title "Connect the folder that holds your project"; the folder from step 1 is filled in; **Choose another folder…** changes it; **Next** records it, and `git log` shows "Update Allomos taskbag".
+    7. **Step 4.** The text says Allomos opens the agent with the request typed in and the plan comes back to Allomos; one agent can be chosen; the project folder line is on the left without **Change…**; **Not now** and **Connect** are in the bottom row, **Connect** where **Next** was. Choosing Codex (terminal) shows the paste tip under it.
+    8. **Connect.** The chosen agent opens in the project folder with the request typed in; nothing is sent until you send it. After it adds `AGENTS.md` / `CLAUDE.md`, the window says they are new and that only new agent sessions know about Allomos.
+    9. **Existing tasks.** In a test copy of a project with a Markdown task board, the agent adds the instructions, finds the board, and changes nothing until its plan is confirmed in the app with **Go ahead**.
+    10. **Direct open.** Opening a taskbag with no project folder (the `alm init` command in the handoff) opens the wizard at step 3; no "Which folder holds this project?" card on the page.
+    11. **File → Connect with the Agents…** (and the top bar's "Connect with the agents…") opens the wizard at step 4, with **Change…** for the project folder.
+    12. **Closing.** After **Not now** or **Cancel**, the wizard does not open again by itself until the folder is opened again; reopening the app returns to the same taskbag.
+  - **Not checked by anyone yet:** Git not installed (the amber note; this Mac has Git); Windows (Ctrl+V in the paste tip).
 
 ## Approvals
 
