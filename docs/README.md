@@ -6,8 +6,8 @@
 
 | Where | What | Kind |
 |---|---|---|
-| [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the taskbag (`../.allomos/taskbag/`, read with `alm list` or the app). | status |
-| [AGENT_HANDOFF.md](./AGENT_HANDOFF.md) | Restart mechanics for the next agent session: active resume, live state, pitfalls, current truth | handoff |
+| [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the taskbag (`../allomos-taskbag/.allomos/taskbag/`, read with `alm list` or the app). | status |
+| taskbag `handoffs/` and `project-notes.md` (in `../allomos-taskbag/.allomos/taskbag/`, outside this repository) | Each session's handoff (`alm handoffs`), and what every session must know: running, pitfalls, where credentials live, current truth. Replaced `AGENT_HANDOFF.md` on 2026-10-12 | handoff |
 | [tasks/](./tasks/) | One file per card: outcome, scope, approvals, notes | cards |
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
