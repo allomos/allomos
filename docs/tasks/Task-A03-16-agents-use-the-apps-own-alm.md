@@ -18,7 +18,7 @@ What the owner can see at the end: an app built from a task's worktree opens an 
 
 - **Outcome.** An agent the app opens in a terminal window uses the `alm` that came with that app, so testing an in-development app also tests its in-development `alm`, with nothing set by hand.
 - **Decisive unknowns.**
-  - Agents opened through a link (the Claude desktop app, `how == "link"`) start outside any terminal window the app controls, so `PATH` cannot be set for them. Instead the request the app sends names the app's own `alm` by its full path and asks the agent to use it (owner, 2026-10-14). Find out the wording that makes the agent use that path for every `alm` command, and whether the request should name it only when it differs from the `alm` the person's shell finds.
+  - Agents opened through a link (the Claude desktop app, `how == "link"`) start outside any terminal window the app controls, so `PATH` cannot be set for them. Instead the request the app sends names the app's own `alm` by its full path and asks the agent to use it (owner, 2026-10-14). The request names it only when it differs from the `alm` the person's shell finds (owner, 2026-10-14); `alm_command.rs` already finds both (the app's own, and the shell's `command -v alm`, fully resolved), so reuse that. Find out the wording that makes the agent use that path for every `alm` command.
   - Windows (PowerShell window): the same change, `$env:PATH` set before starting the agent, where `alm.exe` sits beside the app. Check on Windows if a Windows computer is available; otherwise mark it untested.
   - When the app has no `alm` beside it (for example `tauri dev` before `cargo build -p allomos-cli`): leave `PATH` unchanged rather than fail.
 - **Files owned.** `apps/desktop/src-tauri/src/agents.rs`; reuse the finder in `apps/desktop/src-tauri/src/alm_command.rs`; one line in `docs/workflow/CODING_RULES.md` (Install on a Mac / testing).
@@ -26,7 +26,7 @@ What the owner can see at the end: an app built from a task's worktree opens an 
 - **Done means mechanically.**
   - Unit test: the terminal command the app builds puts the app's `alm` folder first, and is unchanged when there is no `alm` beside the app.
   - Manual check: from a worktree's `tauri dev`, ask Claude Code in a test project under `~/allomos-tests/a03-16-own-alm/`; in that window `which alm` names `<worktree>/target/debug/alm`. With the installed app it names `/Applications/Allomos.app/Contents/MacOS/alm`.
-  - Unit test: a request for an agent opened through a link names the app's own `alm` by full path.
+  - Unit test: a request for an agent opened through a link names the app's own `alm` by full path when the shell's `alm` is a different one, and does not when they are the same.
   - Manual check: from a worktree's `tauri dev`, ask Claude Code through the Claude desktop app; the agent runs the worktree's `alm`.
   - The person's own terminal windows are unchanged.
 
@@ -35,7 +35,7 @@ What the owner can see at the end: an app built from a task's worktree opens an 
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-14 | Write this card and approve it (ready); local work only | owner (chat) |
-| 2026-10-14 | Agents opened through a link: the request names the `alm` to use | owner (chat) |
+| 2026-10-14 | Agents opened through a link: the request names the `alm` to use, only when the shell would find a different one | owner (chat) |
 
 ## Notes
 
