@@ -120,6 +120,8 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
   `--from <file.md>`. It prints the file's path.
 - `alm handoffs [--task <id>] [--latest]`: handoffs, newest first. `alm next` and `alm show <id>`
   show a task's latest one.
+- `alm handoffs --check`: lists every handoff with the state of each task it names, for you to
+  check one by one; remove each whose tasks are all done or dropped with `alm handoff --remove`.
 - `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (Git keeps it).
 - `alm handoff-template [--set <file.md>]`: show or replace the project's template.
 

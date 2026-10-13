@@ -339,8 +339,9 @@ pub struct Followup {
     pub unfinished: Vec<String>,
 }
 
-/// Every handoff that names `task`, with which of its tasks are still unfinished. `finished` says
-/// whether a task ID is done or dropped (a task no longer in the taskbag counts as finished).
+/// Every handoff that names `task`, with which of its tasks are still unfinished (`alm done`).
+/// `finished` says whether a task ID is done or dropped (a task no longer in the taskbag counts as
+/// finished).
 pub fn followups(root: &Path, task: &str, finished: impl Fn(&str) -> bool) -> Vec<Followup> {
     list(root)
         .into_iter()
@@ -351,6 +352,14 @@ pub fn followups(root: &Path, task: &str, finished: impl Fn(&str) -> bool) -> Ve
             tasks: h.tasks,
         })
         .collect()
+}
+
+impl Followup {
+    /// It may be removed: it names tasks, and all of them are finished. A handoff naming no task
+    /// stays (nothing says its work is over).
+    pub fn removable(&self) -> bool {
+        !self.tasks.is_empty() && self.unfinished.is_empty()
+    }
 }
 
 /// `handoffs/<base>.md`, or `<base>-2.md`, … when that is taken.
