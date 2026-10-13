@@ -495,8 +495,17 @@ pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcom
     Ok(Outcome::plain(task))
 }
 
-/// The first task that is `ready` and held by no one: by area order, then area ID, then task ID.
-pub fn next(taskbag: &Taskbag) -> Option<&Task> {
+/// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14):
+/// earliest iteration first (unplanned tasks last), then area order, then ID. With an
+/// iteration, only the tasks planned in it; an iteration that does not exist is refused.
+pub fn next<'a>(taskbag: &'a Taskbag, iteration: Option<&str>) -> Result<Vec<&'a Task>, Problem> {
+    if let Some(i) = iteration {
+        if !taskbag.iterations.iter().any(|x| x.id == i) {
+            return Err(Problem::UnknownIteration {
+                iteration: i.to_string(),
+            });
+        }
+    }
     let area_rank = |area: &str| {
         taskbag
             .areas
@@ -504,15 +513,25 @@ pub fn next(taskbag: &Taskbag) -> Option<&Task> {
             .position(|a| a.id == area)
             .unwrap_or(usize::MAX)
     };
-    taskbag
+    let iteration_rank = |t: &Task| {
+        t.iteration
+            .as_ref()
+            .and_then(|i| taskbag.iterations.iter().position(|x| &x.id == i))
+            .unwrap_or(usize::MAX)
+    };
+    let mut tasks: Vec<&Task> = taskbag
         .tasks
         .iter()
         .filter(|t| t.state == State::Ready && t.holder.is_none())
-        .min_by(|a, b| {
-            area_rank(&a.area)
-                .cmp(&area_rank(&b.area))
-                .then(a.id.cmp(&b.id))
-        })
+        .filter(|t| iteration.is_none_or(|i| t.iteration.as_deref() == Some(i)))
+        .collect();
+    tasks.sort_by(|a, b| {
+        iteration_rank(a)
+            .cmp(&iteration_rank(b))
+            .then(area_rank(&a.area).cmp(&area_rank(&b.area)))
+            .then(a.id.cmp(&b.id))
+    });
+    Ok(tasks)
 }
 
 #[cfg(test)]
@@ -926,17 +945,24 @@ mod tests {
     }
 
     #[test]
-    fn next_picks_first_free_ready_task_by_area_then_id() {
+    fn next_lists_free_ready_tasks_by_iteration_area_then_id() {
         let mut s = bag();
-        assert_eq!(next(&s), None);
+        assert!(next(&s, None).unwrap().is_empty());
         for id in ["A01-02", "A01-01", "A02-01"] {
             let mut t = find_task(&s, id).unwrap();
             t.state = State::Ready;
             put!(s, t);
         }
+        let ids = |s: &Taskbag, i: Option<&str>| -> Vec<String> {
+            next(s, i).unwrap().iter().map(|t| t.id.clone()).collect()
+        };
         // A02 has the lower order, so it comes first.
-        assert_eq!(next(&s).unwrap().id, "A02-01");
+        assert_eq!(ids(&s, None), ["A02-01", "A01-01", "A01-02"]);
         put!(s, claim(&s, "A02-01", Some("a"), false).unwrap().task);
-        assert_eq!(next(&s).unwrap().id, "A01-01");
+        assert_eq!(ids(&s, None), ["A01-01", "A01-02"]);
+        assert!(matches!(
+            next(&s, Some("I09")),
+            Err(Problem::UnknownIteration { .. })
+        ));
     }
 }

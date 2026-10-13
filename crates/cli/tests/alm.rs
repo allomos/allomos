@@ -194,7 +194,7 @@ fn work_one_task_from_claim_to_done() {
 fn release_leaves_a_note_that_next_shows() {
     let repo = filled();
     let v = ok(&repo, &["next"]);
-    assert_eq!(v["task"], Value::Null);
+    assert_eq!(v["tasks"], json!([]));
     ok(&repo, &["--as", "a", "claim", "A01-02"]);
     let v = ok(
         &repo,
@@ -210,8 +210,8 @@ fn release_leaves_a_note_that_next_shows() {
     assert_eq!(v["task"]["state"], "ready");
     assert_eq!(v["task"].get("holder"), Some(&Value::Null));
     let v = ok(&repo, &["next"]);
-    assert_eq!(v["task"]["id"], "A01-02");
-    assert_eq!(v["task"]["handoff_note"], "tests pass; docs left");
+    assert_eq!(v["tasks"][0]["id"], "A01-02");
+    assert_eq!(v["tasks"][0]["handoff_note"], "tests pass; docs left");
     assert_eq!(
         task_file(&repo, "A01-02")["handoff_note"],
         "tests pass; docs left"
@@ -221,6 +221,87 @@ fn release_leaves_a_note_that_next_shows() {
     // A new agent resumes in one step.
     let v = ok(&repo, &["--as", "b", "claim", "A01-02"]);
     assert_eq!(v["task"]["handoff_note"], "tests pass; docs left");
+}
+
+#[test]
+fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
+    let repo = filled();
+    ok(
+        &repo,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Sort"],
+    );
+    ok(&repo, &["add", "iteration", "I01", "v0.1"]);
+    ok(&repo, &["add", "iteration", "I02", "v0.2"]);
+    for id in ["A01-01", "A01-02", "A01-03", "A02-01"] {
+        ok(&repo, &["ready", id]);
+    }
+    ok(&repo, &["plan", "A01-02", "I02"]);
+    ok(&repo, &["plan", "A02-01", "I01"]);
+    // Held and non-ready tasks are not listed.
+    ok(&repo, &["--as", "a", "claim", "A01-03"]);
+    ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "A01-04",
+            "--area",
+            "A01",
+            "--title",
+            "Not ready",
+        ],
+    );
+    // A handoff covering a listed task comes with it.
+    ok(
+        &repo,
+        &["handoff", "--as", "claude/run", "--tasks", "A01-02"],
+    );
+
+    let v = ok(&repo, &["next"]);
+    let ids: Vec<&str> = v["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap())
+        .collect();
+    // Earliest iteration first, unplanned last.
+    assert_eq!(ids, ["A02-01", "A01-02", "A01-01"]);
+    assert_eq!(v["tasks"][1]["handoff"]["writer"], "claude/run");
+    assert_eq!(v["tasks"][0]["handoff"], Value::Null);
+    let rule = v["instruction"].as_str().unwrap();
+    assert!(
+        rule.starts_with("Take the task the person named, if any."),
+        "{rule}"
+    );
+    assert!(rule.contains("alm claim <id> --as <your session name> --push"));
+    assert!(v["handoff_rules"]["quota_gate"].is_number());
+
+    // `--iteration` narrows the list; an unknown iteration is refused.
+    let v = ok(&repo, &["next", "--iteration", "I02"]);
+    assert_eq!(v["tasks"].as_array().unwrap().len(), 1);
+    assert_eq!(v["tasks"][0]["id"], "A01-02");
+    refused(
+        &repo,
+        &["next", "--iteration", "I09"],
+        1,
+        "unknown_iteration",
+    );
+
+    // Text for people: every task, then the rule and the handoff rules.
+    let text = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(text.contains("A02-01  ready") && text.contains("  iteration: I01"));
+    assert!(text.contains("Take the task the person named") && text.contains("Handoff rules"));
+
+    // Nothing to take in an iteration with no free ready task.
+    ok(&repo, &["add", "iteration", "I03", "v0.3"]);
+    let v = ok(&repo, &["next", "--iteration", "I03"]);
+    assert_eq!(v["tasks"], json!([]));
+    assert!(
+        v["instruction"]
+            .as_str()
+            .unwrap()
+            .starts_with("Nothing to take")
+    );
 }
 
 #[test]
