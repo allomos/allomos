@@ -101,8 +101,8 @@ Work a task:
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm wait <id> --on \"<what>\"`: state waiting.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id>`: it also says, for each handoff naming the task, whether to remove it (all its
-  tasks finished; it prints the command) or leave it; `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
+- `alm done <id>`: when handoffs name the task, it asks you to check them with
+  `alm handoffs --check --task <id>`; `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
 
 Plan:
 - `alm add area <id> \"<name>\"`, `alm add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`

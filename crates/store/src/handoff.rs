@@ -330,38 +330,6 @@ pub fn remove(root: &Path, file: &str) -> Result<Handoff, Problem> {
     Ok(parse(&format!("{HANDOFFS_DIR}/{name}"), &text))
 }
 
-/// What finishing a task means for one handoff that names it (Task-A03-13).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Followup {
-    pub file: String,
-    pub tasks: Vec<String>,
-    /// Its tasks not yet done or dropped; empty when the handoff can be removed.
-    pub unfinished: Vec<String>,
-}
-
-/// Every handoff that names `task`, with which of its tasks are still unfinished (`alm done`).
-/// `finished` says whether a task ID is done or dropped (a task no longer in the taskbag counts as
-/// finished).
-pub fn followups(root: &Path, task: &str, finished: impl Fn(&str) -> bool) -> Vec<Followup> {
-    list(root)
-        .into_iter()
-        .filter(|h| h.tasks.iter().any(|t| t == task))
-        .map(|h| Followup {
-            unfinished: h.tasks.iter().filter(|t| !finished(t)).cloned().collect(),
-            file: h.file,
-            tasks: h.tasks,
-        })
-        .collect()
-}
-
-impl Followup {
-    /// It may be removed: it names tasks, and all of them are finished. A handoff naming no task
-    /// stays (nothing says its work is over).
-    pub fn removable(&self) -> bool {
-        !self.tasks.is_empty() && self.unfinished.is_empty()
-    }
-}
-
 /// `handoffs/<base>.md`, or `<base>-2.md`, … when that is taken.
 fn free_name(root: &Path, base: &str) -> String {
     let mut n = 1;
@@ -519,30 +487,13 @@ mod tests {
     }
 
     #[test]
-    fn a_finished_handoff_is_removed_and_others_stay() {
+    fn a_handoff_is_removed_and_others_stay() {
         let root = tmp("remove");
         init(&root, "p", "P").unwrap();
         let known = vec!["A1-01".to_string(), "A1-02".to_string()];
         let both = write(&root, "claude/both", Some(&known), None, &known, false).unwrap();
         write(&root, "codex/one", Some(&known[..1]), None, &known, false).unwrap();
         write(&root, "codex/none", None, None, &known, false).unwrap();
-
-        // A1-01 finished, A1-02 not: one handoff can go, the other still has work.
-        let f = followups(&root, "A1-01", |t| t == "A1-01");
-        assert_eq!(f.len(), 2);
-        let of = |file: &str| {
-            f.iter()
-                .find(|x| x.file == file)
-                .unwrap()
-                .unfinished
-                .clone()
-        };
-        assert_eq!(of(&both.handoff.file), vec!["A1-02".to_string()]);
-        assert!(
-            f.iter()
-                .any(|x| x.tasks == ["A1-01"] && x.unfinished.is_empty())
-        );
-        assert!(followups(&root, "A9-99", |_| true).is_empty());
 
         // Removed by its listed name or its bare name; then it is gone from the list.
         let gone = remove(&root, &both.handoff.file).unwrap();

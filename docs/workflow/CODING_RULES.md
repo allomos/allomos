@@ -73,6 +73,8 @@ Rust puts everything it builds in `target/`, one per worktree. A Tauri app's `ta
 
 A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md)). `allomos` and `alm` are the same program.
 
+**`alm` tells; the agent checks** (owner, 2026-10-13). When a task needs judging (are these handoffs finished? is this card ready?), `alm` lays out the facts and asks the agent to check; it does not decide for it. A new check made by `alm` itself needs the owner's approval first, recorded on the card. Refusing invalid input (unknown IDs, bad dates, the holder rule) is not such a check.
+
 | Command | What it does |
 |---|---|
 | `alm init [--name <name>] [--id <id>] [--labels <a,b,…>] [--write-agent-files]` | Creates an empty taskbag in `.allomos/taskbag/` at the root of the current Git repository, or of the current folder outside Git. Refused (`taskbag_exists`) when one is there. Never creates a Git repository. `--id` sets the project ID (default: from the folder's name); `--labels` sets the label ladder, lowest step first (default: implemented, locally verified, deployed and verified, owner verified; empty → `ladder_empty`). It then prints numbered steps asking the AI agent that ran it to add Allomos's section to the project's `AGENTS.md` and `CLAUDE.md`, merged with what is there (also in `--json` as `agent_setup`) ([`Task-A01-14`](../tasks/Task-A01-14-init-asks-the-agent.md)). `--write-agent-files` writes the section itself instead (see [FILE-FORMAT](../product/FILE-FORMAT.md#where-the-taskbag-is)) and lists the files in `agent_files`; with `--commit`, they go into the same commit. |
@@ -85,7 +87,7 @@ A **contract** for agents and scripts ([`Task-A01-03`](../tasks/Task-A01-03-gb-c
 | `alm claim <id> [--take]` | You hold the task; state becomes `in_progress`. Refused (`task_held`) when someone else holds it, unless `--take`, which takes it over with a `took_over` warning (for an agent whose quota ran out). Refused (`task_closed`) when done or dropped. |
 | `alm label <id> <label>` | Sets the label; it must be on the project's ladder. |
 | `alm wait <id> --on <text>` | State `waiting`, with what it waits on. |
-| `alm done <id>` | State `done`. Warns (`label_below_top`) without refusing when the label is below the top step. For each handoff naming the task, says what to do: all its tasks done or dropped → remove it, with the exact `alm handoff --remove <file> --push`; otherwise leave it, naming the unfinished tasks. Nothing extra when no handoff names it (`--json`: `handoffs`, each with `file`, `tasks`, `unfinished`, `action` `remove`/`keep`, and `command` for `remove`) ([`Task-A03-13`](../tasks/Task-A03-13-done-cleans-up-handoffs.md)). |
+| `alm done <id>` | State `done`. Warns (`label_below_top`) without refusing when the label is below the top step. When handoffs name the task, asks the agent to check them: one line naming how many and the command `alm handoffs --check --task <id>`; no verdict. Nothing extra when none does (`--json`: `handoff_check` with `files`, `command`, `instruction`) ([`Task-A03-13`](../tasks/Task-A03-13-done-cleans-up-handoffs.md)) |
 | `alm release <id> [--note <text>]` | Clears the holder; `in_progress` goes back to `ready`. The note replaces the task's handoff note. |
 | `alm needs <id> [<text>]` | Sets the task's next dependency; without text, clears it. |
 | `alm ready <id>` | An unheld `backlog` or `waiting` task becomes `ready`, its *waiting on* cleared. Otherwise refused (`cannot_make_ready`). |

@@ -1385,7 +1385,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
         Command::Done { id } => {
             let mut done = change(cli, cwd, |bag| ops::finish(bag, id, me))?;
-            followups(cli, cwd, id, &mut done)?;
+            ask_to_check_handoffs(cli, cwd, id, &mut done)?;
             Ok(done)
         }
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
@@ -1421,56 +1421,26 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
 /// What `alm handoffs --check` asks the agent to do with the handoffs it lists.
 const CHECK_INSTRUCTION: &str = "Check these handoffs one by one. When every task a handoff names is done or dropped (or missing), remove it: `alm handoff --remove <file> --push`. Leave the others, and any handoff that names no task.";
 
-/// Whether a task is finished (done or dropped); a task not in the taskbag counts as finished.
-fn finished_in(bag: &Taskbag) -> impl Fn(&str) -> bool + '_ {
-    |t| {
-        bag.tasks
-            .iter()
-            .find(|x| x.id == t)
-            .is_none_or(|x| matches!(x.state, State::Done | State::Dropped))
-    }
-}
-
-/// What to do with one handoff: a line for people and its `--json` item (Task-A03-13).
-fn followup_of(f: &handoff::Followup) -> (String, Value) {
-    if f.removable() {
-        let command = format!("alm handoff --remove {} --push", f.file);
-        (
-            format!(
-                "Handoff {}: all its tasks are finished; remove it: `{command}`\n",
-                f.file
-            ),
-            json!({ "file": f.file, "tasks": f.tasks, "unfinished": f.unfinished, "action": "remove", "command": command }),
-        )
-    } else {
-        let why = if f.tasks.is_empty() {
-            "names no task".to_string()
-        } else {
-            format!("{} not finished yet", f.unfinished.join(", "))
-        };
-        (
-            format!("Handoff {}: {why}; leave it as it is.\n", f.file),
-            json!({ "file": f.file, "tasks": f.tasks, "unfinished": f.unfinished, "action": "keep" }),
-        )
-    }
-}
-
-/// After `alm done`: what to do with each handoff that names the task. One whose tasks are all
-/// finished is to be removed with `alm handoff --remove`; one with work left stays.
-fn followups(cli: &Cli, cwd: &Path, id: &str, done: &mut Done) -> Result<(), Problem> {
+/// After `alm done`: when handoffs name the task, ask the agent to check them (Task-A03-13).
+/// `alm` gives no verdict; the agent checks (owner, 2026-10-13).
+fn ask_to_check_handoffs(cli: &Cli, cwd: &Path, id: &str, done: &mut Done) -> Result<(), Problem> {
     let root = locate(cli, cwd)?;
-    let (bag, _) = taskbag_of(&root, load(&root))?;
-    let list = handoff::followups(&root, id, finished_in(&bag));
-    if list.is_empty() {
+    let files: Vec<String> = handoff::list(&root)
+        .into_iter()
+        .filter(|h| h.tasks.iter().any(|t| t == id))
+        .map(|h| h.file)
+        .collect();
+    if files.is_empty() {
         return Ok(());
     }
-    let mut items = Vec::new();
-    for f in &list {
-        let (line, item) = followup_of(f);
-        done.text.push_str(&line);
-        items.push(item);
-    }
-    done.fields["handoffs"] = Value::Array(items);
+    let command = format!("alm handoffs --check --task {id}");
+    let instruction = format!(
+        "{} handoff(s) name {id}. Check them now: run `{command}` and follow what it says.",
+        files.len()
+    );
+    done.text.push_str(&format!("{instruction}\n"));
+    done.fields["handoff_check"] =
+        json!({ "files": files, "command": command, "instruction": instruction });
     Ok(())
 }
 
