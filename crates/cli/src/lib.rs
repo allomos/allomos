@@ -242,6 +242,9 @@ enum Command {
         /// A Markdown file with the handoff's text.
         #[arg(long, value_name = "FILE")]
         from: Option<PathBuf>,
+        /// Remove this handoff (as `alm handoffs` names it) once all its tasks are finished.
+        #[arg(long, value_name = "FILE", conflicts_with_all = ["tasks", "from"])]
+        remove: Option<String>,
     },
     /// List handoffs, newest first.
     Handoffs {
@@ -251,6 +254,9 @@ enum Command {
         /// Only the newest one.
         #[arg(long)]
         latest: bool,
+        /// Only the rule for checking the handoffs yourself and removing finished ones.
+        #[arg(long, conflicts_with = "latest")]
+        check: bool,
     },
 }
 
@@ -1027,7 +1033,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text,
             ))
         }
-        Command::Handoff { tasks, from } => {
+        Command::Handoff {
+            remove: Some(file), ..
+        } => {
+            let root = locate(cli, cwd)?;
+            let gone = handoff::remove(&root, file)?;
+            Ok(Done::new(
+                json!({ "taskbag": root, "removed": handoff_brief(&gone) }),
+                format!("Removed the handoff {}.\n", gone.file),
+            ))
+        }
+        Command::Handoff { tasks, from, .. } => {
             let root = locate(cli, cwd)?;
             let me = me.ok_or(Problem::HolderMissing)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
@@ -1072,7 +1088,18 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Handoffs { task, latest } => {
+        Command::Handoffs {
+            task, check: true, ..
+        } => {
+            // Only the rule: the agent gets the list and checks it itself (owner, 2026-10-13).
+            let root = locate(cli, cwd)?;
+            let instruction = check_rule(task.as_deref());
+            Ok(Done::new(
+                json!({ "taskbag": root, "instruction": instruction }),
+                instruction,
+            ))
+        }
+        Command::Handoffs { task, latest, .. } => {
             let root = locate(cli, cwd)?;
             let mut all = handoff::list(&root);
             if let Some(task) = task {
@@ -1441,9 +1468,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Claim { id, take } => change(cli, cwd, |bag| ops::claim(bag, id, me, *take)),
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
-        Command::Done { id, without_owner } => change(cli, cwd, |bag| {
-            ops::finish(bag, id, me, without_owner.as_deref())
-        }),
+        Command::Done { id, without_owner } => {
+            let mut done = change(cli, cwd, |bag| {
+                ops::finish(bag, id, me, without_owner.as_deref())
+            })?;
+            ask_to_check_handoffs(id, &mut done);
+            Ok(done)
+        }
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;
@@ -1489,6 +1520,33 @@ fn save_project(
         event::changes(Some(before), after, &[]),
     );
     lock.record(&event, |l| l.save_project(after))
+}
+
+/// The rule for the agent to check the handoffs itself (`alm handoffs --check`, and after
+/// `alm done` for the finished task). `alm` looks at nothing: the agent gets the list, checks each
+/// handoff and removes the finished ones (owner, 2026-10-13; Task-A03-13).
+fn check_rule(task: Option<&str>) -> String {
+    let (what, list) = match task {
+        Some(id) => (
+            format!("the handoffs that name {id}"),
+            format!("`alm handoffs --task {id}`"),
+        ),
+        None => ("the handoffs".to_string(), "`alm handoffs`".to_string()),
+    };
+    format!(
+        "Now check {what} yourself, one by one:\n\
+         1. Get the list: {list}.\n\
+         2. For each handoff, look up every task it names (`alm show <id>`).\n\
+         3. If all of them are done or dropped, remove the handoff: `alm handoff --remove <file> --push`.\n\
+         4. Otherwise leave it as it is.\n"
+    )
+}
+
+/// After `alm done`: the rule for checking the handoffs that name the finished task.
+fn ask_to_check_handoffs(id: &str, done: &mut Done) {
+    let instruction = check_rule(Some(id));
+    done.text.push_str(&instruction);
+    done.fields["handoff_check"] = json!({ "instruction": instruction });
 }
 
 /// One change to one task, under the taskbag's lock: load, apply the rule, write it and its event.

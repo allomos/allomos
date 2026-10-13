@@ -41,12 +41,8 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 - **All Git actions use the `git` command**, not only commit and push: pull, status and diff too.
 - **If `git` is not installed**, the desktop app asks the user to install it. Projects stay usable without Git actions until then.
 - **Only standalone folders and subfolders of an existing project folder** are in scope. No special handling is planned for synced folders (Dropbox, iCloud), network drives or removable disks.
+- **Folder gone or moved** (owner, 2026-10-14; built by [`Task-A01-28`](../tasks/Task-A01-28-forget-missing-last-folder.md)). The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
 - **One Allomos project per repository.** Several Allomos projects in different subfolders of one code repository are **out of scope**.
-
-## Proposed detail (not yet confirmed)
-
-
-- **Folder gone or moved.** The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
 
 ## How this fits earlier decisions
 

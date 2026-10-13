@@ -71,6 +71,8 @@ problems! {
     InvalidPercent { value } => "invalid_percent", "\"{value}\" is not a percentage. Use a whole number from 0 to 100.";
     /// The handoff template may not be empty (Task-A03-06).
     TemplateEmpty => "template_empty", "The handoff template cannot be empty.";
+    /// `alm handoff --remove` named no handoff file (Task-A03-13).
+    HandoffNotFound { file } => "handoff_not_found", "There is no handoff \"{file}\". `alm handoffs` lists them.";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     /// `task_language` is neither `ui` nor a language code (Task-A01-21).

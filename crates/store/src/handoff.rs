@@ -305,6 +305,31 @@ pub fn write(
     })
 }
 
+/// Remove a handoff whose work is finished (`alm handoff --remove`, Task-A03-13). `file` is its
+/// name as `alm handoffs` prints it (`handoffs/<name>.md`) or just `<name>.md`. The file is
+/// deleted; Git history keeps it (owner, 2026-10-13).
+pub fn remove(root: &Path, file: &str) -> Result<Handoff, Problem> {
+    let name = file.trim();
+    let name = name
+        .strip_prefix(&format!("{HANDOFFS_DIR}/"))
+        .unwrap_or(name);
+    let missing = || Problem::HandoffNotFound {
+        file: file.to_string(),
+    };
+    if name.is_empty()
+        || name.contains(['/', '\\'])
+        || name.starts_with('.')
+        || !name.ends_with(".md")
+    {
+        return Err(missing());
+    }
+    let lock = Lock::acquire(root, LOCK_WAIT)?;
+    let path = lock.root().join(HANDOFFS_DIR).join(name);
+    let text = fs::read_to_string(&path).map_err(|_| missing())?;
+    fs::remove_file(&path).map_err(|e| write_failed(&path, e))?;
+    Ok(parse(&format!("{HANDOFFS_DIR}/{name}"), &text))
+}
+
 /// `handoffs/<base>.md`, or `<base>-2.md`, … when that is taken.
 fn free_name(root: &Path, base: &str) -> String {
     let mut n = 1;
@@ -459,6 +484,44 @@ mod tests {
                 .code(),
             "holder_missing"
         );
+    }
+
+    #[test]
+    fn a_handoff_is_removed_and_others_stay() {
+        let root = tmp("remove");
+        init(&root, "p", "P").unwrap();
+        let known = vec!["A1-01".to_string(), "A1-02".to_string()];
+        let both = write(&root, "claude/both", Some(&known), None, &known, false).unwrap();
+        write(&root, "codex/one", Some(&known[..1]), None, &known, false).unwrap();
+        write(&root, "codex/none", None, None, &known, false).unwrap();
+
+        // Removed by its listed name or its bare name; then it is gone from the list.
+        let gone = remove(&root, &both.handoff.file).unwrap();
+        assert_eq!(gone.writer, "claude/both");
+        assert!(!both.path.exists());
+        assert_eq!(list(&root).len(), 2);
+        let name = list(&root)[0]
+            .file
+            .trim_start_matches("handoffs/")
+            .to_string();
+        remove(&root, &name).unwrap();
+        assert_eq!(list(&root).len(), 1);
+
+        // Missing files and anything outside handoffs/ are refused.
+        for bad in [
+            &both.handoff.file[..],
+            "../project.json",
+            "handoffs/.keep",
+            "x.json",
+            "",
+        ] {
+            assert_eq!(
+                remove(&root, bad).unwrap_err().code(),
+                "handoff_not_found",
+                "{bad}"
+            );
+        }
+        assert!(root.join("project.json").is_file());
     }
 
     #[test]

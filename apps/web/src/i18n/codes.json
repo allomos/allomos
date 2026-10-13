@@ -40,6 +40,9 @@
     "detail"
   ],
   "git_missing": [],
+  "handoff_not_found": [
+    "file"
+  ],
   "holder_missing": [],
   "instructions_outdated": [
     "files",

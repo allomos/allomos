@@ -1558,3 +1558,60 @@ fn an_older_taskbag_without_events_is_upgraded_and_history_starts_then() {
         "ready"
     );
 }
+
+#[test]
+fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
+    let repo = filled();
+    // alm done always ends with the rule for the finished task; alm looks at no handoff.
+    ok(&repo, &["--as", "a", "claim", "A02-01"]);
+    let v = ok(&repo, &["--as", "a", "done", "A02-01"]);
+    let rule = v["handoff_check"]["instruction"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rule.starts_with("Now check the handoffs that name A02-01 yourself"),
+        "{rule}"
+    );
+    assert!(rule.contains("`alm handoffs --task A02-01`"));
+    assert!(rule.contains("`alm handoff --remove <file> --push`"));
+    ok(&repo, &["--as", "b", "claim", "A01-01"]);
+    let text = String::from_utf8(alm(&repo, &["--as", "b", "done", "A01-01"]).stdout).unwrap();
+    assert!(text.starts_with("A01-01  done"), "{text}");
+    assert!(text.contains("Now check the handoffs that name A01-01 yourself, one by one:\n1. Get the list: `alm handoffs --task A01-01`."), "{text}");
+
+    // alm handoffs --check: only the rule, with or without a task.
+    let v = ok(&repo, &["handoffs", "--check"]);
+    assert!(v.get("handoffs").is_none(), "{v}");
+    assert!(
+        v["instruction"]
+            .as_str()
+            .unwrap()
+            .contains("1. Get the list: `alm handoffs`.")
+    );
+    let v = ok(&repo, &["handoffs", "--check", "--task", "A01-01"]);
+    assert_eq!(v["instruction"], json!(text.split_once('\n').unwrap().1));
+
+    // The agent removes a handoff by the name alm handoffs lists; then it is gone.
+    let file = ok(&repo, &["handoff", "--as", "s/one", "--tasks", "A01-01"])["handoff"]["file"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let v = ok(&repo, &["handoff", "--remove", &file]);
+    assert_eq!(v["removed"]["writer"], "s/one");
+    assert_eq!(ok(&repo, &["handoffs"])["handoffs"], json!([]));
+    assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
+    refused(
+        &repo,
+        &["handoff", "--remove", &file],
+        1,
+        "handoff_not_found",
+    );
+    refused(
+        &repo,
+        &["handoff", "--remove", "../project.json"],
+        1,
+        "handoff_not_found",
+    );
+    assert!(repo.join(".allomos/taskbag/project.json").is_file());
+}
