@@ -1,0 +1,38 @@
+# Task-A03-16-agents-use-the-apps-own-alm
+
+*Card type: coding.*
+
+## What gets built (plain words)
+
+When Allomos opens an AI agent in a terminal window, the agent's `alm` is the one that came with that same copy of Allomos. Today the terminal finds whatever `alm` the person's shell finds first, usually the installed one in `/usr/local/bin`.
+
+| Piece | In everyday words | Where |
+|---|---|---|
+| The app's own `alm` | The `alm` next to the app's program: inside `Allomos.app` when installed, `target/debug/alm` when run with `tauri dev` | `apps/desktop/src-tauri/src/alm_command.rs` already finds it |
+| Terminal window for an agent | Before starting `claude` or `codex`, the window puts the folder of the app's own `alm` first in `PATH`, for that window only | `apps/desktop/src-tauri/src/agents.rs` (`ask`) |
+
+What the owner can see at the end: an app built from a task's worktree opens an agent, and `which alm` in that window names the worktree's `alm`; the installed app opens one, and it names the installed app's `alm`.
+
+## Details for the worker
+
+- **Outcome.** An agent the app opens in a terminal window uses the `alm` that came with that app, so testing an in-development app also tests its in-development `alm`, with nothing set by hand.
+- **Decisive unknowns.**
+  - Agents opened through a link (the Claude desktop app, `how == "link"`) start outside any terminal window the app controls; whether their `alm` can be chosen at all. Find out; if not, say so on the card and leave them as they are.
+  - Windows (PowerShell window): the same change, `$env:PATH` set before starting the agent, where `alm.exe` sits beside the app. Check on Windows if a Windows computer is available; otherwise mark it untested.
+  - When the app has no `alm` beside it (for example `tauri dev` before `cargo build -p allomos-cli`): leave `PATH` unchanged rather than fail.
+- **Files owned.** `apps/desktop/src-tauri/src/agents.rs`; reuse the finder in `apps/desktop/src-tauri/src/alm_command.rs`; one line in `docs/workflow/CODING_RULES.md` (Install on a Mac / testing).
+- **External operations.** None.
+- **Done means mechanically.**
+  - Unit test: the terminal command the app builds puts the app's `alm` folder first, and is unchanged when there is no `alm` beside the app.
+  - Manual check: from a worktree's `tauri dev`, ask Claude Code in a test project under `~/allomos-tests/a03-16-own-alm/`; in that window `which alm` names `<worktree>/target/debug/alm`. With the installed app it names `/Applications/Allomos.app/Contents/MacOS/alm`.
+  - The person's own terminal windows are unchanged.
+
+## Approvals
+
+| Date | What was approved | By |
+|---|---|---|
+| 2026-10-14 | Write this card and approve it (ready); local work only | owner (chat) |
+
+## Notes
+
+- 2026-10-14: Found while installing a newer `alm`: an app run from a worktree still sends its agents to the installed `alm`, so a task's new `alm` commands cannot be tried through the app. Until this is done, start the agent by hand with `PATH="<worktree>/target/debug:$PATH"`, in a test project, never on the real taskbag.
