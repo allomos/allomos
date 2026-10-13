@@ -33,7 +33,9 @@ Today Allomos keeps only each task's *current* fields; nobody can see who change
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
+| 2026-10-13 | Card approved ("approve"), with the two recommendations: one event file per change, named by time and a random suffix; no history invented for changes made before this card | owner (chat) |
 
 ## Notes
 
 - 2026-10-09 — Card written by the agent. Next: the owner approves the card (`ready`).
+- 2026-10-13 — Owner approved the card with both recommendations; moved to ready and claimed by `claude/a01-17-history`.
