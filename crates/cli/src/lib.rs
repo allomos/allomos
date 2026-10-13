@@ -185,8 +185,12 @@ enum Command {
     },
     /// Drop a task: it will not be done.
     Drop { id: String },
-    /// Show the first ready task that no one holds.
-    Next,
+    /// List the ready tasks that no one holds, with the rule for choosing one.
+    Next {
+        /// Only tasks planned in this iteration.
+        #[arg(long)]
+        iteration: Option<String>,
+    },
     /// Bring a taskbag written by an older Allomos up to this one's format. Run it when `alm`
     /// says the taskbag is older; it adds only what the newer format has.
     Upgrade,
@@ -298,7 +302,7 @@ impl Command {
             | Command::HandoffTemplate { .. }
             | Command::Handoff { .. }
             | Command::Handoffs { .. }
-            | Command::Next => None,
+            | Command::Next { .. } => None,
         }
     }
 
@@ -327,7 +331,7 @@ impl Command {
             self,
             Command::List { .. }
                 | Command::Show { .. }
-                | Command::Next
+                | Command::Next { .. }
                 | Command::Confirm { .. }
                 | Command::Brief
                 | Command::Guide { .. }
@@ -359,7 +363,7 @@ impl Command {
             Command::Title { .. } => "title",
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
-            Command::Next => "next",
+            Command::Next { .. } => "next",
             Command::Upgrade => "upgrade",
             Command::HandoffRules { .. } => "handoff-rules",
             Command::HandoffTemplate { .. } => "handoff-template",
@@ -755,6 +759,9 @@ fn taskbag_of(root: &Path, loaded: allomos_core::Loaded) -> Result<(Taskbag, Vec
         }),
     }
 }
+
+/// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Claim it with `alm claim <id> --as <your session name> --push`.";
 
 fn task_json(t: &Task) -> Value {
     serde_json::to_value(t).expect("tasks serialize")
@@ -1272,32 +1279,58 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Next => {
+        Command::Next { iteration } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
-            let task = ops::next(&bag);
-            let latest = task.and_then(|t| handoff::latest_for(&root, &t.id));
-            let mut text = match task {
-                Some(t) => {
-                    let mut s = format!("{}\n", task_line(t));
-                    if let Some(note) = &t.handoff_note {
-                        s.push_str(&format!("  handoff note: {note}\n"));
+            // `alm` lists; the agent chooses (Task-A03-14).
+            let tasks = ops::next(&bag, iteration.as_deref())?;
+            let instruction = if tasks.is_empty() {
+                match iteration {
+                    Some(i) => format!(
+                        "Nothing to take: no ready task in iteration {i} is free. Ask the person what to do next."
+                    ),
+                    None => {
+                        "Nothing to take: no ready task is free. Ask the person what to do next."
+                            .to_string()
                     }
-                    if let Some(h) = &latest {
-                        s.push_str(&format!("  {}", handoff_line(h)));
-                    }
-                    s
                 }
-                None => "No ready task is free.\n".to_string(),
+            } else {
+                CHOOSING_RULE.to_string()
             };
+            let mut text = String::new();
+            let mut listed = Vec::new();
+            for t in &tasks {
+                let latest = handoff::latest_for(&root, &t.id);
+                text.push_str(&format!("{}\n", task_line(t)));
+                if let Some(i) = &t.iteration {
+                    text.push_str(&format!("  iteration: {i}\n"));
+                }
+                if let Some(n) = &t.next_dependency {
+                    text.push_str(&format!("  next dependency: {n}\n"));
+                }
+                if let Some(note) = &t.handoff_note {
+                    text.push_str(&format!("  handoff note: {note}\n"));
+                }
+                if let Some(h) = &latest {
+                    text.push_str(&format!("  {}", handoff_line(h)));
+                }
+                let mut v = task_json(t);
+                v["handoff"] = latest.as_ref().map(handoff_brief).into();
+                listed.push(v);
+            }
+            if !tasks.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(&instruction);
+            text.push('\n');
             // At the start of a session: when this agent must write its handoff (Task-A03-06).
             let rules = bag.project.handoff.clone().unwrap_or_default().applied(me);
             text.push_str(&rules_line(&rules));
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
-                    "task": task.map(task_json),
-                    "handoff": latest.as_ref().map(handoff_brief),
+                    "tasks": listed,
+                    "instruction": instruction,
                     "handoff_rules": rules,
                 }),
                 text,

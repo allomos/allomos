@@ -24,3 +24,9 @@ Everything else `alm next` shows stays: each task's latest handoff, and the hand
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-13 | `alm next` lists the ready tasks and gives the rule for choosing; add `--iteration` | owner (chat) |
+
+## Notes
+
+- **2026-10-13, claude/a03-14-next-list — locally verified.** `alm next` now lists every ready task nobody holds, earliest iteration first (unplanned last), then area order and ID, each with its handoff note and latest handoff, followed by the owner-approved choosing rule (verbatim) and the handoff rules. `--iteration <id>` narrows the list; an unknown one is refused with `unknown_iteration`. With nothing free it says "Nothing to take: no ready task (in iteration X) is free. Ask the person what to do next." `--json`: `tasks` (each with `handoff`), `instruction`, `handoff_rules`; the old single `task`/`handoff` keys are gone. `ops::next(taskbag, iteration)` now returns the list; nothing in the app called it. The brief in `crates/store/src/lib.rs` still says "the next ready task" — outside this card's files (changing it bumps the brief version), left for a follow-up if wanted.
+  - Checks: `cargo fmt --check` PASS; `cargo clippy --workspace --all-targets -- -D warnings` PASS; `cargo test --workspace` PASS (new: `next_lists_every_free_ready_task_with_the_rule_for_choosing`, `ops::tests::next_lists_free_ready_tasks_by_iteration_area_then_id`); web `typecheck`, `build`, `check:i18n`, `test` (35/35) PASS.
+  - By hand on this project's taskbag: `alm next` and `alm next --iteration I02` both list `A03-15` (I02) with the rule and handoff rules; `--iteration I01` gives the "Nothing to take" line; `--iteration I99` exits 1 with `unknown_iteration`.

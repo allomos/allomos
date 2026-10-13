@@ -91,7 +91,8 @@ taskbag's files; push the current branch). Exit codes: 0 done, 1 refused by a ru
 usage, 3 taskbag busy or not writable.
 
 See:
-- `alm next`: the first ready task no one holds, with its handoff note.
+- `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
+  latest handoff, and the rule for choosing one. `alm` chooses nothing; you do.
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
 - `alm show <id>`: one task in full, with its description.
 
@@ -133,7 +134,9 @@ About Allomos:
 
 const WORKFLOW: &str = "# How to work the tasks
 
-1. Start with `alm next` (or `alm list`), and read the task's handoff note and description.
+1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
+   otherwise one from the earliest iteration whose next dependency is met. Read its handoff
+   first (`alm show <id>`).
 2. Hold one task at a time: `alm claim <id> --as <your session name> --push`. A task someone else
    holds is not yours to change.
 3. As you prove each step, `alm label <id> \"<label>\" --push`, and keep its next dependency
