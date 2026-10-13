@@ -13,9 +13,9 @@ use allomos_core::ops::{self, Outcome};
 use allomos_core::{Issue, Iteration, Problem, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
-    DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
-    agent_section_for, agent_setup_request, find_taskbag, git_root, guide, id_from_name,
-    init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
+    GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section, agent_section_for,
+    agent_setup_request, default_root, find_taskbag, git_root, guide, id_from_name,
+    init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer, read_text,
     requests_dir, task_language, versions, was_seen, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
@@ -650,8 +650,8 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
             let path = cwd.join(path);
             if path.join("project.json").is_file() {
                 Ok(path)
-            } else if path.join(DEFAULT_DIR).join("project.json").is_file() {
-                Ok(path.join(DEFAULT_DIR))
+            } else if default_root(&path).join("project.json").is_file() {
+                Ok(default_root(&path))
             } else {
                 Err(not_found(&path))
             }
@@ -679,11 +679,8 @@ fn language_line(l: &allomos_store::TaskLanguage) -> String {
 fn confirm_project(cli: &Cli, cwd: &Path) -> PathBuf {
     let taskbag = match &cli.taskbag {
         Some(path) => cwd.join(path),
-        None => find_taskbag(cwd).unwrap_or_else(|| {
-            git_root(cwd)
-                .unwrap_or_else(|| cwd.to_path_buf())
-                .join(DEFAULT_DIR)
-        }),
+        None => find_taskbag(cwd)
+            .unwrap_or_else(|| default_root(&git_root(cwd).unwrap_or_else(|| cwd.to_path_buf()))),
     };
     picked_folder(&taskbag)
         .map(Path::to_path_buf)
@@ -695,22 +692,40 @@ fn confirm_project(cli: &Cli, cwd: &Path) -> PathBuf {
 const CONFIRM_POLL: Duration = Duration::from_millis(250);
 const CONFIRM_LAUNCH_AFTER: Duration = Duration::from_secs(3);
 
-/// Open the Allomos app on `project`, so it can show the question. macOS only for now;
+/// Open the Allomos app on `project`, so it can show the question: on macOS by its bundle ID, on
+/// Windows the app beside `alm.exe`, where the installer puts both (Task-A07-06).
 /// `ALLOMOS_NO_LAUNCH` turns it off (tests).
 fn open_app(project: &Path) {
-    if cfg!(target_os = "macos") && std::env::var_os("ALLOMOS_NO_LAUNCH").is_none() {
+    if std::env::var_os("ALLOMOS_NO_LAUNCH").is_some() {
+        return;
+    }
+    if cfg!(target_os = "macos") {
         let _ = std::process::Command::new("open")
             .args(["-n", "-b", "io.allomos", "--args"])
             .arg(project)
             .status();
+    } else if cfg!(windows) {
+        if let Some(app) = windows_app() {
+            // Not waited for: the app keeps running after the question is answered.
+            let _ = std::process::Command::new(app).arg(project).spawn();
+        }
     }
+}
+
+/// The Allomos app installed beside this `alm.exe`, if there is one.
+fn windows_app() -> Option<PathBuf> {
+    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    ["Allomos.exe", "allomos-desktop.exe"]
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|p| p.is_file())
 }
 
 /// `alm confirm`: leave the question, wait for the person's answer in the app, then tidy up.
 fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Result<Done, Problem> {
     let project = confirm_project(cli, cwd);
     let path = cwd.join(plan);
-    let text = std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+    let text = read_text(&path).map_err(|e| Problem::ReadFailed {
         detail: format!("{}: {e}", path.display()),
     })?;
     if text.len() > MAX_PLAN_BYTES {
@@ -853,9 +868,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         } => {
             let root = match &cli.taskbag {
                 Some(p) => cwd.join(p),
-                None => git_root(cwd)
-                    .unwrap_or_else(|| cwd.to_path_buf())
-                    .join(DEFAULT_DIR),
+                None => default_root(&git_root(cwd).unwrap_or_else(|| cwd.to_path_buf())),
             };
             let folder = root
                 .parent()
@@ -982,7 +995,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let root = locate(cli, cwd)?;
             if let Some(file) = set {
                 let file = cwd.join(file);
-                let text = std::fs::read_to_string(&file).map_err(|e| Problem::ReadFailed {
+                let text = read_text(&file).map_err(|e| Problem::ReadFailed {
                     detail: format!("{}: {e}", file.display()),
                 })?;
                 handoff::set_template(&root, &text)?;
@@ -1018,11 +1031,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let body = match from {
                 Some(file) => {
                     let file = cwd.join(file);
-                    Some(
-                        std::fs::read_to_string(&file).map_err(|e| Problem::ReadFailed {
-                            detail: format!("{}: {e}", file.display()),
-                        })?,
-                    )
+                    Some(read_text(&file).map_err(|e| Problem::ReadFailed {
+                        detail: format!("{}: {e}", file.display()),
+                    })?)
                 }
                 None => None,
             };

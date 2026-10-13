@@ -22,6 +22,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 ```text
 .allomos/taskbag/
   .gitignore        keeps .lock and temporary files out of Git
+  .gitattributes    keeps `\n` line endings on every computer
   .lock             Allomos's writing lock (never committed)
   project.json
   areas/
@@ -128,9 +129,11 @@ Free Markdown: the task's outcome and details. Optional; it is not stored inside
 Owner's choice A, 2026-10-06 ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md)).
 
 - **One short lock per change.** Every Allomos writer (`alm` now, the app when it starts editing) takes an exclusive operating-system lock on `.lock` for one change only: read the taskbag, check the rules, write, let go. A second writer waits up to 5 seconds, then gives up with `taskbag_busy`. The operating system drops the lock if the process dies, so a crash never leaves the taskbag locked.
-- **Whole files only.** A file is written to a temporary `.tmp-…` file in the same folder, flushed to disk, then renamed over the old one; a new task folder is filled under a temporary name and renamed into place. A reader sees the old file or the new one, never half of one. On macOS a reader that already opened the old file keeps reading the old file whole. (Windows is checked when the app starts writing, Iteration 2.)
+- **Whole files only.** A file is written to a temporary `.tmp-…` file in the same folder, flushed to disk, then renamed over the old one; a new task folder is filled under a temporary name and renamed into place. A reader sees the old file or the new one, never half of one. On macOS a reader that already opened the old file keeps reading the old file whole. On Windows another program (an editor, a virus scanner) that has the file open can make the rename fail for a moment, so it is tried again for up to one second while the writer still holds the lock ([`Task-A07-03`](../tasks/Task-A07-03-windows-works.md)).
 - **Readers need no lock.** The app and `alm list` / `show` / `next` read without waiting.
 - **`.gitignore`** in the taskbag lists `.lock` and `.tmp-*`. `alm init` and the app both write it; since 2026-10-09 the app, like `alm init`, creates an empty taskbag ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)).
+- **Line endings** ([`Task-A07-03`](../tasks/Task-A07-03-windows-works.md)). Allomos always writes `\n`. It reads `\r\n` the same as `\n`, since Git on Windows may check text files out that way. A new taskbag gets a **`.gitattributes`** (`*.json`, `*.md`, `.gitignore` and `.gitattributes` with `text eol=lf`) so Git keeps `\n` on every computer; `alm init`, the app and the starter project write it. A taskbag made before 2026-10-14 has none; reading still works, and one can be added by hand.
+- **Paths in files** ([`Task-A07-03`](../tasks/Task-A07-03-windows-works.md)). A relative path Allomos writes into a shared file (`project_folder` in `project.json`, the taskbag's place in `AGENTS.md`) uses `/`, so the same file works on macOS and Windows; a relative `project_folder` written with `\` is read the same. A path on another Windows drive cannot be relative and is kept as it is.
 - The lock only orders Allomos's own writers; a person editing a file by hand is not blocked. The checks below still catch a bad file.
 
 ## Checks Allomos makes

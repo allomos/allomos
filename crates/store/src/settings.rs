@@ -74,7 +74,7 @@ pub fn save_ui_language(language: &str) -> io::Result<()> {
     let text = serde_json::to_string_pretty(&settings).map_err(io::Error::other)?;
     let tmp = dir.join(format!("{SETTINGS_FILE}.tmp-{}", std::process::id()));
     fs::write(&tmp, text + "\n")?;
-    fs::rename(tmp, dir.join(SETTINGS_FILE))
+    crate::replace_file(&tmp, &dir.join(SETTINGS_FILE))
 }
 
 /// The interface language the app last saved, if it has run on this computer.

@@ -57,7 +57,7 @@ fn now() -> u64 {
 fn write_whole(path: &Path, text: &str) -> io::Result<()> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, text)?;
-    fs::rename(&tmp, path)
+    crate::replace_file(&tmp, path)
 }
 
 /// Leave a question for the person in `project`. Returns it with its new ID.

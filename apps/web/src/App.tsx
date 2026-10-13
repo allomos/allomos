@@ -12,6 +12,7 @@ import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
 import { useFold } from "./useFold";
+import { projectFolder } from "./paths";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
@@ -30,11 +31,6 @@ const NEW_WINDOW = new URLSearchParams(window.location.search).has("new");
 /** Recently opened project folders, newest first, for File → Open Recent. */
 const RECENT_KEY = "allomos.recentFolders";
 const RECENT_MAX = 10;
-
-/** The project folder the user picked, from a taskbag root (`<folder>/.allomos/taskbag`). */
-function projectFolder(root: string): string {
-  return root.replace(/[\\/]\.allomos[\\/]taskbag[\\/]?$/, "");
-}
 
 function readRecent(): string[] {
   try {
