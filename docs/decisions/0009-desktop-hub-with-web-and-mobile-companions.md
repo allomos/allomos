@@ -25,7 +25,7 @@ The full product should be a desktop application. It provides a web program and 
 - **Companions can also act, through the desktop app** (owner, 2026-10-04). For example, they can mark a check done or approve something. A companion never changes project data itself: it sends the request to the desktop app, which checks it, applies it and records who did it. The desktop app stays the only authority.
 - **Companions work from outside the home or office network** (owner, 2026-10-04). The connection method must be **free or very cheap**. Any relay or tunnel service is an external operation and needs the owner's approval before it is set up.
 - **Pairing by a code shown on screen** (owner, 2026-10-04; changed 2026-10-14: no email). A new phone or browser gets access like this:
-  1. The companion user enters an **alias** (a display name).
+  1. The companion user types a **device name**, any text they like. No email address or other identity is asked for (owner, 2026-10-14).
   2. The desktop app user sees the request and **approves it**.
   3. The desktop app **shows a 9-digit code** on its screen, written in three groups such as `482 913 076`.
   4. The companion user types the code (with or without the spaces) and gets access.
@@ -54,8 +54,8 @@ Answered 2026-10-04: companions can act (through the desktop app); access from o
 
 ### Pairing details (owner, 2026-10-14)
 
-- The code is **9 random digits**, shown as three groups of three separated by spaces (`482 913 076`) so it is easy to type; the spaces need not be typed. It works **once** and expires after a short time (about 15 minutes).
-- Each paired device is listed in the desktop app with its alias. The desktop user can **remove** a device at any time, which ends its access immediately.
+- The code is **9 random digits**, shown as three groups of three separated by spaces (`482 913 076`) so it is easy to type; the spaces need not be typed. It works **once** and expires after a short time (about 15 minutes). **After 5 wrong tries** the code is replaced by a new one, shown on the desktop app's screen; the old one no longer works (owner, 2026-10-14).
+- Each paired device is listed in the desktop app with its device name. The desktop user can **remove** a device at any time, which ends its access immediately.
 - The desktop app records every pairing, removal and companion action as events.
 - Traffic between companion and desktop is encrypted.
 
