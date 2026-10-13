@@ -40,5 +40,6 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-13 | Start the card, in I02; merging the workflow change into `main` and a release run attaching the `.pkg` (publishing) | owner (chat) |
 | 2026-10-13 | `alm` made available as a link `/usr/local/bin/alm` → the app's own `alm` | owner (chat) |
 | 2026-10-13 | The idea: a Mac package installing app and `alm`; both a `.pkg` and the app offering to install `alm` (card not yet approved to start) | owner (chat) |
