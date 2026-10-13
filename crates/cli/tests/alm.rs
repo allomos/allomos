@@ -157,9 +157,11 @@ fn work_one_task_from_claim_to_done() {
     assert_eq!(v["task"]["state"], "waiting");
     assert_eq!(v["task"]["waiting_on"], "owner review");
 
+    // Below the top label: finished with no warning; `alm` does not judge (Task-A03-15).
     let v = ok(&sub, &["--as", "agent-a", "done", "A01-01"]);
     assert_eq!(v["task"]["state"], "done");
-    assert_eq!(v["warnings"][0]["code"], "label_below_top");
+    assert_eq!(v["warnings"], json!([]));
+    assert_eq!(v["task"]["finished_without_owner"], Value::Null);
 
     // The files say what the command said.
     let file = task_file(&repo, "A01-01");
@@ -1124,7 +1126,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v2)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v3)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -1138,9 +1140,94 @@ fn upgrade_on_a_current_taskbag_changes_nothing() {
     let v = ok(&repo, &["upgrade"]);
     assert_eq!(
         v["upgrade"],
-        json!({ "from": "allomos/2", "to": "allomos/2", "changed": false })
+        json!({ "from": "allomos/3", "to": "allomos/3", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
+}
+
+#[test]
+fn upgrade_from_2_adds_nothing_but_the_format() {
+    let repo = filled();
+    set_format(&repo, "allomos/2");
+    refused(&repo, &["list"], 1, "taskbag_older");
+    let path = repo.join(".allomos/taskbag/project.json");
+    let before = fs::read_to_string(&path).unwrap();
+    let v = ok(&repo, &["upgrade"]);
+    assert_eq!(
+        v["upgrade"],
+        json!({ "from": "allomos/2", "to": "allomos/3", "changed": true })
+    );
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        before.replace("\"allomos/2\"", "\"allomos/3\"")
+    );
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]));
+}
+
+#[test]
+fn a_task_finished_without_the_owner_is_noted_and_found() {
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["--as", "a", "label", "A01-01", "locally verified"]);
+    // Empty text is refused, and nothing changes.
+    refused(
+        &repo,
+        &["--as", "a", "done", "A01-01", "--without-owner", " "],
+        1,
+        "without_owner_missing",
+    );
+    assert_eq!(task_file(&repo, "A01-01")["state"], "in_progress");
+
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-owner",
+            "card run, owner away",
+        ],
+    );
+    assert_eq!(v["warnings"], json!([]));
+    assert_eq!(v["task"]["finished_without_owner"], "card run, owner away");
+    let file = task_file(&repo, "A01-01");
+    assert_eq!(file["finished_without_owner"], "card run, owner away");
+    assert_eq!(file["label"], "locally verified", "the label stays");
+
+    // `alm show` shows it.
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["task"]["finished_without_owner"], "card run, owner away");
+    let out = alm(&repo, &["show", "A01-01"]);
+    assert!(
+        String::from_utf8_lossy(&out.stdout)
+            .contains("finished without the owner's check: card run, owner away")
+    );
+
+    // A task finished the usual way is not found by --without-owner.
+    ok(&repo, &["--as", "b", "claim", "A01-02"]);
+    ok(&repo, &["--as", "b", "done", "A01-02"]);
+    assert!(
+        task_file(&repo, "A01-02")
+            .get("finished_without_owner")
+            .is_none()
+    );
+    let v = ok(&repo, &["list", "--without-owner"]);
+    let found: Vec<&Value> = v["areas"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|a| a["tasks"].as_array().unwrap())
+        .collect();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0]["id"], "A01-01");
+
+    // The owner checks it later: the note stays, the label shows the check.
+    ok(&repo, &["--as", "a", "label", "A01-01", "owner verified"]);
+    let file = task_file(&repo, "A01-01");
+    assert_eq!(file["label"], "owner verified");
+    assert_eq!(file["finished_without_owner"], "card run, owner away");
 }
 
 #[test]

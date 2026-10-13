@@ -93,7 +93,8 @@ usage, 3 taskbag busy or not writable.
 See:
 - `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
   latest handoff, and the rule for choosing one. `alm` chooses nothing; you do.
-- `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
+- `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`;
+  `--without-owner`: only tasks finished without the owner's check.
 - `alm show <id>`: one task in full, with its description.
 
 Work a task:
@@ -102,7 +103,8 @@ Work a task:
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm wait <id> --on \"<what>\"`: state waiting.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id>`; `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
+- `alm done <id> [--without-owner \"<why, which run>\"]`: finished (see `alm guide workflow`,
+  step 7); `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
 
 Plan:
 - `alm add area <id> \"<name>\"`, `alm add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`
@@ -148,7 +150,11 @@ const WORKFLOW: &str = "# How to work the tasks
    or a person. Evidence goes on the task's card, not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\" --push`.
-7. Finished: the top label, then `alm done <id> --push`.
+7. Finished: only once the task has the top label of the ladder (the owner has checked it), then
+   `alm done <id> --push`. The one exception: in an automatic or loop run the person set up to go
+   on without them (for example a card run or `/loop`), you may finish a task below the top label
+   with `alm done <id> --without-owner \"<why, which run>\" --push`; say so in your handoff. The
+   task keeps its label and the note, so the owner finds it with `alm list --without-owner`.
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
@@ -210,5 +216,13 @@ mod tests {
         );
         assert!(guide(Some("tasks")).unwrap().contains("alm task-language"));
         assert!(crate::agent_section().contains("run `alm task-language`"));
+        // The rule for finishing, with its automatic/loop exception (Task-A03-15).
+        for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
+            assert!(text.contains("top label"), "{text}");
+            assert!(text.contains("automatic or loop run"), "{text}");
+            assert!(text.contains("--without-owner"), "{text}");
+            assert!(text.contains("handoff"), "{text}");
+        }
+        assert!(crate::agent_section().contains("every ready task nobody holds"));
     }
 }

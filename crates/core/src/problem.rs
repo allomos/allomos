@@ -82,6 +82,8 @@ problems! {
     UnknownArea { area } => "unknown_area", "The area \"{area}\" does not exist. Add areas/{area}.json or use an existing area ID.";
     LabelNotOnLadder { label, ladder } => "label_not_on_ladder", "\"{label}\" is not a step of this project's ladder ({ladder}).";
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
+    /// `alm done --without-owner` with no text, or the field empty in `task.json` (Task-A03-15).
+    WithoutOwnerMissing => "without_owner_missing", "Say why the task is finished without the owner's check, and in which run.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";
@@ -103,8 +105,6 @@ problems! {
     HolderMissing => "holder_missing", "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
     TaskClosed { id, state } => "task_closed", "Task {id} is {state}, so it cannot be changed this way.";
-    /// A warning: the task was finished below the top step of the ladder.
-    LabelBelowTop { label, top } => "label_below_top", "Finished with the label \"{label}\", below the top step \"{top}\".";
     /// A warning: the task was taken over from another holder.
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";

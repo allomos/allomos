@@ -62,10 +62,6 @@
     "value"
   ],
   "iteration_name_missing": [],
-  "label_below_top": [
-    "label",
-    "top"
-  ],
   "label_not_on_ladder": [
     "label",
     "ladder"
@@ -150,6 +146,7 @@
     "current"
   ],
   "waiting_on_missing": [],
+  "without_owner_missing": [],
   "write_failed": [
     "path",
     "detail"
