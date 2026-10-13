@@ -11,6 +11,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the owner, **
 - **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
 - **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
+- **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the owner to approve it ([CODING_RULES § The `alm` command](docs/workflow/CODING_RULES.md#the-alm-command)).
 - **Decisions are made by the owner.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
 
 ## AI working mode

@@ -206,6 +206,7 @@
   "update.download": "最新の「肩代」をダウンロード",
   "update.newer_title": "「肩代」を更新してください",
   "problem.invalid_percent": "「{value}」はパーセントではありません。0 から 100 までの整数にしてください。",
+  "problem.handoff_not_found": "引き継ぎ「{file}」はありません。`alm handoffs` で一覧できます。",
   "problem.template_empty": "引き継ぎのテンプレートは空にできません。",
   "group.handoffs": "引き継ぎ",
   "handoffs.title": "引き継ぎ",
