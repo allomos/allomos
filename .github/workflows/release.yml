@@ -43,7 +43,7 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 ||
             gh release create "$TAG" --verify-tag --title "Allomos $TAG" \
-              --notes "Unsigned builds. macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.dmg. Windows: Allomos_${TAG#v}_x64-setup.exe. How to install: https://mypals-ml.github.io/allomos/start/getting-started/"
+              --notes "Unsigned builds. macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.pkg (installs the app and the alm command) or Allomos_${TAG#v}_aarch64.dmg. Windows: Allomos_${TAG#v}_x64-setup.exe. How to install: https://mypals-ml.github.io/allomos/start/getting-started/"
 
   macos:
     needs: release
@@ -60,13 +60,15 @@ jobs:
       # signingIdentity "-" signs the app ad hoc (no Apple certificate): Apple Silicon Macs refuse
       # to open an app that is not signed at all. GitHub sets CI=true, which makes Tauri skip
       # arranging the .dmg window through Finder (on a Mac outside CI, run it with CI=true).
-      - run: npm --prefix apps/desktop run tauri build -- --bundles dmg --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
-      - run: cargo build --release -p allomos-cli --bin alm
+      # The app carries alm (tauri.macos.conf.json builds it before bundling, Task-A07-12).
+      - run: npm --prefix apps/desktop run tauri build -- --bundles app,dmg --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+      # The .pkg installs the app and links /usr/local/bin/alm to the alm inside it (Task-A07-12).
+      - run: apps/desktop/scripts/build-mac-pkg.sh
       - name: Attach to the release
         run: |
           v=${{ needs.release.outputs.version }}
           tar -czf "alm_${v}_macos_arm64.tar.gz" -C target/release alm
-          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg "alm_${v}_macos_arm64.tar.gz"
+          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg target/release/bundle/pkg/*.pkg "alm_${v}_macos_arm64.tar.gz"
 
   windows:
     needs: release

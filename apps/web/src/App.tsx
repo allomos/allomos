@@ -8,6 +8,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
+import { almOfferLines } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
@@ -15,7 +16,7 @@ import { useFold } from "./useFold";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -394,6 +395,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       </header>
 
       <main className="main">
+        <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />
         {error && (
           <Banner kind="error" onClose={() => setError(null)}>
             {noteText(error)}
@@ -522,6 +524,66 @@ function VersionNotice({
       <span>{notice.kind === "taskbag" ? t("update.notice_taskbag") : t("update.notice_section", { files: notice.files })}</span>
       <button type="button" className="primary" onClick={onUpdate}>
         {t("update.button")}
+      </button>
+    </div>
+  );
+}
+
+/** **Install the alm command** (Task-A07-12): in a built Mac app whose own `alm` is not the one
+ * Terminal finds. Asked once when the window opens. Nothing is installed unless the person clicks;
+ * "Don't ask again" is remembered, × hides it until the next start. */
+function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: unknown) => void }) {
+  const { t } = useI18n();
+  const [status, setStatus] = useState<AlmStatus | null>(null);
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .almCommandStatus()
+      .then((s) => live && setStatus(s))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [messenger]);
+  if (installed) {
+    return (
+      <Banner kind="ok" onClose={() => setInstalled(false)}>
+        {t("alm.installed")}
+      </Banner>
+    );
+  }
+  const lines = almOfferLines(status);
+  if (hidden || lines.length === 0) return null;
+  const install = () => {
+    setBusy(true);
+    messenger
+      .installAlmCommand()
+      .then((r) => {
+        if (r.cancelled) return;
+        setStatus(r.status);
+        setInstalled(true);
+      })
+      .catch(onError)
+      .finally(() => setBusy(false));
+  };
+  const dismiss = () => {
+    void messenger.dismissAlmOffer().catch(() => undefined);
+    setHidden(true);
+  };
+  return (
+    <div className="banner update" role="status">
+      <span>{lines.map((l) => t(l.key, l.params)).join(" ")}</span>
+      <button type="button" className="primary" onClick={install} disabled={busy}>
+        {t("alm.install")}
+      </button>
+      <button type="button" onClick={dismiss} disabled={busy}>
+        {t("alm.dismiss")}
+      </button>
+      <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={() => setHidden(true)}>
+        ×
       </button>
     </div>
   );

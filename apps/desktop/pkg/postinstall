@@ -1,0 +1,19 @@
+#!/bin/sh
+# After the Allomos .pkg installs the app (Task-A07-12): make `alm` work in every new terminal with
+# a link /usr/local/bin/alm -> the alm inside Allomos.app, so updating the app updates alm too.
+# Never replaces someone else's alm (a real file, or a link to something that is not an Allomos):
+# the app offers that later and names it, so the person decides (owner, 2026-10-13).
+app_alm="${2:-/Applications}/Allomos.app/Contents/MacOS/alm"
+link=/usr/local/bin/alm
+[ -x "$app_alm" ] || exit 0
+mkdir -p /usr/local/bin
+if [ -L "$link" ]; then
+  case "$(readlink "$link")" in
+    */Allomos.app/Contents/MacOS/alm) ;;
+    *) exit 0 ;;
+  esac
+elif [ -e "$link" ]; then
+  exit 0
+fi
+ln -sfn "$app_alm" "$link"
+exit 0

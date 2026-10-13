@@ -36,8 +36,8 @@ pub use convert::{
 };
 pub use guide::{GUIDE_TOPICS, guide};
 pub use settings::{
-    TaskLanguage, pick_ui_language, save_ui_language, saved_ui_language, settings_dir,
-    task_language,
+    TaskLanguage, alm_offer_dismissed, dismiss_alm_offer, pick_ui_language, save_ui_language,
+    saved_ui_language, settings_dir, task_language,
 };
 pub use setup::{
     SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
