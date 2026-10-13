@@ -43,12 +43,14 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
 - Postinstall rules in a scratch folder: no `alm` → link made; a link to another program → kept; a link to an older Allomos.app → replaced; a real file → kept.
 - The shell probe on this Mac finds `~/.cargo/bin/alm` first, so the app here offers with the "found first" warning.
 - Tests: Rust workspace (6 new `alm_command` cases, settings "Don't ask again"), web 38 incl. 3 new, typecheck, translation check, clippy: all pass.
-- Not yet: installing the `.pkg` for real and the app's click (they need the Mac password: owner's check); a release run on GitHub.
+- Owner's check on this Mac (2026-10-14): the `.pkg` installed; `/usr/local/bin/alm` → `/Applications/Allomos.app/Contents/MacOS/alm`, `alm --version` → `alm 0.1.2`. After removing the link, Allomos showed the offer; **Install the alm command…** with the Mac password made the link again (00:58), `alm 0.1.2`.
+- Not yet: a release run on GitHub (at the next version tag).
 
 ## Approvals
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Verified on this Mac (`.pkg` install and the app's offer); merge into `main` | owner (chat) |
 | 2026-10-13 | Start the card, in I02; merging the workflow change into `main` and a release run attaching the `.pkg` (publishing) | owner (chat) |
 | 2026-10-13 | `alm` made available as a link `/usr/local/bin/alm` → the app's own `alm` | owner (chat) |
 | 2026-10-13 | The idea: a Mac package installing app and `alm`; both a `.pkg` and the app offering to install `alm` (card not yet approved to start) | owner (chat) |
