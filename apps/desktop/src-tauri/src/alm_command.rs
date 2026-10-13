@@ -94,6 +94,38 @@ pub fn bundled() -> Option<PathBuf> {
     dir.join("alm").canonicalize().ok().filter(|p| p.is_file())
 }
 
+/// The `alm` beside the app's own program, on any system and in development too
+/// ([`Task-A03-16`]): `Allomos.app/Contents/MacOS/alm` when installed, `target/debug/alm` under
+/// `tauri dev`, `alm.exe` beside the app on Windows. `None` when there is none (for example
+/// `tauri dev` before `cargo build -p allomos-cli`). Resolved on macOS; on Windows the path is kept
+/// as it is, because a resolved one starts with `\\?\`, which `PATH` does not take.
+///
+/// [`Task-A03-16`]: ../../../../docs/tasks/Task-A03-16-agents-use-the-apps-own-alm.md
+pub fn own() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    if cfg!(windows) {
+        return Some(exe.parent()?.join("alm.exe")).filter(|p| p.is_file());
+    }
+    let exe = exe.canonicalize().ok()?;
+    exe.parent()?
+        .join("alm")
+        .canonicalize()
+        .ok()
+        .filter(|p| p.is_file())
+}
+
+/// The `alm` the person's own shell finds, resolved: on Windows the first `alm.exe` on the app's
+/// `PATH` (which comes from the person's settings), elsewhere what [`terminal`] reports.
+pub fn shell_alm() -> Option<PathBuf> {
+    if cfg!(windows) {
+        let path = std::env::var_os("PATH")?;
+        return std::env::split_paths(&path)
+            .map(|d| d.join("alm.exe"))
+            .find(|p| p.is_file());
+    }
+    terminal().alm
+}
+
 pub fn place() -> Place {
     let link = Path::new(LINK);
     match link.symlink_metadata() {
