@@ -34,3 +34,4 @@ The label layer has its own React root (`apps/web/src/main.tsx`), so it keeps wo
 - 2026-10-13 — Built. Checked in a browser against sample elements (the full app only runs inside the desktop shell): labels `A0` … `A7` appeared in reading order on a heading, two buttons, a field, two list rows, a paragraph and a link; text inside a button was not labelled twice; a second press removed them all. Next: the owner tries it in the desktop app.
 
   Evidence: `typecheck` PASS; `check:i18n` PASS; `npm --prefix apps/web test` PASS, 35 tests (4 new in `tests/labelFlow.test.ts`); `npm --prefix apps/web run build` PASS. Desktop (Tauri) window: NOT RUN.
+- 2026-10-13 — Debug build of this branch (`target/debug/bundle/macos/Allomos.app`) opened for the owner, who tried Ctrl+Shift+S in the desktop app: "passed". Merged into main; card done.
