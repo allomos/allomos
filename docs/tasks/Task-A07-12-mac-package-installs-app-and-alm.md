@@ -10,9 +10,9 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
 
 | Piece | What it is in everyday words | Where |
 |---|---|---|
-| `alm` inside the app | The app carries its own `alm`, next to the app's program inside `Allomos.app` | `apps/desktop/src-tauri/tauri.macos.conf.json` (or the build script), `.gitignore` |
-| Mac installer package | `Allomos_<version>_aarch64.pkg`: double-click, enter the Mac password once; it puts Allomos in Applications and makes `alm` work in every new terminal | a build script under `apps/desktop/scripts/`, `.github/workflows/release.yml` |
-| The app offers `alm` | When `alm` is missing from the terminal, or is not the app's own one, the app offers **Install the alm command** (asks for the Mac password); so a `.dmg` install, or an old `alm` from `cargo install`, is fixed with one click | `apps/desktop/src-tauri/src/`, `apps/web/src/` (three languages) |
+| `alm` inside the app | The app carries its own `alm`, next to the app's program inside `Allomos.app`; built before bundling | `apps/desktop/src-tauri/tauri.macos.conf.json` |
+| Mac installer package | `Allomos_<version>_aarch64.pkg`: double-click, enter the Mac password once; it puts Allomos in Applications and makes `alm` work in every new terminal (never over someone else's `alm`) | `apps/desktop/scripts/build-mac-pkg.sh`, `apps/desktop/pkg/postinstall`, `.github/workflows/release.yml` |
+| The app offers `alm` | When `alm` is missing from the terminal, or is not the app's own one, the app offers **Install the alm command** (asks for the Mac password); so a `.dmg` install, or an old `alm` from `cargo install`, is fixed with one click | `apps/desktop/src-tauri/src/alm_command.rs`, `crates/store/src/settings.rs` ("Don't ask again"), `apps/web/src/App.tsx` + `almOfferFlow.ts` (three languages) |
 
 **How `alm` is made available:** a link `/usr/local/bin/alm` → `/Applications/Allomos.app/Contents/MacOS/alm`. `/usr/local/bin` is on every Mac terminal's PATH. Because it is a link, updating the app updates `alm` too; they can never drift apart. *Decided (owner, 2026-10-13): this way.*
 
@@ -36,10 +36,21 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
   - A local build produces the `.pkg` and a `.dmg` whose `Allomos.app` contains `alm`.
   - Checked by hand by the owner: on this Mac (with `~/.cargo/bin/alm` moved aside), the `.pkg` gives a working `alm` in a new Terminal; with `/usr/local/bin/alm` removed, the app offers to install it and the click works.
 
+## Evidence (2026-10-14, this Mac)
+
+- Built `Allomos.app` (release, ad hoc signed): `Contents/MacOS/alm` is there, `alm --version` → `alm 0.1.2`, `codesign --verify --deep --strict` passes, `alm` signature ad hoc.
+- `build-mac-pkg.sh` → `Allomos_0.1.2_aarch64.pkg` (4.5 MB): payload `Allomos.app`, `install-location="/Applications"`, `relocatable="false"`, `Scripts/postinstall`.
+- Postinstall rules in a scratch folder: no `alm` → link made; a link to another program → kept; a link to an older Allomos.app → replaced; a real file → kept.
+- The shell probe on this Mac finds `~/.cargo/bin/alm` first, so the app here offers with the "found first" warning.
+- Tests: Rust workspace (6 new `alm_command` cases, settings "Don't ask again"), web 38 incl. 3 new, typecheck, translation check, clippy: all pass.
+- Owner's check on this Mac (2026-10-14): the `.pkg` installed; `/usr/local/bin/alm` → `/Applications/Allomos.app/Contents/MacOS/alm`, `alm --version` → `alm 0.1.2`. After removing the link, Allomos showed the offer; **Install the alm command…** with the Mac password made the link again (00:58), `alm 0.1.2`.
+- Not yet: a release run on GitHub (at the next version tag).
+
 ## Approvals
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Verified on this Mac (`.pkg` install and the app's offer); merge into `main` | owner (chat) |
 | 2026-10-13 | Start the card, in I02; merging the workflow change into `main` and a release run attaching the `.pkg` (publishing) | owner (chat) |
 | 2026-10-13 | `alm` made available as a link `/usr/local/bin/alm` → the app's own `alm` | owner (chat) |
 | 2026-10-13 | The idea: a Mac package installing app and `alm`; both a `.pkg` and the app offering to install `alm` (card not yet approved to start) | owner (chat) |

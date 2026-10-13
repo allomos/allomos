@@ -1,0 +1,10 @@
+{
+  "build": {
+    "beforeBundleCommand": "cargo build --release -p allomos-cli --bin alm"
+  },
+  "bundle": {
+    "macOS": {
+      "files": { "MacOS/alm": "../../../target/release/alm" }
+    }
+  }
+}

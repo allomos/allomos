@@ -11,15 +11,15 @@ sidebar:
 
 从[发布页](https://github.com/mypals-ml/allomos/releases/latest)下载最新版本：
 
-- **macOS**（Apple 芯片的 Mac：M1 或更新）：`Allomos_<版本>_aarch64.dmg`。打开它，把 Allomos 拖进“应用程序”。
+- **macOS**（Apple 芯片的 Mac：M1 或更新）：`Allomos_<版本>_aarch64.pkg`。打开它，按安装器的步骤操作；它会请你输入一次 Mac 密码，把 Allomos 放进“应用程序”，并一起安装 `alm` 命令。（也可以用 `Allomos_<版本>_aarch64.dmg`：打开它，把 Allomos 拖进“应用程序”；之后 Allomos 会提示 **安装 alm 命令**。）
 - **Windows**：`Allomos_<版本>_x64-setup.exe`。运行它即可；不需要管理员权限，它也会安装 `alm` 命令。
 
 在 1.0 版之前，这些下载还没有签名，所以第一次打开 Allomos 时系统会提醒你：
 
-- **macOS** 会说无法检查 Allomos 是否含有恶意软件。选择 **完成**，打开 **系统设置 › 隐私与安全性**，向下滚动，在 Allomos 旁边选择 **仍要打开**。
+- **macOS** 会说无法检查 Allomos（或它的安装器）是否含有恶意软件。选择 **完成**，打开 **系统设置 › 隐私与安全性**，向下滚动，在 Allomos 旁边选择 **仍要打开**。
 - **Windows** 会显示“Windows 已保护你的电脑”。选择 **更多信息**，再选择 **仍要运行**。
 
-在 macOS 上，`alm` 命令要另外下载：`alm_<版本>_macos_arm64.tar.gz`。打开它，把 `alm` 移到 PATH 里的某个文件夹，例如 `/usr/local/bin`。
+在 macOS 上，`alm` 是指向 Allomos 里那一份的链接（`/usr/local/bin/alm`），所以更新 Allomos 时 `alm` 也一起更新。不装应用的 Mac 可以用只含 `alm` 的 `alm_<版本>_macos_arm64.tar.gz`：打开它，把 `alm` 移到 PATH 里的某个文件夹，例如 `/usr/local/bin`。
 
 ## 2. 开始
 
