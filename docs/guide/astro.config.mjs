@@ -10,7 +10,7 @@ export default defineConfig({
       title: {
         en: 'Allomos Guide',
         'zh-CN': '换肩 Allomos 使用指南',
-        ja: 'アロモス ガイド',
+        ja: '肩代 Allomos ガイド',
       },
       logo: { src: './src/assets/logo.svg', alt: '' },
       favicon: '/favicon.svg',

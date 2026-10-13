@@ -127,17 +127,17 @@ const README_ZH_CN: &str = "# 换肩项目
 此文件夹原本是空的，所以「换肩」写了这个文件。你可以修改或删除它。
 ";
 
-const README_JA: &str = "# アロモスプロジェクト
+const README_JA: &str = "# 肩代プロジェクト
 
-このフォルダーはアロモスのプロジェクトです。タスク、エリア、進捗は隠しフォルダー
+このフォルダーは「肩代」のプロジェクトです。タスク、エリア、進捗は隠しフォルダー
 `.allomos/taskbag/` に入っています。
 
-- アロモスアプリでこのフォルダーを開くと、タスクをエリアごとに見られます。
+- 「肩代」アプリでこのフォルダーを開くと、タスクをエリアごとに見られます。
 - AI エージェントや人は、ターミナルの `alm` コマンドでもタスクを扱えます
   （`alm list`、`alm next`、`alm claim <タスク>`）。
 - ファイルはただの JSON と Markdown なので、Git ですべての変更を記録できます。
 
-このフォルダーが空だったので、アロモスがこのファイルを書きました。編集や削除は自由です。
+このフォルダーが空だったので、「肩代」がこのファイルを書きました。編集や削除は自由です。
 ";
 
 /// Write `README-allomos.md` into `folder` when the folder looks empty (see
@@ -1314,7 +1314,7 @@ mod tests {
     fn readme_speaks_three_languages() {
         assert!(readme_text("en").starts_with("# Allomos project"));
         assert!(readme_text("zh-CN").contains("此文件夹是一个「换肩」项目"));
-        assert!(readme_text("ja").contains("このフォルダーはアロモスのプロジェクトです"));
+        assert!(readme_text("ja").contains("このフォルダーは「肩代」のプロジェクトです"));
         assert_eq!(readme_text("fr"), readme_text("en"));
         for lang in ["en", "zh-CN", "ja"] {
             assert!(readme_text(lang).contains("`.allomos/taskbag/`"));

@@ -8,7 +8,7 @@ Supersedes the name in [0013](./0013-product-name-fliphopper.md) (FlipHopper, se
 
 ## In plain words
 
-The product was called **FlipHopper**. It is now **Allomos**: Greek *állos* ("other") plus *ōmos* ("shoulder"), **the other shoulder**. Its Chinese name is **换肩** (huàn jiān): shifting a load to the other shoulder so the carrying goes on. That is what the product does: when one AI agent runs out or a teammate takes over, the project moves to another shoulder without losing its tasks, progress or notes. Japanese **アロモス**.
+The product was called **FlipHopper**. It is now **Allomos**: Greek *állos* ("other") plus *ōmos* ("shoulder"), **the other shoulder**. Its Chinese name is **换肩** (huàn jiān): shifting a load to the other shoulder so the carrying goes on. That is what the product does: when one AI agent runs out or a teammate takes over, the project moves to another shoulder without losing its tasks, progress or notes. Japanese **肩代** (アロモス until 2026-10-13; see the end of this record).
 
 The folder that holds a project's tasks, the **seabag**, is now the **taskbag**: a bag is carried on the shoulder. Chinese **任务包**, Japanese **タスクバッグ**.
 
@@ -16,7 +16,7 @@ The folder that holds a project's tasks, the **seabag**, is now the **taskbag**:
 
 | What | Before | Now |
 |---|---|---|
-| Name in text | FlipHopper | **Allomos**; Chinese screens **换肩**, Japanese screens **アロモス** |
+| Name in text | FlipHopper | **Allomos**; Chinese screens **换肩**, Japanese screens **肩代** (アロモス until 2026-10-13) |
 | Lower-case name in code | `fliphopper` | **`allomos`** |
 | Command and short alias | `fliphopper` / `fh` | **`allomos` / `alm`**; `fh` is not kept |
 | A project's folder | seabag, `.fliphopper/seabag/` | **taskbag, `.allomos/taskbag/`** |
@@ -43,3 +43,5 @@ Names compared on the way: Handoff, HandoffHub, TagTeamHub, Batonhop, TaskHub, P
 ## Where the old name stays
 
 As [0013](./0013-product-name-fliphopper.md#where-the-old-name-stays) did for "glidebox": dated history keeps "FlipHopper" and "seabag" (discussion records, research, analysis, finished cards, dated notes, decks), and so do file names, which never change. Current documents use Allomos.
+
+**Japanese name changed to 肩代 (owner, 2026-10-13).** The Japanese screens, README, guide and the Japanese `README-allomos.md` now say **肩代** instead of アロモス, written 「肩代」 in a sentence and 肩代 where it stands alone, as the Chinese text does with 换肩. 肩代 has not been searched for marks.

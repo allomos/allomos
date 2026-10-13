@@ -345,7 +345,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             <circle className="terracotta" cx="512" cy="759" r="138" />
             <path className="spark" d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" />
           </svg>
-          {/* The product's name in the interface's language: Allomos, 换肩, アロモス. */}
+          {/* The product's name in the interface's language: Allomos, 换肩, 肩代. */}
           <span>{t("brand.name")}</span>
         </div>
         {opened?.loaded.taskbag && (
