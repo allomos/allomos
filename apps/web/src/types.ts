@@ -36,6 +36,8 @@ export interface Task {
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
+  /** Why the task was finished without the owner's check (Task-A03-15). */
+  finished_without_owner: string | null;
   description: string;
 }
 

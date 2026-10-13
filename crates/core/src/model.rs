@@ -4,14 +4,15 @@ use serde::{Deserialize, Serialize};
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/2";
+pub const FORMAT: &str = "allomos/3";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; a newer Allomos
 /// upgrades an older taskbag, and an older one refuses a newer taskbag (Task-A01-25).
 ///
 /// 2: handoff rules in `project.json`, `handoff-template.md`, `project-notes.md` and `handoffs/`
 /// (Task-A03-06).
-pub const FORMAT_VERSION: u32 = 2;
+/// 3: a task's optional `finished_without_owner` (Task-A03-15).
+pub const FORMAT_VERSION: u32 = 3;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
 /// FlipHopper's `fliphopper/1`).
@@ -239,6 +240,11 @@ pub struct Task {
     /// A short note left on release for whoever picks the task up next.
     #[serde(default)]
     pub handoff_note: Option<String>,
+    /// Why the task was finished without the owner's check, and in which run: set only by
+    /// `alm done --without-owner` (Task-A03-15). Kept when the owner checks it later, so such tasks
+    /// stay searchable; the owner's check shows in the label.
+    #[serde(default)]
+    pub finished_without_owner: Option<String>,
     #[serde(default, skip_deserializing)]
     pub description: String,
 }

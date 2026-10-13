@@ -139,6 +139,9 @@ enum Command {
         /// Only tasks you hold.
         #[arg(long)]
         mine: bool,
+        /// Only tasks finished without the owner's check (`alm done --without-owner`).
+        #[arg(long)]
+        without_owner: bool,
     },
     /// Show one task in full.
     Show { id: String },
@@ -157,8 +160,15 @@ enum Command {
         #[arg(long, value_name = "TEXT")]
         on: String,
     },
-    /// Finish a task.
-    Done { id: String },
+    /// Finish a task. Finish it at the top label (the owner has checked it); in an automatic or
+    /// loop run, a task may be finished below it with --without-owner.
+    Done {
+        id: String,
+        /// Why the task is finished without the owner's check, and in which run (an automatic or
+        /// loop run). Recorded in the task's file; `alm list --without-owner` finds it.
+        #[arg(long, value_name = "TEXT")]
+        without_owner: Option<String>,
+    },
     /// Let go of a task, optionally leaving a handoff note for the next one.
     Release {
         id: String,
@@ -281,7 +291,7 @@ impl Command {
             | Command::Claim { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
-            | Command::Done { id }
+            | Command::Done { id, .. }
             | Command::Release { id, .. }
             | Command::Needs { id, .. }
             | Command::Plan { id, .. }
@@ -1153,6 +1163,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             by,
             state,
             mine,
+            without_owner,
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
@@ -1178,6 +1189,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         .is_none_or(|i| t.iteration.as_ref() == Some(i))
                     && state.as_ref().is_none_or(|s| t.state.as_str() == s)
                     && (!*mine || t.holder.as_deref() == me)
+                    && (!*without_owner || t.finished_without_owner.is_some())
             };
             let mut tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
             tasks.sort_by(|a, b| a.id.cmp(&b.id));
@@ -1258,6 +1270,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("waiting on", task.waiting_on.as_deref()),
                 ("next dependency", task.next_dependency.as_deref()),
                 ("handoff note", task.handoff_note.as_deref()),
+                (
+                    "finished without the owner's check",
+                    task.finished_without_owner.as_deref(),
+                ),
             ];
             for (name, value) in fields {
                 if let Some(v) = value {
@@ -1341,7 +1357,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Claim { id, take } => change(cli, cwd, |bag| ops::claim(bag, id, me, *take)),
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
-        Command::Done { id } => change(cli, cwd, |bag| ops::finish(bag, id, me)),
+        Command::Done { id, without_owner } => change(cli, cwd, |bag| {
+            ops::finish(bag, id, me, without_owner.as_deref())
+        }),
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;

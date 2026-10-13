@@ -39,16 +39,20 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v2)
+## Tasks: Allomos (v3)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
 
-- Start a session with `alm next` (the next ready task and its handoff note), or `alm list`.
+- Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
+  rule for choosing; `--iteration <id>` for one iteration), or `alm list`.
 - Take a task: `alm claim <id> --as <your session name> --push`.
 - Report progress: `alm label <id> "<label>" --push`; when blocked: `alm wait <id> --on "<what>" --push`.
 - Stopping before it is done: `alm release <id> --note "<what the next one needs>" --push`.
-- Finished: `alm done <id> --push`.
+- Finished: only at the top label (the owner has checked it): `alm done <id> --push`. In an
+  automatic or loop run the person set up to go on without them (a card run, `/loop`), you may
+  finish below it with `alm done <id> --without-owner "<why, which run>" --push`; say so in your
+  handoff.
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --push`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.

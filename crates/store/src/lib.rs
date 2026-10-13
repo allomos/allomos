@@ -173,11 +173,15 @@ pub fn agent_section() -> String {
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
 
-- Start a session with `alm next` (the next ready task and its handoff note), or `alm list`.
+- Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
+  rule for choosing; `--iteration <id>` for one iteration), or `alm list`.
 - Take a task: `alm claim <id> --as <your session name> --push`.
 - Report progress: `alm label <id> \"<label>\" --push`; when blocked: `alm wait <id> --on \"<what>\" --push`.
 - Stopping before it is done: `alm release <id> --note \"<what the next one needs>\" --push`.
-- Finished: `alm done <id> --push`.
+- Finished: only at the top label (the owner has checked it): `alm done <id> --push`. In an
+  automatic or loop run the person set up to go on without them (a card run, `/loop`), you may
+  finish below it with `alm done <id> --without-owner \"<why, which run>\" --push`; say so in your
+  handoff.
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --push`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
@@ -746,6 +750,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             next_dependency: None,
             iteration: None,
             handoff_note: None,
+            finished_without_owner: None,
             description: String::new(),
         };
         write_json(&dir.join("task.json"), &task_file_json(&task))?;
@@ -1337,7 +1342,7 @@ mod tests {
         create_starter(&root, "Demo").unwrap();
         assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
         let loaded = load(&root);
-        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/2");
+        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/3");
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         let tb = loaded.taskbag.unwrap();
         assert_eq!(tb.project.name, "Demo");
