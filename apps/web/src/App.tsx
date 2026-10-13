@@ -269,10 +269,24 @@ export function App({ messenger }: { messenger: Messenger }) {
         } catch {
           start = null;
         }
+        // The remembered folder was deleted or moved: forget it quietly and show the start page
+        // (Task-A01-28). Its project folder leaves Open Recent too, if that is gone as well.
+        if (start && (await messenger.inspectFolder(start).catch(() => null))?.inspection.kind === "not_a_folder") {
+          try {
+            localStorage.removeItem(LAST_ROOT_KEY);
+          } catch {
+            /* storage unavailable: nothing to forget */
+          }
+          const folder = projectFolder(start);
+          if ((await messenger.inspectFolder(folder).catch(() => null))?.inspection.kind === "not_a_folder") {
+            changeRecent((list) => list.filter((f) => f !== folder));
+          }
+          return;
+        }
       }
       if (start) await openFolder(start);
     })();
-  }, [messenger, openFolder]);
+  }, [messenger, openFolder, changeRecent]);
 
   // The menu is shared by every window: the window in front sets Connect with the Agents… and
   // Open Recent (which other windows may have changed) whenever it comes forward.
