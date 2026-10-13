@@ -116,6 +116,46 @@ pub fn next_task_id(taskbag: &Taskbag, area: &str) -> Result<String, Problem> {
     Ok(format!("{prefix}{:0width$}", highest + 1))
 }
 
+/// The next free ID after `ids` (in their order), following the project's own pattern
+/// `<letters><number>`: the letters of the last such ID (`fallback` when there is none), one more
+/// than the highest number used with them, as wide as the widest one (at least two digits). IDs of
+/// another shape do not count. Shared by areas (`A08` after `A07`) and iterations (`I16`).
+fn next_numbered_id<'a>(ids: impl Iterator<Item = &'a str> + Clone, fallback: &'a str) -> String {
+    let split = |id: &'a str| -> Option<(&'a str, &'a str)> {
+        let at = id.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+        (at < id.len()).then(|| id.split_at(at))
+    };
+    let prefix = ids
+        .clone()
+        .filter_map(split)
+        .last()
+        .map_or(fallback, |(p, _)| p);
+    let (highest, width) = ids
+        .clone()
+        .filter_map(split)
+        .filter(|(p, _)| *p == prefix)
+        .filter_map(|(_, n)| n.parse::<u64>().ok().map(|v| (v, n.len())))
+        .fold((0, 2), |(h, w), (v, len)| (h.max(v), w.max(len)));
+    // Higher than every number used with these letters, so it is free in any spelling.
+    format!("{prefix}{:0width$}", highest + 1)
+}
+
+/// The next free area ID (`alm add area` without one; the app's suggestion, Task-A01-19):
+/// `A08` after `A00`–`A07`, `A01` in a taskbag with no areas.
+pub fn next_area_id(taskbag: &Taskbag) -> String {
+    let mut areas: Vec<&Area> = taskbag.areas.iter().collect();
+    areas.sort_by_key(|a| a.order);
+    next_numbered_id(areas.iter().map(|a| a.id.as_str()), "A")
+}
+
+/// The next free iteration ID (`alm add iteration` without one; the app's suggestion,
+/// Task-A01-19): `I16` after `I01`–`I15`, `I01` in a taskbag with no iterations.
+pub fn next_iteration_id(taskbag: &Taskbag) -> String {
+    let mut iterations: Vec<&Iteration> = taskbag.iterations.iter().collect();
+    iterations.sort_by_key(|i| i.order);
+    next_numbered_id(iterations.iter().map(|i| i.id.as_str()), "I")
+}
+
 /// The project with a new task language (`alm language`): `ui` to follow the Allomos app's
 /// language, or a language code. Refused when it is neither.
 pub fn set_task_language(taskbag: &Taskbag, value: &str) -> Result<Project, Problem> {
@@ -706,6 +746,32 @@ mod tests {
             next_task_id(&s, "A09"),
             Err(Problem::UnknownArea { area: "A09".into() })
         );
+    }
+
+    /// `alm add area` / `alm add iteration` without an ID, and the app's suggestions (Task-A01-19).
+    #[test]
+    fn the_next_area_and_iteration_ids_follow_the_pattern() {
+        let mut s = bag();
+        s.areas.clear();
+        assert_eq!(next_area_id(&s), "A01");
+        assert_eq!(next_iteration_id(&s), "I01");
+        for id in ["A00", "A01", "A07"] {
+            s.areas.push(new_area(&s, id, "x").unwrap());
+        }
+        assert_eq!(next_area_id(&s), "A08");
+        for n in 1..=15 {
+            let id = format!("I{n:02}");
+            s.iterations
+                .push(new_iteration(&s, &id, "x", IterationDetails::default()).unwrap());
+        }
+        assert_eq!(next_iteration_id(&s), "I16");
+        // Other shapes do not count; the last area's letters are followed; width is kept.
+        s.areas.push(new_area(&s, "misc", "x").unwrap());
+        assert_eq!(next_area_id(&s), "A08");
+        s.areas.push(new_area(&s, "T009", "x").unwrap());
+        assert_eq!(next_area_id(&s), "T010");
+        s.areas.push(new_area(&s, "T0010", "x").unwrap());
+        assert_eq!(next_area_id(&s), "T0011");
     }
 
     #[test]

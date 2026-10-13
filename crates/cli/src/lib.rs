@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use allomos_core::event::{self, Kind, TASK_FIELDS};
+use allomos_core::event::{self, Kind};
 use allomos_core::ops::{self, Outcome};
 use allomos_core::{Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
@@ -262,12 +262,24 @@ enum Command {
 
 #[derive(Subcommand)]
 enum Add {
-    /// Add an area.
-    Area { id: String, name: String },
-    /// Add an iteration (when tasks are planned), ordered after the existing ones.
+    /// Add an area: `alm add area [<id>] <name>`. With only a name, the ID is the next free one,
+    /// like A08 after A07.
+    Area {
+        /// The area's ID, then its name; or only its name.
+        #[arg(value_name = "ID")]
+        first: String,
+        #[arg(value_name = "NAME")]
+        name: Option<String>,
+    },
+    /// Add an iteration (when tasks are planned), ordered after the existing ones:
+    /// `alm add iteration [<id>] <name>`. With only a name, the ID is the next free one, like I16
+    /// after I15.
     Iteration {
-        id: String,
-        name: String,
+        /// The iteration's ID, then its name; or only its name.
+        #[arg(value_name = "ID")]
+        first: String,
+        #[arg(value_name = "NAME")]
+        name: Option<String>,
         /// The release it produces, for example v0.2.
         #[arg(long)]
         release: Option<String>,
@@ -291,12 +303,22 @@ enum Add {
     },
 }
 
+/// `alm add area|iteration [<id>] <name>`: the ID given, if any, and the name.
+fn id_and_name<'a>(first: &'a str, name: &'a Option<String>) -> (Option<&'a str>, &'a str) {
+    match name {
+        Some(name) => (Some(first), name),
+        None => (None, first),
+    }
+}
+
 impl Command {
     /// The task or area a command acts on, for the commit message.
     fn target(&self) -> Option<&str> {
         match self {
-            Command::Add(Add::Area { id, .. } | Add::Iteration { id, .. })
-            | Command::Show { id }
+            Command::Add(Add::Area { first, name } | Add::Iteration { first, name, .. }) => {
+                id_and_name(first, name).0
+            }
+            Command::Show { id }
             | Command::History { id }
             | Command::Claim { id, .. }
             | Command::Label { id, .. }
@@ -475,8 +497,11 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
         Ok(mut done) => {
             if (cli.commit || cli.push) && cli.command.changes() {
                 if let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) {
-                    // A task added without an ID: name the one it got.
-                    let made = done.fields["task"]["id"].as_str().map(String::from);
+                    // Added without an ID: name the one it got.
+                    let made = ["task", "area", "iteration"]
+                        .iter()
+                        .find_map(|k| done.fields[*k]["id"].as_str())
+                        .map(String::from);
                     done.warnings
                         .extend(share(&cli, &root, &done.extra, made.as_deref()));
                 }
@@ -1165,43 +1190,35 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         Command::Add(add) => {
             let root = locate(cli, cwd)?;
-            let lock = Lock::acquire(&root, lock_wait())?;
-            let (bag, issues) = taskbag_of(&root, lock.load())?;
-            let mut done = match add {
-                Add::Area { id, name } => {
-                    let area = ops::new_area(&bag, id, name)?;
-                    let event = Actor::alm(me).event(
-                        "add area",
-                        Kind::Area,
-                        Some(&area.id),
-                        event::changes(None, &area, &[]),
-                    );
-                    lock.record(&event, |l| l.create_area(&area))?;
+            let actor = Actor::alm(me);
+            let (mut done, issues) = match add {
+                Add::Area { first, name } => {
+                    let (id, name) = id_and_name(first, name);
+                    let added = allomos_store::add_area(&root, actor, lock_wait(), id, name)?;
+                    let area = added.item;
                     let text = format!("Added area {} ({})\n", area.id, area.name);
-                    Done::new(json!({ "taskbag": root, "area": area }), text)
+                    let done = Done::new(json!({ "taskbag": root, "area": area }), text);
+                    (done, added.issues)
                 }
                 Add::Iteration {
-                    id,
+                    first,
                     name,
                     release,
                     start,
                     end,
                 } => {
+                    let (id, name) = id_and_name(first, name);
                     let details = ops::IterationDetails {
                         release: release.as_deref(),
                         start: start.as_deref(),
                         end: end.as_deref(),
                     };
-                    let iteration = ops::new_iteration(&bag, id, name, details)?;
-                    let event = Actor::alm(me).event(
-                        "add iteration",
-                        Kind::Iteration,
-                        Some(&iteration.id),
-                        event::changes(None, &iteration, &[]),
-                    );
-                    lock.record(&event, |l| l.create_iteration(&iteration))?;
+                    let added =
+                        allomos_store::add_iteration(&root, actor, lock_wait(), id, name, details)?;
+                    let iteration = added.item;
                     let text = format!("Added iteration {}\n", iteration_heading(&iteration));
-                    Done::new(json!({ "taskbag": root, "iteration": iteration }), text)
+                    let done = Done::new(json!({ "taskbag": root, "iteration": iteration }), text);
+                    (done, added.issues)
                 }
                 Add::Task {
                     id,
@@ -1209,20 +1226,19 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     title,
                     description,
                 } => {
-                    let id = match id {
-                        Some(id) => id.clone(),
-                        None => ops::next_task_id(&bag, area)?,
+                    let new = allomos_store::NewTask {
+                        id: id.clone(),
+                        area: area.clone(),
+                        title: title.clone(),
+                        description: description.clone(),
+                        iteration: None,
                     };
-                    let task = ops::new_task(&bag, &id, area, title, description.as_deref())?;
-                    let event = Actor::alm(me).event(
-                        "add task",
-                        Kind::Task,
-                        Some(&task.id),
-                        event::changes(None, &task, TASK_FIELDS),
-                    );
-                    lock.record(&event, |l| l.create_task(&task))?;
+                    let added = allomos_store::add_task(&root, actor, lock_wait(), &new)?;
+                    let task = added.item;
                     let text = format!("Added {}\n", task_line(&task));
-                    Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text)
+                    let done =
+                        Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text);
+                    (done, added.issues)
                 }
             };
             done.issues = issues;

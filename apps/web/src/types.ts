@@ -55,6 +55,35 @@ export type Edit =
   | { field: "title"; title: string }
   | { field: "description"; text: string };
 
+/**
+ * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID
+ * means the next free one in the area; with an iteration it is also planned there (two events).
+ */
+export interface NewTask {
+  id: string | null;
+  area: string;
+  title: string;
+  description: string | null;
+  iteration: string | null;
+}
+
+/** A new iteration from the New iteration form (Task-A01-19). No ID means the next free one. */
+export interface NewIteration {
+  id: string | null;
+  name: string;
+  release: string | null;
+  start: string | null;
+  end: string | null;
+}
+
+/** The IDs the New forms suggest, each the next free one, worked out in Rust (Task-A01-19). */
+export interface NextIds {
+  area: string;
+  iteration: string;
+  /** For each area, the next free task ID in it. */
+  tasks: Record<string, string>;
+}
+
 /** One field's change in an event (crates/core/src/event.rs). A missing side was empty. */
 export interface FieldChange {
   field: string;
