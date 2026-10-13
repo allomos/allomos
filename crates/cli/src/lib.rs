@@ -237,8 +237,8 @@ enum Command {
         /// Only the newest one.
         #[arg(long)]
         latest: bool,
-        /// For the agent to check them one by one: each with its tasks' states, and what to do.
-        #[arg(long)]
+        /// Only the rule for checking the handoffs yourself and removing finished ones.
+        #[arg(long, conflicts_with = "latest")]
         check: bool,
     },
 }
@@ -1032,63 +1032,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             Ok(done)
         }
         Command::Handoffs {
-            task,
-            latest,
-            check: true,
+            task, check: true, ..
         } => {
-            // The agent checks; alm only lays out each handoff with its tasks' states (Task-A03-13).
+            // Only the rule: the agent gets the list and checks it itself (owner, 2026-10-13).
             let root = locate(cli, cwd)?;
-            let (bag, issues) = taskbag_of(&root, load(&root))?;
-            let mut all = handoff::list(&root);
-            if let Some(task) = task {
-                all.retain(|h| h.tasks.iter().any(|t| t == task));
-            }
-            if *latest {
-                all.truncate(1);
-            }
-            let state_of = |id: &str| {
-                bag.tasks
-                    .iter()
-                    .find(|t| t.id == id)
-                    .map_or("missing", |t| t.state.as_str())
-            };
-            let mut text = if all.is_empty() {
-                "No handoffs.\n".to_string()
-            } else {
-                format!("{CHECK_INSTRUCTION}\n")
-            };
-            let mut items = Vec::new();
-            for h in &all {
-                let tasks: Vec<String> = h
-                    .tasks
-                    .iter()
-                    .map(|t| format!("{t} {}", state_of(t)))
-                    .collect();
-                text.push_str(&format!(
-                    "{} ({}, {}): {}\n",
-                    h.file,
-                    h.writer,
-                    h.updated,
-                    if tasks.is_empty() {
-                        "no task".to_string()
-                    } else {
-                        tasks.join(", ")
-                    }
-                ));
-                let mut item = handoff_brief(h);
-                item["tasks"] = h
-                    .tasks
-                    .iter()
-                    .map(|t| json!({ "id": t, "state": state_of(t) }))
-                    .collect();
-                items.push(item);
-            }
-            let mut done = Done::new(
-                json!({ "taskbag": root, "instruction": CHECK_INSTRUCTION, "handoffs": items }),
-                text,
-            );
-            done.issues = issues;
-            Ok(done)
+            let instruction = check_rule(task.as_deref());
+            Ok(Done::new(
+                json!({ "taskbag": root, "instruction": instruction }),
+                instruction,
+            ))
         }
         Command::Handoffs { task, latest, .. } => {
             let root = locate(cli, cwd)?;
@@ -1385,7 +1337,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
         Command::Done { id } => {
             let mut done = change(cli, cwd, |bag| ops::finish(bag, id, me))?;
-            ask_to_check_handoffs(cli, cwd, id, &mut done)?;
+            ask_to_check_handoffs(id, &mut done);
             Ok(done)
         }
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
@@ -1418,30 +1370,31 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     }
 }
 
-/// What `alm handoffs --check` asks the agent to do with the handoffs it lists.
-const CHECK_INSTRUCTION: &str = "Check these handoffs one by one. When every task a handoff names is done or dropped (or missing), remove it: `alm handoff --remove <file> --push`. Leave the others, and any handoff that names no task.";
+/// The rule for the agent to check the handoffs itself (`alm handoffs --check`, and after
+/// `alm done` for the finished task). `alm` looks at nothing: the agent gets the list, checks each
+/// handoff and removes the finished ones (owner, 2026-10-13; Task-A03-13).
+fn check_rule(task: Option<&str>) -> String {
+    let (what, list) = match task {
+        Some(id) => (
+            format!("the handoffs that name {id}"),
+            format!("`alm handoffs --task {id}`"),
+        ),
+        None => ("the handoffs".to_string(), "`alm handoffs`".to_string()),
+    };
+    format!(
+        "Now check {what} yourself, one by one:\n\
+         1. Get the list: {list}.\n\
+         2. For each handoff, look up every task it names (`alm show <id>`).\n\
+         3. If all of them are done or dropped, remove the handoff: `alm handoff --remove <file> --push`.\n\
+         4. Otherwise leave it as it is.\n"
+    )
+}
 
-/// After `alm done`: when handoffs name the task, ask the agent to check them (Task-A03-13).
-/// `alm` gives no verdict; the agent checks (owner, 2026-10-13).
-fn ask_to_check_handoffs(cli: &Cli, cwd: &Path, id: &str, done: &mut Done) -> Result<(), Problem> {
-    let root = locate(cli, cwd)?;
-    let files: Vec<String> = handoff::list(&root)
-        .into_iter()
-        .filter(|h| h.tasks.iter().any(|t| t == id))
-        .map(|h| h.file)
-        .collect();
-    if files.is_empty() {
-        return Ok(());
-    }
-    let command = format!("alm handoffs --check --task {id}");
-    let instruction = format!(
-        "{} handoff(s) name {id}. Check them now: run `{command}` and follow what it says.",
-        files.len()
-    );
-    done.text.push_str(&format!("{instruction}\n"));
-    done.fields["handoff_check"] =
-        json!({ "files": files, "command": command, "instruction": instruction });
-    Ok(())
+/// After `alm done`: the rule for checking the handoffs that name the finished task.
+fn ask_to_check_handoffs(id: &str, done: &mut Done) {
+    let instruction = check_rule(Some(id));
+    done.text.push_str(&instruction);
+    done.fields["handoff_check"] = json!({ "instruction": instruction });
 }
 
 /// One change to one task, under the taskbag's lock: load, apply the rule, write.

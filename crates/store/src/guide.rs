@@ -101,8 +101,8 @@ Work a task:
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm wait <id> --on \"<what>\"`: state waiting.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id>`: when handoffs name the task, it asks you to check them with
-  `alm handoffs --check --task <id>`; `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
+- `alm done <id>`: it ends with the rule for checking the handoffs that name the task; follow it.
+  `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
 
 Plan:
 - `alm add area <id> \"<name>\"`, `alm add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`
@@ -120,8 +120,8 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
   `--from <file.md>`. It prints the file's path.
 - `alm handoffs [--task <id>] [--latest]`: handoffs, newest first. `alm next` and `alm show <id>`
   show a task's latest one.
-- `alm handoffs --check`: lists every handoff with the state of each task it names, for you to
-  check one by one; remove each whose tasks are all done or dropped with `alm handoff --remove`.
+- `alm handoffs --check [--task <id>]`: the rule for checking the handoffs yourself, one by one,
+  and removing those whose tasks are all done or dropped.
 - `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (Git keeps it).
 - `alm handoff-template [--set <file.md>]`: show or replace the project's template.
 

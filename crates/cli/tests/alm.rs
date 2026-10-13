@@ -1170,61 +1170,50 @@ fn the_template_can_be_shown_and_replaced() {
 }
 
 #[test]
-fn done_asks_the_agent_to_check_the_handoffs_that_name_the_task() {
+fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
     let repo = filled();
-    // No handoff names A02-01: done prints the task and nothing more.
+    // alm done always ends with the rule for the finished task; alm looks at no handoff.
     ok(&repo, &["--as", "a", "claim", "A02-01"]);
     let v = ok(&repo, &["--as", "a", "done", "A02-01"]);
-    assert!(v.get("handoff_check").is_none(), "{v}");
-    ok(&repo, &["--as", "b", "claim", "A01-01"]);
-    let out = alm(&repo, &["--as", "b", "done", "A01-01"]);
-    assert_eq!(String::from_utf8(out.stdout).unwrap().lines().count(), 1);
-
-    // Two handoffs name A01-02: done asks the agent to check them, and gives no verdict.
-    let file = |v: Value| v["handoff"]["file"].as_str().unwrap().to_string();
-    let one = file(ok(
-        &repo,
-        &["handoff", "--as", "s/one", "--tasks", "A01-02,A02-01"],
-    ));
-    let two = file(ok(
-        &repo,
-        &["handoff", "--as", "s/two", "--tasks", "A01-02"],
-    ));
-    ok(&repo, &["--as", "c", "claim", "A01-02"]);
-    let v = ok(&repo, &["--as", "c", "done", "A01-02"]);
-    let check = &v["handoff_check"];
-    assert_eq!(check["command"], "alm handoffs --check --task A01-02");
-    let mut files: Vec<String> = check["files"]
-        .as_array()
+    let rule = v["handoff_check"]["instruction"]
+        .as_str()
         .unwrap()
-        .iter()
-        .map(|f| f.as_str().unwrap().to_string())
-        .collect();
-    files.sort();
-    let mut want = vec![one.clone(), two];
-    want.sort();
-    assert_eq!(files, want);
-    assert!(v.get("handoffs").is_none() && !check.to_string().contains("remove"));
-
-    assert_eq!(
-        check["instruction"],
-        "2 handoff(s) name A01-02. Check them now: run `alm handoffs --check --task A01-02` and follow what it says."
+        .to_string();
+    assert!(
+        rule.starts_with("Now check the handoffs that name A02-01 yourself"),
+        "{rule}"
     );
+    assert!(rule.contains("`alm handoffs --task A02-01`"));
+    assert!(rule.contains("`alm handoff --remove <file> --push`"));
+    ok(&repo, &["--as", "b", "claim", "A01-01"]);
+    let text = String::from_utf8(alm(&repo, &["--as", "b", "done", "A01-01"]).stdout).unwrap();
+    assert!(text.starts_with("A01-01  done"), "{text}");
+    assert!(text.contains("Now check the handoffs that name A01-01 yourself, one by one:\n1. Get the list: `alm handoffs --task A01-01`."), "{text}");
 
-    // Removing: by the name alm listed; then it is no longer listed, and the taskbag is sound.
-    let v = ok(&repo, &["handoff", "--remove", &one]);
-    assert_eq!(v["removed"]["writer"], "s/one");
-    assert_eq!(
-        ok(&repo, &["handoffs"])["handoffs"]
-            .as_array()
+    // alm handoffs --check: only the rule, with or without a task.
+    let v = ok(&repo, &["handoffs", "--check"]);
+    assert!(v.get("handoffs").is_none(), "{v}");
+    assert!(
+        v["instruction"]
+            .as_str()
             .unwrap()
-            .len(),
-        1
+            .contains("1. Get the list: `alm handoffs`.")
     );
+    let v = ok(&repo, &["handoffs", "--check", "--task", "A01-01"]);
+    assert_eq!(v["instruction"], json!(text.split_once('\n').unwrap().1));
+
+    // The agent removes a handoff by the name alm handoffs lists; then it is gone.
+    let file = ok(&repo, &["handoff", "--as", "s/one", "--tasks", "A01-01"])["handoff"]["file"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let v = ok(&repo, &["handoff", "--remove", &file]);
+    assert_eq!(v["removed"]["writer"], "s/one");
+    assert_eq!(ok(&repo, &["handoffs"])["handoffs"], json!([]));
     assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
     refused(
         &repo,
-        &["handoff", "--remove", &one],
+        &["handoff", "--remove", &file],
         1,
         "handoff_not_found",
     );
@@ -1235,62 +1224,4 @@ fn done_asks_the_agent_to_check_the_handoffs_that_name_the_task() {
         "handoff_not_found",
     );
     assert!(repo.join(".allomos/taskbag/project.json").is_file());
-}
-
-#[test]
-fn handoffs_check_lays_them_out_for_the_agent_to_check() {
-    let repo = filled();
-    let v = ok(&repo, &["handoffs", "--check"]);
-    assert_eq!(v["handoffs"], json!([]));
-    let file = |v: Value| v["handoff"]["file"].as_str().unwrap().to_string();
-    let finished = file(ok(
-        &repo,
-        &["handoff", "--as", "s/fin", "--tasks", "A01-01,A02-01"],
-    ));
-    let open = file(ok(
-        &repo,
-        &["handoff", "--as", "s/open", "--tasks", "A01-01,A01-02"],
-    ));
-    let none = file(ok(&repo, &["handoff", "--as", "s/none"]));
-    ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "done", "A01-01"]);
-    ok(&repo, &["--as", "a", "drop", "A02-01"]);
-
-    // alm gives no verdict: each handoff with its tasks' states, and what the agent is to do.
-    let v = ok(&repo, &["handoffs", "--check"]);
-    assert!(
-        v["instruction"]
-            .as_str()
-            .unwrap()
-            .contains("`alm handoff --remove <file> --push`")
-    );
-    let hs = v["handoffs"].as_array().unwrap();
-    let of = |f: &str| hs.iter().find(|h| h["file"] == f).unwrap().clone();
-    assert_eq!(hs.len(), 3);
-    assert_eq!(
-        of(&finished)["tasks"],
-        json!([{ "id": "A01-01", "state": "done" }, { "id": "A02-01", "state": "dropped" }])
-    );
-    assert_eq!(
-        of(&open)["tasks"][1],
-        json!({ "id": "A01-02", "state": "backlog" })
-    );
-    assert_eq!(of(&none)["tasks"], json!([]));
-    assert!(of(&none).get("action").is_none());
-    let one = ok(&repo, &["handoffs", "--check", "--task", "A01-02"]);
-    assert_eq!(one["handoffs"].as_array().unwrap().len(), 1);
-
-    let text = String::from_utf8(alm(&repo, &["handoffs", "--check"]).stdout).unwrap();
-    assert!(
-        text.starts_with("Check these handoffs one by one."),
-        "{text}"
-    );
-    assert!(text.contains(&format!("{finished} (s/fin, ")), "{text}");
-    assert!(text.contains("): A01-01 done, A02-01 dropped\n"), "{text}");
-    assert!(text.contains("): no task\n"), "{text}");
-
-    // The agent removes the one whose tasks are all finished; the others stay listed.
-    ok(&repo, &["handoff", "--remove", &finished]);
-    let v = ok(&repo, &["handoffs", "--check"]);
-    assert_eq!(v["handoffs"].as_array().unwrap().len(), 2);
 }
