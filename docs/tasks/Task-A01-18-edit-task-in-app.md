@@ -33,6 +33,7 @@ Today the app only shows tasks; every change is made with `alm` in a terminal. A
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Card approved (ready), with its proposals: all eight fields editable; no claiming or releasing from the app; the owner's name asked once for the history. Starts after A01-17 | owner (chat) |
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
 | 2026-10-14 | Approve the card (ready): all eight fields changeable; no claiming or releasing from the app; the app asks the owner's name once and keeps it | owner (chat) |
 
