@@ -321,3 +321,18 @@ button.link:hover { text-decoration: underline; }
 .dialog .form .task-checks { display: grid; gap: 2px; max-height: 140px; overflow: auto; }
 .dialog .form .task-checks label { display: block; }
 .handoffs .write-handoff { justify-self: end; }
+
+/* Number labels on elements, shown with Ctrl+Shift+S (Task-A03-12). */
+.element-labels { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; }
+.element-label {
+  position: absolute;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 10px/14px var(--mono);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  /* Sits on the element's top edge, so the text it labels stays readable. */
+  transform: translate(-4px, -9px);
+}
