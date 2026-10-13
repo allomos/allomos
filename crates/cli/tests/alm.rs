@@ -110,7 +110,7 @@ fn both_names_run() {
     let allomos = Path::new(ALM).with_file_name(format!("allomos{}", std::env::consts::EXE_SUFFIX));
     let out = Command::new(allomos).arg("--version").output().unwrap();
     assert!(out.status.success());
-    assert!(String::from_utf8_lossy(&out.stdout).contains("0.1.0"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains(env!("CARGO_PKG_VERSION")));
 }
 
 #[test]

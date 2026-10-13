@@ -38,6 +38,7 @@ At the end the owner pushes a tag, and a few minutes later the release page has 
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-13 | The card (local work only; merging the workflow, pushing a tag and publishing files still need their own approval) | owner |
+| 2026-10-13 | Version 0.1.2; merge `claude/a07-11-release-builds` into `main`; push tag `v0.1.2`, which runs the Release workflow and publishes its four files on the `v0.1.2` release. Cleanup: delete the tag and its release | owner |
 
 ## Notes
 
@@ -46,3 +47,4 @@ At the end the owner pushes a tag, and a few minutes later the release page has 
 - 2026-10-13 — Built locally, in branch `claude/a07-11-release-builds`. Plain words: the GitHub build script is written, its Mac step works on the owner's Mac and makes a `.dmg` that opens correctly, and the guide's "Get the app" step now says where to download and how to open an unsigned app, in all three languages. Nothing has run on GitHub yet.
   Evidence: `CI=true npm --prefix apps/desktop run tauri build -- --bundles dmg --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'` → `Allomos_0.1.0_aarch64.dmg` (3.7 MB); mounted: `Allomos.app` + `Applications` link, `codesign --verify --deep --strict` passes (ad hoc), arm64 only. Without `CI=true` the `.dmg` step fails on this Mac, because arranging the window needs Finder automation; GitHub sets `CI=true`. The Windows job is not tried locally (it runs only on GitHub). `npm --prefix docs/guide run build`: 10 pages, no warnings. Workflow YAML parses (jobs: release, macos, windows).
   The app's version is still `0.1.0` while tags `v0.1.0` and `v0.1.1` exist, so the first run needs a new version in `tauri.conf.json` and `Cargo.toml` with a matching tag.
+- 2026-10-13 — Owner chose version 0.1.2 and approved publishing. Version set in `Cargo.toml`, `Cargo.lock`, `tauri.conf.json` and both `package.json` / `package-lock.json`; the `alm --version` test now compares with the package version instead of a fixed "0.1.0". `cargo test --workspace`: all pass; `cargo fmt --check`: pass.
