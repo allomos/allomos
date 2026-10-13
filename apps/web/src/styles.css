@@ -346,3 +346,16 @@ button.link:hover { text-decoration: underline; }
 .task-pane .editor textarea { resize: vertical; }
 .task-pane .editor p { margin: 0; }
 .task-pane .editor-buttons { display: flex; gap: 6px; }
+
+/* New task, area and iteration forms in the list (Task-A01-19). */
+.area-head .new-task { grid-column: 1 / -1; justify-self: start; }
+.create-form { display: grid; gap: 6px; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); max-width: 560px; }
+.area > .create-form { margin: 0 16px 12px; }
+.create-form h3 { margin: 0; font-size: 1em; }
+.create-form p { margin: 0; }
+.create-form label { display: grid; gap: 2px; }
+.create-form label > span { font-size: 0.85em; color: var(--muted); }
+.create-form input, .create-form select, .create-form textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.create-form textarea { resize: vertical; }
+.create-form .editor-buttons { display: flex; gap: 6px; }
+.add-group { margin: 4px 0 16px; }

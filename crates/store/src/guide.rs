@@ -109,7 +109,8 @@ Work a task:
   `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
 
 Plan:
-- `alm add area <id> \"<name>\"`, `alm add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`
+- `alm add area [<id>] \"<name>\"`, `alm add iteration [<id>] \"<name>\" [--release …] [--start …]
+  [--end …]`: without an ID, the next free one, like A08 or I16.
 - `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]`: without
   an ID, the next free one in the area. Read `alm guide tasks` first.
 - `alm plan <id> [<iteration>]`; `alm labels \"<a,b,…>\"`

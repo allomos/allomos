@@ -981,6 +981,64 @@ fn add_task_without_an_id_takes_the_next_in_its_area() {
     );
 }
 
+/// `alm add area` and `alm add iteration` take the ID as optional, like `alm add task`
+/// (Task-A01-19): with only a name, the next free one; each writes one event.
+#[test]
+fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
+    let repo = filled();
+    let events = || {
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .map(|d| d.count())
+            .unwrap_or(0)
+    };
+    // filled() has A01 and A02.
+    let before = events();
+    let v = ok(&repo, &["add", "area", "Planning"]);
+    assert_eq!(
+        (&v["area"]["id"], &v["area"]["name"]),
+        (&json!("A03"), &json!("Planning"))
+    );
+    assert_eq!(events(), before + 1);
+    // An ID given is still used as given.
+    let v = ok(&repo, &["add", "area", "A07", "Later"]);
+    assert_eq!(v["area"]["id"], "A07");
+    assert_eq!(ok(&repo, &["add", "area", "Next"])["area"]["id"], "A08");
+
+    let v = ok(&repo, &["add", "iteration", "First", "--release", "v0.1"]);
+    assert_eq!(
+        (&v["iteration"]["id"], &v["iteration"]["release"]),
+        (&json!("I01"), &json!("v0.1"))
+    );
+    let v = ok(
+        &repo,
+        &["add", "iteration", "Second", "--start", "2026-10-15"],
+    );
+    assert_eq!(v["iteration"]["id"], "I02");
+    assert_eq!(events(), before + 5);
+
+    // Refused with the same codes as before, and nothing written.
+    refused(
+        &repo,
+        &["add", "area", "A01", "Again"],
+        1,
+        "duplicate_area_id",
+    );
+    refused(
+        &repo,
+        &["add", "iteration", "I01", "Again"],
+        1,
+        "duplicate_iteration_id",
+    );
+    refused(
+        &repo,
+        &["add", "iteration", "Third", "--end", "soon"],
+        1,
+        "invalid_date",
+    );
+    assert_eq!(events(), before + 5);
+    assert!(!repo.join(".allomos/taskbag/iterations/I03.json").exists());
+}
+
 /// `alm --json …` with its own settings folder, so the person's real app settings are never read.
 fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
     let out = Command::new(ALM)

@@ -14,9 +14,11 @@ import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
 import { useFold } from "./useFold";
 import { TaskPane } from "./TaskPane";
+import { CreateForm, type AddRequest } from "./CreateForm";
+import type { Creating } from "./createFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -717,7 +719,16 @@ function readGroupBy(): GroupBy {
 }
 
 /** One group of the list as shown: an area or an iteration with its tasks. */
-type Group = { key: string; id: string; name: string; sub?: string; empty: string; tasks: Task[] };
+type Group = {
+  key: string;
+  id: string;
+  name: string;
+  sub?: string;
+  empty: string;
+  tasks: Task[];
+  /** Where a new task added in this group goes; none for tasks with an unknown area. */
+  newTask?: { area: string | null; iteration: string | null };
+};
 
 function TaskbagView({
   opened,
@@ -779,11 +790,13 @@ function TaskbagView({
         sub: iterationSub(it, t),
         empty: t("iteration.no_tasks"),
         tasks: box.tasks.filter((task) => task.iteration === it.id),
+        newTask: { area: null, iteration: it.id },
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
     const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
-    if (unplanned.length > 0) groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned });
+    if (unplanned.length > 0)
+      groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned, newTask: { area: null, iteration: null } });
   } else if (box) {
     for (const area of box.areas) {
       groups.push({
@@ -792,6 +805,7 @@ function TaskbagView({
         name: area.name,
         empty: t("area.no_tasks"),
         tasks: box.tasks.filter((task) => task.area === area.id),
+        newTask: { area: area.id, iteration: null },
       });
     }
     const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
@@ -870,6 +884,51 @@ function TaskbagView({
     await onReload().catch(() => undefined);
   };
 
+  // New tasks, areas and iterations (Task-A01-19): one form open at a time, with the next free IDs
+  // suggested, read again whenever the taskbag reloads.
+  const [creating, setCreating] = useState<Creating | null>(null);
+  const [nextIds, setNextIds] = useState<NextIds | null>(null);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .nextIds(opened.root)
+      .then((n) => live && setNextIds(n))
+      .catch(() => live && setNextIds(null));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened]);
+  const add = async (request: AddRequest) => {
+    let shown: string | null = null;
+    if (request.kind === "task") {
+      shown = (await messenger.addTask(opened.root, request.task)).id;
+    } else if (request.kind === "area") {
+      await messenger.addArea(opened.root, request.id, request.name);
+    } else {
+      await messenger.addIteration(opened.root, request.iteration);
+    }
+    setCreating(null);
+    await onReload().catch(() => undefined);
+    // The new task opens in the pane, so it can be changed further right away.
+    if (shown) setSelectedId(shown);
+  };
+  const createForm = (c: Creating) =>
+    box && (
+      <CreateForm
+        key={c.kind === "task" ? c.group : c.kind}
+        creating={c}
+        areas={box.areas}
+        iterations={iterations}
+        next={nextIds}
+        ownerName={ownerName}
+        onSaveName={saveOwnerName}
+        onAdd={add}
+        onClose={() => setCreating(null)}
+      />
+    );
+  // Which group's New task form is open, if any.
+  const creatingIn = (key: string) => (creating?.kind === "task" && creating.group === key ? creating : null);
+
   const openLink = (href: string) => {
     if (selected) messenger.openTaskLink(opened.root, selected.id, href).catch(onError);
   };
@@ -880,7 +939,7 @@ function TaskbagView({
       {shownIssues.length > 0 && <Issues issues={shownIssues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
-          {(box.tasks.length > 0 || handoffs.length > 0) && (
+          {box && (
             <div className="list-tools">
               <div className="group-by" role="group" aria-label={t("group.label")}>
                 {(["area", "iteration", "handoffs"] as const).map((g) => (
@@ -945,10 +1004,26 @@ function TaskbagView({
                   onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
                   collapsed={collapsed.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
+                  onNewTask={
+                    g.newTask && box.areas.length > 0
+                      ? () => setCreating({ kind: "task", group: g.key, area: g.newTask!.area, iteration: g.newTask!.iteration })
+                      : undefined
+                  }
+                  form={creatingIn(g.key) && createForm(creatingIn(g.key)!)}
                 />
               ))}
               {groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
                 <p className="muted">{t("box.empty")}</p>
+              )}
+              {/* Task-A01-19: a new area at the end of the by-area list, a new iteration at the end of the by-iteration list. */}
+              {creating && creating.kind !== "task" && creating.kind === groupBy ? (
+                createForm(creating)
+              ) : (
+                <p className="add-group">
+                  <button type="button" className="link small" onClick={() => setCreating({ kind: groupBy === "iteration" ? "iteration" : "area" })}>
+                    {t(groupBy === "iteration" ? "create.new_iteration_button" : "create.new_area_button")}
+                  </button>
+                </p>
               )}
             </div>
             )}
@@ -1060,6 +1135,8 @@ function TaskGroup({
   onSelect,
   collapsed,
   onToggle,
+  onNewTask,
+  form,
 }: {
   id: string;
   name: string;
@@ -1074,6 +1151,10 @@ function TaskGroup({
   /** Only the header shows: name, count and progress (Task-A01-26). */
   collapsed: boolean;
   onToggle: () => void;
+  /** Opens the New task form in this group (Task-A01-19); not given where no task can be added. */
+  onNewTask?: () => void;
+  /** The New task form, when it is open in this group. */
+  form?: ReactNode;
 }) {
   const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
@@ -1091,7 +1172,13 @@ function TaskGroup({
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
+        {onNewTask && !form && (
+          <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
+            {t("create.new_task_button")}
+          </button>
+        )}
       </header>
+      {form}
       {collapsed ? null : tasks.length === 0 ? (
         <p className="muted small">{empty}</p>
       ) : (

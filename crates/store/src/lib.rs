@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use fs4::{FileExt, TryLockError};
 
 use allomos_core::event::{self, Event, Kind};
+use allomos_core::ops;
 use allomos_core::{
     Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Task, Taskbag, parse_area,
     parse_iteration, parse_project, parse_task, validate_taskbag,
@@ -1104,16 +1105,9 @@ pub fn taskbag_of(root: &Path, loaded: Loaded) -> Result<(Taskbag, Vec<Issue>), 
     }
 }
 
-/// One change to one task, the same way for `alm` and the app (Task-A01-18): refuse a taskbag in
-/// another format, take the lock (waiting up to `wait` for another writer), load, apply `rule`
-/// (a `crates/core` operation, which also names its command), then write the task and its event.
-/// A refused change writes nothing.
-pub fn change_task(
-    root: &Path,
-    actor: Actor,
-    wait: Duration,
-    rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
-) -> Result<Changed, Problem> {
+/// Before any change, for `alm` and the app alike: refuse a taskbag in another format, take the
+/// lock (waiting up to `wait` for another writer), then load what the change builds on.
+fn lock_for_change(root: &Path, wait: Duration) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
     match versions::format_state(root) {
         versions::FormatState::Newer { found } => {
             return Err(Problem::TaskbagNewer {
@@ -1131,6 +1125,143 @@ pub fn change_task(
     }
     let lock = Lock::acquire(root, wait)?;
     let (bag, issues) = taskbag_of(root, lock.load())?;
+    Ok((lock, bag, issues))
+}
+
+/// Something added by [`add_area`], [`add_iteration`] or [`add_task`], with the problems found in
+/// the taskbag's files while loading it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Added<T> {
+    pub item: T,
+    pub issues: Vec<Issue>,
+}
+
+/// A new area, the same way for `alm add area` and the app (Task-A01-19): under the lock, by the
+/// `crates/core` rule, recorded as one `add area` event. Without an ID it takes the next free one.
+pub fn add_area(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: Option<&str>,
+    name: &str,
+) -> Result<Added<Area>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let id = id.map_or_else(|| ops::next_area_id(&bag), String::from);
+    let area = ops::new_area(&bag, &id, name)?;
+    let event = actor.event(
+        "add area",
+        Kind::Area,
+        Some(&area.id),
+        event::changes(None, &area, &[]),
+    );
+    lock.record(&event, |l| l.create_area(&area))?;
+    Ok(Added { item: area, issues })
+}
+
+/// A new iteration, the same way for `alm add iteration` and the app (Task-A01-19): under the lock,
+/// by the `crates/core` rule, recorded as one `add iteration` event. Without an ID it takes the
+/// next free one.
+pub fn add_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: Option<&str>,
+    name: &str,
+    details: ops::IterationDetails,
+) -> Result<Added<Iteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let id = id.map_or_else(|| ops::next_iteration_id(&bag), String::from);
+    let iteration = ops::new_iteration(&bag, &id, name, details)?;
+    let event = actor.event(
+        "add iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::changes(None, &iteration, &[]),
+    );
+    lock.record(&event, |l| l.create_iteration(&iteration))?;
+    Ok(Added {
+        item: iteration,
+        issues,
+    })
+}
+
+/// What a new task is made of (`alm add task`, the app's New task form).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NewTask {
+    /// Without one, the next free ID in the area.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub area: String,
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The app only: plan it there too, as `alm plan` would (owner, 2026-10-14).
+    #[serde(default)]
+    pub iteration: Option<String>,
+}
+
+/// A new task in backlog, the same way for `alm add task` and the app (Task-A01-19): under the
+/// lock, by the `crates/core` rule, recorded as one `add task` event. With an iteration it is then
+/// planned under the same lock, by the rule `alm plan` uses, as a second `plan` event: the same as
+/// typing both commands (owner, 2026-10-14). Both rules are checked before anything is written, so
+/// a refusal of either writes nothing.
+pub fn add_task(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    new: &NewTask,
+) -> Result<Added<Task>, Problem> {
+    let (lock, mut bag, issues) = lock_for_change(root, wait)?;
+    let id = match &new.id {
+        Some(id) => id.clone(),
+        None => ops::next_task_id(&bag, &new.area)?,
+    };
+    let task = ops::new_task(&bag, &id, &new.area, &new.title, new.description.as_deref())?;
+    bag.tasks.push(task.clone());
+    let planned = match new
+        .iteration
+        .as_deref()
+        .map(str::trim)
+        .filter(|i| !i.is_empty())
+    {
+        Some(iteration) => Some(ops::plan(&bag, &task.id, Some(iteration))?.task),
+        None => None,
+    };
+    let added = actor.event(
+        "add task",
+        Kind::Task,
+        Some(&task.id),
+        event::changes(None, &task, event::TASK_FIELDS),
+    );
+    lock.record(&added, |l| l.create_task(&task))?;
+    let Some(planned) = planned else {
+        return Ok(Added { item: task, issues });
+    };
+    let plan = actor.event(
+        "plan",
+        Kind::Task,
+        Some(&task.id),
+        event::changes(Some(&task), &planned, event::TASK_FIELDS),
+    );
+    lock.record(&plan, |l| l.save_task(&planned))?;
+    Ok(Added {
+        item: planned,
+        issues,
+    })
+}
+
+/// One change to one task, the same way for `alm` and the app (Task-A01-18): refuse a taskbag in
+/// another format, take the lock (waiting up to `wait` for another writer), load, apply `rule`
+/// (a `crates/core` operation, which also names its command), then write the task and its event.
+/// A refused change writes nothing.
+pub fn change_task(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
+) -> Result<Changed, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let (outcome, command) = rule(&bag)?;
     let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
     let described = before.is_some_and(|b| b.description != outcome.task.description);
