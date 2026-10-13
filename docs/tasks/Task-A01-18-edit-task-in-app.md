@@ -20,8 +20,8 @@ Today the app only shows tasks; every change is made with `alm` in a terminal. A
 
 - **Outcome.** The owner changes tasks without a terminal, under the same rules agents follow.
 - **Decisive unknowns.**
-  - Which fields the owner wants changeable first (all eight above are proposed); and whether claiming/releasing a task from the app is wanted (proposed: not now: holders are agent sessions).
-  - The owner's name for the history: proposed as a one-time question in the app.
+  - Decided (owner, 2026-10-14): all eight fields above are changeable; no claiming or releasing from the app (holders are agent sessions).
+  - Decided (owner, 2026-10-14): the owner's name for the history is asked once in the app and kept in its settings.
 - **Files owned.** `apps/web/src/TaskPane.tsx`, `apps/web/src/App.tsx`, `apps/web/src/messenger.ts`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`, `apps/desktop/src-tauri/src/lib.rs`, `crates/core/src/ops.rs` (any missing operation, such as setting the title or description), `crates/store`, tests, this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -34,7 +34,9 @@ Today the app only shows tasks; every change is made with `alm` in a terminal. A
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
+| 2026-10-14 | Approve the card (ready): all eight fields changeable; no claiming or releasing from the app; the app asks the owner's name once and keeps it | owner (chat) |
 
 ## Notes
 
 - 2026-10-09 — Card written by the agent. Next: the owner approves the card (`ready`); it starts after A01-17.
+- 2026-10-14 — Owner approved the card; ready. Starts once A01-17 (change history) is done.
