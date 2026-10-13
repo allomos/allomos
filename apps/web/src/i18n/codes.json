@@ -10,6 +10,10 @@
     "id",
     "state"
   ],
+  "cannot_set_state": [
+    "id",
+    "state"
+  ],
   "commit_failed": [
     "detail"
   ],

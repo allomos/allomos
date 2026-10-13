@@ -16,7 +16,7 @@ import { useFold } from "./useFold";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AlmStatus, InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -470,6 +470,10 @@ export function App({ messenger }: { messenger: Messenger }) {
             messenger={messenger}
             onError={(e) => setError(errorNote(e))}
             hideOlder={olderShown}
+            onReload={async () => {
+              const fresh = await messenger.openTaskbag(opened.root);
+              setOpened((o) => (o?.root === fresh.root ? fresh : o));
+            }}
           />
         )}
       </main>
@@ -720,12 +724,15 @@ function TaskbagView({
   messenger,
   onError,
   hideOlder,
+  onReload,
 }: {
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
   /** The update notice already says the taskbag is older. */
   hideOlder: boolean;
+  /** Reads the taskbag again now, after a change made in this window. */
+  onReload: () => Promise<void>;
 }) {
   const { t, rich } = useI18n();
   const { taskbag: box, issues } = opened.loaded;
@@ -842,6 +849,27 @@ function TaskbagView({
     if (selectedId) document.getElementById(`task-${selectedId}`)?.scrollIntoView({ block: "nearest" });
   }, [selectedId, groupBy]);
 
+  // The person's name for the task pane's changes (Task-A01-18): asked once, kept in the app's settings.
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .ownerName()
+      .then((n) => live && setOwnerName(n))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [messenger]);
+  const saveOwnerName = async (name: string) => {
+    await messenger.saveOwnerName(name);
+    setOwnerName(name);
+  };
+  const editTask = async (id: string, edit: Edit) => {
+    await messenger.editTask(opened.root, id, edit);
+    await onReload().catch(() => undefined);
+  };
+
   const openLink = (href: string) => {
     if (selected) messenger.openTaskLink(opened.root, selected.id, href).catch(onError);
   };
@@ -933,6 +961,11 @@ function TaskbagView({
                 onLink={openLink}
                 latest={latestFor(handoffs, selected.id)}
                 history={history?.id === selected.id ? history.history : null}
+                labels={box.project.labels}
+                iterations={iterations}
+                ownerName={ownerName}
+                onSaveName={saveOwnerName}
+                onEdit={(edit) => editTask(selected.id, edit)}
                 onAllHandoffs={() => {
                   setHandoffTask(selected.id);
                   choose("handoffs");

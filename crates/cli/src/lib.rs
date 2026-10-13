@@ -17,7 +17,7 @@ use allomos_store::{
     Actor, DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
     agent_section_for, agent_setup_request, events, find_taskbag, git_root, guide, id_from_name,
     init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
-    requests_dir, task_language, versions, was_seen, withdraw_confirm,
+    requests_dir, task_language, taskbag_of, versions, was_seen, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -764,20 +764,6 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
         Some(false) => Err(Problem::ConfirmDeclined),
         None => Err(Problem::ConfirmTimeout {
             seconds: timeout.to_string(),
-        }),
-    }
-}
-
-fn taskbag_of(root: &Path, loaded: allomos_core::Loaded) -> Result<(Taskbag, Vec<Issue>), Problem> {
-    match loaded.taskbag {
-        Some(bag) => Ok((bag, loaded.issues)),
-        None => Err(Problem::TaskbagUnreadable {
-            path: root.display().to_string(),
-            detail: loaded
-                .issues
-                .first()
-                .map(|i| format!("{}: {}", i.file, i.problem.english()))
-                .unwrap_or_default(),
         }),
     }
 }
@@ -1550,30 +1536,26 @@ fn ask_to_check_handoffs(id: &str, done: &mut Done) {
 }
 
 /// One change to one task, under the taskbag's lock: load, apply the rule, write it and its event.
+/// The app makes its changes through the same `allomos_store::change_task` (Task-A01-18).
 fn change(
     cli: &Cli,
     cwd: &Path,
     rule: impl FnOnce(&Taskbag) -> Result<Outcome, Problem>,
 ) -> Result<Done, Problem> {
     let root = locate(cli, cwd)?;
-    let lock = Lock::acquire(&root, lock_wait())?;
-    let (bag, issues) = taskbag_of(&root, lock.load())?;
-    let outcome = rule(&bag)?;
-    let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
-    let event = Actor::alm(cli.holder.as_deref()).event(
-        cli.command.name(),
-        Kind::Task,
-        Some(&outcome.task.id),
-        event::changes(before, &outcome.task, TASK_FIELDS),
-    );
-    lock.record(&event, |l| l.save_task(&outcome.task))?;
-    drop(lock);
-    let text = format!("{}\n", task_line(&outcome.task));
+    let command = cli.command.name();
+    let changed = allomos_store::change_task(
+        &root,
+        Actor::alm(cli.holder.as_deref()),
+        lock_wait(),
+        |bag| rule(bag).map(|o| (o, command)),
+    )?;
+    let text = format!("{}\n", task_line(&changed.task));
     let mut done = Done::new(
-        json!({ "taskbag": root, "task": task_json(&outcome.task) }),
+        json!({ "taskbag": root, "task": task_json(&changed.task) }),
         text,
     );
-    done.warnings = outcome.warnings;
-    done.issues = issues;
+    done.warnings = changed.warnings;
+    done.issues = changed.issues;
     Ok(done)
 }

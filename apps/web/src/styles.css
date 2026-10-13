@@ -338,3 +338,11 @@ button.link:hover { text-decoration: underline; }
   /* Sits on the element's top edge, so the text it labels stays readable. */
   transform: translate(-4px, -9px);
 }
+
+/* Changing a task in the task pane (Task-A01-18). */
+.task-pane button.link.change { margin-left: 4px; font-weight: normal; vertical-align: baseline; }
+.task-pane .editor { display: grid; gap: 6px; width: 100%; }
+.task-pane .editor input[type="text"], .task-pane .editor select, .task-pane .editor textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.task-pane .editor textarea { resize: vertical; }
+.task-pane .editor p { margin: 0; }
+.task-pane .editor-buttons { display: flex; gap: 6px; }
