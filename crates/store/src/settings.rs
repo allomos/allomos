@@ -1,6 +1,7 @@
 //! Allomos's per-user settings on this computer, outside any taskbag (Task-A01-21). For now it
 //! holds one thing: the interface language the app last showed, so `alm language` can tell an
-//! agent which language to write tasks in when the taskbag says "follow the app" (`ui`).
+//! agent which language to write tasks in when the taskbag says "follow the app" (`ui`), and the
+//! person's name, under which the app records the changes they make (Task-A01-18).
 
 use std::fs;
 use std::io;
@@ -17,6 +18,9 @@ struct Settings {
     /// The language the app's interface shows (`en`, `zh-CN`, `ja`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ui_language: Option<String>,
+    /// The person's name, asked once by the app; its task changes are recorded under it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owner_name: Option<String>,
 }
 
 /// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
@@ -62,19 +66,36 @@ fn read_settings() -> Settings {
         .unwrap_or_default()
 }
 
-/// Save the app's interface language. Called by the app whenever its language is chosen.
-pub fn save_ui_language(language: &str) -> io::Result<()> {
+fn write_settings(settings: &Settings) -> io::Result<()> {
     let dir = settings_dir().ok_or_else(|| io::Error::other("no settings folder"))?;
     fs::create_dir_all(&dir)?;
+    let text = serde_json::to_string_pretty(settings).map_err(io::Error::other)?;
+    let tmp = dir.join(format!("{SETTINGS_FILE}.tmp-{}", std::process::id()));
+    fs::write(&tmp, text + "\n")?;
+    fs::rename(tmp, dir.join(SETTINGS_FILE))
+}
+
+/// Save the app's interface language. Called by the app whenever its language is chosen.
+pub fn save_ui_language(language: &str) -> io::Result<()> {
     let mut settings = read_settings();
     if settings.ui_language.as_deref() == Some(language) {
         return Ok(());
     }
     settings.ui_language = Some(language.to_string());
-    let text = serde_json::to_string_pretty(&settings).map_err(io::Error::other)?;
-    let tmp = dir.join(format!("{SETTINGS_FILE}.tmp-{}", std::process::id()));
-    fs::write(&tmp, text + "\n")?;
-    fs::rename(tmp, dir.join(SETTINGS_FILE))
+    write_settings(&settings)
+}
+
+/// Save the person's name for the app's task changes (Task-A01-18). Empty text removes it.
+pub fn save_owner_name(name: &str) -> io::Result<()> {
+    let mut settings = read_settings();
+    let name = name.trim();
+    settings.owner_name = (!name.is_empty()).then(|| name.to_string());
+    write_settings(&settings)
+}
+
+/// The person's name the app saved, if it has asked for it.
+pub fn saved_owner_name() -> Option<String> {
+    read_settings().owner_name
 }
 
 /// The interface language the app last saved, if it has run on this computer.
@@ -197,6 +218,16 @@ mod tests {
             (l.language.as_str(), l.setting.as_str(), l.source),
             ("fr", "fr", "taskbag")
         );
+
+        // The person's name is kept beside the language, and saving one keeps the other.
+        assert_eq!(saved_owner_name(), None);
+        save_owner_name("  Will  ").unwrap();
+        assert_eq!(saved_owner_name().as_deref(), Some("Will"));
+        assert_eq!(saved_ui_language().as_deref(), Some("zh-CN"));
+        save_ui_language("ja").unwrap();
+        assert_eq!(saved_owner_name().as_deref(), Some("Will"));
+        save_owner_name(" ").unwrap();
+        assert_eq!(saved_owner_name(), None);
 
         // SAFETY: as above.
         unsafe { std::env::remove_var("ALLOMOS_SETTINGS_DIR") };

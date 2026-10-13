@@ -202,6 +202,68 @@ fn save_ui_language(language: String) {
     let _ = allomos_store::save_ui_language(&language);
 }
 
+/// The person's name the app records its task changes under (Task-A01-18); null until asked.
+#[tauri::command]
+fn owner_name() -> Option<String> {
+    allomos_store::saved_owner_name()
+}
+
+/// Keep the person's name in the app's settings, asked once (owner, 2026-10-14).
+#[tauri::command]
+fn save_owner_name(name: String) -> Result<(), Problem> {
+    if name.trim().is_empty() {
+        return Err(Problem::HolderMissing);
+    }
+    allomos_store::save_owner_name(&name).map_err(|e| Problem::WriteFailed {
+        path: allomos_store::settings_dir()
+            .map(|d| d.display().to_string())
+            .unwrap_or_default(),
+        detail: e.to_string(),
+    })
+}
+
+/// How long a change from the app waits for another writer (such as `alm`) to finish, as `alm`
+/// waits by default.
+const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Change one field of a task from the task pane (Task-A01-18), under the person's saved name.
+/// The change goes through the same `crates/core` rule and the same locked, recorded write as its
+/// `alm` command (`allomos_store::change_task`); a refused change writes nothing and comes back
+/// as the same problem `alm` reports.
+fn edit_task_as(
+    root: &Path,
+    name: Option<&str>,
+    id: &str,
+    edit: &allomos_core::ops::Edit,
+) -> Result<allomos_core::Task, Problem> {
+    let name = name
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .ok_or(Problem::HolderMissing)?;
+    let actor = allomos_store::Actor {
+        by: Some(name),
+        via: "app",
+    };
+    allomos_store::change_task(root, actor, LOCK_WAIT, |bag| {
+        allomos_core::ops::edit(bag, id, Some(name), edit)
+    })
+    .map(|c| c.task)
+}
+
+#[tauri::command]
+fn edit_task(
+    root: PathBuf,
+    id: String,
+    edit: allomos_core::ops::Edit,
+) -> Result<allomos_core::Task, Problem> {
+    edit_task_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &id,
+        &edit,
+    )
+}
+
 /// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).
 /// Read from the operating system: inside the macOS app window, `navigator.language` is
 /// not a reliable guide to the system's language.
@@ -1000,6 +1062,9 @@ pub fn run() {
             open_task_link,
             system_languages,
             save_ui_language,
+            owner_name,
+            save_owner_name,
+            edit_task,
             set_menu_texts,
             set_recent_folders,
             find_agents,
@@ -1265,5 +1330,74 @@ mod tests {
             "No developer tools were found, requesting install."
         ));
         assert!(!git_missing(true, true, ""), "git version 2.50.1");
+    }
+
+    /// The task pane's change command (Task-A01-18): the edit arrives as the interface sends it,
+    /// is refused without the person's name or by the holder rule, and is otherwise recorded
+    /// under that name, through the app.
+    #[test]
+    fn the_task_pane_changes_a_task_under_the_persons_name() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-edit-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let lock = allomos_store::Lock::acquire(&root, std::time::Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&allomos_core::ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_task(
+            &allomos_core::ops::new_task(&bag, "A01-01", "A01", "Do it", None).unwrap(),
+        )
+        .unwrap();
+        drop(lock);
+
+        // As the interface sends it: `{ field: "label", label: "implemented" }`.
+        let edit: allomos_core::ops::Edit =
+            serde_json::from_value(serde_json::json!({ "field": "label", "label": "implemented" }))
+                .unwrap();
+        assert_eq!(
+            edit_task_as(&root, None, "A01-01", &edit),
+            Err(Problem::HolderMissing)
+        );
+        assert_eq!(
+            edit_task_as(&root, Some(" "), "A01-01", &edit),
+            Err(Problem::HolderMissing)
+        );
+        assert!(load(&root).taskbag.unwrap().tasks[0].label.is_none());
+
+        let task = edit_task_as(&root, Some("Will"), "A01-01", &edit).unwrap();
+        assert_eq!(task.label.as_deref(), Some("implemented"));
+        let h = allomos_store::events::history(&root, "A01-01");
+        let e = &h.events[0];
+        assert_eq!(
+            (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
+            (Some("Will"), "app", "label")
+        );
+
+        // A task an agent holds is refused with the same problem `alm` gives.
+        let lock = allomos_store::Lock::acquire(&root, std::time::Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.save_task(
+            &allomos_core::ops::claim(&bag, "A01-01", Some("claude/x"), false)
+                .unwrap()
+                .task,
+        )
+        .unwrap();
+        drop(lock);
+        assert_eq!(
+            edit_task_as(&root, Some("Will"), "A01-01", &edit),
+            Err(Problem::TaskHeld {
+                id: "A01-01".into(),
+                holder: "claude/x".into()
+            })
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

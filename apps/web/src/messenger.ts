@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -86,6 +86,16 @@ export interface Messenger {
   listHandoffs(root: string): Promise<Handoff[]>;
   /** One task's recorded changes, newest first (Task-A01-17). */
   taskHistory(root: string, id: string): Promise<TaskHistory>;
+  /** The person's name the app records its task changes under; null until it has been asked (Task-A01-18). */
+  ownerName(): Promise<string | null>;
+  /** Keeps the person's name in the app's settings. Rejects with a Problem. */
+  saveOwnerName(name: string): Promise<void>;
+  /**
+   * Changes one field of task `id` under the saved name, by the same rule as its `alm` command,
+   * under the taskbag's lock, recorded in its history. Resolves to the task as saved; rejects with
+   * the same Problem `alm` gives, and then nothing was changed.
+   */
+  editTask(root: string, id: string, edit: Edit): Promise<Task>;
   /** Writes a new handoff by a person. Rejects with a Problem. */
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
@@ -162,6 +172,9 @@ export const desktopMessenger: Messenger = {
   setHandoffTemplate: (root, text) => invoke<HandoffSettings>("set_handoff_template", { root, text }),
   listHandoffs: (root) => invoke<Handoff[]>("list_handoffs", { root }),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
+  ownerName: () => invoke<string | null>("owner_name"),
+  saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
+  editTask: (root, id, edit) => invoke<Task>("edit_task", { root, id, edit }),
   writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),

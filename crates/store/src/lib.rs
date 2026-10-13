@@ -39,8 +39,8 @@ pub use convert::{
 pub use events::Actor;
 pub use guide::{GUIDE_TOPICS, guide};
 pub use settings::{
-    TaskLanguage, pick_ui_language, save_ui_language, saved_ui_language, settings_dir,
-    task_language,
+    TaskLanguage, pick_ui_language, save_owner_name, save_ui_language, saved_owner_name,
+    saved_ui_language, settings_dir, task_language,
 };
 pub use setup::{
     SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
@@ -1043,6 +1043,24 @@ impl Lock {
         write_atomic(&path, &json_text(&task_file_json(task)))
     }
 
+    /// Rewrite an existing task's `description.md`, or remove it when the description is empty
+    /// (the app's task pane, Task-A01-18).
+    pub fn save_description(&self, task: &Task) -> Result<(), Problem> {
+        let path = self
+            .root
+            .join("tasks")
+            .join(&task.id)
+            .join("description.md");
+        if task.description.is_empty() {
+            match fs::remove_file(&path) {
+                Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write_failed(&path, e)),
+                _ => Ok(()),
+            }
+        } else {
+            write_atomic(&path, &task.description)
+        }
+    }
+
     /// Make one change and record it (Task-A01-17): write `event`, then run `write`. When `write`
     /// fails the event is taken back, so the history never shows a change that did not happen.
     /// An event with no changes is not written: nothing happened worth recording.
@@ -1059,6 +1077,81 @@ impl Lock {
             let _ = fs::remove_file(&file);
         })
     }
+}
+
+/// A task as changed by [`change_task`], with what is worth telling the person.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Changed {
+    pub task: Task,
+    /// Things worth telling that did not refuse the change (for example `took_over`).
+    pub warnings: Vec<Problem>,
+    /// Problems found in the taskbag's files while loading it.
+    pub issues: Vec<Issue>,
+}
+
+/// The taskbag loaded at `root`, or why it cannot be worked on.
+pub fn taskbag_of(root: &Path, loaded: Loaded) -> Result<(Taskbag, Vec<Issue>), Problem> {
+    match loaded.taskbag {
+        Some(bag) => Ok((bag, loaded.issues)),
+        None => Err(Problem::TaskbagUnreadable {
+            path: root.display().to_string(),
+            detail: loaded
+                .issues
+                .first()
+                .map(|i| format!("{}: {}", i.file, i.problem.english()))
+                .unwrap_or_default(),
+        }),
+    }
+}
+
+/// One change to one task, the same way for `alm` and the app (Task-A01-18): refuse a taskbag in
+/// another format, take the lock (waiting up to `wait` for another writer), load, apply `rule`
+/// (a `crates/core` operation, which also names its command), then write the task and its event.
+/// A refused change writes nothing.
+pub fn change_task(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
+) -> Result<Changed, Problem> {
+    match versions::format_state(root) {
+        versions::FormatState::Newer { found } => {
+            return Err(Problem::TaskbagNewer {
+                found,
+                supported: FORMAT.to_string(),
+            });
+        }
+        versions::FormatState::Older { found } => {
+            return Err(Problem::TaskbagOlder {
+                found,
+                current: FORMAT.to_string(),
+            });
+        }
+        versions::FormatState::Current | versions::FormatState::Unknown => {}
+    }
+    let lock = Lock::acquire(root, wait)?;
+    let (bag, issues) = taskbag_of(root, lock.load())?;
+    let (outcome, command) = rule(&bag)?;
+    let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
+    let described = before.is_some_and(|b| b.description != outcome.task.description);
+    let event = actor.event(
+        command,
+        Kind::Task,
+        Some(&outcome.task.id),
+        event::changes(before, &outcome.task, event::TASK_FIELDS),
+    );
+    lock.record(&event, |l| {
+        l.save_task(&outcome.task)?;
+        if described {
+            l.save_description(&outcome.task)?;
+        }
+        Ok(())
+    })?;
+    Ok(Changed {
+        task: outcome.task,
+        warnings: outcome.warnings,
+        issues,
+    })
 }
 
 /// A fingerprint of the taskbag's files (names, sizes and change times). It changes when any

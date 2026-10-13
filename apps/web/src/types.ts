@@ -41,6 +41,20 @@ export interface Task {
   description: string;
 }
 
+/**
+ * One change the task pane asks for (Task-A01-18), as `crates/core/src/ops.rs` `Edit` reads it.
+ * Each goes through the same rule as its `alm` command; Rust decides whether it is allowed.
+ */
+export type Edit =
+  | { field: "state"; state: State; waiting_on?: string | null }
+  | { field: "label"; label: string }
+  | { field: "waiting_on"; text: string }
+  | { field: "next_dependency"; text: string | null }
+  | { field: "handoff_note"; text: string | null }
+  | { field: "iteration"; iteration: string | null }
+  | { field: "title"; title: string }
+  | { field: "description"; text: string };
+
 /** One field's change in an event (crates/core/src/event.rs). A missing side was empty. */
 export interface FieldChange {
   field: string;

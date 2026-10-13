@@ -8,6 +8,7 @@
 use crate::model::{Area, Iteration, Project, State, Task, Taskbag};
 use crate::problem::Problem;
 use crate::validate::valid_date;
+use serde::Deserialize;
 
 /// A changed task plus warnings: things worth telling the user that do not refuse the change.
 #[derive(Debug, Clone, PartialEq)]
@@ -452,6 +453,117 @@ pub fn set_title(
     check_holder(&task, me)?;
     task.title = non_empty(Some(title)).ok_or(Problem::TaskTitleMissing)?;
     Ok(Outcome::plain(task))
+}
+
+/// Set or clear the task's handoff note (the app's task pane, Task-A01-18). Same holder rule as
+/// other changes; allowed in any state. `release --note` sets it too, together with letting go.
+pub fn set_handoff_note(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    note: Option<&str>,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    task.handoff_note = non_empty(note);
+    Ok(Outcome::plain(task))
+}
+
+/// Give the task a new description, the text of its `description.md` (the app's task pane,
+/// Task-A01-18). Same holder rule as other changes; allowed in any state. Empty text removes it.
+pub fn set_description(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    text: &str,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    let mut description = text.trim_end().to_string();
+    if !description.is_empty() {
+        description.push('\n');
+    }
+    task.description = description;
+    Ok(Outcome::plain(task))
+}
+
+/// One change to one field of a task, as the app's task pane asks for it (Task-A01-18). Each
+/// goes through the same rule as its `alm` command; [`edit`] says which.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(tag = "field", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Edit {
+    /// `ready`, `waiting` (with `waiting_on`), `done` or `dropped`. `in_progress` comes only from
+    /// claiming the task, and nothing moves a task back to `backlog`.
+    State {
+        state: State,
+        #[serde(default)]
+        waiting_on: Option<String>,
+    },
+    Label {
+        label: String,
+    },
+    /// What the task waits on; like `alm wait`, this also makes it `waiting`.
+    WaitingOn {
+        text: String,
+    },
+    NextDependency {
+        #[serde(default)]
+        text: Option<String>,
+    },
+    HandoffNote {
+        #[serde(default)]
+        text: Option<String>,
+    },
+    Iteration {
+        #[serde(default)]
+        iteration: Option<String>,
+    },
+    Title {
+        title: String,
+    },
+    Description {
+        text: String,
+    },
+}
+
+/// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
+/// the name of that rule's command (`ready`, `wait`, `done`, `drop`, `label`, `needs`, `plan`,
+/// `title`; `note` and `describe` for the two changes `alm` has no command of their own for), so
+/// the change is recorded the same way.
+pub fn edit(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    edit: &Edit,
+) -> Result<(Outcome, &'static str), Problem> {
+    match edit {
+        Edit::State { state, waiting_on } => match state {
+            State::Ready => make_ready(taskbag, id, me).map(|o| (o, "ready")),
+            State::Waiting => wait(taskbag, id, me, waiting_on.as_deref().unwrap_or_default())
+                .map(|o| (o, "wait")),
+            State::Done => finish(taskbag, id, me, None).map(|o| (o, "done")),
+            State::Dropped => drop_task(taskbag, id, me).map(|o| (o, "drop")),
+            State::Backlog | State::InProgress => Err(Problem::CannotSetState {
+                id: id.to_string(),
+                state: state.as_str().to_string(),
+            }),
+        },
+        Edit::Label { label } => set_label(taskbag, id, me, label).map(|o| (o, "label")),
+        Edit::WaitingOn { text } => wait(taskbag, id, me, text).map(|o| (o, "wait")),
+        Edit::NextDependency { text } => {
+            set_next(taskbag, id, me, text.as_deref()).map(|o| (o, "needs"))
+        }
+        Edit::HandoffNote { text } => {
+            set_handoff_note(taskbag, id, me, text.as_deref()).map(|o| (o, "note"))
+        }
+        Edit::Iteration { iteration } => {
+            plan(taskbag, id, iteration.as_deref()).map(|o| (o, "plan"))
+        }
+        Edit::Title { title } => set_title(taskbag, id, me, title).map(|o| (o, "title")),
+        Edit::Description { text } => {
+            set_description(taskbag, id, me, text).map(|o| (o, "describe"))
+        }
+    }
 }
 
 /// The project with a new name and/or ID (`alm project`). An empty name or an invalid ID is
@@ -982,5 +1094,177 @@ mod tests {
             next(&s, Some("I09")),
             Err(Problem::UnknownIteration { .. })
         ));
+    }
+
+    /// Every edit the app's task pane makes goes through the same rule as its `alm` command, and
+    /// is refused the same way (Task-A01-18).
+    #[test]
+    fn each_app_edit_is_its_alm_rule() {
+        let mut s = bag();
+        s.iterations
+            .push(new_iteration(&s, "I01", "One", IterationDetails::default()).unwrap());
+        let me = Some("will");
+        let ed = |s: &Taskbag, e: Edit| edit(s, "A01-01", me, &e);
+        let same = |got: Result<(Outcome, &str), Problem>,
+                    want: Result<Outcome, Problem>,
+                    command: &str| {
+            match (got, want) {
+                (Ok((g, c)), Ok(w)) => {
+                    assert_eq!(g, w);
+                    assert_eq!(c, command);
+                }
+                (Err(g), Err(w)) => assert_eq!(g, w),
+                (g, w) => panic!("{g:?} vs {w:?}"),
+            }
+        };
+        let state = |st: State, on: Option<&str>| Edit::State {
+            state: st,
+            waiting_on: on.map(String::from),
+        };
+        same(
+            ed(&s, state(State::Ready, None)),
+            make_ready(&s, "A01-01", me),
+            "ready",
+        );
+        same(
+            ed(&s, state(State::Waiting, Some("the owner"))),
+            wait(&s, "A01-01", me, "the owner"),
+            "wait",
+        );
+        same(
+            ed(&s, state(State::Waiting, None)),
+            wait(&s, "A01-01", me, ""),
+            "wait",
+        );
+        same(
+            ed(&s, state(State::Done, None)),
+            finish(&s, "A01-01", me, None),
+            "done",
+        );
+        same(
+            ed(&s, state(State::Dropped, None)),
+            drop_task(&s, "A01-01", me),
+            "drop",
+        );
+        assert_eq!(
+            ed(&s, state(State::InProgress, None)),
+            Err(Problem::CannotSetState {
+                id: "A01-01".into(),
+                state: "in_progress".into()
+            })
+        );
+        assert!(ed(&s, state(State::Backlog, None)).is_err());
+        for label in ["implemented", "nonsense"] {
+            same(
+                ed(
+                    &s,
+                    Edit::Label {
+                        label: label.into(),
+                    },
+                ),
+                set_label(&s, "A01-01", me, label),
+                "label",
+            );
+        }
+        same(
+            ed(&s, Edit::WaitingOn { text: "x".into() }),
+            wait(&s, "A01-01", me, "x"),
+            "wait",
+        );
+        same(
+            ed(
+                &s,
+                Edit::NextDependency {
+                    text: Some("y".into()),
+                },
+            ),
+            set_next(&s, "A01-01", me, Some("y")),
+            "needs",
+        );
+        for it in [Some("I01"), Some("I09"), None] {
+            same(
+                ed(
+                    &s,
+                    Edit::Iteration {
+                        iteration: it.map(String::from),
+                    },
+                ),
+                plan(&s, "A01-01", it),
+                "plan",
+            );
+        }
+        same(
+            ed(&s, Edit::Title { title: " ".into() }),
+            set_title(&s, "A01-01", me, " "),
+            "title",
+        );
+        let (o, c) = ed(
+            &s,
+            Edit::HandoffNote {
+                text: Some(" n ".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!((o.task.handoff_note.as_deref(), c), (Some("n"), "note"));
+        let (o, c) = ed(
+            &s,
+            Edit::Description {
+                text: "New\n\n".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!((o.task.description.as_str(), c), ("New\n", "describe"));
+        let (o, _) = ed(&s, Edit::Description { text: " ".into() }).unwrap();
+        assert_eq!(o.task.description, "");
+
+        // A task an agent holds: the app's person is refused by the holder rule, like `alm`;
+        // planning is not progress, so it is still allowed.
+        put!(
+            s,
+            claim(&s, "A01-01", Some("claude/x"), false).unwrap().task
+        );
+        let held = Err(Problem::TaskHeld {
+            id: "A01-01".into(),
+            holder: "claude/x".into(),
+        });
+        for e in [
+            state(State::Ready, None),
+            state(State::Done, None),
+            Edit::Label {
+                label: "implemented".into(),
+            },
+            Edit::NextDependency { text: None },
+            Edit::HandoffNote { text: None },
+            Edit::Title { title: "t".into() },
+            Edit::Description { text: "d".into() },
+        ] {
+            assert_eq!(ed(&s, e).map(|(o, _)| o), held.clone());
+        }
+        assert!(
+            ed(
+                &s,
+                Edit::Iteration {
+                    iteration: Some("I01".into())
+                }
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn edits_arrive_as_json_from_the_app() {
+        let e: Edit =
+            serde_json::from_str(r#"{"field":"state","state":"waiting","waiting_on":"x"}"#)
+                .unwrap();
+        assert_eq!(
+            e,
+            Edit::State {
+                state: State::Waiting,
+                waiting_on: Some("x".into())
+            }
+        );
+        let e: Edit = serde_json::from_str(r#"{"field":"iteration","iteration":null}"#).unwrap();
+        assert_eq!(e, Edit::Iteration { iteration: None });
+        assert!(serde_json::from_str::<Edit>(r#"{"field":"holder","holder":"x"}"#).is_err());
     }
 }
