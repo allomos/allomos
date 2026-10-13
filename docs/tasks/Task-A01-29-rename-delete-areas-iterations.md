@@ -21,8 +21,9 @@ After [`A01-19`](./Task-A01-19-create-in-app.md) the owner can create areas and 
 - **Outcome.** The owner keeps areas and iterations correct as plans change, in the app or in a terminal.
 - **Decisive unknowns.**
   - Decided (owner, 2026-10-14): deleting an area or an iteration is refused unless it has no tasks. These two refusals are checks inside `alm`, approved by the owner here.
-  - Command names (proposed): `alm rename area <id> "<name>"`, `alm change iteration <id> [--name] [--release] [--start] [--end]`, `alm delete area <id>`, `alm delete iteration <id>`. The worker may propose others before starting.
-  - Whether a done or dropped task counts as "in" an area or iteration: proposed yes (history must still point at an area that exists).
+  - Decided (owner, 2026-10-14): command names `alm rename area <id> "<name>"`, `alm change iteration <id> [--name] [--release] [--start] [--end]`, `alm delete area <id>`, `alm delete iteration <id>`.
+  - Decided (owner, 2026-10-14): a done or dropped task counts as "in" its area or iteration, so history never points at one that is gone.
+  - Open: which iteration it is planned in (owner).
 - **Files owned.** `crates/core/src/ops.rs`, `crates/cli`, `apps/web/src/App.tsx` (or a new component), `apps/web/src/messenger.ts`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`, `apps/desktop/src-tauri/src/lib.rs`, the `alm` guide text for the new commands, tests, this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -35,7 +36,9 @@ After [`A01-19`](./Task-A01-19-create-in-app.md) the owner can create areas and 
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-14 | Write the card (not start it); delete only when empty, for both areas and iterations | owner (chat) |
+| 2026-10-14 | Approve the card (ready) with the proposed command names and done/dropped tasks counting | owner (chat) |
 
 ## Notes
 
 - 2026-10-14 — Card written by the agent. Next: the owner approves the card (`ready`) and picks its iteration; it starts after A01-19.
+- 2026-10-14 — Owner approved the card; ready. Starts after A01-19; iteration still to be picked.
