@@ -127,7 +127,7 @@ npm --prefix apps/desktop run dev
 
 While a taskbag is open, the window checks about once a second whether its files changed (a fingerprint of names, sizes and change times, `taskbag_stamp`) and reloads when they did, so changes made with `alm` show without reopening the folder. Polling was chosen over a folder watcher because it needs no new package or thread, and inside the desktop app it is a cheap local call. **Companions are different:** over the network, the desktop app pushes a change notice to them; they never ask on a timer (owner, 2026-10-06).
 
-To build a local, unsigned app: `npx --prefix apps/desktop tauri build --debug --bundles app`. The result is `target/debug/bundle/macos/Allomos.app`.
+To build a local, unsigned app: `npm --prefix apps/desktop run tauri build -- --debug --bundles app`. The result is `target/debug/bundle/macos/Allomos.app`. Run it through `npm run` as shown, the same way GitHub's release build does: `npm run` starts Tauri inside `apps/desktop`, whereas `npx --prefix apps/desktop tauri …` starts it in the repository's root, where Tauri can pick the user guide's `docs/guide/package.json` and fail looking for `docs/web/package.json` (seen 2026-10-13).
 
 ## Building for Windows
 
