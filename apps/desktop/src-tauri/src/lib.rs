@@ -339,7 +339,13 @@ fn set_handoff_rules(
         clear,
     };
     let project = allomos_core::ops::set_handoff_rules(&bag, &change)?;
-    lock.save_project(&project)?;
+    let event = allomos_store::Actor::APP.event(
+        "handoff-rules",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        allomos_core::event::changes(Some(&bag.project), &project, &[]),
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
     drop(lock);
     handoff_settings_of(&root)
 }
@@ -348,6 +354,12 @@ fn set_handoff_rules(
 fn set_handoff_template(root: PathBuf, text: String) -> Result<HandoffSettings, Problem> {
     allomos_store::handoff::set_template(&root, &text)?;
     handoff_settings_of(&root)
+}
+
+/// One task's history, newest first, and when the taskbag started recording (Task-A01-17).
+#[tauri::command]
+fn task_history(root: PathBuf, id: String) -> allomos_store::events::History {
+    allomos_store::events::history(&root, &id)
 }
 
 /// Every handoff in the taskbag, newest first (the Handoffs tab and the task pane).
@@ -983,6 +995,7 @@ pub fn run() {
             list_handoffs,
             write_handoff,
             create_taskbag,
+            task_history,
             show_in_file_manager,
             open_task_link,
             system_languages,

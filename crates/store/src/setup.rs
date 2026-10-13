@@ -81,10 +81,16 @@ pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Probl
     let text = std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
         detail: format!("{}: {e}", path.display()),
     })?;
-    let mut project =
-        parse_project(PROJECT_FILE, &text).map_err(|issues| issues[0].problem.clone())?;
+    let before = parse_project(PROJECT_FILE, &text).map_err(|issues| issues[0].problem.clone())?;
+    let mut project = before.clone();
     project.project_folder = Some(recorded.clone());
-    write_atomic(&path, &json_text(&project))?;
+    let event = crate::Actor::APP.event(
+        "connect project folder",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        allomos_core::event::changes(Some(&before), &project, &[]),
+    );
+    lock.record(&event, |_| write_atomic(&path, &json_text(&project)))?;
     Ok(recorded)
 }
 

@@ -435,11 +435,14 @@ fn git_sees_only_text_files() {
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     assert!(repo.join(".allomos/taskbag/.lock").exists());
     let out = git(&["status", "--porcelain", "-uall"]).unwrap();
-    let files: Vec<String> = String::from_utf8(out.stdout)
+    let (events, files): (Vec<String>, Vec<String>) = String::from_utf8(out.stdout)
         .unwrap()
         .lines()
         .map(|l| l[3..].to_string())
-        .collect();
+        .partition(|f| f.starts_with(".allomos/taskbag/events/"));
+    // One event per change: init, add area, add task, claim (Task-A01-17).
+    assert_eq!(events.len(), 4, "{events:?}");
+    assert!(events.iter().all(|f| f.ends_with(".json")));
     assert_eq!(
         files,
         [
@@ -573,10 +576,15 @@ fn commit_and_push_share_only_the_taskbag() {
         git(&repo, &["log", "-1", "--format=%s%n%b"]),
         "alm: claim A01-01\nAgent: agent-a"
     );
-    assert_eq!(
-        git(&repo, &["show", "--name-only", "--format=", "HEAD"]),
-        ".allomos/taskbag/tasks/A01-01/task.json"
+    // The task and the event that records its change (Task-A01-17).
+    let shown = git(&repo, &["show", "--name-only", "--format=", "HEAD"]);
+    let shown: Vec<&str> = shown.lines().collect();
+    assert_eq!(shown.len(), 2, "{shown:?}");
+    assert!(
+        shown[0].starts_with(".allomos/taskbag/events/"),
+        "{shown:?}"
     );
+    assert_eq!(shown[1], ".allomos/taskbag/tasks/A01-01/task.json");
     assert_eq!(git(&repo, &["status", "--porcelain"]), "M README.md");
     // The push landed on the remote.
     assert_eq!(
@@ -1057,7 +1065,7 @@ fn upgrade_on_a_current_taskbag_changes_nothing() {
     let v = ok(&repo, &["upgrade"]);
     assert_eq!(
         v["upgrade"],
-        json!({ "from": "allomos/2", "to": "allomos/2", "changed": false })
+        json!({ "from": "allomos/3", "to": "allomos/3", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
 }
@@ -1166,5 +1174,219 @@ fn the_template_can_be_shown_and_replaced() {
         &["handoff-template", "--set", "empty.md"],
         1,
         "template_empty",
+    );
+}
+
+/// The event files in a taskbag (Task-A01-17).
+fn event_count(repo: &Path) -> usize {
+    fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .map(|d| {
+            d.filter_map(Result::ok)
+                .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+#[test]
+fn every_change_writes_exactly_one_event_and_a_refusal_none() {
+    let repo = filled();
+    // init, two areas and three tasks so far.
+    assert_eq!(event_count(&repo), 6);
+    let changes: &[&[&str]] = &[
+        &["add", "iteration", "I01", "First"],
+        &["ready", "A01-01"],
+        &["--as", "a", "claim", "A01-01"],
+        &["--as", "a", "label", "A01-01", "implemented"],
+        &["--as", "a", "needs", "A01-01", "a check"],
+        &["plan", "A01-01", "I01"],
+        &["--as", "a", "title", "A01-01", "Open a folder"],
+        &["--as", "a", "wait", "A01-01", "--on", "the owner"],
+        &["--as", "a", "release", "A01-01", "--note", "over to you"],
+        &["--as", "b", "claim", "A01-01"],
+        &["--as", "b", "done", "A01-01"],
+        &["drop", "A01-02"],
+        &["labels", "implemented,locally verified,owner verified"],
+        &["project", "--name", "Demo 2"],
+        &["task-language", "ja"],
+        &["handoff-rules", "--quota", "5"],
+    ];
+    for (i, args) in changes.iter().enumerate() {
+        ok(&repo, args);
+        assert_eq!(event_count(&repo), 7 + i, "after {args:?}");
+    }
+    let n = event_count(&repo);
+    // Refused changes write nothing.
+    refused(&repo, &["--as", "c", "claim", "A01-01"], 1, "task_closed");
+    refused(
+        &repo,
+        &["--as", "b", "label", "A02-01", "nope"],
+        1,
+        "label_not_on_ladder",
+    );
+    refused(
+        &repo,
+        &["add", "task", "A01-01", "--area", "A01", "--title", "T"],
+        1,
+        "duplicate_task_id",
+    );
+    // A change that changes nothing records nothing.
+    ok(&repo, &["task-language", "ja"]);
+    // Reading never writes.
+    ok(&repo, &["history", "A01-01"]);
+    ok(&repo, &["list"]);
+    assert_eq!(event_count(&repo), n);
+}
+
+#[test]
+fn history_lists_a_tasks_changes_newest_first() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    ok(&repo, &["--as", "claude/x", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "claude/x", "label", "A01-01", "implemented"],
+    );
+    let v = ok(&repo, &["history", "A01-01"]);
+    assert!(v["since"].as_str().unwrap().ends_with('Z'));
+    let events = v["events"].as_array().unwrap();
+    let commands: Vec<&str> = events
+        .iter()
+        .map(|e| e["command"].as_str().unwrap())
+        .collect();
+    assert_eq!(commands, ["label", "claim", "ready", "add task"]);
+    assert_eq!(events[0]["by"], "claude/x");
+    assert_eq!(events[0]["via"], "alm");
+    assert_eq!(
+        events[1]["changes"],
+        json!([
+            { "field": "state", "from": "ready", "to": "in_progress" },
+            { "field": "holder", "to": "claude/x" }
+        ])
+    );
+    // Nobody named: no `by`.
+    assert!(events[2].get("by").is_none());
+    // Another task's events are not listed; an unknown task is refused.
+    assert_eq!(
+        ok(&repo, &["history", "A01-02"])["events"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    refused(&repo, &["history", "A09-09"], 1, "task_not_found");
+    // For people: newest first, one line per change.
+    let out = alm(&repo, &["history", "A01-01"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.starts_with("History of A01-01 (recorded since "),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "claude/x (alm)  claim\n  state: ready → in_progress\n  holder: — → claude/x\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.find("  label").unwrap() < text.find("  claim").unwrap(),
+        "{text}"
+    );
+}
+
+#[test]
+fn two_copies_with_different_events_merge_without_conflict() {
+    let (repo, remote) = real_repo();
+    ok(&repo, &["init", "--commit"]);
+    ok(&repo, &["add", "area", "A01", "One", "--commit"]);
+    ok(
+        &repo,
+        &[
+            "add", "task", "A01-01", "--area", "A01", "--title", "T1", "--commit",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "add", "task", "A01-02", "--area", "A01", "--title", "T2", "--push",
+        ],
+    );
+    let other = repo.with_file_name("other");
+    git(
+        repo.parent().unwrap(),
+        &[
+            "clone",
+            "--quiet",
+            "-b",
+            "main",
+            remote.to_str().unwrap(),
+            other.to_str().unwrap(),
+        ],
+    );
+    git(&other, &["config", "user.name", "Other"]);
+    git(&other, &["config", "user.email", "other@example.com"]);
+    // Each copy changes a different task, at the same time, and records its own events.
+    ok(&other, &["--as", "codex/b", "claim", "A01-02", "--push"]);
+    ok(&repo, &["--as", "claude/a", "claim", "A01-01", "--commit"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "claude/a",
+            "label",
+            "A01-01",
+            "implemented",
+            "--commit",
+        ],
+    );
+    let before = event_count(&repo);
+    git(
+        &repo,
+        &[
+            "pull",
+            "--quiet",
+            "--no-rebase",
+            "--no-edit",
+            "origin",
+            "main",
+        ],
+    );
+    assert_eq!(event_count(&repo), before + 1);
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "");
+    let mine = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(mine["events"][0]["command"], "label");
+    let theirs = ok(&repo, &["history", "A01-02"]);
+    assert_eq!(theirs["events"][0]["by"], "codex/b");
+}
+
+#[test]
+fn an_older_taskbag_without_events_is_upgraded_and_history_starts_then() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    fs::remove_dir_all(bag.join("events")).unwrap();
+    let project = bag.join("project.json");
+    let text = fs::read_to_string(&project).unwrap();
+    fs::write(&project, text.replace("\"allomos/3\"", "\"allomos/2\"")).unwrap();
+    // Older: alm asks for the upgrade first, and changes nothing.
+    refused(&repo, &["history", "A01-01"], 1, "taskbag_older");
+    refused(&repo, &["ready", "A01-01"], 1, "taskbag_older");
+    assert!(!bag.join("events").exists());
+    let v = ok(&repo, &["--as", "claude/u", "upgrade"]);
+    assert_eq!(v["upgrade"]["to"], "allomos/3");
+    assert!(bag.join("events/.keep").is_file());
+    // History starts with the upgrade; nothing earlier is invented.
+    let h = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(h["events"], json!([]));
+    let since = h["since"].as_str().unwrap().to_string();
+    let text = String::from_utf8(alm(&repo, &["history", "A01-01"]).stdout).unwrap();
+    assert!(text.contains(&format!("recorded since {since}")), "{text}");
+    assert!(
+        text.contains("No changes recorded for this task yet."),
+        "{text}"
+    );
+    ok(&repo, &["ready", "A01-01"]);
+    assert_eq!(
+        ok(&repo, &["history", "A01-01"])["events"][0]["command"],
+        "ready"
     );
 }

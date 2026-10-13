@@ -1,10 +1,10 @@
-# Taskbag file format — `allomos/2`
+# Taskbag file format — `allomos/3`
 
 A **contract**: the files inside a taskbag. The Allomos app, the `alm` command and AI agents must all read and write exactly this. Code: `crates/core` (rules) and `crates/store` (reading and writing). Decided by [0007](../decisions/0007-git-like-project-sync.md) and [0010](../decisions/0010-project-data-folder.md).
 
 ## In plain words
 
-A taskbag is an ordinary folder of small text files. There is one file for the project, one file per area, one file per iteration (if the project plans by iteration), and one folder per task. Each task folder holds a JSON file for its fields and a Markdown file for its description. Because they are plain text, Git can show exactly what changed, and anyone can read them.
+A taskbag is an ordinary folder of small text files. There is one file for the project, one file per area, one file per iteration (if the project plans by iteration), and one folder per task. Each task folder holds a JSON file for its fields and a Markdown file for its description. Every change is also written down as one small **event** file in `events/`: what changed, who did it and when, so a task's history can be shown. Because they are plain text, Git can show exactly what changed, and anyone can read them.
 
 ## Where the taskbag is
 
@@ -41,6 +41,9 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
   project-notes.md      what every session must know: running, pitfalls, where credentials live
   handoffs/             one file per session (allomos/2)
     2026-10-12-1130-claude-a03-06.md
+  events/               one file per change: the history (allomos/3)
+    .keep
+    2026-10-13-140205-123-k7f3q2.json
 ```
 
 - File and folder names use the item's ID.
@@ -51,7 +54,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | `"allomos/2"` for this version (`"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
+| `format` | yes | `"allomos/3"` for this version (`"allomos/2"` before events, A01-17; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `alm labels`. |
@@ -79,6 +82,42 @@ Added by [`Task-A03-06`](../tasks/Task-A03-06-agent-handoff-rules.md). A handoff
 - **`handoff-template.md`**: the outline. Part 1, for anyone in plain words; part 2, restart details. Replaced with `alm handoff-template --set` or in the app.
 - **`project-notes.md`**: what every session must know whatever its task: what is running, pitfalls, where credentials live (never their values).
 - A task's `handoff_note` stays: the one line left on release.
+
+## Events (`allomos/3`)
+
+Added by [`Task-A01-17`](../tasks/Task-A01-17-change-history.md) (R7). Every change Allomos makes to a task, an area, an iteration or `project.json` is also written down as one **event**. History is shown from events, and later the burndown and the timeline are computed from them. Owner, 2026-10-13: one file per change; nothing is invented for changes made before a taskbag started recording.
+
+- **`events/<date>-<time>-<ms>-<random>.json`**, for example `events/2026-10-13-140205-123-k7f3q2.json`: the UTC time of the change, to the millisecond, then six random letters or digits. Two people's changes therefore never share a file name, and Git merges their `events/` folders without a conflict (each side only adds files). Files are never changed or removed once written. `events/.keep` keeps the folder in Git before the first change.
+
+  ```json
+  {
+    "at": "2026-10-13T14:02:05Z",
+    "by": "claude/a01-17-history",
+    "via": "alm",
+    "command": "claim",
+    "kind": "task",
+    "id": "A01-17",
+    "changes": [
+      { "field": "state", "from": "ready", "to": "in_progress" },
+      { "field": "holder", "to": "claude/a01-17-history" }
+    ]
+  }
+  ```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `at` | yes | When, in UTC, to the second. |
+| `by` | no | Who: the `--as` name of the agent session or person. Left out when nobody said (the app does not know the person's name yet). |
+| `via` | yes | Which writer made the change: `alm` or `app`. |
+| `command` | yes | What was run: the `alm` command (`claim`, `add task`, `labels`, `init`, `upgrade`…) or the app's action (`handoff-rules`, `connect project folder`). |
+| `kind` | yes | What changed: `task`, `area`, `iteration` or `project`. |
+| `id` | no | The item's ID; for the project, the project's ID. |
+| `changes` | yes | One entry per field that changed: `field`, then `from` (left out when the field was empty, or the item new) and `to` (left out when it was emptied). Values are as they are stored, for example `"in_progress"` or a list of labels. A new item lists every field it was created with except its ID. A task's fields come in the task pane's order. |
+
+- **One change, one event, under the same lock.** The writer writes the event, then the changed file; if that write fails, the event is removed. A refused change writes no event, and neither does a change that changes nothing.
+- **Where history starts.** `alm init` (and the app's new taskbag) writes the first event, `init`. A taskbag upgraded from `allomos/2` gets `events/` and one `upgrade` event; that is when its history starts. A task's History shows "recorded since" the taskbag's oldest event.
+- **Not events:** handoffs and the handoff template (each handoff carries its own writer and times), and reading.
+- **Checks.** An event file that is not valid, or has an unknown field, is reported for that file (`alm history --json` → `issues`) and left out; other events still show.
 
 ## `areas/<id>.json`
 
@@ -151,15 +190,11 @@ Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md). Allomo
 
 - **Newer** than this Allomos (`allomos/2` read by an Allomos that writes `allomos/1`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
 - **Older**: `alm` refuses every command that works on the taskbag with `taskbag_older`, telling the agent to run `alm upgrade` and then repeat the command. The app shows **Update the taskbag…**.
-- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). Steps: `allomos/1` → `allomos/2` adds `handoff-template.md`, `project-notes.md` and `handoffs/` (the rules in `project.json` are optional).
+- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). Steps: `allomos/1` → `allomos/2` adds `handoff-template.md`, `project-notes.md` and `handoffs/` (the rules in `project.json` are optional); `allomos/2` → `allomos/3` adds `events/` ([§ Events](#events-allomos3)). An upgrade that changed something is recorded as an `upgrade` event.
 - **Allomos never upgrades by itself** (owner, 2026-10-12): the running AI agent does, with `alm upgrade`, when `alm` or the app's request tells it to.
 
 Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v2)` (v2: the handoff lines, A03-06). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
 
 ## Not yet in this version
-
-- **Events** (the history of changes, R7) arrive with editing (Iteration 2). They will go in `events/`.
-
-This is an addition; existing files stay valid.
 
 **Older Allomos versions** refuse a task with an `iteration` field (`field_unknown`), because unknown fields are refused. Update `alm` and the app before planning tasks in iterations.

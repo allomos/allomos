@@ -9,12 +9,13 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use allomos_core::event::{self, Kind, TASK_FIELDS};
 use allomos_core::ops::{self, Outcome};
-use allomos_core::{Issue, Iteration, Problem, State, Task, Taskbag};
+use allomos_core::{Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
-    DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
-    agent_section_for, agent_setup_request, find_taskbag, git_root, guide, id_from_name,
+    Actor, DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
+    agent_section_for, agent_setup_request, events, find_taskbag, git_root, guide, id_from_name,
     init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
     requests_dir, task_language, versions, was_seen, withdraw_confirm,
 };
@@ -142,6 +143,8 @@ enum Command {
     },
     /// Show one task in full.
     Show { id: String },
+    /// Show a task's history: every recorded change, newest first, with who and when.
+    History { id: String },
     /// Hold a task and start it.
     Claim {
         id: String,
@@ -274,6 +277,7 @@ impl Command {
         match self {
             Command::Add(Add::Area { id, .. } | Add::Iteration { id, .. })
             | Command::Show { id }
+            | Command::History { id }
             | Command::Claim { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
@@ -327,6 +331,7 @@ impl Command {
             self,
             Command::List { .. }
                 | Command::Show { .. }
+                | Command::History { .. }
                 | Command::Next
                 | Command::Confirm { .. }
                 | Command::Brief
@@ -348,6 +353,7 @@ impl Command {
             Command::Add(Add::Task { .. }) => "add task",
             Command::List { .. } => "list",
             Command::Show { .. } => "show",
+            Command::History { .. } => "history",
             Command::Claim { .. } => "claim",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",
@@ -807,6 +813,40 @@ fn rules_line(r: &allomos_core::AppliedRules) -> String {
     )
 }
 
+/// An event for people: when, who (and through which writer), the command, then one line per
+/// changed field. Long or multi-line values are shortened to their first 80 characters.
+fn event_lines(e: &event::Event) -> String {
+    let value = |v: &Option<Value>| match v {
+        None => "—".to_string(),
+        Some(Value::String(s)) => {
+            let first = s.lines().next().unwrap_or_default();
+            let short: String = first.chars().take(80).collect();
+            if short.len() < s.trim_end().len() {
+                format!("{short}…")
+            } else {
+                short
+            }
+        }
+        Some(other) => other.to_string(),
+    };
+    let mut out = format!(
+        "{}  {} ({})  {}\n",
+        e.at,
+        e.by.as_deref().unwrap_or("someone"),
+        e.via,
+        e.command
+    );
+    for c in &e.changes {
+        out.push_str(&format!(
+            "  {}: {} → {}\n",
+            c.field,
+            value(&c.from),
+            value(&c.to)
+        ));
+    }
+    out
+}
+
 /// One line about a task: ID, state, label, holder, title.
 fn task_line(t: &Task) -> String {
     format!(
@@ -851,7 +891,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .collect(),
                 None => allomos_core::default_labels(),
             };
-            let root = init_with_labels(&root, &id, &name, labels)?;
+            let root = init_with_labels(&root, &id, &name, labels, Actor::alm(me))?;
             let mut text = format!("Created an empty taskbag at {}\n", root.display());
             // Tell AI agents about Allomos in the project's instruction files: by default ask
             // the agent running `alm init` to merge the section in; with --write-agent-files, write it.
@@ -925,7 +965,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     clear: *clear,
                 };
                 let project = ops::set_handoff_rules(&bag, &change)?;
-                lock.save_project(&project)?;
+                save_project(&lock, me, "handoff-rules", &bag.project, &project)?;
                 (Taskbag { project, ..bag }, issues)
             } else {
                 taskbag_of(&root, load(&root))?
@@ -1036,7 +1076,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         Command::Upgrade => {
             let root = locate(cli, cwd)?;
-            let up = versions::upgrade(&root)?;
+            let up = versions::upgrade(&root, Actor::alm(me))?;
             let text = if up.changed {
                 format!("Upgraded the taskbag from {} to {}.\n", up.from, up.to)
             } else {
@@ -1053,7 +1093,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let lock = Lock::acquire(&root, lock_wait())?;
             let (bag, issues) = taskbag_of(&root, lock.load())?;
             let project = ops::set_task_language(&bag, value)?;
-            lock.save_project(&project)?;
+            save_project(&lock, me, "task-language", &bag.project, &project)?;
             let system: Vec<String> = sys_locale::get_locales().collect();
             let now = task_language(&project, &system);
             let mut done = Done::new(
@@ -1085,7 +1125,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let (bag, issues) = taskbag_of(&root, lock.load())?;
             let labels: Vec<String> = ladder.split(',').map(String::from).collect();
             let project = ops::set_ladder(&bag, &labels)?;
-            lock.save_project(&project)?;
+            save_project(&lock, me, "labels", &bag.project, &project)?;
             let mut done = Done::new(
                 json!({ "taskbag": root, "labels": project.labels }),
                 format!("Label ladder: {}\n", project.labels.join(" → ")),
@@ -1100,7 +1140,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let mut done = match add {
                 Add::Area { id, name } => {
                     let area = ops::new_area(&bag, id, name)?;
-                    lock.create_area(&area)?;
+                    let event = Actor::alm(me).event(
+                        "add area",
+                        Kind::Area,
+                        Some(&area.id),
+                        event::changes(None, &area, &[]),
+                    );
+                    lock.record(&event, |l| l.create_area(&area))?;
                     let text = format!("Added area {} ({})\n", area.id, area.name);
                     Done::new(json!({ "taskbag": root, "area": area }), text)
                 }
@@ -1117,7 +1163,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         end: end.as_deref(),
                     };
                     let iteration = ops::new_iteration(&bag, id, name, details)?;
-                    lock.create_iteration(&iteration)?;
+                    let event = Actor::alm(me).event(
+                        "add iteration",
+                        Kind::Iteration,
+                        Some(&iteration.id),
+                        event::changes(None, &iteration, &[]),
+                    );
+                    lock.record(&event, |l| l.create_iteration(&iteration))?;
                     let text = format!("Added iteration {}\n", iteration_heading(&iteration));
                     Done::new(json!({ "taskbag": root, "iteration": iteration }), text)
                 }
@@ -1132,7 +1184,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         None => ops::next_task_id(&bag, area)?,
                     };
                     let task = ops::new_task(&bag, &id, area, title, description.as_deref())?;
-                    lock.create_task(&task)?;
+                    let event = Actor::alm(me).event(
+                        "add task",
+                        Kind::Task,
+                        Some(&task.id),
+                        event::changes(None, &task, TASK_FIELDS),
+                    );
+                    lock.record(&event, |l| l.create_task(&task))?;
                     let text = format!("Added {}\n", task_line(&task));
                     Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text)
                 }
@@ -1272,6 +1330,32 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
+        Command::History { id } => {
+            let root = locate(cli, cwd)?;
+            let (bag, mut issues) = taskbag_of(&root, load(&root))?;
+            let task = ops::find_task(&bag, id)?;
+            let history = events::history(&root, &task.id);
+            let mut text = match &history.since {
+                Some(since) => format!("History of {} (recorded since {since})\n", task.id),
+                None => format!(
+                    "No history yet: this taskbag has recorded no changes, so none are shown for {}.\n",
+                    task.id
+                ),
+            };
+            if history.since.is_some() && history.events.is_empty() {
+                text.push_str("No changes recorded for this task yet.\n");
+            }
+            for e in &history.events {
+                text.push_str(&event_lines(e));
+            }
+            issues.extend(history.issues.iter().cloned());
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task.id, "since": history.since, "events": history.events }),
+                text,
+            );
+            done.issues = issues;
+            Ok(done)
+        }
         Command::Next => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
@@ -1316,7 +1400,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let (bag, issues) = taskbag_of(&root, lock.load())?;
             let project = ops::rename_project(&bag, name.as_deref(), id.as_deref())?;
             if name.is_some() || id.is_some() {
-                lock.save_project(&project)?;
+                save_project(&lock, me, "project", &bag.project, &project)?;
             }
             let mut done = Done::new(
                 json!({ "taskbag": root, "project": { "id": project.id, "name": project.name } }),
@@ -1339,7 +1423,24 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     }
 }
 
-/// One change to one task, under the taskbag's lock: load, apply the rule, write.
+/// Rewrite `project.json` under the held lock, recording what changed as `command`'s event.
+fn save_project(
+    lock: &Lock,
+    me: Option<&str>,
+    command: &str,
+    before: &Project,
+    after: &Project,
+) -> Result<(), Problem> {
+    let event = Actor::alm(me).event(
+        command,
+        Kind::Project,
+        Some(&after.id),
+        event::changes(Some(before), after, &[]),
+    );
+    lock.record(&event, |l| l.save_project(after))
+}
+
+/// One change to one task, under the taskbag's lock: load, apply the rule, write it and its event.
 fn change(
     cli: &Cli,
     cwd: &Path,
@@ -1349,7 +1450,14 @@ fn change(
     let lock = Lock::acquire(&root, lock_wait())?;
     let (bag, issues) = taskbag_of(&root, lock.load())?;
     let outcome = rule(&bag)?;
-    lock.save_task(&outcome.task)?;
+    let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
+    let event = Actor::alm(cli.holder.as_deref()).event(
+        cli.command.name(),
+        Kind::Task,
+        Some(&outcome.task.id),
+        event::changes(before, &outcome.task, TASK_FIELDS),
+    );
+    lock.record(&event, |l| l.save_task(&outcome.task))?;
     drop(lock);
     let text = format!("{}\n", task_line(&outcome.task));
     let mut done = Done::new(

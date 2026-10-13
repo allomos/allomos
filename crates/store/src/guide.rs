@@ -94,6 +94,7 @@ See:
 - `alm next`: the first ready task no one holds, with its handoff note.
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
 - `alm show <id>`: one task in full, with its description.
+- `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
 Work a task:
 - `alm claim <id>`: you hold it; state in progress. `--take` only when its holder has stopped.

@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use fs4::{FileExt, TryLockError};
 
+use allomos_core::event::{self, Event, Kind};
 use allomos_core::{
     Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Task, Taskbag, parse_area,
     parse_iteration, parse_project, parse_task, validate_taskbag,
@@ -21,6 +22,7 @@ use serde::Serialize;
 
 mod confirm;
 mod convert;
+pub mod events;
 mod guide;
 pub mod handoff;
 mod settings;
@@ -34,6 +36,7 @@ pub use convert::{
     CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, agent_connect_request_in,
     agent_convert_request_in,
 };
+pub use events::Actor;
 pub use guide::{GUIDE_TOPICS, guide};
 pub use settings::{
     TaskLanguage, pick_ui_language, save_ui_language, saved_ui_language, settings_dir,
@@ -859,17 +862,20 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
 /// Create an empty taskbag at `root` (normally `<repository>/.allomos/taskbag/`): `project.json`,
 /// empty `areas/` and `tasks/`, and a `.gitignore` for the lock. Refused when `root` exists.
 /// Never creates a Git repository.
+/// This is how the app creates one, so its first event says `via: app`.
 pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
-    init_with_labels(root, id, name, allomos_core::default_labels())
+    init_with_labels(root, id, name, allomos_core::default_labels(), Actor::APP)
 }
 
-/// [`init`] with the project's own label ladder, lowest step first. An empty ladder is
-/// refused (`ladder_empty`), like an invalid ID.
+/// [`init`] with the project's own label ladder, lowest step first, made by `actor`. An empty
+/// ladder is refused (`ladder_empty`), like an invalid ID. The taskbag's first event records its
+/// creation, which is when its history starts.
 pub fn init_with_labels(
     root: &Path,
     id: &str,
     name: &str,
     labels: Vec<String>,
+    actor: Actor,
 ) -> Result<PathBuf, Problem> {
     if root.exists() {
         return Err(Problem::TaskbagExists {
@@ -891,6 +897,12 @@ pub fn init_with_labels(
     if let Err(issues) = parse_project(PROJECT_FILE, &text) {
         return Err(issues[0].problem.clone());
     }
+    let first = actor.event(
+        "init",
+        Kind::Project,
+        Some(id),
+        event::changes(None, &project, &[]),
+    );
     let parent = root.parent().expect("a taskbag root has a parent");
     fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
     create_dir_atomic(
@@ -906,6 +918,7 @@ pub fn init_with_labels(
             ),
             (handoff::NOTES_FILE, handoff::DEFAULT_NOTES.to_string()),
             ("handoffs/.keep", String::new()),
+            (&events::new_file(root), json_text(&first)),
         ],
     )
     .map_err(|p| match p {
@@ -1024,6 +1037,23 @@ impl Lock {
         let path = self.root.join("tasks").join(&task.id).join("task.json");
         write_atomic(&path, &json_text(&task_file_json(task)))
     }
+
+    /// Make one change and record it (Task-A01-17): write `event`, then run `write`. When `write`
+    /// fails the event is taken back, so the history never shows a change that did not happen.
+    /// An event with no changes is not written: nothing happened worth recording.
+    pub fn record(
+        &self,
+        event: &Event,
+        write: impl FnOnce(&Lock) -> Result<(), Problem>,
+    ) -> Result<(), Problem> {
+        if event.changes.is_empty() {
+            return write(self);
+        }
+        let file = events::write(&self.root, event)?;
+        write(self).inspect_err(|_| {
+            let _ = fs::remove_file(&file);
+        })
+    }
 }
 
 /// A fingerprint of the taskbag's files (names, sizes and change times). It changes when any
@@ -1041,6 +1071,8 @@ pub fn stamp(root: &Path) -> u64 {
     add(&root.join(PROJECT_FILE));
     add(&root.join(handoff::TEMPLATE_FILE));
     add(&root.join(handoff::NOTES_FILE));
+    // A new event changes its folder's time; reading every event file here would grow with history.
+    add(&root.join(events::EVENTS_DIR));
     for folder in ["areas", "iterations", handoff::HANDOFFS_DIR] {
         for p in sorted_entries(&root.join(folder)) {
             add(&p);
@@ -1090,7 +1122,7 @@ mod tests {
         let dir = tmp("init-ladder");
         let root = dir.join(DEFAULT_DIR);
         let ladder = vec!["drafted".to_string(), "owner verified".to_string()];
-        init_with_labels(&root, "allomos", "Allomos", ladder.clone()).unwrap();
+        init_with_labels(&root, "allomos", "Allomos", ladder.clone(), Actor::APP).unwrap();
         let bag = load(&root).taskbag.unwrap();
         assert_eq!(
             (bag.project.id.as_str(), bag.project.labels),
@@ -1098,12 +1130,12 @@ mod tests {
         );
         let other = dir.join("other");
         assert_eq!(
-            init_with_labels(&other, "p", "P", vec![]),
+            init_with_labels(&other, "p", "P", vec![], Actor::APP),
             Err(Problem::LadderEmpty)
         );
         assert!(!other.exists());
         assert!(matches!(
-            init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()]),
+            init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()], Actor::APP),
             Err(Problem::InvalidId { .. })
         ));
         fs::remove_dir_all(dir).unwrap();
@@ -1337,7 +1369,7 @@ mod tests {
         create_starter(&root, "Demo").unwrap();
         assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
         let loaded = load(&root);
-        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/2");
+        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/3");
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         let tb = loaded.taskbag.unwrap();
         assert_eq!(tb.project.name, "Demo");

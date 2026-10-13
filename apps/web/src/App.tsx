@@ -15,7 +15,7 @@ import { useFold } from "./useFold";
 import { TaskPane } from "./TaskPane";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck, Handoff } from "./types";
+import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -738,6 +738,20 @@ function TaskbagView({
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
+  // The selected task's history (Task-A01-17), read again whenever the taskbag reloads. Kept with
+  // its task's ID, so another task never shows it and a reload does not blank it while reading.
+  const [history, setHistory] = useState<{ id: string; history: TaskHistory | null } | null>(null);
+  useEffect(() => {
+    if (!selectedId) return;
+    let live = true;
+    messenger
+      .taskHistory(opened.root, selectedId)
+      .then((h) => live && setHistory({ id: selectedId, history: h }))
+      .catch(() => live && setHistory({ id: selectedId, history: null }));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened, selectedId]);
   const shownRef = useRef(shown);
   shownRef.current = shown;
   // Up and down move through the tasks as listed; Esc closes the pane.
@@ -856,6 +870,7 @@ function TaskbagView({
                 onClose={() => setSelectedId(null)}
                 onLink={openLink}
                 latest={latestFor(handoffs, selected.id)}
+                history={history?.id === selected.id ? history.history : null}
                 onAllHandoffs={() => {
                   setHandoffTask(selected.id);
                   choose("handoffs");

@@ -1,11 +1,14 @@
 // The task pane (Task-A01-16): everything about one task, beside the list. Read only; editing
-// arrives later in Iteration 2 and will happen here.
+// arrives later in Iteration 2 and will happen here. History lists the task's recorded changes
+// (Task-A01-17).
 
 import { useEffect, useRef } from "react";
 import { useI18n } from "./i18n";
 import { Markdown } from "./Markdown";
 import { LatestHandoff } from "./Handoffs";
-import type { Area, Handoff, Iteration, Task } from "./types";
+import { localTime } from "./handoffFlow";
+import { changeLine } from "./historyFlow";
+import type { Area, Handoff, Iteration, Task, TaskHistory } from "./types";
 
 export function TaskPane({
   task,
@@ -15,6 +18,7 @@ export function TaskPane({
   onLink,
   latest,
   onAllHandoffs,
+  history,
 }: {
   task: Task;
   area: Area | undefined;
@@ -25,6 +29,8 @@ export function TaskPane({
   latest: Handoff | null;
   /** Opens the Handoffs tab on this task. */
   onAllHandoffs: () => void;
+  /** The task's recorded changes; null until read, or when they cannot be. */
+  history: TaskHistory | null;
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLElement>(null);
@@ -80,7 +86,27 @@ export function TaskPane({
       <LatestHandoff handoff={latest} onAll={onAllHandoffs} />
       <section>
         <h3>{t("pane.history")}</h3>
-        <p className="muted small">{t("pane.history_none")}</p>
+        {!history?.since ? (
+          <p className="muted small">{t("pane.history_none")}</p>
+        ) : history.events.length === 0 ? (
+          <p className="muted small">{t("pane.history_empty", { date: localTime(history.since) })}</p>
+        ) : (
+          <>
+            <ol className="history">
+              {history.events.map((e, i) => (
+                <li key={`${e.at}-${i}`} className="small">
+                  <span className="muted">
+                    {localTime(e.at)} · {e.by || t("pane.history_someone")}
+                  </span>
+                  {e.changes.map((c) => (
+                    <div key={c.field}>{changeLine(c, t)}</div>
+                  ))}
+                </li>
+              ))}
+            </ol>
+            <p className="muted small">{t("pane.history_since", { date: localTime(history.since) })}</p>
+          </>
+        )}
       </section>
     </aside>
   );

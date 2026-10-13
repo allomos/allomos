@@ -13,7 +13,8 @@ use allomos_core::{FORMAT, FORMAT_VERSION, Problem, format_version};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{AGENT_SECTION_HEADING, Lock, PROJECT_FILE, picked_folder, tells_agents};
+use crate::{AGENT_SECTION_HEADING, Actor, Lock, PROJECT_FILE, picked_folder, tells_agents};
+use allomos_core::event::{Change, Kind};
 
 /// The version of Allomos's section that this Allomos writes. Raise it whenever the section's
 /// wording changes, so projects with the older wording are asked to renew it.
@@ -212,12 +213,19 @@ pub struct Step {
 }
 
 /// The upgrade steps this Allomos knows, oldest first.
-pub const STEPS: &[Step] = &[Step {
-    // 1 → 2 (Task-A03-06): the handoff template, project notes and `handoffs/`. The handoff rules
-    // in `project.json` are optional, so nothing is added there.
-    from: 1,
-    apply: crate::handoff::add_missing_files,
-}];
+pub const STEPS: &[Step] = &[
+    Step {
+        // 1 → 2 (Task-A03-06): the handoff template, project notes and `handoffs/`. The handoff
+        // rules in `project.json` are optional, so nothing is added there.
+        from: 1,
+        apply: crate::handoff::add_missing_files,
+    },
+    Step {
+        // 2 → 3 (Task-A01-17): the `events/` folder. The upgrade's own event starts the history.
+        from: 2,
+        apply: crate::events::add_folder,
+    },
+];
 
 /// What `alm upgrade` did.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -228,13 +236,20 @@ pub struct Upgraded {
     pub changed: bool,
 }
 
-/// Bring the taskbag at `root` up to this Allomos's format, one step at a time. A newer taskbag
-/// is refused (`taskbag_newer`) and nothing is written.
-pub fn upgrade(root: &Path) -> Result<Upgraded, Problem> {
-    upgrade_with(root, STEPS, FORMAT_VERSION)
+/// Bring the taskbag at `root` up to this Allomos's format, one step at a time, as `actor`. A
+/// newer taskbag is refused (`taskbag_newer`) and nothing is written. An upgrade that changed
+/// something is recorded as an event; for a taskbag that had no `events/` yet, that event is
+/// where its history starts.
+pub fn upgrade(root: &Path, actor: Actor) -> Result<Upgraded, Problem> {
+    upgrade_with(root, STEPS, FORMAT_VERSION, actor)
 }
 
-fn upgrade_with(root: &Path, steps: &[Step], current: u32) -> Result<Upgraded, Problem> {
+fn upgrade_with(
+    root: &Path,
+    steps: &[Step],
+    current: u32,
+    actor: Actor,
+) -> Result<Upgraded, Problem> {
     let lock = Lock::acquire(root, LOCK_WAIT)?;
     let to = format!("allomos/{current}");
     let found = read_format(root).unwrap_or_default();
@@ -271,6 +286,19 @@ fn upgrade_with(root: &Path, steps: &[Step], current: u32) -> Result<Upgraded, P
         (step.apply)(lock.root()).map_err(write_failed)?;
         version += 1;
         set_format(&path, version)?;
+    }
+    if changed && current >= 3 {
+        let event = actor.event(
+            "upgrade",
+            Kind::Project,
+            None,
+            vec![Change {
+                field: "format".to_string(),
+                from: Some(found.clone().into()),
+                to: Some(to.clone().into()),
+            }],
+        );
+        crate::events::write(lock.root(), &event)?;
     }
     Ok(Upgraded {
         from: found,
@@ -524,24 +552,24 @@ mod tests {
     fn format_states() {
         let (_, root) = project("formats");
         assert_eq!(format_state(&root), FormatState::Current);
-        set_project_format(&root, "allomos/3");
+        set_project_format(&root, "allomos/4");
         assert_eq!(
             format_state(&root),
             FormatState::Newer {
-                found: "allomos/3".into()
+                found: "allomos/4".into()
             }
         );
         assert_eq!(
-            format_state_against(&root, 4),
+            format_state_against(&root, 5),
             FormatState::Older {
-                found: "allomos/3".into()
+                found: "allomos/4".into()
             }
         );
         set_project_format(&root, "fliphopper/1");
         assert_eq!(format_state(&root), FormatState::Unknown);
     }
 
-    /// A made-up step from 2 to 3, standing in for a later one: it adds a file with a default,
+    /// A made-up step from 3 to 4, standing in for a later one: it adds a file with a default,
     /// and leaves it alone when it is already there.
     fn add_template(root: &Path) -> io::Result<()> {
         let path = root.join("later.md");
@@ -551,7 +579,7 @@ mod tests {
         Ok(())
     }
     const TEST_STEPS: &[Step] = &[Step {
-        from: 2,
+        from: 3,
         apply: add_template,
     }];
 
@@ -561,12 +589,12 @@ mod tests {
         let before = load(&root).taskbag.unwrap();
         let project_before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
 
-        let done = upgrade_with(&root, TEST_STEPS, 3).unwrap();
+        let done = upgrade_with(&root, TEST_STEPS, 4, Actor::APP).unwrap();
         assert_eq!(
             done,
             Upgraded {
-                from: "allomos/2".into(),
-                to: "allomos/3".into(),
+                from: "allomos/3".into(),
+                to: "allomos/4".into(),
                 changed: true
             }
         );
@@ -574,21 +602,28 @@ mod tests {
         let project_after = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
             project_after,
-            project_before.replace("\"allomos/2\"", "\"allomos/3\""),
+            project_before.replace("\"allomos/3\"", "\"allomos/4\""),
             "only the format line changes"
         );
-        assert_eq!(format_state_against(&root, 3), FormatState::Current);
+        assert_eq!(format_state_against(&root, 4), FormatState::Current);
+        // The upgrade is recorded (Task-A01-17).
+        let (events, _) = crate::events::list(&root);
+        let last = events.last().unwrap();
+        assert_eq!(last.command, "upgrade");
+        assert_eq!(last.changes[0].to, Some("allomos/4".into()));
 
         // Upgrading again changes nothing.
-        let again = upgrade_with(&root, TEST_STEPS, 3).unwrap();
+        let again = upgrade_with(&root, TEST_STEPS, 4, Actor::APP).unwrap();
         assert!(!again.changed);
         assert_eq!(
             fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
             project_after
         );
 
-        // Every task is as it was (read back as allomos/2, the format this build knows).
-        set_project_format(&root, "allomos/2");
+        assert_eq!(crate::events::list(&root).0.len(), events.len());
+
+        // Every task is as it was (read back as allomos/3, the format this build knows).
+        set_project_format(&root, "allomos/3");
         assert_eq!(load(&root).taskbag.unwrap().tasks, before.tasks);
     }
 
@@ -597,13 +632,15 @@ mod tests {
         let (_, root) = project("refused");
         let text = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
-            upgrade_with(&root, &[], 3).unwrap_err().code(),
+            upgrade_with(&root, &[], 4, Actor::APP).unwrap_err().code(),
             "upgrade_missing"
         );
-        set_project_format(&root, "allomos/4");
+        set_project_format(&root, "allomos/5");
         let newer = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
-            upgrade_with(&root, TEST_STEPS, 3).unwrap_err().code(),
+            upgrade_with(&root, TEST_STEPS, 4, Actor::APP)
+                .unwrap_err()
+                .code(),
             "taskbag_newer"
         );
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), newer);
@@ -665,12 +702,13 @@ mod tests {
     }
 
     #[test]
-    fn the_real_upgrade_from_1_adds_the_handoff_files() {
+    fn the_real_upgrade_from_1_adds_the_handoff_files_and_events() {
         let (_, root) = project("from-1");
         for f in ["handoff-template.md", "project-notes.md", "handoffs/.keep"] {
             fs::remove_file(root.join(f)).unwrap();
         }
         fs::remove_dir(root.join("handoffs")).unwrap();
+        fs::remove_dir_all(root.join("events")).unwrap();
         set_project_format(&root, "allomos/1");
         let before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
@@ -679,10 +717,10 @@ mod tests {
                 found: "allomos/1".into()
             }
         );
-        let done = upgrade(&root).unwrap();
+        let done = upgrade(&root, Actor::APP).unwrap();
         assert_eq!(
             (done.from.as_str(), done.to.as_str(), done.changed),
-            ("allomos/1", "allomos/2", true)
+            ("allomos/1", "allomos/3", true)
         );
         assert_eq!(
             crate::handoff::template(&root),
@@ -691,15 +729,25 @@ mod tests {
         assert!(root.join("project-notes.md").is_file() && root.join("handoffs/.keep").is_file());
         assert_eq!(
             fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
-            before.replace("\"allomos/1\"", "\"allomos/2\"")
+            before.replace("\"allomos/1\"", "\"allomos/3\"")
         );
         assert!(load(&root).issues.is_empty());
+        // The history starts with the upgrade: no earlier change is invented (Task-A01-17).
+        assert!(root.join("events/.keep").is_file());
+        let (events, issues) = crate::events::list(&root);
+        assert!(issues.is_empty());
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].command, "upgrade");
+        assert_eq!(events[0].changes[0].from, Some("allomos/1".into()));
+        let h = crate::events::history(&root, "A1-01");
+        assert_eq!(h.since.as_deref(), Some(events[0].at.as_str()));
+        assert!(h.events.is_empty());
     }
 
     #[test]
     fn upgrading_a_current_taskbag_does_nothing() {
         let (_, root) = project("current");
-        let done = upgrade(&root).unwrap();
+        let done = upgrade(&root, Actor::APP).unwrap();
         assert!(!done.changed);
         assert_eq!(done.to, FORMAT);
     }

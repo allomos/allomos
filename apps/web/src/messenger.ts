@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings } from "./types";
+import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -84,6 +84,8 @@ export interface Messenger {
   setHandoffTemplate(root: string, text: string): Promise<HandoffSettings>;
   /** Every handoff, newest first. */
   listHandoffs(root: string): Promise<Handoff[]>;
+  /** One task's recorded changes, newest first (Task-A01-17). */
+  taskHistory(root: string, id: string): Promise<TaskHistory>;
   /** Writes a new handoff by a person. Rejects with a Problem. */
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
@@ -159,6 +161,7 @@ export const desktopMessenger: Messenger = {
     }),
   setHandoffTemplate: (root, text) => invoke<HandoffSettings>("set_handoff_template", { root, text }),
   listHandoffs: (root) => invoke<Handoff[]>("list_handoffs", { root }),
+  taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),

@@ -192,6 +192,12 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     }
 }
 
+/// One event file (`events/<name>.json`, Task-A01-17). Unknown fields are refused, like
+/// everywhere else, so a mistyped name is caught.
+pub fn parse_event(file: &str, text: &str) -> Result<crate::event::Event, Issue> {
+    parse(file, text)
+}
+
 pub fn parse_area(file: &str, text: &str) -> Result<Area, Vec<Issue>> {
     let area: Area = parse(file, text).map_err(|i| vec![i])?;
     let mut issues = Vec::new();
@@ -371,7 +377,7 @@ pub fn validate_taskbag(
 mod tests {
     use super::*;
 
-    const PROJECT: &str = r#"{"format":"allomos/2","id":"demo","name":"Demo"}"#;
+    const PROJECT: &str = r#"{"format":"allomos/3","id":"demo","name":"Demo"}"#;
 
     fn project() -> Project {
         parse_project("project.json", PROJECT).unwrap()
@@ -386,7 +392,7 @@ mod tests {
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/3","id":"d","name":"D","later":{"context":90}}"#,
+            r#"{"format":"allomos/4","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);
@@ -398,7 +404,7 @@ mod tests {
     fn handoff_gates_must_be_percentages() {
         let ok = parse_project(
             "project.json",
-            r#"{"format":"allomos/2","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
+            r#"{"format":"allomos/3","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
         )
         .unwrap();
         let rules = ok.handoff.unwrap();
@@ -412,7 +418,7 @@ mod tests {
         assert_eq!(rules.applied(Some("codexy")).context_gate, 90);
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/2","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
+            r#"{"format":"allomos/3","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
         )
         .unwrap_err();
         assert_eq!(err[0].problem.code(), "invalid_percent");

@@ -39,6 +39,30 @@ export interface Task {
   description: string;
 }
 
+/** One field's change in an event (crates/core/src/event.rs). A missing side was empty. */
+export interface FieldChange {
+  field: string;
+  from?: unknown;
+  to?: unknown;
+}
+
+/** One recorded change (Task-A01-17). */
+export interface TaskEvent {
+  at: string;
+  by?: string;
+  via: string;
+  command: string;
+  kind: "task" | "area" | "iteration" | "project";
+  id?: string;
+  changes: FieldChange[];
+}
+
+/** A task's history: newest first, and when the taskbag started recording (null: not yet). */
+export interface TaskHistory {
+  since: string | null;
+  events: TaskEvent[];
+}
+
 /** A problem from Rust: a code the interface words in the chosen language (see i18n/codes.json). */
 export interface Problem {
   code: string;
