@@ -54,7 +54,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | `"allomos/3"` for this version (`"allomos/2"` before events, A01-17; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
+| `format` | yes | `"allomos/3"` for this version (`"allomos/2"` before events, A01-17, and a task's `finished_without_owner`, A03-15; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `alm labels`. |
@@ -154,6 +154,7 @@ An **iteration** is *when* tasks are planned: a time-box that ends in a release 
 | `next_dependency` | no | The single thing needed for the next label. |
 | `iteration` | no | ID of an existing iteration the task is planned in. Without it the task is unplanned. |
 | `handoff_note` | no | A short note left by the last holder on release (`alm release --note`) for whoever picks the task up next. Each release replaces it, or removes it when no note is given. |
+| `finished_without_owner` | no (`allomos/3`) | Why the task was finished without the owner's check, and in which run (an automatic or loop run): written only by `alm done <id> --without-owner "<text>"`; empty text is refused (`without_owner_missing`). It stays when the task is later labelled at the top step, so such tasks remain searchable (`alm list --without-owner`); the owner's check shows in the label. `alm` records what the agent says; it does not check whether the run was automatic ([`Task-A03-15`](../tasks/Task-A03-15-done-rule-instead-of-warning.md)). |
 
 Empty optional fields are left out rather than written as `null`. **Unknown fields are refused**, so mistyped names are caught.
 
@@ -188,12 +189,12 @@ Each problem names the **file** and, where it can, the **field**, with a plain e
 
 Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md). Allomos reads `format` before anything else in `project.json`, because a newer taskbag may have fields this Allomos does not know.
 
-- **Newer** than this Allomos (`allomos/2` read by an Allomos that writes `allomos/1`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
+- **Newer** than this Allomos (`allomos/3` read by an Allomos that writes `allomos/2`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
 - **Older**: `alm` refuses every command that works on the taskbag with `taskbag_older`, telling the agent to run `alm upgrade` and then repeat the command. The app shows **Update the taskbag…**.
-- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). Steps: `allomos/1` → `allomos/2` adds `handoff-template.md`, `project-notes.md` and `handoffs/` (the rules in `project.json` are optional); `allomos/2` → `allomos/3` adds `events/` ([§ Events](#events-allomos3)). An upgrade that changed something is recorded as an `upgrade` event.
+- **`alm upgrade`** goes one step at a time (`crates/store/src/versions.rs`, `STEPS`); each step adds only what the newer format has, with its defaults, and the only other change is the `format` line. A step that is missing changes nothing (`upgrade_missing`). Steps: `allomos/1` → `allomos/2` adds `handoff-template.md`, `project-notes.md` and `handoffs/` (the rules in `project.json` are optional); `allomos/2` → `allomos/3` adds `events/` ([§ Events](#events-allomos3)); a task's `finished_without_owner` (A03-15), also new in `allomos/3`, is optional, so nothing is added for it (older Allomos builds would refuse it as an unknown field). An upgrade that changed something is recorded as an `upgrade` event.
 - **Allomos never upgrades by itself** (owner, 2026-10-12): the running AI agent does, with `alm upgrade`, when `alm` or the app's request tells it to.
 
-Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v2)` (v2: the handoff lines, A03-06). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
+Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v3)` (v2: the handoff lines, A03-06; v3: the rule for finishing a task and `alm next` listing every free ready task, A03-15). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
 
 ## Not yet in this version
 

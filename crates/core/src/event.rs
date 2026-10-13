@@ -62,6 +62,7 @@ pub const TASK_FIELDS: &[&str] = &[
     "waiting_on",
     "next_dependency",
     "handoff_note",
+    "finished_without_owner",
     "description",
 ];
 
@@ -128,6 +129,7 @@ mod tests {
             next_dependency: None,
             iteration: None,
             handoff_note: None,
+            finished_without_owner: None,
             description: String::new(),
         }
     }

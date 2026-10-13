@@ -274,6 +274,17 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
     if task.title.trim().is_empty() {
         issues.push(Issue::new(file, Some("title"), Problem::TaskTitleMissing));
     }
+    if task
+        .finished_without_owner
+        .as_ref()
+        .is_some_and(|t| t.trim().is_empty())
+    {
+        issues.push(Issue::new(
+            file,
+            Some("finished_without_owner"),
+            Problem::WithoutOwnerMissing,
+        ));
+    }
     if issues.is_empty() {
         Ok(task)
     } else {
@@ -493,6 +504,23 @@ mod tests {
         let err = parse_area("a.json", r#"{"id":"A1","name":"X","colour":"red"}"#).unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("colour"));
         assert_eq!(err[0].problem, Problem::FieldUnknown);
+    }
+
+    #[test]
+    fn a_task_finished_without_the_owner_carries_its_note() {
+        let t = parse_task(
+            "t.json",
+            r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
+        )
+        .unwrap();
+        assert_eq!(t.finished_without_owner.as_deref(), Some("card run"));
+        let err = parse_task(
+            "t.json",
+            r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":" "}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err[0].field.as_deref(), Some("finished_without_owner"));
+        assert_eq!(err[0].problem, Problem::WithoutOwnerMissing);
     }
 
     #[test]

@@ -20,7 +20,8 @@ use allomos_core::event::{Change, Kind};
 /// wording changes, so projects with the older wording are asked to renew it.
 ///
 /// 2: the handoff lines (Task-A03-06).
-pub const SECTION_VERSION: u32 = 2;
+/// 3: the rule for finishing a task, and `alm next` listing every free ready task (Task-A03-15).
+pub const SECTION_VERSION: u32 = 3;
 
 /// How long `alm upgrade` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -221,7 +222,8 @@ pub const STEPS: &[Step] = &[
         apply: crate::handoff::add_missing_files,
     },
     Step {
-        // 2 → 3 (Task-A01-17): the `events/` folder. The upgrade's own event starts the history.
+        // 2 → 3 (Task-A01-17): the `events/` folder; the upgrade's own event starts the history.
+        // A task's `finished_without_owner` (Task-A03-15), also new in 3, is optional: nothing to add.
         from: 2,
         apply: crate::events::add_folder,
     },
@@ -720,7 +722,7 @@ mod tests {
         let done = upgrade(&root, Actor::APP).unwrap();
         assert_eq!(
             (done.from.as_str(), done.to.as_str(), done.changed),
-            ("allomos/1", "allomos/3", true)
+            ("allomos/1", FORMAT, true)
         );
         assert_eq!(
             crate::handoff::template(&root),
@@ -729,7 +731,7 @@ mod tests {
         assert!(root.join("project-notes.md").is_file() && root.join("handoffs/.keep").is_file());
         assert_eq!(
             fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
-            before.replace("\"allomos/1\"", "\"allomos/3\"")
+            before.replace("\"allomos/1\"", &format!("\"{FORMAT}\""))
         );
         assert!(load(&root).issues.is_empty());
         // The history starts with the upgrade: no earlier change is invented (Task-A01-17).
@@ -742,6 +744,31 @@ mod tests {
         let h = crate::events::history(&root, "A1-01");
         assert_eq!(h.since.as_deref(), Some(events[0].at.as_str()));
         assert!(h.events.is_empty());
+    }
+
+    #[test]
+    fn the_real_upgrade_from_2_adds_events() {
+        let (_, root) = project("from-2");
+        fs::remove_dir_all(root.join("events")).unwrap();
+        set_project_format(&root, "allomos/2");
+        let before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+        let done = upgrade(&root, Actor::APP).unwrap();
+        assert_eq!(
+            (done.from.as_str(), done.to.as_str(), done.changed),
+            ("allomos/2", "allomos/3", true)
+        );
+        assert_eq!(
+            fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
+            before.replace("\"allomos/2\"", "\"allomos/3\"")
+        );
+        let after = load(&root);
+        assert!(after.issues.is_empty());
+        assert_eq!(after.taskbag.unwrap().tasks.len(), 1);
+        // `events/` and the upgrade event that starts the history (Task-A01-17).
+        assert!(root.join("events/.keep").is_file());
+        let (events, _) = crate::events::list(&root);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].command, "upgrade");
     }
 
     #[test]

@@ -322,6 +322,7 @@ pub fn new_task(
         next_dependency: None,
         iteration: None,
         handoff_note: None,
+        finished_without_owner: None,
         description,
     })
 }
@@ -383,23 +384,26 @@ pub fn wait(taskbag: &Taskbag, id: &str, me: Option<&str>, on: &str) -> Result<O
     Ok(Outcome::plain(task))
 }
 
-/// Finish the task. Allowed below the top label, with a warning (owner, 2026-10-06).
-pub fn finish(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+/// Finish the task. `alm` does not judge whether it is really finished: the agent is given the
+/// rule before it finishes (Task-A03-15). `without_owner` records why a task is finished without
+/// the owner's check (an automatic or loop run); empty text is refused. A note already on the task
+/// is kept when none is given.
+pub fn finish(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    without_owner: Option<&str>,
+) -> Result<Outcome, Problem> {
     let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Dropped])?;
-    let mut warnings = Vec::new();
-    if let Some(top) = taskbag.project.labels.last() {
-        if task.label.as_ref() != Some(top) {
-            warnings.push(Problem::LabelBelowTop {
-                label: task.label.clone().unwrap_or_else(|| "none".to_string()),
-                top: top.clone(),
-            });
-        }
+    if let Some(text) = without_owner {
+        task.finished_without_owner =
+            Some(non_empty(Some(text)).ok_or(Problem::WithoutOwnerMissing)?);
     }
     task.state = State::Done;
     task.waiting_on = None;
-    Ok(Outcome { task, warnings })
+    Ok(Outcome::plain(task))
 }
 
 /// Let go of the task. A task `in_progress` goes back to `ready`. The handoff note is
@@ -495,8 +499,17 @@ pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcom
     Ok(Outcome::plain(task))
 }
 
-/// The first task that is `ready` and held by no one: by area order, then area ID, then task ID.
-pub fn next(taskbag: &Taskbag) -> Option<&Task> {
+/// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14):
+/// earliest iteration first (unplanned tasks last), then area order, then ID. With an
+/// iteration, only the tasks planned in it; an iteration that does not exist is refused.
+pub fn next<'a>(taskbag: &'a Taskbag, iteration: Option<&str>) -> Result<Vec<&'a Task>, Problem> {
+    if let Some(i) = iteration {
+        if !taskbag.iterations.iter().any(|x| x.id == i) {
+            return Err(Problem::UnknownIteration {
+                iteration: i.to_string(),
+            });
+        }
+    }
     let area_rank = |area: &str| {
         taskbag
             .areas
@@ -504,15 +517,25 @@ pub fn next(taskbag: &Taskbag) -> Option<&Task> {
             .position(|a| a.id == area)
             .unwrap_or(usize::MAX)
     };
-    taskbag
+    let iteration_rank = |t: &Task| {
+        t.iteration
+            .as_ref()
+            .and_then(|i| taskbag.iterations.iter().position(|x| &x.id == i))
+            .unwrap_or(usize::MAX)
+    };
+    let mut tasks: Vec<&Task> = taskbag
         .tasks
         .iter()
         .filter(|t| t.state == State::Ready && t.holder.is_none())
-        .min_by(|a, b| {
-            area_rank(&a.area)
-                .cmp(&area_rank(&b.area))
-                .then(a.id.cmp(&b.id))
-        })
+        .filter(|t| iteration.is_none_or(|i| t.iteration.as_deref() == Some(i)))
+        .collect();
+    tasks.sort_by(|a, b| {
+        iteration_rank(a)
+            .cmp(&iteration_rank(b))
+            .then(area_rank(&a.area).cmp(&area_rank(&b.area)))
+            .then(a.id.cmp(&b.id))
+    });
+    Ok(tasks)
 }
 
 #[cfg(test)]
@@ -707,7 +730,7 @@ mod tests {
                 previous: "a".into()
             }]
         );
-        let done = finish(&s, "A01-01", Some("a")).unwrap().task;
+        let done = finish(&s, "A01-01", Some("a"), None).unwrap().task;
         put!(s, done);
         assert_eq!(
             claim(&s, "A01-01", Some("a"), false),
@@ -838,21 +861,35 @@ mod tests {
         assert_eq!(r.state, State::Ready);
         assert_eq!(r.handoff_note, None);
 
-        let d = finish(&s, "A01-01", Some("b")).unwrap();
+        // Below the top step: finished with no warning; `alm` does not judge (Task-A03-15).
+        let d = finish(&s, "A01-01", Some("b"), None).unwrap();
         assert_eq!(d.task.state, State::Done);
+        assert!(d.warnings.is_empty());
+        assert_eq!(d.task.finished_without_owner, None);
+        // Finished without the owner's check: the note is written; empty text is refused.
         assert_eq!(
-            d.warnings,
-            vec![Problem::LabelBelowTop {
-                label: "implemented".into(),
-                top: "owner verified".into()
-            }]
+            finish(&s, "A01-01", Some("b"), Some("  ")).unwrap_err(),
+            Problem::WithoutOwnerMissing
         );
-        // At the top step, and unheld: anyone may finish it, with no warning.
+        let d = finish(&s, "A01-01", Some("b"), Some("card run, owner away"))
+            .unwrap()
+            .task;
+        assert_eq!(
+            d.finished_without_owner.as_deref(),
+            Some("card run, owner away")
+        );
+        put!(s, d);
+        // Labelled owner verified later and unheld: anyone may finish it, the note is kept.
         let mut top = find_task(&s, "A01-01").unwrap();
         top.label = Some("owner verified".into());
         top.holder = None;
         put!(s, top);
-        assert!(finish(&s, "A01-01", None).unwrap().warnings.is_empty());
+        let d = finish(&s, "A01-01", None, None).unwrap();
+        assert!(d.warnings.is_empty());
+        assert_eq!(
+            d.task.finished_without_owner.as_deref(),
+            Some("card run, owner away")
+        );
     }
 
     #[test]
@@ -907,7 +944,7 @@ mod tests {
 
         // Planning works whoever holds the task, and on finished tasks too.
         put!(s, claim(&s, "A01-01", Some("a"), false).unwrap().task);
-        put!(s, finish(&s, "A01-01", Some("a")).unwrap().task);
+        put!(s, finish(&s, "A01-01", Some("a"), None).unwrap().task);
         let t = plan(&s, "A01-01", Some("I01")).unwrap().task;
         assert_eq!(t.iteration.as_deref(), Some("I01"));
         put!(s, t);
@@ -926,17 +963,24 @@ mod tests {
     }
 
     #[test]
-    fn next_picks_first_free_ready_task_by_area_then_id() {
+    fn next_lists_free_ready_tasks_by_iteration_area_then_id() {
         let mut s = bag();
-        assert_eq!(next(&s), None);
+        assert!(next(&s, None).unwrap().is_empty());
         for id in ["A01-02", "A01-01", "A02-01"] {
             let mut t = find_task(&s, id).unwrap();
             t.state = State::Ready;
             put!(s, t);
         }
+        let ids = |s: &Taskbag, i: Option<&str>| -> Vec<String> {
+            next(s, i).unwrap().iter().map(|t| t.id.clone()).collect()
+        };
         // A02 has the lower order, so it comes first.
-        assert_eq!(next(&s).unwrap().id, "A02-01");
+        assert_eq!(ids(&s, None), ["A02-01", "A01-01", "A01-02"]);
         put!(s, claim(&s, "A02-01", Some("a"), false).unwrap().task);
-        assert_eq!(next(&s).unwrap().id, "A01-01");
+        assert_eq!(ids(&s, None), ["A01-01", "A01-02"]);
+        assert!(matches!(
+            next(&s, Some("I09")),
+            Err(Problem::UnknownIteration { .. })
+        ));
     }
 }

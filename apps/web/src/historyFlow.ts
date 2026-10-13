@@ -14,6 +14,7 @@ const FIELD_KEYS: Record<string, Key> = {
   waiting_on: "pane.waiting_on",
   next_dependency: "pane.next",
   handoff_note: "pane.handoff",
+  finished_without_owner: "pane.finished_without_owner",
   description: "pane.description",
 };
 

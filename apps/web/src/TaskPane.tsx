@@ -55,6 +55,7 @@ export function TaskPane({
     [t("pane.waiting_on"), task.waiting_on],
     [t("pane.next"), task.next_dependency],
     [t("pane.handoff"), task.handoff_note],
+    [t("pane.finished_without_owner"), task.finished_without_owner],
   ];
 
   return (
