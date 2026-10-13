@@ -1,6 +1,6 @@
 # Task-A01-29-rename-delete-areas-iterations
 
-*Card type: coding. Area A01 (Tracking), not yet planned in an iteration. Written 2026-10-14 at the owner's request, split out of [`A01-19`](./Task-A01-19-create-in-app.md) (creating them in the app).*
+*Card type: coding. Area A01 (Tracking), Iteration 2. Written 2026-10-14 at the owner's request, split out of [`A01-19`](./Task-A01-19-create-in-app.md) (creating them in the app).*
 
 ## What gets built (plain words)
 
@@ -23,7 +23,7 @@ After [`A01-19`](./Task-A01-19-create-in-app.md) the owner can create areas and 
   - Decided (owner, 2026-10-14): deleting an area or an iteration is refused unless it has no tasks. These two refusals are checks inside `alm`, approved by the owner here.
   - Decided (owner, 2026-10-14): command names `alm rename area <id> "<name>"`, `alm change iteration <id> [--name] [--release] [--start] [--end]`, `alm delete area <id>`, `alm delete iteration <id>`.
   - Decided (owner, 2026-10-14): a done or dropped task counts as "in" its area or iteration, so history never points at one that is gone.
-  - Open: which iteration it is planned in (owner).
+  - Decided (owner, 2026-10-14): planned in Iteration 2 (I02).
 - **Files owned.** `crates/core/src/ops.rs`, `crates/cli`, `apps/web/src/App.tsx` (or a new component), `apps/web/src/messenger.ts`, `apps/web/src/types.ts`, `apps/web/src/i18n/*`, `apps/desktop/src-tauri/src/lib.rs`, the `alm` guide text for the new commands, tests, this card.
 - **External operations.** None.
 - **Done means mechanically.**
@@ -42,3 +42,4 @@ After [`A01-19`](./Task-A01-19-create-in-app.md) the owner can create areas and 
 
 - 2026-10-14 — Card written by the agent. Next: the owner approves the card (`ready`) and picks its iteration; it starts after A01-19.
 - 2026-10-14 — Owner approved the card; ready. Starts after A01-19; iteration still to be picked.
+- 2026-10-14 — Owner planned it in I02.
