@@ -14,7 +14,7 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
 | Mac installer package | `Allomos_<version>_aarch64.pkg`: double-click, enter the Mac password once; it puts Allomos in Applications and makes `alm` work in every new terminal | a build script under `apps/desktop/scripts/`, `.github/workflows/release.yml` |
 | The app offers `alm` | When `alm` is missing from the terminal, or is not the app's own one, the app offers **Install the alm command** (asks for the Mac password); so a `.dmg` install, or an old `alm` from `cargo install`, is fixed with one click | `apps/desktop/src-tauri/src/`, `apps/web/src/` (three languages) |
 
-**How `alm` is made available:** a link `/usr/local/bin/alm` → `/Applications/Allomos.app/Contents/MacOS/alm`. `/usr/local/bin` is on every Mac terminal's PATH. Because it is a link, updating the app updates `alm` too; they can never drift apart.
+**How `alm` is made available:** a link `/usr/local/bin/alm` → `/Applications/Allomos.app/Contents/MacOS/alm`. `/usr/local/bin` is on every Mac terminal's PATH. Because it is a link, updating the app updates `alm` too; they can never drift apart. *Decided (owner, 2026-10-13): this way.*
 
 **What you can see at the end:** on a Mac without `alm`, open the `.pkg`, install, open a new Terminal, and `alm --version` answers with the app's version. Or install from the `.dmg`, start Allomos, click **Install the alm command**, and the same works.
 
@@ -40,4 +40,5 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-13 | `alm` made available as a link `/usr/local/bin/alm` → the app's own `alm` | owner (chat) |
 | 2026-10-13 | The idea: a Mac package installing app and `alm`; both a `.pkg` and the app offering to install `alm` (card not yet approved to start) | owner (chat) |
