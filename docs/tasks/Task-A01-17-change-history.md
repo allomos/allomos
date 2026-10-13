@@ -34,6 +34,7 @@ Today Allomos keeps only each task's *current* fields; nobody can see who change
 |---|---|---|
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
 | 2026-10-13 | Card approved ("approve"), with the two recommendations: one event file per change, named by time and a random suffix; no history invented for changes made before this card | owner (chat) |
+| 2026-10-14 | History checked in the app ("looks good"); merge into `main`, upgrade Allomos's own taskbag to `allomos/3` and reinstall `alm` ("go") | owner (chat) |
 
 ## Notes
 
@@ -54,4 +55,4 @@ Today Allomos keeps only each task's *current* fields; nobody can see who change
 | Every changing `alm` command writes exactly one event; refused and no-op changes write none | PASS: `every_change_writes_exactly_one_event_and_a_refusal_none` |
 | Two taskbag copies with different events merge in Git without a conflict | PASS: `two_copies_with_different_events_merge_without_conflict` |
 | An older taskbag without `events/` still opens, is upgraded, and its history starts then | PASS: `an_older_taskbag_without_events_is_upgraded_and_history_starts_then`, `the_real_upgrade_from_1_adds_the_handoff_files_and_events` |
-| In the built app, a task changed with `alm` shows those changes under History | NOT RUN by the agent (screen access declined, 2026-10-13): owner check. App built at `target/debug/bundle/macos/Allomos.app` in the worktree; test project `~/allomos-tests/a01-17-history/` (task A01-01 changed five times). |
+| In the built app, a task changed with `alm` shows those changes under History | PASS: owner checked A01-01 in `~/allomos-tests/a01-17-history/` with the branch's build ("looks good", 2026-10-14). The agent did not look (screen access declined). |
