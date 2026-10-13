@@ -76,6 +76,14 @@ export interface NewIteration {
   end: string | null;
 }
 
+/** What the Edit form of an iteration sends (Task-A01-29): every field; an empty release or date clears it. */
+export interface IterationChange {
+  name: string;
+  release: string;
+  start: string;
+  end: string;
+}
+
 /** The IDs the New forms suggest, each the next free one, worked out in Rust (Task-A01-19). */
 export interface NextIds {
   area: string;

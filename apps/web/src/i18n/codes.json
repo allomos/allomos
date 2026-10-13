@@ -3,6 +3,10 @@
     "agent"
   ],
   "area_name_missing": [],
+  "area_not_empty": [
+    "id",
+    "count"
+  ],
   "bad_usage": [
     "detail"
   ],
@@ -69,6 +73,10 @@
     "value"
   ],
   "iteration_name_missing": [],
+  "iteration_not_empty": [
+    "id",
+    "count"
+  ],
   "label_not_on_ladder": [
     "label",
     "ladder"

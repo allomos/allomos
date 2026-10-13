@@ -16,6 +16,8 @@ import { useFold } from "./useFold";
 import { TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import type { Creating } from "./createFlow";
+import { GroupEditForm } from "./GroupEditForm";
+import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
@@ -728,6 +730,8 @@ type Group = {
   tasks: Task[];
   /** Where a new task added in this group goes; none for tasks with an unknown area. */
   newTask?: { area: string | null; iteration: string | null };
+  /** The area or iteration this group is, for its Edit form (Task-A01-29); none for Unplanned and unknown areas. */
+  edit?: Editing;
 };
 
 function TaskbagView({
@@ -791,6 +795,7 @@ function TaskbagView({
         empty: t("iteration.no_tasks"),
         tasks: box.tasks.filter((task) => task.iteration === it.id),
         newTask: { area: null, iteration: it.id },
+        edit: { kind: "iteration", id: it.id },
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
@@ -806,6 +811,7 @@ function TaskbagView({
         empty: t("area.no_tasks"),
         tasks: box.tasks.filter((task) => task.area === area.id),
         newTask: { area: area.id, iteration: null },
+        edit: { kind: "area", id: area.id },
       });
     }
     const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
@@ -926,6 +932,47 @@ function TaskbagView({
         onClose={() => setCreating(null)}
       />
     );
+  // Renaming, changing and deleting areas and iterations (Task-A01-29): one Edit form open at a
+  // time, in its group; opening it closes a New form, and the other way round.
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const startCreating = (c: Creating) => {
+    setEditing(null);
+    setCreating(c);
+  };
+  const startEditing = (e: Editing) => {
+    setCreating(null);
+    setEditing(e);
+  };
+  const saveGroup = async (e: Editing, draft: GroupDraft) => {
+    if (e.kind === "area") await messenger.renameArea(opened.root, e.id, draft.name.trim());
+    else await messenger.changeIteration(opened.root, e.id, toIterationChange(draft));
+    setEditing(null);
+    await onReload().catch(() => undefined);
+  };
+  const deleteGroup = async (e: Editing) => {
+    if (e.kind === "area") await messenger.deleteArea(opened.root, e.id);
+    else await messenger.deleteIteration(opened.root, e.id);
+    setEditing(null);
+    await onReload().catch(() => undefined);
+  };
+  const editForm = (e: Editing) => {
+    const item = e.kind === "area" ? box?.areas.find((a) => a.id === e.id) : iterations.find((i) => i.id === e.id);
+    return (
+      item && (
+        <GroupEditForm
+          key={`${e.kind}-${e.id}`}
+          editing={e}
+          item={item}
+          ownerName={ownerName}
+          onSaveName={saveOwnerName}
+          onSave={(draft) => saveGroup(e, draft)}
+          onDelete={() => deleteGroup(e)}
+          onClose={() => setEditing(null)}
+        />
+      )
+    );
+  };
+  const editingIn = (g: Group) => (g.edit && editing?.kind === g.edit.kind && editing.id === g.edit.id ? editing : null);
   // Which group's New task form is open, if any.
   const creatingIn = (key: string) => (creating?.kind === "task" && creating.group === key ? creating : null);
 
@@ -1006,10 +1053,12 @@ function TaskbagView({
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
                   onNewTask={
                     g.newTask && box.areas.length > 0
-                      ? () => setCreating({ kind: "task", group: g.key, area: g.newTask!.area, iteration: g.newTask!.iteration })
+                      ? () => startCreating({ kind: "task", group: g.key, area: g.newTask!.area, iteration: g.newTask!.iteration })
                       : undefined
                   }
                   form={creatingIn(g.key) && createForm(creatingIn(g.key)!)}
+                  onEdit={g.edit && (() => startEditing(g.edit!))}
+                  editForm={editingIn(g) && editForm(editingIn(g)!)}
                 />
               ))}
               {groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
@@ -1020,7 +1069,7 @@ function TaskbagView({
                 createForm(creating)
               ) : (
                 <p className="add-group">
-                  <button type="button" className="link small" onClick={() => setCreating({ kind: groupBy === "iteration" ? "iteration" : "area" })}>
+                  <button type="button" className="link small" onClick={() => startCreating({ kind: groupBy === "iteration" ? "iteration" : "area" })}>
                     {t(groupBy === "iteration" ? "create.new_iteration_button" : "create.new_area_button")}
                   </button>
                 </p>
@@ -1137,6 +1186,8 @@ function TaskGroup({
   onToggle,
   onNewTask,
   form,
+  onEdit,
+  editForm,
 }: {
   id: string;
   name: string;
@@ -1155,6 +1206,10 @@ function TaskGroup({
   onNewTask?: () => void;
   /** The New task form, when it is open in this group. */
   form?: ReactNode;
+  /** Opens this area's or iteration's Edit form (Task-A01-29); not given for Unplanned or an unknown area. */
+  onEdit?: () => void;
+  /** The Edit form, when it is open in this group. */
+  editForm?: ReactNode;
 }) {
   const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
@@ -1172,12 +1227,22 @@ function TaskGroup({
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
-        {onNewTask && !form && (
-          <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
-            {t("create.new_task_button")}
-          </button>
+        {((onNewTask && !form) || (onEdit && !editForm)) && (
+          <span className="group-actions">
+            {onNewTask && !form && (
+              <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
+                {t("create.new_task_button")}
+              </button>
+            )}
+            {onEdit && !editForm && (
+              <button type="button" className="link small" onClick={onEdit} aria-label={t("group_edit.edit_aria", { group: name })}>
+                {t("group_edit.edit_button")}
+              </button>
+            )}
+          </span>
         )}
       </header>
+      {editForm}
       {form}
       {collapsed ? null : tasks.length === 0 ? (
         <p className="muted small">{empty}</p>

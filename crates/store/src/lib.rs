@@ -1033,6 +1033,28 @@ impl Lock {
         create_dir_atomic(&target, &files)
     }
 
+    /// Rewrite an existing area's file (`alm rename area`, Task-A01-29).
+    pub fn save_area(&self, area: &Area) -> Result<(), Problem> {
+        let path = self.root.join("areas").join(format!("{}.json", area.id));
+        write_atomic(&path, &json_text(area))
+    }
+
+    /// Rewrite an existing iteration's file (`alm change iteration`, Task-A01-29).
+    pub fn save_iteration(&self, iteration: &Iteration) -> Result<(), Problem> {
+        let path = self
+            .root
+            .join("iterations")
+            .join(format!("{}.json", iteration.id));
+        write_atomic(&path, &json_text(iteration))
+    }
+
+    /// Remove an area's or an iteration's file (`alm delete area|iteration`, Task-A01-29).
+    /// `folder` is `areas` or `iterations`.
+    pub fn remove_item(&self, folder: &str, id: &str) -> Result<(), Problem> {
+        let path = self.root.join(folder).join(format!("{id}.json"));
+        fs::remove_file(&path).map_err(|e| write_failed(&path, e))
+    }
+
     /// Rewrite `project.json` (`alm labels`).
     pub fn save_project(&self, project: &Project) -> Result<(), Problem> {
         write_atomic(&self.root.join(PROJECT_FILE), &json_text(project))
@@ -1128,8 +1150,9 @@ fn lock_for_change(root: &Path, wait: Duration) -> Result<(Lock, Taskbag, Vec<Is
     Ok((lock, bag, issues))
 }
 
-/// Something added by [`add_area`], [`add_iteration`] or [`add_task`], with the problems found in
-/// the taskbag's files while loading it.
+/// Something added by [`add_area`], [`add_iteration`] or [`add_task`] (or renamed, changed or
+/// deleted by [`rename_area`], [`change_iteration`], [`delete_area`], [`delete_iteration`]), with
+/// the problems found in the taskbag's files while loading it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Added<T> {
     pub item: T,
@@ -1179,6 +1202,99 @@ pub fn add_iteration(
         event::changes(None, &iteration, &[]),
     );
     lock.record(&event, |l| l.create_iteration(&iteration))?;
+    Ok(Added {
+        item: iteration,
+        issues,
+    })
+}
+
+/// An area renamed, the same way for `alm rename area` and the app (Task-A01-29): under the lock,
+/// by the `crates/core` rule, recorded as one `rename area` event. Its ID stays.
+pub fn rename_area(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    name: &str,
+) -> Result<Added<Area>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let area = ops::rename_area(&bag, id, name)?;
+    let before = bag.areas.iter().find(|a| a.id == area.id);
+    let event = actor.event(
+        "rename area",
+        Kind::Area,
+        Some(&area.id),
+        event::changes(before, &area, &[]),
+    );
+    lock.record(&event, |l| l.save_area(&area))?;
+    Ok(Added { item: area, issues })
+}
+
+/// An iteration changed (name, release, dates), the same way for `alm change iteration` and the
+/// app (Task-A01-29): under the lock, by the `crates/core` rule, recorded as one
+/// `change iteration` event. A change that changes nothing writes no event.
+pub fn change_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    change: &ops::IterationChange,
+) -> Result<Added<Iteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let iteration = ops::change_iteration(&bag, id, change)?;
+    let before = bag.iterations.iter().find(|i| i.id == iteration.id);
+    let event = actor.event(
+        "change iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::changes(before, &iteration, &[]),
+    );
+    lock.record(&event, |l| l.save_iteration(&iteration))?;
+    Ok(Added {
+        item: iteration,
+        issues,
+    })
+}
+
+/// An area deleted, the same way for `alm delete area` and the app (Task-A01-29): refused while
+/// any task is in it (done and dropped ones too); otherwise its file is removed under the lock,
+/// recorded as one `delete area` event listing what it had. Returns the area as it was.
+pub fn delete_area(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Added<Area>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let area = ops::delete_area(&bag, id)?;
+    let event = actor.event(
+        "delete area",
+        Kind::Area,
+        Some(&area.id),
+        event::removed(&area, &[]),
+    );
+    lock.record(&event, |l| l.remove_item("areas", &area.id))?;
+    Ok(Added { item: area, issues })
+}
+
+/// An iteration deleted, the same way for `alm delete iteration` and the app (Task-A01-29):
+/// refused while any task is planned in it (done and dropped ones too); otherwise its file is
+/// removed under the lock, recorded as one `delete iteration` event. Returns it as it was.
+pub fn delete_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Added<Iteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let iteration = ops::delete_iteration(&bag, id)?;
+    let event = actor.event(
+        "delete iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::removed(&iteration, &[]),
+    );
+    lock.record(&event, |l| l.remove_item("iterations", &iteration.id))?;
     Ok(Added {
         item: iteration,
         issues,

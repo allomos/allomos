@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, NextIds } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, IterationChange, NextIds } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -107,6 +107,16 @@ export interface Messenger {
   addArea(root: string, id: string | null, name: string): Promise<Area>;
   addIteration(root: string, iteration: NewIteration): Promise<Iteration>;
   addTask(root: string, task: NewTask): Promise<Task>;
+  /**
+   * Renames an area, changes an iteration, or deletes either (Task-A01-29), under the saved name,
+   * by the same rule as `alm rename area`, `alm change iteration` and `alm delete`, under the
+   * taskbag's lock, recorded in its history. A delete is refused while any task is in it, done and
+   * dropped ones too. Rejects with the same Problem `alm` gives, and then nothing changed.
+   */
+  renameArea(root: string, id: string, name: string): Promise<Area>;
+  changeIteration(root: string, id: string, change: IterationChange): Promise<Iteration>;
+  deleteArea(root: string, id: string): Promise<void>;
+  deleteIteration(root: string, id: string): Promise<void>;
   /** Writes a new handoff by a person. Rejects with a Problem. */
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
@@ -199,6 +209,10 @@ export const desktopMessenger: Messenger = {
   addArea: (root, id, name) => invoke<Area>("add_area", { root, id, name }),
   addIteration: (root, iteration) => invoke<Iteration>("add_iteration", { root, iteration }),
   addTask: (root, task) => invoke<Task>("add_task", { root, task }),
+  renameArea: (root, id, name) => invoke<Area>("rename_area", { root, id, name }),
+  changeIteration: (root, id, change) => invoke<Iteration>("change_iteration", { root, id, change }),
+  deleteArea: (root, id) => invoke<void>("delete_area", { root, id }),
+  deleteIteration: (root, id) => invoke<void>("delete_iteration", { root, id }),
   writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),

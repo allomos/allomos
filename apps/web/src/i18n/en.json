@@ -296,5 +296,18 @@
   "create.release": "Release",
   "create.start": "First day",
   "create.end": "Last day",
-  "create.add": "Add"
+  "create.add": "Add",
+  "group_edit.edit_button": "Edit",
+  "group_edit.edit_aria": "Edit {group}",
+  "group_edit.edit_area": "Edit area {id}",
+  "group_edit.edit_iteration": "Edit iteration {id}",
+  "group_edit.id_stays": "The ID {id} stays the same.",
+  "group_edit.delete": "Delete…",
+  "group_edit.delete_area_confirm": "Delete area {id}? This works only when no task is in it, counting done and dropped ones.",
+  "group_edit.delete_iteration_confirm": "Delete iteration {id}? This works only when no task is planned in it, counting done and dropped ones.",
+  "group_edit.delete_yes": "Delete",
+  "group_edit.deleting": "Deleting…",
+  "group_edit.keep": "Keep it",
+  "problem.area_not_empty": "The area \"{id}\" cannot be deleted: {count} task(s) are in it, counting done and dropped ones. An area can be deleted only when no task is in it.",
+  "problem.iteration_not_empty": "The iteration \"{id}\" cannot be deleted: {count} task(s) are planned in it, counting done and dropped ones. Plan them in another iteration, or take them out of it, first."
 }

@@ -89,6 +89,10 @@ problems! {
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";
+    /// `alm delete area` while a task, even a done or dropped one, is in the area (owner, 2026-10-14; Task-A01-29).
+    AreaNotEmpty { id, count } => "area_not_empty", "The area \"{id}\" cannot be deleted: {count} task(s) are in it, counting done and dropped ones. An area can be deleted only when no task is in it.";
+    /// `alm delete iteration` while a task, even a done or dropped one, is planned in it (owner, 2026-10-14; Task-A01-29).
+    IterationNotEmpty { id, count } => "iteration_not_empty", "The iteration \"{id}\" cannot be deleted: {count} task(s) are planned in it, counting done and dropped ones. Plan them in another iteration (`alm plan <task> <iteration>`) or take them out (`alm plan <task>`) first.";
     InvalidDate { value } => "invalid_date", "\"{value}\" is not a date. Write it as YYYY-MM-DD, for example 2026-10-08.";
     /// The file exists but could not be read. `detail` is the system's own text.
     ReadFailed { detail } => "read_failed", "Could not read this file: {detail}.";

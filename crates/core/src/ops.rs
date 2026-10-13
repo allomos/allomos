@@ -291,10 +291,7 @@ pub fn new_iteration(
         return Err(Problem::DuplicateIterationId { id: id.to_string() });
     }
     let name = non_empty(Some(name)).ok_or(Problem::IterationNameMissing)?;
-    let date = |d: Option<&str>| match non_empty(d) {
-        Some(d) if !valid_date(&d) => Err(Problem::InvalidDate { value: d }),
-        d => Ok(d),
-    };
+    let date = optional_date;
     let order = taskbag
         .iterations
         .iter()
@@ -310,6 +307,115 @@ pub fn new_iteration(
         end: date(details.end)?,
         release: non_empty(details.release),
     })
+}
+
+/// `YYYY-MM-DD`, or empty; the same check as a new iteration's dates.
+fn optional_date(d: Option<&str>) -> Result<Option<String>, Problem> {
+    match non_empty(d) {
+        Some(d) if !valid_date(&d) => Err(Problem::InvalidDate { value: d }),
+        d => Ok(d),
+    }
+}
+
+fn find_area(taskbag: &Taskbag, id: &str) -> Result<Area, Problem> {
+    taskbag
+        .areas
+        .iter()
+        .find(|a| a.id == id)
+        .cloned()
+        .ok_or_else(|| Problem::UnknownArea {
+            area: id.to_string(),
+        })
+}
+
+fn find_iteration(taskbag: &Taskbag, id: &str) -> Result<Iteration, Problem> {
+    taskbag
+        .iterations
+        .iter()
+        .find(|i| i.id == id)
+        .cloned()
+        .ok_or_else(|| Problem::UnknownIteration {
+            iteration: id.to_string(),
+        })
+}
+
+/// The area with a new name (`alm rename area`, Task-A01-29). Its ID and order stay; an empty
+/// name is refused.
+pub fn rename_area(taskbag: &Taskbag, id: &str, name: &str) -> Result<Area, Problem> {
+    let mut area = find_area(taskbag, id)?;
+    area.name = non_empty(Some(name)).ok_or(Problem::AreaNameMissing)?;
+    Ok(area)
+}
+
+/// What `alm change iteration` changes (Task-A01-29). A field left out (`None`) stays as it is;
+/// an empty release or date clears it. The name cannot be emptied.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IterationChange {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub release: Option<String>,
+    #[serde(default)]
+    pub start: Option<String>,
+    #[serde(default)]
+    pub end: Option<String>,
+}
+
+/// The iteration with `change` applied (`alm change iteration`, Task-A01-29). Its ID and order
+/// stay; dates are checked as `alm add iteration` checks them.
+pub fn change_iteration(
+    taskbag: &Taskbag,
+    id: &str,
+    change: &IterationChange,
+) -> Result<Iteration, Problem> {
+    let mut iteration = find_iteration(taskbag, id)?;
+    if let Some(name) = &change.name {
+        iteration.name = non_empty(Some(name)).ok_or(Problem::IterationNameMissing)?;
+    }
+    if let Some(release) = &change.release {
+        iteration.release = non_empty(Some(release));
+    }
+    if let Some(start) = &change.start {
+        iteration.start = optional_date(Some(start))?;
+    }
+    if let Some(end) = &change.end {
+        iteration.end = optional_date(Some(end))?;
+    }
+    Ok(iteration)
+}
+
+/// The area to delete (`alm delete area`, Task-A01-29). Refused while any task is in it, done
+/// and dropped ones included, so history never points at an area that is gone (owner,
+/// 2026-10-14).
+pub fn delete_area(taskbag: &Taskbag, id: &str) -> Result<Area, Problem> {
+    let area = find_area(taskbag, id)?;
+    let count = taskbag.tasks.iter().filter(|t| t.area == id).count();
+    if count > 0 {
+        return Err(Problem::AreaNotEmpty {
+            id: id.to_string(),
+            count: count.to_string(),
+        });
+    }
+    Ok(area)
+}
+
+/// The iteration to delete (`alm delete iteration`, Task-A01-29). Refused while any task is
+/// planned in it, done and dropped ones included (owner, 2026-10-14).
+pub fn delete_iteration(taskbag: &Taskbag, id: &str) -> Result<Iteration, Problem> {
+    let iteration = find_iteration(taskbag, id)?;
+    let count = taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.iteration.as_deref() == Some(id))
+        .count();
+    if count > 0 {
+        return Err(Problem::IterationNotEmpty {
+            id: id.to_string(),
+            count: count.to_string(),
+        });
+    }
+    Ok(iteration)
 }
 
 /// Plan the task in an iteration, or take it out of its iteration with `None`. Planning is not
@@ -1137,6 +1243,103 @@ mod tests {
         assert!(matches!(
             plan(&s, "nope", None),
             Err(Problem::TaskNotFound { .. })
+        ));
+    }
+
+    #[test]
+    fn areas_and_iterations_are_renamed_changed_and_deleted_only_when_empty() {
+        let mut s = bag();
+        let a = rename_area(&s, "A01", "  Tracking ").unwrap();
+        assert_eq!(
+            (a.id.as_str(), a.name.as_str(), a.order),
+            ("A01", "Tracking", 2)
+        );
+        assert_eq!(rename_area(&s, "A01", " "), Err(Problem::AreaNameMissing));
+        assert_eq!(
+            rename_area(&s, "A09", "x"),
+            Err(Problem::UnknownArea { area: "A09".into() })
+        );
+
+        let details = IterationDetails {
+            release: Some("v0.1"),
+            start: Some("2026-10-01"),
+            end: Some("2026-10-10"),
+        };
+        s.iterations
+            .push(new_iteration(&s, "I01", "One", details).unwrap());
+        // Only what is given changes; an empty release or date clears it.
+        let it = change_iteration(
+            &s,
+            "I01",
+            &IterationChange {
+                end: Some("2026-10-20".into()),
+                release: Some(String::new()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                it.name.as_str(),
+                it.start.as_deref(),
+                it.end.as_deref(),
+                it.release.as_deref(),
+                it.order
+            ),
+            ("One", Some("2026-10-01"), Some("2026-10-20"), None, 1)
+        );
+        let bad = |c: IterationChange| change_iteration(&s, "I01", &c);
+        assert_eq!(
+            bad(IterationChange {
+                start: Some("1/10/2026".into()),
+                ..Default::default()
+            }),
+            Err(Problem::InvalidDate {
+                value: "1/10/2026".into()
+            })
+        );
+        assert_eq!(
+            bad(IterationChange {
+                name: Some("".into()),
+                ..Default::default()
+            }),
+            Err(Problem::IterationNameMissing)
+        );
+        assert_eq!(
+            change_iteration(&s, "I09", &IterationChange::default()),
+            Err(Problem::UnknownIteration {
+                iteration: "I09".into()
+            })
+        );
+
+        // Deleting: refused while any task is in it, a dropped one included.
+        assert_eq!(
+            delete_area(&s, "A01"),
+            Err(Problem::AreaNotEmpty {
+                id: "A01".into(),
+                count: "2".into()
+            })
+        );
+        put!(s, drop_task(&s, "A02-01", None).unwrap().task);
+        assert!(matches!(
+            delete_area(&s, "A02"),
+            Err(Problem::AreaNotEmpty { .. })
+        ));
+        assert_eq!(delete_iteration(&s, "I01").unwrap().id, "I01");
+        put!(s, plan(&s, "A02-01", Some("I01")).unwrap().task);
+        assert_eq!(
+            delete_iteration(&s, "I01"),
+            Err(Problem::IterationNotEmpty {
+                id: "I01".into(),
+                count: "1".into()
+            })
+        );
+        s.tasks.retain(|t| t.area != "A02");
+        assert_eq!(delete_area(&s, "A02").unwrap().id, "A02");
+        assert_eq!(delete_iteration(&s, "I01").unwrap().id, "I01");
+        assert!(matches!(
+            delete_area(&s, "A09"),
+            Err(Problem::UnknownArea { .. })
         ));
     }
 
