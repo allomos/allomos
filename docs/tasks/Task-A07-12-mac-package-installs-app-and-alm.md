@@ -25,12 +25,14 @@ After this card, both ways of installing on a Mac bring `alm` (owner's choice, 2
   - The `.pkg` is unsigned, like the `.dmg` (right-click › Open the first time); signing is a separate card.
   - Whether Tauri can place an extra program inside `Contents/MacOS` (`bundle.macOS.files` or `externalBin`), or the build script copies it in: found by building.
   - The app's offer needs administrator rights for `/usr/local/bin` (macOS password prompt via `osascript … with administrator privileges`). If `/usr/local/bin` is missing (some new Apple Silicon Macs), the installer and the offer create it.
-  - What "not the app's own one" means: `alm` on the PATH is not the link above, or reports a different version. The offer only proposes; the person decides, and can dismiss it.
+  - **The app never replaces `alm` by itself** (owner asked, 2026-10-13). It does not copy `alm` out; it only makes the link, and only when the person clicks. At start it finds one of three cases: the link to the app's own `alm` is there → nothing to do (updating the app updates `alm`); no `alm` → offer; another `alm` found first (not the link, or a different version) → offer, naming the one found.
+  - A real file (not a link) already at `/usr/local/bin/alm` is never overwritten without the person's yes, naming that file.
+  - An `alm` earlier on the PATH (such as `~/.cargo/bin/alm`) still wins after the link is made, so the offer explains that and has **Don't ask again** (remembered in Allomos's per-user settings), so it does not come back at every start.
   - This Mac's own `~/.cargo/bin/alm` (development) comes before `/usr/local/bin` on the PATH; development keeps using `cargo install` (CODING_RULES says so).
 - **Files owned.** The files in the table; `docs/workflow/CODING_RULES.md` (how `alm` is installed on a Mac); `docs/guide/` "Get the app" (three languages); this card.
 - **External operations** (each needs the owner's exact approval, recorded below): merging the workflow change into `main`; a release run that attaches the `.pkg` to a release page. Local builds and handing the files to the owner need none.
 - **Done means mechanically.**
-  - Tests: the app's check that tells whether `alm` is missing, foreign or the app's own (unit tests over the three cases).
+  - Tests: the app's check that tells whether `alm` is missing, foreign or the app's own (unit tests over the three cases, plus a real file at `/usr/local/bin/alm` and "Don't ask again").
   - A local build produces the `.pkg` and a `.dmg` whose `Allomos.app` contains `alm`.
   - Checked by hand by the owner: on this Mac (with `~/.cargo/bin/alm` moved aside), the `.pkg` gives a working `alm` in a new Terminal; with `/usr/local/bin/alm` removed, the app offers to install it and the click works.
 
