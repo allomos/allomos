@@ -1,0 +1,97 @@
+# Builds Allomos for macOS (Apple Silicon) and Windows when a version tag is pushed, and attaches
+# the unsigned installers and alm to that version's GitHub release (Task-A07-11).
+# The tag must match the app's version: tag v0.2.0 needs "version": "0.2.0" in tauri.conf.json
+# and Cargo.toml. The Mac script apps/desktop/scripts/build-windows.sh stays as a backup.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'An existing version tag to build again, e.g. v0.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - id: version
+        name: Check that the tag matches the app's version
+        run: |
+          app=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "v$app" != "$TAG" ] || [ "$app" != "$cargo" ]; then
+            echo "::error::Tag $TAG, tauri.conf.json $app and Cargo.toml $cargo must name the same version."
+            exit 1
+          fi
+          echo "version=$app" >> "$GITHUB_OUTPUT"
+      - name: Create the release if it does not exist yet
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 ||
+            gh release create "$TAG" --verify-tag --title "Allomos $TAG" \
+              --notes "Unsigned builds. macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.dmg. Windows: Allomos_${TAG#v}_x64-setup.exe. How to install: https://mypals-ml.github.io/allomos/start/getting-started/"
+
+  macos:
+    needs: release
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: npm --prefix apps/web ci && npm --prefix apps/desktop ci
+      # signingIdentity "-" signs the app ad hoc (no Apple certificate): Apple Silicon Macs refuse
+      # to open an app that is not signed at all. GitHub sets CI=true, which makes Tauri skip
+      # arranging the .dmg window through Finder (on a Mac outside CI, run it with CI=true).
+      - run: npm --prefix apps/desktop run tauri build -- --bundles dmg --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+      - run: cargo build --release -p allomos-cli --bin alm
+      - name: Attach to the release
+        run: |
+          v=${{ needs.release.outputs.version }}
+          tar -czf "alm_${v}_macos_arm64.tar.gz" -C target/release alm
+          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg "alm_${v}_macos_arm64.tar.gz"
+
+  windows:
+    needs: release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: npm --prefix apps/web ci && npm --prefix apps/desktop ci
+      # alm first: the installer carries it (tauri.windows.conf.json, Task-A07-06), under the name
+      # Tauri expects for a bundled program.
+      - run: cargo build --release -p allomos-cli --bin alm
+      - run: |
+          mkdir -p apps/desktop/src-tauri/binaries
+          cp target/release/alm.exe apps/desktop/src-tauri/binaries/alm-x86_64-pc-windows-msvc.exe
+      - run: npm --prefix apps/desktop run tauri build -- --bundles nsis
+      - name: Attach to the release
+        run: |
+          v=${{ needs.release.outputs.version }}
+          cp target/release/alm.exe "alm_${v}_windows_x64.exe"
+          gh release upload "$TAG" --clobber target/release/bundle/nsis/*-setup.exe "alm_${v}_windows_x64.exe"

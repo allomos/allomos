@@ -9,7 +9,17 @@ sidebar:
 
 ## 1. 获取应用
 
-Allomos 0.1 运行在 macOS 上；Windows 版将在 0.2 推出。目前还没有下载：以后会出现在[发布页](https://github.com/mypals-ml/allomos/releases)。在那之前，需要从源代码运行应用（[开发者说明](https://github.com/mypals-ml/allomos/blob/main/docs/workflow/CODING_RULES.md#running-the-app)）。
+从[发布页](https://github.com/mypals-ml/allomos/releases/latest)下载最新版本：
+
+- **macOS**（Apple 芯片的 Mac：M1 或更新）：`Allomos_<版本>_aarch64.dmg`。打开它，把 Allomos 拖进“应用程序”。
+- **Windows**：`Allomos_<版本>_x64-setup.exe`。运行它即可；不需要管理员权限，它也会安装 `alm` 命令。
+
+在 1.0 版之前，这些下载还没有签名，所以第一次打开 Allomos 时系统会提醒你：
+
+- **macOS** 会说无法检查 Allomos 是否含有恶意软件。选择 **完成**，打开 **系统设置 › 隐私与安全性**，向下滚动，在 Allomos 旁边选择 **仍要打开**。
+- **Windows** 会显示“Windows 已保护你的电脑”。选择 **更多信息**，再选择 **仍要运行**。
+
+在 macOS 上，`alm` 命令要另外下载：`alm_<版本>_macos_arm64.tar.gz`。打开它，把 `alm` 移到 PATH 里的某个文件夹，例如 `/usr/local/bin`。
 
 ## 2. 开始
 
