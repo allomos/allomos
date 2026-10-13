@@ -305,6 +305,54 @@ pub fn write(
     })
 }
 
+/// Remove a handoff whose work is finished (`alm handoff --remove`, Task-A03-13). `file` is its
+/// name as `alm handoffs` prints it (`handoffs/<name>.md`) or just `<name>.md`. The file is
+/// deleted; Git history keeps it (owner, 2026-10-13).
+pub fn remove(root: &Path, file: &str) -> Result<Handoff, Problem> {
+    let name = file.trim();
+    let name = name
+        .strip_prefix(&format!("{HANDOFFS_DIR}/"))
+        .unwrap_or(name);
+    let missing = || Problem::HandoffNotFound {
+        file: file.to_string(),
+    };
+    if name.is_empty()
+        || name.contains(['/', '\\'])
+        || name.starts_with('.')
+        || !name.ends_with(".md")
+    {
+        return Err(missing());
+    }
+    let lock = Lock::acquire(root, LOCK_WAIT)?;
+    let path = lock.root().join(HANDOFFS_DIR).join(name);
+    let text = fs::read_to_string(&path).map_err(|_| missing())?;
+    fs::remove_file(&path).map_err(|e| write_failed(&path, e))?;
+    Ok(parse(&format!("{HANDOFFS_DIR}/{name}"), &text))
+}
+
+/// What finishing a task means for one handoff that names it (Task-A03-13).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Followup {
+    pub file: String,
+    pub tasks: Vec<String>,
+    /// Its tasks not yet done or dropped; empty when the handoff can be removed.
+    pub unfinished: Vec<String>,
+}
+
+/// Every handoff that names `task`, with which of its tasks are still unfinished. `finished` says
+/// whether a task ID is done or dropped (a task no longer in the taskbag counts as finished).
+pub fn followups(root: &Path, task: &str, finished: impl Fn(&str) -> bool) -> Vec<Followup> {
+    list(root)
+        .into_iter()
+        .filter(|h| h.tasks.iter().any(|t| t == task))
+        .map(|h| Followup {
+            unfinished: h.tasks.iter().filter(|t| !finished(t)).cloned().collect(),
+            file: h.file,
+            tasks: h.tasks,
+        })
+        .collect()
+}
+
 /// `handoffs/<base>.md`, or `<base>-2.md`, … when that is taken.
 fn free_name(root: &Path, base: &str) -> String {
     let mut n = 1;
@@ -459,6 +507,61 @@ mod tests {
                 .code(),
             "holder_missing"
         );
+    }
+
+    #[test]
+    fn a_finished_handoff_is_removed_and_others_stay() {
+        let root = tmp("remove");
+        init(&root, "p", "P").unwrap();
+        let known = vec!["A1-01".to_string(), "A1-02".to_string()];
+        let both = write(&root, "claude/both", Some(&known), None, &known, false).unwrap();
+        write(&root, "codex/one", Some(&known[..1]), None, &known, false).unwrap();
+        write(&root, "codex/none", None, None, &known, false).unwrap();
+
+        // A1-01 finished, A1-02 not: one handoff can go, the other still has work.
+        let f = followups(&root, "A1-01", |t| t == "A1-01");
+        assert_eq!(f.len(), 2);
+        let of = |file: &str| {
+            f.iter()
+                .find(|x| x.file == file)
+                .unwrap()
+                .unfinished
+                .clone()
+        };
+        assert_eq!(of(&both.handoff.file), vec!["A1-02".to_string()]);
+        assert!(
+            f.iter()
+                .any(|x| x.tasks == ["A1-01"] && x.unfinished.is_empty())
+        );
+        assert!(followups(&root, "A9-99", |_| true).is_empty());
+
+        // Removed by its listed name or its bare name; then it is gone from the list.
+        let gone = remove(&root, &both.handoff.file).unwrap();
+        assert_eq!(gone.writer, "claude/both");
+        assert!(!both.path.exists());
+        assert_eq!(list(&root).len(), 2);
+        let name = list(&root)[0]
+            .file
+            .trim_start_matches("handoffs/")
+            .to_string();
+        remove(&root, &name).unwrap();
+        assert_eq!(list(&root).len(), 1);
+
+        // Missing files and anything outside handoffs/ are refused.
+        for bad in [
+            &both.handoff.file[..],
+            "../project.json",
+            "handoffs/.keep",
+            "x.json",
+            "",
+        ] {
+            assert_eq!(
+                remove(&root, bad).unwrap_err().code(),
+                "handoff_not_found",
+                "{bad}"
+            );
+        }
+        assert!(root.join("project.json").is_file());
     }
 
     #[test]

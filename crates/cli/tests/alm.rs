@@ -1168,3 +1168,78 @@ fn the_template_can_be_shown_and_replaced() {
         "template_empty",
     );
 }
+
+#[test]
+fn done_says_what_to_do_with_each_handoff_that_names_the_task() {
+    let repo = filled();
+    // No handoff names A02-01: done prints the task and nothing more.
+    ok(&repo, &["--as", "a", "claim", "A02-01"]);
+    let v = ok(&repo, &["--as", "a", "done", "A02-01"]);
+    assert!(v.get("handoffs").is_none(), "{v}");
+    ok(&repo, &["--as", "b", "claim", "A01-01"]);
+    let out = alm(&repo, &["--as", "b", "done", "A01-01"]);
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap().lines().count(),
+        1,
+        "no handoff lines"
+    );
+
+    // One handoff covers A01-02 and the finished A02-01; another A01-02 and the open A01-03.
+    ok(
+        &repo,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Sort"],
+    );
+    let all = ok(
+        &repo,
+        &["handoff", "--as", "claude/all", "--tasks", "A01-02,A02-01"],
+    );
+    let all_file = all["handoff"]["file"].as_str().unwrap().to_string();
+    let left = ok(
+        &repo,
+        &["handoff", "--as", "codex/left", "--tasks", "A01-02,A01-03"],
+    );
+    let left_file = left["handoff"]["file"].as_str().unwrap().to_string();
+
+    ok(&repo, &["--as", "c", "claim", "A01-02"]);
+    let v = ok(&repo, &["--as", "c", "done", "A01-02"]);
+    let hs = v["handoffs"].as_array().unwrap();
+    assert_eq!(hs.len(), 2, "{v}");
+    let of = |file: &str| hs.iter().find(|h| h["file"] == file).unwrap().clone();
+    let remove = format!("alm handoff --remove {all_file} --push");
+    assert_eq!(of(&all_file)["action"], "remove");
+    assert_eq!(of(&all_file)["unfinished"], json!([]));
+    assert_eq!(of(&all_file)["command"], remove);
+    assert_eq!(of(&left_file)["action"], "keep");
+    assert_eq!(of(&left_file)["unfinished"], json!(["A01-03"]));
+    assert!(of(&left_file).get("command").is_none());
+
+    // The same in words for people: finishing A01-03 leaves nothing open in the second one.
+    ok(&repo, &["--as", "d", "claim", "A01-03"]);
+    let text = String::from_utf8(alm(&repo, &["--as", "d", "done", "A01-03"]).stdout).unwrap();
+    assert!(text.contains(&format!("Handoff {left_file}: all its tasks are finished; remove it: `alm handoff --remove {left_file} --push`")), "{text}");
+
+    // Removing: by the name alm printed; then it is no longer listed, and the taskbag is sound.
+    let v = ok(&repo, &["handoff", "--remove", &all_file]);
+    assert_eq!(v["removed"]["writer"], "claude/all");
+    let names: Vec<Value> = ok(&repo, &["handoffs"])["handoffs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| h["file"].clone())
+        .collect();
+    assert_eq!(names, vec![json!(left_file)]);
+    assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
+    refused(
+        &repo,
+        &["handoff", "--remove", &all_file],
+        1,
+        "handoff_not_found",
+    );
+    refused(
+        &repo,
+        &["handoff", "--remove", "../project.json"],
+        1,
+        "handoff_not_found",
+    );
+    assert!(repo.join(".allomos/taskbag/project.json").is_file());
+}

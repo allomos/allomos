@@ -205,6 +205,7 @@
   "update.download": "Download the newest Allomos",
   "update.newer_title": "Please update Allomos",
   "problem.invalid_percent": "\"{value}\" is not a percentage. Use a whole number from 0 to 100.",
+  "problem.handoff_not_found": "There is no handoff \"{file}\". `alm handoffs` lists them.",
   "problem.template_empty": "The handoff template cannot be empty.",
   "group.handoffs": "Handoffs",
   "handoffs.title": "Handoffs",

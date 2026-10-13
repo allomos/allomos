@@ -101,7 +101,8 @@ Work a task:
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm wait <id> --on \"<what>\"`: state waiting.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id>`; `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
+- `alm done <id>`: it also says, for each handoff naming the task, whether to remove it (all its
+  tasks finished; it prints the command) or leave it; `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
 
 Plan:
 - `alm add area <id> \"<name>\"`, `alm add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`
@@ -119,6 +120,7 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
   `--from <file.md>`. It prints the file's path.
 - `alm handoffs [--task <id>] [--latest]`: handoffs, newest first. `alm next` and `alm show <id>`
   show a task's latest one.
+- `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (Git keeps it).
 - `alm handoff-template [--set <file.md>]`: show or replace the project's template.
 
 Ask the person:

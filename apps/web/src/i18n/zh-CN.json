@@ -205,6 +205,7 @@
   "update.download": "下载最新版「换肩」",
   "update.newer_title": "请更新「换肩」",
   "problem.invalid_percent": "“{value}”不是百分比。请填 0 到 100 之间的整数。",
+  "problem.handoff_not_found": "没有交接「{file}」。`alm handoffs` 可列出所有交接。",
   "problem.template_empty": "交接模板不能为空。",
   "group.handoffs": "交接",
   "handoffs.title": "交接",

@@ -225,6 +225,9 @@ enum Command {
         /// A Markdown file with the handoff's text.
         #[arg(long, value_name = "FILE")]
         from: Option<PathBuf>,
+        /// Remove this handoff (as `alm handoffs` names it) once all its tasks are finished.
+        #[arg(long, value_name = "FILE", conflicts_with_all = ["tasks", "from"])]
+        remove: Option<String>,
     },
     /// List handoffs, newest first.
     Handoffs {
@@ -970,7 +973,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text,
             ))
         }
-        Command::Handoff { tasks, from } => {
+        Command::Handoff {
+            remove: Some(file), ..
+        } => {
+            let root = locate(cli, cwd)?;
+            let gone = handoff::remove(&root, file)?;
+            Ok(Done::new(
+                json!({ "taskbag": root, "removed": handoff_brief(&gone) }),
+                format!("Removed the handoff {}.\n", gone.file),
+            ))
+        }
+        Command::Handoff { tasks, from, .. } => {
             let root = locate(cli, cwd)?;
             let me = me.ok_or(Problem::HolderMissing)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
@@ -1308,7 +1321,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Claim { id, take } => change(cli, cwd, |bag| ops::claim(bag, id, me, *take)),
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
         Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
-        Command::Done { id } => change(cli, cwd, |bag| ops::finish(bag, id, me)),
+        Command::Done { id } => {
+            let mut done = change(cli, cwd, |bag| ops::finish(bag, id, me))?;
+            followups(cli, cwd, id, &mut done)?;
+            Ok(done)
+        }
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;
@@ -1337,6 +1354,43 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             change(cli, cwd, |bag| ops::release(bag, id, me, note.as_deref()))
         }
     }
+}
+
+/// After `alm done`: what to do with each handoff that names the task (Task-A03-13). One whose
+/// tasks are all finished is to be removed with `alm handoff --remove`; one with work left stays.
+fn followups(cli: &Cli, cwd: &Path, id: &str, done: &mut Done) -> Result<(), Problem> {
+    let root = locate(cli, cwd)?;
+    let (bag, _) = taskbag_of(&root, load(&root))?;
+    let finished = |t: &str| {
+        bag.tasks
+            .iter()
+            .find(|x| x.id == t)
+            .is_none_or(|x| matches!(x.state, State::Done | State::Dropped))
+    };
+    let list = handoff::followups(&root, id, finished);
+    if list.is_empty() {
+        return Ok(());
+    }
+    let mut items = Vec::new();
+    for f in &list {
+        if f.unfinished.is_empty() {
+            let command = format!("alm handoff --remove {} --push", f.file);
+            done.text.push_str(&format!(
+                "Handoff {}: all its tasks are finished; remove it: `{command}`\n",
+                f.file
+            ));
+            items.push(json!({ "file": f.file, "tasks": f.tasks, "unfinished": f.unfinished, "action": "remove", "command": command }));
+        } else {
+            done.text.push_str(&format!(
+                "Handoff {}: {} not finished yet; leave it as it is.\n",
+                f.file,
+                f.unfinished.join(", ")
+            ));
+            items.push(json!({ "file": f.file, "tasks": f.tasks, "unfinished": f.unfinished, "action": "keep" }));
+        }
+    }
+    done.fields["handoffs"] = Value::Array(items);
+    Ok(())
 }
 
 /// One change to one task, under the taskbag's lock: load, apply the rule, write.
