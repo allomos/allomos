@@ -21,6 +21,9 @@ struct Settings {
     /// The person's name, asked once by the app; its task changes are recorded under it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     owner_name: Option<String>,
+    /// The person chose "Don't ask again" for **Install the alm command** (Task-A07-12).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    alm_offer_dismissed: bool,
 }
 
 /// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
@@ -66,15 +69,6 @@ fn read_settings() -> Settings {
         .unwrap_or_default()
 }
 
-fn write_settings(settings: &Settings) -> io::Result<()> {
-    let dir = settings_dir().ok_or_else(|| io::Error::other("no settings folder"))?;
-    fs::create_dir_all(&dir)?;
-    let text = serde_json::to_string_pretty(settings).map_err(io::Error::other)?;
-    let tmp = dir.join(format!("{SETTINGS_FILE}.tmp-{}", std::process::id()));
-    fs::write(&tmp, text + "\n")?;
-    fs::rename(tmp, dir.join(SETTINGS_FILE))
-}
-
 /// Save the app's interface language. Called by the app whenever its language is chosen.
 pub fn save_ui_language(language: &str) -> io::Result<()> {
     let mut settings = read_settings();
@@ -96,6 +90,27 @@ pub fn save_owner_name(name: &str) -> io::Result<()> {
 /// The person's name the app saved, if it has asked for it.
 pub fn saved_owner_name() -> Option<String> {
     read_settings().owner_name
+}
+
+/// Whether the person chose "Don't ask again" for **Install the alm command** (Task-A07-12).
+pub fn alm_offer_dismissed() -> bool {
+    read_settings().alm_offer_dismissed
+}
+
+/// Remember "Don't ask again" for **Install the alm command**.
+pub fn dismiss_alm_offer() -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.alm_offer_dismissed = true;
+    write_settings(&settings)
+}
+
+fn write_settings(settings: &Settings) -> io::Result<()> {
+    let dir = settings_dir().ok_or_else(|| io::Error::other("no settings folder"))?;
+    fs::create_dir_all(&dir)?;
+    let text = serde_json::to_string_pretty(settings).map_err(io::Error::other)?;
+    let tmp = dir.join(format!("{SETTINGS_FILE}.tmp-{}", std::process::id()));
+    fs::write(&tmp, text + "\n")?;
+    fs::rename(tmp, dir.join(SETTINGS_FILE))
 }
 
 /// The interface language the app last saved, if it has run on this computer.
@@ -211,6 +226,12 @@ mod tests {
         save_ui_language("zh-CN").unwrap();
         let l = task_language(&project(Some("ui")), &["ja-JP"]);
         assert_eq!((l.language.as_str(), l.source), ("zh-CN", "app"));
+
+        // "Don't ask again" for the alm command is kept beside the language (Task-A07-12).
+        assert!(!alm_offer_dismissed());
+        dismiss_alm_offer().unwrap();
+        assert!(alm_offer_dismissed());
+        assert_eq!(saved_ui_language().as_deref(), Some("zh-CN"));
 
         // A code in the taskbag wins.
         let l = task_language(&project(Some("fr")), &["ja-JP"]);

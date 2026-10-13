@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -100,6 +100,12 @@ export interface Messenger {
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
+  /** Whether to offer **Install the alm command** (Task-A07-12). */
+  almCommandStatus(): Promise<AlmStatus>;
+  /** Links the app's own `alm` into Terminal's path, asking for the Mac password. Rejects with a Problem. */
+  installAlmCommand(): Promise<AlmInstalled>;
+  /** "Don't ask again" for **Install the alm command**. */
+  dismissAlmOffer(): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
@@ -159,6 +165,9 @@ export const desktopMessenger: Messenger = {
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
+  almCommandStatus: () => invoke<AlmStatus>("alm_command_status"),
+  installAlmCommand: () => invoke<AlmInstalled>("install_alm_command"),
+  dismissAlmOffer: () => invoke<void>("dismiss_alm_offer"),
   handoffSettings: (root) => invoke<HandoffSettings>("handoff_settings", { root }),
   setHandoffRules: (root, c) =>
     invoke<HandoffSettings>("set_handoff_rules", {

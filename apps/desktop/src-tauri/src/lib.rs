@@ -5,6 +5,7 @@
 //! local server from a browser without changes.
 
 mod agents;
+mod alm_command;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -262,6 +263,52 @@ fn edit_task(
         &id,
         &edit,
     )
+}
+
+/// Whether to offer **Install the alm command** (Task-A07-12): only in a built Mac app whose own
+/// `alm` is not the one Terminal finds, unless the person chose "Don't ask again".
+#[tauri::command]
+async fn alm_command_status() -> alm_command::AlmStatus {
+    let bundled = alm_command::bundled();
+    if bundled.is_none() || allomos_store::alm_offer_dismissed() {
+        return alm_command::AlmStatus::default();
+    }
+    alm_command::decide(
+        bundled.as_deref(),
+        &alm_command::place(),
+        &alm_command::terminal(),
+        false,
+    )
+}
+
+/// Link `/usr/local/bin/alm` to the app's own `alm`, asking for the Mac password. Only when the
+/// person clicks. Returns the status afterwards; `cancelled` when the password dialog was closed.
+#[derive(Serialize)]
+struct AlmInstalled {
+    cancelled: bool,
+    status: alm_command::AlmStatus,
+}
+
+#[tauri::command]
+async fn install_alm_command() -> Result<AlmInstalled, Problem> {
+    let bundled = alm_command::bundled().ok_or_else(|| Problem::WriteFailed {
+        path: alm_command::LINK.to_string(),
+        detail: "this Allomos carries no alm".to_string(),
+    })?;
+    let done = alm_command::install(&bundled).map_err(|detail| Problem::WriteFailed {
+        path: alm_command::LINK.to_string(),
+        detail,
+    })?;
+    Ok(AlmInstalled {
+        cancelled: !done,
+        status: alm_command_status().await,
+    })
+}
+
+/// "Don't ask again" for **Install the alm command**.
+#[tauri::command]
+fn dismiss_alm_offer() {
+    let _ = allomos_store::dismiss_alm_offer();
 }
 
 /// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).
@@ -1077,7 +1124,10 @@ pub fn run() {
             answer_confirm_request,
             project_setup,
             set_project_folder,
-            set_connect_enabled
+            set_connect_enabled,
+            alm_command_status,
+            install_alm_command,
+            dismiss_alm_offer
         ])
         .run(tauri::generate_context!())
         .expect("error while running Allomos");

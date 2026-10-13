@@ -221,3 +221,19 @@ export interface InstructionFiles {
   agents_md: boolean;
   claude_md: boolean;
 }
+
+/** Whether to offer **Install the alm command** (apps/desktop/src-tauri/src/alm_command.rs, Task-A07-12). */
+export interface AlmStatus {
+  offer: boolean;
+  /** The `alm` Terminal finds now, when it is not the app's own. */
+  found: string | null;
+  /** A real file that installing would replace. */
+  replaces_file: string | null;
+  /** An `alm` Terminal finds first, which would still be used after installing. */
+  shadowed_by: string | null;
+}
+
+export interface AlmInstalled {
+  cancelled: boolean;
+  status: AlmStatus;
+}

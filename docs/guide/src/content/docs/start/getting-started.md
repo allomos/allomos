@@ -11,15 +11,15 @@ This page takes you from a first start to an AI agent working from your taskbag.
 
 Download the newest version from the [releases page](https://github.com/mypals-ml/allomos/releases/latest):
 
-- **macOS** (Apple Silicon Macs: M1 or newer): `Allomos_<version>_aarch64.dmg`. Open it and drag Allomos into Applications.
+- **macOS** (Apple Silicon Macs: M1 or newer): `Allomos_<version>_aarch64.pkg`. Open it and follow the installer; it asks for your Mac password once, puts Allomos in Applications and installs the `alm` command too. (Or `Allomos_<version>_aarch64.dmg`: open it and drag Allomos into Applications; Allomos then offers **Install the alm command**.)
 - **Windows**: `Allomos_<version>_x64-setup.exe`. Run it; it needs no administrator rights, and it installs the `alm` command too.
 
 Until version 1.0 these downloads are not signed, so the first time you open Allomos the system warns you:
 
-- **macOS** says it cannot check Allomos for malware. Choose **Done**, open **System Settings › Privacy & Security**, scroll down and choose **Open Anyway** next to Allomos.
+- **macOS** says it cannot check Allomos (or its installer) for malware. Choose **Done**, open **System Settings › Privacy & Security**, scroll down and choose **Open Anyway** next to Allomos.
 - **Windows** shows "Windows protected your PC". Choose **More info**, then **Run anyway**.
 
-On macOS the `alm` command is a separate download, `alm_<version>_macos_arm64.tar.gz`: open it and move `alm` into a folder on your PATH, such as `/usr/local/bin`.
+On macOS, `alm` is a link to the copy inside Allomos (`/usr/local/bin/alm`), so updating Allomos updates `alm` too. For a Mac without the app, `alm_<version>_macos_arm64.tar.gz` holds `alm` alone: open it and move `alm` into a folder on your PATH, such as `/usr/local/bin`.
 
 ## 2. Start
 
