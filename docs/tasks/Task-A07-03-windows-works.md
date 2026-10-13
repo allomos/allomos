@@ -33,8 +33,10 @@ Allomos was written and tested only on macOS. Windows differs in ways that commo
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Approve the card (state `ready`); it starts after A07-02. The manual Windows GitHub workflow still needs its own exact approval before it is added | owner (chat) |
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
 
 ## Notes
 
 - 2026-10-09 — Card written by the agent. Next: the owner approves the card (`ready`); it starts after A07-02.
+- 2026-10-14 — Owner approved the card. Next: A07-02 finishes; then claim this card.
