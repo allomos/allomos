@@ -1039,6 +1039,120 @@ fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
     assert!(!repo.join(".allomos/taskbag/iterations/I03.json").exists());
 }
 
+/// `alm rename area`, `alm change iteration`, `alm delete area|iteration` (Task-A01-29): each
+/// writes one event; a delete is refused while any task is in it, done and dropped ones too; a bad
+/// date has `alm add iteration`'s code.
+#[test]
+fn areas_and_iterations_are_renamed_changed_and_deleted() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    let events = || {
+        fs::read_dir(bag.join("events"))
+            .map(|d| d.count())
+            .unwrap_or(0)
+    };
+    ok(&repo, &["add", "area", "A03", "Spare"]);
+    ok(
+        &repo,
+        &["add", "iteration", "I01", "One", "--end", "2026-10-10"],
+    );
+    ok(&repo, &["add", "iteration", "I02", "Two"]);
+    let before = events();
+
+    let v = ok(&repo, &["rename", "area", "A01", "Tracking work"]);
+    assert_eq!(
+        (&v["command"], &v["area"]["id"], &v["area"]["name"]),
+        (
+            &json!("rename area"),
+            &json!("A01"),
+            &json!("Tracking work")
+        )
+    );
+    assert_eq!(events(), before + 1);
+
+    let v = ok(
+        &repo,
+        &[
+            "change",
+            "iteration",
+            "I01",
+            "--end",
+            "2026-10-20",
+            "--release",
+            "v0.1",
+        ],
+    );
+    assert_eq!(
+        (&v["iteration"]["end"], &v["iteration"]["release"]),
+        (&json!("2026-10-20"), &json!("v0.1"))
+    );
+    assert_eq!(events(), before + 2);
+    // An empty value clears it.
+    let v = ok(&repo, &["change", "iteration", "I01", "--release", ""]);
+    assert!(v["iteration"].get("release").is_none());
+    assert_eq!(events(), before + 3);
+
+    // Refusals: nothing written.
+    refused(
+        &repo,
+        &["change", "iteration", "I01", "--start", "soon"],
+        1,
+        "invalid_date",
+    );
+    refused(
+        &repo,
+        &["change", "iteration", "I09", "--name", "x"],
+        1,
+        "unknown_iteration",
+    );
+    refused(&repo, &["rename", "area", "A09", "x"], 1, "unknown_area");
+    refused(
+        &repo,
+        &["rename", "area", "A01", " "],
+        1,
+        "area_name_missing",
+    );
+    // A02 holds only a dropped task; I01 only a done one: both still count.
+    ok(&repo, &["drop", "A02-01"]);
+    ok(&repo, &["plan", "A01-01", "I01"]);
+    ok(&repo, &["--as", "w", "claim", "A01-01"]);
+    ok(&repo, &["--as", "w", "done", "A01-01"]);
+    let before = events();
+    let v = refused(&repo, &["delete", "area", "A02"], 1, "area_not_empty");
+    assert_eq!(v["error"]["params"]["count"], "1");
+    refused(
+        &repo,
+        &["delete", "iteration", "I01"],
+        1,
+        "iteration_not_empty",
+    );
+    refused(&repo, &["delete", "area", "A09"], 1, "unknown_area");
+    assert_eq!(events(), before);
+    assert!(bag.join("areas/A02.json").exists() && bag.join("iterations/I01.json").exists());
+
+    let v = ok(&repo, &["delete", "iteration", "I02"]);
+    assert_eq!(v["deleted"]["iteration"]["id"], "I02");
+    let v = ok(&repo, &["delete", "area", "A03"]);
+    assert_eq!(v["deleted"]["area"]["id"], "A03");
+    assert_eq!(events(), before + 2);
+    assert!(!bag.join("areas/A03.json").exists() && !bag.join("iterations/I02.json").exists());
+
+    // `alm list` agrees.
+    let list = ok(&repo, &["list", "--by", "iteration"]);
+    let ids: Vec<&str> = list["iterations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["I01"]);
+    let text = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(
+        text.contains("Tracking work") && !text.contains("Spare"),
+        "{text}"
+    );
+}
+
 /// `alm --json …` with its own settings folder, so the person's real app settings are never read.
 fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
     let out = Command::new(ALM)

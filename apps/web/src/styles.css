@@ -349,6 +349,10 @@ button.link:hover { text-decoration: underline; }
 
 /* New task, area and iteration forms in the list (Task-A01-19). */
 .area-head .new-task { grid-column: 1 / -1; justify-self: start; }
+.area-head .group-actions { grid-column: 1 / -1; justify-self: start; display: flex; gap: 14px; }
+.create-form .delete-group { margin-left: auto; color: var(--err); }
+.create-form .delete-confirm { display: grid; gap: 6px; padding: 8px 10px; border-radius: 6px; background: var(--err-bg); }
+.create-form .delete-confirm .delete-group { margin-left: 0; }
 .create-form { display: grid; gap: 6px; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); max-width: 560px; }
 .area > .create-form { margin: 0 16px 12px; }
 .create-form h3 { margin: 0; font-size: 1em; }

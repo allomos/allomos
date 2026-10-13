@@ -296,5 +296,18 @@
   "create.release": "リリース",
   "create.start": "初日",
   "create.end": "最終日",
-  "create.add": "追加"
+  "create.add": "追加",
+  "group_edit.edit_button": "編集",
+  "group_edit.edit_aria": "{group} を編集",
+  "group_edit.edit_area": "エリア {id} を編集",
+  "group_edit.edit_iteration": "イテレーション {id} を編集",
+  "group_edit.id_stays": "ID {id} は変わりません。",
+  "group_edit.delete": "削除…",
+  "group_edit.delete_area_confirm": "エリア {id} を削除しますか？ 中にタスクが一つもないとき（完了・取りやめも数えます）だけ削除できます。",
+  "group_edit.delete_iteration_confirm": "イテレーション {id} を削除しますか？ 計画されたタスクが一つもないとき（完了・取りやめも数えます）だけ削除できます。",
+  "group_edit.delete_yes": "削除",
+  "group_edit.deleting": "削除しています…",
+  "group_edit.keep": "残す",
+  "problem.area_not_empty": "エリア「{id}」は削除できません。タスクが {count} 件あります（完了・取りやめも数えます）。エリアはタスクが一つもないときだけ削除できます。",
+  "problem.iteration_not_empty": "イテレーション「{id}」は削除できません。{count} 件のタスクが計画されています（完了・取りやめも数えます）。先に別のイテレーションに計画し直すか、このイテレーションから外してください。"
 }

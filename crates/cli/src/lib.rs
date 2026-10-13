@@ -90,6 +90,15 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
+    /// Rename an area: `alm rename area <id> "<name>"`. Its ID stays.
+    #[command(subcommand)]
+    Rename(Rename),
+    /// Change an iteration: `alm change iteration <id> [--name] [--release] [--start] [--end]`.
+    #[command(subcommand)]
+    Change(ChangeWhat),
+    /// Delete an area or an iteration; refused while any task is in it, done and dropped ones too.
+    #[command(subcommand)]
+    Delete(Delete),
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
     /// Print the details the brief points to: terms, what a project may customize, commands,
@@ -303,6 +312,41 @@ enum Add {
     },
 }
 
+#[derive(Subcommand)]
+enum Rename {
+    /// Give an area a new name; its ID stays.
+    Area { id: String, name: String },
+}
+
+#[derive(Subcommand)]
+enum ChangeWhat {
+    /// Change an iteration's name, release or dates; its ID stays. What is not given stays as it
+    /// is; an empty release or date ("") clears it.
+    Iteration {
+        id: String,
+        #[arg(long)]
+        name: Option<String>,
+        /// The release it produces, for example v0.2.
+        #[arg(long)]
+        release: Option<String>,
+        /// First day, YYYY-MM-DD.
+        #[arg(long, value_name = "DATE")]
+        start: Option<String>,
+        /// Last day, YYYY-MM-DD.
+        #[arg(long, value_name = "DATE")]
+        end: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum Delete {
+    /// Delete an area. Refused while any task is in it, done and dropped ones included.
+    Area { id: String },
+    /// Delete an iteration. Refused while any task is planned in it, done and dropped ones
+    /// included: plan them elsewhere first.
+    Iteration { id: String },
+}
+
 /// `alm add area|iteration [<id>] <name>`: the ID given, if any, and the name.
 fn id_and_name<'a>(first: &'a str, name: &'a Option<String>) -> (Option<&'a str>, &'a str) {
     match name {
@@ -318,6 +362,9 @@ impl Command {
             Command::Add(Add::Area { first, name } | Add::Iteration { first, name, .. }) => {
                 id_and_name(first, name).0
             }
+            Command::Rename(Rename::Area { id, .. })
+            | Command::Change(ChangeWhat::Iteration { id, .. })
+            | Command::Delete(Delete::Area { id } | Delete::Iteration { id }) => Some(id),
             Command::Show { id }
             | Command::History { id }
             | Command::Claim { id, .. }
@@ -393,6 +440,10 @@ impl Command {
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
             Command::Add(Add::Task { .. }) => "add task",
+            Command::Rename(Rename::Area { .. }) => "rename area",
+            Command::Change(ChangeWhat::Iteration { .. }) => "change iteration",
+            Command::Delete(Delete::Area { .. }) => "delete area",
+            Command::Delete(Delete::Iteration { .. }) => "delete iteration",
             Command::List { .. } => "list",
             Command::Show { .. } => "show",
             Command::History { .. } => "history",
@@ -1242,6 +1293,64 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
             };
             done.issues = issues;
+            Ok(done)
+        }
+        Command::Rename(Rename::Area { id, name }) => {
+            let root = locate(cli, cwd)?;
+            let renamed = allomos_store::rename_area(&root, Actor::alm(me), lock_wait(), id, name)?;
+            let area = renamed.item;
+            let text = format!("Renamed area {} ({})\n", area.id, area.name);
+            let mut done = Done::new(json!({ "taskbag": root, "area": area }), text);
+            done.issues = renamed.issues;
+            Ok(done)
+        }
+        Command::Change(ChangeWhat::Iteration {
+            id,
+            name,
+            release,
+            start,
+            end,
+        }) => {
+            let root = locate(cli, cwd)?;
+            let change = ops::IterationChange {
+                name: name.clone(),
+                release: release.clone(),
+                start: start.clone(),
+                end: end.clone(),
+            };
+            let changed =
+                allomos_store::change_iteration(&root, Actor::alm(me), lock_wait(), id, &change)?;
+            let iteration = changed.item;
+            let text = format!("Changed iteration {}\n", iteration_heading(&iteration));
+            let mut done = Done::new(json!({ "taskbag": root, "iteration": iteration }), text);
+            done.issues = changed.issues;
+            Ok(done)
+        }
+        Command::Delete(what) => {
+            let root = locate(cli, cwd)?;
+            let actor = Actor::alm(me);
+            let done = match what {
+                Delete::Area { id } => {
+                    let gone = allomos_store::delete_area(&root, actor, lock_wait(), id)?;
+                    let text = format!("Deleted area {} ({})\n", gone.item.id, gone.item.name);
+                    let mut done = Done::new(
+                        json!({ "taskbag": root, "deleted": { "area": gone.item } }),
+                        text,
+                    );
+                    done.issues = gone.issues;
+                    done
+                }
+                Delete::Iteration { id } => {
+                    let gone = allomos_store::delete_iteration(&root, actor, lock_wait(), id)?;
+                    let text = format!("Deleted iteration {}\n", iteration_heading(&gone.item));
+                    let mut done = Done::new(
+                        json!({ "taskbag": root, "deleted": { "iteration": gone.item } }),
+                        text,
+                    );
+                    done.issues = gone.issues;
+                    done
+                }
+            };
             Ok(done)
         }
         Command::List {

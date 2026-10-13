@@ -112,6 +112,31 @@ pub fn changes<T: Serialize>(before: Option<&T>, after: &T, order: &[&str]) -> V
         .collect()
 }
 
+/// The fields of an item that is deleted (Task-A01-29): every field it had, with only its `from`,
+/// in `order` first and then by name. Like a new item, its `id` is not listed: the event names it.
+pub fn removed<T: Serialize>(before: &T, order: &[&str]) -> Vec<Change> {
+    let old = object(before);
+    let mut fields: Vec<&str> = order.to_vec();
+    let mut rest: Vec<&str> = old
+        .keys()
+        .map(String::as_str)
+        .filter(|k| !order.contains(k))
+        .collect();
+    rest.sort_unstable();
+    fields.extend(rest);
+    fields
+        .into_iter()
+        .filter(|f| *f != "id")
+        .filter_map(|field| {
+            present(old.get(field)).map(|from| Change {
+                field: field.to_string(),
+                from: Some(from),
+                to: None,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,6 +190,14 @@ mod tests {
         let fields: Vec<&str> = c.iter().map(|c| c.field.as_str()).collect();
         assert_eq!(fields, ["title", "area", "state"]);
         assert!(c.iter().all(|c| c.from.is_none()));
+    }
+
+    #[test]
+    fn a_deleted_item_lists_what_it_had() {
+        let c = removed(&task(), TASK_FIELDS);
+        let fields: Vec<&str> = c.iter().map(|c| c.field.as_str()).collect();
+        assert_eq!(fields, ["title", "area", "state"]);
+        assert!(c.iter().all(|c| c.from.is_some() && c.to.is_none()));
     }
 
     #[test]

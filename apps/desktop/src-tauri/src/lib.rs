@@ -400,6 +400,74 @@ fn add_task(root: PathBuf, task: allomos_store::NewTask) -> Result<allomos_core:
     add_task_as(&root, allomos_store::saved_owner_name().as_deref(), task)
 }
 
+/// An area renamed from its group in the list (Task-A01-29), under the person's saved name: the
+/// same rule, lock and recorded event as `alm rename area`.
+fn rename_area_as(
+    root: &Path,
+    name: Option<&str>,
+    id: &str,
+    new_name: &str,
+) -> Result<allomos_core::Area, Problem> {
+    allomos_store::rename_area(root, app_actor(name)?, LOCK_WAIT, id, new_name).map(|a| a.item)
+}
+
+#[tauri::command]
+fn rename_area(root: PathBuf, id: String, name: String) -> Result<allomos_core::Area, Problem> {
+    rename_area_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &id,
+        &name,
+    )
+}
+
+/// An iteration changed from its group (Task-A01-29): the same rule, lock and recorded event as
+/// `alm change iteration`. The form sends every field; an empty release or date clears it.
+fn change_iteration_as(
+    root: &Path,
+    name: Option<&str>,
+    id: &str,
+    change: &allomos_core::ops::IterationChange,
+) -> Result<allomos_core::Iteration, Problem> {
+    allomos_store::change_iteration(root, app_actor(name)?, LOCK_WAIT, id, change).map(|i| i.item)
+}
+
+#[tauri::command]
+fn change_iteration(
+    root: PathBuf,
+    id: String,
+    change: allomos_core::ops::IterationChange,
+) -> Result<allomos_core::Iteration, Problem> {
+    change_iteration_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &id,
+        &change,
+    )
+}
+
+/// An area deleted from its group (Task-A01-29): the same rule (refused while any task is in it,
+/// done and dropped ones too), lock and recorded event as `alm delete area`.
+fn delete_area_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Problem> {
+    allomos_store::delete_area(root, app_actor(name)?, LOCK_WAIT, id).map(|_| ())
+}
+
+#[tauri::command]
+fn delete_area(root: PathBuf, id: String) -> Result<(), Problem> {
+    delete_area_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
+}
+
+/// An iteration deleted from its group (Task-A01-29): the same rule (refused while any task is
+/// planned in it, done and dropped ones too), lock and recorded event as `alm delete iteration`.
+fn delete_iteration_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Problem> {
+    allomos_store::delete_iteration(root, app_actor(name)?, LOCK_WAIT, id).map(|_| ())
+}
+
+#[tauri::command]
+fn delete_iteration(root: PathBuf, id: String) -> Result<(), Problem> {
+    delete_iteration_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
+}
+
 /// Whether to offer **Install the alm command** (Task-A07-12): only in a built Mac app whose own
 /// `alm` is not the one Terminal finds, unless the person chose "Don't ask again".
 #[tauri::command]
@@ -1251,6 +1319,10 @@ pub fn run() {
             add_area,
             add_iteration,
             add_task,
+            rename_area,
+            change_iteration,
+            delete_area,
+            delete_iteration,
             set_menu_texts,
             set_recent_folders,
             find_agents,
@@ -1672,6 +1744,118 @@ mod tests {
             Err(Problem::UnknownArea { area: "A09".into() })
         );
         assert_eq!(load(&root).taskbag.unwrap().tasks.len(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Task-A01-29: renaming an area, changing an iteration and deleting either, with the
+    /// arguments as `messenger.renameArea`, `changeIteration`, `deleteArea` and `deleteIteration`
+    /// send them; each under the person's name, each one event; a non-empty one is not deleted.
+    #[test]
+    fn the_list_renames_changes_and_deletes_under_the_persons_name() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-rename-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let will = Some("Will");
+        add_area_as(&root, will, Some("A01".into()), "Tracking").unwrap();
+        add_area_as(&root, will, Some("A02".into()), "Spare").unwrap();
+        let it = |id: &str| -> NewIteration {
+            serde_json::from_value(serde_json::json!({ "id": id, "name": id, "end": "2026-10-10" }))
+                .unwrap()
+        };
+        add_iteration_as(&root, will, it("I01")).unwrap();
+        add_iteration_as(&root, will, it("I02")).unwrap();
+        let task: allomos_store::NewTask = serde_json::from_value(
+            serde_json::json!({ "area": "A01", "title": "Do it", "iteration": "I01" }),
+        )
+        .unwrap();
+        add_task_as(&root, will, task).unwrap();
+        let count = || allomos_store::events::list(&root).0.len();
+        let last = || {
+            let e = allomos_store::events::list(&root).0.pop().unwrap();
+            (e.command, e.id.unwrap_or_default(), e.by, e.via)
+        };
+        let by = |c: &str, id: &str| {
+            (
+                c.to_string(),
+                id.to_string(),
+                Some("Will".to_string()),
+                "app".to_string(),
+            )
+        };
+
+        // Without the person's name, nothing changes.
+        assert_eq!(
+            rename_area_as(&root, None, "A01", "x"),
+            Err(Problem::HolderMissing)
+        );
+        let start = count();
+        assert_eq!(
+            rename_area_as(&root, will, "A01", "Tracking work")
+                .unwrap()
+                .name,
+            "Tracking work"
+        );
+        assert_eq!((count(), last()), (start + 1, by("rename area", "A01")));
+
+        // The iteration form sends every field; an empty release clears it.
+        let change: allomos_core::ops::IterationChange = serde_json::from_value(
+            serde_json::json!({ "name": "I01", "release": "", "start": "", "end": "2026-10-20" }),
+        )
+        .unwrap();
+        let changed = change_iteration_as(&root, will, "I01", &change).unwrap();
+        assert_eq!(changed.end.as_deref(), Some("2026-10-20"));
+        assert_eq!(
+            (count(), last()),
+            (start + 2, by("change iteration", "I01"))
+        );
+        let bad: allomos_core::ops::IterationChange =
+            serde_json::from_value(serde_json::json!({ "end": "20/10/2026" })).unwrap();
+        assert_eq!(
+            change_iteration_as(&root, will, "I01", &bad),
+            Err(Problem::InvalidDate {
+                value: "20/10/2026".into()
+            })
+        );
+
+        // Not empty: refused, nothing deleted.
+        assert_eq!(
+            delete_area_as(&root, will, "A01"),
+            Err(Problem::AreaNotEmpty {
+                id: "A01".into(),
+                count: "1".into()
+            })
+        );
+        assert_eq!(
+            delete_iteration_as(&root, will, "I01"),
+            Err(Problem::IterationNotEmpty {
+                id: "I01".into(),
+                count: "1".into()
+            })
+        );
+        assert_eq!(count(), start + 2);
+        delete_iteration_as(&root, will, "I02").unwrap();
+        assert_eq!(
+            (count(), last()),
+            (start + 3, by("delete iteration", "I02"))
+        );
+        delete_area_as(&root, will, "A02").unwrap();
+        assert_eq!((count(), last()), (start + 4, by("delete area", "A02")));
+        let bag = load(&root).taskbag.unwrap();
+        assert_eq!(
+            (
+                bag.areas.len(),
+                bag.iterations.len(),
+                bag.areas[0].name.as_str()
+            ),
+            (1, 1, "Tracking work")
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

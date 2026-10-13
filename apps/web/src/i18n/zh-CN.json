@@ -296,5 +296,18 @@
   "create.release": "版本",
   "create.start": "第一天",
   "create.end": "最后一天",
-  "create.add": "添加"
+  "create.add": "添加",
+  "group_edit.edit_button": "编辑",
+  "group_edit.edit_aria": "编辑 {group}",
+  "group_edit.edit_area": "编辑领域 {id}",
+  "group_edit.edit_iteration": "编辑迭代 {id}",
+  "group_edit.id_stays": "ID {id} 保持不变。",
+  "group_edit.delete": "删除…",
+  "group_edit.delete_area_confirm": "删除领域 {id}？只有其中没有任何任务（包括已完成和已放弃的）时才能删除。",
+  "group_edit.delete_iteration_confirm": "删除迭代 {id}？只有其中没有安排任何任务（包括已完成和已放弃的）时才能删除。",
+  "group_edit.delete_yes": "删除",
+  "group_edit.deleting": "正在删除…",
+  "group_edit.keep": "保留",
+  "problem.area_not_empty": "领域“{id}”不能删除：其中有 {count} 个任务（包括已完成和已放弃的）。只有领域中没有任何任务时才能删除。",
+  "problem.iteration_not_empty": "迭代“{id}”不能删除：其中安排了 {count} 个任务（包括已完成和已放弃的）。请先把它们安排到别的迭代，或移出这个迭代。"
 }
