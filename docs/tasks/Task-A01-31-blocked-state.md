@@ -2,7 +2,7 @@
 
 *Card type: decision, then coding. Area A01 (Tracking), Iteration 2. Written 2026-10-14 at the owner's request; replaces A01-30 (dropped).*
 
-> **Code waits for the owner.** The first step is decision record [0016](../decisions/0016-waiting-and-blocked-states.md), status *Proposed*. Nothing below is built until the owner accepts it and answers its open points; the details below follow the proposal and change with the owner's answers.
+> **Approved for code.** Decision record [0016](../decisions/0016-waiting-and-blocked-states.md) was accepted by the owner on 2026-10-14 with the answers recorded there; where the details below differ from those answers, the record wins. The format goes to `allomos/4` through A01-32's guided migration, not a code step.
 
 ## What gets built (plain words)
 
@@ -42,7 +42,9 @@ Today a task that cannot go on is always **Waiting**, whether a person must act 
 | Date | What was approved | By |
 |---|---|---|
 | 2026-10-14 | Owner request; card and decision record written (not approved) | owner (chat) |
+| 2026-10-14 | Accept 0016 with its five answers; build A01-31 together with A01-32, version 4 through the guided migration (relayed by the owner's other session, confirmed in this session's chat) | owner (chat) |
 
 ## Notes
 
 - 2026-10-14 — Card and decision record 0016 written by the agent (`claude/a01-31-blocked-state`), documents only. Next: the owner accepts 0016 and answers its open points; then the card is approved for code.
+- 2026-10-14 — Owner accepted 0016; card approved for code. Version 4 is built on A01-32's migration machinery.

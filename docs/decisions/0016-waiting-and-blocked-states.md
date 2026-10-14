@@ -2,9 +2,9 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Proposed** | 2026-10-14 | — | will.w.hui |
+| **Accepted** | 2026-10-14 | 2026-10-14 | will.w.hui |
 
-Card: [`Task-A01-31`](../tasks/Task-A01-31-blocked-state.md). No code is written until the owner accepts this record.
+Card: [`Task-A01-31`](../tasks/Task-A01-31-blocked-state.md). Accepted by the owner on 2026-10-14 (said in the owner's other session, relayed here, and confirmed by the owner in this session's chat).
 
 ## In plain words
 
@@ -67,7 +67,7 @@ Anything outside the taskbag — an attorney's reply, a vendor's release — sta
 
 ## Owner's answers (2026-10-14)
 
-Given in chat and relayed to this session by the owner's other session ("Task workflow open questions"). The record as a whole is **not yet accepted**: the owner still says "accept the record" before it is marked Accepted and code starts.
+Given in chat and relayed to this session by the owner's other session ("Task workflow open questions"). The owner then accepted the record as a whole, as it stood at commit 86bf35b (2026-10-14).
 
 1. **Names:** keep `waiting`, add `blocked`.
 2. **Blocked and waiting on a person:** one state only, `blocked`; the person part goes in the note (`next_dependency`).

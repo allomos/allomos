@@ -19,4 +19,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0013](./0013-product-name-fliphopper.md) | The product is called FlipHopper; a project's data is its seabag, always in `.fliphopper/seabag/` | Superseded by 0015 (2026-10-10) |
 | [0014](./0014-main-purpose-and-three-sets.md) | Main purpose: switch between AI agents and teammates; three sets (main, AI skills, progress management) | Accepted 2026-10-06; contents of sets 2–3 proposed |
 | [0015](./0015-product-name-allomos.md) | The product is called Allomos (换肩); a project's data is its taskbag, always in `.allomos/taskbag/` | Accepted 2026-10-10 |
-| [0016](./0016-waiting-and-blocked-states.md) | Waiting on a person and blocked by another task are two different states (`waiting` narrowed, new `blocked`) | **Proposed** 2026-10-14 |
+| [0016](./0016-waiting-and-blocked-states.md) | Waiting on a person and blocked by another task are two different states (`waiting` narrowed, new `blocked`) | **Accepted** 2026-10-14 |
