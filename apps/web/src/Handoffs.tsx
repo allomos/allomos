@@ -7,12 +7,15 @@ import { useI18n } from "./i18n";
 import { Markdown } from "./Markdown";
 import type { Messenger } from "./messenger";
 import { filterHandoffs, localTime, writers } from "./handoffFlow";
+import { handoffMatches, snippet } from "./searchFlow";
+import { Highlight, Marked } from "./Search";
 import { isProblem } from "./types";
 import type { Handoff, HandoffSettings, Task } from "./types";
 
 /** The Handoffs tab. */
 export function HandoffsView({
   handoffs,
+  terms,
   tasks,
   task,
   onTask,
@@ -25,6 +28,8 @@ export function HandoffsView({
   onShown,
 }: {
   handoffs: Handoff[];
+  /** The search box's words (Task-A01-36): only handoffs holding them are shown, the words marked. */
+  terms: string[];
   tasks: Task[];
   /** The task filter, kept by the window so the task pane can open the tab on one task. */
   task: string | null;
@@ -43,7 +48,11 @@ export function HandoffsView({
   const { t } = useI18n();
   const [writer, setWriter] = useState<string | null>(null);
   const [latestOnly, setLatestOnly] = useState(true);
-  const shown = filterHandoffs(handoffs, { task, writer, latestOnly });
+  // While searching, older handoffs are searched too: "Latest only" would hide what was asked for.
+  const searching = terms.length > 0;
+  const shown = filterHandoffs(handoffs, { task, writer, latestOnly: latestOnly && !searching }).filter((h) =>
+    handoffMatches(h, terms),
+  );
   const shownFiles = shown.map((h) => h.file).join("\n");
   useEffect(() => onShown(shownFiles ? shownFiles.split("\n") : []), [shownFiles]);
   const titleOf = (id: string) => tasks.find((x) => x.id === id)?.title ?? "";
@@ -74,7 +83,7 @@ export function HandoffsView({
           </select>
         </label>
         <label>
-          <input type="checkbox" checked={latestOnly} onChange={(e) => setLatestOnly(e.target.checked)} />{" "}
+          <input type="checkbox" checked={latestOnly} disabled={searching} onChange={(e) => setLatestOnly(e.target.checked)} />{" "}
           {t("handoffs.latest_only")}
         </label>
         <span className="spacer" />
@@ -84,7 +93,11 @@ export function HandoffsView({
         </button>
       </div>
       {shown.length === 0 ? (
-        <p className="muted">{handoffs.length === 0 ? t("handoffs.none") : t("handoffs.none_match")}</p>
+        <p className="muted">{handoffs.length === 0
+            ? t("handoffs.none")
+            : searching
+              ? t("search.nothing", { query: terms.join(" ") })
+              : t("handoffs.none_match")}</p>
       ) : (
         <ul className="handoff-list">
           {shown.map((h) => {
@@ -94,7 +107,9 @@ export function HandoffsView({
               <button type="button" className="handoff-head" aria-expanded={open} onClick={() => onToggle(h.file)}>
                 <span className="when">{localTime(h.updated)}</span>
                 <span className="who">{h.writer || t("handoffs.unknown_writer")}</span>
-                <span className="what">{h.summary || t("handoffs.empty")}</span>
+                <span className="what">
+                  <Highlight text={h.summary || t("handoffs.empty")} terms={terms} />
+                </span>
               </button>
               <div className="handoff-tasks">
                 {h.tasks.length === 0 ? (
@@ -107,6 +122,8 @@ export function HandoffsView({
                   ))
                 )}
               </div>
+              {/* A closed handoff found by its text shows the words around the first match. */}
+              {!open && searching && <BodyHit body={h.body} terms={terms} />}
               {open && (
                 <div className="handoff-body">
                   <Markdown source={h.body} onLink={onLink} />
@@ -126,6 +143,16 @@ export function HandoffsView({
       </button>
     </section>
   );
+}
+
+/** The line under a closed handoff found by its text (Task-A01-36). */
+function BodyHit({ body, terms }: { body: string; terms: string[] }) {
+  const parts = snippet(body, terms);
+  return parts ? (
+    <p className="search-snippet small">
+      <Marked parts={parts} />
+    </p>
+  ) : null;
 }
 
 /** A task's latest handoff, in the task pane. */

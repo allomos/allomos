@@ -336,5 +336,13 @@
   "problem.human_check_steps_missing": "{id} 没有人工检查步骤：要让人能接手并测试它。用 Markdown 写下步骤（测试文件夹、打开什么、点击什么、应该看到什么），再用 --steps 加上。",
   "problem.human_check_steps_empty": "人工检查步骤是空的。请写明要打开什么、点击什么、应该看到什么。",
   "problem.not_done": "任务 {id} 的状态是 {state}，还没有完成：只有已完成的任务才能做人工检查。",
-  "problem.finished_without_owner_renamed": "任务 {id} 仍带有 finished_without_owner，这是 allomos/4 之前的名称。「迁移任务包…」会把它移过去。"
+  "problem.finished_without_owner_renamed": "任务 {id} 仍带有 finished_without_owner，这是 allomos/4 之前的名称。「迁移任务包…」会把它移过去。",
+  "search.label": "搜索任务和交接",
+  "search.placeholder": "搜索任务和交接（{keys}）",
+  "search.clear": "清空搜索",
+  "search.nothing": "没有找到「{query}」：没有任务或交接含有这些文字。",
+  "search.in_description": "说明中：",
+  "search.handoffs": "找到的交接",
+  "search.handoff_count": "{count} 条",
+  "search.handoff_kind": "交接"
 }
