@@ -360,5 +360,10 @@
   "search.in_description": "In the description:",
   "search.handoffs": "Handoffs found",
   "search.handoff_count": "{count} found",
-  "search.handoff_kind": "Handoff"
+  "search.handoff_kind": "Handoff",
+  "filter.hidden": "{count} more hidden by the filter: {states}",
+  "filter.state_count": "{count} {state}",
+  "filter.list_sep": ", ",
+  "filter.show_all": "Show all",
+  "search.hidden_by_filter": "Hidden by the “{filter}” filter"
 }

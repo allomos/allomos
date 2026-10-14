@@ -12,9 +12,9 @@ import { almOffer } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
-import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms } from "./searchFlow";
-import { DescriptionHit, HandoffHits, Highlight, SearchBox, isSearchShortcut } from "./Search";
-import { FILTER_STATES, keepState, readFilter, stopText, toCheck, type StateFilter } from "./stopFlow";
+import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
+import { DescriptionHit, FilterHits, HandoffHits, Highlight, SearchBox, isSearchShortcut } from "./Search";
+import { FILTER_STATES, filterName, hiddenByFilter, hiddenText, keepState, readFilter, stopText, toCheck, type Hidden, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
 import { HumanCheckBadge, TaskPane } from "./TaskPane";
@@ -862,14 +862,15 @@ function TaskbagView({
     const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
     if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
   }
-  // With a state filter, each group lists only the tasks in that state (its count stays whole),
-  // and a group with none is left out.
+  // With a state filter, each group lists only the tasks in that state (its count stays whole)
+  // and says how many it hides (Task-A01-42); a group with none at all is left out, and a group
+  // whose tasks are all hidden shows only that line.
   if (stateFilter !== "all") {
     for (let i = groups.length - 1; i >= 0; i--) {
       const g = groups[i];
       g.counted = g.tasks;
       g.tasks = g.tasks.filter((task) => keepState(stateFilter, task));
-      if (g.tasks.length === 0) groups.splice(i, 1);
+      if (g.counted.length === 0) groups.splice(i, 1);
     }
   }
   // A search keeps only the tasks that match, and groups with none are left out; each group left
@@ -877,6 +878,8 @@ function TaskbagView({
   const found = searchGroups(groups, terms);
   const folded = collapsedWhileSearching(collapsed, found, terms);
   const foundHandoffs = searching ? handoffs.filter((h) => handoffMatches(h, terms)) : [];
+  // Task-A01-42: tasks the search finds that the state filter hides, shown apart after the groups.
+  const hiddenHits = searching && stateFilter !== "all" && box ? box.tasks.filter((task) => !keepState(stateFilter, task) && taskMatches(task, terms)) : [];
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(found, folded);
   const foldAll = (on: boolean) => {
@@ -1124,6 +1127,8 @@ function TaskbagView({
                   empty={g.empty}
                   tasks={g.tasks}
                   counted={g.counted}
+                  hidden={!searching && stateFilter !== "all" ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
+                  onShowAll={() => chooseFilter("all")}
                   stop={stop}
                   iterationName={groupBy === "area" ? iterationName : undefined}
                   selectedId={selectedId}
@@ -1144,6 +1149,16 @@ function TaskbagView({
               {!searching && groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
                 <p className="muted">{t("box.empty")}</p>
               )}
+              {hiddenHits.length > 0 && (
+                <FilterHits
+                  tasks={hiddenHits}
+                  terms={terms}
+                  filter={filterName(stateFilter, t)}
+                  selectedId={selectedId}
+                  onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
+                  onShowAll={() => chooseFilter("all")}
+                />
+              )}
               {/* Task-A01-36: handoffs the search found, after the tasks; or that nothing was found. */}
               {searching && (
                 <HandoffHits
@@ -1156,7 +1171,7 @@ function TaskbagView({
                   }}
                 />
               )}
-              {searching && found.length === 0 && foundHandoffs.length === 0 && (
+              {searching && found.length === 0 && foundHandoffs.length === 0 && hiddenHits.length === 0 && (
                 <p className="muted search-none" role="status">
                   {t("search.nothing", { query: query.trim() })}
                 </p>
@@ -1280,6 +1295,8 @@ function TaskGroup({
   empty,
   tasks,
   counted,
+  hidden,
+  onShowAll,
   stop,
   iterationName,
   selectedId,
@@ -1299,6 +1316,10 @@ function TaskGroup({
   tasks: Task[];
   /** Every task of the group, for its count and progress, when `tasks` is filtered by state. */
   counted?: Task[];
+  /** What the state filter hides in this group (Task-A01-42); not given without a filter or while searching. */
+  hidden?: Hidden;
+  /** Turns the state filter off. */
+  onShowAll?: () => void;
   /** Why a stopped task is stopped: "Waiting for you: …", "Blocked by A01-17 (in progress)". */
   stop?: (task: Task) => string | null;
   /** Given in the by-area view, so each task says which iteration it is planned in. */
@@ -1355,7 +1376,7 @@ function TaskGroup({
       {editForm}
       {form}
       {collapsed ? null : tasks.length === 0 ? (
-        <p className="muted small">{empty}</p>
+        !hidden?.count && <p className="muted small">{empty}</p>
       ) : (
         <ul className="tasks">
           {tasks.map((task) => {
@@ -1397,6 +1418,14 @@ function TaskGroup({
             );
           })}
         </ul>
+      )}
+      {!collapsed && hidden && hidden.count > 0 && (
+        <p className="filter-hidden small">
+          <span>{hiddenText(hidden, t)}</span>{" "}
+          <button type="button" className="link small" onClick={onShowAll}>
+            {t("filter.show_all")}
+          </button>
+        </p>
       )}
     </section>
   );
