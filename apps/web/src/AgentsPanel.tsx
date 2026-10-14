@@ -2,9 +2,10 @@
 // panels): lists the AI agents on this computer, lets the person pick one (owner, 2026-10-12) and
 // the project folder, then opens it with the request typed in: add Allomos's instructions, then
 // look for the project's existing tasks and, if it finds some, ask with `alm confirm` before
-// moving them. Allomos never sends a request; the person does.
+// moving them. Allomos never sends a request; the person does. **Manual** (Task-A05-06), offered
+// even when no known agent is found, shows the same request with Copy, for any other AI.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
@@ -12,6 +13,8 @@ import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Agent, InstructionFiles } from "./types";
 import { updateNotice } from "./versionFlow";
+import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, firstChoice, manualWritten } from "./manualFlow";
+import type { Seen } from "./manualFlow";
 
 const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -102,9 +105,13 @@ export function AgentsPanel({
           if (tool) first[g.name] = tool;
         }
         setPicked(first);
-        setTicked(new Set(GROUPS.filter((g) => first[g.name]).slice(0, 1).map((g) => g.name)));
+        setTicked(new Set([firstChoice(GROUPS.filter((g) => first[g.name]).map((g) => g.name))]));
       })
-      .catch(() => live && setAgents([]))
+      .catch(() => {
+        if (!live) return;
+        setAgents([]);
+        setTicked(new Set([MANUAL]));
+      })
       .finally(() => window.clearTimeout(timer));
     return () => {
       live = false;
@@ -115,6 +122,75 @@ export function AgentsPanel({
   // One agent (owner, 2026-10-12): choosing a group replaces the choice.
   const toggleGroup = (name: string) => setTicked(new Set([name]));
   const chosen = GROUPS.filter((g) => ticked.has(g.name) && picked[g.name]).map((g) => picked[g.name]);
+  const manual = ticked.has(MANUAL);
+  const choice = [...ticked][0] ?? null;
+  const buttons = connectActions(agents === null ? null : choice, agents?.length ?? 0, updating);
+
+  // Manual: the request (the same automatic sending types in), what the project looked like when
+  // it was shown, and what the AI has written since.
+  const [request, setRequest] = useState<string | null>(null);
+  const [before, setBefore] = useState<Seen | null>(null);
+  const [written, setWritten] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+
+  useEffect(() => {
+    if (!manual) return;
+    let live = true;
+    setRequest(null);
+    setCopied(false);
+    void (async () => {
+      try {
+        const [text, seen] = await Promise.all([messenger.manualRequest(project, taskbag, language), seenNow()]);
+        if (!live) return;
+        setRequest(text);
+        setBefore(seen);
+        setWritten([]);
+      } catch (e) {
+        if (live) fail(e);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // `seenNow` and `fail` read the same props; ask again only when the request would change.
+  }, [messenger, manual, project, taskbag, language, updating]);
+
+  // Watch for what the automatic path watches for: a new instruction file, or one that now tells
+  // about Allomos. Done stays available either way (Task-A05-06).
+  useEffect(() => {
+    if (!manual || !before) return;
+    let live = true;
+    const look = async () => {
+      const now = await seenNow().catch(() => null);
+      if (live && now) setWritten(manualWritten(before, now));
+    };
+    const timer = window.setInterval(() => void look(), MANUAL_LOOK_MS);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [messenger, manual, before, project, taskbag]);
+
+  const copy = async () => {
+    if (request === null) return;
+    setError(null);
+    try {
+      await messenger.copyText(request);
+      setCopied(true);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const doneManual = () =>
+    onDone({
+      message: written.length > 0 ? t("manual.finished", { files: written.join(", ") }) : t("manual.pending"),
+      watch: before ? { project, before: before.files } : undefined,
+    });
 
   const changeProject = async () => {
     const path = await messenger.pickFolder(t("agents.project"));
@@ -128,6 +204,12 @@ export function AgentsPanel({
   };
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
+
+  /** The project's instruction files and which mention Allomos (for Manual). */
+  const seenNow = async (): Promise<Seen> => {
+    const [files, setup] = await Promise.all([messenger.instructionFiles(project), messenger.projectSetup(taskbag)]);
+    return { files, agents: setup.agents };
+  };
 
   /** Which instruction files the project folder has now; when unknown, assume both, so no notice. */
   const filesNow = () =>
@@ -176,14 +258,19 @@ export function AgentsPanel({
       <button type="button" onClick={() => onDone({ message: null })} disabled={busy}>
         {t("agents.later")}
       </button>
-      {agents && agents.length > 0 && (
+      {buttons.write && (
+        <button type="button" onClick={() => void write()} disabled={busy}>
+          {t("agents.write")}
+        </button>
+      )}
+      {buttons.primary === "connect" && (
         <button type="button" className="primary" onClick={() => void ask()} disabled={busy || chosen.length === 0}>
           {t("agents.ask")}
         </button>
       )}
-      {agents && agents.length === 0 && !updating && (
-        <button type="button" className="primary" onClick={() => void write()} disabled={busy}>
-          {t("agents.write")}
+      {buttons.primary === "done" && (
+        <button type="button" className="primary" onClick={doneManual} disabled={busy}>
+          {t("manual.done")}
         </button>
       )}
     </>
@@ -209,9 +296,9 @@ export function AgentsPanel({
             <span className="spinner" aria-hidden="true" /> {t("agents.searching")}
           </p>
         )
-      ) : agents.length === 0 ? (
-        <p>{t(updating ? "update.no_agent" : "agents.none")}</p>
       ) : (
+        <>
+        {agents.length === 0 && <p>{t(updating ? "update.no_agent" : "agents.none")}</p>}
         <ul className="agent-list">
           {GROUPS.map((g) => {
             const tools = g.tools
@@ -266,7 +353,45 @@ export function AgentsPanel({
               </li>
             );
           })}
+          {/* Manual (Task-A05-06): any AI, even when none is found; the person pastes the request. */}
+          <li>
+            <label>
+              <input
+                type="radio"
+                name="agent-group"
+                checked={manual}
+                onChange={() => toggleGroup(MANUAL)}
+                disabled={busy}
+              />{" "}
+              <strong>{t("agents.manual")}</strong> <span className="muted">— {t("agents.manual_how")}</span>
+            </label>
+            {manual && (
+              <div className="manual">
+                <p className="small">{rich("manual.intro", { path: <code>{project}</code> })}</p>
+                <textarea
+                  className="manual-request"
+                  readOnly
+                  rows={8}
+                  aria-label={t("manual.request")}
+                  value={request ?? ""}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <div className="row start">
+                  <button type="button" onClick={() => void copy()} disabled={busy || request === null}>
+                    {t("manual.copy")}
+                  </button>
+                  <span className="muted small" role="status">
+                    {copied ? t("manual.copied") : ""}
+                  </span>
+                </div>
+                <p className="small" role="status">
+                  {written.length > 0 ? t("manual.seen", { files: written.join(", ") }) : t("manual.waiting")}
+                </p>
+              </div>
+            )}
+          </li>
         </ul>
+        </>
       )}
       {error && <p className="banner error">{error}</p>}
       {actionsIn ? createPortal(actions, actionsIn) : <div className="row actions">{actions}</div>}

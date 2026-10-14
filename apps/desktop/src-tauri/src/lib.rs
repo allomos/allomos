@@ -586,6 +586,42 @@ async fn connect_agents(
     Ok(opened)
 }
 
+/// What the **Manual** choice of Connect with the agents shows (Task-A05-06): exactly the request
+/// the first chosen agent would get ([`connect_plan`]: connect, or update when something is out
+/// of date), as an agent opened through a link gets it ([`agents::link_request`]).
+fn manual_plan(language: &str, project: &Path, taskbag: &Path) -> String {
+    connect_plan(&[MANUAL.to_string()], language, project, taskbag)
+        .remove(0)
+        .1
+}
+
+/// The id of the Manual choice: no agent is opened; the person copies the request.
+const MANUAL: &str = "manual";
+
+#[tauri::command]
+async fn manual_request(
+    project: PathBuf,
+    taskbag: PathBuf,
+    language: String,
+) -> Result<String, Problem> {
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    let request = manual_plan(&language, &project, &taskbag);
+    Ok(agents::link_request(
+        &request,
+        alm_command::own().as_deref(),
+    ))
+}
+
+/// Put `text` on the clipboard: the Manual choice's **Copy** button (Task-A05-06).
+#[tauri::command]
+async fn copy_text(text: String) -> Result<(), Problem> {
+    agents::copy_text(&text)
+}
+
 /// Is the project up to date with this Allomos (Task-A01-25)? `None` until an agent is connected
 /// with it. The window asks when a folder is opened and every few seconds while it is open, so
 /// an agent's update shows without reopening.
@@ -1182,6 +1218,8 @@ pub fn run() {
             set_recent_folders,
             find_agents,
             connect_agents,
+            manual_request,
+            copy_text,
             instruction_files,
             write_agent_files,
             agent_status,
@@ -1300,6 +1338,32 @@ mod tests {
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
         assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
         assert!(!version_check(taskbag).unwrap().needs_update());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn manual_shows_the_request_an_agent_would_get() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-manual-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let taskbag = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&taskbag, "p", "P").unwrap();
+        // Not connected yet: the connect request, in every language, as automatic sending.
+        for language in ["en", "zh-CN", "ja"] {
+            let auto = connect_plan(&["claude_app".into()], language, &dir, &taskbag);
+            assert_eq!(manual_plan(language, &dir, &taskbag), auto[0].1);
+        }
+        assert_eq!(
+            manual_plan("en", &dir, &taskbag),
+            agent_connect_request_in("en", &dir, &taskbag)
+        );
+        // Out of date: the update request, as automatic sending.
+        std::fs::write(dir.join("AGENTS.md"), "## Tasks: Allomos\n\nalm next\n").unwrap();
+        let auto = connect_plan(&["codex_cli".into()], "en", &dir, &taskbag);
+        let manual = manual_plan("en", &dir, &taskbag);
+        assert_eq!(manual, auto[0].1);
+        assert!(manual.starts_with("This project was set up by an older Allomos"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

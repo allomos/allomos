@@ -412,6 +412,28 @@ fn with_own_alm(request: &str, own: Option<&Path>, shell: Option<&Path>) -> Stri
     }
 }
 
+/// The request as an agent opened through a link gets it: with [`own_alm_line`] first when the
+/// person's shell would find another `alm`. The **Manual** choice (Task-A05-06) shows the same
+/// text, since the AI it is pasted into also starts outside any window the app controls.
+pub fn link_request(request: &str, own: Option<&Path>) -> String {
+    match own {
+        Some(own) => with_own_alm(
+            request,
+            Some(own),
+            crate::alm_command::shell_alm().as_deref(),
+        ),
+        None => request.to_string(),
+    }
+}
+
+/// Put `text` on the clipboard (the **Copy** button of the Manual choice, Task-A05-06).
+pub fn copy_text(text: &str) -> Result<(), Problem> {
+    copy_to_clipboard(text).map_err(|e| Problem::OpenFailed {
+        path: "clipboard".to_string(),
+        detail: e.to_string(),
+    })
+}
+
 /// What a new Terminal window types (macOS): the folder of the app's own `alm` first in `PATH`,
 /// for that window only, then the agent in the project. With no `alm` beside the app, `PATH` is
 /// left as it is ([`Task-A03-16`](../../../../docs/tasks/Task-A03-16-agents-use-the-apps-own-alm.md)).
@@ -456,14 +478,7 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     }
     let own_alm = crate::alm_command::own();
     if agent.how == "link" {
-        let request = match &own_alm {
-            Some(own) => with_own_alm(
-                request,
-                Some(own),
-                crate::alm_command::shell_alm().as_deref(),
-            ),
-            None => request.to_string(),
-        };
+        let request = link_request(request, own_alm.as_deref());
         if let Some(url) = link(id, project, &request) {
             return open_link(&url).map_err(|e| ask_failed(id, e));
         }

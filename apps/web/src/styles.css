@@ -369,3 +369,8 @@ button.link:hover { text-decoration: underline; }
 .create-form textarea { resize: vertical; }
 .create-form .editor-buttons { display: flex; gap: 6px; }
 .add-group { margin: 4px 0 16px; }
+
+/* The Manual choice of Connect with the agents (Task-A05-06). */
+.manual { margin: 6px 0 0 24px; display: grid; gap: 6px; }
+.manual p { margin: 0; }
+.manual-request { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; resize: vertical; }
