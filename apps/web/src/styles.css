@@ -370,6 +370,11 @@ button.link:hover { text-decoration: underline; }
 .create-form .editor-buttons { display: flex; gap: 6px; }
 .add-group { margin: 4px 0 16px; }
 
+/* The Manual choice of Connect with the agents (Task-A05-06). */
+.manual { margin: 6px 0 0 24px; display: grid; gap: 6px; }
+.manual p { margin: 0; }
+.manual-request { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; resize: vertical; }
+
 /* Searching the task list (Task-A01-36): the box sits in the list's tool row, before Collapse all;
    found words are marked in the accent's pale tint, readable in light and dark mode. */
 .search { position: relative; display: inline-flex; align-items: center; flex: 1 1 220px; max-width: 360px; }

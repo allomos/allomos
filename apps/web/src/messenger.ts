@@ -60,6 +60,10 @@ export interface Messenger {
    * Resolves to the ones that opened. Rejects with a Problem.
    */
   connectAgents(agents: string[], project: string, taskbag: string, language: string): Promise<string[]>;
+  /** The Manual choice (Task-A05-06): the request automatic sending would type in, to copy. Rejects with a Problem. */
+  manualRequest(project: string, taskbag: string, language: string): Promise<string>;
+  /** Puts `text` on the clipboard. Rejects with a Problem. */
+  copyText(text: string): Promise<void>;
   /** Whether `project` has AGENTS.md and CLAUDE.md. */
   instructionFiles(project: string): Promise<InstructionFiles>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
@@ -175,6 +179,8 @@ export const desktopMessenger: Messenger = {
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
+  manualRequest: (project, taskbag, language) => invoke<string>("manual_request", { project, taskbag, language }),
+  copyText: (text) => invoke<void>("copy_text", { text }),
   instructionFiles: (project) => invoke<InstructionFiles>("instruction_files", { project }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
