@@ -529,6 +529,7 @@ fn git_sees_only_text_files() {
     assert_eq!(
         files,
         [
+            ".allomos/taskbag/.gitattributes",
             ".allomos/taskbag/.gitignore",
             ".allomos/taskbag/areas/.keep",
             ".allomos/taskbag/areas/A01.json",

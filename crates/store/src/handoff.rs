@@ -79,7 +79,7 @@ pub struct Handoff {
 
 /// The project's template; the default when the file is missing.
 pub fn template(root: &Path) -> String {
-    fs::read_to_string(root.join(TEMPLATE_FILE)).unwrap_or_else(|_| DEFAULT_TEMPLATE.to_string())
+    crate::read_text(&root.join(TEMPLATE_FILE)).unwrap_or_else(|_| DEFAULT_TEMPLATE.to_string())
 }
 
 /// Replace the project's template. An empty text is refused.
@@ -122,7 +122,9 @@ pub fn latest_for(root: &Path, task: &str) -> Option<Handoff> {
 
 /// Read one handoff file: a header between `---` lines (`writer:`, `tasks:`, `written:`,
 /// `updated:`), then the text. A file without a header is all text, by an unknown writer.
+/// `\r\n` line endings (a checkout on Windows) read the same as `\n`.
 pub fn parse(file: &str, text: &str) -> Handoff {
+    let text = &crate::lf(text);
     let mut h = Handoff {
         file: file.to_string(),
         writer: String::new(),

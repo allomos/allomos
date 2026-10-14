@@ -1,0 +1,77 @@
+# Runs Allomos's checks on Windows, only when started by hand (Task-A07-03). Not run on push:
+# start it from the Actions tab ("Windows tests" → "Run workflow"). The repository is public, so
+# GitHub's standard Windows runner costs no minutes. Each check runs even when an earlier one
+# failed, so one run shows every failure. The installer, alm.exe and the logs are kept 14 days.
+# Cleanup when no longer needed: delete this file and the run's stored artifacts.
+name: Windows tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Checked out the way Git for Windows does by default (core.autocrlf=true), so the tests
+      # also see text files with \r\n line endings.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: npm --prefix apps/web ci && npm --prefix apps/desktop ci
+      # The desktop crate needs the interface built (frontendDist) and alm.exe under the name
+      # Tauri expects for a bundled program (tauri.windows.conf.json), as release.yml does.
+      - run: npm --prefix apps/web run build
+      - run: cargo build -p allomos-cli --bin alm
+      - run: |
+          mkdir -p apps/desktop/src-tauri/binaries logs
+          cp target/debug/alm.exe apps/desktop/src-tauri/binaries/alm-x86_64-pc-windows-msvc.exe
+
+      # The named checks (docs/workflow/CODING_RULES.md § Checks before a commit).
+      - name: cargo fmt --check
+        if: success() || failure()
+        run: cargo fmt --check 2>&1 | tee logs/fmt.txt
+      - name: cargo clippy
+        if: success() || failure()
+        run: cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee logs/clippy.txt
+      - name: cargo test
+        if: success() || failure()
+        run: cargo test --workspace 2>&1 | tee logs/cargo-test.txt
+      - name: web typecheck
+        if: success() || failure()
+        run: npm --prefix apps/web run typecheck 2>&1 | tee logs/typecheck.txt
+      - name: web build
+        if: success() || failure()
+        run: npm --prefix apps/web run build 2>&1 | tee logs/web-build.txt
+      - name: web check:i18n
+        if: success() || failure()
+        run: npm --prefix apps/web run check:i18n 2>&1 | tee logs/i18n.txt
+      - name: web test
+        if: success() || failure()
+        run: npm --prefix apps/web test 2>&1 | tee logs/web-test.txt
+
+      # An installer to try by hand (A07-04's workmate check), unsigned.
+      - name: Build the installer
+        if: success() || failure()
+        run: |
+          cargo build --release -p allomos-cli --bin alm
+          cp target/release/alm.exe apps/desktop/src-tauri/binaries/alm-x86_64-pc-windows-msvc.exe
+          npm --prefix apps/desktop run tauri build -- --bundles nsis 2>&1 | tee logs/installer.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allomos-windows-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            logs/
+            target/release/bundle/nsis/*-setup.exe
+            target/release/alm.exe

@@ -7,7 +7,10 @@ use std::path::{Component, Path, PathBuf};
 use allomos_core::{Problem, Project, parse_project};
 use serde::Serialize;
 
-use crate::{AgentSetup, Lock, PROJECT_FILE, agent_setup, json_text, picked_folder, write_atomic};
+use crate::{
+    AgentSetup, Lock, PROJECT_FILE, agent_setup, json_text, picked_folder, portable_path,
+    read_text, write_atomic,
+};
 
 /// How long recording the project folder waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -42,12 +45,14 @@ pub fn relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
 }
 
 /// The project folder recorded in `project`, as an absolute path, for a taskbag at `root`.
+/// A relative path may be written with `/` or `\` (an older Allomos on Windows wrote `..\app`);
+/// both are read as separators on every system.
 pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
     let recorded = project.project_folder.as_deref()?.trim();
     if recorded.is_empty() {
         return None;
     }
-    let path = allomos_folder(root).join(recorded);
+    let path = join_recorded(&allomos_folder(root), recorded);
     // Tidy `.` and `..` without asking the disk, so a moved folder still gives a clear path.
     let mut clean = PathBuf::new();
     for part in path.components() {
@@ -62,8 +67,21 @@ pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
     Some(clean)
 }
 
+/// `recorded` (a `project_folder` value) read from `base`: an absolute path as it is, a relative
+/// one split at `/` and `\\` alike.
+pub(crate) fn join_recorded(base: &Path, recorded: &str) -> PathBuf {
+    if Path::new(recorded).is_absolute() {
+        return PathBuf::from(recorded);
+    }
+    recorded
+        .split(['/', '\\'])
+        .filter(|part| !part.is_empty())
+        .fold(base.to_path_buf(), |p, part| p.join(part))
+}
+
 /// Record `folder` as the project folder of the taskbag at `root`, relative to the Allomos
-/// folder when it can be. Returns what was written.
+/// folder when it can be, with `/` between its parts so the taskbag works on every system.
+/// Returns what was written.
 pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Problem> {
     if !folder.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -72,13 +90,13 @@ pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Probl
     }
     let folder = std::path::absolute(folder).unwrap_or_else(|_| folder.to_path_buf());
     let base = std::path::absolute(allomos_folder(root)).unwrap_or_else(|_| allomos_folder(root));
-    let recorded = relative_path(&base, &folder)
-        .unwrap_or(folder)
-        .to_string_lossy()
-        .into_owned();
+    let recorded = match relative_path(&base, &folder) {
+        Some(relative) => portable_path(&relative),
+        None => folder.to_string_lossy().into_owned(),
+    };
     let lock = Lock::acquire(root, LOCK_WAIT)?;
     let path = lock.root().join(PROJECT_FILE);
-    let text = std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+    let text = read_text(&path).map_err(|e| Problem::ReadFailed {
         detail: format!("{}: {e}", path.display()),
     })?;
     let before = parse_project(PROJECT_FILE, &text).map_err(|issues| issues[0].problem.clone())?;

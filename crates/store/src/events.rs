@@ -135,7 +135,7 @@ pub fn list(root: &Path) -> (Vec<Event>, Vec<Issue>) {
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         let file = format!("{EVENTS_DIR}/{name}");
-        match fs::read_to_string(&path) {
+        match crate::read_text(&path) {
             Ok(text) => match parse_event(&file, &text) {
                 Ok(e) => events.push((file, e)),
                 Err(i) => issues.push(i),

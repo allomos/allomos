@@ -154,7 +154,8 @@ fn file_manager_command(root: &Path) -> Result<Command, Problem> {
         "xdg-open"
     };
     let mut command = agents::command(program);
-    command.arg(root);
+    // Explorer understands only `\` and no `\\?\` prefix.
+    command.arg(allomos_store::plain_path(root));
     Ok(command)
 }
 
@@ -1404,7 +1405,7 @@ mod tests {
     #[test]
     fn file_manager_opens_only_a_taskbag() {
         let dir = std::env::temp_dir().join(format!("allomos-reveal-{}", std::process::id()));
-        let root = dir.join(allomos_store::DEFAULT_DIR);
+        let root = allomos_store::default_root(&dir);
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // The project folder itself, a missing path and a plain file are refused.
@@ -1416,7 +1417,9 @@ mod tests {
         }
         allomos_store::init(&root, "p", "P").unwrap();
         let command = file_manager_command(&root).unwrap();
-        assert_eq!(command.get_args().collect::<Vec<_>>(), [root.as_os_str()]);
+        // The path as Explorer wants it (on macOS and Linux, unchanged).
+        let shown = allomos_store::plain_path(&root);
+        assert_eq!(command.get_args().collect::<Vec<_>>(), [shown.as_os_str()]);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

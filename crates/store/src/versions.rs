@@ -402,7 +402,7 @@ fn set_format(path: &Path, version: u32) -> Result<(), Problem> {
         path: path.display().to_string(),
         detail: detail.to_string(),
     };
-    let text = fs::read_to_string(path).map_err(|e| failed(&e.to_string()))?;
+    let text = crate::read_text(path).map_err(|e| failed(&e.to_string()))?;
     let key = text
         .find("\"format\"")
         .ok_or_else(|| failed("no format field"))?;
@@ -485,7 +485,7 @@ pub fn connected_project(root: &Path) -> Option<std::path::PathBuf> {
     let folder = match recorded {
         Some(r) => {
             let base = picked_folder(root).unwrap_or(root);
-            normalize(&base.join(r))
+            normalize(&crate::setup::join_recorded(base, r))
         }
         None => picked_folder(root)?.to_path_buf(),
     };

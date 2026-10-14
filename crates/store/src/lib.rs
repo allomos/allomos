@@ -58,6 +58,58 @@ pub const LOCK_FILE: &str = ".lock";
 const TMP_PREFIX: &str = ".tmp-";
 /// Written into every new taskbag, so Git never sees Allomos's working files.
 const GITIGNORE: &str = "# Allomos's own working files. Never commit them.\n.lock\n.tmp-*\n";
+/// Written into every new taskbag, so Git on Windows checks the files out with `\n` line endings,
+/// as Allomos writes them (Task-A07-03). Reading accepts `\r\n` too.
+const GITATTRIBUTES: &str = "# Allomos writes these files with \\n line endings; keep them so on every computer.\n*.json text eol=lf\n*.md text eol=lf\n.gitignore text eol=lf\n.gitattributes text eol=lf\n";
+
+/// `<folder>/.allomos/taskbag`, built part by part so the path uses the system's own separator
+/// (`C:\p\.allomos\taskbag` on Windows, not `C:\p\.allomos/taskbag`).
+pub fn default_root(folder: &Path) -> PathBuf {
+    DEFAULT_DIR
+        .split('/')
+        .fold(folder.to_path_buf(), |p, part| p.join(part))
+}
+
+/// `text` with every `\r\n` turned into `\n`: Git on Windows may check text files out with
+/// `\r\n`, and Allomos always writes `\n` (Task-A07-03).
+pub fn lf(text: &str) -> String {
+    text.replace("\r\n", "\n")
+}
+
+/// Read a text file, with `\r\n` line endings turned into `\n`.
+pub fn read_text(path: &Path) -> io::Result<String> {
+    fs::read_to_string(path).map(|t| lf(&t))
+}
+
+/// A path as the system's own programs want it: on Windows with `\` throughout and without the
+/// `\\?\` prefix that [`Path::canonicalize`] adds (Explorer does not understand it). Elsewhere
+/// the path as it is.
+pub fn plain_path(path: &Path) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(plain_windows(&path.to_string_lossy()))
+    } else {
+        path.to_path_buf()
+    }
+}
+
+/// [`plain_path`]'s text rule, kept apart so it is tested on every system: `/` becomes `\`,
+/// `\\?\C:\x` becomes `C:\x` and `\\?\UNC\server\share` becomes `\\server\share`.
+fn plain_windows(path: &str) -> String {
+    let path = path.replace('/', "\\");
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        rest.to_string()
+    } else {
+        path
+    }
+}
+
+/// A path written with `/` between its parts, for files shared between computers (a
+/// relative path recorded on Windows as `..\app` is stored as `../app`).
+pub fn portable_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
 
 /// What a folder the user picked turns out to be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -237,10 +289,10 @@ pub fn agent_section_for(project: &Path, taskbag: &Path) -> String {
     if taskbag.starts_with(project) {
         return section;
     }
+    // Relative, it is written with `/`, so the same file works on macOS and Windows.
     let at = relative_path(project, taskbag)
-        .unwrap_or_else(|| taskbag.to_path_buf())
-        .display()
-        .to_string();
+        .map(|p| portable_path(&p))
+        .unwrap_or_else(|| taskbag.display().to_string());
     format!(
         "{section}
 This project's taskbag is not inside this folder: it is at `{at}`. Run every `alm` command with
@@ -485,7 +537,7 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
     if !target.starts_with(&project) || !target.is_file() || !text {
         return Err(refused());
     }
-    Ok(LinkTarget::File(target))
+    Ok(LinkTarget::File(plain_path(&target)))
 }
 
 /// The folder the user picked, for a taskbag at `<folder>/.allomos/taskbag`; `None` for a
@@ -510,7 +562,7 @@ pub fn inspect(folder: &Path) -> Inspection {
             root: folder.to_path_buf(),
         };
     }
-    let nested = folder.join(DEFAULT_DIR);
+    let nested = default_root(folder);
     if nested.join(PROJECT_FILE).is_file() {
         return Inspection::Found { root: nested };
     }
@@ -543,7 +595,7 @@ fn rel(root: &Path, path: &Path) -> String {
 }
 
 fn read(root: &Path, path: &Path, issues: &mut Vec<Issue>) -> Option<String> {
-    match fs::read_to_string(path) {
+    match read_text(path) {
         Ok(text) => Some(text),
         Err(e) => {
             issues.push(Issue::new(
@@ -643,8 +695,7 @@ pub fn load(root: &Path) -> Loaded {
         if let Some(text) = read(root, &path, &mut issues) {
             match parse_task(&file, &text) {
                 Ok(mut t) => {
-                    t.description =
-                        fs::read_to_string(dir.join("description.md")).unwrap_or_default();
+                    t.description = read_text(&dir.join("description.md")).unwrap_or_default();
                     tasks.push((file, t));
                 }
                 Err(mut e) => issues.append(&mut e),
@@ -700,6 +751,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     }
     fs::create_dir_all(root)?;
     fs::write(root.join(".gitignore"), GITIGNORE)?;
+    fs::write(root.join(".gitattributes"), GITATTRIBUTES)?;
     let project = Project {
         format: FORMAT.to_string(),
         id: "project".to_string(),
@@ -778,7 +830,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
 pub fn find_taskbag(start: &Path) -> Option<PathBuf> {
     start
         .ancestors()
-        .map(|p| p.join(DEFAULT_DIR))
+        .map(default_root)
         .find(|p| p.join(PROJECT_FILE).is_file())
 }
 
@@ -825,18 +877,53 @@ fn json_text<T: Serialize>(value: &T) -> String {
     text
 }
 
+/// How long replacing a file keeps trying while another program has it open (Windows).
+const REPLACE_RETRY: Duration = Duration::from_millis(1000);
+const REPLACE_PAUSE: Duration = Duration::from_millis(50);
+
+/// Whether `e` may be a file that another program has open, which Windows reports as "access
+/// denied" (5) or a sharing or lock violation (32, 33) until that program lets go.
+fn may_be_in_use(e: &io::Error) -> bool {
+    e.kind() == io::ErrorKind::PermissionDenied
+        || (cfg!(windows) && matches!(e.raw_os_error(), Some(5 | 32 | 33)))
+}
+
+/// Run `attempt` until it works, a failure is not [`may_be_in_use`], or `limit` has passed,
+/// pausing `pause` in between. A writer holds the taskbag's lock meanwhile, so the wait stays
+/// well within the 5 seconds another writer waits for the lock.
+fn retry_in_use<T>(
+    limit: Duration,
+    pause: Duration,
+    mut attempt: impl FnMut() -> io::Result<T>,
+) -> io::Result<T> {
+    let start = Instant::now();
+    loop {
+        match attempt() {
+            Err(e) if may_be_in_use(&e) && start.elapsed() < limit => std::thread::sleep(pause),
+            result => return result,
+        }
+    }
+}
+
+/// Rename `from` over `to`. On Windows this fails while another program (an editor, a virus
+/// scanner, Git) has `to` open without sharing it, so it is tried again for up to a second.
+pub(crate) fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
+    retry_in_use(REPLACE_RETRY, REPLACE_PAUSE, || fs::rename(from, to))
+}
+
 /// Write `path` whole: the text goes to a temporary file in the same folder, is flushed to
 /// disk, and is then renamed over `path`. A reader sees either the old file or the new one,
-/// never a part-written one.
+/// never a part-written one. Line endings are always written as `\n`.
 fn write_atomic(path: &Path, text: &str) -> Result<(), Problem> {
     let dir = path.parent().expect("taskbag files are inside a folder");
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
     let tmp = tmp_path(dir, name);
     let result = (|| {
         let mut f = fs::File::create(&tmp)?;
-        f.write_all(text.as_bytes())?;
+        f.write_all(lf(text).as_bytes())?;
         f.sync_all()?;
-        fs::rename(&tmp, path)
+        drop(f);
+        replace_file(&tmp, path)
     })();
     result.map_err(|e| {
         let _ = fs::remove_file(&tmp);
@@ -858,7 +945,7 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
                 fs::create_dir_all(dir)?;
             }
             let mut f = fs::File::create(&path)?;
-            f.write_all(text.as_bytes())?;
+            f.write_all(lf(text).as_bytes())?;
             f.sync_all()?;
         }
         if target.exists() {
@@ -876,7 +963,8 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
 }
 
 /// Create an empty taskbag at `root` (normally `<repository>/.allomos/taskbag/`): `project.json`,
-/// empty `areas/` and `tasks/`, and a `.gitignore` for the lock. Refused when `root` exists.
+/// empty `areas/` and `tasks/`, a `.gitignore` for the lock and a `.gitattributes` keeping `\n`
+/// line endings. Refused when `root` exists.
 /// Never creates a Git repository.
 /// This is how the app creates one, so its first event says `via: app`.
 pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
@@ -926,6 +1014,7 @@ pub fn init_with_labels(
         &[
             (PROJECT_FILE, text),
             (".gitignore", GITIGNORE.to_string()),
+            (".gitattributes", GITATTRIBUTES.to_string()),
             ("areas/.keep", String::new()),
             ("tasks/.keep", String::new()),
             (
@@ -1487,6 +1576,7 @@ pub fn stamp(root: &Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allomos_core::ops;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn tmp(name: &str) -> PathBuf {
@@ -2015,7 +2105,8 @@ mod tests {
         let outside = tmp("links-outside");
         fs::write(outside.join("other.md"), "x").unwrap();
 
-        let card = dir.join("docs/tasks/Card.md").canonicalize().unwrap();
+        // On Windows without the `\\?\` prefix canonicalize adds, so Explorer can open it.
+        let card = plain_path(&dir.join("docs/tasks/Card.md").canonicalize().unwrap());
         let file = |link: &str| resolve_task_link(&root, "T1", link);
         assert_eq!(
             file("../../../../docs/tasks/Card.md"),
@@ -2071,5 +2162,190 @@ mod tests {
         let loaded = load(&root);
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Every text file under `dir` rewritten with `\r\n` line endings, the way Git on Windows
+    /// may check a taskbag out.
+    fn to_crlf(dir: &Path) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                to_crlf(&path);
+            } else if let Ok(text) = fs::read_to_string(&path) {
+                fs::write(&path, text.replace('\n', "\r\n")).unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn a_taskbag_checked_out_with_crlf_loads_and_is_written_back_with_lf() {
+        let dir = tmp("crlf");
+        let root = default_root(&dir);
+        init(&root, "p", "P").unwrap();
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        let mut task =
+            ops::new_task(&bag, "A01-01", "A01", "Do it", Some("Why\nand how\n")).unwrap();
+        lock.create_task(&task).unwrap();
+        drop(lock);
+        handoff::write(
+            &root,
+            "me",
+            Some(&["A01-01".to_string()]),
+            Some("Baking bread\n"),
+            &["A01-01".to_string()],
+            false,
+        )
+        .unwrap();
+
+        to_crlf(&root);
+        assert!(
+            fs::read_to_string(root.join("project.json"))
+                .unwrap()
+                .contains("\r\n")
+        );
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let bag = loaded.taskbag.unwrap();
+        assert_eq!(bag.tasks[0].description, "Why\nand how\n");
+        let h = handoff::latest_for(&root, "A01-01").expect("the handoff's header is read");
+        assert_eq!(h.writer, "me");
+        assert_eq!(h.summary, "Baking bread");
+        assert!(!handoff::template(&root).contains('\r'));
+
+        // What Allomos writes back has `\n` only, even from text that came with `\r\n`.
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        task.holder = Some("me".into());
+        lock.save_task(&task).unwrap();
+        lock.create_task(&Task {
+            id: "A01-02".into(),
+            description: "One\r\nTwo\r\n".into(),
+            ..task.clone()
+        })
+        .unwrap();
+        drop(lock);
+        for file in ["tasks/A01-01/task.json", "tasks/A01-02/description.md"] {
+            let text = fs::read_to_string(root.join(file)).unwrap();
+            assert!(!text.contains('\r'), "{file}: {text:?}");
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_new_taskbag_keeps_lf_line_endings_in_git() {
+        let dir = tmp("attributes");
+        let root = default_root(&dir);
+        init(&root, "p", "P").unwrap();
+        let text = fs::read_to_string(root.join(".gitattributes")).unwrap();
+        assert!(text.contains("*.json text eol=lf"), "{text}");
+        assert!(text.contains("*.md text eol=lf"), "{text}");
+        create_starter(&dir.join("starter"), "S").unwrap();
+        assert!(dir.join("starter/.gitattributes").is_file());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_path_with_backslashes_finds_its_project() {
+        let base = tmp("backslash");
+        let home = base.join("tasks-home");
+        let app = base.join("app");
+        fs::create_dir_all(&app).unwrap();
+        let root = default_root(&home);
+        init(&root, "p", "P").unwrap();
+        // Written on Windows by an older Allomos, or by hand: `\` between the parts.
+        let mut bag = load(&root).taskbag.unwrap();
+        bag.project.project_folder = Some(r"..\app".into());
+        assert_eq!(project_folder_of(&root, &bag.project), Some(app.clone()));
+        bag.project.project_folder = Some(r"..\app\".into());
+        assert_eq!(project_folder_of(&root, &bag.project), Some(app.clone()));
+        // Recorded with `/`, so the taskbag works on every computer.
+        assert_eq!(record_project_folder(&root, &app).unwrap(), "../app");
+        // The taskbag found from the project folder, and the project folder from the taskbag.
+        assert_eq!(picked_folder(&root), Some(home.as_path()));
+        assert_eq!(find_taskbag(&home.join("src")), Some(root.clone()));
+        // An AGENTS.md beside a sibling taskbag names it with `/`.
+        let section = agent_section_for(&app, &root);
+        assert!(
+            section.contains("`--taskbag \"../tasks-home/.allomos/taskbag\"`"),
+            "{section}"
+        );
+        assert_eq!(portable_path(Path::new(r"..\a\b")), "../a/b");
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn windows_paths_are_given_to_explorer_plainly() {
+        assert_eq!(
+            plain_windows(r"\\?\C:\p\.allomos\taskbag"),
+            r"C:\p\.allomos\taskbag"
+        );
+        assert_eq!(
+            plain_windows(r"C:\p\.allomos/taskbag"),
+            r"C:\p\.allomos\taskbag"
+        );
+        assert_eq!(
+            plain_windows(r"\\?\UNC\server\share\p"),
+            r"\\server\share\p"
+        );
+        assert_eq!(plain_windows(r"\\server\share\p"), r"\\server\share\p");
+    }
+
+    #[test]
+    fn replacing_a_file_that_is_open_for_reading_succeeds() {
+        let dir = tmp("open-reader");
+        let root = default_root(&dir);
+        init(&root, "p", "P").unwrap();
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        let mut task = ops::new_task(&bag, "A01-01", "A01", "Do it", None).unwrap();
+        lock.create_task(&task).unwrap();
+        let path = root.join("tasks/A01-01/task.json");
+        let before = fs::read_to_string(&path).unwrap();
+
+        // Another reader has the file open while it is replaced.
+        let mut reader = fs::File::open(&path).unwrap();
+        task.holder = Some("me".into());
+        lock.save_task(&task).unwrap();
+        let mut seen = String::new();
+        io::Read::read_to_string(&mut reader, &mut seen).unwrap();
+        // The reader sees the old file whole, or (where the system shares it) the new one whole.
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(seen == before || seen == after, "{seen}");
+        assert!(after.contains("\"holder\": \"me\""), "{after}");
+        drop(reader);
+        drop(lock);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replacing_retries_while_the_file_is_in_use_then_gives_up() {
+        let in_use = || io::Error::from(io::ErrorKind::PermissionDenied);
+        // In use twice, then free: it works.
+        let mut tries = 0;
+        let result = retry_in_use(Duration::from_secs(1), Duration::ZERO, || {
+            tries += 1;
+            if tries < 3 { Err(in_use()) } else { Ok(tries) }
+        });
+        assert_eq!(result.unwrap(), 3);
+        // Another failure is not retried.
+        let mut tries = 0;
+        let result: io::Result<()> = retry_in_use(Duration::from_secs(1), Duration::ZERO, || {
+            tries += 1;
+            Err(io::Error::from(io::ErrorKind::NotFound))
+        });
+        assert!(result.is_err());
+        assert_eq!(tries, 1);
+        // Still in use when the time is up: the failure is returned.
+        let result: io::Result<()> =
+            retry_in_use(Duration::from_millis(20), Duration::from_millis(5), || {
+                Err(in_use())
+            });
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
     }
 }

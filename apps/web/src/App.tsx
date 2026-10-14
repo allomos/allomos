@@ -14,6 +14,7 @@ import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
 import { FILTER_STATES, keepState, readFilter, stopText, toCheck, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
+import { projectFolder } from "./paths";
 import { HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import type { Creating } from "./createFlow";
@@ -36,11 +37,6 @@ const NEW_WINDOW = new URLSearchParams(window.location.search).has("new");
 /** Recently opened project folders, newest first, for File → Open Recent. */
 const RECENT_KEY = "allomos.recentFolders";
 const RECENT_MAX = 10;
-
-/** The project folder the user picked, from a taskbag root (`<folder>/.allomos/taskbag`). */
-function projectFolder(root: string): string {
-  return root.replace(/[\\/]\.allomos[\\/]taskbag[\\/]?$/, "");
-}
 
 function readRecent(): string[] {
   try {
