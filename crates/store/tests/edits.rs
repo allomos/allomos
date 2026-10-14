@@ -270,7 +270,7 @@ fn the_app_waits_for_the_lock_then_takes_it() {
 }
 
 #[test]
-fn an_older_taskbag_is_not_changed() {
+fn a_too_old_taskbag_is_not_changed() {
     let (dir, root) = taskbag("older");
     let project = root.join("project.json");
     let text = fs::read_to_string(&project).unwrap();
@@ -282,7 +282,7 @@ fn an_older_taskbag_is_not_changed() {
     let before = snapshot(&root);
     assert!(matches!(
         edit(&root, "A01-01", Edit::Title { title: "x".into() }),
-        Err(Problem::TaskbagOlder { .. })
+        Err(Problem::TaskbagTooOld { .. })
     ));
     assert_eq!(snapshot(&root), before);
     fs::remove_dir_all(dir).unwrap();

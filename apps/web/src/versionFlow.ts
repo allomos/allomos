@@ -10,7 +10,7 @@ export function outdatedFiles(check: VersionCheck | null): string[] {
 }
 
 /** What the notice above the task list says, or null for no notice. Only once an agent is
- * connected (the check is null before). A newer taskbag is not here: it cannot be read, and the
+ * connected (the check is null before). A newer or too old taskbag is not here: it cannot be read, and the
  * problem list says "update Allomos now". */
 export type UpdateNotice = { kind: "taskbag" } | { kind: "section"; files: string };
 

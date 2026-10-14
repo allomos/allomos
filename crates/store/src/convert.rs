@@ -27,6 +27,53 @@ pub const CONNECT_REQUEST_VERSION: u32 = 1;
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
 
+/// What is being migrated into the newest Allomos: another task system (this module's
+/// conversion), or a taskbag written by an older Allomos (`versions::migration_prompt_in`,
+/// Task-A01-32: owner, 2026-10-14, the same migration process, with its own entries).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Source {
+    OtherSystem,
+    OlderTaskbag,
+}
+
+/// The lines every migration request starts with, after its title: where the project and the
+/// taskbag are, and how to run `alm`. Agents' shells often forget exported variables between
+/// commands, so every command names the taskbag; the request says so once.
+pub(crate) fn migration_header_in(language: &str, project: &Path, taskbag: &Path) -> String {
+    let (p, t) = (project.display(), taskbag.display());
+    let alm = format!("alm --taskbag \"{t}\"");
+    match language {
+        "zh-CN" => format!(
+            "项目文件夹：{p}\n任务包（Allomos 的任务文件）：{t}\n下面每条 `alm` 命令都请这样运行：`{alm} …`"
+        ),
+        "ja" => format!(
+            "プロジェクトのフォルダー：{p}\nタスクバッグ（Allomos のタスクファイル）：{t}\n以下の `alm` コマンドはすべて `{alm} …` の形で実行してください。"
+        ),
+        _ => format!(
+            "Project folder: {p}\nTaskbag (Allomos's task files): {t}\nRun every `alm` command below as `{alm} …`."
+        ),
+    }
+}
+
+/// The rule every migration request gives: ask the person exactly once, with the whole plan in
+/// the app (`alm confirm`), and decide the details by the request's own defaults or rules.
+pub(crate) fn ask_once_in(language: &str, source: Source) -> String {
+    let older = source == Source::OlderTaskbag;
+    match language {
+        "zh-CN" => format!(
+            "只问用户一次：在 Allomos 应用里用 `alm confirm` 确认完整计划。不要在对话中提问；细节按下面的{}自己决定，并写进计划，用户不同意可以取消。",
+            if older { "规则" } else { "默认做法" }
+        ),
+        "ja" => "ユーザーへの質問は一度だけです：Allomos アプリで `alm confirm` により計画全体を確認します。チャットでは質問しないでください。細かい点は下の決まりに従って自分で決め、計画に書きます。同意できなければユーザーはキャンセルできます。".to_string(),
+        _ => format!(
+            "Ask the person exactly once: the full plan, confirmed in the Allomos app with `alm confirm`. \
+Do not ask questions in the chat; decide the details yourself {} and put \
+them in the plan, so the person can cancel if they disagree.",
+            if older { "by the rules below" } else { "with the defaults below" }
+        ),
+    }
+}
+
 /// The request that asks one AI agent to move the project's tasks into Allomos, in an
 /// interface language (`en`, `zh-CN`, `ja`; English otherwise). `project` is the recorded project
 /// folder, `taskbag` the existing taskbag. The steps follow the language; the commands, the paths
@@ -50,18 +97,15 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
     let (project, taskbag) = (project_path.display(), taskbag_path.display());
     let version = CONVERT_REQUEST_VERSION;
     let title = CONFIRM_TITLE;
-    // Agents' shells often forget exported variables between commands, so every command names
-    // the taskbag; the request says so once instead of repeating the path.
-    let with_taskbag = format!("alm --taskbag \"{taskbag}\"");
+    let header = migration_header_in(language, project_path, taskbag_path);
+    let ask = ask_once_in(language, Source::OtherSystem);
     match language {
         "zh-CN" => format!(
             "请找出这个项目的任务，并把它们搬进 Allomos（转换请求 v{version}）。
 
-项目文件夹：{project}
-任务包（Allomos 的任务文件）：{taskbag}
-下面每条 `alm` 命令都请这样运行：`{with_taskbag} …`
+{header}
 
-只问用户一次：在 Allomos 应用里用 `alm confirm` 确认完整计划。不要在对话中提问；细节按下面的默认做法自己决定，并写进计划，用户不同意可以取消。
+{ask}
 
 请按顺序做：
 
@@ -81,11 +125,9 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
         "ja" => format!(
             "このプロジェクトのタスクを見つけて、Allomos に移してください（移行の依頼 v{version}）。
 
-プロジェクトのフォルダー：{project}
-タスクバッグ（Allomos のタスクファイル）：{taskbag}
-以下の `alm` コマンドはすべて `{with_taskbag} …` の形で実行してください。
+{header}
 
-ユーザーへの質問は一度だけです：Allomos アプリで `alm confirm` により計画全体を確認します。チャットでは質問しないでください。細かい点は下の決まりに従って自分で決め、計画に書きます。同意できなければユーザーはキャンセルできます。
+{ask}
 
 順に進めてください：
 
@@ -105,13 +147,9 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
         _ => format!(
             "Please find this project's tasks and move them into Allomos (conversion request v{version}).
 
-Project folder: {project}
-Taskbag (Allomos's task files): {taskbag}
-Run every `alm` command below as `{with_taskbag} …`.
+{header}
 
-Ask the person exactly once: the full plan, confirmed in the Allomos app with `alm confirm`. \
-Do not ask questions in the chat; decide the details yourself with the defaults below and put \
-them in the plan, so the person can cancel if they disagree.
+{ask}
 
 Work in this order:
 

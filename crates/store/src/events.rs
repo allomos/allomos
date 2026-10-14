@@ -182,17 +182,6 @@ pub fn history(root: &Path, id: &str) -> History {
     }
 }
 
-/// The upgrade step from `allomos/2` to `allomos/3`: the `events/` folder, kept in Git by an empty
-/// `.keep`. The event that starts the history is written by the upgrade itself.
-pub fn add_folder(root: &Path) -> std::io::Result<()> {
-    let keep = root.join(EVENTS_DIR).join(".keep");
-    if !keep.exists() {
-        fs::create_dir_all(root.join(EVENTS_DIR))?;
-        fs::write(keep, "")?;
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

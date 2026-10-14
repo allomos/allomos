@@ -37,3 +37,8 @@ test("an older taskbag comes first", () => {
 test("a newer taskbag is left to the problem list", () => {
   assert.equal(updateNotice(check({ state: "newer", found: "allomos/2" }, [{ file: "AGENTS.md", version: 1 }])), null);
 });
+
+test("a taskbag too old to migrate is left to the problem list (Task-A01-32)", () => {
+  const c = check({ state: "too_old", found: "allomos/2", oldest: "allomos/3" }, [{ file: "AGENTS.md", version: 1 }]);
+  assert.equal(updateNotice(c), null);
+});
