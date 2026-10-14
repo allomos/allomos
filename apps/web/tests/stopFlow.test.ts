@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allBlockersDone, blockers, keepState, readFilter, stopText } from "../src/stopFlow.ts";
+import { allBlockersDone, blockers, humanCheckNote, keepState, readFilter, stopText, toCheck } from "../src/stopFlow.ts";
 import type { Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -22,7 +22,8 @@ const base: Task = {
   next_dependency: null,
   iteration: null,
   handoff_note: null,
-  finished_without_owner: null,
+  without_human_check: null,
+  human_check_steps: null,
   description: "",
 };
 const task = (over: Partial<Task>): Task => ({ ...base, ...over });
@@ -64,4 +65,24 @@ test("the state filter keeps waiting and blocked apart", () => {
   assert.equal(readFilter("blocked"), "blocked");
   assert.equal(readFilter("nonsense"), "all");
   assert.equal(readFilter(null), "all");
+});
+
+test("not human-checked: a done task with the note, under either name (Task-A03-18)", () => {
+  const finished = task({ state: "done", without_human_check: "loop run", human_check_steps: "1. Open it." });
+  assert.equal(toCheck(finished), true);
+  assert.equal(humanCheckNote(finished), "loop run");
+  assert.equal(toCheck(task({ state: "done" })), false, "finished the usual way");
+  assert.equal(toCheck(task({ state: "in_progress", without_human_check: "x" })), false, "not finished");
+  const old = task({ state: "done", finished_without_owner: "card run" });
+  assert.equal(toCheck(old), true, "a taskbag being migrated");
+  assert.equal(humanCheckNote(old), "card run");
+});
+
+test("the Needs a human filter keeps the tasks to check and to answer, not backlog", () => {
+  assert.equal(keepState("human", task({ state: "done", without_human_check: "loop run" })), true);
+  assert.equal(keepState("human", task({ state: "waiting", waiting_on: "approve" })), true);
+  assert.equal(keepState("human", task({ state: "backlog" })), false);
+  assert.equal(keepState("human", task({ state: "done" })), false);
+  assert.equal(keepState("human", task({ state: "blocked", blocked_by: ["A01-17"] })), false);
+  assert.equal(readFilter("human"), "human");
 });

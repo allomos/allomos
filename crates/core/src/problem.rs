@@ -104,8 +104,19 @@ problems! {
     NotBlocked { id, state } => "not_blocked", "Task {id} is {state}, not blocked, so there is nothing to unblock.";
     /// A warning: a blocking task is dropped, so it will never be done (owner, 2026-10-14).
     BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: it will never be done, and it does not count as done. Is {id} still blocked?";
-    /// `alm done --without-owner` with no text, or the field empty in `task.json` (Task-A03-15).
-    WithoutOwnerMissing => "without_owner_missing", "Say why the task is finished without the owner's check, and in which run.";
+    /// `alm done --without-human-check` with no text, or the field empty in `task.json`
+    /// (Task-A03-15; renamed from `without_owner_missing` in Task-A03-18).
+    WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check, and in which run.";
+    /// A warning: `alm done --without-human-check` without the steps for the person who checks it
+    /// (Task-A03-18). `alm` asks for them and shows how to write them; it does not refuse.
+    HumanCheckStepsMissing { id } => "human_check_steps_missing", "No human check steps for {id}: a person must be able to pick it up and test it. Write them in Markdown (the test folder, what to open, what to click, what they should see) to a file, then run `alm done {id} --without-human-check \"<why, which run>\" --steps <file.md>`.";
+    /// `--steps` names an empty file (Task-A03-18).
+    HumanCheckStepsEmpty => "human_check_steps_empty", "The human check steps are empty. Write what a person opens, clicks and should see, or leave out --steps.";
+    /// `alm checked` on a task that is not done (Task-A03-18).
+    NotDone { id, state } => "not_done", "Task {id} is {state}, not done: only a finished task is human-checked.";
+    /// A task still carries the note's name from before `allomos/4` (Task-A03-18): the guided
+    /// migration moves it with `alm`.
+    FinishedWithoutOwnerRenamed { id } => "finished_without_owner_renamed", "Task {id} carries `finished_without_owner`, the name used before allomos/4. If it has not been checked by a person since, move the note: `alm done {id} --without-human-check \"<the same note>\"`; if it has (its label is the top one), clear it: `alm checked {id}`.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";

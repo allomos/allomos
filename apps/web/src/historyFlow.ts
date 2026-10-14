@@ -16,7 +16,9 @@ const FIELD_KEYS: Record<string, Key> = {
   blocked_by: "pane.blocked_by",
   next_dependency: "pane.next",
   handoff_note: "pane.handoff",
-  finished_without_owner: "pane.finished_without_owner",
+  without_human_check: "pane.without_human_check",
+  human_check_steps: "pane.human_check_steps",
+  finished_without_owner: "pane.without_human_check",
   description: "pane.description",
 };
 

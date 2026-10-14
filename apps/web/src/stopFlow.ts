@@ -46,17 +46,31 @@ export function stopText(task: Task, tasks: readonly Task[], t: T): string | nul
   return null;
 }
 
-/** The list's state filter: every state, or one. */
-export type StateFilter = "all" | State;
+/** Finished without the human check and not checked since: "Not human-checked" (Task-A03-18).
+ * A task still carrying the note's name from before allomos/4 counts too. */
+export function toCheck(task: Task): boolean {
+  return task.state === "done" && !!(task.without_human_check || task.finished_without_owner);
+}
+
+/** Why it was finished without the human check (the note, under either name). */
+export function humanCheckNote(task: Task): string {
+  return task.without_human_check ?? task.finished_without_owner ?? "";
+}
+
+/** The list's state filter: every state, one, or every task that needs a person: to check or
+ * to answer (waiting), as `alm human` lists them (Task-A03-18). */
+export type StateFilter = "all" | "human" | State;
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
 /** The tasks the filter keeps. */
 export function keepState(filter: StateFilter, task: Task): boolean {
+  if (filter === "human") return toCheck(task) || task.state === "waiting";
   return filter === "all" || task.state === filter;
 }
 
 /** A stored filter read back; anything else is "all". */
 export function readFilter(value: string | null): StateFilter {
+  if (value === "human") return "human";
   return value && (FILTER_STATES as string[]).includes(value) ? (value as State) : "all";
 }

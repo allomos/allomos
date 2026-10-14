@@ -12,9 +12,9 @@ import { almOfferLines } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
-import { FILTER_STATES, keepState, readFilter, stopText, type StateFilter } from "./stopFlow";
+import { FILTER_STATES, keepState, readFilter, stopText, toCheck, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
-import { TaskPane } from "./TaskPane";
+import { HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import type { Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
@@ -787,7 +787,8 @@ function TaskbagView({
   const [handoffDialog, setHandoffDialog] = useState<"settings" | "write" | null>(null);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
-  // The state filter (decision 0016): waiting and blocked tasks apart, or any one state.
+  // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
+  // task that needs a person (Task-A03-18).
   const [stateFilter, setStateFilter] = useState<StateFilter>(() => {
     try {
       return readFilter(localStorage.getItem(STATE_FILTER_KEY));
@@ -1032,6 +1033,8 @@ function TaskbagView({
                   {t("filter.label")}{" "}
                   <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
                     <option value="all">{t("filter.all")}</option>
+                    {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
+                    <option value="human">{t("filter.human")}</option>
                     {FILTER_STATES.map((s) => (
                       <option key={s} value={s}>
                         {t(`state.${s}`)}
@@ -1324,7 +1327,10 @@ function TaskGroup({
               >
                 <span className="id">{task.id}</span>
                 <span className="title">{task.title}</span>
-                <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
+                <span className="state-cell">
+                  {toCheck(task) && <HumanCheckBadge task={task} />}
+                  <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
+                </span>
                 <span className="meta">
                   {task.label && <span className="label">{task.label}</span>}
                   {iteration && <span>{t("task.iteration", { iteration })}</span>}

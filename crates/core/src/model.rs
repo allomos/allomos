@@ -16,7 +16,9 @@ pub const FORMAT: &str = "allomos/4";
 /// 3: `events/`, one file per change, the history of changes (Task-A01-17), and a task's
 /// optional `finished_without_owner` (Task-A03-15).
 /// 4: the `blocked` state with a task's `blocked_by`, and a waiting task's optional `who`
-/// (decision 0016, Task-A01-31).
+/// (decision 0016, Task-A01-31); the human check: `finished_without_owner` becomes
+/// `without_human_check`, with optional `human_check_steps`, and the default top label is
+/// "human verified" (Task-A03-18). One migration entry 3 → 4 covers both.
 pub const FORMAT_VERSION: u32 = 4;
 
 /// The oldest format this Allomos can update (owner, 2026-10-14; Task-A01-32). An older taskbag
@@ -154,7 +156,7 @@ pub fn default_labels() -> Vec<String> {
         "implemented",
         "locally verified",
         "deployed and verified",
-        "owner verified",
+        "human verified",
     ]
     .into_iter()
     .map(String::from)
@@ -247,7 +249,7 @@ pub struct Task {
     /// For a `waiting` task: what a person (or an outside event) must do, in plain words.
     #[serde(default)]
     pub waiting_on: Option<String>,
-    /// For a `waiting` task: who must act, when it is not the owner (`alm wait --who`, decision
+    /// For a `waiting` task: who must act, when it is not the approver (`alm wait --who`, decision
     /// 0016). Without it the app says "Waiting for you".
     #[serde(default)]
     pub who: Option<String>,
@@ -263,13 +265,33 @@ pub struct Task {
     /// A short note left on release for whoever picks the task up next.
     #[serde(default)]
     pub handoff_note: Option<String>,
-    /// Why the task was finished without the owner's check, and in which run: set only by
-    /// `alm done --without-owner` (Task-A03-15). Kept when the owner checks it later, so such tasks
-    /// stay searchable; the owner's check shows in the label.
+    /// Why the task was finished without the human check, and in which run: set by
+    /// `alm done --without-human-check` (Task-A03-15, renamed in Task-A03-18). While a done task
+    /// has it, the task waits for a person to check it ("To check", `alm human`). Marking it
+    /// checked (`alm checked`, or the top label on a done task) clears it; its history keeps it.
     #[serde(default)]
+    pub without_human_check: Option<String>,
+    /// How a person checks the task, in Markdown (test folder, what to open, what to click, what
+    /// they should see): `alm done --without-human-check … --steps <file.md>` (Task-A03-18).
+    /// Cleared with the note when the task is checked.
+    #[serde(default)]
+    pub human_check_steps: Option<String>,
+    /// The note's name before `allomos/4`. Read only so that the guided migration can move it
+    /// (`alm done --without-human-check`) or clear it (`alm checked`); a task that still has it is
+    /// reported (`finished_without_owner_renamed`). Never written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_without_owner: Option<String>,
     #[serde(default, skip_deserializing)]
     pub description: String,
+}
+
+impl Task {
+    /// Finished without the human check and not checked since: "To check" (Task-A03-18). A task
+    /// still carrying the note's old name counts too, so it is not lost during a migration.
+    pub fn to_check(&self) -> bool {
+        self.state == State::Done
+            && (self.without_human_check.is_some() || self.finished_without_owner.is_some())
+    }
 }
 
 /// A whole taskbag after loading: the project, its areas, iterations and tasks.

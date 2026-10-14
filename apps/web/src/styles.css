@@ -251,6 +251,11 @@ button.link:hover { text-decoration: underline; }
 .blocker-picker legend { color: var(--muted); padding: 0 4px; }
 .s-done { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
 .s-dropped { color: var(--muted); text-decoration: line-through; }
+/* "Not human-checked" (Task-A03-18): beside the state in the lists and in the task pane's header. */
+.state-cell { display: inline-flex; gap: 6px; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; }
+.badge.to-check { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--warn-bg); color: var(--warn); border: 1px dashed var(--warn); }
+.pane-check { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.pane-check .muted { flex-basis: 100%; }
 @media (max-width: 720px) {
   .list-layout.with-pane { grid-template-columns: minmax(0, 1fr); }
   .task-pane { position: fixed; inset: 64px 12px 12px; max-height: none; z-index: 5; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }

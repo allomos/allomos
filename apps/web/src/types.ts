@@ -34,15 +34,19 @@ export interface Task {
   holder: string | null;
   /** For a waiting task: what a person must do. */
   waiting_on: string | null;
-  /** For a waiting task: who must act; none means the owner ("Waiting for you"). Decision 0016. */
+  /** For a waiting task: who must act; none means the approver ("Waiting for you"). Decision 0016. */
   who?: string | null;
   /** For a blocked task: the tasks that must finish first (left out when none). Decision 0016. */
   blocked_by?: string[];
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
-  /** Why the task was finished without the owner's check (Task-A03-15). */
-  finished_without_owner: string | null;
+  /** Why the task was finished without the human check, and in which run (Task-A03-15, A03-18). */
+  without_human_check: string | null;
+  /** How a person checks it, in Markdown (Task-A03-18). */
+  human_check_steps: string | null;
+  /** The note's name before allomos/4; only on a taskbag being migrated. */
+  finished_without_owner?: string | null;
   description: string;
 }
 
@@ -59,7 +63,8 @@ export type Edit =
   | { field: "handoff_note"; text: string | null }
   | { field: "iteration"; iteration: string | null }
   | { field: "title"; title: string }
-  | { field: "description"; text: string };
+  | { field: "description"; text: string }
+  | { field: "checked" };
 
 /**
  * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID

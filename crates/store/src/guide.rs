@@ -24,12 +24,17 @@ about the project's tasks.
   without one is unplanned.
 - **State**: where a task is in its life: backlog, ready (approved to start), in progress (held
   by someone), waiting (a person or an outside event must act: its waiting-on says what, its
-  optional who says who; no who means the owner), blocked (another task in this taskbag must
+  optional who says who; no who means the approver), blocked (another task in this taskbag must
   finish first: its blocked-by lists them), done, or dropped (will not be done). A task blocked by
   a task and also waiting on a person is blocked; the person part goes in its next dependency.
 - **Label**: the highest step of the project's progress **ladder** the task has proven, for
-  example implemented → locally verified → owner verified. It is the only progress claim; test
+  example implemented → locally verified → human verified. It is the only progress claim; test
   counts support a label but are never one.
+- **Human check**: a person tries the finished task by hand. Its step is the ladder's top label.
+  A task finished without it (in an automatic or loop run) carries why, and the steps for the
+  person who checks it; it is **to check** until someone marks it checked.
+- **Approver**: the person who decides and approves (cards, plans, external effects). A waiting
+  task without a who waits for the approver.
 - **Holder**: the person or agent session working a task (`--as <name>`). One holder at a time.
 - **Next dependency**: the one thing needed before the task's next label.
 - **Handoff note**: what the next holder needs to know, left when a task is released.
@@ -100,7 +105,10 @@ See:
   done. `alm` chooses and moves nothing; you do.
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
   (`--state blocked`, `--state waiting`, …);
-  `--without-owner`: only tasks finished without the owner's check.
+  `--without-human-check`: only tasks finished without the human check, not checked since.
+- `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person: **To check**
+  (finished without the human check, each with why; `--steps` adds how to check it) and **To
+  answer** (waiting on a person, each with what). Backlog tasks are not listed.
 - `alm show <id>`: one task in full, with its description.
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
@@ -109,14 +117,19 @@ Work a task:
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm wait <id> --on \"<what>\" [--who \"<who>\"]`: state waiting: a person (or an outside
-  event) must act; without `--who`, the owner.
+  event) must act; without `--who`, the approver.
 - `alm block <id> --by <task-id> [<task-id>…]`: state blocked: those tasks must finish first.
   `alm list`, `show` and `next` show each blocker's state; a dropped blocker is flagged and never
   counts as done. When all are done, `alm next` says so, and moves nothing: check, then
   `alm unblock <id>` (ready, or in progress when someone holds it).
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id> [--without-owner \"<why, which run>\"]`: finished (see `alm guide workflow`,
-  step 7); it ends with the rule for checking the handoffs that name the task; follow it.
+- `alm done <id> [--without-human-check \"<why, which run>\" --steps <file.md>]`: finished (see
+  `alm guide workflow`, step 7); it ends with the rule for checking the handoffs that name the
+  task; follow it. The steps are Markdown for the person who checks it: the test folder, what to
+  open, what to click, what they should see. On a task already done, it only records its human
+  check again (the old `--without-owner` still works).
+- `alm checked <id>`: a person has checked the finished task: it gets the top label and leaves
+  To check; the note and steps stay in its history. Run it only when the person says so.
   `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task).
 
 Plan:
@@ -178,11 +191,15 @@ const WORKFLOW: &str = "# How to work the tasks
    or a person. Evidence goes on the task's card, not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\" --push`.
-7. Finished: only once the task has the top label of the ladder (the owner has checked it), then
-   `alm done <id> --push`. The one exception: in an automatic or loop run the person set up to go
-   on without them (for example a card run or `/loop`), you may finish a task below the top label
-   with `alm done <id> --without-owner \"<why, which run>\" --push`; say so in your handoff. The
-   task keeps its label and the note, so the owner finds it with `alm list --without-owner`.
+7. Finished: only once the task has the top label of the ladder (a person has checked it: the
+   human check), then `alm done <id> --push`. The one exception: in an automatic or loop run the
+   person set up to go on without them (for example a card run or `/loop`), you may finish a task
+   below the top label with
+   `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md> --push`; say so in
+   your handoff. Write the steps so a person can pick it up and test
+   it: the test folder, what to open, what to click, what they should see. The task keeps its
+   label, the note and the steps, so a person finds it with `alm human`; once they have checked
+   it, `alm checked <id> --push`.
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
@@ -257,7 +274,11 @@ mod tests {
         for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
             assert!(text.contains("top label"), "{text}");
             assert!(text.contains("automatic or loop run"), "{text}");
-            assert!(text.contains("--without-owner"), "{text}");
+            assert!(text.contains("--without-human-check"), "{text}");
+            assert!(text.contains("--steps <file.md>"), "{text}");
+            assert!(text.contains("alm checked <id>"), "{text}");
+            assert!(text.contains("alm human"), "{text}");
+            assert!(!text.contains("owner"), "{text}");
             assert!(text.contains("handoff"), "{text}");
         }
         assert!(crate::agent_section().contains("every ready task nobody holds"));

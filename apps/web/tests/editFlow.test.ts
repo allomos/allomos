@@ -16,7 +16,8 @@ const task: Task = {
   next_dependency: "the owner",
   iteration: "I01",
   handoff_note: null,
-  finished_without_owner: null,
+  without_human_check: null,
+  human_check_steps: null,
   description: "Why.\n",
 };
 

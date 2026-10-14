@@ -13,6 +13,10 @@ test("task fields use the task pane's names; unknown fields stay as stored", () 
   assert.equal(fieldName("next_dependency", t), "pane.next");
   assert.equal(fieldName("title", t), "pane.title");
   assert.equal(fieldName("labels", t), "labels");
+  // Task-A03-18: the human check's note (under either name) and its steps.
+  assert.equal(fieldName("without_human_check", t), "pane.without_human_check");
+  assert.equal(fieldName("finished_without_owner", t), "pane.without_human_check");
+  assert.equal(fieldName("human_check_steps", t), "pane.human_check_steps");
 });
 
 test("a state is worded, an empty side is a dash, long text is shortened", () => {

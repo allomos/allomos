@@ -80,7 +80,7 @@ enum Command {
         #[arg(long)]
         id: Option<String>,
         /// The label ladder, lowest step first, separated by commas.
-        /// Default: implemented, locally verified, deployed and verified, owner verified.
+        /// Default: implemented, locally verified, deployed and verified, human verified.
         #[arg(long, value_name = "A,B,…")]
         labels: Option<String>,
         /// Write Allomos's section for AI agents into AGENTS.md and CLAUDE.md yourself,
@@ -151,10 +151,27 @@ enum Command {
         /// Only tasks you hold.
         #[arg(long)]
         mine: bool,
-        /// Only tasks finished without the owner's check (`alm done --without-owner`).
-        #[arg(long)]
-        without_owner: bool,
+        /// Only tasks finished without the human check and not checked since
+        /// (`alm done --without-human-check`). `--without-owner` is its old name.
+        #[arg(long, alias = "without-owner")]
+        without_human_check: bool,
     },
+    /// What needs a person: To check (tasks finished without the human check, each with why)
+    /// and To answer (tasks waiting on a person, each with what). Backlog tasks are not listed.
+    Human {
+        /// Only tasks planned in this iteration.
+        #[arg(long)]
+        iteration: Option<String>,
+        /// Only tasks in this area.
+        #[arg(long)]
+        area: Option<String>,
+        /// Under each task to check, the steps for checking it.
+        #[arg(long)]
+        steps: bool,
+    },
+    /// A person has checked a finished task: it gets the top label and leaves To check; the note
+    /// and the steps stay in its history. Run it only when the person says so.
+    Checked { id: String },
     /// Show one task in full.
     Show { id: String },
     /// Show a task's history: every recorded change, newest first, with who and when.
@@ -169,12 +186,12 @@ enum Command {
     /// Set a task's label (a step of the project's ladder).
     Label { id: String, label: String },
     /// Park a task as waiting: a person (or an outside event) must act. Say what, and who when it
-    /// is not the owner.
+    /// is not the approver.
     Wait {
         id: String,
         #[arg(long, value_name = "TEXT")]
         on: String,
-        /// Who must act, when it is not the owner (for example Ann).
+        /// Who must act, when it is not the approver (for example Ann).
         #[arg(long, value_name = "NAME")]
         who: Option<String>,
     },
@@ -188,14 +205,20 @@ enum Command {
     /// Move a blocked task on (ready, or in progress when someone holds it). `alm` does not check
     /// its blockers: you do.
     Unblock { id: String },
-    /// Finish a task. Finish it at the top label (the owner has checked it); in an automatic or
-    /// loop run, a task may be finished below it with --without-owner.
+    /// Finish a task. Finish it at the top label (a person has checked it); in an automatic or
+    /// loop run, a task may be finished below it with --without-human-check and --steps. On a task
+    /// already done, only its human check is recorded again.
     Done {
         id: String,
-        /// Why the task is finished without the owner's check, and in which run (an automatic or
-        /// loop run). Recorded in the task's file; `alm list --without-owner` finds it.
-        #[arg(long, value_name = "TEXT")]
-        without_owner: Option<String>,
+        /// Why the task is finished without the human check, and in which run (an automatic or
+        /// loop run). Recorded in the task's file; `alm human` lists it under To check.
+        /// `--without-owner` is its old name.
+        #[arg(long, value_name = "TEXT", alias = "without-owner")]
+        without_human_check: Option<String>,
+        /// A Markdown file with the steps for the person who checks it: the test folder, what to
+        /// open, what to click, what they should see.
+        #[arg(long, value_name = "FILE", requires = "without_human_check")]
+        steps: Option<PathBuf>,
     },
     /// Let go of a task, optionally leaving a handoff note for the next one.
     Release {
@@ -210,7 +233,7 @@ enum Command {
         id: String,
         iteration: Option<String>,
     },
-    /// Mark an unheld backlog, waiting or blocked task ready (for example, the owner approved it).
+    /// Mark an unheld backlog, waiting or blocked task ready (for example, the approver approved it).
     Ready { id: String },
     /// Give a task a new title.
     Title { id: String, title: String },
@@ -401,6 +424,7 @@ impl Command {
             | Command::Block { id, .. }
             | Command::Unblock { id }
             | Command::Done { id, .. }
+            | Command::Checked { id }
             | Command::Release { id, .. }
             | Command::Needs { id, .. }
             | Command::Plan { id, .. }
@@ -416,6 +440,7 @@ impl Command {
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
+            | Command::Human { .. }
             | Command::Migrate { .. }
             | Command::HandoffRules { .. }
             | Command::HandoffTemplate { .. }
@@ -452,6 +477,7 @@ impl Command {
         !matches!(
             self,
             Command::List { .. }
+                | Command::Human { .. }
                 | Command::Show { .. }
                 | Command::History { .. }
                 | Command::Next { .. }
@@ -487,6 +513,8 @@ impl Command {
             Command::Block { .. } => "block",
             Command::Unblock { .. } => "unblock",
             Command::Done { .. } => "done",
+            Command::Checked { .. } => "checked",
+            Command::Human { .. } => "human",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
             Command::Plan { .. } => "plan",
@@ -929,7 +957,7 @@ fn stop_line(bag: &Taskbag, t: &Task) -> Option<String> {
     match t.state {
         State::Waiting => Some(format!(
             "waiting for {}: {}",
-            t.who.as_deref().unwrap_or("the owner"),
+            t.who.as_deref().unwrap_or("the approver"),
             t.waiting_on.as_deref().unwrap_or("-")
         )),
         State::Blocked => {
@@ -1026,6 +1054,108 @@ fn event_lines(e: &event::Event) -> String {
         ));
     }
     out
+}
+
+/// Text indented by four spaces, ending with a new line.
+fn indent(text: &str) -> String {
+    text.trim_end()
+        .lines()
+        .map(|l| {
+            if l.is_empty() {
+                "\n".to_string()
+            } else {
+                format!("    {l}\n")
+            }
+        })
+        .collect()
+}
+
+/// `alm human` (Task-A03-18): the tasks that need a person. **To check**: finished without the
+/// human check and not checked since, each with why (and with `--steps`, how). **To answer**:
+/// waiting on a person, each with what and who. Backlog tasks are not listed. `--json` always
+/// carries the steps.
+fn human(
+    root: &Path,
+    bag: &Taskbag,
+    iteration: Option<&str>,
+    area: Option<&str>,
+    steps: bool,
+) -> Result<Done, Problem> {
+    if let Some(a) = area {
+        if !bag.areas.iter().any(|x| x.id == a) {
+            return Err(Problem::UnknownArea { area: a.into() });
+        }
+    }
+    if let Some(i) = iteration {
+        if !bag.iterations.iter().any(|x| x.id == i) {
+            return Err(Problem::UnknownIteration {
+                iteration: i.into(),
+            });
+        }
+    }
+    let mut tasks: Vec<&Task> = bag
+        .tasks
+        .iter()
+        .filter(|t| {
+            area.is_none_or(|a| t.area == a)
+                && iteration.is_none_or(|i| t.iteration.as_deref() == Some(i))
+        })
+        .collect();
+    tasks.sort_by(|a, b| a.id.cmp(&b.id));
+    let to_check: Vec<&Task> = tasks.iter().copied().filter(|t| t.to_check()).collect();
+    let to_answer: Vec<&Task> = tasks
+        .iter()
+        .copied()
+        .filter(|t| t.state == State::Waiting)
+        .collect();
+    let mut text = String::new();
+    text.push_str(&format!("To check ({})\n", to_check.len()));
+    if to_check.is_empty() {
+        text.push_str("  Nothing to check.\n");
+    }
+    for t in &to_check {
+        text.push_str(&format!("  {}\n", task_line(t)));
+        let why = t
+            .without_human_check
+            .as_deref()
+            .or(t.finished_without_owner.as_deref())
+            .unwrap_or("-");
+        text.push_str(&format!("      not human-checked: {why}\n"));
+        if steps {
+            match &t.human_check_steps {
+                Some(s) => {
+                    text.push_str("      steps:\n");
+                    for line in indent(s).lines() {
+                        text.push_str(&format!("      {line}\n"));
+                    }
+                }
+                None => text.push_str("      steps: none written\n"),
+            }
+        }
+    }
+    text.push_str(&format!("\nTo answer ({})\n", to_answer.len()));
+    if to_answer.is_empty() {
+        text.push_str("  Nothing to answer.\n");
+    }
+    for t in &to_answer {
+        text.push_str(&format!("  {}\n", task_line(t)));
+        if let Some(line) = stop_line(bag, t) {
+            text.push_str(&format!("      {line}\n"));
+        }
+    }
+    if !to_check.is_empty() {
+        text.push_str("\nOnce a person has checked a task: `alm checked <id> --push`.\n");
+    }
+    let list = |members: &[&Task]| {
+        members
+            .iter()
+            .map(|t| task_json_in(bag, t))
+            .collect::<Vec<_>>()
+    };
+    Ok(Done::new(
+        json!({ "taskbag": root, "to_check": list(&to_check), "to_answer": list(&to_answer) }),
+        text,
+    ))
 }
 
 /// One line about a task: ID, state, label, holder, title.
@@ -1512,7 +1642,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             by,
             state,
             mine,
-            without_owner,
+            without_human_check,
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
@@ -1538,7 +1668,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                         .is_none_or(|i| t.iteration.as_ref() == Some(i))
                     && state.as_ref().is_none_or(|s| t.state.as_str() == s)
                     && (!*mine || t.holder.as_deref() == me)
-                    && (!*without_owner || t.finished_without_owner.is_some())
+                    && (!*without_human_check || t.to_check())
             };
             let mut tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
             tasks.sort_by(|a, b| a.id.cmp(&b.id));
@@ -1636,14 +1766,19 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 ("next dependency", task.next_dependency.as_deref()),
                 ("handoff note", task.handoff_note.as_deref()),
                 (
-                    "finished without the owner's check",
-                    task.finished_without_owner.as_deref(),
+                    "not human-checked",
+                    task.without_human_check
+                        .as_deref()
+                        .or(task.finished_without_owner.as_deref()),
                 ),
             ];
             for (name, value) in fields {
                 if let Some(v) = value {
                     text.push_str(&format!("{name}: {v}\n"));
                 }
+            }
+            if let Some(steps) = &task.human_check_steps {
+                text.push_str(&format!("human check steps:\n{}", indent(steps)));
             }
             let latest = handoff::latest_for(&root, &task.id);
             if let Some(h) = &latest {
@@ -1807,12 +1942,46 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             Ok(done)
         }
         Command::Unblock { id } => change(cli, cwd, |bag| ops::unblock(bag, id, me)),
-        Command::Done { id, without_owner } => {
+        Command::Done {
+            id,
+            without_human_check,
+            steps,
+        } => {
+            let steps = match steps {
+                Some(file) => {
+                    let path = cwd.join(file);
+                    Some(
+                        std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+                            detail: format!("{}: {e}", path.display()),
+                        })?,
+                    )
+                }
+                None => None,
+            };
             let mut done = change(cli, cwd, |bag| {
-                ops::finish(bag, id, me, without_owner.as_deref())
+                ops::finish(
+                    bag,
+                    id,
+                    me,
+                    without_human_check.as_deref(),
+                    steps.as_deref(),
+                )
             })?;
             ask_to_check_handoffs(id, &mut done);
             Ok(done)
+        }
+        Command::Checked { id } => change(cli, cwd, |bag| ops::checked(bag, id)),
+        Command::Human {
+            iteration,
+            area,
+            steps,
+        } => {
+            let root = locate(cli, cwd)?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
+            human(&root, &bag, iteration.as_deref(), area.as_deref(), *steps).map(|mut done| {
+                done.issues = issues;
+                done
+            })
         }
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
         Command::Project { name, id } => {
@@ -1932,13 +2101,13 @@ mod tests {
     const TEST_ENTRY: Migration = Migration {
         from: 4,
         changed: Words {
-            en: "The top label is now called \"human checked\".",
-            zh_cn: "最高的标签现在叫 \"human checked\"。",
-            ja: "いちばん上のラベルは \"human checked\" になりました。",
+            en: "The top label is now called \"person checked\".",
+            zh_cn: "最高的标签现在叫 \"person checked\"。",
+            ja: "いちばん上のラベルは \"person checked\" になりました。",
         },
         add: NOTHING,
         decide: Words {
-            en: "Every task labelled \"owner verified\" becomes \"human checked\": `alm rename label \"owner verified\" \"human checked\"`.",
+            en: "Every task labelled \"human verified\" becomes \"person checked\": `alm rename label \"human verified\" \"person checked\"`.",
             zh_cn: "无。",
             ja: "なし。",
         },
@@ -1978,7 +2147,7 @@ mod tests {
         v
     }
 
-    /// A taskbag in today's format with one area and two tasks, A01-01 labelled "owner verified".
+    /// A taskbag in today's format with one area and two tasks, A01-01 labelled "human verified".
     fn taskbag() -> PathBuf {
         let n = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -2004,7 +2173,7 @@ mod tests {
         ok(
             &root,
             real,
-            &["--as", "a", "label", "A01-01", "owner verified"],
+            &["--as", "a", "label", "A01-01", "human verified"],
         );
         root
     }
@@ -2094,7 +2263,7 @@ mod tests {
         // Half done: the task carries the new label, the ladder still has the old one.
         let task = root.join("tasks/A01-01/task.json");
         let mut v: Value = serde_json::from_str(&fs::read_to_string(&task).unwrap()).unwrap();
-        v["label"] = "human checked".into();
+        v["label"] = "person checked".into();
         fs::write(&task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
         let v = refused(
             &root,
@@ -2114,7 +2283,7 @@ mod tests {
         assert_eq!(listed["issues"].as_array().unwrap().len(), 1);
 
         // Put back, then do it properly through `alm`: the entry's own command.
-        v_label(&task, "owner verified");
+        v_label(&task, "human verified");
         let renamed = ok(
             &root,
             t,
@@ -2123,8 +2292,8 @@ mod tests {
                 "m",
                 "rename",
                 "label",
-                "owner verified",
-                "human checked",
+                "human verified",
+                "person checked",
             ],
         );
         assert_eq!(renamed["tasks"][0]["id"], "A01-01");
@@ -2139,7 +2308,7 @@ mod tests {
         );
         let after = fs::read_to_string(&project).unwrap();
         assert!(after.contains("\"format\": \"allomos/5\""), "{after}");
-        assert!(after.contains("\"human checked\""));
+        assert!(after.contains("\"person checked\""));
         // Done: `alm migrate` says there is nothing to update.
         // (This build reads only allomos/4, so the finished taskbag is checked by its file.)
         let v = ok(&root, t, &["migrate"]);

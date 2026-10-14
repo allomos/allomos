@@ -1,6 +1,8 @@
 // The task pane (Task-A01-16): everything about one task, beside the list. History lists the
 // task's recorded changes (Task-A01-17). Eight fields can be changed here (Task-A01-18); Rust
 // checks each change by the same rule as its `alm` command, and a refusal is shown in its words.
+// A task finished without the human check shows "Not human-checked", its steps and a Checked
+// button, which works like `alm checked` (Task-A03-18).
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -9,7 +11,7 @@ import { LatestHandoff } from "./Handoffs";
 import { localTime } from "./handoffFlow";
 import { changeLine } from "./historyFlow";
 import { blockerChoices, draftChanged, startDraft, stateChoices, toEdit, toggleBlocker, type Draft, type EditField } from "./editFlow";
-import { blockerText, blockers, stopText } from "./stopFlow";
+import { blockerText, blockers, humanCheckNote, stopText, toCheck } from "./stopFlow";
 import { isProblem, type Area, type Edit, type Handoff, type Iteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
@@ -58,11 +60,14 @@ export function TaskPane({
   const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [] });
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // The Checked button asked for the person's name first (asked once, like a change).
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
   useEffect(() => {
     ref.current?.scrollTo?.({ top: 0 });
     setEditing(null);
+    setChecking(false);
     setError(null);
   }, [task.id]);
 
@@ -74,7 +79,27 @@ export function TaskPane({
   };
   const cancel = () => {
     setEditing(null);
+    setChecking(false);
     setError(null);
+  };
+  /** Checked (Task-A03-18): top label, off To check; refused in Rust's words like any change. */
+  const markChecked = async () => {
+    if (busy) return;
+    if (!ownerName) {
+      setEditing(null);
+      setChecking(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onEdit({ field: "checked" });
+      setChecking(false);
+      setError(null);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
   };
   const save = async () => {
     if (!editing || busy || !draftChanged(task, editing, draft)) return;
@@ -231,8 +256,7 @@ export function TaskPane({
   };
 
   /** The editor in place of a field's value: the name asked once first, then the control, Save and Cancel. */
-  const editor = (field: EditField): ReactNode =>
-    !ownerName ? (
+  const nameForm = (): ReactNode => (
       <div className="editor">
         <p className="small">{t("edit.name_explain")}</p>
         <input
@@ -263,6 +287,10 @@ export function TaskPane({
         </div>
         {error && <p className="banner error small">{error}</p>}
       </div>
+  );
+  const editor = (field: EditField): ReactNode =>
+    !ownerName ? (
+      nameForm()
     ) : (
       <div className="editor">
         {control(field)}
@@ -294,8 +322,9 @@ export function TaskPane({
     : task.iteration
       ? task.iteration
       : t("box.unplanned");
-  // The area, holder and "finished without the owner's check" are not changed here: holders are
-  // agent sessions (owner, 2026-10-14), and the others have no change of their own in `alm`.
+  // The area, holder and "finished without the human check" are not changed here: holders are
+  // agent sessions (owner, 2026-10-14), and the others have no change of their own in `alm` (the
+  // Checked button below clears the note).
   const rows: [string, string | null, EditField | null][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
@@ -311,7 +340,7 @@ export function TaskPane({
     ],
     [t("pane.next"), task.next_dependency, "next_dependency"],
     [t("pane.handoff"), task.handoff_note, "handoff_note"],
-    [t("pane.finished_without_owner"), task.finished_without_owner, null],
+    [t("pane.without_human_check"), humanCheckNote(task) || null, null],
   ];
 
   return (
@@ -328,6 +357,22 @@ export function TaskPane({
           ×
         </button>
       </header>
+      {toCheck(task) && (
+        <div className="pane-check">
+          <HumanCheckBadge task={task} />
+          {checking && !ownerName ? (
+            nameForm()
+          ) : (
+            <>
+              <button type="button" className="primary" onClick={() => void markChecked()} disabled={busy}>
+                {t("pane.checked_button")}
+              </button>
+              <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
+              {error && !editing && <p className="banner error small">{error}</p>}
+            </>
+          )}
+        </div>
+      )}
       <dl className="fields">
         {rows.map(([label, value, field]) => (
           <div key={label}>
@@ -342,6 +387,16 @@ export function TaskPane({
           </div>
         ))}
       </dl>
+      {toCheck(task) && (
+        <section>
+          <h3>{t("pane.human_check_steps")}</h3>
+          {task.human_check_steps?.trim() ? (
+            <Markdown source={task.human_check_steps} onLink={onLink} />
+          ) : (
+            <p className="muted small">{t("pane.no_steps")}</p>
+          )}
+        </section>
+      )}
       <section>
         <h3>
           {t("pane.description")} {changeButton("description")}
@@ -380,5 +435,16 @@ export function TaskPane({
         )}
       </section>
     </aside>
+  );
+}
+
+/** "Not human-checked" on a task finished without the human check (Task-A03-18): in the lists
+ * and the task pane's header; hovering shows why. */
+export function HumanCheckBadge({ task }: { task: Task }) {
+  const { t } = useI18n();
+  return (
+    <span className="badge to-check" title={t("task.not_human_checked_title", { why: humanCheckNote(task) })}>
+      {t("task.not_human_checked")}
+    </span>
   );
 }

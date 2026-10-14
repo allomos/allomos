@@ -64,6 +64,8 @@ pub const TASK_FIELDS: &[&str] = &[
     "blocked_by",
     "next_dependency",
     "handoff_note",
+    "without_human_check",
+    "human_check_steps",
     "finished_without_owner",
     "description",
 ];
@@ -159,6 +161,8 @@ mod tests {
             next_dependency: None,
             iteration: None,
             handoff_note: None,
+            without_human_check: None,
+            human_check_steps: None,
             finished_without_owner: None,
             description: String::new(),
         }

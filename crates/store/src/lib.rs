@@ -185,10 +185,12 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
   another task: `alm block <id> --by <task-id> --push`. `alm next` says when all blockers are done;
   then check and move it on: `alm unblock <id> --push`.
 - Stopping before it is done: `alm release <id> --note \"<what the next one needs>\" --push`.
-- Finished: only at the top label (the owner has checked it): `alm done <id> --push`. In an
-  automatic or loop run the person set up to go on without them (a card run, `/loop`), you may
-  finish below it with `alm done <id> --without-owner \"<why, which run>\" --push`; say so in your
-  handoff.
+- Finished: only at the top label (a person has checked it: the human check): `alm done <id> --push`.
+  In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
+  may finish below it with `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md>
+  --push` (the steps tell a person how to check it); say so in your handoff.
+- Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
+  checked one: `alm checked <id> --push`.
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --push`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
@@ -725,7 +727,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             "Open this taskbag in Allomos",
             "A01",
             allomos_core::State::Done,
-            Some("owner verified"),
+            Some("human verified"),
             "You picked a folder and Allomos created this starter project in it.\n",
         ),
         (
@@ -760,6 +762,8 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             next_dependency: None,
             iteration: None,
             handoff_note: None,
+            without_human_check: None,
+            human_check_steps: None,
             finished_without_owner: None,
             description: String::new(),
         };

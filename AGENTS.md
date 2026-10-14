@@ -1,18 +1,18 @@
 # Allomos — agent working guide
 
-Allomos is developed by AI agents (Claude Code, Codex) working for the owner, **will.w.hui**. This file is the shared authority for every agent and is always loaded (Codex reads it directly; Claude Code imports it from `CLAUDE.md`). Keep it short: detail lives in the documents it links.
+Allomos is developed by AI agents (Claude Code, Codex) working for the approver, **will.w.hui** (the person who decides and approves; older documents say *owner*). This file is the shared authority for every agent and is always loaded (Codex reads it directly; Claude Code imports it from `CLAUDE.md`). Keep it short: detail lives in the documents it links.
 
 **What Allomos is:** a desktop app (the hub, with every feature) plus web and mobile companions that connect to it, built as our own code ([0008](docs/decisions/0008-build-our-own.md), [0009](docs/decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Its main job is **switching**: a project hops between AI agents (and their accounts) and between teammates without losing its tasks, progress or handoff notes. Two more sets build on that: **AI skills** and **progress management** (areas, lists and charts, a burndown with a forecast finish date) ([0014](docs/decisions/0014-main-purpose-and-three-sets.md)). Local-only projects need no sign-in; optional cloud projects add roles and email invitations. See [docs/product/PLAN.md](docs/product/PLAN.md) and [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
 
 ## Always-on boundaries
 
-- **No external effect without the owner's exact approval**, recorded on the card: creating or changing hosted resources (Supabase projects, databases, hosting, DNS), applying SQL to a real target, deployments, secrets, sending email, creating GitHub repositories, adding or changing a remote, and anything touching other people's data. Approving a card authorizes only its local work.
+- **No external effect without the approver's exact approval**, recorded on the card: creating or changing hosted resources (Supabase projects, databases, hosting, DNS), applying SQL to a real target, deployments, secrets, sending email, creating GitHub repositories, adding or changing a remote, and anything touching other people's data. Approving a card authorizes only its local work.
 - **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live).
 - **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
 - **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
-- **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the owner to approve it ([CODING_RULES § The `alm` command](docs/workflow/CODING_RULES.md#the-alm-command)).
-- **Decisions are made by the owner.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
+- **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the approver to approve it ([CODING_RULES § The `alm` command](docs/workflow/CODING_RULES.md#the-alm-command)).
+- **Decisions are made by the approver.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
 
 ## AI working mode
 
@@ -31,8 +31,8 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 
 1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
 2. **Several sessions may work at once**, each in its own git worktree and branch (`claude/…`, `codex/…`), each holding **one** card. Claim before you work, following the [claiming protocol](docs/workflow/CARDS.md#claiming-protocol).
-3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the owner's open questions.
-4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → owner verified (Done). Each open card names its single next dependency.
+3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the approver's open questions.
+4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → human verified (Done: the human check, called *owner verified* until the taskbag is migrated to `allomos/4`). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
 6. **One card per outcome, including research and decision records.** Do not keep adding unrelated work to an existing card; open a new card, so each piece can be finished and reviewed on its own.
 7. **Push after every commit** (owner, 2026-10-04): push your branch to `origin` (`mypals-ml/allomos`, renamed from `glidebox` 2026-10-06 and from `fliphopper` 2026-10-11) right after each commit, and confirm it landed (`git status -sb` shows no "ahead"). Never force-push, and never push to a remote other than `origin`.
@@ -53,10 +53,12 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
   another task: `alm block <id> --by <task-id> --push`. `alm next` says when all blockers are done;
   then check and move it on: `alm unblock <id> --push`.
 - Stopping before it is done: `alm release <id> --note "<what the next one needs>" --push`.
-- Finished: only at the top label (the owner has checked it): `alm done <id> --push`. In an
-  automatic or loop run the person set up to go on without them (a card run, `/loop`), you may
-  finish below it with `alm done <id> --without-owner "<why, which run>" --push`; say so in your
-  handoff.
+- Finished: only at the top label (a person has checked it: the human check): `alm done <id> --push`.
+  In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
+  may finish below it with `alm done <id> --without-human-check "<why, which run>" --steps <file.md>
+  --push` (the steps tell a person how to check it); say so in your handoff.
+- Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
+  checked one: `alm checked <id> --push`.
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --push`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
@@ -78,7 +80,7 @@ This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.
 
 ## Handoff — write it continuously
 
-Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids> --push`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template; fill it in, plain words first, for any reader (evidence goes on the card). Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the owner the exact prompt for a new session. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). What every session must know (what is running, pitfalls, where credentials live, current truth) is in the taskbag's `project-notes.md`; change its lines in place. Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
+Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids> --push`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template; fill it in, plain words first, for any reader (evidence goes on the card). Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the approver the exact prompt for a new session. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). What every session must know (what is running, pitfalls, where credentials live, current truth) is in the taskbag's `project-notes.md`; change its lines in place. Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
 
 ## Read by activity
 
