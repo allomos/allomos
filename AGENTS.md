@@ -40,7 +40,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v5)
+## Tasks: Allomos (v6)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
@@ -61,6 +61,8 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
   checked one: `alm checked <id>`.
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>"`.
+- Change a task's title, description or handoff note: `alm title <id> "<title>"`,
+  `alm describe <id> --text "<markdown>"` (or `--from <file.md>`), `alm note <id> "<text>"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with

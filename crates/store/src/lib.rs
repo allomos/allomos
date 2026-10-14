@@ -248,6 +248,8 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
   checked one: `alm checked <id>`.
 - Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
+- Change a task's title, description or handoff note: `alm title <id> \"<title>\"`,
+  `alm describe <id> --text \"<markdown>\"` (or `--from <file.md>`), `alm note <id> \"<text>\"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
