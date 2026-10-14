@@ -5,7 +5,7 @@ import { forwardRef } from "react";
 import { useI18n } from "./i18n";
 import { localTime } from "./handoffFlow";
 import { pieces, snippet, type Piece } from "./searchFlow";
-import type { Handoff } from "./types";
+import type { Handoff, Task } from "./types";
 
 /** The shortcut that focuses the search box, as this computer writes it. */
 const SHORTCUT = /Mac/.test(navigator.userAgent) ? "⌘F" : "Ctrl+F";
@@ -120,6 +120,72 @@ export function HandoffHits({ handoffs, terms, onOpen }: { handoffs: Handoff[]; 
             </li>
           );
         })}
+      </ul>
+    </section>
+  );
+}
+
+/** Tasks a search finds that the state filter hides (Task-A01-42), set apart after the groups so a
+ * filter left on cannot make a task look missing. Clicking one opens it in the task pane. */
+export function FilterHits({
+  tasks,
+  terms,
+  filter,
+  selectedId,
+  onSelect,
+  onShowAll,
+}: {
+  tasks: Task[];
+  terms: string[];
+  /** The filter's name, as the Show box words it. */
+  filter: string;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onShowAll: () => void;
+}) {
+  const { t } = useI18n();
+  const heading = t("search.hidden_by_filter", { filter });
+  return (
+    <section className="area search-hidden" aria-label={heading}>
+      <header className="area-head">
+        <h2>{heading}</h2>
+        <span className="count">{t("search.handoff_count", { count: tasks.length })}</span>
+        <span className="group-actions">
+          <button type="button" className="link small" onClick={onShowAll}>
+            {t("filter.show_all")}
+          </button>
+        </span>
+      </header>
+      <ul className="tasks">
+        {tasks.map((task) => (
+          <li
+            key={task.id}
+            className={task.id === selectedId ? "task selected" : "task"}
+            tabIndex={0}
+            aria-current={task.id === selectedId ? "true" : undefined}
+            onClick={() => onSelect(task.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(task.id);
+              }
+            }}
+          >
+            <span className="id">
+              <Highlight text={task.id} terms={terms} />
+            </span>
+            <span className="title">
+              <Highlight text={task.title} terms={terms} />
+            </span>
+            <span className="state-cell">
+              <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
+            </span>
+            <span className="meta">
+              {task.label && <span className="label">{task.label}</span>}
+              <DescriptionHit text={task.description ?? ""} terms={terms} />
+            </span>
+          </li>
+        ))}
       </ul>
     </section>
   );

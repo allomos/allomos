@@ -355,5 +355,10 @@
   "search.in_description": "说明中：",
   "search.handoffs": "找到的交接",
   "search.handoff_count": "{count} 条",
-  "search.handoff_kind": "交接"
+  "search.handoff_kind": "交接",
+  "filter.hidden": "另有 {count} 个被筛选隐藏：{states}",
+  "filter.state_count": "{state} {count}",
+  "filter.list_sep": "、",
+  "filter.show_all": "全部显示",
+  "search.hidden_by_filter": "被「{filter}」筛选隐藏"
 }

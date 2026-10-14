@@ -74,3 +74,28 @@ export function readFilter(value: string | null): StateFilter {
   if (value === "human") return "human";
   return value && (FILTER_STATES as string[]).includes(value) ? (value as State) : "all";
 }
+
+/** What the filter leaves out of a list of tasks: how many, and how many in each state, in the
+ * filter's order of states (Task-A01-42). Nothing is left out when the filter is "all". */
+export type Hidden = { count: number; states: { state: State; count: number }[] };
+
+export function hiddenByFilter(filter: StateFilter, tasks: readonly Task[]): Hidden {
+  const hidden = tasks.filter((task) => !keepState(filter, task));
+  const states = FILTER_STATES.map((state) => ({ state, count: hidden.filter((x) => x.state === state).length })).filter(
+    (s) => s.count > 0,
+  );
+  return { count: hidden.length, states };
+}
+
+/** "38 more hidden by the filter: 1 Waiting, 4 Ready, 33 Done". */
+export function hiddenText(hidden: Hidden, t: T): string {
+  const states = hidden.states.map((s) => t("filter.state_count", { count: s.count, state: t(`state.${s.state}` as Key) })).join(t("filter.list_sep"));
+  return t("filter.hidden", { count: hidden.count, states });
+}
+
+/** The filter's name as the Show box words it. */
+export function filterName(filter: StateFilter, t: T): string {
+  if (filter === "all") return t("filter.all");
+  if (filter === "human") return t("filter.human");
+  return t(`state.${filter}` as Key);
+}

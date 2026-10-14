@@ -355,5 +355,10 @@
   "search.in_description": "説明：",
   "search.handoffs": "見つかった引き継ぎ",
   "search.handoff_count": "{count} 件",
-  "search.handoff_kind": "引き継ぎ"
+  "search.handoff_kind": "引き継ぎ",
+  "filter.hidden": "ほかに {count} 件がフィルターで非表示：{states}",
+  "filter.state_count": "{state} {count}",
+  "filter.list_sep": "、",
+  "filter.show_all": "すべて表示",
+  "search.hidden_by_filter": "「{filter}」フィルターで非表示"
 }

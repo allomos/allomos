@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allBlockersDone, blockers, humanCheckNote, keepState, readFilter, stopText, toCheck } from "../src/stopFlow.ts";
+import { allBlockersDone, blockers, filterName, hiddenByFilter, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck } from "../src/stopFlow.ts";
 import type { Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -85,4 +85,35 @@ test("the Needs a human filter keeps the tasks to check and to answer, not backl
   assert.equal(keepState("human", task({ state: "done" })), false);
   assert.equal(keepState("human", task({ state: "blocked", blocked_by: ["A01-17"] })), false);
   assert.equal(readFilter("human"), "human");
+});
+
+// Task-A01-42: what the state filter hides.
+test("the filter's hidden tasks are counted by state, in the filter's order", () => {
+  const tasks = [
+    task({ id: "a", state: "done" }),
+    task({ id: "b", state: "backlog" }),
+    task({ id: "c", state: "waiting" }),
+    task({ id: "d", state: "done" }),
+    task({ id: "e", state: "ready" }),
+  ];
+  const hidden = hiddenByFilter("backlog", tasks);
+  assert.deepEqual(hidden, {
+    count: 4,
+    states: [
+      { state: "ready", count: 1 },
+      { state: "waiting", count: 1 },
+      { state: "done", count: 2 },
+    ],
+  });
+  assert.equal(hiddenText(hidden, t), "4 more hidden by the filter: 1 Ready, 1 Waiting, 2 Done");
+  assert.deepEqual(hiddenByFilter("all", tasks), { count: 0, states: [] });
+  // "Needs a human" keeps waiting tasks and done ones not yet checked.
+  const human = hiddenByFilter("human", [...tasks, task({ id: "f", state: "done", without_human_check: "loop run" })]);
+  assert.equal(human.count, 4);
+});
+
+test("the filter is named as the Show box words it", () => {
+  assert.equal(filterName("backlog", t), "Backlog");
+  assert.equal(filterName("human", t), "Needs a human (to check, to answer)");
+  assert.equal(filterName("all", t), "All states");
 });
