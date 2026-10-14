@@ -12,7 +12,11 @@ Allomos relies on these terms. Use them as defined here, in commands and when yo
 about the project's tasks.
 
 - **Taskbag**: the folder holding the project's tasks (`.allomos/taskbag/`): readable JSON and
-  Markdown files tracked by Git. Change it only with `alm`.
+  Markdown files tracked by Git. Change it only with `alm`, except the project notes and your
+  own handoff file.
+- **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
+  task (what is running, pitfalls, where credentials live, never their values). Edited directly
+  and kept true while the project is built; `alm next` shows its Running and Pitfalls.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
 - **Task**: one observable outcome: what a person or agent can do when it is done. It has an
@@ -59,7 +63,8 @@ Fixed for every project:
 - **The seven states**: backlog, ready, in progress, waiting, blocked, done, dropped.
 - **The words \"area\" and \"iteration\"**: a project cannot rename them yet (planned: requirement
   R90). Use these words with `alm`, even if the team says \"workstream\" or \"sprint\".
-- **The file format**: never edit the taskbag's files by hand; `alm` checks every change.
+- **The file format**: never edit the taskbag's files by hand (except `project-notes.md` and your
+  own handoff file); `alm` checks every change.
 
 Read the project's current areas, iterations and tasks with `alm list` (`--by iteration`), and its
 ladder in the taskbag's project.json.
@@ -163,7 +168,8 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
   `--quota <n> --context <n> [--write-when \"<text>\"] [--agent <name>] [--clear]` change them.
 - `alm handoff --tasks <id,id> --as <your session name>`: this session's handoff file, made from
   the template the first time (later calls update the same file); fill it in, or pass
-  `--from <file.md>`. It prints the file's path.
+  `--from <file.md>`. It prints the file's path, and reminds you to update `project-notes.md` if
+  what is running or a pitfall changed.
 - `alm handoffs [--task <id>] [--latest]`: handoffs, newest first. `alm next` and `alm show <id>`
   show a task's latest one.
 - `alm handoffs --check [--task <id>]`: the rule for checking the handoffs yourself, one by one,
@@ -188,7 +194,8 @@ const WORKFLOW: &str = "# How to work the tasks
 
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
-   first (`alm show <id>`).
+   first (`alm show <id>`), and the project notes' Running and Pitfalls, which `alm next` shows
+   (the whole file is the taskbag's `project-notes.md`).
 2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>`, and run
    the Git commands it prints right away: until your claim is pushed, other sessions do not see
    it and may take the task too. A task someone else holds is not yours to change.
@@ -217,7 +224,13 @@ const WORKFLOW: &str = "# How to work the tasks
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
-  The one exception: fill in your own handoff file, the one `alm handoff` names.
+  Two exceptions: fill in your own handoff file, the one `alm handoff` names; and keep
+  `project-notes.md` true. Update it when you start or stop a server or process, create or change
+  a hosted resource or a Git remote, learn a pitfall that would change what the next session
+  does, or a credential moves; change lines in place, remove lines no longer true, and commit and
+  push that file yourself.
+- Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
+  `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Before a change the person must agree to, show your plan with `alm confirm` and change nothing

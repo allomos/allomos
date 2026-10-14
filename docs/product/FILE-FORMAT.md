@@ -79,9 +79,9 @@ Added by [`Task-A03-06`](../tasks/Task-A03-06-agent-handoff-rules.md). A handoff
   ---
   ```
 
-  `tasks` lists the tasks it covers (empty for a session with no task). Times are UTC. `alm show`, `alm next`, the task pane and the Handoffs tab find a task's handoffs through this list. Agents fill in their own file directly: the one exception to "never edit the taskbag by hand".
+  `tasks` lists the tasks it covers (empty for a session with no task). Times are UTC. `alm show`, `alm next`, the task pane and the Handoffs tab find a task's handoffs through this list. Agents fill in their own file directly: one of the two exceptions to "never edit the taskbag by hand" (the other is `project-notes.md`).
 - **`handoff-template.md`**: the outline. Part 1, for anyone in plain words; part 2, restart details. Replaced with `alm handoff-template --set` or in the app.
-- **`project-notes.md`**: what every session must know whatever its task: what is running, pitfalls, where credentials live (never their values).
+- **`project-notes.md`**: what every session must know whatever its task: what is running, pitfalls, where credentials live (never their values). A standard part of every taskbag ([`Task-A03-20`](../tasks/Task-A03-20-project-notes-standard.md)): `alm init` creates it; agents edit it directly (the other exception to "never edit the taskbag by hand") and keep it true while the project is built, as Allomos's section in AGENTS.md (`alm brief`, v7) says. `alm next` shows its `## Running` and `## Pitfalls` sections (the first `##` heading starting with that word, any case) and the day the file last changed (its modification time on this computer, UTC); a missing file is said plainly, not an error. `alm handoff` reminds to update it. Both add `project_notes` to `--json` (`file`, `path`, `found`, `changed`, `running`, `pitfalls`).
 - A task's `handoff_note` stays: the one line left on release.
 
 ## Events (`allomos/3`)

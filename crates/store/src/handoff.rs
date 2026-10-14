@@ -59,6 +59,60 @@ None yet.
 Never their values. None yet.
 ";
 
+/// What `alm next` and `alm handoff` show of `project-notes.md` (Task-A03-20): facts only, read
+/// from the file; `alm` judges nothing about them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProjectNotes {
+    /// `project-notes.md`, relative to the taskbag.
+    pub file: String,
+    /// The full path, for the agent to open and edit.
+    pub path: PathBuf,
+    /// False when the taskbag has no `project-notes.md`: said plainly, not an error.
+    pub found: bool,
+    /// The day the file last changed on this computer (its modification time), `YYYY-MM-DD` (UTC).
+    pub changed: Option<String>,
+    /// The text of its `## Running` section; `None` when there is no such section.
+    pub running: Option<String>,
+    /// The text of its `## Pitfalls` section; `None` when there is no such section.
+    pub pitfalls: Option<String>,
+}
+
+/// The taskbag's project notes, as far as they can be read.
+pub fn project_notes(root: &Path) -> ProjectNotes {
+    let path = root.join(NOTES_FILE);
+    let text = crate::read_text(&path).ok().map(|t| crate::lf(&t));
+    let changed = fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| {
+            let (y, m, d) = civil_from_days((d.as_secs() / 86_400) as i64);
+            format!("{y:04}-{m:02}-{d:02}")
+        });
+    ProjectNotes {
+        file: NOTES_FILE.to_string(),
+        path,
+        found: text.is_some(),
+        changed: text.as_ref().and(changed),
+        running: text.as_deref().and_then(|t| notes_section(t, "running")),
+        pitfalls: text.as_deref().and_then(|t| notes_section(t, "pitfalls")),
+    }
+}
+
+/// The text under the first `## ` heading that starts with `name` (any case), up to the next
+/// heading of the same or a higher level; trimmed. `None` when there is no such heading.
+fn notes_section(text: &str, name: &str) -> Option<String> {
+    let mut lines = text.lines();
+    lines.find(|l| {
+        l.strip_prefix("## ")
+            .is_some_and(|h| h.trim().to_lowercase().starts_with(name))
+    })?;
+    let body: Vec<&str> = lines
+        .take_while(|l| !(l.starts_with("## ") || l.starts_with("# ")))
+        .collect();
+    Some(body.join("\n").trim().to_string())
+}
+
 /// One handoff file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Handoff {
@@ -417,6 +471,41 @@ mod tests {
         assert!(root.join(NOTES_FILE).is_file());
         assert!(root.join(HANDOFFS_DIR).join(".keep").is_file());
         assert!(list(&root).is_empty());
+    }
+
+    #[test]
+    fn project_notes_give_running_pitfalls_and_the_day_they_changed() {
+        let root = tmp("notes");
+        init(&root, "p", "P").unwrap();
+        let notes = project_notes(&root);
+        assert!(notes.found);
+        assert_eq!(notes.running.as_deref(), Some("Nothing."));
+        assert_eq!(notes.pitfalls.as_deref(), Some("None yet."));
+        // The file's modification time, as a day.
+        let day = std::fs::File::options()
+            .write(true)
+            .open(root.join(NOTES_FILE))
+            .unwrap();
+        day.set_modified(UNIX_EPOCH + std::time::Duration::from_secs(20_738 * 86_400 + 600))
+            .unwrap();
+        assert_eq!(project_notes(&root).changed.as_deref(), Some("2026-10-12"));
+        // A project's own headings and line endings; a section that is missing is `None`.
+        fs::write(
+            root.join(NOTES_FILE),
+            "# Notes\r\n\r\n## Running now\r\n\r\n- a server on :8080\r\n\r\n### detail\r\nport\r\n\r\n## Current truth\r\nx\r\n",
+        )
+        .unwrap();
+        let notes = project_notes(&root);
+        assert_eq!(
+            notes.running.as_deref(),
+            Some("- a server on :8080\n\n### detail\nport")
+        );
+        assert_eq!(notes.pitfalls, None);
+        // No file: said plainly, not an error.
+        fs::remove_file(root.join(NOTES_FILE)).unwrap();
+        let notes = project_notes(&root);
+        assert!(!notes.found);
+        assert_eq!((notes.changed, notes.running), (None, None));
     }
 
     #[test]

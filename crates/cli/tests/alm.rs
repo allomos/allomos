@@ -1821,10 +1821,131 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v6)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v7)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
+
+    // A v6 section (before the project notes, Task-A03-20) is out of date too.
+    fs::write(
+        repo.join("AGENTS.md"),
+        format!(
+            "# Rules\n\n{}",
+            brief.replace("## Tasks: Allomos (v7)", "## Tasks: Allomos (v6)")
+        ),
+    )
+    .unwrap();
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["warnings"][0]["code"], "instructions_outdated");
+}
+
+/// The project notes are a standard part of Allomos (Task-A03-20): the brief names them and when
+/// to update them, `alm next` shows their Running and Pitfalls and the day they changed, and
+/// `alm handoff` reminds to update them.
+#[test]
+fn project_notes_are_in_the_brief_next_and_handoff() {
+    let repo = filled();
+    let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
+    // Compared as one line: the brief wraps at 100 columns.
+    let brief = brief.split_whitespace().collect::<Vec<_>>().join(" ");
+    for words in [
+        "`project-notes.md`",
+        "Read it at the start",
+        "you edit it directly",
+        "start or stop a server or process",
+        "hosted resource or a Git remote",
+        "learn a pitfall",
+        "a credential moves",
+        "Change lines in place",
+        "commit and push that file with Git yourself",
+        "every new piece of work (a new card, a new outcome) gets its own task",
+        "`alm guide tasks`",
+    ] {
+        assert!(brief.contains(words), "{words}: {brief}");
+    }
+    assert!(
+        brief.contains("never edit those files by hand, except the project notes"),
+        "{brief}"
+    );
+
+    // `alm next`: the default notes, with the day they last changed.
+    let notes_file = repo.join(".allomos/taskbag/project-notes.md");
+    fs::write(
+        &notes_file,
+        "# Project notes\n\n## Running\n\n- dev server on :5173 (`npm run dev`)\n\n## Pitfalls\n\n- zsh expands `=word`\n- run checks in the worktree\n\n## Where credentials live\n\nNever here.\n",
+    )
+    .unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&notes_file)
+        .unwrap()
+        .set_modified(UNIX_EPOCH + Duration::from_secs(20_740 * 86_400 + 3_600))
+        .unwrap();
+    let v = ok(&repo, &["next"]);
+    let notes = &v["project_notes"];
+    assert_eq!(notes["file"], "project-notes.md");
+    assert_eq!(notes["found"], true);
+    assert_eq!(notes["changed"], "2026-10-14");
+    assert_eq!(notes["running"], "- dev server on :5173 (`npm run dev`)");
+    assert_eq!(
+        notes["pitfalls"],
+        "- zsh expands `=word`\n- run checks in the worktree"
+    );
+    assert!(
+        notes["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("project-notes.md")
+    );
+    let out = alm(&repo, &["next"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("project-notes.md, last changed 2026-10-14):"),
+        "{text}"
+    );
+    assert!(text.contains("Running:\n  - dev server on :5173"), "{text}");
+    assert!(
+        text.contains("Pitfalls:\n  - zsh expands `=word`\n  - run checks in the worktree\n"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("Never here."),
+        "only Running and Pitfalls: {text}"
+    );
+
+    // `alm handoff` reminds, with the day.
+    let v = ok(&repo, &["handoff", "--as", "s/one", "--tasks", "A01-01"]);
+    assert_eq!(v["project_notes"]["changed"], "2026-10-14");
+    let out = alm(&repo, &["handoff", "--as", "s/one"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains(
+            "If what is running or a pitfall changed, update `project-notes.md` too (last changed 2026-10-14)"
+        ),
+        "{text}"
+    );
+
+    // No notes file: said plainly, not an error.
+    fs::remove_file(&notes_file).unwrap();
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["project_notes"]["found"], false);
+    assert_eq!(v["project_notes"]["running"], Value::Null);
+    let out = alm(&repo, &["next"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Project notes: this taskbag has no project-notes.md yet"),
+        "{text}"
+    );
+    let v = ok(&repo, &["handoff", "--as", "s/one"]);
+    assert_eq!(v["project_notes"]["found"], false);
+    let out = alm(&repo, &["handoff", "--as", "s/one"]);
+    assert!(
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .contains("update `project-notes.md` too (this taskbag has none yet)")
+    );
 }
 
 #[test]

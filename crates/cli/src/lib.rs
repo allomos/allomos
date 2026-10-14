@@ -1159,6 +1159,54 @@ fn handoff_brief(h: &handoff::Handoff) -> Value {
 }
 
 /// When to write a handoff, for the agent that asked.
+/// The project notes for `alm next`: where they are, the day they last changed, then their
+/// Running and Pitfalls sections as written (Task-A03-20).
+fn notes_lines(n: &handoff::ProjectNotes) -> String {
+    if !n.found {
+        return format!(
+            "Project notes: this taskbag has no {} yet ({}).\n",
+            n.file,
+            n.path.display()
+        );
+    }
+    let mut text = format!(
+        "Project notes ({}, last changed {}):\n",
+        n.path.display(),
+        n.changed.as_deref().unwrap_or("unknown")
+    );
+    for (name, section) in [("Running", &n.running), ("Pitfalls", &n.pitfalls)] {
+        match section.as_deref() {
+            None => text.push_str(&format!("{name}: no such section.\n")),
+            Some("") => text.push_str(&format!("{name}: (empty)\n")),
+            Some(body) => {
+                text.push_str(&format!("{name}:\n"));
+                for line in body.lines() {
+                    if line.is_empty() {
+                        text.push('\n');
+                    } else {
+                        text.push_str(&format!("  {line}\n"));
+                    }
+                }
+            }
+        }
+    }
+    text
+}
+
+/// The line `alm handoff` adds: keep the project notes true too (Task-A03-20).
+fn notes_reminder(n: &handoff::ProjectNotes) -> String {
+    let when = if n.found {
+        format!("last changed {}", n.changed.as_deref().unwrap_or("unknown"))
+    } else {
+        "this taskbag has none yet".to_string()
+    };
+    format!(
+        "If what is running or a pitfall changed, update `{}` too ({when}): {}\n",
+        n.file,
+        n.path.display()
+    )
+}
+
 fn rules_line(r: &allomos_core::AppliedRules) -> String {
     let whose = r
         .override_for
@@ -1500,8 +1548,9 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 None => None,
             };
             let w = handoff::write(&root, me, tasks.as_deref(), body.as_deref(), &known, false)?;
+            let notes = handoff::project_notes(&root);
             let text = format!(
-                "{} {}\n{}",
+                "{} {}\n{}{}",
                 if w.created {
                     "Started this session's handoff:"
                 } else {
@@ -1512,10 +1561,11 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                     "Fill it in, in plain words first, for any reader. Evidence goes on the task's card.\n"
                 } else {
                     ""
-                }
+                },
+                notes_reminder(&notes)
             );
             let mut done = Done::new(
-                json!({ "taskbag": root, "handoff": w.handoff, "path": w.path, "created": w.created }),
+                json!({ "taskbag": root, "handoff": w.handoff, "path": w.path, "created": w.created, "project_notes": notes }),
                 text,
             );
             done.issues = issues;
@@ -2055,6 +2105,11 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             // At the start of a session: when this agent must write its handoff (Task-A03-06).
             let rules = bag.project.handoff.clone().unwrap_or_default().applied(me);
             text.push_str(&rules_line(&rules));
+            // What every session must know: the project notes' Running and Pitfalls, and when
+            // they last changed (Task-A03-20). Facts only.
+            let notes = handoff::project_notes(&root);
+            text.push('\n');
+            text.push_str(&notes_lines(&notes));
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
@@ -2062,6 +2117,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                     "instruction": instruction,
                     "blocked": blocked,
                     "handoff_rules": rules,
+                    "project_notes": notes,
                 }),
                 text,
             );
