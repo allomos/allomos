@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use crate::{relative_path, section_source, setup_steps_in};
+use crate::{portable_path, relative_path, section_source, setup_steps_in, shown};
 
 /// Changes when the conversion request's steps change, so a report can say which it followed.
 /// 2: the agent finds the tasks itself and asks with `alm confirm` before changing anything.
@@ -40,7 +40,7 @@ pub(crate) enum Source {
 /// taskbag are, and how to run `alm`. Agents' shells often forget exported variables between
 /// commands, so every command names the taskbag; the request says so once.
 pub(crate) fn migration_header_in(language: &str, project: &Path, taskbag: &Path) -> String {
-    let (p, t) = (project.display(), taskbag.display());
+    let (p, t) = (shown(project), shown(taskbag));
     let alm = format!("alm --taskbag \"{t}\"");
     match language {
         "zh-CN" => format!(
@@ -90,11 +90,12 @@ pub fn agent_convert_request_in(
 
 /// The conversion request's text without its last line (where Allomos's section comes from).
 fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
-    // A card's link, from a task's description.md to the project folder.
+    // A card's link, from a task's description.md to the project folder: written with `/`, as
+    // Markdown links are, on Windows too.
     let up = relative_path(&taskbag_path.join("tasks").join("ID"), project_path)
-        .map(|p| format!("{}/", p.display()))
-        .unwrap_or_else(|| format!("{}/", project_path.display()));
-    let (project, taskbag) = (project_path.display(), taskbag_path.display());
+        .map(|p| format!("{}/", portable_path(&p)))
+        .unwrap_or_else(|| format!("{}/", portable_path(project_path)));
+    let (project, taskbag) = (shown(project_path), shown(taskbag_path));
     let version = CONVERT_REQUEST_VERSION;
     let title = CONFIRM_TITLE;
     let header = migration_header_in(language, project_path, taskbag_path);
@@ -275,15 +276,13 @@ mod tests {
         let taskbag = project.join(DEFAULT_DIR);
         for language in ["en", "zh-CN", "ja"] {
             let r = agent_convert_request_in(language, &project, &taskbag);
-            assert!(r.contains("/work/bakery"), "{language}");
-            assert!(r.contains("alm --taskbag \"/work/bakery/.allomos/taskbag\""));
+            let tb = shown(&taskbag);
+            assert!(r.contains(&shown(&project)), "{language}");
+            assert!(r.contains(&format!("alm --taskbag \"{tb}\"")));
             assert!(r.contains(&format!("alm confirm --title \"{CONFIRM_TITLE}\" --plan")));
             assert!(r.contains("alm labels"));
             assert!(r.contains("alm task-language"), "{language}");
-            assert!(
-                r.contains("/work/bakery/.allomos/taskbag\" brief`"),
-                "{language}"
-            );
+            assert!(r.contains(&format!("{tb}\" brief`")), "{language}");
             assert!(
                 !r.contains("alm init"),
                 "the app made the taskbag: {language}"

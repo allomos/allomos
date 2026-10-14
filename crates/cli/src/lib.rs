@@ -2161,11 +2161,15 @@ mod tests {
 
     /// A taskbag in today's format with one area and two tasks, A01-01 labelled "human verified".
     fn taskbag() -> PathBuf {
+        // The time alone is not enough: two tests running at once can read the same time (the
+        // Windows clock is coarse), and the second `init` then finds the first one's taskbag.
+        static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("alm-migrate-{n}"));
+        let k = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("alm-migrate-{n}-{k}"));
         fs::create_dir_all(dir.join(".git")).unwrap();
         let root = dir.join(DEFAULT_DIR);
         let real = &versions::FORMATS;
@@ -2256,7 +2260,7 @@ mod tests {
         assert!(prompt.contains("`alm rename label`"));
         assert!(prompt.contains(&format!(
             "alm --taskbag \"{}\" migrate --finish",
-            root.display()
+            allomos_store::plain_path(&root).display()
         )));
         let zh = ok(&root, t, &["migrate", "--language", "zh-CN"]);
         assert!(zh["prompt"].as_str().unwrap().contains("步骤"));
