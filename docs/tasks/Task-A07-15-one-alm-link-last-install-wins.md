@@ -41,3 +41,9 @@ No second link (such as `~/.local/bin/alm`) comes before it, so `which -a alm` s
   - `scripts/install-dev-alm.sh`: `cargo install`, then `sudo ln -sfn ~/.cargo/bin/alm /usr/local/bin/alm` only when the link leads elsewhere; dry run (cargo and sudo left out, link folder redirected) linked it, and a second run asked nothing. It says when this shell finds another `alm` first.
   - Status gains `kind` (missing / development / other), `own`, `leads_to`; the banner shows the sentence, then "In use: … → …" and "This Allomos's own: …", and for a development build the button **Use this Allomos's alm…**. en, zh-CN, ja.
   - Checks: `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings`, `cargo test --workspace` (7 `alm_command` cases, 1 new), web `typecheck`, `check:i18n` (362 texts), `test` (79), `build`: all PASS. NOT RUN: the banner in a built Allomos.app, and the real `/usr/local/bin` link (both the owner's human check).
+- 2026-10-14, owner's check on this Mac (app and `.pkg` built in `.claude/worktrees/a07-15`, `alm 0.1.2`):
+  1. `rm ~/.local/bin/alm` (the hand-made link): a new shell finds `/usr/local/bin/alm` first.
+  2. `scripts/install-dev-alm.sh` (password once): `/usr/local/bin/alm` → `~/.cargo/bin/alm`.
+  3. The new `.pkg` installed: the link moved to `/Applications/Allomos.app/Contents/MacOS/alm` (the old `postinstall` would have kept the link to the development build).
+  4. `install-dev-alm.sh` again, then Allomos opened: the banner offered **Use this Allomos's alm…**; the click (password) said "The alm command is installed. Open a new Terminal window to use it.", and the link leads to the app again.
+  - Before the check, the stale `target/release/bundle/` app and `.pkg` in the main checkout (18:31, not this card's) were removed at the owner's request, and the worktree's app was not registered with macOS, so the installer had only `/Applications`.
