@@ -2,9 +2,9 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Proposed** | 2026-10-14 | — | will.w.hui |
+| **Accepted** | 2026-10-14 | 2026-10-14 | will.w.hui |
 
-Card: [`Task-A01-38`](../tasks/Task-A01-38-no-git-in-alm.md). No code is written until the owner accepts this record.
+Card: [`Task-A01-38`](../tasks/Task-A01-38-no-git-in-alm.md). Accepted by the owner on 2026-10-14 ("accept", in chat with session claude/a01-38-no-git-in-alm); the code may start.
 
 ## In plain words
 
@@ -21,7 +21,7 @@ Today `alm` commits and pushes the task list by itself (`--commit`, `--push`), a
 - Changes made in the app (task pane, new tasks, areas, iterations) are never committed; the next `alm … --push` sweeps them in.
 - The AGENTS.md section (`alm brief`), `alm guide`, `alm`'s hints and the setup, conversion and migration prompts all mention `--push` / `--commit`.
 
-## Decision (proposed; every row agreed with the owner in chat, 2026-10-14)
+## Decision (every row agreed with the owner in chat, 2026-10-14)
 
 | # | Use case | Today | After |
 |---|---|---|---|

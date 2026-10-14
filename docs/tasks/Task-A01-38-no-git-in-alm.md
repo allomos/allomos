@@ -2,7 +2,7 @@
 
 *Card type: decision, then coding. Area A01 (Tracking). Written 2026-10-14 at the owner's request, after one session's `alm wait --push` swept another agent's uncommitted migration into its commit.*
 
-> **Not approved for code yet.** Decision record [0017](../decisions/0017-agents-run-git-not-alm.md) is *Proposed*; code starts when the owner accepts it. Where the details below differ from the record, the record wins.
+> **Approved for code.** Decision record [0017](../decisions/0017-agents-run-git-not-alm.md) was accepted by the owner on 2026-10-14. Where the details below differ from the record, the record wins.
 
 ## What gets built (plain words)
 
@@ -24,10 +24,9 @@ Allomos stops running Git. `alm` and the app only change the task files; after e
 ## Details for the worker
 
 - **Outcome.** Git never runs behind the agent's or the person's back; each commit holds exactly one change, made by the one who made it.
-- **Decisive unknowns.** None open; see [0017 § Decision](../decisions/0017-agents-run-git-not-alm.md#decision-proposed-every-row-agreed-with-the-owner-in-chat-2026-10-14).
+- **Decisive unknowns.** None open; see [0017 § Decision](../decisions/0017-agents-run-git-not-alm.md#decision-every-row-agreed-with-the-owner-in-chat-2026-10-14).
 - **External operations.** None.
 - **Done means mechanically.**
-  - 0017 accepted by the owner.
   - The named checks pass (`cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `npm --prefix apps/web run typecheck`, `build`, `check:i18n`, `test`).
   - Tests: each changing command lists exactly the files it wrote (and no others, with unrelated changes present); `--commit` / `--push` are refused as unknown options; `alm claim`'s wording; `alm init` prints no commands and reads no Git; the wizard finishes in a folder outside Git; "last used by" comes from events; app changes appear in the next `alm` output.
   - Human check: run `alm claim` in a test taskbag and read the printed commands; set up a new folder with the wizard.
@@ -37,4 +36,5 @@ Allomos stops running Git. `alm` and the app only change the task files; after e
 | What | By | When | Source |
 |---|---|---|---|
 | Write the decision record (this card's first step) | owner | 2026-10-14 | chat with session claude/a01-38-no-git-in-alm |
-| Code | — | — | waits on 0017 |
+| Accept 0017 | owner | 2026-10-14 | chat with session claude/a01-38-no-git-in-alm ("accept") |
+| Code (approve the card) | owner | 2026-10-14 | same chat ("approve") |
