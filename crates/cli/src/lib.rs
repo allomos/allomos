@@ -2,8 +2,9 @@
 //!
 //! It reads options, calls the rules in `allomos-core` and the writer in
 //! `allomos-store`, and prints the result: plain lines for people, or one JSON object
-//! for agents (`--json`). It never asks for typed input. The contract is in
-//! `docs/workflow/CODING_RULES.md` § The `alm` command.
+//! for agents (`--json`). It never asks for typed input, and never runs or reads Git: after a
+//! change it prints the Git commands for exactly the files that change wrote, and the agent runs
+//! them (decision 0017). The contract is in `docs/workflow/CODING_RULES.md` § The `alm` command.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -15,10 +16,10 @@ use allomos_core::{Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
     Actor, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
-    agent_section_for, agent_setup_request, default_root, events, find_taskbag, git_root, guide,
-    id_from_name, init_with_labels, load, pick_ui_language, picked_folder, post_confirm,
-    project_folder_of, read_answer, read_text, requests_dir, saved_ui_language, task_language,
-    taskbag_of, versions, was_seen, withdraw_confirm,
+    agent_section_for, agent_setup_request, default_root, events, find_taskbag, guide,
+    id_from_name, init_with_labels, load, pick_ui_language, picked_folder, plain_path,
+    post_confirm, project_folder_of, read_answer, read_text, requests_dir, saved_ui_language,
+    task_language, taskbag_of, versions, was_seen, with_written_files, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -59,19 +60,13 @@ struct Cli {
     /// Print one JSON result on standard output, and nothing else.
     #[arg(long, global = true)]
     json: bool,
-    /// After a change, commit the taskbag's files (only those) with Git.
-    #[arg(long, global = true)]
-    commit: bool,
-    /// After a change, commit the taskbag's files and push the current branch.
-    #[arg(long, global = true)]
-    push: bool,
     #[command(subcommand)]
     command: Command,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    /// Create an empty taskbag at the root of this Git repository (or in this folder).
+    /// Create an empty taskbag in this folder's .allomos/taskbag/ (or where --taskbag says).
     Init {
         /// The project's name. Default: the folder's name.
         #[arg(long)]
@@ -538,8 +533,6 @@ struct Done {
     text: String,
     warnings: Vec<Problem>,
     issues: Vec<Issue>,
-    /// Files outside the taskbag that `--commit` also commits, relative to the taskbag.
-    extra: Vec<String>,
 }
 
 impl Done {
@@ -549,7 +542,6 @@ impl Done {
             text,
             warnings: Vec::new(),
             issues: Vec::new(),
-            extra: Vec::new(),
         }
     }
 }
@@ -630,23 +622,19 @@ fn reply(args: Vec<OsString>, cwd: &Path, formats: &versions::Formats) -> Reply 
         }
     };
     let command = cli.command.name();
-    let code = match check_versions(&cli, cwd, formats).and_then(|outdated| {
-        let mut done = execute(&cli, cwd, formats)?;
-        done.warnings.extend(outdated);
-        Ok(done)
-    }) {
+    // Before the change: is the taskbag being updated, and which changes made in the app has no
+    // agent been told to share yet (decision 0017, row 9)?
+    let before = Before::look(&cli, cwd, formats);
+    let (result, written) = with_written_files(|| {
+        check_versions(&cli, cwd, formats).and_then(|outdated| {
+            let mut done = execute(&cli, cwd, formats)?;
+            done.warnings.extend(outdated);
+            Ok(done)
+        })
+    });
+    let code = match result {
         Ok(mut done) => {
-            if (cli.commit || cli.push) && cli.command.changes() {
-                if let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) {
-                    // Added without an ID: name the one it got.
-                    let made = ["task", "area", "iteration"]
-                        .iter()
-                        .find_map(|k| done.fields[*k]["id"].as_str())
-                        .map(String::from);
-                    done.warnings
-                        .extend(share(&cli, &root, &done.extra, made.as_deref()));
-                }
-            }
+            share(&cli, &before, &written, &mut done);
             if cli.json {
                 let mut out = json!({ "schema": SCHEMA, "ok": true, "command": command });
                 if let (Some(out), Some(fields)) = (out.as_object_mut(), done.fields.as_object()) {
@@ -726,68 +714,194 @@ fn check_versions(
         .collect())
 }
 
-/// Run `git` in `dir`; on failure, Git's own message.
-fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
-    let out = std::process::Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if out.status.success() {
-        Ok(out)
-    } else {
-        let text = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        Err(if text.is_empty() {
-            format!("git {} failed", args.join(" "))
-        } else {
-            text
-        })
+/// What `alm` knows before a change, for the Git commands it prints after it.
+struct Before {
+    /// The taskbag is being updated from an older format (Task-A01-32): its changes are committed
+    /// together once `alm migrate --finish` has succeeded.
+    mid_update: bool,
+    /// Changes made in the app that no agent has been told to share yet.
+    app: Option<events::AppChanges>,
+}
+
+impl Before {
+    fn look(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Before {
+        let telling = (cli.command.changes() && !matches!(cli.command, Command::Init { .. }))
+            || matches!(cli.command, Command::Next { .. });
+        let root = telling.then(|| locate(cli, cwd).ok()).flatten();
+        let mid_update = root
+            .as_ref()
+            .is_some_and(|r| matches!(formats.state(r), versions::FormatState::Older { .. }));
+        let app = root
+            .filter(|_| !mid_update)
+            .map(|r| events::unshared_app_changes(&r))
+            .filter(|a| a.count > 0);
+        Before { mid_update, app }
     }
 }
 
-/// `--commit` / `--push`: commit only the taskbag's files (other changes are left alone), then
-/// push if asked. The change itself is already saved, so a Git failure is a warning, not an error.
-fn share(cli: &Cli, taskbag: &Path, extra: &[String], made: Option<&str>) -> Vec<Problem> {
-    let command = cli.command.name();
-    let subject = match cli.command.target().or(made) {
-        Some(id) => format!("alm: {command} {id}"),
-        None => format!("alm: {command}"),
-    };
-    let agent = format!(
-        "Agent: {}",
-        cli.holder.as_deref().unwrap_or("unknown (alm)")
-    );
-    // The taskbag ("."), plus any other files the command wrote (for `init`, AGENTS.md / CLAUDE.md).
-    let paths: Vec<&str> = std::iter::once(".")
-        .chain(extra.iter().map(String::as_str))
-        .collect();
-    let run = |head: &[&str]| {
-        let args: Vec<&str> = head
-            .iter()
-            .copied()
-            .chain(["--"])
-            .chain(paths.iter().copied())
-            .collect();
-        git(taskbag, &args)
-    };
-    let commit = (|| {
-        run(&["add", "--all"])?;
-        // Nothing staged: the change made no difference, so there is nothing to commit.
-        if run(&["diff", "--cached", "--quiet"]).is_ok() {
-            return Ok(false);
-        }
-        run(&["commit", "--quiet", "-m", &subject, "-m", &agent])?;
-        Ok(true)
-    })();
-    match commit {
-        Err(detail) => vec![Problem::CommitFailed { detail }],
-        Ok(_) if !cli.push => vec![],
-        Ok(_) => match git(taskbag, &["push", "--quiet"]) {
-            Ok(_) => vec![],
-            Err(detail) => vec![Problem::PushFailed { detail }],
-        },
+/// One argument of a printed command: as it is when it is plain, otherwise in double quotes.
+fn quoted(arg: &str) -> String {
+    let plain = !arg.is_empty()
+        && arg
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-/@+=,:".contains(c));
+    if plain {
+        arg.to_string()
+    } else {
+        format!("\"{}\"", arg.replace('"', "\\\""))
     }
+}
+
+/// `git add`, `git commit` (with the two message lines) and, unless `push` is false, `git push`,
+/// run in `taskbag` and naming exactly `files` (relative to it).
+fn git_commands(
+    taskbag: &Path,
+    files: &[String],
+    subject: &str,
+    who: &str,
+    push: bool,
+) -> Vec<String> {
+    let at = format!(
+        "git -C {}",
+        quoted(&plain_path(taskbag).display().to_string())
+    );
+    let list: Vec<String> = files.iter().map(|f| quoted(f)).collect();
+    let list = list.join(" ");
+    let mut out = vec![
+        format!("{at} add -- {list}"),
+        format!(
+            "{at} commit -m {} -m {} -- {list}",
+            quoted(subject),
+            quoted(who)
+        ),
+    ];
+    if push {
+        out.push(format!("{at} push"));
+    }
+    out
+}
+
+/// After a change (decision 0017): `alm` runs no Git; it tells the agent the exact commands that
+/// share this change, naming only the files it wrote (`changed_files`, `git_commands`), and
+/// any changes made in the app that are not shared yet (`app_changes`), to commit as the
+/// person's. `alm init` prints none: no agent is connected yet. While an update is unfinished,
+/// its changes are committed together after `alm migrate --finish`, which prints the commands
+/// for the whole taskbag, without a push.
+fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
+    let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) else {
+        return;
+    };
+    let finishing = matches!(cli.command, Command::Migrate { finish: true, .. });
+    let changes = cli.command.changes() && !matches!(cli.command, Command::Init { .. });
+    let mut text = String::new();
+    let mut files: Vec<String> = written
+        .iter()
+        .filter(|p| p.file_name().is_some_and(|n| n != allomos_store::LOCK_FILE))
+        .map(|p| match p.strip_prefix(&root) {
+            Ok(rel) => allomos_store::portable_path(rel),
+            Err(_) => p.display().to_string(),
+        })
+        .collect();
+    files.sort();
+    files.dedup();
+    if changes {
+        let command = cli.command.name();
+        // Added without an ID: name the one it got.
+        let made = ["task", "area", "iteration"]
+            .iter()
+            .find_map(|k| done.fields[*k]["id"].as_str())
+            .map(String::from);
+        let subject = match cli.command.target().map(String::from).or(made) {
+            Some(id) => format!("alm: {command} {id}"),
+            None => format!("alm: {command}"),
+        };
+        let who = format!(
+            "Agent: {}",
+            cli.holder.as_deref().unwrap_or("<your session name>")
+        );
+        let (instruction, commands) = if files.is_empty() {
+            (
+                "Nothing changed, so there is nothing to commit.".to_string(),
+                Vec::new(),
+            )
+        } else if finishing {
+            let to = done.fields["migrate"]["to"].as_str().unwrap_or_default();
+            (
+                "Commit the update as one commit; commit only, do not push:".to_string(),
+                git_commands(
+                    &root,
+                    &[".".to_string()],
+                    &format!("alm: migrate the taskbag to {to}"),
+                    &who,
+                    false,
+                ),
+            )
+        } else if before.mid_update {
+            (
+                "This change is part of the taskbag's update: do not commit it on its own. Once `alm migrate --finish` has succeeded, commit the update with the commands it prints (commit only; do not push).".to_string(),
+                Vec::new(),
+            )
+        } else if matches!(cli.command, Command::Claim { .. }) {
+            (
+                "Commit and push this change now, before you start the work. Until it is pushed, other sessions do not see your claim and may take this task too:".to_string(),
+                git_commands(&root, &files, &subject, &who, true),
+            )
+        } else {
+            (
+                "Commit and push this change:".to_string(),
+                git_commands(&root, &files, &subject, &who, true),
+            )
+        };
+        text.push('\n');
+        text.push_str(&instruction);
+        text.push('\n');
+        for c in &commands {
+            text.push_str(&format!("  {c}\n"));
+        }
+        if !commands.is_empty() {
+            text.push_str("Commit only these files; leave other changes as they are.\n");
+        }
+        done.fields["changed_files"] = json!(files);
+        done.fields["git_commands"] = json!(commands);
+        done.fields["git_instruction"] = json!(instruction);
+    }
+    if let Some(app) = &before.app {
+        // Files this change also wrote are already in its own commit.
+        let rest: Vec<String> = app
+            .files
+            .iter()
+            .filter(|f| !(changes && files.contains(f)))
+            .cloned()
+            .collect();
+        if !rest.is_empty() {
+            let by = if app.by.is_empty() {
+                "the person".to_string()
+            } else {
+                app.by.join(", ")
+            };
+            let commands = git_commands(
+                &root,
+                &rest,
+                "app: changes made in the Allomos app",
+                &format!("By: {by} (Allomos app)"),
+                true,
+            );
+            text.push_str(&format!(
+                "\n{} change(s) made in the Allomos app by {by} are not shared yet. Commit them as the person's, in their own commit (if someone already committed them, Git finds nothing to commit; that is fine):\n",
+                app.count
+            ));
+            for c in &commands {
+                text.push_str(&format!("  {c}\n"));
+            }
+            done.fields["app_changes"] = json!({
+                "count": app.count,
+                "by": app.by,
+                "files": rest,
+                "git_commands": commands,
+            });
+        }
+    }
+    done.text.push_str(&text);
 }
 
 fn error_line(command: Option<&str>, problem: &Problem) -> String {
@@ -846,13 +960,11 @@ fn language_line(l: &allomos_store::TaskLanguage) -> String {
 }
 
 /// The project folder `alm confirm` asks about: the folder holding the taskbag given with
-/// `--taskbag` (which may not exist yet), else the nearest taskbag's, else the Git repository's
-/// root, else `cwd`.
+/// `--taskbag` (which may not exist yet), else the nearest taskbag's, else `cwd`.
 fn confirm_project(cli: &Cli, cwd: &Path) -> PathBuf {
     let taskbag = match &cli.taskbag {
         Some(path) => cwd.join(path),
-        None => find_taskbag(cwd)
-            .unwrap_or_else(|| default_root(&git_root(cwd).unwrap_or_else(|| cwd.to_path_buf()))),
+        None => find_taskbag(cwd).unwrap_or_else(|| default_root(cwd)),
     };
     picked_folder(&taskbag)
         .map(Path::to_path_buf)
@@ -950,7 +1062,7 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Claim it with `alm claim <id> --as <your session name> --push`.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Pull first, then claim it with `alm claim <id> --as <your session name>` and run the Git commands it prints right away: until your claim is pushed, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
     serde_json::to_value(t).expect("tasks serialize")
@@ -1159,7 +1271,7 @@ fn human(
         }
     }
     if !to_check.is_empty() {
-        text.push_str("\nOnce a person has checked a task: `alm checked <id> --push`.\n");
+        text.push_str("\nOnce a person has checked a task: `alm checked <id>`.\n");
     }
     let list = |members: &[&Task]| {
         members
@@ -1196,7 +1308,8 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
         } => {
             let root = match &cli.taskbag {
                 Some(p) => cwd.join(p),
-                None => default_root(&git_root(cwd).unwrap_or_else(|| cwd.to_path_buf())),
+                // Here, never the repository's top folder: `alm` reads no Git (decision 0017).
+                None => default_root(cwd),
             };
             let folder = root
                 .parent()
@@ -1247,7 +1360,6 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 text,
             );
             done.warnings = warnings;
-            done.extra = agent_files.iter().map(|f| format!("../../{f}")).collect();
             Ok(done)
         }
         Command::Confirm {
@@ -1904,7 +2016,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                     .collect();
                 text.push_str(&if all_done {
                     format!(
-                        "{}: all blockers are done ({}) — unblock it? Check, then `alm unblock {} --push`.\n",
+                        "{}: all blockers are done ({}) — unblock it? Check, then `alm unblock {}`.\n",
                         t.id,
                         list.join(", "),
                         t.id
@@ -2056,7 +2168,7 @@ fn check_rule(task: Option<&str>) -> String {
         "Now check {what} yourself, one by one:\n\
          1. Get the list: {list}.\n\
          2. For each handoff, look up every task it names (`alm show <id>`).\n\
-         3. If all of them are done or dropped, remove the handoff: `alm handoff --remove <file> --push`.\n\
+         3. If all of them are done or dropped, remove the handoff: `alm handoff --remove <file>`.\n\
          4. Otherwise leave it as it is.\n"
     )
 }

@@ -156,7 +156,6 @@ export type Inspection =
 
 export interface FolderInfo {
   inspection: Inspection;
-  git_root: string | null;
 }
 
 export interface Opened {
@@ -180,8 +179,10 @@ export interface AgentStatus {
   project: string;
   /** Which agents' instruction files tell them about Allomos. */
   setup: { codex: boolean; claude: boolean };
-  /** The newest taskbag change an agent made with `alm --commit` / `--push`. `when` is in seconds. */
-  last: { who: string; when: number } | null;
+  /** The newest change an agent made through `alm` under a name, from the change history. `at` is UTC. */
+  last: { who: string; at: string } | null;
+  /** Changes made in the app that no agent has been told to share yet (decision 0017). */
+  unshared: number;
   /** Who holds tasks in progress now. */
   holders: string[];
 }
@@ -254,15 +255,6 @@ export interface SetupState {
   /** Which agents' instruction files in the project folder mention Allomos. */
   agents: { codex: boolean; claude: boolean };
   has_tasks: boolean;
-}
-
-/** Where the setup wizard keeps the taskbag in Git (apps/desktop: `keep_in_git`). */
-export interface GitKept {
-  repo: string;
-  /** The folder was not in a repository, so it was made one. */
-  initialized: boolean;
-  /** A commit was made (false: already committed as it is). */
-  committed: boolean;
 }
 
 /** Whether the project folder has its agent instruction files (apps/desktop: `instruction_files`). */

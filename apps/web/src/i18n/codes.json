@@ -29,9 +29,6 @@
     "id",
     "state"
   ],
-  "commit_failed": [
-    "detail"
-  ],
   "confirm_declined": [],
   "confirm_timeout": [
     "seconds"
@@ -57,11 +54,6 @@
   "folder_not_empty": [
     "path"
   ],
-  "git_init_failed": [
-    "path",
-    "detail"
-  ],
-  "git_missing": [],
   "handoff_not_found": [
     "file"
   ],
@@ -136,9 +128,6 @@
     "detail"
   ],
   "project_name_missing": [],
-  "push_failed": [
-    "detail"
-  ],
   "read_failed": [
     "detail"
   ],

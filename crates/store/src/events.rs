@@ -127,6 +127,12 @@ pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
 
 /// Every event in the taskbag, oldest first, plus the files that could not be read.
 pub fn list(root: &Path) -> (Vec<Event>, Vec<Issue>) {
+    let (events, issues) = list_with_files(root);
+    (events.into_iter().map(|(_, e)| e).collect(), issues)
+}
+
+/// [`list`], with each event's file relative to the taskbag (`events/<name>.json`).
+pub fn list_with_files(root: &Path) -> (Vec<(String, Event)>, Vec<Issue>) {
     let mut events = Vec::new();
     let mut issues = Vec::new();
     for path in sorted_entries(&root.join(EVENTS_DIR)) {
@@ -151,7 +157,95 @@ pub fn list(root: &Path) -> (Vec<Event>, Vec<Issue>) {
     }
     // By time, then by file name (which has milliseconds and is unique).
     events.sort_by(|(fa, a), (fb, b)| a.at.cmp(&b.at).then(fa.cmp(fb)));
-    (events.into_iter().map(|(_, e)| e).collect(), issues)
+    (events, issues)
+}
+
+/// The newest change an agent made through `alm` under a name (`--as`): who and when. The app's
+/// "last used by … at …" line reads it from the change history, not from Git (decision 0017).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LastUse {
+    pub who: String,
+    /// `2026-10-13T14:02:05Z`, UTC.
+    pub at: String,
+}
+
+pub fn last_agent_use(root: &Path) -> Option<LastUse> {
+    list(root)
+        .0
+        .into_iter()
+        .rev()
+        .find(|e| e.via == "alm" && e.by.as_deref().is_some_and(|b| !b.is_empty()))
+        .map(|e| LastUse {
+            who: e.by.unwrap_or_default(),
+            at: e.at,
+        })
+}
+
+/// Changes made in the app that no agent has been told to share yet (decision 0017, row 9): the
+/// app's events after the newest change made through `alm`, and the files they touch that still
+/// exist, relative to the taskbag. The next `alm` change lists them with the Git commands to
+/// commit them as the person's; after that change they are no longer "after the newest `alm`
+/// change". Allomos never reads Git, so a change someone already committed by hand may be listed
+/// once more; committing it again changes nothing.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct AppChanges {
+    /// How many changes (events) the app made.
+    pub count: usize,
+    /// Who made them, as the app recorded it (the person's name), without repeats.
+    pub by: Vec<String>,
+    /// Their files, relative to the taskbag, with `/`.
+    pub files: Vec<String>,
+}
+
+pub fn unshared_app_changes(root: &Path) -> AppChanges {
+    let (all, _) = list_with_files(root);
+    let after = all
+        .iter()
+        .rposition(|(_, e)| e.via == "alm")
+        .map_or(0, |i| i + 1);
+    let mut out = AppChanges::default();
+    let mut files = std::collections::BTreeSet::new();
+    for (file, e) in &all[after..] {
+        if e.via != "app" {
+            continue;
+        }
+        out.count += 1;
+        if let Some(by) = &e.by {
+            if !out.by.contains(by) {
+                out.by.push(by.clone());
+            }
+        }
+        files.insert(file.clone());
+        let id = e.id.as_deref().unwrap_or_default();
+        let item: Vec<String> = match e.kind {
+            Kind::Task => vec![
+                format!("tasks/{id}/task.json"),
+                format!("tasks/{id}/description.md"),
+            ],
+            Kind::Area => vec![format!("areas/{id}.json")],
+            Kind::Iteration => vec![format!("iterations/{id}.json")],
+            Kind::Project => vec!["project.json".to_string()],
+        };
+        for f in item {
+            // A file the app removed (a deleted area or iteration, an emptied description) is
+            // listed too, so the commit records the removal.
+            let removed = match e.kind {
+                Kind::Area | Kind::Iteration => e.command.starts_with("delete"),
+                Kind::Task => {
+                    f.ends_with("description.md")
+                        && e.changes
+                            .iter()
+                            .any(|c| c.field == "description" && c.from.is_some() && c.to.is_none())
+                }
+                Kind::Project => false,
+            };
+            if removed || root.join(&f).is_file() {
+                files.insert(f);
+            }
+        }
+    }
+    out.files = files.into_iter().collect();
+    out
 }
 
 /// One task's history.
