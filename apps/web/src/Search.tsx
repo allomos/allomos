@@ -147,10 +147,11 @@ export function FilterHits({
   const heading = t("search.hidden_by_filter", { filter });
   return (
     <section className="area search-hidden" aria-label={heading}>
+      {/* "3 found" is the title; under it, which filter hides them and Show all (approver, 2026-10-14). */}
       <header className="area-head">
-        <h2>{heading}</h2>
-        <span className="count">{t("search.handoff_count", { count: tasks.length })}</span>
-        <span className="group-actions">
+        <h2>{t("search.handoff_count", { count: tasks.length })}</h2>
+        <span className="sub">
+          {heading}{" "}
           <button type="button" className="link small" onClick={onShowAll}>
             {t("filter.show_all")}
           </button>

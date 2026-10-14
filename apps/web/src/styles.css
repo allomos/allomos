@@ -399,5 +399,4 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 /* Task-A01-42: what the state filter hides, in each group and in a search. */
 .filter-hidden { margin: 0; padding: 8px 16px 10px; color: var(--muted); border-top: 1px solid var(--line); }
 .filter-hidden::before { content: "⊘ "; }
-.search-hidden .area-head h2 { color: var(--muted); }
-.search-hidden .area-head h2::before { content: "⊘ "; }
+.search-hidden .area-head .sub::before { content: "⊘ "; }

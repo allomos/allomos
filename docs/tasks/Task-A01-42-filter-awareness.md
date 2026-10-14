@@ -45,3 +45,5 @@ The **Show** filter above the task list is remembered between launches. A filter
   2. Click Show all on one: the filter goes back to All states and the lines disappear.
   3. Set Show to Backlog again and search `A01-41`: it appears under "Hidden by the “Backlog” filter"; click it: the task pane opens.
   4. Switch the language to 中文 and 日本語: the lines follow.
+
+- 2026-10-14 — **Header of the search section changed at the approver's request, and human verified.** The section of hidden search hits now has the count as its title ("3 found") and, under it, "⊘ Hidden by the “Blocked” filter · Show all" on one line (`apps/web/src/Search.tsx`, `apps/web/src/styles.css`). Web checks PASS (typecheck, test 80, check:i18n, build) on a clean copy of main; debug app built from worktree `.claude/worktrees/a01-42-filter-awareness`. The approver checked it in that app on 2026-10-14: passed.
