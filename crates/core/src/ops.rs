@@ -270,6 +270,40 @@ pub fn set_ladder(taskbag: &Taskbag, labels: &[String]) -> Result<Project, Probl
     })
 }
 
+/// A step of the ladder renamed, with every task that carries it (`alm rename label`,
+/// Task-A01-32): the project with the new ladder (same order), and the tasks whose label changed,
+/// done and dropped ones too. The old name must be on the ladder; the new one must not be.
+pub fn rename_label(
+    taskbag: &Taskbag,
+    old: &str,
+    new: &str,
+) -> Result<(Project, Vec<Task>), Problem> {
+    let old = old.trim();
+    let new = non_empty(Some(new)).ok_or(Problem::LabelNameMissing)?;
+    let ladder = &taskbag.project.labels;
+    let Some(at) = ladder.iter().position(|l| l == old) else {
+        return Err(Problem::LabelNotOnLadder {
+            label: old.to_string(),
+            ladder: ladder.join(" → "),
+        });
+    };
+    if ladder.iter().any(|l| *l == new) {
+        return Err(Problem::LabelExists { label: new });
+    }
+    let mut project = taskbag.project.clone();
+    project.labels[at] = new.clone();
+    let tasks = taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.label.as_deref() == Some(old))
+        .map(|t| Task {
+            label: Some(new.clone()),
+            ..t.clone()
+        })
+        .collect();
+    Ok((project, tasks))
+}
+
 /// The parts of a new iteration besides its ID and name; all optional.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct IterationDetails<'a> {
@@ -833,6 +867,38 @@ mod tests {
             let i = $s.tasks.iter().position(|x| x.id == t.id).unwrap();
             $s.tasks[i] = t;
         }};
+    }
+
+    #[test]
+    fn renaming_a_label_renames_it_on_the_tasks_too() {
+        let mut s = bag();
+        s.tasks[0].label = Some("owner verified".into());
+        s.tasks[1].label = Some("owner verified".into());
+        s.tasks[1].state = State::Done;
+        s.tasks[2].label = Some("implemented".into());
+        let (p, tasks) = rename_label(&s, "owner verified", " human checked ").unwrap();
+        assert_eq!(p.labels[3], "human checked");
+        assert_eq!(p.labels.len(), 4);
+        assert_eq!(tasks.len(), 2, "the done task too");
+        assert!(
+            tasks
+                .iter()
+                .all(|t| t.label.as_deref() == Some("human checked"))
+        );
+        assert_eq!(
+            rename_label(&s, "shipped", "x").unwrap_err().code(),
+            "label_not_on_ladder"
+        );
+        assert_eq!(
+            rename_label(&s, "owner verified", "implemented"),
+            Err(Problem::LabelExists {
+                label: "implemented".into()
+            })
+        );
+        assert_eq!(
+            rename_label(&s, "owner verified", " "),
+            Err(Problem::LabelNameMissing)
+        );
     }
 
     #[test]

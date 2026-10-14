@@ -16,8 +16,9 @@ use allomos_store::handoff;
 use allomos_store::{
     Actor, DEFAULT_DIR, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
     agent_section_for, agent_setup_request, events, find_taskbag, git_root, guide, id_from_name,
-    init_with_labels, load, picked_folder, post_confirm, project_folder_of, read_answer,
-    requests_dir, task_language, taskbag_of, versions, was_seen, withdraw_confirm,
+    init_with_labels, load, pick_ui_language, picked_folder, post_confirm, project_folder_of,
+    read_answer, requests_dir, saved_ui_language, task_language, taskbag_of, versions, was_seen,
+    withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -90,7 +91,8 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
-    /// Rename an area: `alm rename area <id> "<name>"`. Its ID stays.
+    /// Rename an area (`alm rename area <id> "<name>"`; its ID stays), or a label of the ladder
+    /// with every task that carries it (`alm rename label "<old>" "<new>"`).
     #[command(subcommand)]
     Rename(Rename),
     /// Change an iteration: `alm change iteration <id> [--name] [--release] [--start] [--end]`.
@@ -213,9 +215,17 @@ enum Command {
         #[arg(long)]
         iteration: Option<String>,
     },
-    /// Bring a taskbag written by an older Allomos up to this one's format. Run it when `alm`
-    /// says the taskbag is older; it adds only what the newer format has.
-    Upgrade,
+    /// Update a taskbag written by an older Allomos: print the guided steps for the AI agent
+    /// doing it. With --finish, write this Allomos's format once `alm list --json` reports no
+    /// issues; until then, only reading commands and the update's own commands work.
+    Migrate {
+        /// Write the new format (refused while issues remain, listing them).
+        #[arg(long)]
+        finish: bool,
+        /// The language of the steps (en, zh-CN, ja). Default: the Allomos app's language.
+        #[arg(long, value_name = "CODE", conflicts_with = "finish")]
+        language: Option<String>,
+    },
     /// When to write a handoff: the quota and context gates (with any override for you, --as).
     /// With options, change them.
     #[command(name = "handoff-rules")]
@@ -316,6 +326,9 @@ enum Add {
 enum Rename {
     /// Give an area a new name; its ID stays.
     Area { id: String, name: String },
+    /// Rename a step of the label ladder, and the label of every task that carries it (done and
+    /// dropped ones too). Its place on the ladder stays.
+    Label { old: String, new: String },
 }
 
 #[derive(Subcommand)]
@@ -362,6 +375,7 @@ impl Command {
             Command::Add(Add::Area { first, name } | Add::Iteration { first, name, .. }) => {
                 id_and_name(first, name).0
             }
+            Command::Rename(Rename::Label { old, .. }) => Some(old),
             Command::Rename(Rename::Area { id, .. })
             | Command::Change(ChangeWhat::Iteration { id, .. })
             | Command::Delete(Delete::Area { id } | Delete::Iteration { id }) => Some(id),
@@ -386,7 +400,7 @@ impl Command {
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::List { .. }
-            | Command::Upgrade
+            | Command::Migrate { .. }
             | Command::HandoffRules { .. }
             | Command::HandoffTemplate { .. }
             | Command::Handoff { .. }
@@ -416,6 +430,9 @@ impl Command {
         if let Command::HandoffTemplate { set } = self {
             return set.is_some();
         }
+        if let Command::Migrate { finish, .. } = self {
+            return *finish;
+        }
         !matches!(
             self,
             Command::List { .. }
@@ -441,6 +458,7 @@ impl Command {
             Command::Add(Add::Iteration { .. }) => "add iteration",
             Command::Add(Add::Task { .. }) => "add task",
             Command::Rename(Rename::Area { .. }) => "rename area",
+            Command::Rename(Rename::Label { .. }) => "rename label",
             Command::Change(ChangeWhat::Iteration { .. }) => "change iteration",
             Command::Delete(Delete::Area { .. }) => "delete area",
             Command::Delete(Delete::Iteration { .. }) => "delete iteration",
@@ -459,7 +477,7 @@ impl Command {
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
             Command::Next { .. } => "next",
-            Command::Upgrade => "upgrade",
+            Command::Migrate { .. } => "migrate",
             Command::HandoffRules { .. } => "handoff-rules",
             Command::HandoffTemplate { .. } => "handoff-template",
             Command::Handoff { .. } => "handoff",
@@ -515,13 +533,35 @@ fn issue_json(i: &Issue) -> Value {
 
 /// Run `alm` with these arguments from `cwd`; print the result and return the exit code.
 pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
+    let reply = reply(args, cwd, &versions::FORMATS);
+    print!("{}", reply.stdout);
+    eprint!("{}", reply.stderr);
+    reply.code
+}
+
+/// What one run of `alm` printed, and its exit code.
+struct Reply {
+    code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+/// Run `alm` against the taskbag formats in `formats` (the real ones, or a test's), and collect
+/// what it would print. Help, version and usage errors without `--json` are printed by `clap`.
+fn reply(args: Vec<OsString>, cwd: &Path, formats: &versions::Formats) -> Reply {
     let wants_json = args.iter().any(|a| a == "--json");
+    let mut stdout = String::new();
+    let mut stderr = String::new();
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(e) => {
             if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) {
                 let _ = e.print();
-                return EXIT_OK;
+                return Reply {
+                    code: EXIT_OK,
+                    stdout,
+                    stderr,
+                };
             }
             let rendered = e.render().to_string();
             let detail = rendered
@@ -532,16 +572,20 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
                 .to_string();
             let problem = Problem::BadUsage { detail };
             if wants_json {
-                print_error(None, &problem);
+                stdout.push_str(&error_line(None, &problem));
             } else {
                 let _ = e.print();
             }
-            return EXIT_USAGE;
+            return Reply {
+                code: EXIT_USAGE,
+                stdout,
+                stderr,
+            };
         }
     };
     let command = cli.command.name();
-    match check_versions(&cli, cwd).and_then(|outdated| {
-        let mut done = execute(&cli, cwd)?;
+    let code = match check_versions(&cli, cwd, formats).and_then(|outdated| {
+        let mut done = execute(&cli, cwd, formats)?;
         done.warnings.extend(outdated);
         Ok(done)
     }) {
@@ -564,45 +608,53 @@ pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
                 }
                 out["warnings"] = done.warnings.iter().map(problem_json).collect();
                 out["issues"] = done.issues.iter().map(issue_json).collect();
-                println!("{out}");
+                stdout.push_str(&format!("{out}\n"));
             } else {
-                print!("{}", done.text);
+                stdout.push_str(&done.text);
                 for w in &done.warnings {
-                    eprintln!("warning [{}]: {}", w.code(), w.english());
+                    stderr.push_str(&format!("warning [{}]: {}\n", w.code(), w.english()));
                 }
                 if !done.issues.is_empty() {
-                    eprintln!(
-                        "note: {} problem(s) in the taskbag's files; see `alm list --json` or the app.",
+                    stderr.push_str(&format!(
+                        "note: {} problem(s) in the taskbag's files; see `alm list --json` or the app.\n",
                         done.issues.len()
-                    );
+                    ));
                 }
             }
             EXIT_OK
         }
         Err(problem) => {
             if cli.json {
-                print_error(Some(command), &problem);
+                stdout.push_str(&error_line(Some(command), &problem));
             } else {
-                eprintln!("error [{}]: {}", problem.code(), problem.english());
+                stderr.push_str(&format!(
+                    "error [{}]: {}\n",
+                    problem.code(),
+                    problem.english()
+                ));
             }
             exit_code(&problem)
         }
+    };
+    Reply {
+        code,
+        stdout,
+        stderr,
     }
 }
 
-/// Before a command: is the taskbag in this Allomos's format, and is Allomos's section in the
-/// project's instruction files current (Task-A01-25)? A newer or older taskbag stops the command;
-/// an out-of-date section gives a warning telling the agent to renew it. Commands that do not work
-/// on a taskbag (`init`, `brief`, `guide`, `confirm`), and `upgrade` itself, skip the format check.
-fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
-    let skips_format = matches!(
-        cli.command,
-        Command::Init { .. }
-            | Command::Brief
-            | Command::Guide { .. }
-            | Command::Confirm { .. }
-            | Command::Upgrade
-    );
+/// Before a command: is the taskbag in a format this Allomos reads, and is Allomos's section in
+/// the project's instruction files current (Task-A01-25)? A newer or too old taskbag stops every
+/// command. While an older one is being updated (Task-A01-32), reading commands and the update's
+/// own (`migrate`, `handoff`, and those its entries name) work; any other command that changes the
+/// taskbag is refused with what is left to fix. An out-of-date section gives a warning telling the
+/// agent to renew it. Commands that do not work on a taskbag (`init`, `brief`, `guide`, `confirm`)
+/// are not checked.
+fn check_versions(
+    cli: &Cli,
+    cwd: &Path,
+    formats: &versions::Formats,
+) -> Result<Vec<Problem>, Problem> {
     if matches!(
         cli.command,
         Command::Init { .. } | Command::Brief | Command::Guide { .. } | Command::Confirm { .. }
@@ -613,22 +665,14 @@ fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
     let Ok(root) = locate(cli, cwd) else {
         return Ok(Vec::new());
     };
-    if !skips_format {
-        match versions::format_state(&root) {
-            versions::FormatState::Newer { found } => {
-                return Err(Problem::TaskbagNewer {
-                    found,
-                    supported: allomos_core::FORMAT.to_string(),
-                });
-            }
-            versions::FormatState::Older { found } => {
-                return Err(Problem::TaskbagOlder {
-                    found,
-                    current: allomos_core::FORMAT.to_string(),
-                });
-            }
-            versions::FormatState::Current | versions::FormatState::Unknown => {}
+    match formats.state(&root) {
+        versions::FormatState::Older { .. } if !cli.command.changes() => {}
+        versions::FormatState::Older { .. }
+        | versions::FormatState::Newer { .. }
+        | versions::FormatState::TooOld { .. } => {
+            versions::write_allowed_in(&root, cli.command.name(), formats)?;
         }
+        versions::FormatState::Current | versions::FormatState::Unknown => {}
     }
     Ok(versions::check_connected(&root)
         .and_then(|c| c.instructions_warning())
@@ -700,11 +744,11 @@ fn share(cli: &Cli, taskbag: &Path, extra: &[String], made: Option<&str>) -> Vec
     }
 }
 
-fn print_error(command: Option<&str>, problem: &Problem) {
-    println!(
-        "{}",
+fn error_line(command: Option<&str>, problem: &Problem) -> String {
+    format!(
+        "{}\n",
         json!({ "schema": SCHEMA, "ok": false, "command": command, "error": problem_json(problem) })
-    );
+    )
 }
 
 /// The entry point of both programs.
@@ -944,7 +988,7 @@ fn task_line(t: &Task) -> String {
     )
 }
 
-fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
+fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, Problem> {
     let me = cli.holder.as_deref();
     match &cli.command {
         Command::Init {
@@ -1180,15 +1224,53 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text,
             ))
         }
-        Command::Upgrade => {
+        Command::Migrate { finish: true, .. } => {
             let root = locate(cli, cwd)?;
-            let up = versions::upgrade(&root, Actor::alm(me))?;
-            let text = if up.changed {
-                format!("Upgraded the taskbag from {} to {}.\n", up.from, up.to)
+            let done = versions::finish_in(&root, Actor::alm(me), formats)?;
+            let text = if done.changed {
+                format!(
+                    "The update is finished: the taskbag is now in {} (was {}).\n",
+                    done.to, done.from
+                )
             } else {
-                format!("The taskbag is already in {}; nothing to upgrade.\n", up.to)
+                format!(
+                    "The taskbag is already in {}; nothing to finish.\n",
+                    done.to
+                )
             };
-            Ok(Done::new(json!({ "taskbag": root, "upgrade": up }), text))
+            Ok(Done::new(json!({ "taskbag": root, "migrate": done }), text))
+        }
+        Command::Migrate { language, .. } => {
+            let root = locate(cli, cwd)?;
+            let to = formats.current_format();
+            let versions::FormatState::Older { found } = formats.state(&root) else {
+                let text = format!("The taskbag is already in {to}; nothing to update.\n");
+                return Ok(Done::new(
+                    json!({ "taskbag": root, "migrate": { "from": to, "to": to, "needed": false } }),
+                    text,
+                ));
+            };
+            let language = language.clone().unwrap_or_else(|| {
+                saved_ui_language().unwrap_or_else(|| {
+                    let system: Vec<String> = sys_locale::get_locales().collect();
+                    pick_ui_language(&system).to_string()
+                })
+            });
+            let project = load(&root)
+                .taskbag
+                .and_then(|bag| project_folder_of(&root, &bag.project))
+                .unwrap_or_else(|| picked_folder(&root).unwrap_or(&root).to_path_buf());
+            let prompt =
+                versions::migration_prompt_with(&language, &project, &root, &found, formats)?;
+            Ok(Done::new(
+                json!({
+                    "taskbag": root,
+                    "migrate": { "from": found, "to": to, "needed": true },
+                    "language": language,
+                    "prompt": prompt,
+                }),
+                prompt,
+            ))
         }
         Command::Guide { topic } => {
             let text = guide(topic.as_deref()).unwrap_or_default();
@@ -1301,6 +1383,25 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let area = renamed.item;
             let text = format!("Renamed area {} ({})\n", area.id, area.name);
             let mut done = Done::new(json!({ "taskbag": root, "area": area }), text);
+            done.issues = renamed.issues;
+            Ok(done)
+        }
+        Command::Rename(Rename::Label { old, new }) => {
+            let root = locate(cli, cwd)?;
+            let renamed =
+                allomos_store::rename_label(&root, Actor::alm(me), lock_wait(), old, new)?;
+            let (labels, tasks) = renamed.item;
+            let ids: Vec<&str> = tasks.iter().map(|t| t.id.as_str()).collect();
+            let mut text = format!("Label ladder: {}\n", labels.join(" → "));
+            text.push_str(&if ids.is_empty() {
+                "No task carried the label.\n".to_string()
+            } else {
+                format!("Relabelled {} task(s): {}\n", ids.len(), ids.join(", "))
+            });
+            let mut done = Done::new(
+                json!({ "taskbag": root, "labels": labels, "tasks": tasks.iter().map(task_json).collect::<Vec<_>>() }),
+                text,
+            );
             done.issues = renamed.issues;
             Ok(done)
         }
@@ -1683,4 +1784,244 @@ fn change(
     done.warnings = changed.warnings;
     done.issues = changed.issues;
     Ok(done)
+}
+
+#[cfg(test)]
+mod tests {
+    //! The update from one format to the next (Task-A01-32), run in-process against a test-only
+    //! migration entry from 3 to 4, which this Allomos does not ship.
+
+    use super::*;
+    use allomos_store::versions::{Formats, Migration, Words};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const NOTHING: Words = Words {
+        en: "Nothing.",
+        zh_cn: "无。",
+        ja: "なし。",
+    };
+    const TEST_ENTRY: Migration = Migration {
+        from: 3,
+        changed: Words {
+            en: "The top label is now called \"human checked\".",
+            zh_cn: "最高的标签现在叫 \"human checked\"。",
+            ja: "いちばん上のラベルは \"human checked\" になりました。",
+        },
+        add: NOTHING,
+        decide: Words {
+            en: "Every task labelled \"owner verified\" becomes \"human checked\": `alm rename label \"owner verified\" \"human checked\"`.",
+            zh_cn: "无。",
+            ja: "なし。",
+        },
+        commands: &["rename label"],
+        check: NOTHING,
+    };
+    const TEST_FORMATS: Formats = Formats {
+        entries: &[TEST_ENTRY],
+        current: 4,
+        oldest: 3,
+    };
+
+    /// `alm --json --taskbag <root> args…` against `formats`: the exit code and the JSON.
+    fn run_json(root: &Path, formats: &versions::Formats, args: &[&str]) -> (i32, Value) {
+        let mut all: Vec<OsString> = ["alm", "--json", "--taskbag"]
+            .iter()
+            .map(OsString::from)
+            .collect();
+        all.push(root.as_os_str().to_owned());
+        all.extend(args.iter().map(OsString::from));
+        let r = reply(all, root, formats);
+        assert!(r.stderr.is_empty(), "{}", r.stderr);
+        let v: Value = serde_json::from_str(r.stdout.trim()).unwrap();
+        (r.code, v)
+    }
+
+    fn ok(root: &Path, formats: &versions::Formats, args: &[&str]) -> Value {
+        let (code, v) = run_json(root, formats, args);
+        assert_eq!(code, EXIT_OK, "{args:?}: {v}");
+        v
+    }
+
+    fn refused(root: &Path, formats: &versions::Formats, args: &[&str], problem: &str) -> Value {
+        let (code, v) = run_json(root, formats, args);
+        assert_eq!(v["error"]["code"], problem, "{args:?}: {v}");
+        assert_eq!(code, EXIT_REFUSED, "{args:?}");
+        v
+    }
+
+    /// A taskbag in today's format with one area and two tasks, A01-01 labelled "owner verified".
+    fn taskbag() -> PathBuf {
+        let n = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("alm-migrate-{n}"));
+        fs::create_dir_all(dir.join(".git")).unwrap();
+        let root = dir.join(DEFAULT_DIR);
+        let real = &versions::FORMATS;
+        ok(&root, real, &["init", "--name", "Demo"]);
+        ok(&root, real, &["add", "area", "A01", "Baking"]);
+        ok(
+            &root,
+            real,
+            &["add", "task", "--area", "A01", "--title", "Bread"],
+        );
+        ok(
+            &root,
+            real,
+            &["add", "task", "--area", "A01", "--title", "Cake"],
+        );
+        ok(&root, real, &["--as", "a", "claim", "A01-01"]);
+        ok(
+            &root,
+            real,
+            &["--as", "a", "label", "A01-01", "owner verified"],
+        );
+        root
+    }
+
+    fn snapshot(root: &Path) -> Vec<(PathBuf, String)> {
+        let mut all = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for e in fs::read_dir(dir).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if p.file_name().is_some_and(|n| n != ".lock") {
+                    all.push((p.clone(), fs::read_to_string(&p).unwrap_or_default()));
+                }
+            }
+        }
+        all.sort();
+        all
+    }
+
+    #[test]
+    fn mid_update_only_reading_and_the_updates_own_commands_work() {
+        let root = taskbag();
+        let t = &TEST_FORMATS;
+        let before = snapshot(&root);
+        // Reading works.
+        for args in [
+            &["list"][..],
+            &["next"],
+            &["show", "A01-01"],
+            &["history", "A01-01"],
+            &["handoffs"],
+            &["task-language"],
+        ] {
+            ok(&root, t, args);
+        }
+        // Starting or changing work is refused, saying what is left.
+        for args in [
+            &["--as", "b", "claim", "A01-02"][..],
+            &["--as", "a", "label", "A01-01", "implemented"],
+            &["--as", "a", "done", "A01-01"],
+            &["add", "task", "--area", "A01", "--title", "Pie"],
+            &["labels", "a,b"],
+            &["plan", "A01-02"],
+            &["rename", "area", "A01", "Ovens"],
+        ] {
+            let v = refused(&root, t, args, "taskbag_older");
+            assert_eq!(v["error"]["params"]["current"], "allomos/4");
+            let message = v["error"]["message"].as_str().unwrap();
+            assert!(
+                message.contains("Left to fix: no problems reported"),
+                "{message}"
+            );
+            assert!(message.contains("`alm migrate --finish`"), "{message}");
+        }
+        assert_eq!(snapshot(&root), before, "nothing written");
+
+        // `alm migrate` prints the prompt.
+        let v = ok(&root, t, &["migrate", "--language", "en"]);
+        assert_eq!(
+            v["migrate"],
+            json!({ "from": "allomos/3", "to": "allomos/4", "needed": true })
+        );
+        let prompt = v["prompt"].as_str().unwrap();
+        assert!(prompt.contains("allomos/3 → allomos/4"), "{prompt}");
+        assert!(prompt.contains(TEST_ENTRY.changed.en));
+        assert!(prompt.contains("`alm rename label`"));
+        assert!(prompt.contains(&format!(
+            "alm --taskbag \"{}\" migrate --finish",
+            root.display()
+        )));
+        let zh = ok(&root, t, &["migrate", "--language", "zh-CN"]);
+        assert!(zh["prompt"].as_str().unwrap().contains("步骤"));
+        // A handoff may be written mid-update.
+        ok(&root, t, &["--as", "m", "handoff", "--tasks", "A01-01"]);
+        fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn an_update_from_3_to_4_is_finished_only_when_no_issue_is_left() {
+        let root = taskbag();
+        let t = &TEST_FORMATS;
+        let project = root.join("project.json");
+        let project_before = fs::read_to_string(&project).unwrap();
+
+        // Half done: the task carries the new label, the ladder still has the old one.
+        let task = root.join("tasks/A01-01/task.json");
+        let mut v: Value = serde_json::from_str(&fs::read_to_string(&task).unwrap()).unwrap();
+        v["label"] = "human checked".into();
+        fs::write(&task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
+        let v = refused(
+            &root,
+            t,
+            &["--as", "m", "migrate", "--finish"],
+            "migration_unfinished",
+        );
+        let left = v["error"]["params"]["left"].as_str().unwrap();
+        assert!(
+            left.starts_with("1 problem(s): tasks/A01-01/task.json (label)"),
+            "{left}"
+        );
+        assert_eq!(fs::read_to_string(&project).unwrap(), project_before);
+        let v = refused(&root, t, &["--as", "m", "claim", "A01-02"], "taskbag_older");
+        assert_eq!(v["error"]["params"]["left"].as_str().unwrap(), left);
+        let listed = ok(&root, t, &["list"]);
+        assert_eq!(listed["issues"].as_array().unwrap().len(), 1);
+
+        // Put back, then do it properly through `alm`: the entry's own command.
+        v_label(&task, "owner verified");
+        let renamed = ok(
+            &root,
+            t,
+            &[
+                "--as",
+                "m",
+                "rename",
+                "label",
+                "owner verified",
+                "human checked",
+            ],
+        );
+        assert_eq!(renamed["tasks"][0]["id"], "A01-01");
+        assert_eq!(ok(&root, t, &["list"])["issues"], json!([]));
+        let v = ok(&root, t, &["history", "A01-01"]);
+        assert_eq!(v["events"][0]["command"], "rename label");
+
+        let v = ok(&root, t, &["--as", "m", "migrate", "--finish"]);
+        assert_eq!(
+            v["migrate"],
+            json!({ "from": "allomos/3", "to": "allomos/4", "changed": true })
+        );
+        let after = fs::read_to_string(&project).unwrap();
+        assert!(after.contains("\"format\": \"allomos/4\""), "{after}");
+        assert!(after.contains("\"human checked\""));
+        // Done: `alm migrate` says there is nothing to update.
+        // (This build reads only allomos/3, so the finished taskbag is checked by its file.)
+        let v = ok(&root, t, &["migrate"]);
+        assert_eq!(v["migrate"]["needed"], false);
+        fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
+    }
+
+    fn v_label(task: &Path, label: &str) {
+        let mut v: Value = serde_json::from_str(&fs::read_to_string(task).unwrap()).unwrap();
+        v["label"] = label.into();
+        fs::write(task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
+    }
 }

@@ -145,8 +145,9 @@ export function App({ messenger }: { messenger: Messenger }) {
         const state = await messenger.projectSetup(root);
         if (openedRef.current?.root === root) setSetup(state);
       } catch (e) {
-        // A newer or older format is already in the problem list above the tasks (Task-A01-25).
-        if (isProblem(e) && (e.code === "taskbag_newer" || e.code === "taskbag_older")) return;
+        // A newer, older or too old format is already in the problem list above the tasks
+        // (Task-A01-25, Task-A01-32).
+        if (isProblem(e) && ["taskbag_newer", "taskbag_older", "taskbag_too_old"].includes(e.code)) return;
         setError(errorNote(e));
       }
     },
@@ -489,7 +490,7 @@ export function App({ messenger }: { messenger: Messenger }) {
 const VERSION_CHECK_MS = 4000;
 
 /** "This taskbag uses an older format" or "Allomos's instructions are out of date", with
- * **Update the taskbag…** (owner, 2026-10-12). Asked when the folder opens (every way of opening
+ * **Migrate the taskbag…** (owner, 2026-10-12; renamed 2026-10-14, Task-A01-32). Asked when the folder opens (every way of opening
  * one) and every few seconds while it is open. Allomos never updates the files itself. */
 function VersionNotice({
   messenger,
@@ -1117,7 +1118,9 @@ function TaskbagView({
               ? "box.needs_update"
               : issues.some((i) => i.problem.code === "taskbag_newer")
                 ? "box.needs_newer_app"
-                : "box.no_project",
+                : issues.some((i) => i.problem.code === "taskbag_too_old")
+                  ? "box.too_old"
+                  : "box.no_project",
           )}
         </p>
       )}
