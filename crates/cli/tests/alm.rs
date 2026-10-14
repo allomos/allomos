@@ -936,7 +936,7 @@ fn brief_and_guide_tell_agents_about_allomos() {
     );
 
     let v = ok(&repo, &["guide", "customize"]);
-    assert!(v["guide"].as_str().unwrap().contains("The six states"));
+    assert!(v["guide"].as_str().unwrap().contains("The seven states"));
     let all = ok(&repo, &["guide"]);
     assert!(all["guide"].as_str().unwrap().contains("# Allomos terms"));
     let (code, v) = fj(&repo, &["guide", "nope"]);
@@ -1307,7 +1307,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v3)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v4)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -1321,13 +1321,13 @@ fn migrate_on_a_current_taskbag_changes_nothing() {
     let v = ok(&repo, &["migrate"]);
     assert_eq!(
         v["migrate"],
-        json!({ "from": "allomos/3", "to": "allomos/3", "needed": false })
+        json!({ "from": "allomos/4", "to": "allomos/4", "needed": false })
     );
     assert!(v.get("prompt").is_none());
     let v = ok(&repo, &["migrate", "--finish"]);
     assert_eq!(
         v["migrate"],
-        json!({ "from": "allomos/3", "to": "allomos/3", "changed": false })
+        json!({ "from": "allomos/4", "to": "allomos/4", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
 }
@@ -1831,4 +1831,204 @@ fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
         "handoff_not_found",
     );
     assert!(repo.join(".allomos/taskbag/project.json").is_file());
+}
+
+/// Decision 0016 (Task-A01-31): waiting on a person, with an optional who.
+#[test]
+fn wait_says_what_and_optionally_who() {
+    let repo = filled();
+    refused(
+        &repo,
+        &["wait", "A01-01", "--on", " "],
+        1,
+        "waiting_on_missing",
+    );
+    let v = ok(
+        &repo,
+        &["wait", "A01-01", "--on", "reply on licence", "--who", "Ann"],
+    );
+    assert_eq!(v["task"]["state"], "waiting");
+    assert_eq!(v["task"]["who"], "Ann");
+    assert_eq!(task_file(&repo, "A01-01")["who"], "Ann");
+    let out = alm(&repo, &["list"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("waiting for Ann: reply on licence"), "{text}");
+    // Without --who, the owner is meant; a who left over is cleared.
+    ok(&repo, &["wait", "A01-01", "--on", "approve the card"]);
+    let file = task_file(&repo, "A01-01");
+    assert!(file.get("who").is_none(), "{file}");
+    let text = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(text.contains("waiting on: approve the card"), "{text}");
+}
+
+/// Decision 0016: `alm block` and its refusals; each blocker's state in list, show and next; a
+/// dropped blocker flagged; all done told but not acted on; one event per change.
+#[test]
+fn block_shows_blockers_and_next_only_tells() {
+    let repo = filled();
+    refused(
+        &repo,
+        &["block", "A01-02", "--by", "A01-02"],
+        1,
+        "blocked_by_self",
+    );
+    refused(
+        &repo,
+        &["block", "A01-02", "--by", "A09-09"],
+        1,
+        "blocker_unknown",
+    );
+    refused(
+        &repo,
+        &["block", "A01-02", "--by", " "],
+        1,
+        "blocked_by_missing",
+    );
+    let (code, _) = fj(&repo, &["block", "A01-02"]);
+    assert_eq!(code, 2, "--by is required");
+    assert_eq!(
+        task_file(&repo, "A01-02")["state"],
+        "backlog",
+        "nothing written"
+    );
+
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(&repo, &["block", "A01-02", "--by", "A01-01", "A02-01"]);
+    assert_eq!(v["task"]["state"], "blocked");
+    assert_eq!(v["task"]["blocked_by"], json!(["A01-01", "A02-01"]));
+    assert_eq!(
+        v["task"]["blockers"],
+        json!([{ "id": "A01-01", "state": "in_progress" }, { "id": "A02-01", "state": "backlog" }])
+    );
+    assert_eq!(
+        task_file(&repo, "A01-02")["blocked_by"],
+        json!(["A01-01", "A02-01"])
+    );
+    // People read each blocker's current state.
+    let list = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(
+        list.contains("blocked by A01-01 (in progress), A02-01 (backlog)"),
+        "{list}"
+    );
+    let v = ok(&repo, &["list", "--state", "blocked"]);
+    assert_eq!(v["areas"][0]["tasks"][0]["id"], "A01-02");
+    assert_eq!(v["areas"][0]["tasks"][0]["all_blockers_done"], false);
+    let show = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
+    assert!(
+        show.contains("blocked by: A01-01 (in progress), A02-01 (backlog)"),
+        "{show}"
+    );
+    // Not ready, so never in next; nothing to tell yet.
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["blocked"], json!([]));
+
+    // A dropped blocker is flagged, never counted as done.
+    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    ok(&repo, &["drop", "A02-01"]);
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["blocked"][0]["id"], "A01-02");
+    assert_eq!(v["blocked"][0]["all_blockers_done"], false);
+    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(next.contains("A02-01 (dropped; still blocked?)"), "{next}");
+    // Blocking on a dropped task is allowed, with a warning.
+    let v = ok(&repo, &["block", "A01-02", "--by", "A02-01"]);
+    assert_eq!(v["warnings"][0]["code"], "blocker_dropped");
+
+    // Every blocker done: next tells, and moves nothing.
+    ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
+    let before = fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap();
+    let events_before = fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .unwrap()
+        .count();
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["blocked"][0]["id"], "A01-02");
+    assert_eq!(v["blocked"][0]["all_blockers_done"], true);
+    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(
+        next.contains("A01-02: all blockers are done (A01-01 (done)) — unblock it?"),
+        "{next}"
+    );
+    assert_eq!(
+        fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap(),
+        before,
+        "next changes nothing"
+    );
+    assert_eq!(
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count(),
+        events_before
+    );
+
+    // Unblock moves it on; only a blocked task.
+    let v = ok(&repo, &["unblock", "A01-02"]);
+    assert_eq!(v["task"]["state"], "ready");
+    assert!(task_file(&repo, "A01-02").get("blocked_by").is_none());
+    refused(&repo, &["unblock", "A01-02"], 1, "not_blocked");
+    // One event per change, named after the command.
+    let v = ok(&repo, &["history", "A01-02"]);
+    let commands: Vec<&str> = v["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["command"].as_str().unwrap())
+        .collect();
+    assert_eq!(commands, ["unblock", "block", "block", "block", "add task"]);
+}
+
+/// The real 3 → 4 migration, through `alm migrate` and `--finish` (Task-A01-31).
+#[test]
+fn migrate_from_3_to_4_keeps_waiting_tasks_waiting() {
+    let repo = filled();
+    ok(
+        &repo,
+        &["wait", "A01-01", "--on", "the owner approves the card"],
+    );
+    ok(
+        &repo,
+        &["wait", "A01-02", "--on", "A01-01 must be finished first"],
+    );
+    set_format(&repo, "allomos/3");
+    let before = task_file(&repo, "A01-01");
+
+    let v = ok(&repo, &["migrate", "--language", "en"]);
+    assert_eq!(
+        v["migrate"],
+        json!({ "from": "allomos/3", "to": "allomos/4", "needed": true })
+    );
+    let prompt = v["prompt"].as_str().unwrap();
+    assert!(prompt.contains("allomos/3 → allomos/4"), "{prompt}");
+    assert!(prompt.contains("stays `waiting`"), "{prompt}");
+    assert!(
+        prompt.contains("`alm block`, `alm wait`, `alm needs`"),
+        "{prompt}"
+    );
+    assert!(prompt.contains("A03-18's part of this entry is added before version 4 is merged"));
+    for language in ["zh-CN", "ja"] {
+        let v = ok(&repo, &["migrate", "--language", language]);
+        assert!(
+            v["prompt"].as_str().unwrap().contains("A01-31"),
+            "{language}"
+        );
+    }
+    // Mid-migration: work is refused; the entry's commands work.
+    refused(&repo, &["--as", "b", "claim", "A02-01"], 1, "taskbag_older");
+    ok(&repo, &["--as", "m", "block", "A01-02", "--by", "A01-01"]);
+    let v = ok(&repo, &["--as", "m", "migrate", "--finish"]);
+    assert_eq!(
+        v["migrate"],
+        json!({ "from": "allomos/3", "to": "allomos/4", "changed": true })
+    );
+    assert_eq!(task_file(&repo, "A01-01"), before, "stays waiting");
+    assert_eq!(task_file(&repo, "A01-02")["state"], "blocked");
+    ok(&repo, &["--as", "b", "claim", "A02-01"]);
+}
+
+/// A taskbag in format 4 is newer than an allomos/3 build: the older build says so
+/// (`taskbag_newer`). Shown with this build reading a format 5 taskbag, the same rule.
+#[test]
+fn a_newer_taskbag_is_refused_by_an_older_build() {
+    let repo = filled();
+    set_format(&repo, "allomos/5");
+    refused(&repo, &["list"], 4, "taskbag_newer");
 }

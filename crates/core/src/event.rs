@@ -60,6 +60,8 @@ pub const TASK_FIELDS: &[&str] = &[
     "label",
     "holder",
     "waiting_on",
+    "who",
+    "blocked_by",
     "next_dependency",
     "handoff_note",
     "finished_without_owner",
@@ -77,6 +79,7 @@ fn present(value: Option<&Value>) -> Option<Value> {
     match value {
         None | Some(Value::Null) => None,
         Some(Value::String(s)) if s.is_empty() => None,
+        Some(Value::Array(a)) if a.is_empty() => None,
         Some(v) => Some(v.clone()),
     }
 }
@@ -151,6 +154,8 @@ mod tests {
             label: None,
             holder: None,
             waiting_on: None,
+            who: None,
+            blocked_by: Vec::new(),
             next_dependency: None,
             iteration: None,
             handoff_note: None,

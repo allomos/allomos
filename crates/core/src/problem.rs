@@ -94,6 +94,16 @@ problems! {
     UnknownArea { area } => "unknown_area", "The area \"{area}\" does not exist. Add areas/{area}.json or use an existing area ID.";
     LabelNotOnLadder { label, ladder } => "label_not_on_ladder", "\"{label}\" is not a step of this project's ladder ({ladder}).";
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
+    /// A `blocked` task names no blocking task (decision 0016, Task-A01-31).
+    BlockedByMissing => "blocked_by_missing", "A blocked task must name the task(s) that must finish first: `alm block <id> --by <task-id>`.";
+    /// `blocked_by` names a task that is not in this taskbag.
+    BlockerUnknown { id } => "blocker_unknown", "There is no task \"{id}\" in this taskbag, so it cannot block another task.";
+    /// `blocked_by` names the task itself.
+    BlockedBySelf { id } => "blocked_by_self", "Task {id} cannot be blocked by itself.";
+    /// `alm unblock` on a task that is not blocked.
+    NotBlocked { id, state } => "not_blocked", "Task {id} is {state}, not blocked, so there is nothing to unblock.";
+    /// A warning: a blocking task is dropped, so it will never be done (owner, 2026-10-14).
+    BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: it will never be done, and it does not count as done. Is {id} still blocked?";
     /// `alm done --without-owner` with no text, or the field empty in `task.json` (Task-A03-15).
     WithoutOwnerMissing => "without_owner_missing", "Say why the task is finished without the owner's check, and in which run.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
@@ -139,8 +149,8 @@ problems! {
     LinkNotFound { link } => "link_not_found", "The file \"{link}\" does not exist.";
     /// Allomos was started with a folder that does not exist or is not a folder.
     StartupNotAFolder { path } => "startup_not_a_folder", "Allomos was started with {path}, which is not a folder, so nothing was opened.";
-    /// Only an unheld backlog or waiting task can be made ready.
-    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
+    /// Only an unheld backlog, waiting or blocked task can be made ready.
+    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
     CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
     /// A warning from `alm --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.

@@ -1,4 +1,4 @@
-# Taskbag file format — `allomos/3`
+# Taskbag file format — `allomos/4`
 
 A **contract**: the files inside a taskbag. The Allomos app, the `alm` command and AI agents must all read and write exactly this. Code: `crates/core` (rules) and `crates/store` (reading and writing). Decided by [0007](../decisions/0007-git-like-project-sync.md) and [0010](../decisions/0010-project-data-folder.md).
 
@@ -54,7 +54,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | `"allomos/3"` for this version (`"allomos/2"` before events, A01-17, and a task's `finished_without_owner`, A03-15; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
+| `format` | yes | `"allomos/4"` for this version (`"allomos/3"` before the `blocked` state, a task's `blocked_by` and `who`, A01-31; `"allomos/2"` before events, A01-17, and a task's `finished_without_owner`, A03-15; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `owner verified`. Changed with `alm labels`. |
@@ -147,10 +147,12 @@ An **iteration** is *when* tasks are planned: a time-box that ends in a release 
 | `id` | yes | Task ID, unique in the project (e.g. `A01-02`). |
 | `title` | yes | One line. |
 | `area` | yes | ID of an existing area. |
-| `state` | yes | One of `backlog`, `ready`, `in_progress`, `waiting`, `done`, `dropped`. |
+| `state` | yes | One of the seven states: `backlog`, `ready`, `in_progress`, `waiting` (a person or an outside event must act), `blocked` (another task in this taskbag must finish first; `allomos/4`), `done`, `dropped` ([0016](../decisions/0016-waiting-and-blocked-states.md)). A task blocked by a task and also waiting on a person is `blocked`; the person part goes in `next_dependency`. |
 | `label` | no | Highest step of the project's ladder the task has proven. Must be a step on the ladder. |
 | `holder` | no | Who holds the task: a person or an agent session. |
-| `waiting_on` | no | What blocks the next step, in plain words. **Required when `state` is `waiting`.** |
+| `waiting_on` | no | For a `waiting` task: what a person (or an outside event) must do, in plain words. **Required when `state` is `waiting`.** |
+| `who` | no (`allomos/4`) | For a `waiting` task: who must act (`alm wait <id> --on "<what>" --who "<who>"`). Without it the owner is meant, and the app says "Waiting for you: <what>"; with it, "Waiting for <who>: <what>". Cleared when the task leaves `waiting`. |
+| `blocked_by` | no (`allomos/4`) | For a `blocked` task: the IDs of the tasks in this taskbag that must finish first, as a list (`alm block <id> --by <task-id>…`). **At least one when `state` is `blocked`**; each a task of this taskbag and not the task itself. A dropped blocker is allowed but flagged ("A01-30 (dropped; still blocked?)") and never counts as done. When every blocker is done, `alm next` says so; nothing moves the task by itself (`alm unblock <id>` does). Left out when empty; cleared when the task leaves `blocked`. |
 | `next_dependency` | no | The single thing needed for the next label. |
 | `iteration` | no | ID of an existing iteration the task is planned in. Without it the task is unplanned. |
 | `handoff_note` | no | A short note left by the last holder on release (`alm release --note`) for whoever picks the task up next. Each release replaces it, or removes it when no note is given. |
@@ -183,19 +185,20 @@ Each problem names the **file** and, where it can, the **field**, with a plain e
   - every task's `area` exists, and its `iteration`, when it has one;
   - every `label` is on the project's ladder;
   - every `waiting` task says what it waits on;
+  - every `blocked` task names at least one blocking task in `blocked_by` (`blocked_by_missing`), each a task of this taskbag (`blocker_unknown`) and not the task itself (`blocked_by_self`);
   - an iteration's `start` and `end` are real dates written `YYYY-MM-DD`.
 
 ## Format versions
 
 Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md). Allomos reads `format` before anything else in `project.json`, because a newer taskbag may have fields this Allomos does not know.
 
-- **Newer** than this Allomos (`allomos/3` read by an Allomos that writes `allomos/2`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
+- **Newer** than this Allomos (`allomos/4` read by an Allomos that writes `allomos/3`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
 - **Older, and not older than `allomos/3`** (the oldest this Allomos migrates; owner, 2026-10-14, [`Task-A01-32`](../tasks/Task-A01-32-guided-migration.md)): the taskbag is read, and it is **being migrated**. Until the migration is finished, reading commands work, and so do `alm migrate`, `alm handoff` and the commands the migration entries name; every other command that changes the taskbag (claim, label, done, add …), and every change from the app, is refused with `taskbag_older`, whose message lists what is left to fix and says to run `alm migrate`. The app shows **Migrate the taskbag…**.
 - **Too old** (older than `allomos/3`): nothing is read or written (`taskbag_too_old`). The code steps 1 → 2 and 2 → 3 of A01-25 were dropped.
-- **Migration is guided, never automatic** (owner, 2026-10-14): every format change, even one that only adds a folder, has a **migration entry** (`MIGRATIONS` in `crates/store/src/versions.rs`): what changed; what to add; what to decide task by task, with the rule; the `alm` commands to use; how to check. `alm migrate` prints one prompt joining the entries from the taskbag's version to the newest, with the project's paths, in the app's language; it is the same process as moving another task system into Allomos ([`A05-02`](../tasks/Task-A05-02-convert-existing-project.md)), sharing its opening and its one question (`alm confirm`). The agent changes the taskbag only through `alm`; **`alm migrate --finish`** then writes the new `format` (the only change to `project.json`, recorded as a `migrate` event), and is refused with `migration_unfinished` while `alm list --json` reports issues. Raising the format without an entry fails a test. The first entry will be 3 → 4.
+- **Migration is guided, never automatic** (owner, 2026-10-14): every format change, even one that only adds a folder, has a **migration entry** (`MIGRATIONS` in `crates/store/src/versions.rs`): what changed; what to add; what to decide task by task, with the rule; the `alm` commands to use; how to check. `alm migrate` prints one prompt joining the entries from the taskbag's version to the newest, with the project's paths, in the app's language; it is the same process as moving another task system into Allomos ([`A05-02`](../tasks/Task-A05-02-convert-existing-project.md)), sharing its opening and its one question (`alm confirm`). The agent changes the taskbag only through `alm`; **`alm migrate --finish`** then writes the new `format` (the only change to `project.json`, recorded as a `migrate` event), and is refused with `migration_unfinished` while `alm list --json` reports issues. Raising the format without an entry fails a test. The first entry is 3 → 4: A01-31's `blocked` state, `blocked_by` and `who` (nothing to add; existing `waiting` tasks stay `waiting` unless an agent finds from their waiting-on or next dependency that another task must finish first, and then moves them with `alm block` after the person's answer; commands `alm block`, `alm wait`, `alm needs`). A03-18's part of this entry (the human-check rename) is added to the same entry before version 4 is merged (owner, 2026-10-14).
 - **Known limit:** another computer still running an older Allomos sees the old format and keeps writing during the migration; people install the new Allomos first.
 
-Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v3)` (v2: the handoff lines, A03-06; v3: the rule for finishing a task and `alm next` listing every free ready task, A03-15). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Migrate the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
+Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v4)` (v2: the handoff lines, A03-06; v3: the rule for finishing a task and `alm next` listing every free ready task, A03-15; v4: `alm wait --who`, `alm block` / `unblock` and the seven states, A01-31). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Migrate the taskbag…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
 
 ## Not yet in this version
 

@@ -180,7 +180,10 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration), or `alm list`.
 - Take a task: `alm claim <id> --as <your session name> --push`.
-- Report progress: `alm label <id> \"<label>\" --push`; when blocked: `alm wait <id> --on \"<what>\" --push`.
+- Report progress: `alm label <id> \"<label>\" --push`.
+- Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"] --push`; blocked by
+  another task: `alm block <id> --by <task-id> --push`. `alm next` says when all blockers are done;
+  then check and move it on: `alm unblock <id> --push`.
 - Stopping before it is done: `alm release <id> --note \"<what the next one needs>\" --push`.
 - Finished: only at the top label (the owner has checked it): `alm done <id> --push`. In an
   automatic or loop run the person set up to go on without them (a card run, `/loop`), you may
@@ -197,9 +200,10 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
-has proven) and **state** (backlog, ready, in progress, waiting, done, dropped). When you need
-more, ask `alm` rather than guessing: `alm guide terms` (what they mean), `alm guide customize`
-(what this project may change and what is fixed), `alm guide commands`, `alm guide workflow`.
+has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
+you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
+`alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
+`alm guide workflow`.
 "
     )
 }
@@ -751,6 +755,8 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             label: label.map(String::from),
             holder: None,
             waiting_on: None,
+            who: None,
+            blocked_by: Vec::new(),
             next_dependency: None,
             iteration: None,
             handoff_note: None,
@@ -1756,7 +1762,10 @@ mod tests {
         create_starter(&root, "Demo").unwrap();
         assert_eq!(inspect(&dir), Inspection::Found { root: root.clone() });
         let loaded = load(&root);
-        assert_eq!(loaded.taskbag.as_ref().unwrap().project.format, "allomos/3");
+        assert_eq!(
+            loaded.taskbag.as_ref().unwrap().project.format,
+            allomos_core::FORMAT
+        );
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         let tb = loaded.taskbag.unwrap();
         assert_eq!(tb.project.name, "Demo");

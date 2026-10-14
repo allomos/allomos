@@ -16,13 +16,17 @@ about the project's tasks.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
 - **Task**: one observable outcome: what a person or agent can do when it is done. It has an
-  ID, a title, an area, a state, and optionally a label, an iteration, a holder, what it waits on,
-  its next dependency, a handoff note and a description (description.md).
+  ID, a title, an area, a state, and optionally a label, an iteration, a holder, what it waits on
+  (and who), the tasks that block it, its next dependency, a handoff note and a description
+  (description.md).
 - **Area**: *what* part of the product a task belongs to. Every task has exactly one.
 - **Iteration**: *when* a task is planned: a time-box that ends in a release. Optional; a task
   without one is unplanned.
 - **State**: where a task is in its life: backlog, ready (approved to start), in progress (held
-  by someone), waiting (on something, said in its waiting-on), done, or dropped (will not be done).
+  by someone), waiting (a person or an outside event must act: its waiting-on says what, its
+  optional who says who; no who means the owner), blocked (another task in this taskbag must
+  finish first: its blocked-by lists them), done, or dropped (will not be done). A task blocked by
+  a task and also waiting on a person is blocked; the person part goes in its next dependency.
 - **Label**: the highest step of the project's progress **ladder** the task has proven, for
   example implemented → locally verified → owner verified. It is the only progress claim; test
   counts support a label but are never one.
@@ -47,7 +51,7 @@ const CUSTOMIZE: &str = "# What a project may change, and what is fixed
 
 Fixed for every project:
 
-- **The six states**: backlog, ready, in progress, waiting, done, dropped.
+- **The seven states**: backlog, ready, in progress, waiting, blocked, done, dropped.
 - **The words \"area\" and \"iteration\"**: a project cannot rename them yet (planned: requirement
   R90). Use these words with `alm`, even if the team says \"workstream\" or \"sprint\".
 - **The file format**: never edit the taskbag's files by hand; `alm` checks every change.
@@ -92,8 +96,10 @@ usage, 3 taskbag busy or not writable.
 
 See:
 - `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
-  latest handoff, and the rule for choosing one. `alm` chooses nothing; you do.
-- `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`;
+  latest handoff, and the rule for choosing one; then the blocked tasks whose blockers are all
+  done. `alm` chooses and moves nothing; you do.
+- `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
+  (`--state blocked`, `--state waiting`, …);
   `--without-owner`: only tasks finished without the owner's check.
 - `alm show <id>`: one task in full, with its description.
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
@@ -102,11 +108,16 @@ Work a task:
 - `alm claim <id>`: you hold it; state in progress. `--take` only when its holder has stopped.
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
-- `alm wait <id> --on \"<what>\"`: state waiting.
+- `alm wait <id> --on \"<what>\" [--who \"<who>\"]`: state waiting: a person (or an outside
+  event) must act; without `--who`, the owner.
+- `alm block <id> --by <task-id> [<task-id>…]`: state blocked: those tasks must finish first.
+  `alm list`, `show` and `next` show each blocker's state; a dropped blocker is flagged and never
+  counts as done. When all are done, `alm next` says so, and moves nothing: check, then
+  `alm unblock <id>` (ready, or in progress when someone holds it).
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
 - `alm done <id> [--without-owner \"<why, which run>\"]`: finished (see `alm guide workflow`,
   step 7); it ends with the rule for checking the handoffs that name the task; follow it.
-  `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
+  `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task).
 
 Plan:
 - `alm add area [<id>] \"<name>\"`, `alm add iteration [<id>] \"<name>\" [--release …] [--start …]
@@ -156,7 +167,11 @@ const WORKFLOW: &str = "# How to work the tasks
    holds is not yours to change.
 3. As you prove each step, `alm label <id> \"<label>\" --push`, and keep its next dependency
    current with `alm needs`.
-4. Blocked on a person or another task: `alm wait <id> --on \"<what>\" --push`.
+4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
+   [--who \"<who>\"] --push`; when another task must finish first, `alm block <id> --by
+   <task-id> --push` (if a person must act too, say so with `alm needs`). Blocked and waiting
+   tasks are never in `alm next`'s list: they are skipped by their state. When `alm next` says all
+   of a task's blockers are done, check it, then `alm unblock <id> --push`.
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
    every meaningful step): `alm handoff --tasks <id> --as <your session name>`, then fill in the
    file it names, in plain words first, for any reader: you do not know who takes over, an agent
@@ -221,7 +236,16 @@ mod tests {
         let all = guide(None).unwrap();
         assert!(all.contains("# Allomos terms") && all.contains("# How to work the tasks"));
         // The fixed parts are said plainly.
-        assert!(guide(Some("customize")).unwrap().contains("The six states"));
+        assert!(
+            guide(Some("customize"))
+                .unwrap()
+                .contains("The seven states")
+        );
+        for text in [guide(Some("commands")).unwrap(), crate::agent_section()] {
+            assert!(text.contains("alm block <id> --by"), "{text}");
+            assert!(text.contains("alm unblock <id>"), "{text}");
+            assert!(text.contains("--who"), "{text}");
+        }
         assert!(
             guide(Some("tasks"))
                 .unwrap()

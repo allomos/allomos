@@ -24,7 +24,8 @@ use allomos_core::event::{Change, Kind};
 ///
 /// 2: the handoff lines (Task-A03-06).
 /// 3: the rule for finishing a task, and `alm next` listing every free ready task (Task-A03-15).
-pub const SECTION_VERSION: u32 = 3;
+/// 4: `waiting` (on a person) and `blocked` (by another task), seven states (Task-A01-31).
+pub const SECTION_VERSION: u32 = 4;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -143,11 +144,38 @@ pub struct Migration {
 }
 
 /// The migration entries this Allomos knows, oldest first: one per format version from
-/// [`OLDEST_FORMAT_VERSION`] up to [`FORMAT_VERSION`]. Empty while those are the same.
+/// [`OLDEST_FORMAT_VERSION`] up to [`FORMAT_VERSION`].
 ///
-/// The first entry will be 3 → 4 (A01-31's `blocked` state, A03-18's human-check rename); it is
-/// added with the format change itself, not before.
-pub const MIGRATIONS: &[Migration] = &[];
+/// 3 → 4 holds two parts, each text starting with its card: A01-31's `blocked` state (decision
+/// 0016), and A03-18's human-check rename. A03-18's part of this entry is added before version 4
+/// is merged (owner, 2026-10-14): one entry, not 4 and 5.
+pub const MIGRATIONS: &[Migration] = &[MIGRATION_3_TO_4];
+
+/// allomos/3 → allomos/4. Data only: what changed, what to add, what to decide task by task.
+const MIGRATION_3_TO_4: Migration = Migration {
+    from: 3,
+    changed: Words {
+        en: "[A01-31, the blocked state] A task that cannot go on is now either `waiting` (a person or an outside event must act: `waiting_on` says what, the new optional `who` says who; without `who` the owner is meant) or the new state `blocked` (another task in this taskbag must finish first: the new field `blocked_by` lists those task IDs). A task that is blocked and also waits on a person is `blocked`; the person part goes in its next dependency. Allomos now has seven states. [A03-18's part of this entry is added before version 4 is merged.]",
+        zh_cn: "[A01-31，阻塞状态] 无法继续的任务现在分两种：`waiting`（等待某人或外部事件：`waiting_on` 写明等什么，新的可选字段 `who` 写明等谁；没有 `who` 就是在等负责人），或新状态 `blocked`（必须先完成本任务包里的其他任务：新字段 `blocked_by` 列出这些任务 ID）。既被阻塞又在等人的任务是 `blocked`，等人的部分写进它的下一个依赖。Allomos 现在有七个状态。[A03-18 的部分会在版本 4 合并之前加入本条。]",
+        ja: "[A01-31、ブロック状態] 先に進めないタスクは、`waiting`（人か外部の出来事を待つ：`waiting_on` に何を、新しい任意の `who` に誰を書く。`who` がなければオーナーを待つ）か、新しい状態 `blocked`（このタスクバッグのほかのタスクが先に終わる必要がある：新しいフィールド `blocked_by` にそのタスク ID を並べる）のどちらかになりました。ブロックされていて人も待つタスクは `blocked` で、人の部分は次の依存に書きます。Allomos の状態は七つになりました。[A03-18 の部分は、バージョン 4 をマージする前にこの項目に加えます。]",
+    },
+    add: Words {
+        en: "[A01-31] Nothing is required: `who` and `blocked_by` are optional, and no task moves by itself.",
+        zh_cn: "[A01-31] 不需要添加任何东西：`who` 和 `blocked_by` 都是可选的，没有任务会自己改变状态。",
+        ja: "[A01-31] 必須の追加はありません：`who` と `blocked_by` は任意で、どのタスクも自分では動きません。",
+    },
+    decide: Words {
+        en: "[A01-31] For each `waiting` task: it stays `waiting` unless its waiting-on or next dependency shows that another task in this taskbag must finish first. Only then, and only with the person's answer to your plan, move it with `{alm} block <id> --by <task-id> [<task-id>…] --as <you>`; if it also waits on a person, keep that part with `{alm} needs <id> \"<what, from whom>\" --as <you>`. A task that waits on someone other than the owner may get `--who`: `{alm} wait <id> --on \"<what>\" --who \"<who>\" --as <you>`. When you cannot tell, leave the task `waiting` and list it under what you could not decide.",
+        zh_cn: "[A01-31] 对每个 `waiting` 任务：保持 `waiting`，除非它的等待内容或下一个依赖表明必须先完成本任务包里的另一个任务。只有这时，并且用户同意了你的计划，才用 `{alm} block <id> --by <任务 ID> [<任务 ID>…] --as <你>` 改为阻塞；如果它还在等人，用 `{alm} needs <id> \"<等什么、等谁>\" --as <你>` 保留这部分。等的不是负责人的任务可以加 `--who`：`{alm} wait <id> --on \"<什么>\" --who \"<谁>\" --as <你>`。无法判断时，保持 `waiting`，并列入你无法决定的事项。",
+        ja: "[A01-31] `waiting` のタスクごとに：待っている内容か次の依存から、このタスクバッグのほかのタスクが先に終わる必要があるとわかる場合を除き、`waiting` のままにします。その場合だけ、しかも計画への相手の答えを得てから、`{alm} block <id> --by <タスク ID> [<タスク ID>…] --as <あなた>` で移します。人も待っているなら、その部分は `{alm} needs <id> \"<何を、誰から>\" --as <あなた>` で残します。オーナー以外を待つタスクには `--who` を付けられます：`{alm} wait <id> --on \"<何>\" --who \"<誰>\" --as <あなた>`。判断できないときは `waiting` のままにし、決められなかったことに挙げます。",
+    },
+    commands: &["block", "wait", "needs"],
+    check: Words {
+        en: "[A01-31] `{alm} list --json` reports no issues: every `blocked` task names at least one other task of this taskbag in `blocked_by`. `{alm} list --state blocked` shows each task you moved, and `{alm} list --state waiting` the rest.",
+        zh_cn: "[A01-31] `{alm} list --json` 没有报告问题：每个 `blocked` 任务的 `blocked_by` 至少列出本任务包里的另一个任务。`{alm} list --state blocked` 显示你改过的每个任务，`{alm} list --state waiting` 显示其余的。",
+        ja: "[A01-31] `{alm} list --json` が問題を報告しないこと：`blocked` のタスクはどれも `blocked_by` にこのタスクバッグのほかのタスクを一つ以上挙げている。`{alm} list --state blocked` に移したタスクが、`{alm} list --state waiting` に残りが出ること。",
+    },
+};
 
 /// Commands that change the taskbag but always work while an update is unfinished: the update's
 /// own, and writing a handoff (a session may have to stop in the middle of an update).
@@ -821,10 +849,10 @@ mod tests {
         fs::write(path, text).unwrap();
     }
 
-    /// A made-up entry from 3 to 4, standing in for the first real one (never shipped): the top
+    /// A made-up entry from 4 to 5, standing in for a later one (never shipped): the top
     /// label is renamed, and each task decides nothing.
     const TEST_ENTRY: Migration = Migration {
-        from: 3,
+        from: 4,
         changed: Words {
             en: "The top label is now called \"human checked\".",
             zh_cn: "最高的标签现在叫 \"human checked\"。",
@@ -849,8 +877,8 @@ mod tests {
     };
     const TEST_FORMATS: Formats = Formats {
         entries: &[TEST_ENTRY],
-        current: 4,
-        oldest: 3,
+        current: 5,
+        oldest: 4,
     };
 
     #[test]
@@ -948,14 +976,14 @@ mod tests {
         assert_eq!(
             TEST_FORMATS.state(&root),
             FormatState::Older {
-                found: "allomos/3".into()
+                found: "allomos/4".into()
             }
         );
-        set_project_format(&root, "allomos/4");
+        set_project_format(&root, "allomos/5");
         assert_eq!(
             format_state(&root),
             FormatState::Newer {
-                found: "allomos/4".into()
+                found: "allomos/5".into()
             }
         );
         assert_eq!(TEST_FORMATS.state(&root), FormatState::Current);
@@ -1022,7 +1050,7 @@ mod tests {
             let Problem::TaskbagOlder { left, current, .. } = &err else {
                 unreachable!()
             };
-            assert_eq!(current, "allomos/4");
+            assert_eq!(current, "allomos/5");
             assert!(left.contains("no problems reported"), "{left}");
         }
         for command in ["rename label", "migrate", "handoff"] {
@@ -1031,13 +1059,13 @@ mod tests {
         // The real formats: a current taskbag allows everything.
         write_allowed(&root, "claim").unwrap();
         assert_eq!(
-            TEST_FORMATS.allowed_commands(3),
+            TEST_FORMATS.allowed_commands(4),
             vec!["rename label", "migrate", "handoff"]
         );
     }
 
     #[test]
-    fn an_update_from_3_to_4_finishes_only_when_nothing_is_left() {
+    fn an_update_finishes_only_when_nothing_is_left() {
         let (_, root) = project("three-to-four");
         let path = root.join(PROJECT_FILE);
         let before = fs::read_to_string(&path).unwrap();
@@ -1085,8 +1113,8 @@ mod tests {
         assert_eq!(
             done,
             Finished {
-                from: "allomos/3".into(),
-                to: "allomos/4".into(),
+                from: "allomos/4".into(),
+                to: "allomos/5".into(),
                 changed: true
             }
         );
@@ -1094,7 +1122,7 @@ mod tests {
         assert_eq!(
             after,
             before
-                .replace("\"allomos/3\"", "\"allomos/4\"")
+                .replace("\"allomos/4\"", "\"allomos/5\"")
                 .replace("\"owner verified\"", "\"human checked\""),
             "the format line changes, and the label the agent renamed"
         );
@@ -1103,7 +1131,7 @@ mod tests {
         let last = events.last().unwrap();
         assert_eq!(last.command, "migrate");
         assert_eq!(last.by.as_deref(), Some("claude/m"));
-        assert_eq!(last.changes[0].to, Some("allomos/4".into()));
+        assert_eq!(last.changes[0].to, Some("allomos/5".into()));
 
         // Finishing again changes nothing.
         let again = finish_in(&root, Actor::APP, &TEST_FORMATS).unwrap();
@@ -1118,20 +1146,20 @@ mod tests {
         let (_, root) = project("refused");
         let no_entry = Formats {
             entries: &[],
-            current: 4,
-            oldest: 3,
+            current: 5,
+            oldest: 4,
         };
         assert_eq!(
             finish_in(&root, Actor::APP, &no_entry).unwrap_err().code(),
             "migration_missing"
         );
         assert_eq!(
-            migration_prompt_with("en", &root, &root, "allomos/3", &no_entry)
+            migration_prompt_with("en", &root, &root, "allomos/4", &no_entry)
                 .unwrap_err()
                 .code(),
             "migration_missing"
         );
-        set_project_format(&root, "allomos/5");
+        set_project_format(&root, "allomos/6");
         let newer = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
             finish_in(&root, Actor::APP, &TEST_FORMATS)
@@ -1140,6 +1168,83 @@ mod tests {
             "taskbag_newer"
         );
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), newer);
+    }
+
+    /// The real 3 → 4 entry (A01-31): mid-migration only `block`, `wait`, `needs` (and `migrate`,
+    /// `handoff`) change the taskbag; waiting tasks stay waiting unless the agent moves one; the
+    /// finish writes only the format line.
+    #[test]
+    fn the_real_migration_from_3_to_4() {
+        let (_, root) = project("real-three-to-four");
+        let lock = Lock::acquire(&root, LOCK_WAIT).unwrap();
+        for (id, state, extra) in [
+            (
+                "A1-02",
+                "waiting",
+                r#","waiting_on":"the owner approves the card""#,
+            ),
+            (
+                "A1-03",
+                "waiting",
+                r#","waiting_on":"A1-01 must be done first","next_dependency":"A1-01 finished""#,
+            ),
+        ] {
+            let json =
+                format!(r#"{{"id":"{id}","area":"A1","title":"T","state":"{state}"{extra}}}"#);
+            lock.create_task(&serde_json::from_str(&json).unwrap())
+                .unwrap();
+        }
+        drop(lock);
+        set_project_format(&root, "allomos/3");
+        let path = root.join(PROJECT_FILE);
+        let before = fs::read_to_string(&path).unwrap();
+        let waiting_before = fs::read_to_string(root.join("tasks/A1-02/task.json")).unwrap();
+        assert_eq!(
+            format_state(&root),
+            FormatState::Older {
+                found: "allomos/3".into()
+            }
+        );
+        for command in ["claim", "label", "done", "add task", "rename label"] {
+            assert_eq!(
+                write_allowed(&root, command).unwrap_err().code(),
+                "taskbag_older",
+                "{command}"
+            );
+        }
+        for command in ["block", "wait", "needs", "migrate", "handoff"] {
+            write_allowed(&root, command).unwrap();
+        }
+        let prompt = migration_prompt_in("en", &root, &root, "allomos/3").unwrap();
+        assert!(prompt.contains("allomos/3 → allomos/4"));
+        assert!(prompt.contains("block <id> --by"), "{prompt}");
+        assert!(prompt.contains("A03-18's part of this entry is added before version 4 is merged"));
+        // The agent moves the one task another task holds up, through `alm`'s rule.
+        crate::change_task(&root, Actor::alm(Some("claude/m")), LOCK_WAIT, |bag| {
+            allomos_core::ops::block(bag, "A1-03", None, &["A1-01".to_string()])
+                .map(|o| (o, "block"))
+        })
+        .unwrap();
+        let done = finish(&root, Actor::alm(Some("claude/m"))).unwrap();
+        assert_eq!(
+            (done.from.as_str(), done.to.as_str(), done.changed),
+            ("allomos/3", "allomos/4", true)
+        );
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            before.replace("\"allomos/3\"", "\"allomos/4\"")
+        );
+        // The other waiting task is untouched; the moved one is blocked by A1-01.
+        assert_eq!(
+            fs::read_to_string(root.join("tasks/A1-02/task.json")).unwrap(),
+            waiting_before
+        );
+        let bag = load(&root).taskbag.unwrap();
+        let moved = bag.tasks.iter().find(|t| t.id == "A1-03").unwrap();
+        assert_eq!(moved.state, allomos_core::State::Blocked);
+        assert_eq!(moved.blocked_by, vec!["A1-01".to_string()]);
+        assert_eq!(format_state(&root), FormatState::Current);
+        write_allowed(&root, "claim").unwrap();
     }
 
     #[test]
@@ -1155,21 +1260,21 @@ mod tests {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(DEFAULT_DIR);
         const SECOND: Migration = Migration {
-            from: 4,
+            from: 5,
             ..TEST_ENTRY
         };
         let two = Formats {
             entries: &[TEST_ENTRY, SECOND],
-            current: 5,
-            oldest: 3,
+            current: 6,
+            oldest: 4,
         };
         for language in ["en", "zh-CN", "ja"] {
-            let p = migration_prompt_with(language, &project, &taskbag, "allomos/3", &two).unwrap();
+            let p = migration_prompt_with(language, &project, &taskbag, "allomos/4", &two).unwrap();
             let alm = "alm --taskbag \"/work/bakery/.allomos/taskbag\"";
             assert!(p.contains("/work/bakery"), "{language}");
-            assert!(p.contains("allomos/3 → allomos/4"), "{language}");
             assert!(p.contains("allomos/4 → allomos/5"), "{language}");
-            assert!(p.contains("allomos/5"), "{language}");
+            assert!(p.contains("allomos/5 → allomos/6"), "{language}");
+            assert!(p.contains("allomos/6"), "{language}");
             assert!(
                 p.contains(&format!("`{alm} list --json`")),
                 "{language}: {p}"
@@ -1193,7 +1298,7 @@ mod tests {
             );
             assert!(!p.contains("brief`"), "{language}: no section step");
         }
-        let en = migration_prompt_with("en", &project, &taskbag, "allomos/3", &two).unwrap();
+        let en = migration_prompt_with("en", &project, &taskbag, "allomos/4", &two).unwrap();
         for words in [
             "change nothing",
             "wait for the person's answer",
@@ -1204,8 +1309,8 @@ mod tests {
             assert!(en.contains(words), "{words}");
         }
         // From 4, only the second entry.
-        let p = migration_prompt_with("en", &project, &taskbag, "allomos/4", &two).unwrap();
-        assert!(!p.contains("allomos/3 → allomos/4"));
+        let p = migration_prompt_with("en", &project, &taskbag, "allomos/5", &two).unwrap();
+        assert!(!p.contains("allomos/4 → allomos/5"));
     }
 
     #[test]
@@ -1222,7 +1327,7 @@ mod tests {
             }],
         };
         let older = || FormatState::Older {
-            found: "allomos/3".into(),
+            found: "allomos/4".into(),
         };
         for language in ["en", "zh-CN", "ja"] {
             let both = check(older(), None);
@@ -1236,7 +1341,7 @@ mod tests {
                 "{language}"
             );
             assert!(r.contains("AGENTS.md"), "{language}");
-            assert!(r.contains("allomos/3 → allomos/4"), "{language}");
+            assert!(r.contains("allomos/4 → allomos/5"), "{language}");
 
             let section = check(FormatState::Current, None);
             let r =

@@ -168,12 +168,26 @@ enum Command {
     },
     /// Set a task's label (a step of the project's ladder).
     Label { id: String, label: String },
-    /// Park a task as waiting, saying on what.
+    /// Park a task as waiting: a person (or an outside event) must act. Say what, and who when it
+    /// is not the owner.
     Wait {
         id: String,
         #[arg(long, value_name = "TEXT")]
         on: String,
+        /// Who must act, when it is not the owner (for example Ann).
+        #[arg(long, value_name = "NAME")]
+        who: Option<String>,
     },
+    /// Mark a task blocked: other tasks in this taskbag must finish first.
+    Block {
+        id: String,
+        /// The blocking tasks' IDs (several, or separated by commas).
+        #[arg(long, value_name = "TASK-ID", num_args = 1.., required = true)]
+        by: Vec<String>,
+    },
+    /// Move a blocked task on (ready, or in progress when someone holds it). `alm` does not check
+    /// its blockers: you do.
+    Unblock { id: String },
     /// Finish a task. Finish it at the top label (the owner has checked it); in an automatic or
     /// loop run, a task may be finished below it with --without-owner.
     Done {
@@ -196,7 +210,7 @@ enum Command {
         id: String,
         iteration: Option<String>,
     },
-    /// Mark an unheld backlog or waiting task ready (for example, the owner approved it).
+    /// Mark an unheld backlog, waiting or blocked task ready (for example, the owner approved it).
     Ready { id: String },
     /// Give a task a new title.
     Title { id: String, title: String },
@@ -384,6 +398,8 @@ impl Command {
             | Command::Claim { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
+            | Command::Block { id, .. }
+            | Command::Unblock { id }
             | Command::Done { id, .. }
             | Command::Release { id, .. }
             | Command::Needs { id, .. }
@@ -468,6 +484,8 @@ impl Command {
             Command::Claim { .. } => "claim",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",
+            Command::Block { .. } => "block",
+            Command::Unblock { .. } => "unblock",
             Command::Done { .. } => "done",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
@@ -893,6 +911,40 @@ const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise t
 
 fn task_json(t: &Task) -> Value {
     serde_json::to_value(t).expect("tasks serialize")
+}
+
+/// A task for `--json` reading commands: with each blocker's current state when it is blocked.
+fn task_json_in(bag: &Taskbag, t: &Task) -> Value {
+    let mut v = task_json(t);
+    if !t.blocked_by.is_empty() {
+        v["blockers"] = json!(ops::blockers(bag, t));
+        v["all_blockers_done"] = json!(ops::all_blockers_done(bag, t));
+    }
+    v
+}
+
+/// What a stopped task waits on, in one line: "waiting for you: approve the card", "waiting for
+/// Ann: …", or "blocked by A01-17 (in progress), A01-20 (done)" (decision 0016).
+fn stop_line(bag: &Taskbag, t: &Task) -> Option<String> {
+    match t.state {
+        State::Waiting => Some(format!(
+            "waiting for {}: {}",
+            t.who.as_deref().unwrap_or("the owner"),
+            t.waiting_on.as_deref().unwrap_or("-")
+        )),
+        State::Blocked => {
+            let list: Vec<String> = ops::blockers(bag, t)
+                .iter()
+                .map(ops::Blocker::describe)
+                .collect();
+            let mut line = format!("blocked by {}", list.join(", "));
+            if ops::all_blockers_done(bag, t) {
+                line.push_str(&format!(" — all done: check, then `alm unblock {}`", t.id));
+            }
+            Some(line)
+        }
+        _ => None,
+    }
 }
 
 /// An iteration's heading: ID and name, then its release and dates when it has them.
@@ -1499,10 +1551,17 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 text.push('\n');
                 for t in members {
                     text.push_str(&format!("  {}\n", task_line(t)));
+                    if let Some(line) = stop_line(&bag, t) {
+                        text.push_str(&format!("      {line}\n"));
+                    }
                 }
             };
-            let tasks_json =
-                |members: &[&&Task]| members.iter().map(|t| task_json(t)).collect::<Vec<_>>();
+            let tasks_json = |members: &[&&Task]| {
+                members
+                    .iter()
+                    .map(|t| task_json_in(&bag, t))
+                    .collect::<Vec<_>>()
+            };
             let fields = if by == "iteration" {
                 let mut groups = Vec::new();
                 for it in &bag.iterations {
@@ -1556,6 +1615,13 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             let task = ops::find_task(&bag, id)?;
             let mut text = String::new();
+            let blocked = (!task.blocked_by.is_empty()).then(|| {
+                ops::blockers(&bag, &task)
+                    .iter()
+                    .map(ops::Blocker::describe)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            });
             let fields = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
@@ -1565,6 +1631,8 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 ("label", task.label.as_deref()),
                 ("holder", task.holder.as_deref()),
                 ("waiting on", task.waiting_on.as_deref()),
+                ("waiting for", task.who.as_deref()),
+                ("blocked by", blocked.as_deref()),
                 ("next dependency", task.next_dependency.as_deref()),
                 ("handoff note", task.handoff_note.as_deref()),
                 (
@@ -1581,12 +1649,18 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             if let Some(h) = &latest {
                 text.push_str(&handoff_line(h));
             }
+            if ops::all_blockers_done(&bag, &task) {
+                text.push_str(&format!(
+                    "All blockers are done: check, then `alm unblock {}`. alm moves nothing by itself.\n",
+                    task.id
+                ));
+            }
             if !task.description.is_empty() {
                 text.push('\n');
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json(&task), "handoff": latest.as_ref().map(handoff_brief) }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "handoff": latest.as_ref().map(handoff_brief) }),
                 text,
             );
             done.issues = issues;
@@ -1662,6 +1736,42 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             }
             text.push_str(&instruction);
             text.push('\n');
+            // Blocked tasks are skipped by their state; `alm` tells when one may go on, or when a
+            // blocker was dropped, and moves nothing (decision 0016).
+            let mut blocked = Vec::new();
+            for t in bag.tasks.iter().filter(|t| {
+                t.state == State::Blocked
+                    && iteration
+                        .as_ref()
+                        .is_none_or(|i| t.iteration.as_ref() == Some(i))
+            }) {
+                let all_done = ops::all_blockers_done(&bag, t);
+                let dropped = ops::blockers(&bag, t)
+                    .iter()
+                    .any(|b| b.state == Some(State::Dropped));
+                if !(all_done || dropped) {
+                    continue;
+                }
+                let list: Vec<String> = ops::blockers(&bag, t)
+                    .iter()
+                    .map(ops::Blocker::describe)
+                    .collect();
+                text.push_str(&if all_done {
+                    format!(
+                        "{}: all blockers are done ({}) — unblock it? Check, then `alm unblock {} --push`.\n",
+                        t.id,
+                        list.join(", "),
+                        t.id
+                    )
+                } else {
+                    format!(
+                        "{}: blocked by {}: a dropped task is never done.\n",
+                        t.id,
+                        list.join(", ")
+                    )
+                });
+                blocked.push(task_json_in(&bag, t));
+            }
             // At the start of a session: when this agent must write its handoff (Task-A03-06).
             let rules = bag.project.handoff.clone().unwrap_or_default().applied(me);
             text.push_str(&rules_line(&rules));
@@ -1670,6 +1780,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                     "taskbag": root,
                     "tasks": listed,
                     "instruction": instruction,
+                    "blocked": blocked,
                     "handoff_rules": rules,
                 }),
                 text,
@@ -1679,7 +1790,23 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
         }
         Command::Claim { id, take } => change(cli, cwd, |bag| ops::claim(bag, id, me, *take)),
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
-        Command::Wait { id, on } => change(cli, cwd, |bag| ops::wait(bag, id, me, on)),
+        Command::Wait { id, on, who } => {
+            change(cli, cwd, |bag| ops::wait(bag, id, me, on, who.as_deref()))
+        }
+        Command::Block { id, by } => {
+            let mut done = change(cli, cwd, |bag| ops::block(bag, id, me, by))?;
+            let root = locate(cli, cwd)?;
+            if let Some(bag) = load(&root).taskbag {
+                if let Some(task) = bag.tasks.iter().find(|t| &t.id == id) {
+                    if let Some(line) = stop_line(&bag, task) {
+                        done.text.push_str(&format!("  {line}\n"));
+                    }
+                    done.fields["task"] = task_json_in(&bag, task);
+                }
+            }
+            Ok(done)
+        }
+        Command::Unblock { id } => change(cli, cwd, |bag| ops::unblock(bag, id, me)),
         Command::Done { id, without_owner } => {
             let mut done = change(cli, cwd, |bag| {
                 ops::finish(bag, id, me, without_owner.as_deref())
@@ -1789,7 +1916,8 @@ fn change(
 #[cfg(test)]
 mod tests {
     //! The update from one format to the next (Task-A01-32), run in-process against a test-only
-    //! migration entry from 3 to 4, which this Allomos does not ship.
+    //! migration entry from 4 to 5, which this Allomos does not ship. The real 3 → 4 entry is
+    //! tried through the `alm` program in `tests/alm.rs`.
 
     use super::*;
     use allomos_store::versions::{Formats, Migration, Words};
@@ -1802,7 +1930,7 @@ mod tests {
         ja: "なし。",
     };
     const TEST_ENTRY: Migration = Migration {
-        from: 3,
+        from: 4,
         changed: Words {
             en: "The top label is now called \"human checked\".",
             zh_cn: "最高的标签现在叫 \"human checked\"。",
@@ -1819,8 +1947,8 @@ mod tests {
     };
     const TEST_FORMATS: Formats = Formats {
         entries: &[TEST_ENTRY],
-        current: 4,
-        oldest: 3,
+        current: 5,
+        oldest: 4,
     };
 
     /// `alm --json --taskbag <root> args…` against `formats`: the exit code and the JSON.
@@ -1925,7 +2053,7 @@ mod tests {
             &["rename", "area", "A01", "Ovens"],
         ] {
             let v = refused(&root, t, args, "taskbag_older");
-            assert_eq!(v["error"]["params"]["current"], "allomos/4");
+            assert_eq!(v["error"]["params"]["current"], "allomos/5");
             let message = v["error"]["message"].as_str().unwrap();
             assert!(
                 message.contains("Left to fix: no problems reported"),
@@ -1939,10 +2067,10 @@ mod tests {
         let v = ok(&root, t, &["migrate", "--language", "en"]);
         assert_eq!(
             v["migrate"],
-            json!({ "from": "allomos/3", "to": "allomos/4", "needed": true })
+            json!({ "from": "allomos/4", "to": "allomos/5", "needed": true })
         );
         let prompt = v["prompt"].as_str().unwrap();
-        assert!(prompt.contains("allomos/3 → allomos/4"), "{prompt}");
+        assert!(prompt.contains("allomos/4 → allomos/5"), "{prompt}");
         assert!(prompt.contains(TEST_ENTRY.changed.en));
         assert!(prompt.contains("`alm rename label`"));
         assert!(prompt.contains(&format!(
@@ -1957,7 +2085,7 @@ mod tests {
     }
 
     #[test]
-    fn an_update_from_3_to_4_is_finished_only_when_no_issue_is_left() {
+    fn an_update_is_finished_only_when_no_issue_is_left() {
         let root = taskbag();
         let t = &TEST_FORMATS;
         let project = root.join("project.json");
@@ -2007,13 +2135,13 @@ mod tests {
         let v = ok(&root, t, &["--as", "m", "migrate", "--finish"]);
         assert_eq!(
             v["migrate"],
-            json!({ "from": "allomos/3", "to": "allomos/4", "changed": true })
+            json!({ "from": "allomos/4", "to": "allomos/5", "changed": true })
         );
         let after = fs::read_to_string(&project).unwrap();
-        assert!(after.contains("\"format\": \"allomos/4\""), "{after}");
+        assert!(after.contains("\"format\": \"allomos/5\""), "{after}");
         assert!(after.contains("\"human checked\""));
         // Done: `alm migrate` says there is nothing to update.
-        // (This build reads only allomos/3, so the finished taskbag is checked by its file.)
+        // (This build reads only allomos/4, so the finished taskbag is checked by its file.)
         let v = ok(&root, t, &["migrate"]);
         assert_eq!(v["migrate"]["needed"], false);
         fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();

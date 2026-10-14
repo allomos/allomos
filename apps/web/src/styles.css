@@ -243,6 +243,12 @@ button.link:hover { text-decoration: underline; }
 .state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
 .s-in_progress { border-color: var(--accent); color: var(--accent-ink); }
 .s-waiting { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.s-blocked { background: var(--err-bg); color: var(--err); border-color: transparent; }
+.stop.s-waiting-text { color: var(--warn); font-weight: 500; }
+.stop.s-blocked-text { color: var(--err); }
+.state-filter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.blocker-picker { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 6px 0; max-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.blocker-picker legend { color: var(--muted); padding: 0 4px; }
 .s-done { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
 .s-dropped { color: var(--muted); text-decoration: line-through; }
 @media (max-width: 720px) {

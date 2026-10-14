@@ -46,12 +46,12 @@ Add an area by editing this table and the board in the same commit.
 
 - **Change status only with `alm`.** Every checkout and worktree shares the one taskbag outside this repository; point `alm` at it: `export ALLOMOS_TASKBAG=/Users/wanghui/coding/glidepace/allomos-taskbag/.allomos/taskbag` (or `--taskbag` on each command). Branches made before 2026-10-12 still hold an old copy at `.allomos/taskbag/`; never change it. Add `--push` to every status change: `alm` then commits only the taskbag's files in the taskbag's repository and pushes them (`alm label A01-05 "locally verified" --push`). Check the output for a `commit_failed` or `push_failed` warning; if one appears, commit or push by hand.
 - **Who you are:** `export ALLOMOS_HOLDER=<your branch>` (for example `claude/a01-05-readme`), or `--as <branch>` on each command.
-- **Next dependency:** `alm needs <ID> "<the one thing needed for the next label>"`. For a waiting task, its *waiting on* says it.
+- **Next dependency:** `alm needs <ID> "<the one thing needed for the next label>"`. For a waiting task, its *waiting on* says it; for a blocked task, `alm show <ID>` lists each blocking card with its state.
 - **Seeing status:** `alm list` (all, by area), `alm list --state in_progress` (who holds what — this replaces the old Sessions table), `alm list --state done`, `alm show <ID>`, `alm next`. The app shows the same when it opens this repository.
 
 ## States and labels
 
-- **State:** `backlog` → `ready` (owner reviewed the card) → `in progress` → `waiting` (on the owner or another card) → `done`; or `dropped`.
+- **State** (seven, [0016](../decisions/0016-waiting-and-blocked-states.md)): `backlog` → `ready` (owner reviewed the card) → `in progress` → `done`; or `dropped`. A card that stops is `waiting` when a person must act (the owner by default; `--who` names someone else) or `blocked` when another card must finish first (`blocked_by` lists them). A card blocked by a card and also waiting on the owner is `blocked`; the owner's part goes in its next dependency.
 - **Label**, the only progress claim, for work that ships:
   0. **drafted** — a document or decision card is written for review
   1. **implemented** — code written, may not run end to end
@@ -75,7 +75,7 @@ One card is worked by exactly one session at a time. The taskbag, not memory or 
 2. **Claim in a commit of its own.** `alm claim <ID> --as <branch> --push`, then start work. `alm claim` refuses a task someone else holds (`task_held`), and the lock stops two sessions on this computer from both winning.
 3. **A card held by another session is read-only to you.** If its card file holds a stale fact, correct only that fact. `alm claim --take` is only for a session whose holder has stopped (for example its quota ran out) and says so in the handoff.
 4. **Two claims from different computers:** the second to push gets a merge conflict in that task's `task.json` — keep whichever landed first and claim a different card.
-5. **Labels and waiting:** `alm label <ID> "<label>" --push` and `alm wait <ID> --on "<what>" --push`.
+5. **Labels, waiting and blocked:** `alm label <ID> "<label>" --push`; `alm wait <ID> --on "<what>" [--who "<who>"] --push` when a person must act; `alm block <ID> --by <card ID> --push` when another card must finish first. When `alm next` says all its blockers are done, check, then `alm unblock <ID> --push`; `alm` never moves it by itself.
 6. **Finish** after the owner's check: `alm label <ID> "owner verified" --push`, `alm done <ID> --push`.
 7. **Release** a card you stop short of Done: `alm release <ID> --note "<what the next session needs>" --push`, and make sure your handoff (`alm handoff --as <session> --tasks <ID> --push`) says where you stopped.
 8. **Clean up after a merge.** Once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check: stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).

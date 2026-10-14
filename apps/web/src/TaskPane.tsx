@@ -8,11 +8,13 @@ import { Markdown } from "./Markdown";
 import { LatestHandoff } from "./Handoffs";
 import { localTime } from "./handoffFlow";
 import { changeLine } from "./historyFlow";
-import { draftChanged, startDraft, stateChoices, toEdit, type Draft, type EditField } from "./editFlow";
+import { blockerChoices, draftChanged, startDraft, stateChoices, toEdit, toggleBlocker, type Draft, type EditField } from "./editFlow";
+import { blockerText, blockers, stopText } from "./stopFlow";
 import { isProblem, type Area, type Edit, type Handoff, type Iteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
   task,
+  tasks,
   area,
   iteration,
   onClose,
@@ -27,6 +29,8 @@ export function TaskPane({
   onEdit,
 }: {
   task: Task;
+  /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
+  tasks: Task[];
   area: Area | undefined;
   iteration: Iteration | undefined;
   onClose: () => void;
@@ -51,7 +55,7 @@ export function TaskPane({
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<EditField | null>(null);
-  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "" });
+  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [] });
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +120,19 @@ export function TaskPane({
           : (`pane.${field}` as "pane.state"),
     );
 
+  /** The "Blocked by" task picker: every other task, ticked when it blocks this one. */
+  const picker = (): ReactNode => (
+    <fieldset className="blocker-picker" disabled={busy}>
+      <legend className="small">{t("edit.blocked_by_legend")}</legend>
+      {blockerChoices(task, tasks).map((x) => (
+        <label key={x.id} className="small">
+          <input type="checkbox" checked={draft.blockedBy.includes(x.id)} onChange={() => setDraft((d) => toggleBlocker(d, x.id))} />{" "}
+          <span className="id">{x.id}</span> {x.title} <span className="muted">({t(`state.${x.state}`)})</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+
   /** The control for the field being changed. */
   const control = (field: EditField): ReactNode => {
     const set = (value: string) => setDraft((d) => ({ ...d, value }));
@@ -126,7 +143,7 @@ export function TaskPane({
           <>
             <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
               {stateChoices(task).map((s) => (
-                <option key={s} value={s} disabled={s !== "ready" && s !== "waiting" && s !== "done" && s !== "dropped"}>
+                <option key={s} value={s} disabled={s === "backlog" || s === "in_progress"}>
                   {t(`state.${s}`)}
                 </option>
               ))}
@@ -142,8 +159,22 @@ export function TaskPane({
                 disabled={busy}
               />
             )}
+            {draft.value === "waiting" && (
+              <input
+                type="text"
+                value={draft.who}
+                placeholder={t("edit.who_placeholder")}
+                aria-label={t("pane.who")}
+                onChange={(e) => setDraft((d) => ({ ...d, who: e.target.value }))}
+                onKeyDown={(e) => keys(e, true)}
+                disabled={busy}
+              />
+            )}
+            {draft.value === "blocked" && picker()}
           </>
         );
+      case "blocked_by":
+        return picker();
       case "label":
         return (
           <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
@@ -236,6 +267,7 @@ export function TaskPane({
       <div className="editor">
         {control(field)}
         {field === "waiting_on" && task.state !== "waiting" && <p className="muted small">{t("edit.waiting_on_hint")}</p>}
+        {field === "blocked_by" && task.state !== "blocked" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
         <div className="editor-buttons">
           <button type="button" className="primary" onClick={() => void save()} disabled={busy || !draftChanged(task, field, draft)}>
             {busy ? t("edit.saving") : t("edit.save")}
@@ -267,10 +299,16 @@ export function TaskPane({
   const rows: [string, string | null, EditField | null][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
-    [t("pane.state"), t(`state.${task.state}`), "state"],
+    [t("pane.state"), stopText(task, tasks, t) ?? t(`state.${task.state}`), "state"],
     [t("pane.label"), task.label, "label"],
     [t("pane.holder"), task.holder, null],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],
+    [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
+    [
+      t("pane.blocked_by"),
+      (task.blocked_by ?? []).length ? blockers(task, tasks).map((b) => blockerText(b, t)).join(", ") : null,
+      "blocked_by",
+    ],
     [t("pane.next"), task.next_dependency, "next_dependency"],
     [t("pane.handoff"), task.handoff_note, "handoff_note"],
     [t("pane.finished_without_owner"), task.finished_without_owner, null],

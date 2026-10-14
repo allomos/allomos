@@ -10,6 +10,17 @@
   "bad_usage": [
     "detail"
   ],
+  "blocked_by_missing": [],
+  "blocked_by_self": [
+    "id"
+  ],
+  "blocker_dropped": [
+    "id",
+    "blocker"
+  ],
+  "blocker_unknown": [
+    "id"
+  ],
   "cannot_make_ready": [
     "id",
     "state"
@@ -101,6 +112,10 @@
   ],
   "not_a_taskbag": [
     "path"
+  ],
+  "not_blocked": [
+    "id",
+    "state"
   ],
   "not_json": [
     "detail"
