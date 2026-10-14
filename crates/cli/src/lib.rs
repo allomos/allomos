@@ -105,7 +105,7 @@ enum Command {
         topic: Option<String>,
     },
     /// The language to write new and changed tasks in. Without a value: show it (run this before
-    /// adding a task or changing its title or description). With one: set it, to a language code
+    /// adding a task or changing its title or description: `alm title`, `alm describe`). With one: set it, to a language code
     /// such as zh-CN, or to ui to follow the Allomos app's language.
     #[command(name = "task-language", alias = "task_language")]
     TaskLanguage {
@@ -232,6 +232,24 @@ enum Command {
     Ready { id: String },
     /// Give a task a new title.
     Title { id: String, title: String },
+    /// Give a task a new description (its description.md): `--text "<markdown>"`, or `--from` a
+    /// Markdown file. An empty text (`--text ""`) removes it.
+    Describe {
+        id: String,
+        /// The new description, in Markdown.
+        #[arg(
+            long,
+            value_name = "TEXT",
+            required_unless_present = "from",
+            conflicts_with = "from"
+        )]
+        text: Option<String>,
+        /// A Markdown file with the new description.
+        #[arg(long, value_name = "FILE")]
+        from: Option<PathBuf>,
+    },
+    /// Set the task's handoff note (what the next one needs); no text clears it.
+    Note { id: String, text: Option<String> },
     /// Change the project's name and/or ID; without either, show them.
     Project {
         #[arg(long)]
@@ -425,6 +443,8 @@ impl Command {
             | Command::Plan { id, .. }
             | Command::Ready { id }
             | Command::Title { id, .. }
+            | Command::Describe { id, .. }
+            | Command::Note { id, .. }
             | Command::Drop { id } => Some(id),
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Init { .. }
@@ -515,6 +535,8 @@ impl Command {
             Command::Plan { .. } => "plan",
             Command::Ready { .. } => "ready",
             Command::Title { .. } => "title",
+            Command::Describe { .. } => "describe",
+            Command::Note { .. } => "note",
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
             Command::Next { .. } => "next",
@@ -2107,6 +2129,22 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             })
         }
         Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
+        Command::Describe { id, text, from } => {
+            // `--text` and `--from` exclude each other, and one of them is required.
+            let text = match from {
+                Some(file) => {
+                    let file = cwd.join(file);
+                    read_text(&file).map_err(|e| Problem::ReadFailed {
+                        detail: format!("{}: {e}", file.display()),
+                    })?
+                }
+                None => text.clone().unwrap_or_default(),
+            };
+            change(cli, cwd, |bag| ops::set_description(bag, id, me, &text))
+        }
+        Command::Note { id, text } => change(cli, cwd, |bag| {
+            ops::set_handoff_note(bag, id, me, text.as_deref())
+        }),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;

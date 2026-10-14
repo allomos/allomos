@@ -902,6 +902,10 @@ fn each_change_names_exactly_the_files_it_wrote() {
         vec!["--as", "a", "claim", "A01-01"],
         vec!["--as", "a", "label", "A01-01", "implemented"],
         vec!["--as", "a", "needs", "A01-01", "a person"],
+        vec!["--as", "a", "note", "A01-01", "half way"],
+        vec!["--as", "a", "describe", "A01-01", "--text", "New words."],
+        vec!["--as", "a", "describe", "A01-01", "--from", steps],
+        vec!["--as", "a", "describe", "A01-01", "--text", ""],
         vec![
             "--as", "a", "wait", "A01-01", "--on", "approve", "--who", "Ann",
         ],
@@ -987,6 +991,175 @@ fn each_change_names_exactly_the_files_it_wrote() {
         .to_string();
     let v = ok(&repo, &["handoff", "--remove", &file]);
     assert_eq!(v["changed_files"], json!([file]));
+}
+
+/// `alm describe` and `alm note` change a task's description and handoff note through the same
+/// rules as the app's task pane (Task-A01-37): the holder rule, one history event each named as
+/// the app names it, `description.md` removed when emptied, and Git commands naming only the
+/// files written.
+#[test]
+fn describe_and_note_change_a_task_like_the_app() {
+    let repo = filled();
+    let root = repo.join(".allomos/taskbag");
+    let desc = root.join("tasks/A01-01/description.md");
+    let task_json = "tasks/A01-01/task.json";
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+
+    // A new description from text: description.md rewritten; only it and one event are named.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "describe",
+            "A01-01",
+            "--text",
+            "# Goal\n\nOpen it.  \n\n",
+        ],
+    );
+    assert_eq!(fs::read_to_string(&desc).unwrap(), "# Goal\n\nOpen it.\n");
+    assert_eq!(v["task"]["description"], "# Goal\n\nOpen it.\n");
+    let files = v["changed_files"].as_array().unwrap();
+    assert_eq!(files.len(), 2, "{v}");
+    assert!(files[0].as_str().unwrap().starts_with("events/"), "{v}");
+    assert_eq!(files[1], "tasks/A01-01/description.md", "{v}");
+    let commit = v["git_commands"][1].as_str().unwrap();
+    assert!(commit.contains("alm: describe A01-01"), "{commit}");
+    assert!(commit.contains("Agent: a"), "{commit}");
+
+    // From a Markdown file.
+    let file = tmp("describe").join("d.md");
+    fs::write(&file, "From a file.\n").unwrap();
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "describe",
+            "A01-01",
+            "--from",
+            file.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(fs::read_to_string(&desc).unwrap(), "From a file.\n");
+    assert_eq!(
+        ok(&repo, &["show", "A01-01"])["task"]["description"],
+        "From a file.\n"
+    );
+
+    // Emptied: description.md removed, and named among the changed files.
+    let v = ok(&repo, &["--as", "a", "describe", "A01-01", "--text", ""]);
+    assert!(!desc.exists());
+    assert!(
+        v["changed_files"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("tasks/A01-01/description.md")),
+        "{v}"
+    );
+
+    // The handoff note: set, then cleared with no text.
+    let v = ok(
+        &repo,
+        &["--as", "a", "note", "A01-01", "Tests pass; docs left."],
+    );
+    assert_eq!(
+        task_file(&repo, "A01-01")["handoff_note"],
+        "Tests pass; docs left."
+    );
+    let files: Vec<&str> = v["changed_files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f.as_str().unwrap())
+        .collect();
+    assert_eq!(files.len(), 2, "{v}");
+    assert!(
+        files[0].starts_with("events/") && files[1] == task_json,
+        "{v}"
+    );
+    assert!(
+        v["git_commands"][1]
+            .as_str()
+            .unwrap()
+            .contains("alm: note A01-01")
+    );
+    ok(&repo, &["--as", "a", "note", "A01-01"]);
+    assert!(task_file(&repo, "A01-01").get("handoff_note").is_none());
+
+    // Each change is one event in the history, named as the app names it.
+    let events = ok(&repo, &["history", "A01-01"])["events"].clone();
+    let commands: Vec<&str> = events
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["command"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        &commands[..5],
+        ["note", "note", "describe", "describe", "describe"],
+        "{events}"
+    );
+    assert_eq!(events[0]["by"], "a", "{events}");
+    let note = events[1]["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["field"] == "handoff_note")
+        .unwrap_or_else(|| panic!("{events}"));
+    assert_eq!(note["to"], "Tests pass; docs left.");
+
+    // Someone else holds it: refused like the app, and no file changes.
+    let before = contents(&root);
+    refused(
+        &repo,
+        &["--as", "b", "describe", "A01-01", "--text", "Mine"],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "note", "A01-01", "Mine"],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &["describe", "A01-01", "--text", "Mine"],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "describe", "A09-09", "--text", "x"],
+        1,
+        "task_not_found",
+    );
+    // --text or --from: exactly one.
+    refused(&repo, &["--as", "a", "describe", "A01-01"], 2, "bad_usage");
+    refused(
+        &repo,
+        &[
+            "--as", "a", "describe", "A01-01", "--text", "x", "--from", "d.md",
+        ],
+        2,
+        "bad_usage",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "describe", "A01-01", "--from", "missing.md"],
+        3,
+        "read_failed",
+    );
+    assert_eq!(contents(&root), before, "a refused change writes nothing");
+
+    // People see the same commands, naming only the changed files.
+    let out = alm(&repo, &["--as", "a", "note", "A01-01", "Back soon."]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{text}");
+    assert!(text.contains("Commit and push this change:"), "{text}");
+    assert!(text.contains(task_json), "{text}");
+    assert!(!text.contains("description.md"), "{text}");
 }
 
 /// Changes made in the app are listed by the next `alm` change, with commands to commit them as
@@ -1648,7 +1821,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v5)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v6)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));

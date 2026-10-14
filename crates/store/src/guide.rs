@@ -123,6 +123,7 @@ Work a task:
 - `alm claim <id>`: you hold it; state in progress. `--take` only when its holder has stopped.
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
+- `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).
 - `alm wait <id> --on \"<what>\" [--who \"<who>\"]`: state waiting: a person (or an outside
   event) must act; without `--who`, the approver.
 - `alm block <id> --by <task-id> [<task-id>…]`: state blocked: those tasks must finish first.
@@ -148,9 +149,13 @@ Plan:
   dropped ones too (plan them elsewhere first).
 - `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]`: without
   an ID, the next free one in the area. Read `alm guide tasks` first.
+- `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
+  `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
+  description). Same holder rule as `alm label`; each is recorded in `alm history`.
 - `alm plan <id> [<iteration>]`; `alm labels \"<a,b,…>\"`; `alm rename label \"<old>\" \"<new>\"`
   (a step of the ladder, and every task that carries it)
-- `alm task-language`: the language to write new and changed tasks in (run it first);
+- `alm task-language`: the language to write new and changed tasks in (run it before
+  `alm add task`, `alm title` and `alm describe`);
   `alm task-language <code|ui>` sets it.
 
 Handoffs (the note a session leaves so whoever continues does not start blind):
