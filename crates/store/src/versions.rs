@@ -15,7 +15,8 @@ use allomos_core::{FORMAT, FORMAT_VERSION, OLDEST_FORMAT_VERSION, Problem, forma
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::convert::{Source, ask_once_in, migration_header_in, shown};
+use crate::convert::{Source, ask_once_in, migration_header_in};
+use crate::shown;
 use crate::{AGENT_SECTION_HEADING, Actor, Lock, PROJECT_FILE, picked_folder, tells_agents};
 use allomos_core::event::{Change, Kind};
 

@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use crate::{plain_path, portable_path, relative_path, section_source, setup_steps_in};
+use crate::{portable_path, relative_path, section_source, setup_steps_in, shown};
 
 /// Changes when the conversion request's steps change, so a report can say which it followed.
 /// 2: the agent finds the tasks itself and asks with `alm confirm` before changing anything.
@@ -34,12 +34,6 @@ const CONFIRM_TITLE: &str = "Move tasks into Allomos";
 pub(crate) enum Source {
     OtherSystem,
     OlderTaskbag,
-}
-
-/// A folder as a request shows it to the agent: on Windows with `\` throughout
-/// ([`plain_path`]), so a taskbag at `C:\work\app` reads `C:\work\app\.allomos\taskbag`.
-pub(crate) fn shown(path: &Path) -> String {
-    plain_path(path).display().to_string()
 }
 
 /// The lines every migration request starts with, after its title: where the project and the

@@ -262,11 +262,17 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
     )
 }
 
+/// A folder as a request shows it to the agent: on Windows with `\` throughout
+/// ([`plain_path`]), so a taskbag at `C:\work\app` reads `C:\work\app\.allomos\taskbag`.
+pub(crate) fn shown(path: &Path) -> String {
+    plain_path(path).display().to_string()
+}
+
 /// The last line of a request: the agent takes Allomos's section from `alm brief`, so it always
 /// matches the installed `alm`. `alm` must be usable where the agent works (owner, 2026-10-10), so
 /// the request carries no copy of the section.
 pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
-    let brief = format!("alm --taskbag \"{}\" brief", taskbag.display());
+    let brief = format!("alm --taskbag \"{}\" brief", shown(taskbag));
     match language {
         "zh-CN" => {
             format!("Allomos 的一节就是 `{brief}` 的输出：运行它，把输出原样（英文）作为这一节。")
@@ -338,8 +344,8 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 /// connect request can carry it as its first part.
 pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
     let (project, taskbag, heading) = (
-        project_path.display(),
-        taskbag_path.display(),
+        shown(project_path),
+        shown(taskbag_path),
         AGENT_SECTION_HEADING,
     );
     match language {
