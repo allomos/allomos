@@ -30,7 +30,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 ## Working procedure
 
 1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
-2. **Several sessions may work at once**, each in its own git worktree and branch (`claude/…`, `codex/…`), each holding **one** card. Claim before you work, following the [claiming protocol](docs/workflow/CARDS.md#claiming-protocol).
+2. **A session works in the current checkout by default**, holding **one** card. A worktree is created only when a task needs its own checkout, for example when several sessions work at once: each then has its own git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from `main`. Claim before you work, following the [claiming protocol](docs/workflow/CARDS.md#claiming-protocol).
 3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the approver's open questions.
 4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → human verified (Done: the human check, called *owner verified* until the taskbag is migrated to `allomos/4`). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
