@@ -30,7 +30,7 @@ When Allomos opens with no project, it shows one button, **Start**. Press it to 
 1. **What is a taskbag?** The first step explains it in a few lines. Press **Choose a folder…** and choose your project's folder. The taskbag is created inside it as `.allomos/`.
 2. **The taskbag folder.** If the folder has no taskbag yet, press **Create taskbag**. If it already has one, Allomos says so and uses it. Then press **Next**.
 
-Allomos keeps the taskbag in Git, so its history is saved. If the folder is not in a Git repository yet, Allomos makes it one. It saves (commits) only the taskbag's own files, and it never sends anything to the internet.
+Allomos itself never runs Git. The AI agent you connect in the last step keeps the taskbag in Git, so its history is saved: if the folder is not in a Git repository yet, the agent asks you whether to make it one, then commits only the taskbag's own files. Nothing is sent to the internet unless you say so.
 
 ## 4. Choose the project folder
 

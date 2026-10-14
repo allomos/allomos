@@ -27,7 +27,9 @@ use allomos_core::event::{Change, Kind};
 /// 3: the rule for finishing a task, and `alm next` listing every free ready task (Task-A03-15).
 /// 4: `waiting` (on a person) and `blocked` (by another task), seven states (Task-A01-31); the
 /// human check: `--without-human-check` with its steps, `alm human`, `alm checked` (Task-A03-18).
-pub const SECTION_VERSION: u32 = 4;
+/// 5: no `--push`; `alm` never runs Git and prints the Git commands for each change, and a claim
+/// is pushed before the work starts (decision 0017, Task-A01-38).
+pub const SECTION_VERSION: u32 = 5;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -562,12 +564,12 @@ const EN: Phrases = Phrases {
     steps: "Steps",
     look: "Look first, and change nothing. Read the changes above, look at the taskbag with `{alm} list --json` and `{alm} show <id>`, and work out what each change means for this taskbag, task by task.",
     plan: "The one question: show the plan and wait for the person's answer. Write the whole plan in Markdown to a file outside the project: every task you would change, how, and why by the rules above, and everything you cannot decide. Then run `{alm} confirm --title \"Migrate the taskbag\" --plan <file>`. Exit code 0 means go ahead with the whole plan; any other exit code means the person cancelled or did not answer: change nothing, stop, and tell the person that nothing changed.",
-    apply: "Apply the plan only through `alm`, with the commands above and `--as <your session name>`. Never edit the taskbag's files by hand, and do not use `--commit` or `--push`.",
+    apply: "Apply the plan only through `alm`, with the commands above and `--as <your session name>`. Never edit the taskbag's files by hand. While the update is unfinished, `alm` prints no Git commands for these changes: they are committed together at the end.",
     finish: "Check: `{alm} list --json` must report no issues, and the checks above must hold. Then run `{alm} migrate --finish`. It writes the new format only when nothing is left to fix; otherwise it lists what is left: fix that and run it again.",
     section: "In the project folder, replace Allomos's section in {files} (headed \"{heading}…\", or any other text about Allomos or `alm`) with the output of `{alm} brief`, exactly as it is. Keep the rest of each file as it is.",
     report_older: "Tell the person what changed, and what you could not decide.",
     report_section: "Show the user what you changed and the commits you made.",
-    commit_older: "Commit only the taskbag's files{files}, and only when the person asks. Leave every other change as it is; do not push unless the person asks.",
+    commit_older: "When `alm migrate --finish` has succeeded, commit the update as one commit: only the taskbag's files{files} (`alm migrate --finish` prints the Git commands for the taskbag's files). Commit only; do not push. Leave every other change as it is.",
     commit_section: "If the project is a Git repository, commit only these changes: the taskbag's files{files}. Leave every other change as it is; do not push unless the person asks.",
     none: "(none)",
 };
@@ -587,12 +589,12 @@ const ZH_CN: Phrases = Phrases {
     steps: "步骤",
     look: "先看，什么都不改。读上面的改动，用 `{alm} list --json` 和 `{alm} show <id>` 查看任务包，逐个任务想清楚每项改动对这个任务包意味着什么。",
     plan: "唯一的问题：展示计划，等用户回答。把完整计划用 Markdown 写进项目之外的文件：你要改的每个任务、怎么改、按上面的规则为什么这样改，以及你无法决定的所有事项。然后运行 `{alm} confirm --title \"迁移任务包\" --plan <文件>`。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户没有任何改动。",
-    apply: "只通过 `alm` 执行计划，使用上面的命令并加上 `--as <你的会话名>`。不要手动编辑任务包的文件，也不要用 `--commit` 或 `--push`。",
+    apply: "只通过 `alm` 执行计划，使用上面的命令并加上 `--as <你的会话名>`。不要手动编辑任务包的文件。更新完成之前，`alm` 不会为这些改动打印 Git 命令：它们在最后一起提交。",
     finish: "检查：`{alm} list --json` 必须没有报告任何问题，上面的检查也都要满足。然后运行 `{alm} migrate --finish`。只有没有剩下要修的东西时，它才会写入新格式；否则它会列出剩下的问题：修好后再运行一次。",
     section: "在项目文件夹中，把 {files} 里 Allomos 的一节（标题以“{heading}”开头，或其他关于 Allomos 或 `alm` 的说明）替换为 `{alm} brief` 的输出，原样（英文）使用。文件的其他内容保持不变。",
     report_older: "告诉用户改了什么，以及你无法决定的事项。",
     report_section: "告诉用户你改了什么，以及你做的提交。",
-    commit_older: "只提交任务包的文件{files}，而且只在用户要求时提交。其他改动保持原样；除非用户要求，不要推送。",
+    commit_older: "`alm migrate --finish` 成功后，把这次更新作为一次提交：只提交任务包的文件{files}（`alm migrate --finish` 会打印任务包文件的 Git 命令）。只提交，不要推送；其他改动保持原样。",
     commit_section: "如果项目是 Git 仓库，只提交这些改动：任务包的文件{files}。其他改动保持原样；除非用户要求，不要推送。",
     none: "（无）",
 };
@@ -612,12 +614,12 @@ const JA: Phrases = Phrases {
     steps: "手順",
     look: "まず見るだけで、何も変えません。上の変更を読み、`{alm} list --json` と `{alm} show <id>` でタスクバッグを見て、それぞれの変更がこのタスクバッグにとって何を意味するかをタスクごとに考えます。",
     plan: "ただ一つの質問：計画を見せて、相手の答えを待ちます。計画全体を Markdown でプロジェクトの外のファイルに書きます：変えるタスクすべて、どう変えるか、上のルールでなぜそうするか、そして決められないこと。続いて `{alm} confirm --title \"タスクバッグを移行\" --plan <ファイル>` を実行します。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、何も変わっていないことを伝えます。",
-    apply: "計画は `alm` を通してだけ実行します。上のコマンドに `--as <あなたのセッション名>` を付けて使います。タスクバッグのファイルを手で編集せず、`--commit` や `--push` も使いません。",
+    apply: "計画は `alm` を通してだけ実行します。上のコマンドに `--as <あなたのセッション名>` を付けて使います。タスクバッグのファイルを手で編集しません。更新が終わるまで、`alm` はこれらの変更の Git コマンドを表示せず、最後にまとめてコミットします。",
     finish: "確認：`{alm} list --json` が問題を何も報告せず、上の確かめ方もすべて満たすこと。それから `{alm} migrate --finish` を実行します。直すものが残っていないときだけ新しい形式を書き込み、残っていればそれを一覧にします：直してからもう一度実行します。",
     section: "プロジェクトのフォルダーで、{files} の Allomos の節（見出しが「{heading}」で始まるもの、または Allomos や `alm` についてのほかの説明）を `{alm} brief` の出力で置き換え、そのまま（英語のまま）使います。ファイルのほかの部分は変えません。",
     report_older: "何が変わったか、そして決められなかったことを相手に伝えます。",
     report_section: "何を変えたか、どんなコミットをしたかをユーザーに見せてください。",
-    commit_older: "コミットするのはタスクバッグのファイル{files}だけで、頼まれたときだけです。ほかの変更はそのままにし、頼まれない限りプッシュしません。",
+    commit_older: "`alm migrate --finish` が成功したら、更新を一つのコミットにします：タスクバッグのファイル{files}だけ（タスクバッグのファイルの Git コマンドは `alm migrate --finish` が表示します）。コミットだけで、プッシュはしません。ほかの変更はそのままにします。",
     commit_section: "プロジェクトが Git リポジトリなら、これらの変更だけをコミットします：タスクバッグのファイル{files}。ほかの変更はそのままにし、頼まれない限りプッシュしません。",
     none: "（なし）",
 };
@@ -1391,7 +1393,8 @@ mod tests {
             "wait for the person's answer",
             "only through `alm`",
             "could not decide",
-            "only when the person asks",
+            "When `alm migrate --finish` has succeeded, commit the update as one commit",
+            "Commit only; do not push.",
         ] {
             assert!(en.contains(words), "{words}");
         }

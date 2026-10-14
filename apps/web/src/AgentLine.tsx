@@ -1,7 +1,8 @@
 // "Do the AI agents know about this project?" (Task-A03-04): a short note beside Show in Finder.
 // Allomos works it out itself from the project's instruction files (AGENTS.md, CLAUDE.md);
 // agents write no flag. Since 2026-10-10 (owner) it no longer says who last used `alm` or holds
-// tasks: a holder copied from an old board read as an agent "working now".
+// tasks: a holder copied from an old board read as an agent "working now". Allomos runs no Git
+// (decision 0017), so it also says how many changes made here are not shared yet.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -53,6 +54,9 @@ export function AgentLine({
         <button type="button" className="link" onClick={onTell}>
           {t("agentline.tell")}
         </button>
+      )}
+      {status.unshared > 0 && (
+        <span title={t("agentline.unshared_hint")}>{t("agentline.unshared", { count: status.unshared })}</span>
       )}
     </div>
   );

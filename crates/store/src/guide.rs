@@ -88,16 +88,23 @@ Read this before you add a task, so it fits this project.
    (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
 7. **One outcome per task.** If it is really two outcomes, add two tasks.
 
-Add it with `--push` when the project shares its tasks through Git, so others see it.
+When the project shares its tasks through Git, run the Git commands `alm add task` prints, so
+others see the new task.
 ";
 
 const COMMANDS: &str = "# alm commands
 
 Every command takes `--taskbag <path>` (or ALLOMOS_TASKBAG; default: the nearest
 `.allomos/taskbag/` above the current folder), `--as <name>` (or ALLOMOS_HOLDER), `--json`
-(one JSON object on standard output), and for changes `--commit` or `--push` (commit only the
-taskbag's files; push the current branch). Exit codes: 0 done, 1 refused by a rule, 2 wrong
-usage, 3 taskbag busy or not writable.
+(one JSON object on standard output). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage,
+3 taskbag busy or not writable.
+
+`alm` never runs or reads Git. After a change it prints \"Commit and push this change:\" and the
+exact `git add`, `git commit` and `git push` commands naming only the files that change wrote
+(`--json`: `changed_files` and `git_commands`); run them yourself and leave other changes as they
+are. `alm claim` asks you to push at once, before you start the work. Changes the person made in
+the Allomos app and not shared yet come with their own commands, to commit as the person's.
+`alm init` prints none: commit the new taskbag yourself.
 
 See:
 - `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
@@ -166,7 +173,8 @@ Ask the person:
 About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:
   this guide.
-- `alm init`: create a taskbag (only when there is none).
+- `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
+  folder, or where `--taskbag` says.
 - `alm migrate`: when `alm` says the taskbag is in an older format, the steps for updating it;
   follow them. `alm migrate --finish` ends the update once `alm list --json` reports no issues.
 ";
@@ -176,30 +184,31 @@ const WORKFLOW: &str = "# How to work the tasks
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
    first (`alm show <id>`).
-2. Hold one task at a time: `alm claim <id> --as <your session name> --push`. A task someone else
-   holds is not yours to change.
-3. As you prove each step, `alm label <id> \"<label>\" --push`, and keep its next dependency
-   current with `alm needs`.
+2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>`, and run
+   the Git commands it prints right away: until your claim is pushed, other sessions do not see
+   it and may take the task too. A task someone else holds is not yours to change.
+3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
+   with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
-   [--who \"<who>\"] --push`; when another task must finish first, `alm block <id> --by
-   <task-id> --push` (if a person must act too, say so with `alm needs`). Blocked and waiting
-   tasks are never in `alm next`'s list: they are skipped by their state. When `alm next` says all
-   of a task's blockers are done, check it, then `alm unblock <id> --push`.
+   [--who \"<who>\"]`; when another task must finish first, `alm block <id> --by <task-id>` (if
+   a person must act too, say so with `alm needs`). Blocked and waiting tasks are never in
+   `alm next`'s list: they are skipped by their state. When `alm next` says all of a task's
+   blockers are done, check it, then `alm unblock <id>`.
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
    every meaningful step): `alm handoff --tasks <id> --as <your session name>`, then fill in the
    file it names, in plain words first, for any reader: you do not know who takes over, an agent
    or a person. Evidence goes on the task's card, not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
-   the next one needs>\" --push`.
+   the next one needs>\"`.
 7. Finished: only once the task has the top label of the ladder (a person has checked it: the
-   human check), then `alm done <id> --push`. The one exception: in an automatic or loop run the
+   human check), then `alm done <id>`. The one exception: in an automatic or loop run the
    person set up to go on without them (for example a card run or `/loop`), you may finish a task
    below the top label with
-   `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md> --push`; say so in
+   `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md>`; say so in
    your handoff. Write the steps so a person can pick it up and test
    it: the test folder, what to open, what to click, what they should see. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
-   it, `alm checked <id> --push`.
+   it, `alm checked <id>`.
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
@@ -208,7 +217,8 @@ Rules:
   that language.
 - Before a change the person must agree to, show your plan with `alm confirm` and change nothing
   unless it exits 0.
-- `--push` commits only the taskbag's files; your other work is committed as usual.
+- After every `alm` change, run the Git commands it prints: they name only that change's files.
+  Your other work is committed as usual.
 ";
 
 /// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
@@ -282,5 +292,17 @@ mod tests {
             assert!(text.contains("handoff"), "{text}");
         }
         assert!(crate::agent_section().contains("every ready task nobody holds"));
+        // Decision 0017: no `--commit` / `--push`; pull before claiming, push the claim at once,
+        // and run the Git commands each change prints.
+        for text in [guide(None).unwrap(), crate::agent_section()] {
+            assert!(!text.contains("--push"), "{text}");
+            assert!(!text.contains("--commit"), "{text}");
+            assert!(
+                text.contains("Pull first") || text.contains("pull first"),
+                "{text}"
+            );
+            assert!(text.contains("until your claim is pushed"), "{text}");
+            assert!(text.contains("Git commands"), "{text}");
+        }
     }
 }

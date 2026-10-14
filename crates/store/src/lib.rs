@@ -2,9 +2,12 @@
 //!
 //! A *taskbag* is a folder holding `project.json`, `areas/<id>.json`, optionally
 //! `iterations/<id>.json`, and `tasks/<id>/task.json` (+ `description.md`). See `docs/product/FILE-FORMAT.md`.
-//! This crate never runs `git`: a taskbag inside a repository is versioned by that
-//! repository, and nothing here creates a nested one.
+//! This crate never runs or reads Git (decision 0017): a taskbag inside a repository is
+//! versioned by that repository, and the agent commits each change itself. [`with_written_files`]
+//! tells which files a change wrote, so `alm` can print the Git commands for exactly those.
 
+use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -231,26 +234,29 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration), or `alm list`.
-- Take a task: `alm claim <id> --as <your session name> --push`.
-- Report progress: `alm label <id> \"<label>\" --push`.
-- Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"] --push`; blocked by
-  another task: `alm block <id> --by <task-id> --push`. `alm next` says when all blockers are done;
-  then check and move it on: `alm unblock <id> --push`.
-- Stopping before it is done: `alm release <id> --note \"<what the next one needs>\" --push`.
-- Finished: only at the top label (a person has checked it: the human check): `alm done <id> --push`.
+- Take a task: pull first, then `alm claim <id> --as <your session name>`, and run the Git
+  commands it prints right away: until your claim is pushed, other sessions do not see it.
+- Report progress: `alm label <id> \"<label>\"`.
+- Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
+  another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
+  then check and move it on: `alm unblock <id>`.
+- Stopping before it is done: `alm release <id> --note \"<what the next one needs>\"`.
+- Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
   In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
-  may finish below it with `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md>
-  --push` (the steps tell a person how to check it); say so in your handoff.
+  may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
+  --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
 - Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
-  checked one: `alm checked <id> --push`.
-- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --push`.
+  checked one: `alm checked <id>`.
+- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
-  `alm handoff --tasks <ids> --as <your session name> --push`, for any reader, agent or person.
+  `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
 
-`--push` commits only the taskbag's files and pushes them, so others see the change.
+`alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
+`git commit`, `git push`), naming only that change's files: run them, and leave other changes as
+they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
@@ -357,7 +363,7 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 
 在项目文件夹中：
 
-1. 如果项目是 Git 仓库，而任务包还没有提交，先单独提交它：`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（只提交任务包，不要带上其他文件）。
+1. Git：Allomos 自己从不运行 Git。如果项目文件夹不在 Git 仓库中，先问用户是否要建立一个（在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于 Git 的部分。在 Git 仓库中，先单独提交任务包和它的改动（包括记录的项目文件夹）：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要推送）。
 2. 打开 AGENTS.md（如果没有就新建）。
 3. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
@@ -373,7 +379,7 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 
 プロジェクトのフォルダーで：
 
-1. プロジェクトが Git リポジトリで、タスクバッグがまだコミットされていなければ、先にそれだけをコミットします：`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（タスクバッグだけ。ほかのファイルは入れません）。
+1. Git：Allomos 自身は Git を一切実行しません。プロジェクトのフォルダーが Git リポジトリの中になければ、作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下の Git の部分はすべて飛ばします。リポジトリの中なら、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをコミットします：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、プッシュもしません）。
 2. AGENTS.md を開きます（なければ作成します）。
 3. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
@@ -389,7 +395,12 @@ Taskbag (Allomos's task files): {taskbag}
 
 In the project folder:
 
-1. If the project is a Git repository and the taskbag is not committed yet, commit it on its own first: `git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` (only the taskbag; never other files).
+1. Git: Allomos itself never runs Git. If the project folder is not in a Git repository, ask \
+the person whether to set one up (`git init` in the project folder); if they say no, skip every Git \
+part below. In a repository, first commit the taskbag on its own, with its changes so far (the \
+recorded project folder too): `git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` \
+(add `../../README-allomos.md` to the end of both commands when Allomos left that file beside \
+`.allomos/`; never other files, and do not push).
 2. Open AGENTS.md (create it if it is missing).
 3. If AGENTS.md already has Allomos instructions (for example a section headed \
 \"{heading}\", or any other text about Allomos or `alm`), replace them with \
@@ -583,14 +594,6 @@ pub fn inspect(folder: &Path) -> Inspection {
             suggested_root: nested,
         }
     }
-}
-
-/// The nearest folder at or above `path` that contains `.git`, if any (shown to the user;
-/// never used to run Git here).
-pub fn git_root(path: &Path) -> Option<PathBuf> {
-    path.ancestors()
-        .find(|p| p.join(".git").exists())
-        .map(Path::to_path_buf)
 }
 
 fn rel(root: &Path, path: &Path) -> String {
@@ -864,6 +867,45 @@ pub fn id_from_name(name: &str) -> String {
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+thread_local! {
+    /// The files written or removed by the change running on this thread, while
+    /// [`with_written_files`] is listening.
+    static WRITTEN: RefCell<Option<BTreeSet<PathBuf>>> = const { RefCell::new(None) };
+}
+
+/// Note that `path` was written or removed, when someone is listening.
+pub(crate) fn note_written(path: &Path) {
+    WRITTEN.with(|w| {
+        if let Some(set) = w.borrow_mut().as_mut() {
+            set.insert(path.to_path_buf());
+        }
+    });
+}
+
+/// Whether [`with_written_files`] is listening on this thread.
+fn listening() -> bool {
+    WRITTEN.with(|w| w.borrow().is_some())
+}
+
+/// Run `f`, and return with its result every file it wrote or removed through this crate
+/// (decision 0017): a file rewritten with the same text is not counted. `alm` prints the Git
+/// commands for exactly these files; nothing here runs Git.
+pub fn with_written_files<T>(f: impl FnOnce() -> T) -> (T, Vec<PathBuf>) {
+    let outer = WRITTEN.with(|w| w.borrow_mut().replace(BTreeSet::new()));
+    let out = f();
+    let mine = WRITTEN.with(|w| {
+        let mut slot = w.borrow_mut();
+        let mine = slot.take().unwrap_or_default();
+        // Listening inside another listener: the outer one sees these files too.
+        *slot = outer.map(|mut o| {
+            o.extend(mine.iter().cloned());
+            o
+        });
+        mine
+    });
+    (out, mine.into_iter().collect())
+}
+
 /// A name for a temporary file or folder next to `dir`'s contents, unique to this process.
 fn tmp_path(dir: &Path, what: &str) -> PathBuf {
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -921,6 +963,11 @@ pub(crate) fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
 /// disk, and is then renamed over `path`. A reader sees either the old file or the new one,
 /// never a part-written one. Line endings are always written as `\n`.
 fn write_atomic(path: &Path, text: &str) -> Result<(), Problem> {
+    if listening() && fs::read_to_string(path).is_ok_and(|old| old == lf(text)) {
+        // The same text again: the file is rewritten, but nothing changed to commit.
+    } else {
+        note_written(path);
+    }
     let dir = path.parent().expect("taskbag files are inside a folder");
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
     let tmp = tmp_path(dir, name);
@@ -962,6 +1009,11 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
         }
         fs::rename(&tmp, target)
     })();
+    if result.is_ok() {
+        for (rel_path, _) in files {
+            note_written(&target.join(rel_path));
+        }
+    }
     result.map_err(|e| {
         let _ = fs::remove_dir_all(&tmp);
         write_failed(target, e)
@@ -1157,7 +1209,9 @@ impl Lock {
     /// `folder` is `areas` or `iterations`.
     pub fn remove_item(&self, folder: &str, id: &str) -> Result<(), Problem> {
         let path = self.root.join(folder).join(format!("{id}.json"));
-        fs::remove_file(&path).map_err(|e| write_failed(&path, e))
+        fs::remove_file(&path).map_err(|e| write_failed(&path, e))?;
+        note_written(&path);
+        Ok(())
     }
 
     /// Rewrite `project.json` (`alm labels`).
@@ -1182,7 +1236,11 @@ impl Lock {
         if task.description.is_empty() {
             match fs::remove_file(&path) {
                 Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write_failed(&path, e)),
-                _ => Ok(()),
+                Err(_) => Ok(()),
+                Ok(()) => {
+                    note_written(&path);
+                    Ok(())
+                }
             }
         } else {
             write_atomic(&path, &task.description)
@@ -1896,7 +1954,6 @@ mod tests {
             }
         );
         assert!(!suggested_root.join(".git").exists());
-        assert_eq!(git_root(&suggested_root), Some(repo.clone()));
         fs::remove_dir_all(repo).unwrap();
     }
 

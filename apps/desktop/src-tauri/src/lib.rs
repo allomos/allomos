@@ -16,7 +16,7 @@ use allomos_core::{Loaded, Problem};
 use allomos_store::{
     AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
     add_readme_if_empty, agent_connect_request_in, agent_setup, agent_setup_request_in,
-    answer_confirm, git_root, id_from_name, init, inspect, load, pending_confirms, picked_folder,
+    answer_confirm, id_from_name, init, inspect, load, pending_confirms, picked_folder,
     project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
@@ -26,8 +26,6 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 #[derive(Serialize)]
 struct FolderInfo {
     inspection: Inspection,
-    /// The Git repository the folder belongs to, if any (information only).
-    git_root: Option<PathBuf>,
 }
 
 #[derive(Serialize)]
@@ -87,7 +85,6 @@ fn startup_folder() -> Result<Option<PathBuf>, Problem> {
 #[tauri::command]
 fn inspect_folder(path: PathBuf) -> FolderInfo {
     FolderInfo {
-        git_root: git_root(&path),
         inspection: inspect(&path),
     }
 }
@@ -748,153 +745,6 @@ fn instruction_files(project: PathBuf) -> InstructionFiles {
     }
 }
 
-/// Where the setup wizard keeps the taskbag in Git (Task-A05-03).
-#[derive(Debug, Serialize, PartialEq, Eq)]
-struct GitKept {
-    /// The repository that holds the taskbag.
-    repo: PathBuf,
-    /// The folder was not in a repository, so the wizard made it one (`git init`).
-    initialized: bool,
-    /// A commit was made; false when the taskbag was already committed as it is.
-    committed: bool,
-}
-
-/// The commit message for the taskbag's first commit, the same as the agents' setup request uses;
-/// later commits by the wizard (the project folder, step 3) say "Update".
-const TASKBAG_COMMIT: &str = "Add Allomos taskbag";
-const TASKBAG_UPDATE: &str = "Update Allomos taskbag";
-
-/// Run `git -C dir …` with extra environment (tests set an author): its output, or Git's own
-/// message on failure.
-fn run_git(dir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Result<String, String> {
-    let out = agents::command("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .envs(envs.iter().copied())
-        .output()
-        .map_err(|e| format!("git: {e}"))?;
-    if out.status.success() {
-        return Ok(String::from_utf8_lossy(&out.stdout).into_owned());
-    }
-    let text = String::from_utf8_lossy(&out.stderr).trim().to_string();
-    Err(if text.is_empty() {
-        format!("git {} failed", args.join(" "))
-    } else {
-        text
-    })
-}
-
-/// Whether a `git --version` run shows that Git is missing: the program is not found, or it is the
-/// macOS stand-in that only offers to install the developer tools.
-fn git_missing(started: bool, succeeded: bool, stderr: &str) -> bool {
-    let stub = stderr.contains("xcrun: error") || stderr.contains("developer tools");
-    !started || stub || !succeeded
-}
-
-/// Is there a working `git` program?
-fn git_works(envs: &[(&str, &str)]) -> bool {
-    match agents::command("git")
-        .arg("--version")
-        .envs(envs.iter().copied())
-        .output()
-    {
-        Ok(out) => !git_missing(
-            true,
-            out.status.success(),
-            &String::from_utf8_lossy(&out.stderr),
-        ),
-        Err(_) => !git_missing(false, false, ""),
-    }
-}
-
-/// After the wizard's step 2 (owner, 2026-10-12): make sure the folder holding `.allomos/` is in a
-/// Git repository, making it one with `git init` when it is not, without asking; then commit the
-/// taskbag (and `README-allomos.md`, when Allomos left one) to that repository, and nothing else.
-/// Never pushes. The person's own Git settings and hooks apply (decision 0010).
-fn keep_taskbag_in_git(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Problem> {
-    if !git_works(envs) {
-        return Err(Problem::GitMissing);
-    }
-    let folder = std::path::absolute(picked_folder(root).unwrap_or(root))
-        .unwrap_or_else(|_| picked_folder(root).unwrap_or(root).to_path_buf());
-    let (repo, initialized) = match git_root(&folder) {
-        Some(repo) => (repo, false),
-        None => {
-            run_git(&folder, &["init", "--quiet"], envs).map_err(|detail| {
-                Problem::GitInitFailed {
-                    path: folder.display().to_string(),
-                    detail,
-                }
-            })?;
-            (folder.clone(), true)
-        }
-    };
-    let root = std::path::absolute(root).unwrap_or_else(|_| root.to_path_buf());
-    let mut paths = vec![root.display().to_string()];
-    let readme = folder.join(allomos_store::README_FILE);
-    if readme.is_file() {
-        paths.push(readme.display().to_string());
-    }
-    let with_paths = |head: &[&str]| -> Vec<String> {
-        head.iter()
-            .map(|s| s.to_string())
-            .chain(std::iter::once("--".to_string()))
-            .chain(paths.iter().cloned())
-            .collect()
-    };
-    let git = |args: Vec<String>| {
-        let args: Vec<&str> = args.iter().map(String::as_str).collect();
-        run_git(&repo, &args, envs)
-    };
-    let commit = (|| {
-        git(with_paths(&["add", "--all"]))?;
-        // Nothing new to commit: the taskbag is already in the repository as it is.
-        if git(with_paths(&["diff", "--cached", "--quiet"])).is_ok() {
-            return Ok(false);
-        }
-        // Already in the history (an earlier step committed it): this one updates it.
-        let before = git(vec![
-            "log".into(),
-            "-1".into(),
-            "--format=%H".into(),
-            "--".into(),
-            paths[0].clone(),
-        ]);
-        let known = before.as_ref().is_ok_and(|out| !out.trim().is_empty());
-        let message = if known {
-            TASKBAG_UPDATE
-        } else {
-            TASKBAG_COMMIT
-        };
-        git(with_paths(&["commit", "--quiet", "-m", message]))?;
-        Ok(true)
-    })();
-    match commit {
-        Ok(committed) => Ok(GitKept {
-            repo,
-            initialized,
-            committed,
-        }),
-        Err(detail) => Err(Problem::CommitFailed { detail }),
-    }
-}
-
-/// One commit at a time: two `git add`/`git commit` runs at once fail on Git's `index.lock`. The
-/// wizard can ask twice for one opening (React runs a starting effect twice in development, and a
-/// quick second opening does too); the second then waits and finds nothing new to commit.
-static KEEP_IN_GIT: Mutex<()> = Mutex::new(());
-
-fn keep_one_at_a_time(root: &Path, envs: &[(&str, &str)]) -> Result<GitKept, Problem> {
-    let _one = KEEP_IN_GIT.lock().unwrap_or_else(|e| e.into_inner());
-    keep_taskbag_in_git(root, envs)
-}
-
-#[tauri::command]
-async fn keep_in_git(root: PathBuf) -> Result<GitKept, Problem> {
-    keep_one_at_a_time(&root, &[])
-}
-
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
 /// here when AGENTS.md or CLAUDE.md sits beside `.allomos/`), whether that folder's agent
 /// instructions mention Allomos, and whether the taskbag has tasks.
@@ -936,8 +786,11 @@ struct AgentStatus {
     project: PathBuf,
     /// Which agents' instruction files tell them about Allomos.
     setup: AgentSetup,
-    /// The newest taskbag change an agent made with `alm --commit` / `--push`.
-    last: Option<agents::LastUse>,
+    /// The newest change an agent made through `alm` under a name, from the change history
+    /// (decision 0017: not from Git).
+    last: Option<allomos_store::events::LastUse>,
+    /// Changes made in the app that no agent has been told to share yet (decision 0017, row 9).
+    unshared: usize,
     /// Who holds tasks in progress now.
     holders: Vec<String>,
 }
@@ -963,7 +816,8 @@ async fn agent_status(root: PathBuf) -> AgentStatus {
     holders.dedup();
     AgentStatus {
         setup: agent_setup(&project),
-        last: agents::last_agent_use(&root),
+        last: allomos_store::events::last_agent_use(&root),
+        unshared: allomos_store::events::unshared_app_changes(&root).count,
         holders,
         project,
     }
@@ -1329,7 +1183,6 @@ pub fn run() {
             find_agents,
             connect_agents,
             instruction_files,
-            keep_in_git,
             write_agent_files,
             agent_status,
             confirm_requests,
@@ -1496,104 +1349,44 @@ mod tests {
         assert!(connect_plan(&[], "en", &project, &taskbag).is_empty());
     }
 
+    /// Decision 0017: the wizard's steps 2 and 3 run no Git. A folder outside Git is set up
+    /// without errors and stays outside Git; the agent connected in step 4 is asked to set Git up
+    /// with the person and commit. "Last used by" and the changes not shared yet come from the
+    /// change history.
     #[test]
-    fn the_taskbag_is_put_under_git_and_committed_alone() {
-        let me = [
-            ("GIT_AUTHOR_NAME", "Test"),
-            ("GIT_AUTHOR_EMAIL", "test@example.com"),
-            ("GIT_COMMITTER_NAME", "Test"),
-            ("GIT_COMMITTER_EMAIL", "test@example.com"),
-        ];
-        let base = std::env::temp_dir().join(format!("allomos-keep-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&base);
-        let log = |repo: &Path| {
-            let out = agents::command("git")
-                .arg("-C")
-                .arg(repo)
-                .args(["log", "--format=%s", "--name-only"])
-                .output()
-                .unwrap();
-            String::from_utf8_lossy(&out.stdout).into_owned()
-        };
-
-        // A folder outside Git: made a repository, and only the taskbag is committed.
+    fn the_wizard_sets_up_a_folder_outside_git_without_running_git() {
+        let base = std::env::temp_dir().join(format!(
+            "allomos-no-git-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let plain = base.join("plain");
         std::fs::create_dir_all(&plain).unwrap();
-        std::fs::write(plain.join("notes.txt"), "mine").unwrap();
         let root = plain.join(allomos_store::DEFAULT_DIR);
-        allomos_store::init(&root, "p", "P").unwrap();
-        let kept = keep_taskbag_in_git(&root, &me).unwrap();
-        assert!(kept.initialized && kept.committed);
-        assert_eq!(kept.repo, plain);
-        let history = log(&plain);
-        assert!(history.starts_with(TASKBAG_COMMIT), "{history}");
-        assert!(
-            history.contains(".allomos/taskbag/project.json"),
-            "{history}"
-        );
-        assert!(!history.contains("notes.txt"), "{history}");
-        // Again: nothing new, no second commit.
-        let again = keep_taskbag_in_git(&root, &me).unwrap();
-        assert!(!again.initialized && !again.committed);
-        // Step 3 records the project folder: committed before the agent is connected, as an update.
-        allomos_store::record_project_folder(&root, &plain).unwrap();
-        assert!(keep_taskbag_in_git(&root, &me).unwrap().committed);
-        assert!(log(&plain).starts_with(TASKBAG_UPDATE), "{}", log(&plain));
-
-        // Inside an existing repository: no new repository; the person's staged work stays staged.
-        let repo = base.join("repo");
-        let sub = repo.join("app");
-        std::fs::create_dir_all(&sub).unwrap();
-        run_git(&repo, &["init", "--quiet"], &me).unwrap();
-        std::fs::write(repo.join("work.txt"), "staged").unwrap();
-        run_git(&repo, &["add", "work.txt"], &me).unwrap();
-        let root = sub.join(allomos_store::DEFAULT_DIR);
-        allomos_store::init(&root, "q", "Q").unwrap();
-        let kept = keep_taskbag_in_git(&root, &me).unwrap();
-        assert_eq!(kept.repo, repo);
-        assert!(!kept.initialized && kept.committed);
-        assert!(!sub.join(".git").exists(), "no nested repository");
-        assert!(!log(&repo).contains("work.txt"));
-        assert!(
-            run_git(
-                &repo,
-                &["diff", "--cached", "--quiet", "--", "work.txt"],
-                &me
-            )
-            .is_err()
-        );
-
-        // Two openings at once (React's double start in development): one commits, the other
-        // waits and finds nothing new, instead of failing on Git's index.lock.
-        let twice = base.join("twice");
-        std::fs::create_dir_all(&twice).unwrap();
-        run_git(&twice, &["init", "--quiet"], &me).unwrap();
-        let root = twice.join(allomos_store::DEFAULT_DIR);
-        allomos_store::init(&root, "t", "T").unwrap();
-        let results: Vec<_> = std::thread::scope(|s| {
-            let a = s.spawn(|| keep_one_at_a_time(&root, &me));
-            let b = s.spawn(|| keep_one_at_a_time(&root, &me));
-            vec![a.join().unwrap(), b.join().unwrap()]
-        });
-        let committed: Vec<bool> = results.into_iter().map(|r| r.unwrap().committed).collect();
-        assert_eq!(committed.iter().filter(|c| **c).count(), 1, "{committed:?}");
+        // Step 2 (Create) and step 3 (the project folder).
+        let opened = create_taskbag(root.clone(), "Plain".into(), "en".into()).unwrap();
+        assert!(opened.readme_added);
+        let setup = set_project_folder(root.clone(), plain.clone()).unwrap();
+        assert!(setup.project_folder.is_some());
+        assert!(!plain.join(".git").exists() && !root.join(".git").exists());
+        // Step 4's request asks the agent to set up Git with the person, then commit.
+        let (project, taskbag) = (plain.as_path(), root.as_path());
+        for language in ["en", "zh-CN", "ja"] {
+            let request = agent_connect_request_in(language, project, taskbag);
+            assert!(request.contains("`git init`"), "{language}");
+            assert!(
+                request.contains("commit -m \"Add Allomos taskbag\""),
+                "{language}"
+            );
+        }
+        // No agent has used it yet; the app's own changes (create, project folder) are not
+        // shared yet.
+        assert_eq!(allomos_store::events::last_agent_use(&root), None);
+        assert_eq!(allomos_store::events::unshared_app_changes(&root).count, 2);
         std::fs::remove_dir_all(&base).unwrap();
-    }
-
-    #[test]
-    fn missing_git_is_recognized() {
-        assert!(git_missing(false, false, ""), "no program");
-        assert!(git_missing(
-            true,
-            false,
-            "xcrun: error: invalid active developer path (/Library/Developer/CommandLineTools)"
-        ));
-        assert!(git_missing(
-            true,
-            true,
-            "No developer tools were found, requesting install."
-        ));
-        assert!(!git_missing(true, true, ""), "git version 2.50.1");
     }
 
     /// The task pane's change command (Task-A01-18): the edit arrives as the interface sends it,

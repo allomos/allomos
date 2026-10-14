@@ -129,17 +129,29 @@ fn init_refuses_twice_and_needs_no_git() {
     );
     assert!(!root.join(".git").exists() && !dir.join(".git").exists());
     refused(&dir, &["init"], 1, "taskbag_exists");
-    // From a subfolder of a repository, the taskbag goes at the repository's root.
+    // `alm` reads no Git (decision 0017): in a subfolder of a repository the taskbag goes in that
+    // subfolder, not at the repository's root, and `init` prints no Git commands.
     let repo = tmp("sub");
     fs::create_dir_all(repo.join(".git")).unwrap();
-    fs::create_dir_all(repo.join("src/deep")).unwrap();
-    ok(&repo.join("src/deep"), &["init"]);
-    assert!(repo.join(".allomos/taskbag/project.json").is_file());
+    let deep = repo.join("src/deep");
+    fs::create_dir_all(&deep).unwrap();
+    let v = ok(&deep, &["init"]);
+    assert!(deep.join(".allomos/taskbag/project.json").is_file());
+    assert!(!repo.join(".allomos").exists());
+    assert!(
+        v.get("git_commands").is_none() && v.get("changed_files").is_none(),
+        "{v}"
+    );
     let project: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
+        &fs::read_to_string(deep.join(".allomos/taskbag/project.json")).unwrap(),
     )
     .unwrap();
-    assert_eq!(project["name"], repo.file_name().unwrap().to_str().unwrap());
+    assert_eq!(project["name"], "deep");
+    let text = String::from_utf8(alm(&tmp("init-text"), &["init"]).stdout).unwrap();
+    assert!(
+        !text.contains("Commit and push") && !text.contains("Commit only these files"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -281,7 +293,11 @@ fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
         rule.starts_with("Take the task the person named, if any."),
         "{rule}"
     );
-    assert!(rule.contains("alm claim <id> --as <your session name> --push"));
+    assert!(
+        rule.contains("Pull first, then claim it with `alm claim <id> --as <your session name>`")
+    );
+    assert!(rule.contains("until your claim is pushed"), "{rule}");
+    assert!(!rule.contains("--push"), "{rule}");
     assert!(v["handoff_rules"]["quota_gate"].is_number());
 
     // `--iteration` narrows the list; an unknown iteration is refused.
@@ -638,71 +654,389 @@ fn real_repo() -> (PathBuf, PathBuf) {
     (repo, remote)
 }
 
+/// Run the Git commands `alm` printed (its `git_commands`) in `dir`, as an agent would.
+fn run_printed(dir: &Path, v: &Value) {
+    let commands = v["git_commands"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{v}"));
+    assert!(!commands.is_empty(), "{v}");
+    for c in commands {
+        let c = c.as_str().unwrap();
+        let out = if cfg!(windows) {
+            Command::new("cmd")
+                .current_dir(dir)
+                .args(["/C", c])
+                .output()
+        } else {
+            Command::new("sh").current_dir(dir).args(["-c", c]).output()
+        }
+        .unwrap();
+        assert!(
+            out.status.success(),
+            "{c}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+/// Decision 0017: `alm` runs no Git. After a change it prints the commands that share exactly
+/// that change's files; the agent runs them, and other changes stay as they are.
 #[test]
-fn commit_and_push_share_only_the_taskbag() {
+fn printed_git_commands_share_only_that_change() {
     let (repo, remote) = real_repo();
-    let v = ok(&repo, &["init", "--write-agent-files", "--commit"]);
-    assert_eq!(v["warnings"], json!([]));
+    let v = ok(&repo, &["init", "--write-agent-files"]);
     assert_eq!(v["agent_files"], json!(["AGENTS.md", "CLAUDE.md"]));
-    assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "alm: init");
-    // The agent files went into the same commit as the new taskbag.
-    let files = git(&repo, &["show", "--name-only", "--format=", "HEAD"]);
-    assert!(
-        files.contains("AGENTS.md") && files.contains("CLAUDE.md"),
-        "{files}"
+    // `init` prints no Git commands (row 3): no agent is connected yet. Nothing was committed.
+    assert!(v.get("git_commands").is_none(), "{v}");
+    assert_eq!(git(&repo, &["log", "-1", "--format=%s"]), "first");
+    git(&repo, &["add", "--", ".allomos", "AGENTS.md", "CLAUDE.md"]);
+    git(&repo, &["commit", "--quiet", "-m", "Add Allomos taskbag"]);
+    let v = ok(&repo, &["add", "area", "A01", "Tracking"]);
+    run_printed(&repo, &v);
+    assert_eq!(
+        git(&repo, &["log", "-1", "--format=%s%n%b"]),
+        "alm: add area A01\nAgent: <your session name>"
     );
-    ok(&repo, &["add", "area", "A01", "Tracking", "--commit"]);
-    ok(
-        &repo,
-        &[
-            "add", "task", "A01-01", "--area", "A01", "--title", "T", "--commit",
-        ],
+    let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "T"]);
+    assert_eq!(v["git_instruction"], "Commit and push this change:");
+    run_printed(&repo, &v);
+    assert_eq!(
+        git(&repo, &["log", "-1", "--format=%s"]),
+        "alm: add task A01-01"
     );
-    // Another changed file stays out of alm's commit.
+    // Unrelated changes: a changed file of the project, and another task added but not committed.
     fs::write(repo.join("README.md"), "changed\n").unwrap();
-    let v = ok(&repo, &["--as", "agent-a", "claim", "A01-01", "--push"]);
-    assert_eq!(v["warnings"], json!([]), "{v}");
+    let other = ok(&repo, &["add", "task", "--area", "A01", "--title", "Other"]);
+    let v = ok(&repo, &["--as", "agent-a", "claim", "A01-01"]);
+    // Only the task and the event that records its change (Task-A01-17).
+    let files: Vec<&str> = v["changed_files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f.as_str().unwrap())
+        .collect();
+    assert_eq!(files.len(), 2, "{v}");
+    assert!(
+        files[0].starts_with("events/") && files[0].ends_with(".json"),
+        "{v}"
+    );
+    assert_eq!(files[1], "tasks/A01-01/task.json");
+    // The claim says to push at once, before the work starts (row 2).
+    assert_eq!(
+        v["git_instruction"],
+        "Commit and push this change now, before you start the work. Until it is pushed, other sessions do not see your claim and may take this task too:"
+    );
+    let commands: Vec<&str> = v["git_commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap())
+        .collect();
+    assert_eq!(commands.len(), 3, "{v}");
+    assert!(
+        commands[0].ends_with(&format!(" add -- {} {}", files[0], files[1])),
+        "{v}"
+    );
+    assert!(
+        commands[1].ends_with(&format!(
+            " commit -m \"alm: claim A01-01\" -m \"Agent: agent-a\" -- {} {}",
+            files[0], files[1]
+        )),
+        "{v}"
+    );
+    assert!(commands[2].ends_with(" push"), "{v}");
+    // alm ran no Git: the claim is not committed until the agent runs the commands.
+    assert_eq!(
+        git(&repo, &["log", "-1", "--format=%s"]),
+        "alm: add task A01-01"
+    );
+    run_printed(&repo, &v);
     assert_eq!(
         git(&repo, &["log", "-1", "--format=%s%n%b"]),
         "alm: claim A01-01\nAgent: agent-a"
     );
-    // The task and the event that records its change (Task-A01-17).
     let shown = git(&repo, &["show", "--name-only", "--format=", "HEAD"]);
-    let shown: Vec<&str> = shown.lines().collect();
-    assert_eq!(shown.len(), 2, "{shown:?}");
-    assert!(
-        shown[0].starts_with(".allomos/taskbag/events/"),
-        "{shown:?}"
+    assert_eq!(
+        shown.lines().collect::<Vec<_>>(),
+        [
+            format!(".allomos/taskbag/{}", files[0]),
+            ".allomos/taskbag/tasks/A01-01/task.json".to_string()
+        ]
     );
-    assert_eq!(shown[1], ".allomos/taskbag/tasks/A01-01/task.json");
-    assert_eq!(git(&repo, &["status", "--porcelain"]), "M README.md");
+    // The other changes are left as they are.
+    let status = git(&repo, &["status", "--porcelain"]);
+    assert!(
+        status.lines().any(|l| l.trim() == "M README.md"),
+        "{status}"
+    );
+    for f in other["changed_files"].as_array().unwrap() {
+        let f = f.as_str().unwrap();
+        let top = f.split('/').next().unwrap();
+        assert!(
+            status.contains(&format!(".allomos/taskbag/{top}/")),
+            "{f}: {status}"
+        );
+    }
     // The push landed on the remote.
     assert_eq!(
         git(&remote, &["log", "-1", "--format=%s", "main"]),
         "alm: claim A01-01"
     );
-    // A change that changes nothing makes no commit.
-    let before = git(&repo, &["rev-parse", "HEAD"]);
-    ok(&repo, &["--as", "agent-a", "claim", "A01-01", "--commit"]);
-    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), before);
+    // A change that changes nothing names no files and no commands.
+    let v = ok(&repo, &["--as", "agent-a", "claim", "A01-01"]);
+    assert_eq!(v["changed_files"], json!([]), "{v}");
+    assert_eq!(v["git_commands"], json!([]), "{v}");
+    assert_eq!(
+        v["git_instruction"],
+        "Nothing changed, so there is nothing to commit."
+    );
+    // For people: the same commands, then the rule.
+    let out = alm(
+        &repo,
+        &["--as", "agent-a", "label", "A01-01", "implemented"],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("\nCommit and push this change:\n  git -C "),
+        "{text}"
+    );
+    assert!(
+        text.contains("commit -m \"alm: label A01-01\" -m \"Agent: agent-a\" -- events/"),
+        "{text}"
+    );
+    assert!(
+        text.ends_with("Commit only these files; leave other changes as they are.\n"),
+        "{text}"
+    );
 }
 
+/// `alm` never runs Git: every command works with no `git` program at all, in a folder outside
+/// any repository; and the removed options are refused as unknown.
 #[test]
-fn commit_outside_git_warns_and_keeps_the_change() {
+fn alm_needs_no_git_and_refuses_the_removed_options() {
     let dir = tmp("no-git");
-    ok(&dir, &["init"]);
-    ok(&dir, &["add", "area", "A01", "Tracking"]);
-    let v = ok(
-        &dir,
-        &[
-            "add", "task", "A01-01", "--area", "A01", "--title", "T", "--commit",
+    let empty = tmp("no-git-path");
+    let run = |args: &[&str]| {
+        let mut all = vec!["--json"];
+        all.extend_from_slice(args);
+        let out = Command::new(ALM)
+            .current_dir(&dir)
+            .args(&all)
+            .env("PATH", &empty)
+            .env_remove("ALLOMOS_TASKBAG")
+            .env_remove("ALLOMOS_HOLDER")
+            .output()
+            .unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (out.status.code().unwrap(), v)
+    };
+    for args in [
+        &["init"][..],
+        &["add", "area", "A01", "Tracking"],
+        &["add", "task", "--area", "A01", "--title", "T"],
+        &["--as", "a", "claim", "A01-01"],
+        &["--as", "a", "label", "A01-01", "human verified"],
+        &["--as", "a", "handoff", "--tasks", "A01-01"],
+        &["--as", "a", "done", "A01-01"],
+        &["next"],
+    ] {
+        let (code, v) = run(args);
+        assert_eq!((code, &v["ok"]), (0, &json!(true)), "{args:?}: {v}");
+        assert!(
+            v["warnings"].as_array().unwrap().is_empty(),
+            "{args:?}: {v}"
+        );
+    }
+    assert!(!dir.join(".git").exists());
+    for flag in ["--push", "--commit"] {
+        let (code, v) = run(&["--as", "a", "label", "A01-01", "implemented", flag]);
+        assert_eq!(code, 2, "{flag}: {v}");
+        assert_eq!(v["error"]["code"], "bad_usage", "{flag}: {v}");
+        assert!(
+            v["error"]["message"].as_str().unwrap().contains(flag),
+            "{v}"
+        );
+    }
+}
+
+/// Every file in the taskbag and its contents, except the lock.
+fn contents(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    walk(root)
+        .into_iter()
+        .filter(|p| p.is_file() && p.file_name().unwrap() != ".lock")
+        .map(|p| {
+            let rel = p
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            (rel, fs::read(&p).unwrap())
+        })
+        .collect()
+}
+
+/// Each changing command names exactly the files it wrote, added or removed: no more (other
+/// uncommitted changes are present all along) and no fewer.
+#[test]
+fn each_change_names_exactly_the_files_it_wrote() {
+    let repo = filled();
+    let root = repo.join(".allomos/taskbag");
+    let steps = tmp("steps").join("steps.md");
+    fs::write(&steps, "Open it.\n").unwrap();
+    let template = tmp("template").join("t.md");
+    fs::write(&template, "# Handoff\n\nWhat next.\n").unwrap();
+    let (steps, template) = (steps.to_str().unwrap(), template.to_str().unwrap());
+    let commands: Vec<Vec<&str>> = vec![
+        vec!["add", "iteration", "I01", "One"],
+        vec!["add", "iteration", "I02", "Two"],
+        vec![
+            "add",
+            "task",
+            "--area",
+            "A02",
+            "--title",
+            "With text",
+            "--description",
+            "Why.",
         ],
-    );
-    assert_eq!(v["warnings"][0]["code"], "commit_failed", "{v}");
+        vec!["--as", "a", "claim", "A01-01"],
+        vec!["--as", "a", "label", "A01-01", "implemented"],
+        vec!["--as", "a", "needs", "A01-01", "a person"],
+        vec![
+            "--as", "a", "wait", "A01-01", "--on", "approve", "--who", "Ann",
+        ],
+        vec!["--as", "a", "ready", "A02-01"],
+        vec!["--as", "a", "claim", "A01-02"],
+        vec!["--as", "a", "block", "A01-02", "--by", "A02-01"],
+        vec!["--as", "a", "unblock", "A01-02"],
+        vec!["plan", "A01-02", "I01"],
+        vec!["--as", "a", "title", "A01-02", "Lists"],
+        vec!["--as", "a", "release", "A01-02", "--note", "half done"],
+        vec!["--as", "a", "drop", "A02-01"],
+        vec!["--as", "b", "claim", "A01-02"],
+        vec![
+            "--as",
+            "b",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "loop run",
+            "--steps",
+            steps,
+        ],
+        vec!["checked", "A01-02"],
+        vec!["rename", "area", "A02", "Graphs"],
+        vec!["change", "iteration", "I01", "--release", "v0.1"],
+        vec!["delete", "iteration", "I02"],
+        vec![
+            "labels",
+            "drafted,implemented,locally verified,deployed and verified,human verified",
+        ],
+        vec!["rename", "label", "drafted", "sketched"],
+        vec!["project", "--name", "Demo 2"],
+        vec!["task-language", "ja"],
+        vec!["handoff-rules", "--quota", "5"],
+        vec!["handoff-template", "--set", template],
+        vec!["--as", "b", "handoff", "--tasks", "A01-02"],
+    ];
+    // An unrelated uncommitted change sits in the taskbag the whole time.
+    fs::write(root.join("project-notes.md"), "Changed by hand.\n").unwrap();
+    for args in &commands {
+        let before = contents(&root);
+        let v = ok(&repo, args);
+        let after = contents(&root);
+        let mut changed: Vec<&String> = after
+            .iter()
+            .filter(|(f, text)| before.get(*f) != Some(*text))
+            .map(|(f, _)| f)
+            .chain(before.keys().filter(|f| !after.contains_key(*f)))
+            .collect();
+        changed.sort();
+        let named: Vec<&str> = v["changed_files"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{args:?}: {v}"))
+            .iter()
+            .map(|f| f.as_str().unwrap())
+            .collect();
+        assert_eq!(named, changed, "{args:?}");
+        assert!(!named.is_empty(), "{args:?}");
+        let commands = v["git_commands"].as_array().unwrap();
+        assert_eq!(commands.len(), 3, "{args:?}: {v}");
+        for c in commands.iter().take(2) {
+            assert!(
+                c.as_str().unwrap().ends_with(&format!(
+                    " -- {}",
+                    named
+                        .iter()
+                        .map(|f| if f.contains(' ') {
+                            format!("\"{f}\"")
+                        } else {
+                            f.to_string()
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )),
+                "{args:?}: {c}"
+            );
+        }
+    }
+    // Removing a finished handoff names the removed file.
+    let file = ok(&repo, &["handoffs"])["handoffs"][0]["file"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let v = ok(&repo, &["handoff", "--remove", &file]);
+    assert_eq!(v["changed_files"], json!([file]));
+}
+
+/// Changes made in the app are listed by the next `alm` change, with commands to commit them as
+/// the person's (decision 0017, row 9), and only once.
+#[test]
+fn app_changes_not_shared_yet_come_with_the_next_change() {
+    let repo = filled();
+    let root = repo.join(".allomos/taskbag");
+    let app = allomos_store::Actor {
+        by: Some("Ann"),
+        via: "app",
+    };
+    allomos_store::change_task(&root, app, Duration::from_secs(5), |bag| {
+        allomos_core::ops::make_ready(bag, "A01-02", None).map(|o| (o, "ready"))
+    })
+    .unwrap();
+    // `alm next` lists them as well.
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["app_changes"]["count"], 1, "{v}");
+    let v = ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let app_changes = &v["app_changes"];
+    assert_eq!(app_changes["count"], 1, "{v}");
+    assert_eq!(app_changes["by"], json!(["Ann"]));
+    let files: Vec<&str> = app_changes["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f.as_str().unwrap())
+        .collect();
+    assert_eq!(files.len(), 2, "{v}");
+    assert!(files[0].starts_with("events/"));
+    assert_eq!(files[1], "tasks/A01-02/task.json");
+    let commit = app_changes["git_commands"][1].as_str().unwrap();
     assert!(
-        dir.join(".allomos/taskbag/tasks/A01-01/task.json")
-            .is_file()
+        commit.contains(
+            "commit -m \"app: changes made in the Allomos app\" -m \"By: Ann (Allomos app)\""
+        ),
+        "{commit}"
     );
+    // The claim's own commands name only the claim's files.
+    assert!(
+        !v["changed_files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == "tasks/A01-02/task.json")
+    );
+    // Handed over: the next change no longer lists them.
+    let v = ok(&repo, &["--as", "a", "label", "A01-01", "implemented"]);
+    assert!(v.get("app_changes").is_none(), "{v}");
 }
 
 #[test]
@@ -1314,7 +1648,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v4)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v5)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -1849,19 +2183,23 @@ fn history_lists_a_tasks_changes_newest_first() {
 #[test]
 fn two_copies_with_different_events_merge_without_conflict() {
     let (repo, remote) = real_repo();
-    ok(&repo, &["init", "--commit"]);
-    ok(&repo, &["add", "area", "A01", "One", "--commit"]);
-    ok(
+    ok(&repo, &["init"]);
+    git(&repo, &["add", "--", ".allomos"]);
+    git(&repo, &["commit", "--quiet", "-m", "Add Allomos taskbag"]);
+    run_printed(&repo, &ok(&repo, &["add", "area", "A01", "One"]));
+    run_printed(
         &repo,
-        &[
-            "add", "task", "A01-01", "--area", "A01", "--title", "T1", "--commit",
-        ],
+        &ok(
+            &repo,
+            &["add", "task", "A01-01", "--area", "A01", "--title", "T1"],
+        ),
     );
-    ok(
+    run_printed(
         &repo,
-        &[
-            "add", "task", "A01-02", "--area", "A01", "--title", "T2", "--push",
-        ],
+        &ok(
+            &repo,
+            &["add", "task", "A01-02", "--area", "A01", "--title", "T2"],
+        ),
     );
     let other = repo.with_file_name("other");
     git(
@@ -1878,19 +2216,16 @@ fn two_copies_with_different_events_merge_without_conflict() {
     git(&other, &["config", "user.name", "Other"]);
     git(&other, &["config", "user.email", "other@example.com"]);
     // Each copy changes a different task, at the same time, and records its own events.
-    ok(&other, &["--as", "codex/b", "claim", "A01-02", "--push"]);
-    ok(&repo, &["--as", "claude/a", "claim", "A01-01", "--commit"]);
-    ok(
-        &repo,
-        &[
-            "--as",
-            "claude/a",
-            "label",
-            "A01-01",
-            "implemented",
-            "--commit",
-        ],
-    );
+    run_printed(&other, &ok(&other, &["--as", "codex/b", "claim", "A01-02"]));
+    // This copy commits without pushing: the first of the printed commands only.
+    for args in [
+        &["--as", "claude/a", "claim", "A01-01"][..],
+        &["--as", "claude/a", "label", "A01-01", "implemented"],
+    ] {
+        let mut v = ok(&repo, args);
+        v["git_commands"].as_array_mut().unwrap().truncate(2);
+        run_printed(&repo, &v);
+    }
     let before = event_count(&repo);
     git(
         &repo,
@@ -1926,7 +2261,7 @@ fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
         "{rule}"
     );
     assert!(rule.contains("`alm handoffs --task A02-01`"));
-    assert!(rule.contains("`alm handoff --remove <file> --push`"));
+    assert!(rule.contains("`alm handoff --remove <file>`."));
     ok(&repo, &["--as", "b", "claim", "A01-01"]);
     let text = String::from_utf8(alm(&repo, &["--as", "b", "done", "A01-01"]).stdout).unwrap();
     assert!(text.starts_with("A01-01  done"), "{text}");
@@ -1942,7 +2277,10 @@ fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
             .contains("1. Get the list: `alm handoffs`.")
     );
     let v = ok(&repo, &["handoffs", "--check", "--task", "A01-01"]);
-    assert_eq!(v["instruction"], json!(text.split_once('\n').unwrap().1));
+    // The done's text: the task, the rule, then the Git commands for the done itself.
+    let rule = text.split_once('\n').unwrap().1;
+    let rule = &rule[..rule.find("\nCommit and push this change:").unwrap()];
+    assert_eq!(v["instruction"], json!(rule));
 
     // The agent removes a handoff by the name alm handoffs lists; then it is gone.
     let file = ok(&repo, &["handoff", "--as", "s/one", "--tasks", "A01-01"])["handoff"]["file"]
@@ -2241,7 +2579,17 @@ fn migrate_from_3_to_4_blocked_state_and_human_check() {
         1,
         "migration_unfinished",
     );
-    ok(&repo, &["--as", "m", "block", "A01-02", "--by", "A01-01"]);
+    let v = ok(&repo, &["--as", "m", "block", "A01-02", "--by", "A01-01"]);
+    // Mid-update, a change prints no Git commands of its own: the update is committed as one
+    // commit once `alm migrate --finish` has succeeded (decision 0017, row 14).
+    assert_eq!(v["git_commands"], json!([]), "{v}");
+    assert!(
+        v["git_instruction"]
+            .as_str()
+            .unwrap()
+            .contains("part of the taskbag's update"),
+        "{v}"
+    );
     // The person answered the plan: rename the top step; move one note, clear the other.
     ok(
         &repo,
@@ -2270,6 +2618,23 @@ fn migrate_from_3_to_4_blocked_state_and_human_check() {
     assert_eq!(
         v["migrate"],
         json!({ "from": "allomos/3", "to": "allomos/4", "changed": true })
+    );
+    // Commit only, the whole taskbag, no push.
+    let commands = v["git_commands"].as_array().unwrap();
+    assert_eq!(commands.len(), 2, "{v}");
+    assert!(commands[0].as_str().unwrap().ends_with(" add -- ."), "{v}");
+    assert!(
+        commands[1]
+            .as_str()
+            .unwrap()
+            .ends_with(" commit -m \"alm: migrate the taskbag to allomos/4\" -m \"Agent: m\" -- ."),
+        "{v}"
+    );
+    assert!(
+        v["git_instruction"]
+            .as_str()
+            .unwrap()
+            .contains("do not push")
     );
     assert_eq!(task_file(&repo, "A01-01"), before, "stays waiting");
     assert_eq!(task_file(&repo, "A01-02")["state"], "blocked");

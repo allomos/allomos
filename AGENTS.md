@@ -40,33 +40,36 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v4)
+## Tasks: Allomos (v5)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
 
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration), or `alm list`.
-- Take a task: `alm claim <id> --as <your session name> --push`.
-- Report progress: `alm label <id> "<label>" --push`.
-- Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"] --push`; blocked by
-  another task: `alm block <id> --by <task-id> --push`. `alm next` says when all blockers are done;
-  then check and move it on: `alm unblock <id> --push`.
-- Stopping before it is done: `alm release <id> --note "<what the next one needs>" --push`.
-- Finished: only at the top label (a person has checked it: the human check): `alm done <id> --push`.
+- Take a task: pull first, then `alm claim <id> --as <your session name>`, and run the Git
+  commands it prints right away: until your claim is pushed, other sessions do not see it.
+- Report progress: `alm label <id> "<label>"`.
+- Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
+  another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
+  then check and move it on: `alm unblock <id>`.
+- Stopping before it is done: `alm release <id> --note "<what the next one needs>"`.
+- Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
   In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
-  may finish below it with `alm done <id> --without-human-check "<why, which run>" --steps <file.md>
-  --push` (the steps tell a person how to check it); say so in your handoff.
+  may finish below it with `alm done <id> --without-human-check "<why, which run>"
+  --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
 - Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
-  checked one: `alm checked <id> --push`.
-- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --push`.
+  checked one: `alm checked <id>`.
+- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
-  `alm handoff --tasks <ids> --as <your session name> --push`, for any reader, agent or person.
+  `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
 
-`--push` commits only the taskbag's files and pushes them, so others see the change.
+`alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
+`git commit`, `git push`), naming only that change's files: run them, and leave other changes as
+they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
@@ -80,7 +83,7 @@ This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.
 
 ## Handoff — write it continuously
 
-Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids> --push`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template; fill it in, plain words first, for any reader (evidence goes on the card). Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the approver the exact prompt for a new session. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). What every session must know (what is running, pitfalls, where credentials live, current truth) is in the taskbag's `project-notes.md`; change its lines in place. Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
+Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids>`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template, and the Git commands that share it; fill it in, plain words first, for any reader (evidence goes on the card), then run those commands. Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the approver the exact prompt for a new session. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). What every session must know (what is running, pitfalls, where credentials live, current truth) is in the taskbag's `project-notes.md`; change its lines in place. Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
 
 ## Read by activity
 

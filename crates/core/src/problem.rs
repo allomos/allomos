@@ -164,13 +164,6 @@ problems! {
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
     CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
-    /// A warning from `alm --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.
-    CommitFailed { detail } => "commit_failed", "The change is saved, but committing it failed: {detail}";
-    PushFailed { detail } => "push_failed", "The change is saved and committed, but pushing it failed: {detail}";
-    /// The setup wizard could not make the taskbag's folder a Git repository (Task-A05-03). `detail` is Git's own text.
-    /// The setup wizard found no working `git` program (Task-A05-03).
-    GitMissing => "git_missing", "Git is not installed on this computer, so the taskbag is saved but not kept in Git yet.";
-    GitInitFailed { path, detail } => "git_init_failed", "The taskbag is saved, but {path} could not be put under Git: {detail}";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

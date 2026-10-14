@@ -22,7 +22,7 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [A
 
 **When.** `alm handoff-rules` gives the project's rules; `alm next` repeats them for you at the start of a session (with any override for your agent or account). For Allomos: after every meaningful step — a task finished, a finding recorded, a commit, a process or container started or stopped — so an interrupted session loses at most one step; near **3% left** in the 5-hour window (Claude Code: `mcp__ccd_session_mgmt__get_usage`), start no new work, finish the handoff and stop; at about **70% context used**, see [When to start a new session](#when-to-start-a-new-session).
 
-**Where.** `alm handoff --as <your session name> --tasks <id,id> --push`: the first call makes this session's file in the taskbag's `handoffs/` from the template and prints its path; later calls update the same file (`--tasks` changes the tasks it covers, `--from <file>` its text). Fill it in directly: the one file in the taskbag you edit by hand. Push it with your next `alm … --push` or `git -C ../allomos-taskbag` commit.
+**Where.** `alm handoff --as <your session name> --tasks <id,id>`: the first call makes this session's file in the taskbag's `handoffs/` from the template and prints its path; later calls update the same file (`--tasks` changes the tasks it covers, `--from <file>` its text). Fill it in directly: the one file in the taskbag you edit by hand. Then run the Git commands `alm handoff` printed (they name only that file), so the next session sees it.
 
 **What.** The template, in two parts, written for any reader (you do not know who takes over, an agent or a person):
 

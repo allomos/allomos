@@ -19,10 +19,15 @@ use crate::{portable_path, relative_path, section_source, setup_steps_in, shown}
 /// 6: starting again is File → Connect with the Agents… (Task-A05-03).
 /// 7: the project's handoff notes move too: into handoff files, `project-notes.md` and the
 /// handoff rules (Task-A03-06, owner 2026-10-12).
-pub const CONVERT_REQUEST_VERSION: u32 = 7;
+/// 8: `alm` prints Git commands after each change; during the move they are not run one by one:
+/// the agent commits the taskbag, the AGENTS.md change and the report at the end, commit only,
+/// never push (decision 0017).
+pub const CONVERT_REQUEST_VERSION: u32 = 8;
 
 /// Changes when the connect request's parts change (Task-A05-03).
-pub const CONNECT_REQUEST_VERSION: u32 = 1;
+/// 2: the setup part asks the person before setting up Git, and commits the taskbag itself (the
+/// app no longer runs Git, decision 0017).
+pub const CONNECT_REQUEST_VERSION: u32 = 2;
 
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
@@ -115,12 +120,12 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
 3. 如果项目是 Git 仓库：记下当前分支（原分支）。先把前面 Allomos 步骤留下的未提交改动各自单独提交，不带其他文件：任务包（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`），然后是只含 Allomos 一节改动的 AGENTS.md 和 CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。如果你要改的其他文件（卡片和看板文件，或 AGENTS.md 中其他改动）有未提交的改动，先告诉用户请他们提交或另存，然后停止；不要把它们混进去。
 4. 唯一的问题。把完整计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、你做的决定、AGENTS.md 中要替换的规则、要删除的旧状态（卡片里的状态表、生成的看板段落、会话登记表）、要搬的交接记录和它们的去处、工作分支 `allomos/convert`，以及“完成后提交，并合并到 <原分支>；不推送”。然后运行 `alm confirm --title \"{title}\" --plan <文件>`，它会在应用中显示计划并等待回答。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户：没有任何改动；如果改主意了，可以在这里让你再给他看一次计划，或在 Allomos 中选择“文件 → 连接 AI 智能体…”重新开始。
 5. 从原分支新建分支 `allomos/convert` 并在上面工作。
-6. 只用 `alm` 写任务包，绝不手工编辑它的文件。任务包已经存在（由 Allomos 建立）：不要再建一个，也不要删除它；如果它已经有任务，只添加，不改动那些任务。标签阶梯与任务包的不同时，用 `alm labels \"<阶梯，用逗号分隔>\"` 设置。然后每个领域 `alm add area <id> \"<名称>\"`，每个任务 `alm add task <id> --area <id> --title \"<标题>\" --description \"Card: [<路径>]({up}<从项目文件夹起的路径>)\"`（卡片是大文件中的一节时，链接到 `文件.md#节`）。
+6. 只用 `alm` 写任务包，绝不手工编辑它的文件。任务包已经存在（由 Allomos 建立）：不要再建一个，也不要删除它；如果它已经有任务，只添加，不改动那些任务。标签阶梯与任务包的不同时，用 `alm labels \"<阶梯，用逗号分隔>\"` 设置。然后每个领域 `alm add area <id> \"<名称>\"`，每个任务 `alm add task <id> --area <id> --title \"<标题>\" --description \"Card: [<路径>]({up}<从项目文件夹起的路径>)\"`（卡片是大文件中的一节时，链接到 `文件.md#节`）。每条改动任务包的 `alm` 命令都会打印用来分享这次改动的 Git 命令；搬迁期间不要逐条运行它们，第 11 步一起提交。
 7. 照文件所写原样复制状态：`alm --as <负责人> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。只复制写明的内容：不明的状态、日期或负责人保持不明，并写进报告；绝不编造进度、验证或批准。`alm` 还记不下的值（完成日期、依赖、优先级、批准等）写进报告。然后搬交接记录：当前的每段交接（每个会话或卡片一段）原文写进一个交接文件：`alm --as <它的会话> handoff --tasks <id,id> --from <文件>`；全项目都要知道的内容（在运行的服务、陷阱、凭据存放的位置，绝不写凭据本身）写进任务包的 project-notes.md（这个文件可以直接编辑）；项目写明的交接规则用 `alm handoff-rules --quota <n> --context <n> --write-when \"<何时>\"` 设置。旧的交接历史存档留在原处，在 project-notes.md 里链接它。
 8. 写一份简短报告 `docs/allomos-conversion.md`：每个卡片文件和它对应的任务 ID，没有遗漏或重复；每个无法复制的值，注明文件和行；运行 `alm list --json`，确认没有 issues。
 9. 切换说明：在 AGENTS.md 中，用 Allomos 的一节（`alm brief` 的输出，见最后一行）替换关于状态存放位置、如何认领和释放、会话登记表、重新生成看板、交接写在哪里和何时写的规则；其他规则一字不改。确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md）。
 10. 删除旧状态：卡片文件里的状态表、生成的看板段落和会话登记表，以及内容已经搬走的交接文件。卡片的结果、批准和备注改成普通文字保留下来。只删除计划里写到的东西；有其他用途的脚本、钩子和 CI 不要动。
-11. 只提交你改动的文件（不要提交 .DS_Store 这类无关文件），用 `git merge --no-ff allomos/convert` 合并到原分支，然后删除 `allomos/convert`。绝不推送。
+11. 搬迁完成后提交：任务包、AGENTS.md / CLAUDE.md 的改动、报告，以及你改动的卡片和看板文件，只提交这些（不要提交 .DS_Store 这类无关文件）。用 `git merge --no-ff allomos/convert` 合并到原分支，然后删除 `allomos/convert`。只提交，绝不推送。
 12. 告诉用户做了什么、合并提交的编号，以及如何整体撤销：`git revert -m 1 <合并提交>`。"
         ),
         "ja" => format!(
@@ -137,12 +142,12 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
 3. プロジェクトが Git リポジトリなら、今のブランチ（元のブランチ）を控えます。まず、前の「肩代」の手順が残したコミットされていない変更を、それぞれ単独でコミットします（ほかのファイルは入れません）：タスクバッグ（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`）、次に Allomos の節の変更だけを含む AGENTS.md と CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。変えるほかのファイル（カードやボードのファイル、AGENTS.md のほかの変更）にコミットされていない変更があれば、コミットするか退避するようユーザーに伝えて終わります。混ぜないでください。
 4. ただ一つの質問。計画全体を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、自分で決めたこと、AGENTS.md で置き換えるルール、消す古い状況（カードの状況表、生成されるボードの節、セッション一覧）、移す引き継ぎとその行き先、作業ブランチ `allomos/convert`、そして「最後にコミットし、<元のブランチ> にマージする。プッシュはしない」。続いて `alm confirm --title \"{title}\" --plan <ファイル>` を実行すると、アプリに計画が表示され、答えを待ちます。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、ユーザーに伝えます：何も変わっていないこと、考えが変わったらここでもう一度計画を見せるよう頼めること、または Allomos の「ファイル → AI エージェントとつなぐ…」からやり直せること。
 5. 元のブランチから `allomos/convert` を作り、そこで作業します。
-6. タスクバッグは `alm` だけで書き、ファイルを手で編集しません。タスクバッグはすでにあります（Allomos が作りました）：新しく作ったり削除したりしないでください。すでにタスクがあれば追加だけにし、それらは変えません。ラベルの段階がタスクバッグと違えば `alm labels \"<段階、カンマ区切り>\"` で設定します。続いてエリアごとに `alm add area <id> \"<名前>\"`、タスクごとに `alm add task <id> --area <id> --title \"<題名>\" --description \"Card: [<パス>]({up}<プロジェクトのフォルダーからのパス>)\"`（カードが大きなファイルの一節なら `ファイル.md#節` へリンク）。
+6. タスクバッグは `alm` だけで書き、ファイルを手で編集しません。タスクバッグはすでにあります（Allomos が作りました）：新しく作ったり削除したりしないでください。すでにタスクがあれば追加だけにし、それらは変えません。ラベルの段階がタスクバッグと違えば `alm labels \"<段階、カンマ区切り>\"` で設定します。続いてエリアごとに `alm add area <id> \"<名前>\"`、タスクごとに `alm add task <id> --area <id> --title \"<題名>\" --description \"Card: [<パス>]({up}<プロジェクトのフォルダーからのパス>)\"`（カードが大きなファイルの一節なら `ファイル.md#節` へリンク）。タスクバッグを変える `alm` コマンドは、その変更を共有する Git コマンドを毎回表示します。移行の間はそれを一つずつ実行せず、手順 11 でまとめてコミットします。
 7. 状況はファイルに書かれているとおりに写します：`alm --as <担当者> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。書かれていることだけを写し、わからない状況・日付・担当者はわからないままにしてレポートに書きます。進捗、検証、承認を作り出してはいけません。`alm` がまだ記録できない値（完了日、依存関係、優先度、承認など）はレポートに書きます。続いて引き継ぎを移します：今の引き継ぎ（セッションかカードごとに一つ）を、言葉を変えずに引き継ぎファイルにします：`alm --as <そのセッション> handoff --tasks <id,id> --from <ファイル>`。プロジェクト全体で知っておくこと（動いているサーバー、落とし穴、資格情報の置き場所。値そのものは書かない）はタスクバッグの project-notes.md に書きます（このファイルは直接編集してかまいません）。プロジェクトが定めている引き継ぎのルールは `alm handoff-rules --quota <n> --context <n> --write-when \"<いつ>\"` で設定します。古い引き継ぎの履歴はその場に残し、project-notes.md からリンクします。
 8. 短いレポート `docs/allomos-conversion.md` を書きます：カードのファイルごとに対応するタスク ID（抜けも重複もないこと）、写せなかった値とそのファイルと行。`alm list --json` を実行し、issues がないことを確かめます。
 9. 説明を切り替えます。AGENTS.md で、状況の置き場所、担当の取り方と手放し方、セッション一覧、ボードの再生成、引き継ぎの置き場所と書くタイミングについてのルールを、Allomos の節（`alm brief` の出力。最後の行を参照）で置き換えます。ほかのルールは一字も変えません。CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます。
 10. 古い状況を消します：カードのファイルの状況表、生成されるボードの節、セッション一覧、そして中身を移し終えた引き継ぎのファイル。カードの結果、承認、メモは普通の文として残します。計画に書いたものだけを消し、ほかの役目もあるスクリプト、フック、CI には触れません。
-11. 変えたファイルだけをコミットし（.DS_Store のような関係のないファイルは入れない）、`git merge --no-ff allomos/convert` で元のブランチにマージしてから `allomos/convert` を削除します。プッシュはしません。
+11. 移行が終わったらコミットします：タスクバッグ、AGENTS.md / CLAUDE.md の変更、レポート、そして変えたカードやボードのファイルだけ（.DS_Store のような関係のないファイルは入れない）。`git merge --no-ff allomos/convert` で元のブランチにマージしてから `allomos/convert` を削除します。コミットだけで、プッシュはしません。
 12. 何をしたか、マージコミットの番号、そして全体を元に戻す方法 `git revert -m 1 <マージコミット>` を伝えます。"
         ),
         _ => format!(
@@ -191,7 +196,9 @@ to them and never change those. If the project's label ladder differs from the t
 with `alm labels \"<ladder, comma-separated>\"`. Then `alm add area <id> \"<name>\"` for each area \
 and `alm add task <id> --area <id> --title \"<title>\" --description \"Card: \
 [<path>]({up}<path from the project folder>)\"` for each task (link to `file.md#section` when a \
-card is a section of a bigger file).
+card is a section of a bigger file). Every `alm` command that changes the taskbag prints the Git \
+commands that share that change; during the move do not run them one by one: step 11 commits \
+everything together.
 7. Copy status exactly as the files say it: `alm --as <holder> claim <id>`, `label`, `wait --on`, \
 `needs`, `ready`, `done`, `drop`. Copy only what is written: an unknown state, date or holder \
 stays unknown and goes in the report; never invent progress, verification or approvals. Values \
@@ -213,9 +220,10 @@ CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by
 10. Remove the old status: status tables in card files, generated board sections, session \
 registries, and handoff files whose content you moved. Keep each card's outcome, approvals and notes as plain text. Remove only what the \
 plan named; leave scripts, hooks and CI checks that also do other things alone.
-11. Commit only the files you changed (never unrelated files such as .DS_Store), merge with \
-`git merge --no-ff allomos/convert` into the original branch, then delete \
-`allomos/convert`. Never push.
+11. When the move is done, commit the taskbag, the AGENTS.md / CLAUDE.md change, the report and \
+the card and board files you changed, and nothing else (never unrelated files such as \
+.DS_Store). Merge with `git merge --no-ff allomos/convert` into the original branch, then delete \
+`allomos/convert`. Commit only; never push.
 12. Tell the person what you did, the merge commit, and how to undo the whole move: \
 `git revert -m 1 <merge commit>`."
         ),
@@ -327,6 +335,14 @@ mod tests {
             );
             assert!(r.contains("git revert -m 1"), "{language}");
             assert!(!r.contains("--push"), "{language}");
+            // Row 13 of decision 0017: commit when the move is done; the report is part of it.
+            let end = &r[r.find("11. ").unwrap()..];
+            let report = match language {
+                "zh-CN" => "报告",
+                "ja" => "レポート",
+                _ => "the report",
+            };
+            assert!(end.contains(report), "{language}");
         }
         assert!(en.contains("Do not ask questions in the chat"));
         assert!(agent_convert_request_in("ja", &project, &taskbag).contains("まず見るだけ"));
@@ -364,6 +380,11 @@ mod tests {
             );
             // The person still decides whether tasks move: the plan goes through `alm confirm`.
             assert!(r.contains("alm confirm --title"), "{language}");
+            // The app runs no Git (decision 0017): the agent asks before `git init`, then commits
+            // the taskbag (with the README Allomos left) itself, and never pushes it.
+            assert!(r.contains("`git init`"), "{language}");
+            assert!(r.contains("../../README-allomos.md"), "{language}");
+            assert!(!r.contains("--push"), "{language}");
             // Where the section comes from is said once, at the end.
             let source = section_source(language, &taskbag);
             assert_eq!(r.matches(&source).count(), 1, "{language}");

@@ -308,6 +308,7 @@ pub fn remove(root: &Path, file: &str) -> Result<Handoff, Problem> {
     let path = lock.root().join(HANDOFFS_DIR).join(name);
     let text = fs::read_to_string(&path).map_err(|_| missing())?;
     fs::remove_file(&path).map_err(|e| write_failed(&path, e))?;
+    crate::note_written(&path);
     Ok(parse(&format!("{HANDOFFS_DIR}/{name}"), &text))
 }
 
