@@ -37,7 +37,7 @@ Anything outside the taskbag — an attorney's reply, a vendor's release — sta
 2. **`blocked` is new.** `alm block <id> --by A01-17 [A01-20 …]` sets the state and a new task field `blocked_by` (a list of task IDs). Each ID must be a task in the same taskbag, not the task itself. `alm unblock <id>` (or `alm ready <id>`) moves it on.
 3. **`alm` tells, the agent checks.** `alm list`, `show` and `next` print each blocker with its current state ("A01-17 (done)"). When every blocker is done, `alm next` says so ("A01-31: all blockers are done — unblock it?"); it does **not** move the task by itself (see Open point 3).
 4. **The app** shows the two states with different words and colours, in the task pane, the list, and the state filters, in every UI language (en, zh-CN, ja).
-5. **Format** goes from `allomos/3` to `allomos/4` through the [A01-25](../tasks/Task-A01-25-taskbag-format-upgrade.md) upgrade path: `alm upgrade` adds nothing but the `format` line (and the optional `who` / `blocked_by` fields become allowed); older Allomos builds see `taskbag_newer` and ask to be updated. **Existing `waiting` tasks stay `waiting`** — the upgrade does not guess which ones are really blocked by a task; an agent or the owner may move them with `alm block` afterwards.
+5. **Format** goes from `allomos/3` to `allomos/4` through the guided migration of [A01-32](../tasks/Task-A01-32-guided-migration.md), not a code step: version 4's migration entry says what changed (the `blocked` state, the optional `who` and `blocked_by` fields), and `alm migrate --finish` sets the new version only when the taskbag has no issues; older Allomos builds see `taskbag_newer` and ask to be updated. **Existing `waiting` tasks stay `waiting`**: the entry does not guess which ones are really blocked by a task; an agent or the owner may move them with `alm block` afterwards. A03-18's human-check changes land in the same version 4.
 
 ## Alternatives considered
 
@@ -50,7 +50,7 @@ Anything outside the taskbag — an attorney's reply, a vendor's release — sta
 
 ## Consequences
 
-- **Format:** `allomos/3` → `allomos/4`, one upgrade step in `crates/store/src/versions.rs`; FILE-FORMAT gains the `blocked` state, `blocked_by` and `who`, and validation rules (a `blocked` task has at least one `blocked_by`; each is a known task ID; not itself).
+- **Format:** `allomos/3` → `allomos/4`, through a migration entry in A01-32's guided migration (no code step; `alm upgrade` is replaced by `alm migrate`); FILE-FORMAT gains the `blocked` state, `blocked_by` and `who`, and validation rules (a `blocked` task has at least one `blocked_by`; each is a known task ID; not itself).
 - **Existing data:** nothing moves on upgrade; `waiting` tasks stay `waiting`.
 - **Contract text:** "the six states" becomes seven in `alm guide terms` / `customize`, the `alm brief` section copied into every project's AGENTS.md (this repository's [Tasks: Allomos](../../AGENTS.md#tasks-allomos-v2) included), [CARDS § States and labels](../workflow/CARDS.md#states-and-labels) and [CODING_RULES](../workflow/CODING_RULES.md). Projects with an older AGENTS.md section learn of it through `alm`'s renewed instructions ([A03-07](../tasks/Task-A03-07-renew-agent-instructions.md)).
 - **Loop and `alm next`:** a `blocked` task is skipped by state, not by reading text.
@@ -64,3 +64,14 @@ Anything outside the taskbag — an attorney's reply, a vendor's release — sta
 3. **When every blocker is done**, does the task move by itself (to `ready`, or back to `in_progress` if held), or does `alm` only tell and the agent move it? Proposed: only tell ("alm tells, the agent checks"); an automatic move is a check inside `alm` and needs your approval.
 4. **Dropped blockers.** May `blocked_by` point at a dropped task, and does a dropped blocker count as "finished"? Proposed: allowed but flagged ("A01-30 (dropped) — still blocked?"), never counted as done.
 5. **`--who`.** Add the optional "who" to `waiting` now, or leave `waiting` exactly as it is and change only the app's wording?
+
+## Owner's answers (2026-10-14)
+
+Given in chat and relayed to this session by the owner's other session ("Task workflow open questions"). The record as a whole is **not yet accepted**: the owner still says "accept the record" before it is marked Accepted and code starts.
+
+1. **Names:** keep `waiting`, add `blocked`.
+2. **Blocked and waiting on a person:** one state only, `blocked`; the person part goes in the note (`next_dependency`).
+3. **When every blocker is done:** `alm` only tells; it never moves the task by itself.
+4. **Dropped blocker:** allowed but flagged, never counted as done.
+5. **`--who`:** add the optional `--who` to `alm wait`.
+6. **Format:** version 4 goes through A01-32's guided migration, not a code step; A01-31 is worked together with A01-32, and A03-18 also lands in version 4.
