@@ -30,6 +30,7 @@ No second link (such as `~/.local/bin/alm`) comes before it, so `which -a alm` s
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Human check passed (steps 1–4); merge into `main`; A07-14's "development `alm` that wins" point moved here | owner (chat) |
 | 2026-10-14 | One link, `/usr/local/bin/alm`, set by whichever procedure ran last; the rule "never replace someone else's alm" (2026-10-13) retired; the banner names the kind and shows the `alm` in use and the app's own; start the card | owner (chat) |
 
 ## Notes
