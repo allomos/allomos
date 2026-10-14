@@ -3,8 +3,10 @@
 //! `.pkg` installer or, after a `.dmg` install, by **Install the alm command** in the app. Because
 //! it is a link, updating the app updates `alm` too (owner, 2026-10-13).
 //!
-//! The app never replaces `alm` by itself: it only offers, and makes the link when the person
-//! clicks. A real file at `/usr/local/bin/alm` is named in the offer before it is replaced.
+//! One link, and the latest install wins (owner, 2026-10-14, Task-A07-15): installing the app
+//! points it at the app's own `alm`, installing a development build (`scripts/install-dev-alm.sh`)
+//! at `~/.cargo/bin/alm`. The app never changes the link by itself: it says which `alm` is in use
+//! and offers to switch to its own, and makes the link when the person clicks.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -25,12 +27,29 @@ pub enum Place {
     File,
 }
 
+/// Which `alm` Terminal uses, when it is not the app's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlmKind {
+    /// Terminal finds no `alm`.
+    Missing,
+    /// One built from source: `~/.cargo/bin/alm`, or a `target/debug` or `target/release` build.
+    Development,
+    /// Anything else, for example another Allomos.app's `alm`.
+    Other,
+}
+
 /// What the window shows about `alm`. `offer` false: nothing to show.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct AlmStatus {
     pub offer: bool,
+    pub kind: Option<AlmKind>,
+    /// The app's own `alm`, shown beside the one in use.
+    pub own: Option<String>,
     /// The `alm` Terminal finds now, when it is not the app's own.
     pub found: Option<String>,
+    /// Where [`AlmStatus::found`] leads, when it is a link.
+    pub leads_to: Option<String>,
     /// A real file at [`LINK`] that installing would replace.
     pub replaces_file: Option<String>,
     /// An `alm` that Terminal finds before [`LINK`], so it would still be used after installing.
@@ -71,14 +90,37 @@ pub fn decide(
             (None, Some(_)) => false,
         }
     });
+    let kind = match (&terminal.alm_at, &terminal.alm) {
+        (None, _) => AlmKind::Missing,
+        (Some(at), real) if is_development(real.as_deref().unwrap_or(at)) => AlmKind::Development,
+        _ => AlmKind::Other,
+    };
     AlmStatus {
         offer: true,
+        kind: Some(kind),
+        own: Some(bundled.display().to_string()),
         found: terminal.alm_at.as_ref().map(|p| p.display().to_string()),
+        leads_to: terminal
+            .alm
+            .as_ref()
+            .filter(|real| Some(*real) != terminal.alm_at.as_ref())
+            .map(|p| p.display().to_string()),
         replaces_file: (place == &Place::File).then(|| LINK.to_string()),
         shadowed_by: shadowed_by
             .filter(|p| p.as_path() != Path::new(LINK))
             .map(|p| p.display().to_string()),
     }
+}
+
+/// An `alm` built from source: `cargo install` puts it in `~/.cargo/bin`, `cargo build` in
+/// `target/debug` or `target/release`.
+fn is_development(alm: &Path) -> bool {
+    let Some(dir) = alm.parent() else {
+        return false;
+    };
+    dir.ends_with(".cargo/bin")
+        || ((dir.ends_with("debug") || dir.ends_with("release"))
+            && dir.parent().is_some_and(|p| p.ends_with("target")))
 }
 
 /// The app's own `alm`, when this is a built `Allomos.app` that carries one.
@@ -261,9 +303,41 @@ mod tests {
             s,
             AlmStatus {
                 offer: true,
+                kind: Some(AlmKind::Missing),
+                own: Some(OURS.to_string()),
                 ..AlmStatus::default()
             }
         );
+    }
+
+    #[test]
+    fn a_development_build_through_the_link_is_named_with_both_paths() {
+        let cargo = "/Users/me/.cargo/bin/alm";
+        let t = term(PATH, Some(LINK), Some(cargo));
+        let s = decide(
+            Some(Path::new(OURS)),
+            &Place::Link(Some(cargo.into())),
+            &t,
+            false,
+        );
+        assert_eq!(
+            s,
+            AlmStatus {
+                offer: true,
+                kind: Some(AlmKind::Development),
+                own: Some(OURS.to_string()),
+                found: Some(LINK.to_string()),
+                leads_to: Some(cargo.to_string()),
+                ..AlmStatus::default()
+            }
+        );
+        // A `cargo build` straight from a checkout counts too; a bundled app in `target` does not.
+        assert!(is_development(Path::new("/src/allomos/target/debug/alm")));
+        assert!(is_development(Path::new("/src/allomos/target/release/alm")));
+        assert!(!is_development(Path::new(
+            "/src/allomos/target/release/bundle/macos/Allomos.app/Contents/MacOS/alm"
+        )));
+        assert!(!is_development(Path::new("/opt/homebrew/bin/alm")));
     }
 
     #[test]
@@ -272,7 +346,9 @@ mod tests {
         let t = term(PATH, Some(other), Some(other));
         let s = decide(Some(Path::new(OURS)), &Place::File, &t, false);
         assert!(s.offer);
+        assert_eq!(s.kind, Some(AlmKind::Other));
         assert_eq!(s.found.as_deref(), Some(other));
+        assert_eq!(s.leads_to, None);
         assert_eq!(s.replaces_file.as_deref(), Some(LINK));
         assert_eq!(s.shadowed_by, None);
 
@@ -286,6 +362,8 @@ mod tests {
             false,
         );
         assert!(s.offer && s.replaces_file.is_none() && s.shadowed_by.is_none());
+        assert_eq!(s.kind, Some(AlmKind::Other));
+        assert_eq!(s.leads_to.as_deref(), Some(old));
     }
 
     #[test]
@@ -295,6 +373,7 @@ mod tests {
         let t = term(&path, Some(cargo), Some(cargo));
         let s = decide(Some(Path::new(OURS)), &Place::Missing, &t, false);
         assert_eq!(s.shadowed_by.as_deref(), Some(cargo));
+        assert_eq!(s.kind, Some(AlmKind::Development));
 
         // Found after /usr/local/bin: the link will win, so no warning.
         let late = ["/usr/local/bin", "/Users/me/.cargo/bin"];

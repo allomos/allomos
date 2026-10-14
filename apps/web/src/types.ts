@@ -263,11 +263,17 @@ export interface InstructionFiles {
   claude_md: boolean;
 }
 
-/** Whether to offer **Install the alm command** (apps/desktop/src-tauri/src/alm_command.rs, Task-A07-12). */
+/** Whether to offer **Install the alm command** (apps/desktop/src-tauri/src/alm_command.rs, Task-A07-12, A07-15). */
 export interface AlmStatus {
   offer: boolean;
+  /** Which `alm` Terminal uses: none, one built from source, or another program. */
+  kind?: "missing" | "development" | "other" | null;
+  /** The app's own `alm`. */
+  own?: string | null;
   /** The `alm` Terminal finds now, when it is not the app's own. */
   found: string | null;
+  /** Where `found` leads, when it is a link. */
+  leads_to?: string | null;
   /** A real file that installing would replace. */
   replaces_file: string | null;
   /** An `alm` Terminal finds first, which would still be used after installing. */

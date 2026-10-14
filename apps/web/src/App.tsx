@@ -8,7 +8,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
-import { almOfferLines } from "./almOfferFlow";
+import { almOffer } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
@@ -563,8 +563,8 @@ function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: u
       </Banner>
     );
   }
-  const lines = almOfferLines(status);
-  if (hidden || lines.length === 0) return null;
+  const offer = almOffer(status);
+  if (hidden || !offer) return null;
   const install = () => {
     setBusy(true);
     messenger
@@ -583,9 +583,16 @@ function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: u
   };
   return (
     <div className="banner update" role="status">
-      <span>{lines.map((l) => t(l.key, l.params)).join(" ")}</span>
+      <span>
+        {offer.lines.map((l) => t(l.key, l.params)).join(" ")}
+        {offer.paths.map((l) => (
+          <span key={l.key} className="alm-path">
+            {t(l.key, l.params)}
+          </span>
+        ))}
+      </span>
       <button type="button" className="primary" onClick={install} disabled={busy}>
-        {t("alm.install")}
+        {t(offer.button)}
       </button>
       <button type="button" onClick={dismiss} disabled={busy}>
         {t("alm.dismiss")}
