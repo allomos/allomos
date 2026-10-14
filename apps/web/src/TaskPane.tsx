@@ -120,6 +120,11 @@ export function TaskPane({
     try {
       await onSaveName(name.trim());
       setError(null);
+      // Asked for by the Checked button: go on and mark it checked.
+      if (checking) {
+        await onEdit({ field: "checked" });
+        setChecking(false);
+      }
     } catch (e) {
       say(e);
     } finally {
