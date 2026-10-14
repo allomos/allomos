@@ -48,6 +48,6 @@ In the wizard's last step, **Connect with the agents**, Allomos could only open 
 | `npm --prefix apps/web run typecheck`, `build` | PASS |
 | `npm --prefix apps/web run check:i18n` (349 texts) | PASS |
 | `npm --prefix apps/web test` (68 tests; new `manualFlow.test.ts`: first choice, buttons, detection) | PASS |
-| Debug app built (`tauri build --debug --bundles app`) | see the session's report |
+| Debug app built (`npm --prefix apps/desktop run tauri build -- --debug --bundles app`; `target/debug/bundle/macos/Allomos.app`), after merging origin/main at 246006f | PASS |
 | Manual on screen, Copy, detection, Done in the built app on macOS | owner check |
 | Windows | untested (the code paths are shared; Copy uses `clip.exe` as the terminal agents already do) |
