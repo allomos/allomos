@@ -61,13 +61,13 @@ The interface speaks English, Simplified Chinese and Japanese (R94). English is 
 
 ## Build output (`target/`)
 
-Rust puts everything it builds in `target/`, one per worktree. A Tauri app's `target/` reaches several gigabytes, so these rules keep disk use to about one `target/` per active card (owner, 2026-10-06).
+Rust puts everything it builds in `target/`, one per checkout (the main checkout and each worktree). A Tauri app's `target/` reaches several gigabytes, so these rules keep disk use to about one `target/` per active card (owner, 2026-10-06).
 
 - **Development builds keep line numbers only.** The workspace `Cargo.toml` sets `[profile.dev] debug = "line-tables-only"`: crash reports and test failures still name the file and line, but the full information a debugger needs is not kept. When you really need a debugger (`lldb`), turn it on for that one build only, `CARGO_PROFILE_DEV_DEBUG=true cargo build`, and do not commit a change to the setting.
-- **One `target/` per worktree.** Do not set a shared `CARGO_TARGET_DIR`: parallel sessions would wait on each other's builds and keep rebuilding over each other's changes.
+- **One `target/` per checkout.** Do not set a shared `CARGO_TARGET_DIR`: parallel sessions would wait on each other's builds and keep rebuilding over each other's changes.
 - **No routine `cargo clean`.** It throws away work that the next build must redo. Run it only in your own worktree, and only when builds behave strangely after a Rust or Tauri upgrade, or when the disk is short of space.
 - **Remove a worktree when its card is merged.** This deletes its `target/` with it. See [CARDS.md § Claiming protocol](./CARDS.md#claiming-protocol).
-- Do not build in the main checkout; build in your card's worktree.
+- Build in the checkout you work in: the main checkout by default, or your card's worktree when the task has one (see [CARDS.md § Claiming protocol](./CARDS.md#claiming-protocol)).
 
 ## The `alm` command
 
