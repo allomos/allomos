@@ -30,7 +30,9 @@ use allomos_core::event::{Change, Kind};
 /// 5: no `--push`; `alm` never runs Git and prints the Git commands for each change, and a claim
 /// is pushed before the work starts (decision 0017, Task-A01-38).
 /// 6: `alm title`, `alm describe` and `alm note` change a task's text (Task-A01-37).
-pub const SECTION_VERSION: u32 = 6;
+/// 7: the project notes (`project-notes.md`): read them at the start, keep them true, and when to
+/// update them; every new piece of work gets its task (Task-A03-20).
+pub const SECTION_VERSION: u32 = 7;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);

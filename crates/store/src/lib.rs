@@ -230,10 +230,12 @@ pub fn agent_section() -> String {
         "{AGENT_SECTION_HEADING} (v{version})
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
-(`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand.
+(`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
+the project notes (below) and your own handoff file.
 
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
-  rule for choosing; `--iteration <id>` for one iteration), or `alm list`.
+  rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
+  Pitfalls), or `alm list`.
 - Take a task: pull first, then `alm claim <id> --as <your session name>`, and run the Git
   commands it prints right away: until your claim is pushed, other sessions do not see it.
 - Report progress: `alm label <id> \"<label>\"`.
@@ -247,7 +249,8 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
 - Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
   checked one: `alm checked <id>`.
-- Adding a task: read `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
+- Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
+  `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
 - Change a task's title, description or handoff note: `alm title <id> \"<title>\"`,
   `alm describe <id> --text \"<markdown>\"` (or `--from <file.md>`), `alm note <id> \"<text>\"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
@@ -255,6 +258,14 @@ This project's tasks, progress and handoff notes live in Allomos's taskbag
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
+
+Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
+task: what is running, pitfalls, where credentials live (never their values). Read it at the
+start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
+file aside), you edit it directly, and you keep it true while you work: update it when you start
+or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
+that would change what the next session does, or a credential moves. Change lines in place and
+remove lines that are no longer true; then commit and push that file with Git yourself.
 
 `alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
 `git commit`, `git push`), naming only that change's files: run them, and leave other changes as
