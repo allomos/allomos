@@ -523,8 +523,10 @@ const LINKABLE: &[&str] = &["md", "markdown", "txt"];
 /// Check a link from task `task`'s `description.md` in the taskbag at `root`. Web addresses
 /// (`http`, `https`) are allowed. A relative path is read from the task's folder, the way a
 /// Markdown viewer would, and must lead to an existing `.md`, `.markdown` or `.txt` file inside
-/// the project folder (the folder holding `.allomos/`, or the taskbag itself when it stands
-/// alone). Everything else is refused, so a description cannot be used to start a program.
+/// the project: the folder holding `.allomos/` (or the taskbag itself when it stands alone), or
+/// the code folder recorded as `project_folder` in project.json, for a taskbag kept beside the
+/// code it tracks. Everything else is refused, so a description cannot be used to start a
+/// program.
 pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarget, Problem> {
     let refused = || Problem::LinkRefused {
         link: link.to_string(),
@@ -542,18 +544,29 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
     }
     // A link may point into a file (`card.md#approvals`); the part after `#` is not a file name.
     let path = link.split('#').next().unwrap_or_default();
-    let project = picked_folder(root).unwrap_or(root);
     let target = root.join("tasks").join(task).join(path);
-    let (Ok(project), Ok(target)) = (project.canonicalize(), target.canonicalize()) else {
+    let Ok(target) = target.canonicalize() else {
         return Err(Problem::LinkNotFound {
             link: link.to_string(),
         });
     };
+    let recorded = fs::read_to_string(root.join(PROJECT_FILE))
+        .ok()
+        .and_then(|text| parse_project(PROJECT_FILE, &text).ok())
+        .and_then(|project| project_folder_of(root, &project));
+    let inside = [
+        Some(picked_folder(root).unwrap_or(root).to_path_buf()),
+        recorded,
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(|folder| folder.canonicalize().ok())
+    .any(|folder| target.starts_with(folder));
     let text = target
         .extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| LINKABLE.contains(&e.to_ascii_lowercase().as_str()));
-    if !target.starts_with(&project) || !target.is_file() || !text {
+    if !inside || !target.is_file() || !text {
         return Err(refused());
     }
     Ok(LinkTarget::File(plain_path(&target)))
@@ -2217,6 +2230,10 @@ mod tests {
             resolve_task_link(&root, "../x", "a.md"),
             Err(Problem::LinkRefused { .. })
         ));
+        // A taskbag kept beside its code: the recorded code folder counts as the project too.
+        record_project_folder(&root, &outside).unwrap();
+        let other = plain_path(&outside.join("other.md").canonicalize().unwrap());
+        assert_eq!(file(&escape), Ok(LinkTarget::File(other)));
         fs::remove_dir_all(dir).unwrap();
         fs::remove_dir_all(outside).unwrap();
     }
