@@ -209,6 +209,7 @@ export interface HandoffSettings {
 export type FormatState =
   | { state: "current" }
   | { state: "older"; found: string }
+  | { state: "too_old"; found: string; oldest: string }
   | { state: "newer"; found: string }
   | { state: "unknown" };
 

@@ -6,14 +6,21 @@ use serde::{Deserialize, Serialize};
 /// `allomos/<FORMAT_VERSION>`.
 pub const FORMAT: &str = "allomos/3";
 
-/// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; a newer Allomos
-/// upgrades an older taskbag, and an older one refuses a newer taskbag (Task-A01-25).
+/// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; an older one refuses
+/// a newer taskbag (Task-A01-25), and a newer one has an agent update an older taskbag by following
+/// the migration entries in `crates/store/src/versions.rs` (Task-A01-32). Raising it needs an entry
+/// for the version it replaces.
 ///
 /// 2: handoff rules in `project.json`, `handoff-template.md`, `project-notes.md` and `handoffs/`
 /// (Task-A03-06).
 /// 3: `events/`, one file per change, the history of changes (Task-A01-17), and a task's
 /// optional `finished_without_owner` (Task-A03-15).
 pub const FORMAT_VERSION: u32 = 3;
+
+/// The oldest format this Allomos can update (owner, 2026-10-14; Task-A01-32). An older taskbag
+/// is told it is too old (`taskbag_too_old`); between this and [`FORMAT_VERSION`] it is read, and
+/// only the update's own commands may change it until `alm migrate --finish`.
+pub const OLDEST_FORMAT_VERSION: u32 = 3;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
 /// FlipHopper's `fliphopper/1`).

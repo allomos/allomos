@@ -125,10 +125,13 @@ pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
                 });
             }
         }
-        // A newer or older format is said as itself, so the app words it in the person's language
-        // instead of quoting the English meant for agents.
-        if let Some(problem @ (Problem::TaskbagNewer { .. } | Problem::TaskbagOlder { .. })) =
-            loaded.issues.first().map(|i| &i.problem)
+        // A newer or too old format is said as itself, so the app words it in the person's
+        // language instead of quoting the English meant for agents.
+        if let Some(
+            problem @ (Problem::TaskbagNewer { .. }
+            | Problem::TaskbagOlder { .. }
+            | Problem::TaskbagTooOld { .. }),
+        ) = loaded.issues.first().map(|i| &i.problem)
         {
             return Err(problem.clone());
         }

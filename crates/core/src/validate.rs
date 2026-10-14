@@ -4,7 +4,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::model::{
-    Area, FORMAT, FORMAT_VERSION, Iteration, Project, State, Task, Taskbag, format_version,
+    Area, FORMAT, FORMAT_VERSION, Iteration, OLDEST_FORMAT_VERSION, Project, State, Task, Taskbag,
+    format_version,
 };
 use crate::problem::Problem;
 
@@ -101,8 +102,9 @@ fn check_id(file: &str, field: &str, id: &str, issues: &mut Vec<Issue>) {
 }
 
 pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
-    // The format first: a newer taskbag may have fields this Allomos does not know, and an older
-    // one must be upgraded before anything else (Task-A01-25).
+    // The format first: a newer taskbag may have fields this Allomos does not know, and one older
+    // than the oldest it updates cannot be read (Task-A01-25, Task-A01-32). Between the oldest and
+    // this Allomos's, it is read: an agent is updating it (`alm migrate`).
     if let Some(found) = serde_json::from_str::<serde_json::Value>(text)
         .ok()
         .and_then(|v| v.get("format").and_then(|f| f.as_str()).map(String::from))
@@ -118,13 +120,13 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
                     },
                 )]);
             }
-            Some(n) if n < FORMAT_VERSION => {
+            Some(n) if n < OLDEST_FORMAT_VERSION => {
                 return Err(vec![Issue::new(
                     file,
                     Some("format"),
-                    Problem::TaskbagOlder {
+                    Problem::TaskbagTooOld {
                         found,
-                        current: FORMAT.to_string(),
+                        oldest: format!("allomos/{OLDEST_FORMAT_VERSION}"),
                     },
                 )]);
             }
@@ -133,7 +135,7 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     }
     let project: Project = parse(file, text).map_err(|i| vec![i])?;
     let mut issues = Vec::new();
-    if project.format != FORMAT {
+    if format_version(&project.format).is_none() {
         issues.push(Issue::new(
             file,
             Some("format"),

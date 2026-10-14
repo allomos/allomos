@@ -95,27 +95,6 @@ pub fn set_template(root: &Path, text: &str) -> Result<(), Problem> {
     write_atomic(&lock.root().join(TEMPLATE_FILE), &text)
 }
 
-/// Add the template and project notes where they are missing (`alm init`, the upgrade from
-/// `allomos/1`). Never changes a file that is there.
-pub fn add_missing_files(root: &Path) -> std::io::Result<()> {
-    for (name, text) in [
-        (TEMPLATE_FILE, DEFAULT_TEMPLATE),
-        (NOTES_FILE, DEFAULT_NOTES),
-    ] {
-        let path = root.join(name);
-        if !path.exists() {
-            fs::write(path, text)?;
-        }
-    }
-    let dir = root.join(HANDOFFS_DIR);
-    fs::create_dir_all(&dir)?;
-    let keep = dir.join(".keep");
-    if !keep.exists() {
-        fs::write(keep, "")?;
-    }
-    Ok(())
-}
-
 /// Every handoff, most recently changed first.
 pub fn list(root: &Path) -> Vec<Handoff> {
     let mut all: Vec<Handoff> = fs::read_dir(root.join(HANDOFFS_DIR))

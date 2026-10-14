@@ -1249,7 +1249,8 @@ fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
         &["next"][..],
         &["list"],
         &["claim", "A01-01", "--as", "a"],
-        &["upgrade"],
+        &["migrate"],
+        &["migrate", "--finish"],
     ] {
         let v = refused(&repo, args, 4, "taskbag_newer");
         let message = v["error"]["message"].as_str().unwrap();
@@ -1286,7 +1287,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
     )
     .unwrap();
     fs::write(repo.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
-    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["upgrade"]] {
+    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["migrate"]] {
         let v = ok(&repo, args);
         assert_eq!(
             v["warnings"][0]["code"], "instructions_outdated",
@@ -1313,36 +1314,112 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 }
 
 #[test]
-fn upgrade_on_a_current_taskbag_changes_nothing() {
+fn migrate_on_a_current_taskbag_changes_nothing() {
     let repo = filled();
     let path = repo.join(".allomos/taskbag/project.json");
     let before = fs::read_to_string(&path).unwrap();
-    let v = ok(&repo, &["upgrade"]);
+    let v = ok(&repo, &["migrate"]);
     assert_eq!(
-        v["upgrade"],
+        v["migrate"],
+        json!({ "from": "allomos/3", "to": "allomos/3", "needed": false })
+    );
+    assert!(v.get("prompt").is_none());
+    let v = ok(&repo, &["migrate", "--finish"]);
+    assert_eq!(
+        v["migrate"],
         json!({ "from": "allomos/3", "to": "allomos/3", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
 }
 
+/// The owner, 2026-10-14: `allomos/3` is the oldest format this Allomos updates.
 #[test]
-fn upgrade_from_2_adds_nothing_but_the_format() {
+fn a_taskbag_on_version_2_is_too_old() {
     let repo = filled();
     set_format(&repo, "allomos/2");
-    refused(&repo, &["list"], 1, "taskbag_older");
     let path = repo.join(".allomos/taskbag/project.json");
     let before = fs::read_to_string(&path).unwrap();
-    let v = ok(&repo, &["upgrade"]);
-    assert_eq!(
-        v["upgrade"],
-        json!({ "from": "allomos/2", "to": "allomos/3", "changed": true })
-    );
+    for args in [
+        &["list"][..],
+        &["next"],
+        &["migrate"],
+        &["migrate", "--finish"],
+        &["claim", "A01-01", "--as", "a"],
+    ] {
+        let v = refused(&repo, args, 1, "taskbag_too_old");
+        assert_eq!(v["error"]["params"]["found"], "allomos/2");
+        assert_eq!(v["error"]["params"]["oldest"], "allomos/3");
+        assert!(
+            v["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("too old for this Allomos to update")
+        );
+    }
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
-        before.replace("\"allomos/2\"", "\"allomos/3\"")
+        before,
+        "nothing written"
     );
-    let v = ok(&repo, &["list"]);
+    let out = alm(&repo, &["list"]);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("error [taskbag_too_old]"));
+}
+
+#[test]
+fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["--as", "a", "label", "A01-01", "owner verified"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "rename",
+            "label",
+            "owner verified",
+            "human checked",
+        ],
+    );
+    assert_eq!(
+        v["labels"],
+        json!([
+            "implemented",
+            "locally verified",
+            "deployed and verified",
+            "human checked"
+        ])
+    );
+    assert_eq!(v["tasks"][0]["id"], "A01-01");
+    assert_eq!(v["tasks"][0]["label"], "human checked");
     assert_eq!(v["issues"], json!([]));
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["task"]["label"], "human checked");
+    assert_eq!(
+        ok(&repo, &["history", "A01-01"])["events"][0]["command"],
+        "rename label"
+    );
+    refused(
+        &repo,
+        &["rename", "label", "shipped", "x"],
+        1,
+        "label_not_on_ladder",
+    );
+    refused(
+        &repo,
+        &["rename", "label", "human checked", "implemented"],
+        1,
+        "label_exists",
+    );
+    refused(
+        &repo,
+        &["rename", "label", "implemented", " "],
+        1,
+        "label_name_missing",
+    );
+    let out = alm(&repo, &["rename", "label", "implemented", "built"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("No task carried the label."));
 }
 
 #[test]
@@ -1697,38 +1774,6 @@ fn two_copies_with_different_events_merge_without_conflict() {
     assert_eq!(mine["events"][0]["command"], "label");
     let theirs = ok(&repo, &["history", "A01-02"]);
     assert_eq!(theirs["events"][0]["by"], "codex/b");
-}
-
-#[test]
-fn an_older_taskbag_without_events_is_upgraded_and_history_starts_then() {
-    let repo = filled();
-    let bag = repo.join(".allomos/taskbag");
-    fs::remove_dir_all(bag.join("events")).unwrap();
-    let project = bag.join("project.json");
-    let text = fs::read_to_string(&project).unwrap();
-    fs::write(&project, text.replace("\"allomos/3\"", "\"allomos/2\"")).unwrap();
-    // Older: alm asks for the upgrade first, and changes nothing.
-    refused(&repo, &["history", "A01-01"], 1, "taskbag_older");
-    refused(&repo, &["ready", "A01-01"], 1, "taskbag_older");
-    assert!(!bag.join("events").exists());
-    let v = ok(&repo, &["--as", "claude/u", "upgrade"]);
-    assert_eq!(v["upgrade"]["to"], "allomos/3");
-    assert!(bag.join("events/.keep").is_file());
-    // History starts with the upgrade; nothing earlier is invented.
-    let h = ok(&repo, &["history", "A01-01"]);
-    assert_eq!(h["events"], json!([]));
-    let since = h["since"].as_str().unwrap().to_string();
-    let text = String::from_utf8(alm(&repo, &["history", "A01-01"]).stdout).unwrap();
-    assert!(text.contains(&format!("recorded since {since}")), "{text}");
-    assert!(
-        text.contains("No changes recorded for this task yet."),
-        "{text}"
-    );
-    ok(&repo, &["ready", "A01-01"]);
-    assert_eq!(
-        ok(&repo, &["history", "A01-01"])["events"][0]["command"],
-        "ready"
-    );
 }
 
 #[test]
