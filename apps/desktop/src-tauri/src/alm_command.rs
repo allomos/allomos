@@ -321,8 +321,13 @@ mod tests {
 
     #[test]
     fn the_shell_answer_is_read_past_any_greeting() {
-        let out = "Welcome!\n\n__m__/a/bin:/usr/local/bin\n__m__/no/such/alm\n";
-        let t = parse_terminal(out, "__m__");
+        // PATH joined with the system's own separator (`:`, on Windows `;`).
+        let path = std::env::join_paths(["/a/bin", "/usr/local/bin"]).unwrap();
+        let out = format!(
+            "Welcome!\n\n__m__{}\n__m__/no/such/alm\n",
+            path.to_string_lossy()
+        );
+        let t = parse_terminal(&out, "__m__");
         assert_eq!(
             t.path,
             vec![PathBuf::from("/a/bin"), PathBuf::from("/usr/local/bin")]

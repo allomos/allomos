@@ -15,7 +15,7 @@ use allomos_core::{FORMAT, FORMAT_VERSION, OLDEST_FORMAT_VERSION, Problem, forma
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::convert::{Source, ask_once_in, migration_header_in};
+use crate::convert::{Source, ask_once_in, migration_header_in, shown};
 use crate::{AGENT_SECTION_HEADING, Actor, Lock, PROJECT_FILE, picked_folder, tells_agents};
 use allomos_core::event::{Change, Kind};
 
@@ -643,7 +643,7 @@ fn request(
     update: &Update,
 ) -> String {
     let w = phrases(language);
-    let alm = format!("alm --taskbag \"{}\"", taskbag.display());
+    let alm = format!("alm --taskbag \"{}\"", shown(taskbag));
     let fill = |text: &str| text.replace("{alm}", &alm);
     let list = update.files.join(", ");
     let and_files = match (language, update.files.is_empty()) {
@@ -668,9 +668,9 @@ fn request(
         out.push_str(&format!(
             "\n\n{}: {}\n{}: {}\n",
             w.project,
-            project.display(),
+            shown(project),
             w.taskbag,
-            taskbag.display()
+            shown(taskbag)
         ));
     }
     if let Some((found, entries)) = &update.older {
@@ -1356,8 +1356,8 @@ mod tests {
         };
         for language in ["en", "zh-CN", "ja"] {
             let p = migration_prompt_with(language, &project, &taskbag, "allomos/4", &two).unwrap();
-            let alm = "alm --taskbag \"/work/bakery/.allomos/taskbag\"";
-            assert!(p.contains("/work/bakery"), "{language}");
+            let alm = format!("alm --taskbag \"{}\"", shown(&taskbag));
+            assert!(p.contains(&shown(&project)), "{language}");
             assert!(p.contains("allomos/4 → allomos/5"), "{language}");
             assert!(p.contains("allomos/5 → allomos/6"), "{language}");
             assert!(p.contains("allomos/6"), "{language}");
@@ -1419,11 +1419,14 @@ mod tests {
             let both = check(older(), None);
             let r = agent_update_request_with(language, &project, &taskbag, &both, &TEST_FORMATS);
             assert!(
-                r.contains("alm --taskbag \"/work/bakery/.allomos/taskbag\" migrate --finish"),
+                r.contains(&format!(
+                    "alm --taskbag \"{}\" migrate --finish",
+                    shown(&taskbag)
+                )),
                 "{language}"
             );
             assert!(
-                r.contains("/work/bakery/.allomos/taskbag\" brief`"),
+                r.contains(&format!("{}\" brief`", shown(&taskbag))),
                 "{language}"
             );
             assert!(r.contains("AGENTS.md"), "{language}");
