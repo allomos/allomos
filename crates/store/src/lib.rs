@@ -262,11 +262,17 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
     )
 }
 
+/// A folder as a request shows it to the agent: on Windows with `\` throughout
+/// ([`plain_path`]), so a taskbag at `C:\work\app` reads `C:\work\app\.allomos\taskbag`.
+pub(crate) fn shown(path: &Path) -> String {
+    plain_path(path).display().to_string()
+}
+
 /// The last line of a request: the agent takes Allomos's section from `alm brief`, so it always
 /// matches the installed `alm`. `alm` must be usable where the agent works (owner, 2026-10-10), so
 /// the request carries no copy of the section.
 pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
-    let brief = format!("alm --taskbag \"{}\" brief", taskbag.display());
+    let brief = format!("alm --taskbag \"{}\" brief", shown(taskbag));
     match language {
         "zh-CN" => {
             format!("Allomos 的一节就是 `{brief}` 的输出：运行它，把输出原样（英文）作为这一节。")
@@ -338,8 +344,8 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 /// connect request can carry it as its first part.
 pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
     let (project, taskbag, heading) = (
-        project_path.display(),
-        taskbag_path.display(),
+        shown(project_path),
+        shown(taskbag_path),
         AGENT_SECTION_HEADING,
     );
     match language {
@@ -1633,10 +1639,12 @@ mod tests {
         let (p, b) = (Path::new("/p"), Path::new("/p/.allomos/taskbag"));
         let zh = agent_setup_request_in("zh-CN", p, b);
         let ja = agent_setup_request_in("ja", p, b);
-        assert!(zh.contains("2. 打开 AGENTS.md") && zh.contains("项目文件夹：/p\n"));
+        // Folders as the request shows them: on Windows with `\` throughout.
+        let (sp, sb) = (shown(p), shown(b));
+        assert!(zh.contains("2. 打开 AGENTS.md") && zh.contains(&format!("项目文件夹：{sp}\n")));
         assert!(
             ja.contains("2. AGENTS.md を開きます")
-                && ja.contains("タスクバッグ（Allomos のタスクファイル）：/p/.allomos/taskbag")
+                && ja.contains(&format!("タスクバッグ（Allomos のタスクファイル）：{sb}"))
         );
         for r in [&zh, &ja] {
             assert!(
@@ -1655,7 +1663,8 @@ mod tests {
 
     #[test]
     fn agent_setup_request_carries_the_section_and_steps() {
-        let r = agent_setup_request(Path::new("/p"), Path::new("/p/.allomos/taskbag"));
+        let (p, b) = (Path::new("/p"), Path::new("/p/.allomos/taskbag"));
+        let r = agent_setup_request(p, b);
         assert!(r.contains("2. Open AGENTS.md") && r.contains("imports AGENTS.md"));
         // Each step commits its own work, limited to its own paths (Task-A03-08).
         assert!(r.contains("commit -m \"Add Allomos taskbag\" -- ."));
@@ -1663,7 +1672,8 @@ mod tests {
         // The Claude app turns a typed-in "@" into a full-width "＠", so the request avoids it.
         assert!(!r.contains('@'));
         assert!(
-            r.contains("Project folder: /p\n") && r.contains("task files): /p/.allomos/taskbag\n")
+            r.contains(&format!("Project folder: {}\n", shown(p)))
+                && r.contains(&format!("task files): {}\n", shown(b)))
         );
         assert!(r.contains("any other text about Allomos") && !r.contains("<!--"));
         assert!(

@@ -44,7 +44,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee logs/clippy.txt
       - name: cargo test
         if: success() || failure()
-        run: cargo test --workspace 2>&1 | tee logs/cargo-test.txt
+        run: cargo test --workspace --no-fail-fast 2>&1 | tee logs/cargo-test.txt
       - name: web typecheck
         if: success() || failure()
         run: npm --prefix apps/web run typecheck 2>&1 | tee logs/typecheck.txt

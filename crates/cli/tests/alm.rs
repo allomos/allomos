@@ -118,9 +118,15 @@ fn init_refuses_twice_and_needs_no_git() {
     let dir = tmp("plain");
     let v = ok(&dir, &["init"]);
     let root = dir.join(".allomos/taskbag");
-    // The command reports the real path (on macOS, /var is /private/var).
-    let reported = PathBuf::from(v["taskbag"].as_str().unwrap());
-    assert_eq!(reported, root.canonicalize().unwrap());
+    // The command reports the taskbag's folder. Compared as folders, not as text: on macOS /var
+    // is /private/var, and on Windows the temporary folder may come in its short 8.3 form
+    // (RUNNER~1) while canonicalize gives the long one with a `\\?\` prefix.
+    let reported = v["taskbag"].as_str().unwrap();
+    assert!(!reported.starts_with(r"\\?\"), "a plain path: {reported}");
+    assert_eq!(
+        PathBuf::from(reported).canonicalize().unwrap(),
+        root.canonicalize().unwrap()
+    );
     assert!(!root.join(".git").exists() && !dir.join(".git").exists());
     refused(&dir, &["init"], 1, "taskbag_exists");
     // From a subfolder of a repository, the taskbag goes at the repository's root.

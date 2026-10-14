@@ -227,7 +227,10 @@ mod tests {
         if std::env::var_os("ALLOMOS_WRITE_CODES").is_some() {
             std::fs::write(path, &want).unwrap();
         }
-        let have = std::fs::read_to_string(path).unwrap_or_default();
+        // Git for Windows may check the file out with \r\n line endings.
+        let have = std::fs::read_to_string(path)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
         assert!(
             have == want,
             "apps/web/src/i18n/codes.json is out of date. Run \
