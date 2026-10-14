@@ -8,15 +8,20 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
+import { almOfferLines } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
 import { TaskPane } from "./TaskPane";
+import { CreateForm, type AddRequest } from "./CreateForm";
+import type { Creating } from "./createFlow";
+import { GroupEditForm } from "./GroupEditForm";
+import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { InstructionFiles, Issue, Iteration, Opened, Problem, SetupState, Task, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -136,8 +141,9 @@ export function App({ messenger }: { messenger: Messenger }) {
         const state = await messenger.projectSetup(root);
         if (openedRef.current?.root === root) setSetup(state);
       } catch (e) {
-        // A newer or older format is already in the problem list above the tasks (Task-A01-25).
-        if (isProblem(e) && (e.code === "taskbag_newer" || e.code === "taskbag_older")) return;
+        // A newer, older or too old format is already in the problem list above the tasks
+        // (Task-A01-25, Task-A01-32).
+        if (isProblem(e) && ["taskbag_newer", "taskbag_older", "taskbag_too_old"].includes(e.code)) return;
         setError(errorNote(e));
       }
     },
@@ -390,6 +396,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       </header>
 
       <main className="main">
+        <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />
         {error && (
           <Banner kind="error" onClose={() => setError(null)}>
             {noteText(error)}
@@ -464,6 +471,10 @@ export function App({ messenger }: { messenger: Messenger }) {
             messenger={messenger}
             onError={(e) => setError(errorNote(e))}
             hideOlder={olderShown}
+            onReload={async () => {
+              const fresh = await messenger.openTaskbag(opened.root);
+              setOpened((o) => (o?.root === fresh.root ? fresh : o));
+            }}
           />
         )}
       </main>
@@ -475,7 +486,7 @@ export function App({ messenger }: { messenger: Messenger }) {
 const VERSION_CHECK_MS = 4000;
 
 /** "This taskbag uses an older format" or "Allomos's instructions are out of date", with
- * **Update the taskbag…** (owner, 2026-10-12). Asked when the folder opens (every way of opening
+ * **Migrate the taskbag…** (owner, 2026-10-12; renamed 2026-10-14, Task-A01-32). Asked when the folder opens (every way of opening
  * one) and every few seconds while it is open. Allomos never updates the files itself. */
 function VersionNotice({
   messenger,
@@ -518,6 +529,66 @@ function VersionNotice({
       <span>{notice.kind === "taskbag" ? t("update.notice_taskbag") : t("update.notice_section", { files: notice.files })}</span>
       <button type="button" className="primary" onClick={onUpdate}>
         {t("update.button")}
+      </button>
+    </div>
+  );
+}
+
+/** **Install the alm command** (Task-A07-12): in a built Mac app whose own `alm` is not the one
+ * Terminal finds. Asked once when the window opens. Nothing is installed unless the person clicks;
+ * "Don't ask again" is remembered, × hides it until the next start. */
+function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: unknown) => void }) {
+  const { t } = useI18n();
+  const [status, setStatus] = useState<AlmStatus | null>(null);
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .almCommandStatus()
+      .then((s) => live && setStatus(s))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [messenger]);
+  if (installed) {
+    return (
+      <Banner kind="ok" onClose={() => setInstalled(false)}>
+        {t("alm.installed")}
+      </Banner>
+    );
+  }
+  const lines = almOfferLines(status);
+  if (hidden || lines.length === 0) return null;
+  const install = () => {
+    setBusy(true);
+    messenger
+      .installAlmCommand()
+      .then((r) => {
+        if (r.cancelled) return;
+        setStatus(r.status);
+        setInstalled(true);
+      })
+      .catch(onError)
+      .finally(() => setBusy(false));
+  };
+  const dismiss = () => {
+    void messenger.dismissAlmOffer().catch(() => undefined);
+    setHidden(true);
+  };
+  return (
+    <div className="banner update" role="status">
+      <span>{lines.map((l) => t(l.key, l.params)).join(" ")}</span>
+      <button type="button" className="primary" onClick={install} disabled={busy}>
+        {t("alm.install")}
+      </button>
+      <button type="button" onClick={dismiss} disabled={busy}>
+        {t("alm.dismiss")}
+      </button>
+      <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={() => setHidden(true)}>
+        ×
       </button>
     </div>
   );
@@ -647,19 +718,33 @@ function readGroupBy(): GroupBy {
 }
 
 /** One group of the list as shown: an area or an iteration with its tasks. */
-type Group = { key: string; id: string; name: string; sub?: string; empty: string; tasks: Task[] };
+type Group = {
+  key: string;
+  id: string;
+  name: string;
+  sub?: string;
+  empty: string;
+  tasks: Task[];
+  /** Where a new task added in this group goes; none for tasks with an unknown area. */
+  newTask?: { area: string | null; iteration: string | null };
+  /** The area or iteration this group is, for its Edit form (Task-A01-29); none for Unplanned and unknown areas. */
+  edit?: Editing;
+};
 
 function TaskbagView({
   opened,
   messenger,
   onError,
   hideOlder,
+  onReload,
 }: {
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
   /** The update notice already says the taskbag is older. */
   hideOlder: boolean;
+  /** Reads the taskbag again now, after a change made in this window. */
+  onReload: () => Promise<void>;
 }) {
   const { t, rich } = useI18n();
   const { taskbag: box, issues } = opened.loaded;
@@ -706,11 +791,14 @@ function TaskbagView({
         sub: iterationSub(it, t),
         empty: t("iteration.no_tasks"),
         tasks: box.tasks.filter((task) => task.iteration === it.id),
+        newTask: { area: null, iteration: it.id },
+        edit: { kind: "iteration", id: it.id },
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
     const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
-    if (unplanned.length > 0) groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned });
+    if (unplanned.length > 0)
+      groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned, newTask: { area: null, iteration: null } });
   } else if (box) {
     for (const area of box.areas) {
       groups.push({
@@ -719,6 +807,8 @@ function TaskbagView({
         name: area.name,
         empty: t("area.no_tasks"),
         tasks: box.tasks.filter((task) => task.area === area.id),
+        newTask: { area: area.id, iteration: null },
+        edit: { kind: "area", id: area.id },
       });
     }
     const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
@@ -734,6 +824,20 @@ function TaskbagView({
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
+  // The selected task's history (Task-A01-17), read again whenever the taskbag reloads. Kept with
+  // its task's ID, so another task never shows it and a reload does not blank it while reading.
+  const [history, setHistory] = useState<{ id: string; history: TaskHistory | null } | null>(null);
+  useEffect(() => {
+    if (!selectedId) return;
+    let live = true;
+    messenger
+      .taskHistory(opened.root, selectedId)
+      .then((h) => live && setHistory({ id: selectedId, history: h }))
+      .catch(() => live && setHistory({ id: selectedId, history: null }));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened, selectedId]);
   const shownRef = useRef(shown);
   shownRef.current = shown;
   // Up and down move through the tasks as listed; Esc closes the pane.
@@ -762,6 +866,113 @@ function TaskbagView({
     if (selectedId) document.getElementById(`task-${selectedId}`)?.scrollIntoView({ block: "nearest" });
   }, [selectedId, groupBy]);
 
+  // The person's name for the task pane's changes (Task-A01-18): asked once, kept in the app's settings.
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .ownerName()
+      .then((n) => live && setOwnerName(n))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [messenger]);
+  const saveOwnerName = async (name: string) => {
+    await messenger.saveOwnerName(name);
+    setOwnerName(name);
+  };
+  const editTask = async (id: string, edit: Edit) => {
+    await messenger.editTask(opened.root, id, edit);
+    await onReload().catch(() => undefined);
+  };
+
+  // New tasks, areas and iterations (Task-A01-19): one form open at a time, with the next free IDs
+  // suggested, read again whenever the taskbag reloads.
+  const [creating, setCreating] = useState<Creating | null>(null);
+  const [nextIds, setNextIds] = useState<NextIds | null>(null);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .nextIds(opened.root)
+      .then((n) => live && setNextIds(n))
+      .catch(() => live && setNextIds(null));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened]);
+  const add = async (request: AddRequest) => {
+    let shown: string | null = null;
+    if (request.kind === "task") {
+      shown = (await messenger.addTask(opened.root, request.task)).id;
+    } else if (request.kind === "area") {
+      await messenger.addArea(opened.root, request.id, request.name);
+    } else {
+      await messenger.addIteration(opened.root, request.iteration);
+    }
+    setCreating(null);
+    await onReload().catch(() => undefined);
+    // The new task opens in the pane, so it can be changed further right away.
+    if (shown) setSelectedId(shown);
+  };
+  const createForm = (c: Creating) =>
+    box && (
+      <CreateForm
+        key={c.kind === "task" ? c.group : c.kind}
+        creating={c}
+        areas={box.areas}
+        iterations={iterations}
+        next={nextIds}
+        ownerName={ownerName}
+        onSaveName={saveOwnerName}
+        onAdd={add}
+        onClose={() => setCreating(null)}
+      />
+    );
+  // Renaming, changing and deleting areas and iterations (Task-A01-29): one Edit form open at a
+  // time, in its group; opening it closes a New form, and the other way round.
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const startCreating = (c: Creating) => {
+    setEditing(null);
+    setCreating(c);
+  };
+  const startEditing = (e: Editing) => {
+    setCreating(null);
+    setEditing(e);
+  };
+  const saveGroup = async (e: Editing, draft: GroupDraft) => {
+    if (e.kind === "area") await messenger.renameArea(opened.root, e.id, draft.name.trim());
+    else await messenger.changeIteration(opened.root, e.id, toIterationChange(draft));
+    setEditing(null);
+    await onReload().catch(() => undefined);
+  };
+  const deleteGroup = async (e: Editing) => {
+    if (e.kind === "area") await messenger.deleteArea(opened.root, e.id);
+    else await messenger.deleteIteration(opened.root, e.id);
+    setEditing(null);
+    await onReload().catch(() => undefined);
+  };
+  const editForm = (e: Editing) => {
+    const item = e.kind === "area" ? box?.areas.find((a) => a.id === e.id) : iterations.find((i) => i.id === e.id);
+    return (
+      item && (
+        <GroupEditForm
+          key={`${e.kind}-${e.id}`}
+          editing={e}
+          item={item}
+          ownerName={ownerName}
+          onSaveName={saveOwnerName}
+          onSave={(draft) => saveGroup(e, draft)}
+          onDelete={() => deleteGroup(e)}
+          onClose={() => setEditing(null)}
+        />
+      )
+    );
+  };
+  const editingIn = (g: Group) => (g.edit && editing?.kind === g.edit.kind && editing.id === g.edit.id ? editing : null);
+  // Which group's New task form is open, if any.
+  const creatingIn = (key: string) => (creating?.kind === "task" && creating.group === key ? creating : null);
+
   const openLink = (href: string) => {
     if (selected) messenger.openTaskLink(opened.root, selected.id, href).catch(onError);
   };
@@ -772,7 +983,7 @@ function TaskbagView({
       {shownIssues.length > 0 && <Issues issues={shownIssues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
-          {(box.tasks.length > 0 || handoffs.length > 0) && (
+          {box && (
             <div className="list-tools">
               <div className="group-by" role="group" aria-label={t("group.label")}>
                 {(["area", "iteration", "handoffs"] as const).map((g) => (
@@ -837,10 +1048,28 @@ function TaskbagView({
                   onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
                   collapsed={collapsed.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
+                  onNewTask={
+                    g.newTask && box.areas.length > 0
+                      ? () => startCreating({ kind: "task", group: g.key, area: g.newTask!.area, iteration: g.newTask!.iteration })
+                      : undefined
+                  }
+                  form={creatingIn(g.key) && createForm(creatingIn(g.key)!)}
+                  onEdit={g.edit && (() => startEditing(g.edit!))}
+                  editForm={editingIn(g) && editForm(editingIn(g)!)}
                 />
               ))}
               {groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
                 <p className="muted">{t("box.empty")}</p>
+              )}
+              {/* Task-A01-19: a new area at the end of the by-area list, a new iteration at the end of the by-iteration list. */}
+              {creating && creating.kind !== "task" && creating.kind === groupBy ? (
+                createForm(creating)
+              ) : (
+                <p className="add-group">
+                  <button type="button" className="link small" onClick={() => startCreating({ kind: groupBy === "iteration" ? "iteration" : "area" })}>
+                    {t(groupBy === "iteration" ? "create.new_iteration_button" : "create.new_area_button")}
+                  </button>
+                </p>
               )}
             </div>
             )}
@@ -852,6 +1081,12 @@ function TaskbagView({
                 onClose={() => setSelectedId(null)}
                 onLink={openLink}
                 latest={latestFor(handoffs, selected.id)}
+                history={history?.id === selected.id ? history.history : null}
+                labels={box.project.labels}
+                iterations={iterations}
+                ownerName={ownerName}
+                onSaveName={saveOwnerName}
+                onEdit={(edit) => editTask(selected.id, edit)}
                 onAllHandoffs={() => {
                   setHandoffTask(selected.id);
                   choose("handoffs");
@@ -879,7 +1114,9 @@ function TaskbagView({
               ? "box.needs_update"
               : issues.some((i) => i.problem.code === "taskbag_newer")
                 ? "box.needs_newer_app"
-                : "box.no_project",
+                : issues.some((i) => i.problem.code === "taskbag_too_old")
+                  ? "box.too_old"
+                  : "box.no_project",
           )}
         </p>
       )}
@@ -946,6 +1183,10 @@ function TaskGroup({
   onSelect,
   collapsed,
   onToggle,
+  onNewTask,
+  form,
+  onEdit,
+  editForm,
 }: {
   id: string;
   name: string;
@@ -960,6 +1201,14 @@ function TaskGroup({
   /** Only the header shows: name, count and progress (Task-A01-26). */
   collapsed: boolean;
   onToggle: () => void;
+  /** Opens the New task form in this group (Task-A01-19); not given where no task can be added. */
+  onNewTask?: () => void;
+  /** The New task form, when it is open in this group. */
+  form?: ReactNode;
+  /** Opens this area's or iteration's Edit form (Task-A01-29); not given for Unplanned or an unknown area. */
+  onEdit?: () => void;
+  /** The Edit form, when it is open in this group. */
+  editForm?: ReactNode;
 }) {
   const { t } = useI18n();
   const done = tasks.filter((t) => t.state === "done").length;
@@ -977,7 +1226,23 @@ function TaskGroup({
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
+        {((onNewTask && !form) || (onEdit && !editForm)) && (
+          <span className="group-actions">
+            {onNewTask && !form && (
+              <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
+                {t("create.new_task_button")}
+              </button>
+            )}
+            {onEdit && !editForm && (
+              <button type="button" className="link small" onClick={onEdit} aria-label={t("group_edit.edit_aria", { group: name })}>
+                {t("group_edit.edit_button")}
+              </button>
+            )}
+          </span>
+        )}
       </header>
+      {editForm}
+      {form}
       {collapsed ? null : tasks.length === 0 ? (
         <p className="muted small">{empty}</p>
       ) : (

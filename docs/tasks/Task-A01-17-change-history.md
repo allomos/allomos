@@ -34,8 +34,26 @@ Today Allomos keeps only each task's *current* fields; nobody can see who change
 |---|---|---|
 | 2026-10-09 | Write the card (not start it) | owner (chat) |
 | 2026-10-13 | Card approved ("approve"), with the two recommendations: one event file per change, named by time and a random suffix; no history invented for changes made before this card | owner (chat) |
+| 2026-10-14 | History checked in the app ("looks good"); merge into `main`, upgrade Allomos's own taskbag to `allomos/3` and reinstall `alm` ("go") | owner (chat) |
 
 ## Notes
 
 - 2026-10-09 — Card written by the agent. Next: the owner approves the card (`ready`).
 - 2026-10-13 — Owner approved the card with both recommendations; moved to ready and claimed by `claude/a01-17-history`.
+- 2026-10-13 — Built in `claude/a01-17-history`. The event layout is in [FILE-FORMAT § Events](../product/FILE-FORMAT.md#events-allomos3). Because the taskbag gains a folder, its format goes from `allomos/2` to `allomos/3` (the rule from [`A01-25`](./Task-A01-25-taskbag-format-upgrade.md)): an older taskbag is refused by `alm` until `alm upgrade` runs, and the app offers **Update the taskbag…**. This also means an older `alm` refuses an upgraded taskbag (`taskbag_newer`), so every writer records events. Changes to `project.json` (labels, name, task language, handoff rules, project folder), new areas and new iterations are recorded too; handoffs and the handoff template are not (each handoff carries its own writer and times).
+- 2026-10-14 — Merged into `main` (`76cd790`, pushed by the owner after Claude Code's safety check stopped the agent's merge). `main` had meanwhile given `allomos/3` to A03-15's `finished_without_owner`; no release wrote it yet, so `allomos/3` now holds both, and the 2 → 3 step adds `events/`. `alm` reinstalled from `76cd790`. Allomos's own taskbag had already been upgraded to `allomos/3` by `claude/a07-03-approve` with the earlier build (whose step added nothing), so it had no `events/`: its history starts with the first change recorded after the reinstall (A01-17's own `needs` and `done`, 2026-10-14 00:47 JST). Card done.
+
+## Result (2026-10-13)
+
+**In plain words.** Every change made with `alm` is now also written down as one small file in the taskbag's `events/` folder: what changed, from what to what, who did it and when. `alm history <id>` lists a task's changes, newest first, and the task pane's **History** shows the same list in the app's language. A taskbag made before this card starts its history when it is upgraded; nothing earlier is made up.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check` | PASS |
+| `cargo clippy --workspace --all-targets -- -D warnings` | PASS |
+| `cargo test --workspace` | PASS (core 30, store 53, cli 30, desktop 16) |
+| `npm --prefix apps/web run typecheck`, `build`, `check:i18n`, `test` | PASS (39 web tests) |
+| Every changing `alm` command writes exactly one event; refused and no-op changes write none | PASS: `every_change_writes_exactly_one_event_and_a_refusal_none` |
+| Two taskbag copies with different events merge in Git without a conflict | PASS: `two_copies_with_different_events_merge_without_conflict` |
+| An older taskbag without `events/` still opens, is upgraded, and its history starts then | PASS: `an_older_taskbag_without_events_is_upgraded_and_history_starts_then`, `the_real_upgrade_from_1_adds_the_handoff_files_and_events` |
+| In the built app, a task changed with `alm` shows those changes under History | PASS: owner checked A01-01 in `~/allomos-tests/a01-17-history/` with the branch's build ("looks good", 2026-10-14). The agent did not look (screen access declined). |

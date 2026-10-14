@@ -8,6 +8,7 @@
 use crate::model::{Area, Iteration, Project, State, Task, Taskbag};
 use crate::problem::Problem;
 use crate::validate::valid_date;
+use serde::Deserialize;
 
 /// A changed task plus warnings: things worth telling the user that do not refuse the change.
 #[derive(Debug, Clone, PartialEq)]
@@ -113,6 +114,46 @@ pub fn next_task_id(taskbag: &Taskbag, area: &str) -> Result<String, Problem> {
         .filter_map(|n| n.parse::<u64>().ok().map(|v| (v, n.len())))
         .fold((0, 2), |(h, w), (v, len)| (h.max(v), w.max(len)));
     Ok(format!("{prefix}{:0width$}", highest + 1))
+}
+
+/// The next free ID after `ids` (in their order), following the project's own pattern
+/// `<letters><number>`: the letters of the last such ID (`fallback` when there is none), one more
+/// than the highest number used with them, as wide as the widest one (at least two digits). IDs of
+/// another shape do not count. Shared by areas (`A08` after `A07`) and iterations (`I16`).
+fn next_numbered_id<'a>(ids: impl Iterator<Item = &'a str> + Clone, fallback: &'a str) -> String {
+    let split = |id: &'a str| -> Option<(&'a str, &'a str)> {
+        let at = id.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+        (at < id.len()).then(|| id.split_at(at))
+    };
+    let prefix = ids
+        .clone()
+        .filter_map(split)
+        .last()
+        .map_or(fallback, |(p, _)| p);
+    let (highest, width) = ids
+        .clone()
+        .filter_map(split)
+        .filter(|(p, _)| *p == prefix)
+        .filter_map(|(_, n)| n.parse::<u64>().ok().map(|v| (v, n.len())))
+        .fold((0, 2), |(h, w), (v, len)| (h.max(v), w.max(len)));
+    // Higher than every number used with these letters, so it is free in any spelling.
+    format!("{prefix}{:0width$}", highest + 1)
+}
+
+/// The next free area ID (`alm add area` without one; the app's suggestion, Task-A01-19):
+/// `A08` after `A00`–`A07`, `A01` in a taskbag with no areas.
+pub fn next_area_id(taskbag: &Taskbag) -> String {
+    let mut areas: Vec<&Area> = taskbag.areas.iter().collect();
+    areas.sort_by_key(|a| a.order);
+    next_numbered_id(areas.iter().map(|a| a.id.as_str()), "A")
+}
+
+/// The next free iteration ID (`alm add iteration` without one; the app's suggestion,
+/// Task-A01-19): `I16` after `I01`–`I15`, `I01` in a taskbag with no iterations.
+pub fn next_iteration_id(taskbag: &Taskbag) -> String {
+    let mut iterations: Vec<&Iteration> = taskbag.iterations.iter().collect();
+    iterations.sort_by_key(|i| i.order);
+    next_numbered_id(iterations.iter().map(|i| i.id.as_str()), "I")
 }
 
 /// The project with a new task language (`alm language`): `ui` to follow the Allomos app's
@@ -229,6 +270,40 @@ pub fn set_ladder(taskbag: &Taskbag, labels: &[String]) -> Result<Project, Probl
     })
 }
 
+/// A step of the ladder renamed, with every task that carries it (`alm rename label`,
+/// Task-A01-32): the project with the new ladder (same order), and the tasks whose label changed,
+/// done and dropped ones too. The old name must be on the ladder; the new one must not be.
+pub fn rename_label(
+    taskbag: &Taskbag,
+    old: &str,
+    new: &str,
+) -> Result<(Project, Vec<Task>), Problem> {
+    let old = old.trim();
+    let new = non_empty(Some(new)).ok_or(Problem::LabelNameMissing)?;
+    let ladder = &taskbag.project.labels;
+    let Some(at) = ladder.iter().position(|l| l == old) else {
+        return Err(Problem::LabelNotOnLadder {
+            label: old.to_string(),
+            ladder: ladder.join(" → "),
+        });
+    };
+    if ladder.iter().any(|l| *l == new) {
+        return Err(Problem::LabelExists { label: new });
+    }
+    let mut project = taskbag.project.clone();
+    project.labels[at] = new.clone();
+    let tasks = taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.label.as_deref() == Some(old))
+        .map(|t| Task {
+            label: Some(new.clone()),
+            ..t.clone()
+        })
+        .collect();
+    Ok((project, tasks))
+}
+
 /// The parts of a new iteration besides its ID and name; all optional.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct IterationDetails<'a> {
@@ -250,10 +325,7 @@ pub fn new_iteration(
         return Err(Problem::DuplicateIterationId { id: id.to_string() });
     }
     let name = non_empty(Some(name)).ok_or(Problem::IterationNameMissing)?;
-    let date = |d: Option<&str>| match non_empty(d) {
-        Some(d) if !valid_date(&d) => Err(Problem::InvalidDate { value: d }),
-        d => Ok(d),
-    };
+    let date = optional_date;
     let order = taskbag
         .iterations
         .iter()
@@ -269,6 +341,115 @@ pub fn new_iteration(
         end: date(details.end)?,
         release: non_empty(details.release),
     })
+}
+
+/// `YYYY-MM-DD`, or empty; the same check as a new iteration's dates.
+fn optional_date(d: Option<&str>) -> Result<Option<String>, Problem> {
+    match non_empty(d) {
+        Some(d) if !valid_date(&d) => Err(Problem::InvalidDate { value: d }),
+        d => Ok(d),
+    }
+}
+
+fn find_area(taskbag: &Taskbag, id: &str) -> Result<Area, Problem> {
+    taskbag
+        .areas
+        .iter()
+        .find(|a| a.id == id)
+        .cloned()
+        .ok_or_else(|| Problem::UnknownArea {
+            area: id.to_string(),
+        })
+}
+
+fn find_iteration(taskbag: &Taskbag, id: &str) -> Result<Iteration, Problem> {
+    taskbag
+        .iterations
+        .iter()
+        .find(|i| i.id == id)
+        .cloned()
+        .ok_or_else(|| Problem::UnknownIteration {
+            iteration: id.to_string(),
+        })
+}
+
+/// The area with a new name (`alm rename area`, Task-A01-29). Its ID and order stay; an empty
+/// name is refused.
+pub fn rename_area(taskbag: &Taskbag, id: &str, name: &str) -> Result<Area, Problem> {
+    let mut area = find_area(taskbag, id)?;
+    area.name = non_empty(Some(name)).ok_or(Problem::AreaNameMissing)?;
+    Ok(area)
+}
+
+/// What `alm change iteration` changes (Task-A01-29). A field left out (`None`) stays as it is;
+/// an empty release or date clears it. The name cannot be emptied.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IterationChange {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub release: Option<String>,
+    #[serde(default)]
+    pub start: Option<String>,
+    #[serde(default)]
+    pub end: Option<String>,
+}
+
+/// The iteration with `change` applied (`alm change iteration`, Task-A01-29). Its ID and order
+/// stay; dates are checked as `alm add iteration` checks them.
+pub fn change_iteration(
+    taskbag: &Taskbag,
+    id: &str,
+    change: &IterationChange,
+) -> Result<Iteration, Problem> {
+    let mut iteration = find_iteration(taskbag, id)?;
+    if let Some(name) = &change.name {
+        iteration.name = non_empty(Some(name)).ok_or(Problem::IterationNameMissing)?;
+    }
+    if let Some(release) = &change.release {
+        iteration.release = non_empty(Some(release));
+    }
+    if let Some(start) = &change.start {
+        iteration.start = optional_date(Some(start))?;
+    }
+    if let Some(end) = &change.end {
+        iteration.end = optional_date(Some(end))?;
+    }
+    Ok(iteration)
+}
+
+/// The area to delete (`alm delete area`, Task-A01-29). Refused while any task is in it, done
+/// and dropped ones included, so history never points at an area that is gone (owner,
+/// 2026-10-14).
+pub fn delete_area(taskbag: &Taskbag, id: &str) -> Result<Area, Problem> {
+    let area = find_area(taskbag, id)?;
+    let count = taskbag.tasks.iter().filter(|t| t.area == id).count();
+    if count > 0 {
+        return Err(Problem::AreaNotEmpty {
+            id: id.to_string(),
+            count: count.to_string(),
+        });
+    }
+    Ok(area)
+}
+
+/// The iteration to delete (`alm delete iteration`, Task-A01-29). Refused while any task is
+/// planned in it, done and dropped ones included (owner, 2026-10-14).
+pub fn delete_iteration(taskbag: &Taskbag, id: &str) -> Result<Iteration, Problem> {
+    let iteration = find_iteration(taskbag, id)?;
+    let count = taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.iteration.as_deref() == Some(id))
+        .count();
+    if count > 0 {
+        return Err(Problem::IterationNotEmpty {
+            id: id.to_string(),
+            count: count.to_string(),
+        });
+    }
+    Ok(iteration)
 }
 
 /// Plan the task in an iteration, or take it out of its iteration with `None`. Planning is not
@@ -454,6 +635,117 @@ pub fn set_title(
     Ok(Outcome::plain(task))
 }
 
+/// Set or clear the task's handoff note (the app's task pane, Task-A01-18). Same holder rule as
+/// other changes; allowed in any state. `release --note` sets it too, together with letting go.
+pub fn set_handoff_note(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    note: Option<&str>,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    task.handoff_note = non_empty(note);
+    Ok(Outcome::plain(task))
+}
+
+/// Give the task a new description, the text of its `description.md` (the app's task pane,
+/// Task-A01-18). Same holder rule as other changes; allowed in any state. Empty text removes it.
+pub fn set_description(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    text: &str,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    let mut description = text.trim_end().to_string();
+    if !description.is_empty() {
+        description.push('\n');
+    }
+    task.description = description;
+    Ok(Outcome::plain(task))
+}
+
+/// One change to one field of a task, as the app's task pane asks for it (Task-A01-18). Each
+/// goes through the same rule as its `alm` command; [`edit`] says which.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(tag = "field", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Edit {
+    /// `ready`, `waiting` (with `waiting_on`), `done` or `dropped`. `in_progress` comes only from
+    /// claiming the task, and nothing moves a task back to `backlog`.
+    State {
+        state: State,
+        #[serde(default)]
+        waiting_on: Option<String>,
+    },
+    Label {
+        label: String,
+    },
+    /// What the task waits on; like `alm wait`, this also makes it `waiting`.
+    WaitingOn {
+        text: String,
+    },
+    NextDependency {
+        #[serde(default)]
+        text: Option<String>,
+    },
+    HandoffNote {
+        #[serde(default)]
+        text: Option<String>,
+    },
+    Iteration {
+        #[serde(default)]
+        iteration: Option<String>,
+    },
+    Title {
+        title: String,
+    },
+    Description {
+        text: String,
+    },
+}
+
+/// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
+/// the name of that rule's command (`ready`, `wait`, `done`, `drop`, `label`, `needs`, `plan`,
+/// `title`; `note` and `describe` for the two changes `alm` has no command of their own for), so
+/// the change is recorded the same way.
+pub fn edit(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    edit: &Edit,
+) -> Result<(Outcome, &'static str), Problem> {
+    match edit {
+        Edit::State { state, waiting_on } => match state {
+            State::Ready => make_ready(taskbag, id, me).map(|o| (o, "ready")),
+            State::Waiting => wait(taskbag, id, me, waiting_on.as_deref().unwrap_or_default())
+                .map(|o| (o, "wait")),
+            State::Done => finish(taskbag, id, me, None).map(|o| (o, "done")),
+            State::Dropped => drop_task(taskbag, id, me).map(|o| (o, "drop")),
+            State::Backlog | State::InProgress => Err(Problem::CannotSetState {
+                id: id.to_string(),
+                state: state.as_str().to_string(),
+            }),
+        },
+        Edit::Label { label } => set_label(taskbag, id, me, label).map(|o| (o, "label")),
+        Edit::WaitingOn { text } => wait(taskbag, id, me, text).map(|o| (o, "wait")),
+        Edit::NextDependency { text } => {
+            set_next(taskbag, id, me, text.as_deref()).map(|o| (o, "needs"))
+        }
+        Edit::HandoffNote { text } => {
+            set_handoff_note(taskbag, id, me, text.as_deref()).map(|o| (o, "note"))
+        }
+        Edit::Iteration { iteration } => {
+            plan(taskbag, id, iteration.as_deref()).map(|o| (o, "plan"))
+        }
+        Edit::Title { title } => set_title(taskbag, id, me, title).map(|o| (o, "title")),
+        Edit::Description { text } => {
+            set_description(taskbag, id, me, text).map(|o| (o, "describe"))
+        }
+    }
+}
+
 /// The project with a new name and/or ID (`alm project`). An empty name or an invalid ID is
 /// refused; what is not given stays as it is.
 pub fn rename_project(
@@ -578,6 +870,38 @@ mod tests {
     }
 
     #[test]
+    fn renaming_a_label_renames_it_on_the_tasks_too() {
+        let mut s = bag();
+        s.tasks[0].label = Some("owner verified".into());
+        s.tasks[1].label = Some("owner verified".into());
+        s.tasks[1].state = State::Done;
+        s.tasks[2].label = Some("implemented".into());
+        let (p, tasks) = rename_label(&s, "owner verified", " human checked ").unwrap();
+        assert_eq!(p.labels[3], "human checked");
+        assert_eq!(p.labels.len(), 4);
+        assert_eq!(tasks.len(), 2, "the done task too");
+        assert!(
+            tasks
+                .iter()
+                .all(|t| t.label.as_deref() == Some("human checked"))
+        );
+        assert_eq!(
+            rename_label(&s, "shipped", "x").unwrap_err().code(),
+            "label_not_on_ladder"
+        );
+        assert_eq!(
+            rename_label(&s, "owner verified", "implemented"),
+            Err(Problem::LabelExists {
+                label: "implemented".into()
+            })
+        );
+        assert_eq!(
+            rename_label(&s, "owner verified", " "),
+            Err(Problem::LabelNameMissing)
+        );
+    }
+
+    #[test]
     fn the_next_task_id_follows_the_area_pattern() {
         let mut s = bag();
         // bag() has A01-01, A01-02 and A02-01.
@@ -594,6 +918,32 @@ mod tests {
             next_task_id(&s, "A09"),
             Err(Problem::UnknownArea { area: "A09".into() })
         );
+    }
+
+    /// `alm add area` / `alm add iteration` without an ID, and the app's suggestions (Task-A01-19).
+    #[test]
+    fn the_next_area_and_iteration_ids_follow_the_pattern() {
+        let mut s = bag();
+        s.areas.clear();
+        assert_eq!(next_area_id(&s), "A01");
+        assert_eq!(next_iteration_id(&s), "I01");
+        for id in ["A00", "A01", "A07"] {
+            s.areas.push(new_area(&s, id, "x").unwrap());
+        }
+        assert_eq!(next_area_id(&s), "A08");
+        for n in 1..=15 {
+            let id = format!("I{n:02}");
+            s.iterations
+                .push(new_iteration(&s, &id, "x", IterationDetails::default()).unwrap());
+        }
+        assert_eq!(next_iteration_id(&s), "I16");
+        // Other shapes do not count; the last area's letters are followed; width is kept.
+        s.areas.push(new_area(&s, "misc", "x").unwrap());
+        assert_eq!(next_area_id(&s), "A08");
+        s.areas.push(new_area(&s, "T009", "x").unwrap());
+        assert_eq!(next_area_id(&s), "T010");
+        s.areas.push(new_area(&s, "T0010", "x").unwrap());
+        assert_eq!(next_area_id(&s), "T0011");
     }
 
     #[test]
@@ -963,6 +1313,103 @@ mod tests {
     }
 
     #[test]
+    fn areas_and_iterations_are_renamed_changed_and_deleted_only_when_empty() {
+        let mut s = bag();
+        let a = rename_area(&s, "A01", "  Tracking ").unwrap();
+        assert_eq!(
+            (a.id.as_str(), a.name.as_str(), a.order),
+            ("A01", "Tracking", 2)
+        );
+        assert_eq!(rename_area(&s, "A01", " "), Err(Problem::AreaNameMissing));
+        assert_eq!(
+            rename_area(&s, "A09", "x"),
+            Err(Problem::UnknownArea { area: "A09".into() })
+        );
+
+        let details = IterationDetails {
+            release: Some("v0.1"),
+            start: Some("2026-10-01"),
+            end: Some("2026-10-10"),
+        };
+        s.iterations
+            .push(new_iteration(&s, "I01", "One", details).unwrap());
+        // Only what is given changes; an empty release or date clears it.
+        let it = change_iteration(
+            &s,
+            "I01",
+            &IterationChange {
+                end: Some("2026-10-20".into()),
+                release: Some(String::new()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                it.name.as_str(),
+                it.start.as_deref(),
+                it.end.as_deref(),
+                it.release.as_deref(),
+                it.order
+            ),
+            ("One", Some("2026-10-01"), Some("2026-10-20"), None, 1)
+        );
+        let bad = |c: IterationChange| change_iteration(&s, "I01", &c);
+        assert_eq!(
+            bad(IterationChange {
+                start: Some("1/10/2026".into()),
+                ..Default::default()
+            }),
+            Err(Problem::InvalidDate {
+                value: "1/10/2026".into()
+            })
+        );
+        assert_eq!(
+            bad(IterationChange {
+                name: Some("".into()),
+                ..Default::default()
+            }),
+            Err(Problem::IterationNameMissing)
+        );
+        assert_eq!(
+            change_iteration(&s, "I09", &IterationChange::default()),
+            Err(Problem::UnknownIteration {
+                iteration: "I09".into()
+            })
+        );
+
+        // Deleting: refused while any task is in it, a dropped one included.
+        assert_eq!(
+            delete_area(&s, "A01"),
+            Err(Problem::AreaNotEmpty {
+                id: "A01".into(),
+                count: "2".into()
+            })
+        );
+        put!(s, drop_task(&s, "A02-01", None).unwrap().task);
+        assert!(matches!(
+            delete_area(&s, "A02"),
+            Err(Problem::AreaNotEmpty { .. })
+        ));
+        assert_eq!(delete_iteration(&s, "I01").unwrap().id, "I01");
+        put!(s, plan(&s, "A02-01", Some("I01")).unwrap().task);
+        assert_eq!(
+            delete_iteration(&s, "I01"),
+            Err(Problem::IterationNotEmpty {
+                id: "I01".into(),
+                count: "1".into()
+            })
+        );
+        s.tasks.retain(|t| t.area != "A02");
+        assert_eq!(delete_area(&s, "A02").unwrap().id, "A02");
+        assert_eq!(delete_iteration(&s, "I01").unwrap().id, "I01");
+        assert!(matches!(
+            delete_area(&s, "A09"),
+            Err(Problem::UnknownArea { .. })
+        ));
+    }
+
+    #[test]
     fn next_lists_free_ready_tasks_by_iteration_area_then_id() {
         let mut s = bag();
         assert!(next(&s, None).unwrap().is_empty());
@@ -982,5 +1429,177 @@ mod tests {
             next(&s, Some("I09")),
             Err(Problem::UnknownIteration { .. })
         ));
+    }
+
+    /// Every edit the app's task pane makes goes through the same rule as its `alm` command, and
+    /// is refused the same way (Task-A01-18).
+    #[test]
+    fn each_app_edit_is_its_alm_rule() {
+        let mut s = bag();
+        s.iterations
+            .push(new_iteration(&s, "I01", "One", IterationDetails::default()).unwrap());
+        let me = Some("will");
+        let ed = |s: &Taskbag, e: Edit| edit(s, "A01-01", me, &e);
+        let same = |got: Result<(Outcome, &str), Problem>,
+                    want: Result<Outcome, Problem>,
+                    command: &str| {
+            match (got, want) {
+                (Ok((g, c)), Ok(w)) => {
+                    assert_eq!(g, w);
+                    assert_eq!(c, command);
+                }
+                (Err(g), Err(w)) => assert_eq!(g, w),
+                (g, w) => panic!("{g:?} vs {w:?}"),
+            }
+        };
+        let state = |st: State, on: Option<&str>| Edit::State {
+            state: st,
+            waiting_on: on.map(String::from),
+        };
+        same(
+            ed(&s, state(State::Ready, None)),
+            make_ready(&s, "A01-01", me),
+            "ready",
+        );
+        same(
+            ed(&s, state(State::Waiting, Some("the owner"))),
+            wait(&s, "A01-01", me, "the owner"),
+            "wait",
+        );
+        same(
+            ed(&s, state(State::Waiting, None)),
+            wait(&s, "A01-01", me, ""),
+            "wait",
+        );
+        same(
+            ed(&s, state(State::Done, None)),
+            finish(&s, "A01-01", me, None),
+            "done",
+        );
+        same(
+            ed(&s, state(State::Dropped, None)),
+            drop_task(&s, "A01-01", me),
+            "drop",
+        );
+        assert_eq!(
+            ed(&s, state(State::InProgress, None)),
+            Err(Problem::CannotSetState {
+                id: "A01-01".into(),
+                state: "in_progress".into()
+            })
+        );
+        assert!(ed(&s, state(State::Backlog, None)).is_err());
+        for label in ["implemented", "nonsense"] {
+            same(
+                ed(
+                    &s,
+                    Edit::Label {
+                        label: label.into(),
+                    },
+                ),
+                set_label(&s, "A01-01", me, label),
+                "label",
+            );
+        }
+        same(
+            ed(&s, Edit::WaitingOn { text: "x".into() }),
+            wait(&s, "A01-01", me, "x"),
+            "wait",
+        );
+        same(
+            ed(
+                &s,
+                Edit::NextDependency {
+                    text: Some("y".into()),
+                },
+            ),
+            set_next(&s, "A01-01", me, Some("y")),
+            "needs",
+        );
+        for it in [Some("I01"), Some("I09"), None] {
+            same(
+                ed(
+                    &s,
+                    Edit::Iteration {
+                        iteration: it.map(String::from),
+                    },
+                ),
+                plan(&s, "A01-01", it),
+                "plan",
+            );
+        }
+        same(
+            ed(&s, Edit::Title { title: " ".into() }),
+            set_title(&s, "A01-01", me, " "),
+            "title",
+        );
+        let (o, c) = ed(
+            &s,
+            Edit::HandoffNote {
+                text: Some(" n ".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!((o.task.handoff_note.as_deref(), c), (Some("n"), "note"));
+        let (o, c) = ed(
+            &s,
+            Edit::Description {
+                text: "New\n\n".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!((o.task.description.as_str(), c), ("New\n", "describe"));
+        let (o, _) = ed(&s, Edit::Description { text: " ".into() }).unwrap();
+        assert_eq!(o.task.description, "");
+
+        // A task an agent holds: the app's person is refused by the holder rule, like `alm`;
+        // planning is not progress, so it is still allowed.
+        put!(
+            s,
+            claim(&s, "A01-01", Some("claude/x"), false).unwrap().task
+        );
+        let held = Err(Problem::TaskHeld {
+            id: "A01-01".into(),
+            holder: "claude/x".into(),
+        });
+        for e in [
+            state(State::Ready, None),
+            state(State::Done, None),
+            Edit::Label {
+                label: "implemented".into(),
+            },
+            Edit::NextDependency { text: None },
+            Edit::HandoffNote { text: None },
+            Edit::Title { title: "t".into() },
+            Edit::Description { text: "d".into() },
+        ] {
+            assert_eq!(ed(&s, e).map(|(o, _)| o), held.clone());
+        }
+        assert!(
+            ed(
+                &s,
+                Edit::Iteration {
+                    iteration: Some("I01".into())
+                }
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn edits_arrive_as_json_from_the_app() {
+        let e: Edit =
+            serde_json::from_str(r#"{"field":"state","state":"waiting","waiting_on":"x"}"#)
+                .unwrap();
+        assert_eq!(
+            e,
+            Edit::State {
+                state: State::Waiting,
+                waiting_on: Some("x".into())
+            }
+        );
+        let e: Edit = serde_json::from_str(r#"{"field":"iteration","iteration":null}"#).unwrap();
+        assert_eq!(e, Edit::Iteration { iteration: None });
+        assert!(serde_json::from_str::<Edit>(r#"{"field":"holder","holder":"x"}"#).is_err());
     }
 }

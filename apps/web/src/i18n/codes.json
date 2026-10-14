@@ -3,10 +3,18 @@
     "agent"
   ],
   "area_name_missing": [],
+  "area_not_empty": [
+    "id",
+    "count"
+  ],
   "bad_usage": [
     "detail"
   ],
   "cannot_make_ready": [
+    "id",
+    "state"
+  ],
+  "cannot_set_state": [
     "id",
     "state"
   ],
@@ -65,6 +73,14 @@
     "value"
   ],
   "iteration_name_missing": [],
+  "iteration_not_empty": [
+    "id",
+    "count"
+  ],
+  "label_exists": [
+    "label"
+  ],
+  "label_name_missing": [],
   "label_not_on_ladder": [
     "label",
     "ladder"
@@ -75,6 +91,13 @@
   ],
   "link_refused": [
     "link"
+  ],
+  "migration_missing": [
+    "found",
+    "current"
+  ],
+  "migration_unfinished": [
+    "left"
   ],
   "not_a_taskbag": [
     "path"
@@ -127,7 +150,12 @@
   ],
   "taskbag_older": [
     "found",
-    "current"
+    "current",
+    "left"
+  ],
+  "taskbag_too_old": [
+    "found",
+    "oldest"
   ],
   "taskbag_unreadable": [
     "path",
@@ -143,10 +171,6 @@
   ],
   "unknown_iteration": [
     "iteration"
-  ],
-  "upgrade_missing": [
-    "found",
-    "current"
   ],
   "waiting_on_missing": [],
   "without_owner_missing": [],

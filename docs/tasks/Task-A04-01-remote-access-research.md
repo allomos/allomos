@@ -14,6 +14,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Read: away from home both free (own Tailscale) and paid (relay); no pairing email — a 9-digit code (three groups of three, spaces optional) shown on the desktop screen; the other pairing details accepted | owner (chat) |
 | 2026-10-06 | "find some easy task to do for the next 6 hrs … find them and do them" — the agent picked this card (public documentation only, as written) | owner (chat) |
 
 ## Notes

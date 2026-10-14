@@ -10,6 +10,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Reviewed 0010 and R72–R76: all right as recorded; "folder gone or moved" confirmed | owner (chat) |
 | 2026-10-04 | "In the desktop application, the data source folder should be able to be specified to any folder, which includes an independent folder, a subfolder of an existing project folder" | owner (chat) |
 | 2026-10-04 | "The commit and push action should be performed by calling git commands" | owner (chat) |
 

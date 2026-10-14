@@ -2,18 +2,22 @@
 //! taskbag's format (`"format": "allomos/<n>"` in `project.json`) and Allomos's section in the
 //! project's `AGENTS.md` / `CLAUDE.md` (its heading, `## Tasks: Allomos (v<n>)`).
 //!
-//! Allomos only *checks*. It never rewrites the section by itself, and it upgrades a taskbag
-//! only when the running agent asks for it with `alm upgrade` (owner, 2026-10-12).
+//! Allomos only *checks*. It never rewrites the section or the taskbag by itself. An older taskbag
+//! is updated by an AI agent following one guided prompt, joined from the migration entries
+//! between the taskbag's version and this Allomos's ([`MIGRATIONS`]); the agent changes the
+//! taskbag only through `alm`, and `alm migrate --finish` writes the new version only when
+//! `alm list --json` reports no issues (owner, 2026-10-14; Task-A01-32).
 
 use std::fs;
-use std::io;
 use std::path::Path;
 
-use allomos_core::{FORMAT, FORMAT_VERSION, Problem, format_version};
+use allomos_core::{FORMAT, FORMAT_VERSION, OLDEST_FORMAT_VERSION, Problem, format_version};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{AGENT_SECTION_HEADING, Lock, PROJECT_FILE, picked_folder, tells_agents};
+use crate::convert::{Source, ask_once_in, migration_header_in};
+use crate::{AGENT_SECTION_HEADING, Actor, Lock, PROJECT_FILE, picked_folder, tells_agents};
+use allomos_core::event::{Change, Kind};
 
 /// The version of Allomos's section that this Allomos writes. Raise it whenever the section's
 /// wording changes, so projects with the older wording are asked to renew it.
@@ -22,7 +26,7 @@ use crate::{AGENT_SECTION_HEADING, Lock, PROJECT_FILE, picked_folder, tells_agen
 /// 3: the rule for finishing a task, and `alm next` listing every free ready task (Task-A03-15).
 pub const SECTION_VERSION: u32 = 3;
 
-/// How long `alm upgrade` waits for another writer.
+/// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The taskbag's format compared with this Allomos's.
@@ -31,8 +35,10 @@ const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 pub enum FormatState {
     /// The format this Allomos writes.
     Current,
-    /// Written by an older Allomos: the agent runs `alm upgrade`.
+    /// Written by an older Allomos that this one updates: an agent follows `alm migrate`.
     Older { found: String },
+    /// Older than the oldest format this Allomos updates (`taskbag_too_old`).
+    TooOld { found: String, oldest: String },
     /// Written by a newer Allomos: the person chooses (update Allomos, or let the agent go on).
     Newer { found: String },
     /// No `project.json`, or no `allomos/<n>` format in it: the usual checks report it.
@@ -95,22 +101,136 @@ impl VersionCheck {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Migration entries (Task-A01-32)
+// ---------------------------------------------------------------------------------------------
+
+/// One text in the interface's three languages. The prompt follows the app's language.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Words {
+    pub en: &'static str,
+    pub zh_cn: &'static str,
+    pub ja: &'static str,
+}
+
+impl Words {
+    /// The text in `language` (`en`, `zh-CN`, `ja`); English otherwise.
+    pub fn get(&self, language: &str) -> &'static str {
+        match language {
+            "zh-CN" => self.zh_cn,
+            "ja" => self.ja,
+            _ => self.en,
+        }
+    }
+}
+
+/// What an agent needs to bring a taskbag from format `from` to `from + 1`. Adding a format
+/// version is adding one of these to [`MIGRATIONS`]: data only, no code that rewrites files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Migration {
+    pub from: u32,
+    /// What changed in the format, in plain words.
+    pub changed: Words,
+    /// What to add to every taskbag (folders, files, fields), and with which `alm` command.
+    pub add: Words,
+    /// What to decide task by task, with the rule for deciding.
+    pub decide: Words,
+    /// The `alm` commands the update uses, as `alm` names them (`rename label`). They, and no other
+    /// command that changes the taskbag, work while the update is unfinished.
+    pub commands: &'static [&'static str],
+    /// How to check that this step is complete, besides `alm list --json` reporting no issues.
+    pub check: Words,
+}
+
+/// The migration entries this Allomos knows, oldest first: one per format version from
+/// [`OLDEST_FORMAT_VERSION`] up to [`FORMAT_VERSION`]. Empty while those are the same.
+///
+/// The first entry will be 3 → 4 (A01-31's `blocked` state, A03-18's human-check rename); it is
+/// added with the format change itself, not before.
+pub const MIGRATIONS: &[Migration] = &[];
+
+/// Commands that change the taskbag but always work while an update is unfinished: the update's
+/// own, and writing a handoff (a session may have to stop in the middle of an update).
+const ALWAYS_ALLOWED: &[&str] = &["migrate", "handoff"];
+
+/// The formats this Allomos reads and the entries between them. [`FORMATS`] is the real one;
+/// tests make their own with a test-only entry.
+#[derive(Debug, Clone, Copy)]
+pub struct Formats {
+    pub entries: &'static [Migration],
+    pub current: u32,
+    pub oldest: u32,
+}
+
+/// The formats and entries of this Allomos.
+pub const FORMATS: Formats = Formats {
+    entries: MIGRATIONS,
+    current: FORMAT_VERSION,
+    oldest: OLDEST_FORMAT_VERSION,
+};
+
+impl Formats {
+    /// What this Allomos writes: `allomos/<current>`.
+    pub fn current_format(&self) -> String {
+        format!("allomos/{}", self.current)
+    }
+
+    /// The taskbag's format at `root` compared with these.
+    pub fn state(&self, root: &Path) -> FormatState {
+        let Some(found) = read_format(root) else {
+            return FormatState::Unknown;
+        };
+        match format_version(&found) {
+            Some(n) if n == self.current => FormatState::Current,
+            Some(n) if n > self.current => FormatState::Newer { found },
+            Some(n) if n < self.oldest => FormatState::TooOld {
+                found,
+                oldest: format!("allomos/{}", self.oldest),
+            },
+            Some(_) => FormatState::Older { found },
+            None => FormatState::Unknown,
+        }
+    }
+
+    /// The entries from version `found` to the current one, in order; `None` when one is
+    /// missing (then nothing can be finished).
+    pub fn pending(&self, found: u32) -> Option<Vec<&'static Migration>> {
+        (found..self.current)
+            .map(|v| self.entries.iter().find(|m| m.from == v))
+            .collect()
+    }
+
+    /// Whether `command` (as `alm` names it) may change a taskbag that is being updated from
+    /// version `found`.
+    pub fn allows(&self, found: u32, command: &str) -> bool {
+        ALWAYS_ALLOWED.contains(&command)
+            || self
+                .pending(found)
+                .unwrap_or_default()
+                .iter()
+                .any(|m| m.commands.contains(&command))
+    }
+
+    /// The commands an unfinished update allows, for messages: the entries' own, then
+    /// `migrate` and `handoff`.
+    pub fn allowed_commands(&self, found: u32) -> Vec<&'static str> {
+        let mut all: Vec<&'static str> = Vec::new();
+        for m in self.pending(found).unwrap_or_default() {
+            for c in m.commands {
+                if !all.contains(c) {
+                    all.push(c);
+                }
+            }
+        }
+        all.extend(ALWAYS_ALLOWED);
+        all
+    }
+}
+
 /// The taskbag's format, read from `project.json` without the usual checks (a newer taskbag may
 /// have fields this Allomos does not know).
 pub fn format_state(root: &Path) -> FormatState {
-    format_state_against(root, FORMAT_VERSION)
-}
-
-fn format_state_against(root: &Path, current: u32) -> FormatState {
-    let Some(found) = read_format(root) else {
-        return FormatState::Unknown;
-    };
-    match format_version(&found) {
-        Some(n) if n == current => FormatState::Current,
-        Some(n) if n < current => FormatState::Older { found },
-        Some(_) => FormatState::Newer { found },
-        None => FormatState::Unknown,
-    }
+    FORMATS.state(root)
 }
 
 fn read_format(root: &Path) -> Option<String> {
@@ -118,6 +238,168 @@ fn read_format(root: &Path) -> Option<String> {
     let value: Value = serde_json::from_str(&text).ok()?;
     value.get("format")?.as_str().map(String::from)
 }
+
+/// What is left to fix in the taskbag at `root`, in one line for messages: the issues
+/// `alm list --json` reports (at most ten, then how many more).
+pub fn left_to_fix(root: &Path) -> String {
+    let issues = crate::load(root).issues;
+    if issues.is_empty() {
+        return "no problems reported by `alm list --json`; make sure every step of `alm migrate` is done".to_string();
+    }
+    let mut parts: Vec<String> = issues
+        .iter()
+        .take(10)
+        .map(|i| match &i.field {
+            Some(field) => format!("{} ({field}): {}", i.file, i.problem.english()),
+            None => format!("{}: {}", i.file, i.problem.english()),
+        })
+        .collect();
+    if issues.len() > 10 {
+        parts.push(format!(
+            "and {} more (see `alm list --json`)",
+            issues.len() - 10
+        ));
+    }
+    format!("{} problem(s): {}", issues.len(), parts.join("; "))
+}
+
+/// May `command` (as `alm` names it, for example `claim` or `rename label`) change the taskbag at
+/// `root`? Refused for a newer or too old taskbag, and, while an update is unfinished, for every
+/// command but the update's own (owner, 2026-10-14). Used by `alm` and by the app's changes.
+pub fn write_allowed(root: &Path, command: &str) -> Result<(), Problem> {
+    write_allowed_in(root, command, &FORMATS)
+}
+
+pub fn write_allowed_in(root: &Path, command: &str, formats: &Formats) -> Result<(), Problem> {
+    match formats.state(root) {
+        FormatState::Newer { found } => Err(Problem::TaskbagNewer {
+            found,
+            supported: formats.current_format(),
+        }),
+        FormatState::TooOld { found, oldest } => Err(Problem::TaskbagTooOld { found, oldest }),
+        FormatState::Older { found } => {
+            let n = format_version(&found).unwrap_or_default();
+            if formats.allows(n, command) {
+                Ok(())
+            } else {
+                Err(Problem::TaskbagOlder {
+                    found,
+                    current: formats.current_format(),
+                    left: left_to_fix(root),
+                })
+            }
+        }
+        FormatState::Current | FormatState::Unknown => Ok(()),
+    }
+}
+
+/// What `alm migrate --finish` did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Finished {
+    pub from: String,
+    pub to: String,
+    /// False when the taskbag was already in this Allomos's format.
+    pub changed: bool,
+}
+
+/// `alm migrate --finish`: write this Allomos's format into the taskbag at `root`, as `actor`,
+/// only when `alm list --json` reports no issues (`migration_unfinished`, listing them). Only the
+/// `format` line of `project.json` changes, and a `migrate` event records it.
+pub fn finish(root: &Path, actor: Actor) -> Result<Finished, Problem> {
+    finish_in(root, actor, &FORMATS)
+}
+
+pub fn finish_in(root: &Path, actor: Actor, formats: &Formats) -> Result<Finished, Problem> {
+    let lock = Lock::acquire(root, LOCK_WAIT)?;
+    let to = formats.current_format();
+    let found = read_format(root).unwrap_or_default();
+    let unchanged = |found: String| Finished {
+        from: found,
+        to: to.clone(),
+        changed: false,
+    };
+    match formats.state(root) {
+        FormatState::Current => return Ok(unchanged(found)),
+        FormatState::Newer { found } => {
+            return Err(Problem::TaskbagNewer {
+                found,
+                supported: to,
+            });
+        }
+        FormatState::TooOld { found, oldest } => {
+            return Err(Problem::TaskbagTooOld { found, oldest });
+        }
+        FormatState::Unknown => {
+            return Err(Problem::WrongFormat {
+                expected: to,
+                found,
+            });
+        }
+        FormatState::Older { .. } => {}
+    }
+    let version = format_version(&found).unwrap_or_default();
+    if formats.pending(version).is_none() {
+        return Err(Problem::MigrationMissing { found, current: to });
+    }
+    if !crate::load(lock.root()).issues.is_empty() {
+        return Err(Problem::MigrationUnfinished {
+            left: left_to_fix(lock.root()),
+        });
+    }
+    let event = actor.event(
+        "migrate",
+        Kind::Project,
+        None,
+        vec![Change {
+            field: "format".to_string(),
+            from: Some(found.clone().into()),
+            to: Some(to.clone().into()),
+        }],
+    );
+    let path = lock.root().join(PROJECT_FILE);
+    lock.record(&event, |_| set_format(&path, formats.current))?;
+    Ok(Finished {
+        from: found,
+        to,
+        changed: true,
+    })
+}
+
+/// Write `allomos/<version>` as `project.json`'s format, keeping every other byte as it is (the
+/// fields' order too), so the change is one line in a diff.
+fn set_format(path: &Path, version: u32) -> Result<(), Problem> {
+    let failed = |detail: &str| Problem::WriteFailed {
+        path: path.display().to_string(),
+        detail: detail.to_string(),
+    };
+    let text = crate::read_text(path).map_err(|e| failed(&e.to_string()))?;
+    let key = text
+        .find("\"format\"")
+        .ok_or_else(|| failed("no format field"))?;
+    let colon = key
+        + text[key..]
+            .find(':')
+            .ok_or_else(|| failed("no format value"))?;
+    let open = colon
+        + text[colon..]
+            .find('"')
+            .ok_or_else(|| failed("no format value"))?;
+    let close = open
+        + 1
+        + text[open + 1..]
+            .find('"')
+            .ok_or_else(|| failed("no format value"))?;
+    let out = format!(
+        "{}\"allomos/{version}\"{}",
+        &text[..open],
+        &text[close + 1..]
+    );
+    crate::write_atomic(path, &out)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Checking the section, and connecting
+// ---------------------------------------------------------------------------------------------
 
 /// The version in Allomos's section heading in `text`: `Some(Some(n))` for
 /// `## Tasks: Allomos (v<n>)`, `Some(None)` when the text tells agents about Allomos without a
@@ -204,204 +486,298 @@ pub fn check_connected(root: &Path) -> Option<VersionCheck> {
     connected_project(root).map(|project| check(root, &project))
 }
 
-/// One step of an upgrade: from format `from` to `from + 1`. `apply` adds what the newer format
-/// has, with its defaults, and changes nothing else; it runs under the taskbag's lock and must be
-/// safe to run on a taskbag that already has the new parts.
-pub struct Step {
-    pub from: u32,
-    pub apply: fn(&Path) -> io::Result<()>,
+// ---------------------------------------------------------------------------------------------
+// The prompt
+// ---------------------------------------------------------------------------------------------
+
+/// The fixed sentences of the prompt, in one language.
+struct Phrases {
+    older_title: &'static str,
+    section_title: &'static str,
+    project: &'static str,
+    taskbag: &'static str,
+    read_only: &'static str,
+    changes: &'static str,
+    changed: &'static str,
+    add: &'static str,
+    decide: &'static str,
+    commands: &'static str,
+    check: &'static str,
+    steps: &'static str,
+    look: &'static str,
+    plan: &'static str,
+    apply: &'static str,
+    finish: &'static str,
+    section: &'static str,
+    report_older: &'static str,
+    report_section: &'static str,
+    commit_older: &'static str,
+    commit_section: &'static str,
+    none: &'static str,
 }
 
-/// The upgrade steps this Allomos knows, oldest first.
-pub const STEPS: &[Step] = &[
-    Step {
-        // 1 → 2 (Task-A03-06): the handoff template, project notes and `handoffs/`. The handoff
-        // rules in `project.json` are optional, so nothing is added there.
-        from: 1,
-        apply: crate::handoff::add_missing_files,
-    },
-    Step {
-        // 2 → 3 (Task-A03-15): a task's `finished_without_owner` is optional, so nothing is added.
-        from: 2,
-        apply: add_nothing,
-    },
-];
+const EN: Phrases = Phrases {
+    older_title: "Please migrate this taskbag to the newest Allomos format. It was written by an older Allomos (format {found}); this Allomos writes {current}. Migrate it the way another task system is moved into Allomos: Allomos does not change the files itself; you do, only through `alm`, after the person agrees to your plan.",
+    section_title: "This project was set up by an older Allomos. Please update it to this version.",
+    project: "Project folder",
+    taskbag: "Taskbag (Allomos's task files)",
+    read_only: "Until the update is finished, `alm` only reads, except for the update's own commands: {commands}. Commands that start or change work (claim, label, done, add …) are refused until then.",
+    changes: "What changed, version by version",
+    changed: "What changed",
+    add: "What to add",
+    decide: "What to decide, task by task",
+    commands: "Commands to use",
+    check: "How to check",
+    steps: "Steps",
+    look: "Look first, and change nothing. Read the changes above, look at the taskbag with `{alm} list --json` and `{alm} show <id>`, and work out what each change means for this taskbag, task by task.",
+    plan: "The one question: show the plan and wait for the person's answer. Write the whole plan in Markdown to a file outside the project: every task you would change, how, and why by the rules above, and everything you cannot decide. Then run `{alm} confirm --title \"Migrate the taskbag\" --plan <file>`. Exit code 0 means go ahead with the whole plan; any other exit code means the person cancelled or did not answer: change nothing, stop, and tell the person that nothing changed.",
+    apply: "Apply the plan only through `alm`, with the commands above and `--as <your session name>`. Never edit the taskbag's files by hand, and do not use `--commit` or `--push`.",
+    finish: "Check: `{alm} list --json` must report no issues, and the checks above must hold. Then run `{alm} migrate --finish`. It writes the new format only when nothing is left to fix; otherwise it lists what is left: fix that and run it again.",
+    section: "In the project folder, replace Allomos's section in {files} (headed \"{heading}…\", or any other text about Allomos or `alm`) with the output of `{alm} brief`, exactly as it is. Keep the rest of each file as it is.",
+    report_older: "Tell the person what changed, and what you could not decide.",
+    report_section: "Show the user what you changed and the commits you made.",
+    commit_older: "Commit only the taskbag's files{files}, and only when the person asks. Leave every other change as it is; do not push unless the person asks.",
+    commit_section: "If the project is a Git repository, commit only these changes: the taskbag's files{files}. Leave every other change as it is; do not push unless the person asks.",
+    none: "(none)",
+};
 
-/// A step whose newer format has only optional fields: nothing to add.
-fn add_nothing(_root: &Path) -> io::Result<()> {
-    Ok(())
+const ZH_CN: Phrases = Phrases {
+    older_title: "请把这个任务包迁移到最新的 Allomos 格式。它是旧版 Allomos 写的（格式 {found}）；这个版本的 Allomos 写的是 {current}。像把其他任务系统搬进 Allomos 那样迁移它：Allomos 不会自己改这些文件；由你来改，只通过 `alm`，并且在用户同意你的计划之后。",
+    section_title: "这个项目是用旧版的 Allomos 设置的，请把它更新到当前版本。",
+    project: "项目文件夹",
+    taskbag: "任务包（Allomos 的任务文件）",
+    read_only: "更新完成之前，`alm` 只读，只有更新本身的命令可以改动：{commands}。开始或改变工作的命令（claim、label、done、add …）在此之前都会被拒绝。",
+    changes: "各版本的改动",
+    changed: "改了什么",
+    add: "要添加什么",
+    decide: "要逐个任务决定什么",
+    commands: "要用的命令",
+    check: "怎样检查",
+    steps: "步骤",
+    look: "先看，什么都不改。读上面的改动，用 `{alm} list --json` 和 `{alm} show <id>` 查看任务包，逐个任务想清楚每项改动对这个任务包意味着什么。",
+    plan: "唯一的问题：展示计划，等用户回答。把完整计划用 Markdown 写进项目之外的文件：你要改的每个任务、怎么改、按上面的规则为什么这样改，以及你无法决定的所有事项。然后运行 `{alm} confirm --title \"迁移任务包\" --plan <文件>`。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户没有任何改动。",
+    apply: "只通过 `alm` 执行计划，使用上面的命令并加上 `--as <你的会话名>`。不要手动编辑任务包的文件，也不要用 `--commit` 或 `--push`。",
+    finish: "检查：`{alm} list --json` 必须没有报告任何问题，上面的检查也都要满足。然后运行 `{alm} migrate --finish`。只有没有剩下要修的东西时，它才会写入新格式；否则它会列出剩下的问题：修好后再运行一次。",
+    section: "在项目文件夹中，把 {files} 里 Allomos 的一节（标题以“{heading}”开头，或其他关于 Allomos 或 `alm` 的说明）替换为 `{alm} brief` 的输出，原样（英文）使用。文件的其他内容保持不变。",
+    report_older: "告诉用户改了什么，以及你无法决定的事项。",
+    report_section: "告诉用户你改了什么，以及你做的提交。",
+    commit_older: "只提交任务包的文件{files}，而且只在用户要求时提交。其他改动保持原样；除非用户要求，不要推送。",
+    commit_section: "如果项目是 Git 仓库，只提交这些改动：任务包的文件{files}。其他改动保持原样；除非用户要求，不要推送。",
+    none: "（无）",
+};
+
+const JA: Phrases = Phrases {
+    older_title: "このタスクバッグを最新の Allomos の形式に移行してください。古いバージョンの Allomos で書かれています（形式 {found}）。このバージョンの Allomos が書くのは {current} です。ほかのタスク管理を Allomos に移すときと同じように移行します：Allomos はファイルを自分では変えません。変えるのはあなたで、`alm` を通してだけ、相手が計画に同意してからです。",
+    section_title: "このプロジェクトは古いバージョンの Allomos で設定されました。今のバージョンに更新してください。",
+    project: "プロジェクトのフォルダー",
+    taskbag: "タスクバッグ（Allomos のタスクファイル）",
+    read_only: "更新が終わるまで、`alm` は読むだけで、変更できるのは更新のためのコマンドだけです：{commands}。作業を始めたり変えたりするコマンド（claim、label、done、add …）はそれまで拒否されます。",
+    changes: "バージョンごとの変更",
+    changed: "変わったこと",
+    add: "追加するもの",
+    decide: "タスクごとに決めること",
+    commands: "使うコマンド",
+    check: "確かめ方",
+    steps: "手順",
+    look: "まず見るだけで、何も変えません。上の変更を読み、`{alm} list --json` と `{alm} show <id>` でタスクバッグを見て、それぞれの変更がこのタスクバッグにとって何を意味するかをタスクごとに考えます。",
+    plan: "ただ一つの質問：計画を見せて、相手の答えを待ちます。計画全体を Markdown でプロジェクトの外のファイルに書きます：変えるタスクすべて、どう変えるか、上のルールでなぜそうするか、そして決められないこと。続いて `{alm} confirm --title \"タスクバッグを移行\" --plan <ファイル>` を実行します。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、何も変わっていないことを伝えます。",
+    apply: "計画は `alm` を通してだけ実行します。上のコマンドに `--as <あなたのセッション名>` を付けて使います。タスクバッグのファイルを手で編集せず、`--commit` や `--push` も使いません。",
+    finish: "確認：`{alm} list --json` が問題を何も報告せず、上の確かめ方もすべて満たすこと。それから `{alm} migrate --finish` を実行します。直すものが残っていないときだけ新しい形式を書き込み、残っていればそれを一覧にします：直してからもう一度実行します。",
+    section: "プロジェクトのフォルダーで、{files} の Allomos の節（見出しが「{heading}」で始まるもの、または Allomos や `alm` についてのほかの説明）を `{alm} brief` の出力で置き換え、そのまま（英語のまま）使います。ファイルのほかの部分は変えません。",
+    report_older: "何が変わったか、そして決められなかったことを相手に伝えます。",
+    report_section: "何を変えたか、どんなコミットをしたかをユーザーに見せてください。",
+    commit_older: "コミットするのはタスクバッグのファイル{files}だけで、頼まれたときだけです。ほかの変更はそのままにし、頼まれない限りプッシュしません。",
+    commit_section: "プロジェクトが Git リポジトリなら、これらの変更だけをコミットします：タスクバッグのファイル{files}。ほかの変更はそのままにし、頼まれない限りプッシュしません。",
+    none: "（なし）",
+};
+
+fn phrases(language: &str) -> &'static Phrases {
+    match language {
+        "zh-CN" => &ZH_CN,
+        "ja" => &JA,
+        _ => &EN,
+    }
 }
 
-/// What `alm upgrade` did.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Upgraded {
-    pub from: String,
-    pub to: String,
-    /// False when the taskbag was already in this Allomos's format.
-    pub changed: bool,
+/// What to update: the taskbag (from `found`, through `entries`) and/or the section in `files`.
+struct Update<'a> {
+    older: Option<(&'a str, Vec<&'static Migration>)>,
+    files: Vec<String>,
 }
 
-/// Bring the taskbag at `root` up to this Allomos's format, one step at a time. A newer taskbag
-/// is refused (`taskbag_newer`) and nothing is written.
-pub fn upgrade(root: &Path) -> Result<Upgraded, Problem> {
-    upgrade_with(root, STEPS, FORMAT_VERSION)
-}
-
-fn upgrade_with(root: &Path, steps: &[Step], current: u32) -> Result<Upgraded, Problem> {
-    let lock = Lock::acquire(root, LOCK_WAIT)?;
-    let to = format!("allomos/{current}");
-    let found = read_format(root).unwrap_or_default();
-    let mut version = match format_version(&found) {
-        Some(n) => n,
-        None => {
-            return Err(Problem::WrongFormat {
-                expected: to,
-                found,
-            });
+fn request(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    formats: &Formats,
+    update: &Update,
+) -> String {
+    let w = phrases(language);
+    let alm = format!("alm --taskbag \"{}\"", taskbag.display());
+    let fill = |text: &str| text.replace("{alm}", &alm);
+    let list = update.files.join(", ");
+    let and_files = match (language, update.files.is_empty()) {
+        (_, true) => String::new(),
+        ("zh-CN", false) => format!("和 {list}"),
+        ("ja", false) => format!("と {list}"),
+        _ => format!(" and {list}"),
+    };
+    let mut out = String::new();
+    let mut steps: Vec<String> = Vec::new();
+    match &update.older {
+        Some((found, _)) => {
+            out.push_str(
+                &w.older_title
+                    .replace("{found}", found)
+                    .replace("{current}", &formats.current_format()),
+            );
         }
-    };
-    if version > current {
-        return Err(Problem::TaskbagNewer {
-            found,
-            supported: to,
-        });
+        None => out.push_str(w.section_title),
     }
-    // Check the whole way first, so a missing step changes nothing.
-    if (version..current).any(|v| !steps.iter().any(|s| s.from == v)) {
-        return Err(Problem::UpgradeMissing { found, current: to });
+    if update.older.is_none() {
+        out.push_str(&format!(
+            "\n\n{}: {}\n{}: {}\n",
+            w.project,
+            project.display(),
+            w.taskbag,
+            taskbag.display()
+        ));
     }
-    let changed = version < current;
-    let path = lock.root().join(PROJECT_FILE);
-    let write_failed = |e: io::Error| Problem::WriteFailed {
-        path: path.display().to_string(),
-        detail: e.to_string(),
-    };
-    while version < current {
-        let step = steps
+    if let Some((found, entries)) = &update.older {
+        // The same opening as moving another task system into Allomos (Task-A05-02): an older
+        // taskbag is one more task system to migrate (owner, 2026-10-14).
+        out.push_str(&format!(
+            "\n\n{}\n\n{}\n",
+            migration_header_in(language, project, taskbag),
+            ask_once_in(language, Source::OlderTaskbag)
+        ));
+        let n = format_version(found).unwrap_or_default();
+        let commands: Vec<String> = formats
+            .allowed_commands(n)
             .iter()
-            .find(|s| s.from == version)
-            .expect("checked above");
-        (step.apply)(lock.root()).map_err(write_failed)?;
-        version += 1;
-        set_format(&path, version)?;
+            .map(|c| format!("`alm {c}`"))
+            .collect();
+        out.push_str(&format!(
+            "\n{}\n",
+            w.read_only.replace("{commands}", &commands.join(", "))
+        ));
+        out.push_str(&format!("\n## {}\n", w.changes));
+        for m in entries {
+            out.push_str(&format!(
+                "\n### allomos/{} → allomos/{}\n\n",
+                m.from,
+                m.from + 1
+            ));
+            let used: Vec<String> = m.commands.iter().map(|c| format!("`alm {c}`")).collect();
+            let used = if used.is_empty() {
+                w.none.to_string()
+            } else {
+                used.join(", ")
+            };
+            for (name, text) in [
+                (w.changed, m.changed.get(language)),
+                (w.add, m.add.get(language)),
+                (w.decide, m.decide.get(language)),
+                (w.commands, used.as_str()),
+                (w.check, m.check.get(language)),
+            ] {
+                out.push_str(&format!("- **{name}:** {}\n", fill(text)));
+            }
+        }
+        steps.push(fill(w.look));
+        steps.push(fill(w.plan));
+        steps.push(fill(w.apply));
+        steps.push(fill(w.finish));
     }
-    Ok(Upgraded {
-        from: found,
-        to,
-        changed,
-    })
+    if !update.files.is_empty() {
+        steps.push(fill(
+            &w.section
+                .replace("{files}", &list)
+                .replace("{heading}", AGENT_SECTION_HEADING),
+        ));
+    }
+    if update.older.is_some() {
+        steps.push(w.report_older.to_string());
+        steps.push(w.commit_older.replace("{files}", &and_files));
+    } else {
+        steps.push(w.commit_section.replace("{files}", &and_files));
+        steps.push(w.report_section.to_string());
+    }
+    if update.older.is_some() {
+        out.push_str(&format!("\n## {}\n\n", w.steps));
+    } else {
+        out.push('\n');
+    }
+    for (i, s) in steps.iter().enumerate() {
+        out.push_str(&format!("{}. {s}\n", i + 1));
+    }
+    out
 }
 
-/// Write `allomos/<version>` as `project.json`'s format, keeping every other byte as it is (the
-/// fields' order too), so the change is one line in a diff.
-fn set_format(path: &Path, version: u32) -> Result<(), Problem> {
-    let failed = |detail: &str| Problem::WriteFailed {
-        path: path.display().to_string(),
-        detail: detail.to_string(),
+/// The guided prompt for bringing the taskbag at `taskbag` (format `found`) up to this Allomos's
+/// format, in an interface language (`en`, `zh-CN`, `ja`; English otherwise): what `alm migrate`
+/// prints. `migration_missing` when an entry on the way is missing.
+pub fn migration_prompt_in(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    found: &str,
+) -> Result<String, Problem> {
+    migration_prompt_with(language, project, taskbag, found, &FORMATS)
+}
+
+pub fn migration_prompt_with(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    found: &str,
+    formats: &Formats,
+) -> Result<String, Problem> {
+    let missing = || Problem::MigrationMissing {
+        found: found.to_string(),
+        current: formats.current_format(),
     };
-    let text = crate::read_text(path).map_err(|e| failed(&e.to_string()))?;
-    let key = text
-        .find("\"format\"")
-        .ok_or_else(|| failed("no format field"))?;
-    let colon = key
-        + text[key..]
-            .find(':')
-            .ok_or_else(|| failed("no format value"))?;
-    let open = colon
-        + text[colon..]
-            .find('"')
-            .ok_or_else(|| failed("no format value"))?;
-    let close = open
-        + 1
-        + text[open + 1..]
-            .find('"')
-            .ok_or_else(|| failed("no format value"))?;
-    let out = format!(
-        "{}\"allomos/{version}\"{}",
-        &text[..open],
-        &text[close + 1..]
-    );
-    crate::write_atomic(path, &out)
+    let n = format_version(found).ok_or_else(missing)?;
+    let entries = formats.pending(n).ok_or_else(missing)?;
+    let update = Update {
+        older: Some((found, entries)),
+        files: Vec::new(),
+    };
+    Ok(request(language, project, taskbag, formats, &update))
 }
 
-/// What **Update the taskbag…** (and File → Connect with the Agents… while something is out of
+/// What **Migrate the taskbag…** (and File → Connect with the Agents… while something is out of
 /// date) asks the chosen agent, in an interface language (`en`, `zh-CN`, `ja`; English
-/// otherwise): run `alm upgrade` when the taskbag is older, and replace Allomos's section with
-/// `alm brief`'s output in each out-of-date file. The agent does the work; the person sends the
-/// request (owner, 2026-10-12: Allomos never updates these files itself).
+/// otherwise): when the taskbag is older, the guided migration prompt ([`migration_prompt_in`]);
+/// when Allomos's section is out of date, replacing it with `alm brief`'s output in each such file.
+/// The agent does the work; the person sends the request (owner, 2026-10-12).
 pub fn agent_update_request_in(
     language: &str,
     project: &Path,
     taskbag: &Path,
     check: &VersionCheck,
 ) -> String {
-    let alm = format!("alm --taskbag \"{}\"", taskbag.display());
-    let (p, t) = (project.display(), taskbag.display());
-    let older = matches!(check.format, FormatState::Older { .. });
-    let files = check.outdated_files();
-    let list = files.join(", ");
-    let mut steps: Vec<String> = Vec::new();
-    match language {
-        "zh-CN" => {
-            if older {
-                steps.push(format!("运行 `{alm} upgrade`，把任务包升级到这个版本的 Allomos 的格式。它只添加新格式需要的部分；不要手动编辑任务包的文件。"));
-            }
-            if !files.is_empty() {
-                steps.push(format!("在项目文件夹中，把 {list} 里 Allomos 的一节（标题以“{AGENT_SECTION_HEADING}”开头，或其他关于 Allomos 或 `alm` 的说明）替换为 `{alm} brief` 的输出，原样（英文）使用。文件的其他内容保持不变。"));
-            }
-            steps.push(format!("如果项目是 Git 仓库，只提交这些改动：任务包的文件和 {}。其他改动保持原样；除非用户要求，不要推送。", if files.is_empty() { "（无）".to_string() } else { list.clone() }));
-            steps.push("告诉用户你改了什么，以及你做的提交。".to_string());
-            let numbered: Vec<String> = steps
-                .iter()
-                .enumerate()
-                .map(|(i, s)| format!("{}. {s}", i + 1))
-                .collect();
-            format!(
-                "这个项目是用旧版的 Allomos 设置的，请把它更新到当前版本。\n\n项目文件夹：{p}\n任务包（Allomos 的任务文件）：{t}\n\n{}\n",
-                numbered.join("\n")
-            )
-        }
-        "ja" => {
-            if older {
-                steps.push(format!("`{alm} upgrade` を実行して、タスクバッグをこのバージョンの Allomos の形式に更新します。新しい形式に必要な部分だけが追加されます。タスクバッグのファイルを手で編集しないでください。"));
-            }
-            if !files.is_empty() {
-                steps.push(format!("プロジェクトのフォルダーで、{list} の Allomos の節（見出しが「{AGENT_SECTION_HEADING}」で始まるもの、または Allomos や `alm` についてのほかの説明）を `{alm} brief` の出力で置き換え、そのまま（英語のまま）使います。ファイルのほかの部分は変えません。"));
-            }
-            steps.push(format!("プロジェクトが Git リポジトリなら、これらの変更だけをコミットします：タスクバッグのファイルと {}。ほかの変更はそのままにし、頼まれない限りプッシュしません。", if files.is_empty() { "（なし）".to_string() } else { list.clone() }));
-            steps.push(
-                "何を変えたか、どんなコミットをしたかをユーザーに見せてください。".to_string(),
-            );
-            let numbered: Vec<String> = steps
-                .iter()
-                .enumerate()
-                .map(|(i, s)| format!("{}. {s}", i + 1))
-                .collect();
-            format!(
-                "このプロジェクトは古いバージョンの Allomos で設定されました。今のバージョンに更新してください。\n\nプロジェクトのフォルダー：{p}\nタスクバッグ（Allomos のタスクファイル）：{t}\n\n{}\n",
-                numbered.join("\n")
-            )
-        }
-        _ => {
-            if older {
-                steps.push(format!("Run `{alm} upgrade` to bring the taskbag up to this Allomos's format. It adds only what the newer format has; never edit the taskbag's files by hand."));
-            }
-            if !files.is_empty() {
-                steps.push(format!("In the project folder, replace Allomos's section in {list} (headed \"{AGENT_SECTION_HEADING}…\", or any other text about Allomos or `alm`) with the output of `{alm} brief`, exactly as it is. Keep the rest of each file as it is."));
-            }
-            steps.push(format!("If the project is a Git repository, commit only these changes: the taskbag's files{}. Leave every other change as it is; do not push unless the person asks.", if files.is_empty() { String::new() } else { format!(" and {list}") }));
-            steps.push("Show the user what you changed and the commits you made.".to_string());
-            let numbered: Vec<String> = steps
-                .iter()
-                .enumerate()
-                .map(|(i, s)| format!("{}. {s}", i + 1))
-                .collect();
-            format!(
-                "This project was set up by an older Allomos. Please update it to this version.\n\nProject folder: {p}\nTaskbag (Allomos's task files): {t}\n\n{}\n",
-                numbered.join("\n")
-            )
-        }
-    }
+    agent_update_request_with(language, project, taskbag, check, &FORMATS)
+}
+
+fn agent_update_request_with(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    check: &VersionCheck,
+    formats: &Formats,
+) -> String {
+    let older = match &check.format {
+        FormatState::Older { found } => format_version(found)
+            .and_then(|n| formats.pending(n))
+            .map(|entries| (found.as_str(), entries)),
+        _ => None,
+    };
+    let update = Update {
+        older,
+        files: check.outdated_files(),
+    };
+    request(language, project, taskbag, formats, &update)
 }
 
 #[cfg(test)]
@@ -444,6 +820,38 @@ mod tests {
         let text = text.replace(&format!("\"{old}\""), &format!("\"{format}\""));
         fs::write(path, text).unwrap();
     }
+
+    /// A made-up entry from 3 to 4, standing in for the first real one (never shipped): the top
+    /// label is renamed, and each task decides nothing.
+    const TEST_ENTRY: Migration = Migration {
+        from: 3,
+        changed: Words {
+            en: "The top label is now called \"human checked\".",
+            zh_cn: "最高的标签现在叫 \"human checked\"。",
+            ja: "いちばん上のラベルは \"human checked\" になりました。",
+        },
+        add: Words {
+            en: "Nothing.",
+            zh_cn: "无。",
+            ja: "なし。",
+        },
+        decide: Words {
+            en: "Nothing: every task with \"owner verified\" becomes \"human checked\".",
+            zh_cn: "无。",
+            ja: "なし。",
+        },
+        commands: &["rename label"],
+        check: Words {
+            en: "`{alm} list --json` shows no task labelled \"owner verified\".",
+            zh_cn: "`{alm} list --json` 里没有 \"owner verified\"。",
+            ja: "`{alm} list --json` に \"owner verified\" がないこと。",
+        },
+    };
+    const TEST_FORMATS: Formats = Formats {
+        entries: &[TEST_ENTRY],
+        current: 4,
+        oldest: 3,
+    };
 
     #[test]
     fn section_versions_are_read_from_the_heading() {
@@ -537,6 +945,12 @@ mod tests {
     fn format_states() {
         let (_, root) = project("formats");
         assert_eq!(format_state(&root), FormatState::Current);
+        assert_eq!(
+            TEST_FORMATS.state(&root),
+            FormatState::Older {
+                found: "allomos/3".into()
+            }
+        );
         set_project_format(&root, "allomos/4");
         assert_eq!(
             format_state(&root),
@@ -544,84 +958,254 @@ mod tests {
                 found: "allomos/4".into()
             }
         );
-        assert_eq!(
-            format_state_against(&root, 5),
-            FormatState::Older {
-                found: "allomos/4".into()
-            }
-        );
+        assert_eq!(TEST_FORMATS.state(&root), FormatState::Current);
         set_project_format(&root, "fliphopper/1");
         assert_eq!(format_state(&root), FormatState::Unknown);
     }
 
-    /// A made-up step from 3 to 4, standing in for a later one: it adds a file with a default,
-    /// and leaves it alone when it is already there.
-    fn add_template(root: &Path) -> io::Result<()> {
-        let path = root.join("later.md");
-        if !path.exists() {
-            fs::write(path, "# Later\n")?;
+    /// Every version from the oldest supported to the current one has an entry: raising
+    /// `FORMAT_VERSION` without adding one fails here.
+    #[test]
+    fn every_version_since_the_oldest_has_an_entry() {
+        assert!(
+            FORMATS.pending(OLDEST_FORMAT_VERSION).is_some(),
+            "add a migration entry to MIGRATIONS for each format version from allomos/{OLDEST_FORMAT_VERSION}"
+        );
+        for m in MIGRATIONS {
+            let supported = FORMATS.oldest..FORMATS.current;
+            assert!(
+                supported.contains(&m.from),
+                "allomos/{}: no such step",
+                m.from
+            );
+            for words in [m.changed, m.add, m.decide, m.check] {
+                for text in [words.en, words.zh_cn, words.ja] {
+                    assert!(!text.trim().is_empty(), "allomos/{}: empty text", m.from);
+                }
+            }
         }
-        Ok(())
     }
-    const TEST_STEPS: &[Step] = &[Step {
-        from: 3,
-        apply: add_template,
-    }];
+
+    /// The owner, 2026-10-14: `allomos/3` is the oldest; version 2 is too old, with no code steps.
+    #[test]
+    fn version_2_is_too_old() {
+        let (_, root) = project("too-old");
+        set_project_format(&root, "allomos/2");
+        let before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+        let state = format_state(&root);
+        assert_eq!(
+            state,
+            FormatState::TooOld {
+                found: "allomos/2".into(),
+                oldest: "allomos/3".into()
+            }
+        );
+        let loaded = load(&root);
+        assert!(loaded.taskbag.is_none());
+        assert_eq!(loaded.issues[0].problem.code(), "taskbag_too_old");
+        let err = finish(&root, Actor::APP).unwrap_err();
+        assert_eq!(err.code(), "taskbag_too_old");
+        assert!(err.english().contains("too old"), "{}", err.english());
+        assert_eq!(
+            write_allowed(&root, "claim").unwrap_err().code(),
+            "taskbag_too_old"
+        );
+        assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), before);
+    }
 
     #[test]
-    fn an_upgrade_adds_only_the_new_parts() {
-        let (_, root) = project("upgrade");
-        let before = load(&root).taskbag.unwrap();
-        let project_before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+    fn mid_update_only_the_updates_own_commands_change_the_taskbag() {
+        let (_, root) = project("mid-update");
+        for command in ["claim", "label", "done", "add task", "labels", "plan"] {
+            let err = write_allowed_in(&root, command, &TEST_FORMATS).unwrap_err();
+            assert_eq!(err.code(), "taskbag_older", "{command}");
+            let Problem::TaskbagOlder { left, current, .. } = &err else {
+                unreachable!()
+            };
+            assert_eq!(current, "allomos/4");
+            assert!(left.contains("no problems reported"), "{left}");
+        }
+        for command in ["rename label", "migrate", "handoff"] {
+            write_allowed_in(&root, command, &TEST_FORMATS).unwrap();
+        }
+        // The real formats: a current taskbag allows everything.
+        write_allowed(&root, "claim").unwrap();
+        assert_eq!(
+            TEST_FORMATS.allowed_commands(3),
+            vec!["rename label", "migrate", "handoff"]
+        );
+    }
 
-        let done = upgrade_with(&root, TEST_STEPS, 4).unwrap();
+    #[test]
+    fn an_update_from_3_to_4_finishes_only_when_nothing_is_left() {
+        let (_, root) = project("three-to-four");
+        let path = root.join(PROJECT_FILE);
+        let before = fs::read_to_string(&path).unwrap();
+        // Something is left: a task carries a label that is not on the ladder.
+        let task = root.join("tasks/A1-01/task.json");
+        let text = fs::read_to_string(&task).unwrap();
+        let mut v: Value = serde_json::from_str(&text).unwrap();
+        v["label"] = "human checked".into();
+        fs::write(&task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
+
+        let err = finish_in(&root, Actor::APP, &TEST_FORMATS).unwrap_err();
+        assert_eq!(err.code(), "migration_unfinished");
+        let Problem::MigrationUnfinished { left } = &err else {
+            unreachable!()
+        };
+        assert!(
+            left.starts_with("1 problem(s): tasks/A1-01/task.json (label)"),
+            "{left}"
+        );
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            before,
+            "nothing written"
+        );
+        // The refusal of other commands says the same.
+        let Err(Problem::TaskbagOlder { left: same, .. }) =
+            write_allowed_in(&root, "claim", &TEST_FORMATS)
+        else {
+            panic!()
+        };
+        assert_eq!(&same, left);
+
+        // The agent renames the label through `alm`'s rule: nothing is left.
+        crate::rename_label(
+            &root,
+            Actor::alm(Some("claude/m")),
+            LOCK_WAIT,
+            "owner verified",
+            "human checked",
+        )
+        .unwrap();
+        assert!(load(&root).issues.is_empty());
+
+        let done = finish_in(&root, Actor::alm(Some("claude/m")), &TEST_FORMATS).unwrap();
         assert_eq!(
             done,
-            Upgraded {
+            Finished {
                 from: "allomos/3".into(),
                 to: "allomos/4".into(),
                 changed: true
             }
         );
-        assert!(root.join("later.md").is_file());
-        let project_after = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+        let after = fs::read_to_string(&path).unwrap();
         assert_eq!(
-            project_after,
-            project_before.replace("\"allomos/3\"", "\"allomos/4\""),
-            "only the format line changes"
+            after,
+            before
+                .replace("\"allomos/3\"", "\"allomos/4\"")
+                .replace("\"owner verified\"", "\"human checked\""),
+            "the format line changes, and the label the agent renamed"
         );
-        assert_eq!(format_state_against(&root, 4), FormatState::Current);
+        assert_eq!(TEST_FORMATS.state(&root), FormatState::Current);
+        let (events, _) = crate::events::list(&root);
+        let last = events.last().unwrap();
+        assert_eq!(last.command, "migrate");
+        assert_eq!(last.by.as_deref(), Some("claude/m"));
+        assert_eq!(last.changes[0].to, Some("allomos/4".into()));
 
-        // Upgrading again changes nothing.
-        let again = upgrade_with(&root, TEST_STEPS, 4).unwrap();
+        // Finishing again changes nothing.
+        let again = finish_in(&root, Actor::APP, &TEST_FORMATS).unwrap();
         assert!(!again.changed);
-        assert_eq!(
-            fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
-            project_after
-        );
-
-        // Every task is as it was (read back as allomos/3, the format this build knows).
-        set_project_format(&root, "allomos/3");
-        assert_eq!(load(&root).taskbag.unwrap().tasks, before.tasks);
+        assert_eq!(fs::read_to_string(&path).unwrap(), after);
+        // Now every command works again.
+        write_allowed_in(&root, "claim", &TEST_FORMATS).unwrap();
     }
 
     #[test]
-    fn a_newer_taskbag_or_a_missing_step_changes_nothing() {
+    fn a_newer_taskbag_or_a_missing_entry_changes_nothing() {
         let (_, root) = project("refused");
-        let text = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
+        let no_entry = Formats {
+            entries: &[],
+            current: 4,
+            oldest: 3,
+        };
         assert_eq!(
-            upgrade_with(&root, &[], 4).unwrap_err().code(),
-            "upgrade_missing"
+            finish_in(&root, Actor::APP, &no_entry).unwrap_err().code(),
+            "migration_missing"
+        );
+        assert_eq!(
+            migration_prompt_with("en", &root, &root, "allomos/3", &no_entry)
+                .unwrap_err()
+                .code(),
+            "migration_missing"
         );
         set_project_format(&root, "allomos/5");
         let newer = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
-            upgrade_with(&root, TEST_STEPS, 4).unwrap_err().code(),
+            finish_in(&root, Actor::APP, &TEST_FORMATS)
+                .unwrap_err()
+                .code(),
             "taskbag_newer"
         );
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), newer);
-        assert!(!root.join("later.md").exists());
-        assert_ne!(text, newer);
+    }
+
+    #[test]
+    fn finishing_a_current_taskbag_does_nothing() {
+        let (_, root) = project("current");
+        let done = finish(&root, Actor::APP).unwrap();
+        assert!(!done.changed);
+        assert_eq!(done.to, FORMAT);
+    }
+
+    #[test]
+    fn the_prompt_joins_the_entries_in_the_apps_language() {
+        let project = PathBuf::from("/work/bakery");
+        let taskbag = project.join(DEFAULT_DIR);
+        const SECOND: Migration = Migration {
+            from: 4,
+            ..TEST_ENTRY
+        };
+        let two = Formats {
+            entries: &[TEST_ENTRY, SECOND],
+            current: 5,
+            oldest: 3,
+        };
+        for language in ["en", "zh-CN", "ja"] {
+            let p = migration_prompt_with(language, &project, &taskbag, "allomos/3", &two).unwrap();
+            let alm = "alm --taskbag \"/work/bakery/.allomos/taskbag\"";
+            assert!(p.contains("/work/bakery"), "{language}");
+            assert!(p.contains("allomos/3 → allomos/4"), "{language}");
+            assert!(p.contains("allomos/4 → allomos/5"), "{language}");
+            assert!(p.contains("allomos/5"), "{language}");
+            assert!(
+                p.contains(&format!("`{alm} list --json`")),
+                "{language}: {p}"
+            );
+            assert!(
+                p.contains(&format!("`{alm} migrate --finish`")),
+                "{language}"
+            );
+            assert!(p.contains(&format!("`{alm} confirm --title")), "{language}");
+            assert!(p.contains("`alm rename label`"), "{language}");
+            assert!(p.contains(TEST_ENTRY.changed.get(language)), "{language}");
+            assert!(!p.contains("{alm}"), "{language}: placeholders filled");
+            // The same opening as moving another task system into Allomos (Task-A05-02).
+            assert!(
+                p.contains(&migration_header_in(language, &project, &taskbag)),
+                "{language}"
+            );
+            assert!(
+                p.contains(&ask_once_in(language, Source::OlderTaskbag)),
+                "{language}"
+            );
+            assert!(!p.contains("brief`"), "{language}: no section step");
+        }
+        let en = migration_prompt_with("en", &project, &taskbag, "allomos/3", &two).unwrap();
+        for words in [
+            "change nothing",
+            "wait for the person's answer",
+            "only through `alm`",
+            "could not decide",
+            "only when the person asks",
+        ] {
+            assert!(en.contains(words), "{words}");
+        }
+        // From 4, only the second entry.
+        let p = migration_prompt_with("en", &project, &taskbag, "allomos/4", &two).unwrap();
+        assert!(!p.contains("allomos/3 → allomos/4"));
     }
 
     #[test]
@@ -637,16 +1221,14 @@ mod tests {
                 version,
             }],
         };
+        let older = || FormatState::Older {
+            found: "allomos/3".into(),
+        };
         for language in ["en", "zh-CN", "ja"] {
-            let both = check(
-                FormatState::Older {
-                    found: "allomos/2".into(),
-                },
-                None,
-            );
-            let r = agent_update_request_in(language, &project, &taskbag, &both);
+            let both = check(older(), None);
+            let r = agent_update_request_with(language, &project, &taskbag, &both, &TEST_FORMATS);
             assert!(
-                r.contains("alm --taskbag \"/work/bakery/.allomos/taskbag\" upgrade"),
+                r.contains("alm --taskbag \"/work/bakery/.allomos/taskbag\" migrate --finish"),
                 "{language}"
             );
             assert!(
@@ -654,85 +1236,27 @@ mod tests {
                 "{language}"
             );
             assert!(r.contains("AGENTS.md"), "{language}");
+            assert!(r.contains("allomos/3 → allomos/4"), "{language}");
 
             let section = check(FormatState::Current, None);
-            let r = agent_update_request_in(language, &project, &taskbag, &section);
+            let r =
+                agent_update_request_with(language, &project, &taskbag, &section, &TEST_FORMATS);
             assert!(
-                !r.contains("upgrade`"),
-                "{language}: no upgrade when the format is current"
+                !r.contains("migrate"),
+                "{language}: no migration when the format is current"
             );
             assert!(r.contains("brief`"), "{language}");
 
-            let format = check(
-                FormatState::Older {
-                    found: "allomos/2".into(),
-                },
-                Some(SECTION_VERSION),
-            );
-            let r = agent_update_request_in(language, &project, &taskbag, &format);
+            let format = check(older(), Some(SECTION_VERSION));
+            let r = agent_update_request_with(language, &project, &taskbag, &format, &TEST_FORMATS);
             assert!(
-                r.contains("upgrade`") && !r.contains("brief`"),
+                r.contains("migrate --finish`") && !r.contains("brief`"),
                 "{language}"
             );
         }
-    }
-
-    #[test]
-    fn the_real_upgrade_from_1_adds_the_handoff_files() {
-        let (_, root) = project("from-1");
-        for f in ["handoff-template.md", "project-notes.md", "handoffs/.keep"] {
-            fs::remove_file(root.join(f)).unwrap();
-        }
-        fs::remove_dir(root.join("handoffs")).unwrap();
-        set_project_format(&root, "allomos/1");
-        let before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
-        assert_eq!(
-            format_state(&root),
-            FormatState::Older {
-                found: "allomos/1".into()
-            }
-        );
-        let done = upgrade(&root).unwrap();
-        assert_eq!(
-            (done.from.as_str(), done.to.as_str(), done.changed),
-            ("allomos/1", FORMAT, true)
-        );
-        assert_eq!(
-            crate::handoff::template(&root),
-            crate::handoff::DEFAULT_TEMPLATE
-        );
-        assert!(root.join("project-notes.md").is_file() && root.join("handoffs/.keep").is_file());
-        assert_eq!(
-            fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
-            before.replace("\"allomos/1\"", &format!("\"{FORMAT}\""))
-        );
-        assert!(load(&root).issues.is_empty());
-    }
-
-    #[test]
-    fn the_real_upgrade_from_2_adds_nothing() {
-        let (_, root) = project("from-2");
-        set_project_format(&root, "allomos/2");
-        let before = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
-        let done = upgrade(&root).unwrap();
-        assert_eq!(
-            (done.from.as_str(), done.to.as_str(), done.changed),
-            ("allomos/2", "allomos/3", true)
-        );
-        assert_eq!(
-            fs::read_to_string(root.join(PROJECT_FILE)).unwrap(),
-            before.replace("\"allomos/2\"", "\"allomos/3\"")
-        );
-        let after = load(&root);
-        assert!(after.issues.is_empty());
-        assert_eq!(after.taskbag.unwrap().tasks.len(), 1);
-    }
-
-    #[test]
-    fn upgrading_a_current_taskbag_does_nothing() {
-        let (_, root) = project("current");
-        let done = upgrade(&root).unwrap();
-        assert!(!done.changed);
-        assert_eq!(done.to, FORMAT);
+        // The section-only request reads as before (the app's tests rely on its first line).
+        let r =
+            agent_update_request_in("en", &project, &taskbag, &check(FormatState::Current, None));
+        assert!(r.starts_with("This project was set up by an older Allomos"));
     }
 }

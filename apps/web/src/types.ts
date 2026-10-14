@@ -41,6 +41,81 @@ export interface Task {
   description: string;
 }
 
+/**
+ * One change the task pane asks for (Task-A01-18), as `crates/core/src/ops.rs` `Edit` reads it.
+ * Each goes through the same rule as its `alm` command; Rust decides whether it is allowed.
+ */
+export type Edit =
+  | { field: "state"; state: State; waiting_on?: string | null }
+  | { field: "label"; label: string }
+  | { field: "waiting_on"; text: string }
+  | { field: "next_dependency"; text: string | null }
+  | { field: "handoff_note"; text: string | null }
+  | { field: "iteration"; iteration: string | null }
+  | { field: "title"; title: string }
+  | { field: "description"; text: string };
+
+/**
+ * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID
+ * means the next free one in the area; with an iteration it is also planned there (two events).
+ */
+export interface NewTask {
+  id: string | null;
+  area: string;
+  title: string;
+  description: string | null;
+  iteration: string | null;
+}
+
+/** A new iteration from the New iteration form (Task-A01-19). No ID means the next free one. */
+export interface NewIteration {
+  id: string | null;
+  name: string;
+  release: string | null;
+  start: string | null;
+  end: string | null;
+}
+
+/** What the Edit form of an iteration sends (Task-A01-29): every field; an empty release or date clears it. */
+export interface IterationChange {
+  name: string;
+  release: string;
+  start: string;
+  end: string;
+}
+
+/** The IDs the New forms suggest, each the next free one, worked out in Rust (Task-A01-19). */
+export interface NextIds {
+  area: string;
+  iteration: string;
+  /** For each area, the next free task ID in it. */
+  tasks: Record<string, string>;
+}
+
+/** One field's change in an event (crates/core/src/event.rs). A missing side was empty. */
+export interface FieldChange {
+  field: string;
+  from?: unknown;
+  to?: unknown;
+}
+
+/** One recorded change (Task-A01-17). */
+export interface TaskEvent {
+  at: string;
+  by?: string;
+  via: string;
+  command: string;
+  kind: "task" | "area" | "iteration" | "project";
+  id?: string;
+  changes: FieldChange[];
+}
+
+/** A task's history: newest first, and when the taskbag started recording (null: not yet). */
+export interface TaskHistory {
+  since: string | null;
+  events: TaskEvent[];
+}
+
 /** A problem from Rust: a code the interface words in the chosen language (see i18n/codes.json). */
 export interface Problem {
   code: string;
@@ -134,6 +209,7 @@ export interface HandoffSettings {
 export type FormatState =
   | { state: "current" }
   | { state: "older"; found: string }
+  | { state: "too_old"; found: string; oldest: string }
   | { state: "newer"; found: string }
   | { state: "unknown" };
 
@@ -182,4 +258,20 @@ export interface GitKept {
 export interface InstructionFiles {
   agents_md: boolean;
   claude_md: boolean;
+}
+
+/** Whether to offer **Install the alm command** (apps/desktop/src-tauri/src/alm_command.rs, Task-A07-12). */
+export interface AlmStatus {
+  offer: boolean;
+  /** The `alm` Terminal finds now, when it is not the app's own. */
+  found: string | null;
+  /** A real file that installing would replace. */
+  replaces_file: string | null;
+  /** An `alm` Terminal finds first, which would still be used after installing. */
+  shadowed_by: string | null;
+}
+
+export interface AlmInstalled {
+  cancelled: boolean;
+  status: AlmStatus;
 }

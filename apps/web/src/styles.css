@@ -226,6 +226,8 @@ button.link:hover { text-decoration: underline; }
 .fields dd { margin: 0; overflow-wrap: anywhere; }
 .task-pane h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .task-pane section { border-top: 1px solid var(--line); padding-top: 12px; }
+.task-pane .history { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 8px; }
+.task-pane .history li { overflow-wrap: anywhere; }
 .markdown { overflow-wrap: anywhere; }
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }
@@ -336,3 +338,28 @@ button.link:hover { text-decoration: underline; }
   /* Sits on the element's top edge, so the text it labels stays readable. */
   transform: translate(-4px, -9px);
 }
+
+/* Changing a task in the task pane (Task-A01-18). */
+.task-pane button.link.change { margin-left: 4px; font-weight: normal; vertical-align: baseline; }
+.task-pane .editor { display: grid; gap: 6px; width: 100%; }
+.task-pane .editor input[type="text"], .task-pane .editor select, .task-pane .editor textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.task-pane .editor textarea { resize: vertical; }
+.task-pane .editor p { margin: 0; }
+.task-pane .editor-buttons { display: flex; gap: 6px; }
+
+/* New task, area and iteration forms in the list (Task-A01-19). */
+.area-head .new-task { grid-column: 1 / -1; justify-self: start; }
+.area-head .group-actions { grid-column: 1 / -1; justify-self: start; display: flex; gap: 14px; }
+.create-form .delete-group { margin-left: auto; color: var(--err); }
+.create-form .delete-confirm { display: grid; gap: 6px; padding: 8px 10px; border-radius: 6px; background: var(--err-bg); }
+.create-form .delete-confirm .delete-group { margin-left: 0; }
+.create-form { display: grid; gap: 6px; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); max-width: 560px; }
+.area > .create-form { margin: 0 16px 12px; }
+.create-form h3 { margin: 0; font-size: 1em; }
+.create-form p { margin: 0; }
+.create-form label { display: grid; gap: 2px; }
+.create-form label > span { font-size: 0.85em; color: var(--muted); }
+.create-form input, .create-form select, .create-form textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.create-form textarea { resize: vertical; }
+.create-form .editor-buttons { display: flex; gap: 6px; }
+.add-group { margin: 4px 0 16px; }

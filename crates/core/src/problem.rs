@@ -61,12 +61,18 @@ problems! {
     WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of Allomos reads only \"{expected}\".";
     /// The taskbag was written by a newer Allomos (Task-A01-25). The person chooses what happens.
     TaskbagNewer { found, supported } => "taskbag_newer", "This taskbag is written in the format \"{found}\", newer than this Allomos understands (\"{supported}\"). Stop and let the person choose: update Allomos now, or let you go on working with the taskbag's files directly, from your own understanding of the newer format.";
-    /// The taskbag was written by an older Allomos and must be upgraded first (Task-A01-25).
-    TaskbagOlder { found, current } => "taskbag_older", "This taskbag is written in the older format \"{found}\"; this Allomos writes \"{current}\". Update it now: run `alm upgrade`, then run your command again.";
+    /// The taskbag is in an older format that this Allomos updates: an agent is (or should be)
+    /// updating it with `alm migrate`, so only reading and the update's own commands work
+    /// (owner, 2026-10-14; Task-A01-32). `left` lists what `alm list --json` still reports.
+    TaskbagOlder { found, current, left } => "taskbag_older", "This taskbag is in the older format \"{found}\" and is being updated to \"{current}\". Until the update is finished, only reading commands and the update's own commands work, so this command was refused. Left to fix: {left}. Run `alm migrate` for the steps, and `alm migrate --finish` when nothing is left.";
+    /// The taskbag is older than the oldest format this Allomos updates (owner, 2026-10-14).
+    TaskbagTooOld { found, oldest } => "taskbag_too_old", "This taskbag is in the format \"{found}\", too old for this Allomos to update (the oldest it updates is \"{oldest}\"). Nothing was read or changed. Stop and tell the person.";
     /// A warning: Allomos's section in AGENTS.md / CLAUDE.md is out of date (Task-A01-25).
     InstructionsOutdated { files, current } => "instructions_outdated", "Allomos's section in {files} is out of date (this Allomos writes version {current}). Update it now: replace that section with the output of `alm brief`, keep the rest of the file, and commit only those files.";
-    /// `alm upgrade` found no way from the taskbag's format to this Allomos's (Task-A01-25).
-    UpgradeMissing { found, current } => "upgrade_missing", "This Allomos cannot upgrade a taskbag from \"{found}\" to \"{current}\".";
+    /// This Allomos has no migration entry for a version on the way (Task-A01-32).
+    MigrationMissing { found, current } => "migration_missing", "This Allomos has no update steps from \"{found}\" to \"{current}\", so the update cannot be finished.";
+    /// `alm migrate --finish` while `alm list --json` still reports issues (owner, 2026-10-14).
+    MigrationUnfinished { left } => "migration_unfinished", "The update is not finished, so the new format was not written. Left to fix: {left}. Fix these with `alm`, check with `alm list --json`, then run `alm migrate --finish` again.";
     /// A handoff gate is not a percentage (Task-A03-06).
     InvalidPercent { value } => "invalid_percent", "\"{value}\" is not a percentage. Use a whole number from 0 to 100.";
     /// The handoff template may not be empty (Task-A03-06).
@@ -75,6 +81,10 @@ problems! {
     HandoffNotFound { file } => "handoff_not_found", "There is no handoff \"{file}\". `alm handoffs` lists them.";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
+    /// `alm rename label` with an empty new name (Task-A01-32).
+    LabelNameMissing => "label_name_missing", "The label needs a name.";
+    /// `alm rename label` to a name the ladder already has (Task-A01-32).
+    LabelExists { label } => "label_exists", "\"{label}\" is already a step of this project's ladder.";
     /// `task_language` is neither `ui` nor a language code (Task-A01-21).
     InvalidLanguage { value } => "invalid_language", "\"{value}\" is not a language. Use a language code such as en, zh-CN or ja, or ui to follow the Allomos app's language.";
     AreaNameMissing => "area_name_missing", "The area needs a name.";
@@ -89,6 +99,10 @@ problems! {
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";
+    /// `alm delete area` while a task, even a done or dropped one, is in the area (owner, 2026-10-14; Task-A01-29).
+    AreaNotEmpty { id, count } => "area_not_empty", "The area \"{id}\" cannot be deleted: {count} task(s) are in it, counting done and dropped ones. An area can be deleted only when no task is in it.";
+    /// `alm delete iteration` while a task, even a done or dropped one, is planned in it (owner, 2026-10-14; Task-A01-29).
+    IterationNotEmpty { id, count } => "iteration_not_empty", "The iteration \"{id}\" cannot be deleted: {count} task(s) are planned in it, counting done and dropped ones. Plan them in another iteration (`alm plan <task> <iteration>`) or take them out (`alm plan <task>`) first.";
     InvalidDate { value } => "invalid_date", "\"{value}\" is not a date. Write it as YYYY-MM-DD, for example 2026-10-08.";
     /// The file exists but could not be read. `detail` is the system's own text.
     ReadFailed { detail } => "read_failed", "Could not read this file: {detail}.";
@@ -127,6 +141,8 @@ problems! {
     StartupNotAFolder { path } => "startup_not_a_folder", "Allomos was started with {path}, which is not a folder, so nothing was opened.";
     /// Only an unheld backlog or waiting task can be made ready.
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
+    /// The app was asked to set a state that only another step sets (Task-A01-18).
+    CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
     /// A warning from `alm --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.
     CommitFailed { detail } => "commit_failed", "The change is saved, but committing it failed: {detail}";
     PushFailed { detail } => "push_failed", "The change is saved and committed, but pushing it failed: {detail}";

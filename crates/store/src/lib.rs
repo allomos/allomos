@@ -13,6 +13,8 @@ use std::time::{Duration, Instant};
 
 use fs4::{FileExt, TryLockError};
 
+use allomos_core::event::{self, Event, Kind};
+use allomos_core::ops;
 use allomos_core::{
     Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Task, Taskbag, parse_area,
     parse_iteration, parse_project, parse_task, validate_taskbag,
@@ -21,6 +23,7 @@ use serde::Serialize;
 
 mod confirm;
 mod convert;
+pub mod events;
 mod guide;
 pub mod handoff;
 mod settings;
@@ -34,10 +37,11 @@ pub use convert::{
     CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, agent_connect_request_in,
     agent_convert_request_in,
 };
+pub use events::Actor;
 pub use guide::{GUIDE_TOPICS, guide};
 pub use settings::{
-    TaskLanguage, pick_ui_language, save_ui_language, saved_ui_language, settings_dir,
-    task_language,
+    TaskLanguage, alm_offer_dismissed, dismiss_alm_offer, pick_ui_language, save_owner_name,
+    save_ui_language, saved_owner_name, saved_ui_language, settings_dir, task_language,
 };
 pub use setup::{
     SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
@@ -952,17 +956,20 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
 /// empty `areas/` and `tasks/`, a `.gitignore` for the lock and a `.gitattributes` keeping `\n`
 /// line endings. Refused when `root` exists.
 /// Never creates a Git repository.
+/// This is how the app creates one, so its first event says `via: app`.
 pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
-    init_with_labels(root, id, name, allomos_core::default_labels())
+    init_with_labels(root, id, name, allomos_core::default_labels(), Actor::APP)
 }
 
-/// [`init`] with the project's own label ladder, lowest step first. An empty ladder is
-/// refused (`ladder_empty`), like an invalid ID.
+/// [`init`] with the project's own label ladder, lowest step first, made by `actor`. An empty
+/// ladder is refused (`ladder_empty`), like an invalid ID. The taskbag's first event records its
+/// creation, which is when its history starts.
 pub fn init_with_labels(
     root: &Path,
     id: &str,
     name: &str,
     labels: Vec<String>,
+    actor: Actor,
 ) -> Result<PathBuf, Problem> {
     if root.exists() {
         return Err(Problem::TaskbagExists {
@@ -984,6 +991,12 @@ pub fn init_with_labels(
     if let Err(issues) = parse_project(PROJECT_FILE, &text) {
         return Err(issues[0].problem.clone());
     }
+    let first = actor.event(
+        "init",
+        Kind::Project,
+        Some(id),
+        event::changes(None, &project, &[]),
+    );
     let parent = root.parent().expect("a taskbag root has a parent");
     fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
     create_dir_atomic(
@@ -1000,6 +1013,7 @@ pub fn init_with_labels(
             ),
             (handoff::NOTES_FILE, handoff::DEFAULT_NOTES.to_string()),
             ("handoffs/.keep", String::new()),
+            (&events::new_file(root), json_text(&first)),
         ],
     )
     .map_err(|p| match p {
@@ -1108,6 +1122,28 @@ impl Lock {
         create_dir_atomic(&target, &files)
     }
 
+    /// Rewrite an existing area's file (`alm rename area`, Task-A01-29).
+    pub fn save_area(&self, area: &Area) -> Result<(), Problem> {
+        let path = self.root.join("areas").join(format!("{}.json", area.id));
+        write_atomic(&path, &json_text(area))
+    }
+
+    /// Rewrite an existing iteration's file (`alm change iteration`, Task-A01-29).
+    pub fn save_iteration(&self, iteration: &Iteration) -> Result<(), Problem> {
+        let path = self
+            .root
+            .join("iterations")
+            .join(format!("{}.json", iteration.id));
+        write_atomic(&path, &json_text(iteration))
+    }
+
+    /// Remove an area's or an iteration's file (`alm delete area|iteration`, Task-A01-29).
+    /// `folder` is `areas` or `iterations`.
+    pub fn remove_item(&self, folder: &str, id: &str) -> Result<(), Problem> {
+        let path = self.root.join(folder).join(format!("{id}.json"));
+        fs::remove_file(&path).map_err(|e| write_failed(&path, e))
+    }
+
     /// Rewrite `project.json` (`alm labels`).
     pub fn save_project(&self, project: &Project) -> Result<(), Problem> {
         write_atomic(&self.root.join(PROJECT_FILE), &json_text(project))
@@ -1118,6 +1154,382 @@ impl Lock {
         let path = self.root.join("tasks").join(&task.id).join("task.json");
         write_atomic(&path, &json_text(&task_file_json(task)))
     }
+
+    /// Rewrite an existing task's `description.md`, or remove it when the description is empty
+    /// (the app's task pane, Task-A01-18).
+    pub fn save_description(&self, task: &Task) -> Result<(), Problem> {
+        let path = self
+            .root
+            .join("tasks")
+            .join(&task.id)
+            .join("description.md");
+        if task.description.is_empty() {
+            match fs::remove_file(&path) {
+                Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write_failed(&path, e)),
+                _ => Ok(()),
+            }
+        } else {
+            write_atomic(&path, &task.description)
+        }
+    }
+
+    /// Make one change and record it (Task-A01-17): write `event`, then run `write`. When `write`
+    /// fails the event is taken back, so the history never shows a change that did not happen.
+    /// An event with no changes is not written: nothing happened worth recording.
+    pub fn record(
+        &self,
+        event: &Event,
+        write: impl FnOnce(&Lock) -> Result<(), Problem>,
+    ) -> Result<(), Problem> {
+        if event.changes.is_empty() {
+            return write(self);
+        }
+        let file = events::write(&self.root, event)?;
+        write(self).inspect_err(|_| {
+            let _ = fs::remove_file(&file);
+        })
+    }
+}
+
+/// A task as changed by [`change_task`], with what is worth telling the person.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Changed {
+    pub task: Task,
+    /// Things worth telling that did not refuse the change (for example `took_over`).
+    pub warnings: Vec<Problem>,
+    /// Problems found in the taskbag's files while loading it.
+    pub issues: Vec<Issue>,
+}
+
+/// The taskbag loaded at `root`, or why it cannot be worked on.
+pub fn taskbag_of(root: &Path, loaded: Loaded) -> Result<(Taskbag, Vec<Issue>), Problem> {
+    match loaded.taskbag {
+        Some(bag) => Ok((bag, loaded.issues)),
+        None => Err(Problem::TaskbagUnreadable {
+            path: root.display().to_string(),
+            detail: loaded
+                .issues
+                .first()
+                .map(|i| format!("{}: {}", i.file, i.problem.english()))
+                .unwrap_or_default(),
+        }),
+    }
+}
+
+/// Before any change, for `alm` and the app alike: refuse a taskbag in a format this Allomos does
+/// not write, or one that is being updated unless `command` (as `alm` names it) is one of the
+/// update's own ([`versions::write_allowed`], Task-A01-32); take the lock (waiting up to `wait`
+/// for another writer), then load what the change builds on. With no command, a taskbag being
+/// updated is let through and the caller checks once it knows the command.
+fn lock_for_change(
+    root: &Path,
+    wait: Duration,
+    command: Option<&str>,
+) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
+    match command {
+        Some(command) => versions::write_allowed(root, command)?,
+        None => {
+            if !matches!(
+                versions::format_state(root),
+                versions::FormatState::Older { .. }
+            ) {
+                versions::write_allowed(root, "")?;
+            }
+        }
+    }
+    let lock = Lock::acquire(root, wait)?;
+    let (bag, issues) = taskbag_of(root, lock.load())?;
+    Ok((lock, bag, issues))
+}
+
+/// Something added by [`add_area`], [`add_iteration`] or [`add_task`] (or renamed, changed or
+/// deleted by [`rename_area`], [`change_iteration`], [`delete_area`], [`delete_iteration`]), with
+/// the problems found in the taskbag's files while loading it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Added<T> {
+    pub item: T,
+    pub issues: Vec<Issue>,
+}
+
+/// A new area, the same way for `alm add area` and the app (Task-A01-19): under the lock, by the
+/// `crates/core` rule, recorded as one `add area` event. Without an ID it takes the next free one.
+pub fn add_area(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: Option<&str>,
+    name: &str,
+) -> Result<Added<Area>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("add area"))?;
+    let id = id.map_or_else(|| ops::next_area_id(&bag), String::from);
+    let area = ops::new_area(&bag, &id, name)?;
+    let event = actor.event(
+        "add area",
+        Kind::Area,
+        Some(&area.id),
+        event::changes(None, &area, &[]),
+    );
+    lock.record(&event, |l| l.create_area(&area))?;
+    Ok(Added { item: area, issues })
+}
+
+/// A new iteration, the same way for `alm add iteration` and the app (Task-A01-19): under the lock,
+/// by the `crates/core` rule, recorded as one `add iteration` event. Without an ID it takes the
+/// next free one.
+pub fn add_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: Option<&str>,
+    name: &str,
+    details: ops::IterationDetails,
+) -> Result<Added<Iteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("add iteration"))?;
+    let id = id.map_or_else(|| ops::next_iteration_id(&bag), String::from);
+    let iteration = ops::new_iteration(&bag, &id, name, details)?;
+    let event = actor.event(
+        "add iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::changes(None, &iteration, &[]),
+    );
+    lock.record(&event, |l| l.create_iteration(&iteration))?;
+    Ok(Added {
+        item: iteration,
+        issues,
+    })
+}
+
+/// An area renamed, the same way for `alm rename area` and the app (Task-A01-29): under the lock,
+/// by the `crates/core` rule, recorded as one `rename area` event. Its ID stays.
+pub fn rename_area(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    name: &str,
+) -> Result<Added<Area>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("rename area"))?;
+    let area = ops::rename_area(&bag, id, name)?;
+    let before = bag.areas.iter().find(|a| a.id == area.id);
+    let event = actor.event(
+        "rename area",
+        Kind::Area,
+        Some(&area.id),
+        event::changes(before, &area, &[]),
+    );
+    lock.record(&event, |l| l.save_area(&area))?;
+    Ok(Added { item: area, issues })
+}
+
+/// What [`rename_label`] changed: the new ladder, and the tasks whose label changed.
+pub type RenamedLabel = (Vec<String>, Vec<Task>);
+
+/// A label renamed on the ladder together with every task that carries it (`alm rename label`,
+/// Task-A01-32): under the lock, by the `crates/core` rule, recorded as one `rename label` event
+/// for the project and one for each task changed. Returns the new ladder and the tasks changed.
+pub fn rename_label(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    old: &str,
+    new: &str,
+) -> Result<Added<RenamedLabel>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("rename label"))?;
+    let (project, tasks) = ops::rename_label(&bag, old, new)?;
+    let event = actor.event(
+        "rename label",
+        Kind::Project,
+        Some(&project.id),
+        event::changes(Some(&bag.project), &project, &[]),
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
+    for task in &tasks {
+        let before = bag.tasks.iter().find(|t| t.id == task.id);
+        let event = actor.event(
+            "rename label",
+            Kind::Task,
+            Some(&task.id),
+            event::changes(before, task, event::TASK_FIELDS),
+        );
+        lock.record(&event, |l| l.save_task(task))?;
+    }
+    Ok(Added {
+        item: (project.labels, tasks),
+        issues,
+    })
+}
+
+/// An iteration changed (name, release, dates), the same way for `alm change iteration` and the
+/// app (Task-A01-29): under the lock, by the `crates/core` rule, recorded as one
+/// `change iteration` event. A change that changes nothing writes no event.
+pub fn change_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    change: &ops::IterationChange,
+) -> Result<Added<Iteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("change iteration"))?;
+    let iteration = ops::change_iteration(&bag, id, change)?;
+    let before = bag.iterations.iter().find(|i| i.id == iteration.id);
+    let event = actor.event(
+        "change iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::changes(before, &iteration, &[]),
+    );
+    lock.record(&event, |l| l.save_iteration(&iteration))?;
+    Ok(Added {
+        item: iteration,
+        issues,
+    })
+}
+
+/// An area deleted, the same way for `alm delete area` and the app (Task-A01-29): refused while
+/// any task is in it (done and dropped ones too); otherwise its file is removed under the lock,
+/// recorded as one `delete area` event listing what it had. Returns the area as it was.
+pub fn delete_area(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Added<Area>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("delete area"))?;
+    let area = ops::delete_area(&bag, id)?;
+    let event = actor.event(
+        "delete area",
+        Kind::Area,
+        Some(&area.id),
+        event::removed(&area, &[]),
+    );
+    lock.record(&event, |l| l.remove_item("areas", &area.id))?;
+    Ok(Added { item: area, issues })
+}
+
+/// An iteration deleted, the same way for `alm delete iteration` and the app (Task-A01-29):
+/// refused while any task is planned in it (done and dropped ones too); otherwise its file is
+/// removed under the lock, recorded as one `delete iteration` event. Returns it as it was.
+pub fn delete_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Added<Iteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some("delete iteration"))?;
+    let iteration = ops::delete_iteration(&bag, id)?;
+    let event = actor.event(
+        "delete iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::removed(&iteration, &[]),
+    );
+    lock.record(&event, |l| l.remove_item("iterations", &iteration.id))?;
+    Ok(Added {
+        item: iteration,
+        issues,
+    })
+}
+
+/// What a new task is made of (`alm add task`, the app's New task form).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NewTask {
+    /// Without one, the next free ID in the area.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub area: String,
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The app only: plan it there too, as `alm plan` would (owner, 2026-10-14).
+    #[serde(default)]
+    pub iteration: Option<String>,
+}
+
+/// A new task in backlog, the same way for `alm add task` and the app (Task-A01-19): under the
+/// lock, by the `crates/core` rule, recorded as one `add task` event. With an iteration it is then
+/// planned under the same lock, by the rule `alm plan` uses, as a second `plan` event: the same as
+/// typing both commands (owner, 2026-10-14). Both rules are checked before anything is written, so
+/// a refusal of either writes nothing.
+pub fn add_task(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    new: &NewTask,
+) -> Result<Added<Task>, Problem> {
+    let (lock, mut bag, issues) = lock_for_change(root, wait, Some("add task"))?;
+    let id = match &new.id {
+        Some(id) => id.clone(),
+        None => ops::next_task_id(&bag, &new.area)?,
+    };
+    let task = ops::new_task(&bag, &id, &new.area, &new.title, new.description.as_deref())?;
+    bag.tasks.push(task.clone());
+    let planned = match new
+        .iteration
+        .as_deref()
+        .map(str::trim)
+        .filter(|i| !i.is_empty())
+    {
+        Some(iteration) => Some(ops::plan(&bag, &task.id, Some(iteration))?.task),
+        None => None,
+    };
+    let added = actor.event(
+        "add task",
+        Kind::Task,
+        Some(&task.id),
+        event::changes(None, &task, event::TASK_FIELDS),
+    );
+    lock.record(&added, |l| l.create_task(&task))?;
+    let Some(planned) = planned else {
+        return Ok(Added { item: task, issues });
+    };
+    let plan = actor.event(
+        "plan",
+        Kind::Task,
+        Some(&task.id),
+        event::changes(Some(&task), &planned, event::TASK_FIELDS),
+    );
+    lock.record(&plan, |l| l.save_task(&planned))?;
+    Ok(Added {
+        item: planned,
+        issues,
+    })
+}
+
+/// One change to one task, the same way for `alm` and the app (Task-A01-18): refuse a taskbag in
+/// another format, take the lock (waiting up to `wait` for another writer), load, apply `rule`
+/// (a `crates/core` operation, which also names its command), then write the task and its event.
+/// A refused change writes nothing.
+pub fn change_task(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
+) -> Result<Changed, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, None)?;
+    let (outcome, command) = rule(&bag)?;
+    versions::write_allowed(root, command)?;
+    let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
+    let described = before.is_some_and(|b| b.description != outcome.task.description);
+    let event = actor.event(
+        command,
+        Kind::Task,
+        Some(&outcome.task.id),
+        event::changes(before, &outcome.task, event::TASK_FIELDS),
+    );
+    lock.record(&event, |l| {
+        l.save_task(&outcome.task)?;
+        if described {
+            l.save_description(&outcome.task)?;
+        }
+        Ok(())
+    })?;
+    Ok(Changed {
+        task: outcome.task,
+        warnings: outcome.warnings,
+        issues,
+    })
 }
 
 /// A fingerprint of the taskbag's files (names, sizes and change times). It changes when any
@@ -1135,6 +1547,8 @@ pub fn stamp(root: &Path) -> u64 {
     add(&root.join(PROJECT_FILE));
     add(&root.join(handoff::TEMPLATE_FILE));
     add(&root.join(handoff::NOTES_FILE));
+    // A new event changes its folder's time; reading every event file here would grow with history.
+    add(&root.join(events::EVENTS_DIR));
     for folder in ["areas", "iterations", handoff::HANDOFFS_DIR] {
         for p in sorted_entries(&root.join(folder)) {
             add(&p);
@@ -1185,7 +1599,7 @@ mod tests {
         let dir = tmp("init-ladder");
         let root = dir.join(DEFAULT_DIR);
         let ladder = vec!["drafted".to_string(), "owner verified".to_string()];
-        init_with_labels(&root, "allomos", "Allomos", ladder.clone()).unwrap();
+        init_with_labels(&root, "allomos", "Allomos", ladder.clone(), Actor::APP).unwrap();
         let bag = load(&root).taskbag.unwrap();
         assert_eq!(
             (bag.project.id.as_str(), bag.project.labels),
@@ -1193,12 +1607,12 @@ mod tests {
         );
         let other = dir.join("other");
         assert_eq!(
-            init_with_labels(&other, "p", "P", vec![]),
+            init_with_labels(&other, "p", "P", vec![], Actor::APP),
             Err(Problem::LadderEmpty)
         );
         assert!(!other.exists());
         assert!(matches!(
-            init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()]),
+            init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()], Actor::APP),
             Err(Problem::InvalidId { .. })
         ));
         fs::remove_dir_all(dir).unwrap();

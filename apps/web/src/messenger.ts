@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Agent, AgentStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, GitKept, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, IterationChange, NextIds } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -84,10 +84,49 @@ export interface Messenger {
   setHandoffTemplate(root: string, text: string): Promise<HandoffSettings>;
   /** Every handoff, newest first. */
   listHandoffs(root: string): Promise<Handoff[]>;
+  /** One task's recorded changes, newest first (Task-A01-17). */
+  taskHistory(root: string, id: string): Promise<TaskHistory>;
+  /** The person's name the app records its task changes under; null until it has been asked (Task-A01-18). */
+  ownerName(): Promise<string | null>;
+  /** Keeps the person's name in the app's settings. Rejects with a Problem. */
+  saveOwnerName(name: string): Promise<void>;
+  /**
+   * Changes one field of task `id` under the saved name, by the same rule as its `alm` command,
+   * under the taskbag's lock, recorded in its history. Resolves to the task as saved; rejects with
+   * the same Problem `alm` gives, and then nothing was changed.
+   */
+  editTask(root: string, id: string, edit: Edit): Promise<Task>;
+  /** The IDs the New forms suggest: the next free area, iteration, and task in each area (Task-A01-19). */
+  nextIds(root: string): Promise<NextIds>;
+  /**
+   * Adds an area, an iteration or a task under the saved name, by the same rule as `alm add`
+   * (a task with an iteration is then planned, as `alm plan`), under the taskbag's lock, recorded
+   * in its history. Resolves to what was saved; rejects with the same Problem `alm` gives, and then
+   * nothing was added.
+   */
+  addArea(root: string, id: string | null, name: string): Promise<Area>;
+  addIteration(root: string, iteration: NewIteration): Promise<Iteration>;
+  addTask(root: string, task: NewTask): Promise<Task>;
+  /**
+   * Renames an area, changes an iteration, or deletes either (Task-A01-29), under the saved name,
+   * by the same rule as `alm rename area`, `alm change iteration` and `alm delete`, under the
+   * taskbag's lock, recorded in its history. A delete is refused while any task is in it, done and
+   * dropped ones too. Rejects with the same Problem `alm` gives, and then nothing changed.
+   */
+  renameArea(root: string, id: string, name: string): Promise<Area>;
+  changeIteration(root: string, id: string, change: IterationChange): Promise<Iteration>;
+  deleteArea(root: string, id: string): Promise<void>;
+  deleteIteration(root: string, id: string): Promise<void>;
   /** Writes a new handoff by a person. Rejects with a Problem. */
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
+  /** Whether to offer **Install the alm command** (Task-A07-12). */
+  almCommandStatus(): Promise<AlmStatus>;
+  /** Links the app's own `alm` into Terminal's path, asking for the Mac password. Rejects with a Problem. */
+  installAlmCommand(): Promise<AlmInstalled>;
+  /** "Don't ask again" for **Install the alm command**. */
+  dismissAlmOffer(): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
@@ -147,6 +186,9 @@ export const desktopMessenger: Messenger = {
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
+  almCommandStatus: () => invoke<AlmStatus>("alm_command_status"),
+  installAlmCommand: () => invoke<AlmInstalled>("install_alm_command"),
+  dismissAlmOffer: () => invoke<void>("dismiss_alm_offer"),
   handoffSettings: (root) => invoke<HandoffSettings>("handoff_settings", { root }),
   setHandoffRules: (root, c) =>
     invoke<HandoffSettings>("set_handoff_rules", {
@@ -159,6 +201,18 @@ export const desktopMessenger: Messenger = {
     }),
   setHandoffTemplate: (root, text) => invoke<HandoffSettings>("set_handoff_template", { root, text }),
   listHandoffs: (root) => invoke<Handoff[]>("list_handoffs", { root }),
+  taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
+  ownerName: () => invoke<string | null>("owner_name"),
+  saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
+  editTask: (root, id, edit) => invoke<Task>("edit_task", { root, id, edit }),
+  nextIds: (root) => invoke<NextIds>("next_ids", { root }),
+  addArea: (root, id, name) => invoke<Area>("add_area", { root, id, name }),
+  addIteration: (root, iteration) => invoke<Iteration>("add_iteration", { root, iteration }),
+  addTask: (root, task) => invoke<Task>("add_task", { root, task }),
+  renameArea: (root, id, name) => invoke<Area>("rename_area", { root, id, name }),
+  changeIteration: (root, id, change) => invoke<Iteration>("change_iteration", { root, id, change }),
+  deleteArea: (root, id) => invoke<void>("delete_area", { root, id }),
+  deleteIteration: (root, id) => invoke<void>("delete_iteration", { root, id }),
   writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),

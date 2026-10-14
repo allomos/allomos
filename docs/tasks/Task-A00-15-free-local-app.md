@@ -10,6 +10,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | 0012's open questions: MIT open source; companions away from home both free (own Tailscale) and paid (relay); nothing else paid for now; no limits on free use | owner (chat) |
 | 2026-10-04 | "Offer developers and team leaders a new choice: they can use a local app free, if they don't want to pay — which is also my own wish." | owner (chat) |
 
 ## Notes

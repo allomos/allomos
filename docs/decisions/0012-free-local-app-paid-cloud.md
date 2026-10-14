@@ -43,12 +43,12 @@ Developers and team leaders get a real choice. They can **use the Allomos deskto
   - code signing (Apple about US$99 per year, plus a Windows certificate) from Iteration 15;
   - the domain and download page;
   - support time.
-- **Free does not decide open source.** The local app can be free but closed-source, or free and open-source. The choice affects trust, contributions and whether competitors can copy it. Still open.
+- **Free does not decide open source.** Decided separately (owner, 2026-10-14): the app is open source under MIT.
 - **Paid features must be worth paying for**, and cannot be features free users expect. Today's candidates are cloud copy and team work; others (for example hosted remote access for companions) are open.
 
-## Open questions (owner)
+## Answered questions (owner, 2026-10-14)
 
-1. **Source licence:** keep the local app closed-source but free, or open-source it (for example MIT or Apache-2.0)?
-2. **Companions away from home** (Iteration 10): free using the user's own tunnel account, or a paid hosted relay, or both?
-3. **What else is paid,** besides cloud copy and teams (iterations 13–14)?
-4. **Any limits on free use** (for example the number of projects)? The recommendation is **none**, in line with the owner's wish.
+1. ~~Source licence~~ — **open source under MIT**, as the public repository already is.
+2. ~~Companions away from home~~ — **both**: free through the user's own tunnel account (Tailscale), and later a paid Allomos-run relay with end-to-end encryption.
+3. ~~What else is paid~~ — **nothing else for now**: cloud copy, teams and the hosted relay.
+4. ~~Limits on free use~~ — **none**.

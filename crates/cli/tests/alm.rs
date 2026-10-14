@@ -518,11 +518,14 @@ fn git_sees_only_text_files() {
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     assert!(repo.join(".allomos/taskbag/.lock").exists());
     let out = git(&["status", "--porcelain", "-uall"]).unwrap();
-    let files: Vec<String> = String::from_utf8(out.stdout)
+    let (events, files): (Vec<String>, Vec<String>) = String::from_utf8(out.stdout)
         .unwrap()
         .lines()
         .map(|l| l[3..].to_string())
-        .collect();
+        .partition(|f| f.starts_with(".allomos/taskbag/events/"));
+    // One event per change: init, add area, add task, claim (Task-A01-17).
+    assert_eq!(events.len(), 4, "{events:?}");
+    assert!(events.iter().all(|f| f.ends_with(".json")));
     assert_eq!(
         files,
         [
@@ -657,10 +660,15 @@ fn commit_and_push_share_only_the_taskbag() {
         git(&repo, &["log", "-1", "--format=%s%n%b"]),
         "alm: claim A01-01\nAgent: agent-a"
     );
-    assert_eq!(
-        git(&repo, &["show", "--name-only", "--format=", "HEAD"]),
-        ".allomos/taskbag/tasks/A01-01/task.json"
+    // The task and the event that records its change (Task-A01-17).
+    let shown = git(&repo, &["show", "--name-only", "--format=", "HEAD"]);
+    let shown: Vec<&str> = shown.lines().collect();
+    assert_eq!(shown.len(), 2, "{shown:?}");
+    assert!(
+        shown[0].starts_with(".allomos/taskbag/events/"),
+        "{shown:?}"
     );
+    assert_eq!(shown[1], ".allomos/taskbag/tasks/A01-01/task.json");
     assert_eq!(git(&repo, &["status", "--porcelain"]), "M README.md");
     // The push landed on the remote.
     assert_eq!(
@@ -974,6 +982,178 @@ fn add_task_without_an_id_takes_the_next_in_its_area() {
     );
 }
 
+/// `alm add area` and `alm add iteration` take the ID as optional, like `alm add task`
+/// (Task-A01-19): with only a name, the next free one; each writes one event.
+#[test]
+fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
+    let repo = filled();
+    let events = || {
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .map(|d| d.count())
+            .unwrap_or(0)
+    };
+    // filled() has A01 and A02.
+    let before = events();
+    let v = ok(&repo, &["add", "area", "Planning"]);
+    assert_eq!(
+        (&v["area"]["id"], &v["area"]["name"]),
+        (&json!("A03"), &json!("Planning"))
+    );
+    assert_eq!(events(), before + 1);
+    // An ID given is still used as given.
+    let v = ok(&repo, &["add", "area", "A07", "Later"]);
+    assert_eq!(v["area"]["id"], "A07");
+    assert_eq!(ok(&repo, &["add", "area", "Next"])["area"]["id"], "A08");
+
+    let v = ok(&repo, &["add", "iteration", "First", "--release", "v0.1"]);
+    assert_eq!(
+        (&v["iteration"]["id"], &v["iteration"]["release"]),
+        (&json!("I01"), &json!("v0.1"))
+    );
+    let v = ok(
+        &repo,
+        &["add", "iteration", "Second", "--start", "2026-10-15"],
+    );
+    assert_eq!(v["iteration"]["id"], "I02");
+    assert_eq!(events(), before + 5);
+
+    // Refused with the same codes as before, and nothing written.
+    refused(
+        &repo,
+        &["add", "area", "A01", "Again"],
+        1,
+        "duplicate_area_id",
+    );
+    refused(
+        &repo,
+        &["add", "iteration", "I01", "Again"],
+        1,
+        "duplicate_iteration_id",
+    );
+    refused(
+        &repo,
+        &["add", "iteration", "Third", "--end", "soon"],
+        1,
+        "invalid_date",
+    );
+    assert_eq!(events(), before + 5);
+    assert!(!repo.join(".allomos/taskbag/iterations/I03.json").exists());
+}
+
+/// `alm rename area`, `alm change iteration`, `alm delete area|iteration` (Task-A01-29): each
+/// writes one event; a delete is refused while any task is in it, done and dropped ones too; a bad
+/// date has `alm add iteration`'s code.
+#[test]
+fn areas_and_iterations_are_renamed_changed_and_deleted() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    let events = || {
+        fs::read_dir(bag.join("events"))
+            .map(|d| d.count())
+            .unwrap_or(0)
+    };
+    ok(&repo, &["add", "area", "A03", "Spare"]);
+    ok(
+        &repo,
+        &["add", "iteration", "I01", "One", "--end", "2026-10-10"],
+    );
+    ok(&repo, &["add", "iteration", "I02", "Two"]);
+    let before = events();
+
+    let v = ok(&repo, &["rename", "area", "A01", "Tracking work"]);
+    assert_eq!(
+        (&v["command"], &v["area"]["id"], &v["area"]["name"]),
+        (
+            &json!("rename area"),
+            &json!("A01"),
+            &json!("Tracking work")
+        )
+    );
+    assert_eq!(events(), before + 1);
+
+    let v = ok(
+        &repo,
+        &[
+            "change",
+            "iteration",
+            "I01",
+            "--end",
+            "2026-10-20",
+            "--release",
+            "v0.1",
+        ],
+    );
+    assert_eq!(
+        (&v["iteration"]["end"], &v["iteration"]["release"]),
+        (&json!("2026-10-20"), &json!("v0.1"))
+    );
+    assert_eq!(events(), before + 2);
+    // An empty value clears it.
+    let v = ok(&repo, &["change", "iteration", "I01", "--release", ""]);
+    assert!(v["iteration"].get("release").is_none());
+    assert_eq!(events(), before + 3);
+
+    // Refusals: nothing written.
+    refused(
+        &repo,
+        &["change", "iteration", "I01", "--start", "soon"],
+        1,
+        "invalid_date",
+    );
+    refused(
+        &repo,
+        &["change", "iteration", "I09", "--name", "x"],
+        1,
+        "unknown_iteration",
+    );
+    refused(&repo, &["rename", "area", "A09", "x"], 1, "unknown_area");
+    refused(
+        &repo,
+        &["rename", "area", "A01", " "],
+        1,
+        "area_name_missing",
+    );
+    // A02 holds only a dropped task; I01 only a done one: both still count.
+    ok(&repo, &["drop", "A02-01"]);
+    ok(&repo, &["plan", "A01-01", "I01"]);
+    ok(&repo, &["--as", "w", "claim", "A01-01"]);
+    ok(&repo, &["--as", "w", "done", "A01-01"]);
+    let before = events();
+    let v = refused(&repo, &["delete", "area", "A02"], 1, "area_not_empty");
+    assert_eq!(v["error"]["params"]["count"], "1");
+    refused(
+        &repo,
+        &["delete", "iteration", "I01"],
+        1,
+        "iteration_not_empty",
+    );
+    refused(&repo, &["delete", "area", "A09"], 1, "unknown_area");
+    assert_eq!(events(), before);
+    assert!(bag.join("areas/A02.json").exists() && bag.join("iterations/I01.json").exists());
+
+    let v = ok(&repo, &["delete", "iteration", "I02"]);
+    assert_eq!(v["deleted"]["iteration"]["id"], "I02");
+    let v = ok(&repo, &["delete", "area", "A03"]);
+    assert_eq!(v["deleted"]["area"]["id"], "A03");
+    assert_eq!(events(), before + 2);
+    assert!(!bag.join("areas/A03.json").exists() && !bag.join("iterations/I02.json").exists());
+
+    // `alm list` agrees.
+    let list = ok(&repo, &["list", "--by", "iteration"]);
+    let ids: Vec<&str> = list["iterations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["I01"]);
+    let text = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(
+        text.contains("Tracking work") && !text.contains("Spare"),
+        "{text}"
+    );
+}
+
 /// `alm --json …` with its own settings folder, so the person's real app settings are never read.
 fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
     let out = Command::new(ALM)
@@ -1070,7 +1250,8 @@ fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
         &["next"][..],
         &["list"],
         &["claim", "A01-01", "--as", "a"],
-        &["upgrade"],
+        &["migrate"],
+        &["migrate", "--finish"],
     ] {
         let v = refused(&repo, args, 4, "taskbag_newer");
         let message = v["error"]["message"].as_str().unwrap();
@@ -1107,7 +1288,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
     )
     .unwrap();
     fs::write(repo.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
-    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["upgrade"]] {
+    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["migrate"]] {
         let v = ok(&repo, args);
         assert_eq!(
             v["warnings"][0]["code"], "instructions_outdated",
@@ -1134,36 +1315,112 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 }
 
 #[test]
-fn upgrade_on_a_current_taskbag_changes_nothing() {
+fn migrate_on_a_current_taskbag_changes_nothing() {
     let repo = filled();
     let path = repo.join(".allomos/taskbag/project.json");
     let before = fs::read_to_string(&path).unwrap();
-    let v = ok(&repo, &["upgrade"]);
+    let v = ok(&repo, &["migrate"]);
     assert_eq!(
-        v["upgrade"],
+        v["migrate"],
+        json!({ "from": "allomos/3", "to": "allomos/3", "needed": false })
+    );
+    assert!(v.get("prompt").is_none());
+    let v = ok(&repo, &["migrate", "--finish"]);
+    assert_eq!(
+        v["migrate"],
         json!({ "from": "allomos/3", "to": "allomos/3", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
 }
 
+/// The owner, 2026-10-14: `allomos/3` is the oldest format this Allomos updates.
 #[test]
-fn upgrade_from_2_adds_nothing_but_the_format() {
+fn a_taskbag_on_version_2_is_too_old() {
     let repo = filled();
     set_format(&repo, "allomos/2");
-    refused(&repo, &["list"], 1, "taskbag_older");
     let path = repo.join(".allomos/taskbag/project.json");
     let before = fs::read_to_string(&path).unwrap();
-    let v = ok(&repo, &["upgrade"]);
-    assert_eq!(
-        v["upgrade"],
-        json!({ "from": "allomos/2", "to": "allomos/3", "changed": true })
-    );
+    for args in [
+        &["list"][..],
+        &["next"],
+        &["migrate"],
+        &["migrate", "--finish"],
+        &["claim", "A01-01", "--as", "a"],
+    ] {
+        let v = refused(&repo, args, 1, "taskbag_too_old");
+        assert_eq!(v["error"]["params"]["found"], "allomos/2");
+        assert_eq!(v["error"]["params"]["oldest"], "allomos/3");
+        assert!(
+            v["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("too old for this Allomos to update")
+        );
+    }
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
-        before.replace("\"allomos/2\"", "\"allomos/3\"")
+        before,
+        "nothing written"
     );
-    let v = ok(&repo, &["list"]);
+    let out = alm(&repo, &["list"]);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("error [taskbag_too_old]"));
+}
+
+#[test]
+fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["--as", "a", "label", "A01-01", "owner verified"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "rename",
+            "label",
+            "owner verified",
+            "human checked",
+        ],
+    );
+    assert_eq!(
+        v["labels"],
+        json!([
+            "implemented",
+            "locally verified",
+            "deployed and verified",
+            "human checked"
+        ])
+    );
+    assert_eq!(v["tasks"][0]["id"], "A01-01");
+    assert_eq!(v["tasks"][0]["label"], "human checked");
     assert_eq!(v["issues"], json!([]));
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["task"]["label"], "human checked");
+    assert_eq!(
+        ok(&repo, &["history", "A01-01"])["events"][0]["command"],
+        "rename label"
+    );
+    refused(
+        &repo,
+        &["rename", "label", "shipped", "x"],
+        1,
+        "label_not_on_ladder",
+    );
+    refused(
+        &repo,
+        &["rename", "label", "human checked", "implemented"],
+        1,
+        "label_exists",
+    );
+    refused(
+        &repo,
+        &["rename", "label", "implemented", " "],
+        1,
+        "label_name_missing",
+    );
+    let out = alm(&repo, &["rename", "label", "implemented", "built"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("No task carried the label."));
 }
 
 #[test]
@@ -1336,6 +1593,188 @@ fn the_template_can_be_shown_and_replaced() {
         1,
         "template_empty",
     );
+}
+
+/// The event files in a taskbag (Task-A01-17).
+fn event_count(repo: &Path) -> usize {
+    fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .map(|d| {
+            d.filter_map(Result::ok)
+                .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+#[test]
+fn every_change_writes_exactly_one_event_and_a_refusal_none() {
+    let repo = filled();
+    // init, two areas and three tasks so far.
+    assert_eq!(event_count(&repo), 6);
+    let changes: &[&[&str]] = &[
+        &["add", "iteration", "I01", "First"],
+        &["ready", "A01-01"],
+        &["--as", "a", "claim", "A01-01"],
+        &["--as", "a", "label", "A01-01", "implemented"],
+        &["--as", "a", "needs", "A01-01", "a check"],
+        &["plan", "A01-01", "I01"],
+        &["--as", "a", "title", "A01-01", "Open a folder"],
+        &["--as", "a", "wait", "A01-01", "--on", "the owner"],
+        &["--as", "a", "release", "A01-01", "--note", "over to you"],
+        &["--as", "b", "claim", "A01-01"],
+        &["--as", "b", "done", "A01-01"],
+        &["drop", "A01-02"],
+        &["labels", "implemented,locally verified,owner verified"],
+        &["project", "--name", "Demo 2"],
+        &["task-language", "ja"],
+        &["handoff-rules", "--quota", "5"],
+    ];
+    for (i, args) in changes.iter().enumerate() {
+        ok(&repo, args);
+        assert_eq!(event_count(&repo), 7 + i, "after {args:?}");
+    }
+    let n = event_count(&repo);
+    // Refused changes write nothing.
+    refused(&repo, &["--as", "c", "claim", "A01-01"], 1, "task_closed");
+    refused(
+        &repo,
+        &["--as", "b", "label", "A02-01", "nope"],
+        1,
+        "label_not_on_ladder",
+    );
+    refused(
+        &repo,
+        &["add", "task", "A01-01", "--area", "A01", "--title", "T"],
+        1,
+        "duplicate_task_id",
+    );
+    // A change that changes nothing records nothing.
+    ok(&repo, &["task-language", "ja"]);
+    // Reading never writes.
+    ok(&repo, &["history", "A01-01"]);
+    ok(&repo, &["list"]);
+    assert_eq!(event_count(&repo), n);
+}
+
+#[test]
+fn history_lists_a_tasks_changes_newest_first() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    ok(&repo, &["--as", "claude/x", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "claude/x", "label", "A01-01", "implemented"],
+    );
+    let v = ok(&repo, &["history", "A01-01"]);
+    assert!(v["since"].as_str().unwrap().ends_with('Z'));
+    let events = v["events"].as_array().unwrap();
+    let commands: Vec<&str> = events
+        .iter()
+        .map(|e| e["command"].as_str().unwrap())
+        .collect();
+    assert_eq!(commands, ["label", "claim", "ready", "add task"]);
+    assert_eq!(events[0]["by"], "claude/x");
+    assert_eq!(events[0]["via"], "alm");
+    assert_eq!(
+        events[1]["changes"],
+        json!([
+            { "field": "state", "from": "ready", "to": "in_progress" },
+            { "field": "holder", "to": "claude/x" }
+        ])
+    );
+    // Nobody named: no `by`.
+    assert!(events[2].get("by").is_none());
+    // Another task's events are not listed; an unknown task is refused.
+    assert_eq!(
+        ok(&repo, &["history", "A01-02"])["events"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    refused(&repo, &["history", "A09-09"], 1, "task_not_found");
+    // For people: newest first, one line per change.
+    let out = alm(&repo, &["history", "A01-01"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.starts_with("History of A01-01 (recorded since "),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "claude/x (alm)  claim\n  state: ready → in_progress\n  holder: — → claude/x\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.find("  label").unwrap() < text.find("  claim").unwrap(),
+        "{text}"
+    );
+}
+
+#[test]
+fn two_copies_with_different_events_merge_without_conflict() {
+    let (repo, remote) = real_repo();
+    ok(&repo, &["init", "--commit"]);
+    ok(&repo, &["add", "area", "A01", "One", "--commit"]);
+    ok(
+        &repo,
+        &[
+            "add", "task", "A01-01", "--area", "A01", "--title", "T1", "--commit",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "add", "task", "A01-02", "--area", "A01", "--title", "T2", "--push",
+        ],
+    );
+    let other = repo.with_file_name("other");
+    git(
+        repo.parent().unwrap(),
+        &[
+            "clone",
+            "--quiet",
+            "-b",
+            "main",
+            remote.to_str().unwrap(),
+            other.to_str().unwrap(),
+        ],
+    );
+    git(&other, &["config", "user.name", "Other"]);
+    git(&other, &["config", "user.email", "other@example.com"]);
+    // Each copy changes a different task, at the same time, and records its own events.
+    ok(&other, &["--as", "codex/b", "claim", "A01-02", "--push"]);
+    ok(&repo, &["--as", "claude/a", "claim", "A01-01", "--commit"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "claude/a",
+            "label",
+            "A01-01",
+            "implemented",
+            "--commit",
+        ],
+    );
+    let before = event_count(&repo);
+    git(
+        &repo,
+        &[
+            "pull",
+            "--quiet",
+            "--no-rebase",
+            "--no-edit",
+            "origin",
+            "main",
+        ],
+    );
+    assert_eq!(event_count(&repo), before + 1);
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "");
+    let mine = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(mine["events"][0]["command"], "label");
+    let theirs = ok(&repo, &["history", "A01-02"]);
+    assert_eq!(theirs["events"][0]["by"], "codex/b");
 }
 
 #[test]

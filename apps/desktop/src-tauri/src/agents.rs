@@ -427,18 +427,87 @@ fn powershell_quote(text: &str) -> String {
     out
 }
 
+/// For an agent opened through a link, which starts outside any window the app controls: the
+/// line that names the app's own `alm` by its full path, only when the person's shell would find
+/// a different one ([`Task-A03-16`]; the owner's wording, 2026-10-14). `None` with no `alm` beside
+/// the app.
+///
+/// [`Task-A03-16`]: ../../../../docs/tasks/Task-A03-16-agents-use-the-apps-own-alm.md
+fn own_alm_line(own: Option<&Path>, shell: Option<&Path>) -> Option<String> {
+    let own = own?;
+    (shell != Some(own)).then(|| {
+        format!(
+            "In this task, run `alm` as `{}`, every time, never as plain `alm`.",
+            own.display()
+        )
+    })
+}
+
+/// `request` with [`own_alm_line`] first, when there is one.
+fn with_own_alm(request: &str, own: Option<&Path>, shell: Option<&Path>) -> String {
+    match own_alm_line(own, shell) {
+        Some(line) => format!("{line}\n\n{request}"),
+        None => request.to_string(),
+    }
+}
+
+/// What a new Terminal window types (macOS): the folder of the app's own `alm` first in `PATH`,
+/// for that window only, then the agent in the project. With no `alm` beside the app, `PATH` is
+/// left as it is ([`Task-A03-16`](../../../../docs/tasks/Task-A03-16-agents-use-the-apps-own-alm.md)).
+fn terminal_script(project: &Path, program: &str, alm_dir: Option<&Path>) -> String {
+    let start = format!(
+        "cd {} && {program}",
+        shell_quote(&project.display().to_string())
+    );
+    match alm_dir {
+        Some(dir) => format!(
+            "export PATH={}:\"$PATH\"; {start}",
+            shell_quote(&dir.display().to_string())
+        ),
+        None => start,
+    }
+}
+
+/// What a new PowerShell window runs (Windows): the same, with `$env:PATH`. The tool is started
+/// by its full path: a new window does not always get the same `PATH`.
+fn powershell_script(project: &Path, found: &str, alm_dir: Option<&Path>) -> String {
+    let start = format!(
+        "Set-Location -LiteralPath {}; & {}",
+        powershell_quote(&project.display().to_string()),
+        powershell_quote(found)
+    );
+    match alm_dir {
+        Some(dir) => format!(
+            "$env:PATH = {} + $env:PATH; {start}",
+            powershell_quote(&format!("{};", dir.display()))
+        ),
+        None => start,
+    }
+}
+
 /// Open one agent in `project` with `request`: through its link, or in a new terminal window
-/// with the request on the clipboard.
+/// with the request on the clipboard. Either way the agent is pointed at the app's own `alm`
+/// (Task-A03-16).
 pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> {
     let id = agent.id.as_str();
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
     }
+    let own_alm = crate::alm_command::own();
     if agent.how == "link" {
-        if let Some(url) = link(id, project, request) {
+        let request = match &own_alm {
+            Some(own) => with_own_alm(
+                request,
+                Some(own),
+                crate::alm_command::shell_alm().as_deref(),
+            ),
+            None => request.to_string(),
+        };
+        if let Some(url) = link(id, project, &request) {
             return open_link(&url).map_err(|e| ask_failed(id, e));
         }
     }
+    let alm_dir = own_alm.as_deref().and_then(Path::parent);
     let program = match id {
         "claude_cli" => "claude",
         "codex_cli" => "codex",
@@ -446,12 +515,7 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     };
     copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
-        // The tool found, by its full path: a new window does not always get the same `PATH`.
-        let script = format!(
-            "Set-Location -LiteralPath {}; & {}",
-            powershell_quote(&project.display().to_string()),
-            powershell_quote(&agent.found)
-        );
+        let script = powershell_script(project, &agent.found, alm_dir);
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
@@ -460,10 +524,7 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     }
     let script = format!(
         "tell application \"Terminal\"\nactivate\ndo script {}\nend tell",
-        applescript_string(&format!(
-            "cd {} && {program}",
-            shell_quote(&project.display().to_string())
-        ))
+        applescript_string(&terminal_script(project, program, alm_dir))
     );
     command("/usr/bin/osascript")
         .args(["-e", &script])
@@ -631,6 +692,52 @@ mod tests {
             r"'C:\Users\O''Neil\my proj'"
         );
         assert_eq!(powershell_quote("a\u{2019}b"), "'a\u{2019}\u{2019}b'");
+    }
+
+    #[test]
+    fn terminal_windows_put_the_apps_own_alm_first() {
+        let project = Path::new("/Users/me/my proj");
+        let dir = Path::new("/w/tree/target/debug");
+        assert_eq!(
+            terminal_script(project, "claude", Some(dir)),
+            "export PATH='/w/tree/target/debug':\"$PATH\"; cd '/Users/me/my proj' && claude"
+        );
+        // No `alm` beside the app: `PATH` is left as it is.
+        assert_eq!(
+            terminal_script(project, "codex", None),
+            "cd '/Users/me/my proj' && codex"
+        );
+        let found = r"C:\Users\me\AppData\Roaming\npm\claude.cmd";
+        assert_eq!(
+            powershell_script(
+                Path::new(r"C:\p"),
+                found,
+                Some(Path::new(r"C:\Apps\Allomos"))
+            ),
+            format!(
+                r"$env:PATH = 'C:\Apps\Allomos;' + $env:PATH; Set-Location -LiteralPath 'C:\p'; & '{found}'"
+            )
+        );
+        assert_eq!(
+            powershell_script(Path::new(r"C:\p"), found, None),
+            format!(r"Set-Location -LiteralPath 'C:\p'; & '{found}'")
+        );
+    }
+
+    #[test]
+    fn link_requests_name_the_apps_alm_only_when_the_shell_finds_another() {
+        let ours = Path::new("/w/tree/target/debug/alm");
+        let installed = Path::new("/Applications/Allomos.app/Contents/MacOS/alm");
+        assert_eq!(
+            with_own_alm("Do it.", Some(ours), Some(installed)),
+            "In this task, run `alm` as `/w/tree/target/debug/alm`, every time, never as plain `alm`.\n\nDo it."
+        );
+        // The shell finds no `alm` at all: named too.
+        assert!(with_own_alm("Do it.", Some(ours), None).starts_with("In this task"));
+        // The same one: nothing added.
+        assert_eq!(with_own_alm("Do it.", Some(ours), Some(ours)), "Do it.");
+        // No `alm` beside the app: nothing added.
+        assert_eq!(with_own_alm("Do it.", None, Some(installed)), "Do it.");
     }
 
     #[test]

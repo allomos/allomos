@@ -38,9 +38,9 @@ const CUSTOMIZE: &str = "# What a project may change, and what is fixed
 
 | Term | This project may change | How |
 |---|---|---|
-| Areas | which areas exist, their IDs and names | `alm add area <id> \"<name>\"` |
-| Iterations | which exist, their names, releases and dates; which task is in which | `alm add iteration`, `alm plan` |
-| Label ladder | its steps and their order | `alm labels \"<a,b,…>\"` (refused if a task's label would be left off) |
+| Areas | which areas exist, their IDs and names | `alm add area <id> \"<name>\"`, `alm rename area`, `alm delete area` (only an empty one) |
+| Iterations | which exist, their names, releases and dates; which task is in which | `alm add iteration`, `alm change iteration`, `alm delete iteration` (only an empty one), `alm plan` |
+| Label ladder | its steps and their order | `alm labels \"<a,b,…>\"` (refused if a task's label would be left off); `alm rename label \"<old>\" \"<new>\"` renames a step and the tasks that carry it |
 | Task IDs and titles | any ID of letters, digits, `-` or `_` (for example A01-02) | `alm add task <id> --area <id> --title \"…\"` |
 | Description | free Markdown in description.md | written with `alm add task --description` |
 | Task language | `ui` (follow the Allomos app's language, the default) or a language code | `alm task-language <code or ui>`; only when the person asks |
@@ -96,6 +96,7 @@ See:
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`;
   `--without-owner`: only tasks finished without the owner's check.
 - `alm show <id>`: one task in full, with its description.
+- `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
 Work a task:
 - `alm claim <id>`: you hold it; state in progress. `--take` only when its holder has stopped.
@@ -108,10 +109,16 @@ Work a task:
   `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task).
 
 Plan:
-- `alm add area <id> \"<name>\"`, `alm add iteration <id> \"<name>\" [--release …] [--start …] [--end …]`
+- `alm add area [<id>] \"<name>\"`, `alm add iteration [<id>] \"<name>\" [--release …] [--start …]
+  [--end …]`: without an ID, the next free one, like A08 or I16.
+- `alm rename area <id> \"<name>\"`; `alm change iteration <id> [--name …] [--release …]
+  [--start …] [--end …]` (an empty value clears a release or date). IDs stay.
+- `alm delete area <id>`, `alm delete iteration <id>`: refused while any task is in it, done and
+  dropped ones too (plan them elsewhere first).
 - `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]`: without
   an ID, the next free one in the area. Read `alm guide tasks` first.
-- `alm plan <id> [<iteration>]`; `alm labels \"<a,b,…>\"`
+- `alm plan <id> [<iteration>]`; `alm labels \"<a,b,…>\"`; `alm rename label \"<old>\" \"<new>\"`
+  (a step of the ladder, and every task that carries it)
 - `alm task-language`: the language to write new and changed tasks in (run it first);
   `alm task-language <code|ui>` sets it.
 
@@ -136,6 +143,8 @@ About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:
   this guide.
 - `alm init`: create a taskbag (only when there is none).
+- `alm migrate`: when `alm` says the taskbag is in an older format, the steps for updating it;
+  follow them. `alm migrate --finish` ends the update once `alm list --json` reports no issues.
 ";
 
 const WORKFLOW: &str = "# How to work the tasks

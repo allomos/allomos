@@ -10,6 +10,7 @@
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-14 | Reviewed: the areas A00–A07 and their names are OK as they are | owner (chat) |
 | 2026-10-04 | Regroup Allomos's work by user-facing capability; change the term "workstream" to "area"; accept R90 (renameable terms) | owner (chat) |
 
 ## Notes

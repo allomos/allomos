@@ -123,7 +123,7 @@ flowchart TD
     HUB --> GIT["Runs your git<br/>commit · push · pull<br/>Iteration 6"]
     HUB --> MCP["MCP server for agents<br/>Iteration 3"]
     HUB --> RUN["Start / open Claude Code and Codex<br/>Iteration 8"]
-    HUB --> SRV["Local server + pairing emails<br/>Iteration 9–10"]
+    HUB --> SRV["Local server + pairing codes<br/>Iteration 9–10"]
     CLI["allomos / alm command (Rust)<br/>same rules"] --> TB
     TB -. "optional cloud copy" .-> CLOUD["Cloud service · optional, paid<br/>Iteration 13–14"]
 ```
@@ -172,7 +172,7 @@ flowchart TD
 | **Later** | **6** | **v0.6 — Git in the app** | The owner **commits and pushes task changes** without leaving Allomos | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
 | **Later** | **7** | **v0.7 — Import the SSR board** | The owner tracks the **SSR migration** in Allomos | SSR importer (in the app and `alm import`) with a reconciliation report | R15 |
 | **Later** | **8** | **v0.8 — Start and open agents** | The owner **starts a task in Claude Code or Codex from Allomos and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
-| **Later** | **9** | **v0.9 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by email and long code (free email service, needs approval); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
+| **Later** | **9** | **v0.9 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by a 9-digit code shown on the desktop (no email); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
 | **Later** | **10** | **v0.10 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
 | **Later** | **11** | **v0.11 — New projects in minutes** | A team leader **sets up a new project with any AI agent** | **Generation kit** (prompt, file schema, examples); desktop app validates, previews and adopts generated projects | R50–R55 |
 | **Later** | **12** | **v0.12 — Timeline and export** | The owner sees a **timeline** and can **share a Markdown report** | Desktop app: timeline (gantt) generated from events; Markdown export | R8 |
@@ -203,7 +203,7 @@ flowchart TD
 6. Committing from the app runs the user's own `git`, including hooks; a refused commit shows the hook's message.
 7. The SSR board imports with every card accounted for in the reconciliation report.
 8. From the app, start one task in Claude Code and one in Codex; the status shows; "Open session" jumps in.
-9. A phone on the same network pairs by email code and shows progress; with the desktop app closed it shows the "start the desktop app" message.
+9. A phone on the same network pairs with the 9-digit code shown on the desktop and shows progress; with the desktop app closed it shows the "start the desktop app" message.
 10. A phone away from home approves a waiting item; the desktop applies and records it.
 11. An agent generates a project from the kit; Allomos validates, previews and adopts it; a broken bundle changes nothing and gets clear errors.
 12. The timeline and the Markdown export match the project's events.
@@ -219,7 +219,7 @@ flowchart TD
 - **Dependencies to watch:**
   - Iteration 2's exit check runs on **a workmate's Windows machine** (owner, 2026-10-04). The agent prepares an unsigned Windows build and a short step-by-step check list. The workmate installs it, runs the checks and reports the results, which are recorded on the card. Expect a Windows security warning on install, because builds are unsigned until Iteration 15.
   - Iteration 8 needs the agent launch research ([`A03-01`](../tasks/Task-A03-01-agent-launch-research.md)).
-  - Iterations 9–10 need the remote-access and email research ([`A04-01`](../tasks/Task-A04-01-remote-access-research.md)), and owner approval to create the email-service (9) and tunnel (10) accounts.
+  - Iterations 9–10 build on the remote-access research ([`A04-01`](../tasks/Task-A04-01-remote-access-research.md)); pairing needs no email service (owner, 2026-10-14); a hosted relay (10) needs the owner's approval before it is set up.
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
   - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 9–10 choose services that use the user's own account or a free tier.
