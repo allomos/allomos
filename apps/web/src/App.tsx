@@ -11,7 +11,9 @@ import { updateNotice } from "./versionFlow";
 import { almOfferLines } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
-import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
+import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
+import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms } from "./searchFlow";
+import { DescriptionHit, HandoffHits, Highlight, SearchBox, isSearchShortcut } from "./Search";
 import { FILTER_STATES, keepState, readFilter, stopText, toCheck, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
@@ -801,6 +803,23 @@ function TaskbagView({
     }
   };
   const stop = (task: Task) => stopText(task, box?.tasks ?? [], t);
+  // The search box (Task-A01-36): one search for the task list and the Handoffs tab, emptied when
+  // another project opens. Cmd/Ctrl+F focuses it.
+  const [query, setQuery] = useState("");
+  const terms = searchTerms(query);
+  const searching = terms.length > 0;
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => setQuery(""), [opened.root]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isSearchShortcut(e)) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // The groups in the order they are shown; the task pane's arrow keys follow this order.
   const groups: Group[] = [];
@@ -846,11 +865,16 @@ function TaskbagView({
       if (g.tasks.length === 0) groups.splice(i, 1);
     }
   }
+  // A search keeps only the tasks that match, and groups with none are left out; each group left
+  // holds a match, so it opens even if it was collapsed (the collapsed list itself is kept).
+  const found = searchGroups(groups, terms);
+  const folded = collapsedWhileSearching(collapsed, found, terms);
+  const foundHandoffs = searching ? handoffs.filter((h) => handoffMatches(h, terms)) : [];
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
-  const shown = visibleItems(groups, collapsed);
+  const shown = visibleItems(found, folded);
   const foldAll = (on: boolean) => {
     if (groupBy === "handoffs") setOpenHandoffs((keys) => setKeys(keys, shownHandoffs, !on));
-    else setCollapsed((keys) => setKeys(keys, groups.map((g) => g.key), on));
+    else setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
   };
 
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
@@ -1039,6 +1063,7 @@ function TaskbagView({
                   </select>
                 </label>
               )}
+              <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
                 <button type="button" className="link small" onClick={() => foldAll(true)}>
@@ -1055,6 +1080,7 @@ function TaskbagView({
             {groupBy === "handoffs" ? (
               <HandoffsView
                 handoffs={handoffs}
+                terms={terms}
                 tasks={box.tasks}
                 task={handoffTask}
                 onTask={setHandoffTask}
@@ -1077,12 +1103,12 @@ function TaskbagView({
               />
             ) : (
             <div className="areas">
-              {groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
+              {!searching && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
                   {rich("box.no_iterations", { add: <code>alm add iteration</code>, plan: <code>alm plan</code> })}
                 </p>
               )}
-              {groups.map((g) => (
+              {found.map((g) => (
                 <TaskGroup
                   key={g.key}
                   id={g.id}
@@ -1095,7 +1121,8 @@ function TaskbagView({
                   iterationName={groupBy === "area" ? iterationName : undefined}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
-                  collapsed={collapsed.includes(g.key)}
+                  terms={terms}
+                  collapsed={folded.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
                   onNewTask={
                     g.newTask && box.areas.length > 0
@@ -1107,11 +1134,28 @@ function TaskbagView({
                   editForm={editingIn(g) && editForm(editingIn(g)!)}
                 />
               ))}
-              {groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
+              {!searching && groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
                 <p className="muted">{t("box.empty")}</p>
               )}
+              {/* Task-A01-36: handoffs the search found, after the tasks; or that nothing was found. */}
+              {searching && (
+                <HandoffHits
+                  handoffs={foundHandoffs}
+                  terms={terms}
+                  onOpen={(file) => {
+                    setHandoffTask(null);
+                    setOpenHandoffs((keys) => withKey(keys, file));
+                    choose("handoffs");
+                  }}
+                />
+              )}
+              {searching && found.length === 0 && foundHandoffs.length === 0 && (
+                <p className="muted search-none" role="status">
+                  {t("search.nothing", { query: query.trim() })}
+                </p>
+              )}
               {/* Task-A01-19: a new area at the end of the by-area list, a new iteration at the end of the by-iteration list. */}
-              {creating && creating.kind !== "task" && creating.kind === groupBy ? (
+              {searching ? null : creating && creating.kind !== "task" && creating.kind === groupBy ? (
                 createForm(creating)
               ) : (
                 <p className="add-group">
@@ -1233,6 +1277,7 @@ function TaskGroup({
   iterationName,
   selectedId,
   onSelect,
+  terms,
   collapsed,
   onToggle,
   onNewTask,
@@ -1254,6 +1299,8 @@ function TaskGroup({
   selectedId: string | null;
   /** Clicking a task opens it in the task pane; clicking it again closes the pane. */
   onSelect: (id: string) => void;
+  /** The search's words, marked in each task (Task-A01-36); empty when not searching. */
+  terms: string[];
   /** Only the header shows: name, count and progress (Task-A01-26). */
   collapsed: boolean;
   onToggle: () => void;
@@ -1321,8 +1368,12 @@ function TaskGroup({
                   }
                 }}
               >
-                <span className="id">{task.id}</span>
-                <span className="title">{task.title}</span>
+                <span className="id">
+                  <Highlight text={task.id} terms={terms} />
+                </span>
+                <span className="title">
+                  <Highlight text={task.title} terms={terms} />
+                </span>
                 <span className="state-cell">
                   {toCheck(task) && <HumanCheckBadge task={task} />}
                   <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
@@ -1333,6 +1384,7 @@ function TaskGroup({
                   {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
                   {stop?.(task) && <span className={`stop s-${task.state}-text`}>{stop(task)}</span>}
                   {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
+                  <DescriptionHit text={task.description ?? ""} terms={terms} />
                 </span>
               </li>
             );

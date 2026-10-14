@@ -347,5 +347,13 @@
   "problem.human_check_steps_missing": "{id} に人による確認の手順がありません。人が引き継いで試せるように、手順を Markdown で書き（テスト用フォルダー、何を開き、何をクリックし、何が見えるべきか）、--steps で加えてください。",
   "problem.human_check_steps_empty": "人による確認の手順が空です。何を開き、何をクリックし、何が見えるべきかを書いてください。",
   "problem.not_done": "タスク {id} は {state} で、完了していません。人による確認ができるのは完了したタスクだけです。",
-  "problem.finished_without_owner_renamed": "タスク {id} には、allomos/4 より前の名前 finished_without_owner が残っています。「タスクバッグを移行…」で移します。"
+  "problem.finished_without_owner_renamed": "タスク {id} には、allomos/4 より前の名前 finished_without_owner が残っています。「タスクバッグを移行…」で移します。",
+  "search.label": "タスクと引き継ぎを検索",
+  "search.placeholder": "タスクと引き継ぎを検索（{keys}）",
+  "search.clear": "検索をクリア",
+  "search.nothing": "「{query}」は見つかりませんでした。この言葉を含むタスクや引き継ぎはありません。",
+  "search.in_description": "説明：",
+  "search.handoffs": "見つかった引き継ぎ",
+  "search.handoff_count": "{count} 件",
+  "search.handoff_kind": "引き継ぎ"
 }

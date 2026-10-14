@@ -374,3 +374,25 @@ button.link:hover { text-decoration: underline; }
 .manual { margin: 6px 0 0 24px; display: grid; gap: 6px; }
 .manual p { margin: 0; }
 .manual-request { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; resize: vertical; }
+
+/* Searching the task list (Task-A01-36): the box sits in the list's tool row, before Collapse all;
+   found words are marked in the accent's pale tint, readable in light and dark mode. */
+.search { position: relative; display: inline-flex; align-items: center; flex: 1 1 220px; max-width: 360px; }
+.search svg { position: absolute; left: 9px; width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; pointer-events: none; }
+.search input {
+  width: 100%; font: 13px var(--font); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 28px 5px 29px;
+}
+.search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The box's own clear button replaces the one the browser may draw. */
+.search input::-webkit-search-cancel-button { display: none; }
+.search-clear { position: absolute; right: 4px; border: none; background: none; padding: 0 6px; font-size: 16px; line-height: 1; color: var(--muted); }
+.search-clear:hover { color: var(--ink); }
+mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+.search-snippet { color: var(--muted); overflow-wrap: anywhere; }
+.search-where { font-weight: 600; }
+.handoff-list .search-snippet { margin: 0; padding-left: 18px; }
+.search-handoffs .task { grid-template-columns: 76px minmax(0, 1fr) auto; }
+.search-handoffs .kind { font-size: 11.5px; font-weight: 600; color: var(--accent-ink); text-transform: uppercase; letter-spacing: .04em; }
+.search-handoffs .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.search-none { margin: 0; }
