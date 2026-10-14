@@ -9,12 +9,14 @@ Plain meanings of the words used in Allomos's documents and product.
 | **Worktree** | A separate working folder of the same git repository, checked out on its own branch, so several sessions can work at once without disturbing each other. |
 | **Card / task** | One unit of work with one observable outcome. In this repo a card is a file in `docs/tasks/`; in the product it is a task record. |
 | **Area** | *What* part of the product a task belongs to, named after what users can do (Allomos's own: A00 Planning … A07 Platform & release; [CARDS](./workflow/CARDS.md#areas)). Each task has exactly one area. Formerly "workstream" — the SSR project's word, which Allomos maps to area. Other tools say epic, component or track. Renameable per project (R90). |
-| **State** | Where a task is in its life: backlog, ready, in progress, waiting, done, dropped. |
-| **Label** | The last *proven* step of a task's progress, from a fixed ladder (e.g. implemented → locally verified → deployed and verified → owner verified). The only allowed progress claim. |
+| **State** | Where a task is in its life: backlog, ready, in progress, waiting, blocked, done, dropped. |
+| **Label** | The last *proven* step of a task's progress, from a fixed ladder (e.g. implemented → locally verified → deployed and verified → human verified). The only allowed progress claim. |
+| **Human check** | A person trying a finished task by hand; its step is the ladder's top label (*human verified*, formerly *owner verified*). A task finished without it in a loop or automatic run is **to check** ("Not human-checked") until someone marks it checked. zh-CN 人工检查, ja 人による確認. |
+| **Approver** | The person who decides and approves: cards, plans, external operations. For Allomos itself, will.w.hui; in cloud projects later, the approving role. Formerly "owner". zh-CN 审批人, ja 承認者. |
 | **Claim** | A session or person taking a task, so no one else works on it at the same time. |
-| **Waiting on** | What blocks a task's next step: an owner check, an approval, another task, or something external. |
+| **Waiting on** | What a waiting task needs from a person (the approver unless `who` names someone) or an outside event. Another task that must finish first makes it *blocked* instead. |
 | **Next dependency** | The single thing that must happen before a task can reach its next label. |
-| **Approval** | The owner's explicit yes to one exact external operation (e.g. deploy to a named target). Approving a card covers only its local work. |
+| **Approval** | The approver's explicit yes to one exact external operation (e.g. deploy to a named target). Approving a card covers only its local work. |
 | **External operation** | Anything with an effect outside this machine's working copy: hosted databases, deployments, secrets, email, creating repositories, pushing to a new remote. |
 | **Event** | An append-only record of one change (who, what, when). Burndown and timelines are computed from events. |
 | **Burndown** | A chart of work remaining (and total scope) over time; where the line is heading suggests when work will finish. |

@@ -56,7 +56,7 @@ alm claim A01-03
 
 ### 在队友之间切换：交出去的是项目，不是一堆笔记
 
-同一个任务包把工作从你手里交给队友，再交回来。每个人用自己的智能体，大家看到的是同一批任务。每个任务都随身带着：**谁在负责**（某个人，或某个智能体会话）、**验证阶段**（已实现 … 负责人已确认）、**在等什么**，以及**交接笔记**。在共用的代码仓库里，任务包随 Git 一起流转，不花一分钱；云端项目再加上实时共享、邮箱邀请和角色权限 *（计划中）*。
+同一个任务包把工作从你手里交给队友，再交回来。每个人用自己的智能体，大家看到的是同一批任务。每个任务都随身带着：**谁在负责**（某个人，或某个智能体会话）、**验证阶段**（已实现 … 已人工验证）、**在等什么**，以及**交接笔记**。在共用的代码仓库里，任务包随 Git 一起流转，不花一分钱；云端项目再加上实时共享、邮箱邀请和角色权限 *（计划中）*。
 
 ### AI 技能：和智能体合作，越做越好 *（设计中）*
 
@@ -101,7 +101,7 @@ alm claim A01-03
 
 - 从源代码运行应用：[docs/workflow/CODING_RULES.md § Running the app](docs/workflow/CODING_RULES.md#running-the-app)（英文）。
 - 产品计划：[docs/product/PLAN.md](docs/product/PLAN.md) · 需求：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 三组功能：[决定 0014](docs/decisions/0014-main-purpose-and-three-sets.md)（均为英文）。
-- 当前在做什么、负责人待答的问题：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。完整的任务清单在「换肩」自己的任务包里，放在另一个仓库中，目前尚未公开。有权限的维护者把它克隆到这个仓库旁边（`../allomos-taskbag`），然后运行 `alm list --taskbag "../allomos-taskbag/.allomos/taskbag"`，或在「换肩」应用里打开这个仓库。
+- 当前在做什么、审批人待答的问题：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。完整的任务清单在「换肩」自己的任务包里，放在另一个仓库中，目前尚未公开。有权限的维护者把它克隆到这个仓库旁边（`../allomos-taskbag`），然后运行 `alm list --taskbag "../allomos-taskbag/.allomos/taskbag"`，或在「换肩」应用里打开这个仓库。
 - 全部文档：[docs/README.md](docs/README.md)。AI 智能体从 [AGENTS.md](AGENTS.md) 开始。
 
 ## 许可证

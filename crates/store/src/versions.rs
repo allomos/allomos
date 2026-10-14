@@ -24,7 +24,9 @@ use allomos_core::event::{Change, Kind};
 ///
 /// 2: the handoff lines (Task-A03-06).
 /// 3: the rule for finishing a task, and `alm next` listing every free ready task (Task-A03-15).
-pub const SECTION_VERSION: u32 = 3;
+/// 4: `waiting` (on a person) and `blocked` (by another task), seven states (Task-A01-31); the
+/// human check: `--without-human-check` with its steps, `alm human`, `alm checked` (Task-A03-18).
+pub const SECTION_VERSION: u32 = 4;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -143,11 +145,39 @@ pub struct Migration {
 }
 
 /// The migration entries this Allomos knows, oldest first: one per format version from
-/// [`OLDEST_FORMAT_VERSION`] up to [`FORMAT_VERSION`]. Empty while those are the same.
+/// [`OLDEST_FORMAT_VERSION`] up to [`FORMAT_VERSION`].
 ///
-/// The first entry will be 3 → 4 (A01-31's `blocked` state, A03-18's human-check rename); it is
-/// added with the format change itself, not before.
-pub const MIGRATIONS: &[Migration] = &[];
+/// 3 → 4 holds two parts, each text starting with its card: A01-31's `blocked` state (decision
+/// 0016), and A03-18's human check (the note's new name and steps, the top label "human
+/// verified"). One entry, not 4 and 5 (owner, 2026-10-14); the rename is done by the agent with
+/// `alm`, never by a code step, and a customised ladder is shown to the person, never guessed.
+pub const MIGRATIONS: &[Migration] = &[MIGRATION_3_TO_4];
+
+/// allomos/3 → allomos/4. Data only: what changed, what to add, what to decide task by task.
+const MIGRATION_3_TO_4: Migration = Migration {
+    from: 3,
+    changed: Words {
+        en: "[A01-31, the blocked state] A task that cannot go on is now either `waiting` (a person or an outside event must act: `waiting_on` says what, the new optional `who` says who; without `who` the approver is meant) or the new state `blocked` (another task in this taskbag must finish first: the new field `blocked_by` lists those task IDs). A task that is blocked and also waits on a person is `blocked`; the person part goes in its next dependency. Allomos now has seven states.\n  [A03-18, the human check] The word \"owner\" is split by meaning: a person trying the finished task is the **human check**, and the person who decides and approves is the **approver**. A task's `finished_without_owner` is now `without_human_check` (why it was finished without the human check, and in which run), with the new optional `human_check_steps` (Markdown: how a person checks it); `alm done --without-human-check \"<why>\" --steps <file.md>` writes them (`--without-owner` still works). `alm human` lists the tasks to check and to answer; `alm checked <id>` (or the top label on a done task) marks one checked and clears both, which its history keeps. A new taskbag's top label is \"human verified\" instead of \"owner verified\"; an existing ladder is the project's own and changes only with the person's answer.",
+        zh_cn: "[A01-31，阻塞状态] 无法继续的任务现在分两种：`waiting`（等待某人或外部事件：`waiting_on` 写明等什么，新的可选字段 `who` 写明等谁；没有 `who` 就是在等审批人），或新状态 `blocked`（必须先完成本任务包里的其他任务：新字段 `blocked_by` 列出这些任务 ID）。既被阻塞又在等人的任务是 `blocked`，等人的部分写进它的下一个依赖。Allomos 现在有七个状态。\n  [A03-18，人工检查] \"owner\" 一词按含义拆开：由人亲手试用已完成的任务叫**人工检查**，做决定和审批的人叫**审批人**。任务的 `finished_without_owner` 现在叫 `without_human_check`（为什么没有人工检查就完成、在哪次运行中），另有新的可选字段 `human_check_steps`（Markdown：人怎样检查它）；用 `alm done --without-human-check \"<原因>\" --steps <file.md>` 写入（`--without-owner` 仍然可用）。`alm human` 列出待检查和待回答的任务；`alm checked <id>`（或给已完成的任务设最高标签）把它标为已检查并清除这两项，历史记录会保留。新任务包的最高标签是 \"human verified\"，不再是 \"owner verified\"；已有的标签阶梯属于项目自己，只有用户回答后才改。",
+        ja: "[A01-31、ブロック状態] 先に進めないタスクは、`waiting`（人か外部の出来事を待つ：`waiting_on` に何を、新しい任意の `who` に誰を書く。`who` がなければ承認者を待つ）か、新しい状態 `blocked`（このタスクバッグのほかのタスクが先に終わる必要がある：新しいフィールド `blocked_by` にそのタスク ID を並べる）のどちらかになりました。ブロックされていて人も待つタスクは `blocked` で、人の部分は次の依存に書きます。Allomos の状態は七つになりました。\n  [A03-18、人による確認] \"owner\" という語を意味で分けました：終わったタスクを人が実際に試すことを**人による確認**、決めて承認する人を**承認者**と呼びます。タスクの `finished_without_owner` は `without_human_check`（人による確認なしで終えた理由と、どの実行か）になり、新しい任意の `human_check_steps`（Markdown：人がどう確認するか）が加わりました。`alm done --without-human-check \"<理由>\" --steps <file.md>` で書きます（`--without-owner` も使えます）。`alm human` は確認待ちと回答待ちのタスクを挙げ、`alm checked <id>`（または終わったタスクに最上位のラベル）で確認済みにし、両方を消します（履歴には残ります）。新しいタスクバッグの最上位のラベルは \"owner verified\" ではなく \"human verified\" です。既存のラダーはプロジェクトのもので、相手の答えがあるときだけ変えます。",
+    },
+    add: Words {
+        en: "[A01-31] Nothing is required: `who` and `blocked_by` are optional, and no task moves by itself.\n  [A03-18] Nothing is required: `human_check_steps` is optional.",
+        zh_cn: "[A01-31] 不需要添加任何东西：`who` 和 `blocked_by` 都是可选的，没有任务会自己改变状态。\n  [A03-18] 不需要添加任何东西：`human_check_steps` 是可选的。",
+        ja: "[A01-31] 必須の追加はありません：`who` と `blocked_by` は任意で、どのタスクも自分では動きません。\n  [A03-18] 必須の追加はありません：`human_check_steps` は任意です。",
+    },
+    decide: Words {
+        en: "[A01-31] For each `waiting` task: it stays `waiting` unless its waiting-on or next dependency shows that another task in this taskbag must finish first. Only then, and only with the person's answer to your plan, move it with `{alm} block <id> --by <task-id> [<task-id>…] --as <you>`; if it also waits on a person, keep that part with `{alm} needs <id> \"<what, from whom>\" --as <you>`. A task that waits on someone other than the approver may get `--who`: `{alm} wait <id> --on \"<what>\" --who \"<who>\" --as <you>`. When you cannot tell, leave the task `waiting` and list it under what you could not decide.\n  [A03-18] (1) The ladder (`labels` in the taskbag's `project.json`): show the person the whole ladder as it is. If its top step is \"owner verified\", propose `{alm} rename label \"owner verified\" \"human verified\" --as <you>` (it renames the label on every task that carries it too). If the ladder is customised in any other way, ask which step, if any, is the human check and what it should be called; never guess, and rename nothing without the answer. (2) Each task that still has `finished_without_owner` (`{alm} list --json` reports it as `finished_without_owner_renamed`): if its label is below the top step, no person has checked it yet: move the note unchanged with `{alm} done <id> --without-human-check \"<the same note>\" --as <you>`, adding `--steps <file.md>` only when the task's card or description says how a person checks it (otherwise list it under what is left for the person). If its label is already the top step, a person has checked it: `{alm} checked <id> --as <you>` clears the old note, which its history keeps.",
+        zh_cn: "[A01-31] 对每个 `waiting` 任务：保持 `waiting`，除非它的等待内容或下一个依赖表明必须先完成本任务包里的另一个任务。只有这时，并且用户同意了你的计划，才用 `{alm} block <id> --by <任务 ID> [<任务 ID>…] --as <你>` 改为阻塞；如果它还在等人，用 `{alm} needs <id> \"<等什么、等谁>\" --as <你>` 保留这部分。等的不是审批人的任务可以加 `--who`：`{alm} wait <id> --on \"<什么>\" --who \"<谁>\" --as <你>`。无法判断时，保持 `waiting`，并列入你无法决定的事项。\n  [A03-18] (1) 标签阶梯（任务包 `project.json` 里的 `labels`）：把整个阶梯原样给用户看。如果最高一级是 \"owner verified\"，建议用 `{alm} rename label \"owner verified\" \"human verified\" --as <你>`（带这个标签的任务也会一起改名）。如果阶梯有其他自定义，问用户哪一级（如果有）是人工检查、应该叫什么；不要猜，没有回答就什么都不改名。(2) 每个仍带有 `finished_without_owner` 的任务（`{alm} list --json` 报告为 `finished_without_owner_renamed`）：如果它的标签低于最高一级，说明还没有人检查过：用 `{alm} done <id> --without-human-check \"<原样的说明>\" --as <你>` 原样移过去；只有当任务的卡片或描述写明了人怎样检查时才加 `--steps <file.md>`（否则把它列入留给用户的事项）。如果它的标签已经是最高一级，说明有人检查过了：用 `{alm} checked <id> --as <你>` 清除旧说明，历史记录会保留它。",
+        ja: "[A01-31] `waiting` のタスクごとに：待っている内容か次の依存から、このタスクバッグのほかのタスクが先に終わる必要があるとわかる場合を除き、`waiting` のままにします。その場合だけ、しかも計画への相手の答えを得てから、`{alm} block <id> --by <タスク ID> [<タスク ID>…] --as <あなた>` で移します。人も待っているなら、その部分は `{alm} needs <id> \"<何を、誰から>\" --as <あなた>` で残します。承認者以外を待つタスクには `--who` を付けられます：`{alm} wait <id> --on \"<何>\" --who \"<誰>\" --as <あなた>`。判断できないときは `waiting` のままにし、決められなかったことに挙げます。\n  [A03-18] (1) ラダー（タスクバッグの `project.json` の `labels`）：ラダー全体をそのまま相手に見せます。最上位が \"owner verified\" なら、`{alm} rename label \"owner verified\" \"human verified\" --as <あなた>` を提案します（そのラベルを持つタスクも一緒に変わります）。ほかに独自の形になっているなら、どの段が（あれば）人による確認で、何と呼ぶかを尋ねます。推測せず、答えがなければ何も名前を変えません。(2) まだ `finished_without_owner` を持つタスクごとに（`{alm} list --json` が `finished_without_owner_renamed` と報告します）：ラベルが最上位より下なら、まだ誰も確認していません。`{alm} done <id> --without-human-check \"<同じメモ>\" --as <あなた>` でメモをそのまま移し、タスクのカードか説明に人による確認のしかたが書いてあるときだけ `--steps <file.md>` を付けます（なければ相手に残すことに挙げます）。ラベルがすでに最上位なら、人が確認済みです：`{alm} checked <id> --as <あなた>` で古いメモを消します（履歴には残ります）。",
+    },
+    commands: &["block", "wait", "needs", "rename label", "done", "checked"],
+    check: Words {
+        en: "[A01-31] `{alm} list --json` reports no issues: every `blocked` task names at least one other task of this taskbag in `blocked_by`. `{alm} list --state blocked` shows each task you moved, and `{alm} list --state waiting` the rest.\n  [A03-18] `{alm} list --json` reports no `finished_without_owner_renamed`; `{alm} human` lists under To check every task whose note you moved; the ladder's top step is the one the person chose.",
+        zh_cn: "[A01-31] `{alm} list --json` 没有报告问题：每个 `blocked` 任务的 `blocked_by` 至少列出本任务包里的另一个任务。`{alm} list --state blocked` 显示你改过的每个任务，`{alm} list --state waiting` 显示其余的。\n  [A03-18] `{alm} list --json` 没有报告 `finished_without_owner_renamed`；`{alm} human` 的待检查里列出你移过说明的每个任务；阶梯的最高一级是用户选定的那个。",
+        ja: "[A01-31] `{alm} list --json` が問題を報告しないこと：`blocked` のタスクはどれも `blocked_by` にこのタスクバッグのほかのタスクを一つ以上挙げている。`{alm} list --state blocked` に移したタスクが、`{alm} list --state waiting` に残りが出ること。\n  [A03-18] `{alm} list --json` が `finished_without_owner_renamed` を報告しないこと。`{alm} human` の確認待ちに、メモを移したタスクがすべて出ること。ラダーの最上位が相手の選んだ段であること。",
+    },
+};
 
 /// Commands that change the taskbag but always work while an update is unfinished: the update's
 /// own, and writing a handoff (a session may have to stop in the middle of an update).
@@ -821,14 +851,14 @@ mod tests {
         fs::write(path, text).unwrap();
     }
 
-    /// A made-up entry from 3 to 4, standing in for the first real one (never shipped): the top
+    /// A made-up entry from 4 to 5, standing in for a later one (never shipped): the top
     /// label is renamed, and each task decides nothing.
     const TEST_ENTRY: Migration = Migration {
-        from: 3,
+        from: 4,
         changed: Words {
-            en: "The top label is now called \"human checked\".",
-            zh_cn: "最高的标签现在叫 \"human checked\"。",
-            ja: "いちばん上のラベルは \"human checked\" になりました。",
+            en: "The top label is now called \"person checked\".",
+            zh_cn: "最高的标签现在叫 \"person checked\"。",
+            ja: "いちばん上のラベルは \"person checked\" になりました。",
         },
         add: Words {
             en: "Nothing.",
@@ -836,21 +866,21 @@ mod tests {
             ja: "なし。",
         },
         decide: Words {
-            en: "Nothing: every task with \"owner verified\" becomes \"human checked\".",
+            en: "Nothing: every task with \"human verified\" becomes \"person checked\".",
             zh_cn: "无。",
             ja: "なし。",
         },
         commands: &["rename label"],
         check: Words {
-            en: "`{alm} list --json` shows no task labelled \"owner verified\".",
-            zh_cn: "`{alm} list --json` 里没有 \"owner verified\"。",
-            ja: "`{alm} list --json` に \"owner verified\" がないこと。",
+            en: "`{alm} list --json` shows no task labelled \"human verified\".",
+            zh_cn: "`{alm} list --json` 里没有 \"human verified\"。",
+            ja: "`{alm} list --json` に \"human verified\" がないこと。",
         },
     };
     const TEST_FORMATS: Formats = Formats {
         entries: &[TEST_ENTRY],
-        current: 4,
-        oldest: 3,
+        current: 5,
+        oldest: 4,
     };
 
     #[test]
@@ -948,14 +978,14 @@ mod tests {
         assert_eq!(
             TEST_FORMATS.state(&root),
             FormatState::Older {
-                found: "allomos/3".into()
+                found: "allomos/4".into()
             }
         );
-        set_project_format(&root, "allomos/4");
+        set_project_format(&root, "allomos/5");
         assert_eq!(
             format_state(&root),
             FormatState::Newer {
-                found: "allomos/4".into()
+                found: "allomos/5".into()
             }
         );
         assert_eq!(TEST_FORMATS.state(&root), FormatState::Current);
@@ -1022,7 +1052,7 @@ mod tests {
             let Problem::TaskbagOlder { left, current, .. } = &err else {
                 unreachable!()
             };
-            assert_eq!(current, "allomos/4");
+            assert_eq!(current, "allomos/5");
             assert!(left.contains("no problems reported"), "{left}");
         }
         for command in ["rename label", "migrate", "handoff"] {
@@ -1031,13 +1061,13 @@ mod tests {
         // The real formats: a current taskbag allows everything.
         write_allowed(&root, "claim").unwrap();
         assert_eq!(
-            TEST_FORMATS.allowed_commands(3),
+            TEST_FORMATS.allowed_commands(4),
             vec!["rename label", "migrate", "handoff"]
         );
     }
 
     #[test]
-    fn an_update_from_3_to_4_finishes_only_when_nothing_is_left() {
+    fn an_update_finishes_only_when_nothing_is_left() {
         let (_, root) = project("three-to-four");
         let path = root.join(PROJECT_FILE);
         let before = fs::read_to_string(&path).unwrap();
@@ -1045,7 +1075,7 @@ mod tests {
         let task = root.join("tasks/A1-01/task.json");
         let text = fs::read_to_string(&task).unwrap();
         let mut v: Value = serde_json::from_str(&text).unwrap();
-        v["label"] = "human checked".into();
+        v["label"] = "person checked".into();
         fs::write(&task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
 
         let err = finish_in(&root, Actor::APP, &TEST_FORMATS).unwrap_err();
@@ -1075,8 +1105,8 @@ mod tests {
             &root,
             Actor::alm(Some("claude/m")),
             LOCK_WAIT,
-            "owner verified",
-            "human checked",
+            "human verified",
+            "person checked",
         )
         .unwrap();
         assert!(load(&root).issues.is_empty());
@@ -1085,8 +1115,8 @@ mod tests {
         assert_eq!(
             done,
             Finished {
-                from: "allomos/3".into(),
-                to: "allomos/4".into(),
+                from: "allomos/4".into(),
+                to: "allomos/5".into(),
                 changed: true
             }
         );
@@ -1094,8 +1124,8 @@ mod tests {
         assert_eq!(
             after,
             before
-                .replace("\"allomos/3\"", "\"allomos/4\"")
-                .replace("\"owner verified\"", "\"human checked\""),
+                .replace("\"allomos/4\"", "\"allomos/5\"")
+                .replace("\"human verified\"", "\"person checked\""),
             "the format line changes, and the label the agent renamed"
         );
         assert_eq!(TEST_FORMATS.state(&root), FormatState::Current);
@@ -1103,7 +1133,7 @@ mod tests {
         let last = events.last().unwrap();
         assert_eq!(last.command, "migrate");
         assert_eq!(last.by.as_deref(), Some("claude/m"));
-        assert_eq!(last.changes[0].to, Some("allomos/4".into()));
+        assert_eq!(last.changes[0].to, Some("allomos/5".into()));
 
         // Finishing again changes nothing.
         let again = finish_in(&root, Actor::APP, &TEST_FORMATS).unwrap();
@@ -1118,20 +1148,20 @@ mod tests {
         let (_, root) = project("refused");
         let no_entry = Formats {
             entries: &[],
-            current: 4,
-            oldest: 3,
+            current: 5,
+            oldest: 4,
         };
         assert_eq!(
             finish_in(&root, Actor::APP, &no_entry).unwrap_err().code(),
             "migration_missing"
         );
         assert_eq!(
-            migration_prompt_with("en", &root, &root, "allomos/3", &no_entry)
+            migration_prompt_with("en", &root, &root, "allomos/4", &no_entry)
                 .unwrap_err()
                 .code(),
             "migration_missing"
         );
-        set_project_format(&root, "allomos/5");
+        set_project_format(&root, "allomos/6");
         let newer = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
         assert_eq!(
             finish_in(&root, Actor::APP, &TEST_FORMATS)
@@ -1140,6 +1170,167 @@ mod tests {
             "taskbag_newer"
         );
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), newer);
+    }
+
+    /// The real 3 → 4 entry, both parts. A01-31: waiting tasks stay waiting unless the agent
+    /// moves one. A03-18: the old ladder's top step is renamed with `rename label`, the old note
+    /// is moved with `done` or cleared with `checked`, and the finish is refused until no task
+    /// carries the old name. Mid-migration only the entry's commands (and `migrate`, `handoff`)
+    /// change the taskbag; the finish writes only the format line.
+    #[test]
+    fn the_real_migration_from_3_to_4() {
+        let (_, root) = project("real-three-to-four");
+        let lock = Lock::acquire(&root, LOCK_WAIT).unwrap();
+        for (id, state, extra) in [
+            (
+                "A1-02",
+                "waiting",
+                r#","waiting_on":"the approver approves the card""#,
+            ),
+            (
+                "A1-03",
+                "waiting",
+                r#","waiting_on":"A1-01 must be done first","next_dependency":"A1-01 finished""#,
+            ),
+            (
+                "A1-04",
+                "done",
+                r#","label":"locally verified","finished_without_owner":"loop run""#,
+            ),
+            (
+                "A1-05",
+                "done",
+                r#","label":"human verified","finished_without_owner":"card run""#,
+            ),
+        ] {
+            let json =
+                format!(r#"{{"id":"{id}","area":"A1","title":"T","state":"{state}"{extra}}}"#);
+            lock.create_task(&serde_json::from_str(&json).unwrap())
+                .unwrap();
+        }
+        drop(lock);
+        set_project_format(&root, "allomos/3");
+        // A taskbag written by allomos/3: the old default ladder and the old note's name.
+        let path = root.join(PROJECT_FILE);
+        let text = fs::read_to_string(&path).unwrap();
+        fs::write(&path, text.replace("human verified", "owner verified")).unwrap();
+        let task_file = |id: &str| root.join(format!("tasks/{id}/task.json"));
+        let text = fs::read_to_string(task_file("A1-05")).unwrap();
+        fs::write(
+            task_file("A1-05"),
+            text.replace("human verified", "owner verified"),
+        )
+        .unwrap();
+        let before = fs::read_to_string(&path).unwrap();
+        let waiting_before = fs::read_to_string(task_file("A1-02")).unwrap();
+        assert_eq!(
+            format_state(&root),
+            FormatState::Older {
+                found: "allomos/3".into()
+            }
+        );
+        for command in ["claim", "label", "add task", "labels", "release"] {
+            assert_eq!(
+                write_allowed(&root, command).unwrap_err().code(),
+                "taskbag_older",
+                "{command}"
+            );
+        }
+        for command in [
+            "block",
+            "wait",
+            "needs",
+            "rename label",
+            "done",
+            "checked",
+            "migrate",
+            "handoff",
+        ] {
+            write_allowed(&root, command).unwrap();
+        }
+        let prompt = migration_prompt_in("en", &root, &root, "allomos/3").unwrap();
+        assert!(prompt.contains("allomos/3 → allomos/4"));
+        assert!(prompt.contains("block <id> --by"), "{prompt}");
+        assert!(prompt.contains("[A03-18"), "{prompt}");
+        assert!(
+            prompt.contains("rename label \"owner verified\" \"human verified\""),
+            "{prompt}"
+        );
+        assert!(prompt.contains("never guess"), "{prompt}");
+        assert!(!prompt.contains("is added before version 4 is merged"));
+        // The old name is reported, so the finish is refused and writes nothing.
+        let left = load(&root).issues;
+        assert_eq!(
+            left.iter()
+                .filter(|i| i.problem.code() == "finished_without_owner_renamed")
+                .count(),
+            2
+        );
+        assert_eq!(
+            finish(&root, Actor::alm(Some("claude/m")))
+                .unwrap_err()
+                .code(),
+            "migration_unfinished"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+        // A01-31: the agent moves the one task another task holds up, through `alm`'s rule.
+        let me = Actor::alm(Some("claude/m"));
+        crate::change_task(&root, me, LOCK_WAIT, |bag| {
+            allomos_core::ops::block(bag, "A1-03", None, &["A1-01".to_string()])
+                .map(|o| (o, "block"))
+        })
+        .unwrap();
+        // A03-18: the person answered; the top step and the task carrying it are renamed.
+        crate::rename_label(&root, me, LOCK_WAIT, "owner verified", "human verified").unwrap();
+        // Below the top: the note moves unchanged. At the top: checked, the old note cleared.
+        crate::change_task(&root, me, LOCK_WAIT, |bag| {
+            allomos_core::ops::finish(bag, "A1-04", Some("claude/m"), Some("loop run"), None)
+                .map(|o| (o, "done"))
+        })
+        .unwrap();
+        crate::change_task(&root, me, LOCK_WAIT, |bag| {
+            allomos_core::ops::checked(bag, "A1-05").map(|o| (o, "checked"))
+        })
+        .unwrap();
+        let moved = fs::read_to_string(task_file("A1-04")).unwrap();
+        assert!(
+            moved.contains(r#""without_human_check": "loop run""#),
+            "{moved}"
+        );
+        assert!(!moved.contains("finished_without_owner"), "{moved}");
+        let checked = fs::read_to_string(task_file("A1-05")).unwrap();
+        assert!(!checked.contains("finished_without_owner"), "{checked}");
+        let done = finish(&root, me).unwrap();
+        assert_eq!(
+            (done.from.as_str(), done.to.as_str(), done.changed),
+            ("allomos/3", "allomos/4", true)
+        );
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            before
+                .replace("\"allomos/3\"", "\"allomos/4\"")
+                .replace("owner verified", "human verified")
+        );
+        // The other waiting task is untouched; the moved one is blocked by A1-01.
+        assert_eq!(
+            fs::read_to_string(task_file("A1-02")).unwrap(),
+            waiting_before
+        );
+        let bag = load(&root).taskbag.unwrap();
+        let moved = bag.tasks.iter().find(|t| t.id == "A1-03").unwrap();
+        assert_eq!(moved.state, allomos_core::State::Blocked);
+        assert_eq!(moved.blocked_by, vec!["A1-01".to_string()]);
+        let to_check: Vec<&str> = bag
+            .tasks
+            .iter()
+            .filter(|t| t.to_check())
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(to_check, ["A1-04"]);
+        let top = bag.tasks.iter().find(|t| t.id == "A1-05").unwrap();
+        assert_eq!(top.label.as_deref(), Some("human verified"));
+        assert_eq!(format_state(&root), FormatState::Current);
+        write_allowed(&root, "claim").unwrap();
     }
 
     #[test]
@@ -1155,21 +1346,21 @@ mod tests {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(DEFAULT_DIR);
         const SECOND: Migration = Migration {
-            from: 4,
+            from: 5,
             ..TEST_ENTRY
         };
         let two = Formats {
             entries: &[TEST_ENTRY, SECOND],
-            current: 5,
-            oldest: 3,
+            current: 6,
+            oldest: 4,
         };
         for language in ["en", "zh-CN", "ja"] {
-            let p = migration_prompt_with(language, &project, &taskbag, "allomos/3", &two).unwrap();
+            let p = migration_prompt_with(language, &project, &taskbag, "allomos/4", &two).unwrap();
             let alm = "alm --taskbag \"/work/bakery/.allomos/taskbag\"";
             assert!(p.contains("/work/bakery"), "{language}");
-            assert!(p.contains("allomos/3 → allomos/4"), "{language}");
             assert!(p.contains("allomos/4 → allomos/5"), "{language}");
-            assert!(p.contains("allomos/5"), "{language}");
+            assert!(p.contains("allomos/5 → allomos/6"), "{language}");
+            assert!(p.contains("allomos/6"), "{language}");
             assert!(
                 p.contains(&format!("`{alm} list --json`")),
                 "{language}: {p}"
@@ -1193,7 +1384,7 @@ mod tests {
             );
             assert!(!p.contains("brief`"), "{language}: no section step");
         }
-        let en = migration_prompt_with("en", &project, &taskbag, "allomos/3", &two).unwrap();
+        let en = migration_prompt_with("en", &project, &taskbag, "allomos/4", &two).unwrap();
         for words in [
             "change nothing",
             "wait for the person's answer",
@@ -1204,8 +1395,8 @@ mod tests {
             assert!(en.contains(words), "{words}");
         }
         // From 4, only the second entry.
-        let p = migration_prompt_with("en", &project, &taskbag, "allomos/4", &two).unwrap();
-        assert!(!p.contains("allomos/3 → allomos/4"));
+        let p = migration_prompt_with("en", &project, &taskbag, "allomos/5", &two).unwrap();
+        assert!(!p.contains("allomos/4 → allomos/5"));
     }
 
     #[test]
@@ -1222,7 +1413,7 @@ mod tests {
             }],
         };
         let older = || FormatState::Older {
-            found: "allomos/3".into(),
+            found: "allomos/4".into(),
         };
         for language in ["en", "zh-CN", "ja"] {
             let both = check(older(), None);
@@ -1236,7 +1427,7 @@ mod tests {
                 "{language}"
             );
             assert!(r.contains("AGENTS.md"), "{language}");
-            assert!(r.contains("allomos/3 → allomos/4"), "{language}");
+            assert!(r.contains("allomos/4 → allomos/5"), "{language}");
 
             let section = check(FormatState::Current, None);
             let r =

@@ -1,6 +1,8 @@
 // The task pane (Task-A01-16): everything about one task, beside the list. History lists the
 // task's recorded changes (Task-A01-17). Eight fields can be changed here (Task-A01-18); Rust
 // checks each change by the same rule as its `alm` command, and a refusal is shown in its words.
+// A task finished without the human check shows "Not human-checked", its steps and a Checked
+// button, which works like `alm checked` (Task-A03-18).
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -8,11 +10,13 @@ import { Markdown } from "./Markdown";
 import { LatestHandoff } from "./Handoffs";
 import { localTime } from "./handoffFlow";
 import { changeLine } from "./historyFlow";
-import { draftChanged, startDraft, stateChoices, toEdit, type Draft, type EditField } from "./editFlow";
+import { blockerChoices, draftChanged, startDraft, stateChoices, toEdit, toggleBlocker, type Draft, type EditField } from "./editFlow";
+import { blockerText, blockers, humanCheckNote, stopText, toCheck } from "./stopFlow";
 import { isProblem, type Area, type Edit, type Handoff, type Iteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
   task,
+  tasks,
   area,
   iteration,
   onClose,
@@ -27,6 +31,8 @@ export function TaskPane({
   onEdit,
 }: {
   task: Task;
+  /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
+  tasks: Task[];
   area: Area | undefined;
   iteration: Iteration | undefined;
   onClose: () => void;
@@ -51,14 +57,17 @@ export function TaskPane({
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<EditField | null>(null);
-  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "" });
+  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [] });
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // The Checked button asked for the person's name first (asked once, like a change).
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
   useEffect(() => {
     ref.current?.scrollTo?.({ top: 0 });
     setEditing(null);
+    setChecking(false);
     setError(null);
   }, [task.id]);
 
@@ -70,7 +79,27 @@ export function TaskPane({
   };
   const cancel = () => {
     setEditing(null);
+    setChecking(false);
     setError(null);
+  };
+  /** Checked (Task-A03-18): top label, off To check; refused in Rust's words like any change. */
+  const markChecked = async () => {
+    if (busy) return;
+    if (!ownerName) {
+      setEditing(null);
+      setChecking(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onEdit({ field: "checked" });
+      setChecking(false);
+      setError(null);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
   };
   const save = async () => {
     if (!editing || busy || !draftChanged(task, editing, draft)) return;
@@ -91,6 +120,11 @@ export function TaskPane({
     try {
       await onSaveName(name.trim());
       setError(null);
+      // Asked for by the Checked button: go on and mark it checked.
+      if (checking) {
+        await onEdit({ field: "checked" });
+        setChecking(false);
+      }
     } catch (e) {
       say(e);
     } finally {
@@ -116,6 +150,19 @@ export function TaskPane({
           : (`pane.${field}` as "pane.state"),
     );
 
+  /** The "Blocked by" task picker: every other task, ticked when it blocks this one. */
+  const picker = (): ReactNode => (
+    <fieldset className="blocker-picker" disabled={busy}>
+      <legend className="small">{t("edit.blocked_by_legend")}</legend>
+      {blockerChoices(task, tasks).map((x) => (
+        <label key={x.id} className="small">
+          <input type="checkbox" checked={draft.blockedBy.includes(x.id)} onChange={() => setDraft((d) => toggleBlocker(d, x.id))} />{" "}
+          <span className="id">{x.id}</span> {x.title} <span className="muted">({t(`state.${x.state}`)})</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+
   /** The control for the field being changed. */
   const control = (field: EditField): ReactNode => {
     const set = (value: string) => setDraft((d) => ({ ...d, value }));
@@ -126,7 +173,7 @@ export function TaskPane({
           <>
             <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
               {stateChoices(task).map((s) => (
-                <option key={s} value={s} disabled={s !== "ready" && s !== "waiting" && s !== "done" && s !== "dropped"}>
+                <option key={s} value={s} disabled={s === "backlog" || s === "in_progress"}>
                   {t(`state.${s}`)}
                 </option>
               ))}
@@ -142,8 +189,22 @@ export function TaskPane({
                 disabled={busy}
               />
             )}
+            {draft.value === "waiting" && (
+              <input
+                type="text"
+                value={draft.who}
+                placeholder={t("edit.who_placeholder")}
+                aria-label={t("pane.who")}
+                onChange={(e) => setDraft((d) => ({ ...d, who: e.target.value }))}
+                onKeyDown={(e) => keys(e, true)}
+                disabled={busy}
+              />
+            )}
+            {draft.value === "blocked" && picker()}
           </>
         );
+      case "blocked_by":
+        return picker();
       case "label":
         return (
           <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
@@ -200,8 +261,7 @@ export function TaskPane({
   };
 
   /** The editor in place of a field's value: the name asked once first, then the control, Save and Cancel. */
-  const editor = (field: EditField): ReactNode =>
-    !ownerName ? (
+  const nameForm = (): ReactNode => (
       <div className="editor">
         <p className="small">{t("edit.name_explain")}</p>
         <input
@@ -232,10 +292,15 @@ export function TaskPane({
         </div>
         {error && <p className="banner error small">{error}</p>}
       </div>
+  );
+  const editor = (field: EditField): ReactNode =>
+    !ownerName ? (
+      nameForm()
     ) : (
       <div className="editor">
         {control(field)}
         {field === "waiting_on" && task.state !== "waiting" && <p className="muted small">{t("edit.waiting_on_hint")}</p>}
+        {field === "blocked_by" && task.state !== "blocked" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
         <div className="editor-buttons">
           <button type="button" className="primary" onClick={() => void save()} disabled={busy || !draftChanged(task, field, draft)}>
             {busy ? t("edit.saving") : t("edit.save")}
@@ -262,18 +327,25 @@ export function TaskPane({
     : task.iteration
       ? task.iteration
       : t("box.unplanned");
-  // The area, holder and "finished without the owner's check" are not changed here: holders are
-  // agent sessions (owner, 2026-10-14), and the others have no change of their own in `alm`.
+  // The area, holder and "finished without the human check" are not changed here: holders are
+  // agent sessions (owner, 2026-10-14), and the others have no change of their own in `alm` (the
+  // Checked button below clears the note).
   const rows: [string, string | null, EditField | null][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
-    [t("pane.state"), t(`state.${task.state}`), "state"],
+    [t("pane.state"), stopText(task, tasks, t) ?? t(`state.${task.state}`), "state"],
     [t("pane.label"), task.label, "label"],
     [t("pane.holder"), task.holder, null],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],
+    [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
+    [
+      t("pane.blocked_by"),
+      (task.blocked_by ?? []).length ? blockers(task, tasks).map((b) => blockerText(b, t)).join(", ") : null,
+      "blocked_by",
+    ],
     [t("pane.next"), task.next_dependency, "next_dependency"],
     [t("pane.handoff"), task.handoff_note, "handoff_note"],
-    [t("pane.finished_without_owner"), task.finished_without_owner, null],
+    [t("pane.without_human_check"), humanCheckNote(task) || null, null],
   ];
 
   return (
@@ -290,6 +362,22 @@ export function TaskPane({
           ×
         </button>
       </header>
+      {toCheck(task) && (
+        <div className="pane-check">
+          <HumanCheckBadge task={task} />
+          {checking && !ownerName ? (
+            nameForm()
+          ) : (
+            <>
+              <button type="button" className="primary" onClick={() => void markChecked()} disabled={busy}>
+                {t("pane.checked_button")}
+              </button>
+              <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
+              {error && !editing && <p className="banner error small">{error}</p>}
+            </>
+          )}
+        </div>
+      )}
       <dl className="fields">
         {rows.map(([label, value, field]) => (
           <div key={label}>
@@ -304,6 +392,16 @@ export function TaskPane({
           </div>
         ))}
       </dl>
+      {toCheck(task) && (
+        <section>
+          <h3>{t("pane.human_check_steps")}</h3>
+          {task.human_check_steps?.trim() ? (
+            <Markdown source={task.human_check_steps} onLink={onLink} />
+          ) : (
+            <p className="muted small">{t("pane.no_steps")}</p>
+          )}
+        </section>
+      )}
       <section>
         <h3>
           {t("pane.description")} {changeButton("description")}
@@ -342,5 +440,16 @@ export function TaskPane({
         )}
       </section>
     </aside>
+  );
+}
+
+/** "Not human-checked" on a task finished without the human check (Task-A03-18): in the lists
+ * and the task pane's header; hovering shows why. */
+export function HumanCheckBadge({ task }: { task: Task }) {
+  const { t } = useI18n();
+  return (
+    <span className="badge to-check" title={t("task.not_human_checked_title", { why: humanCheckNote(task) })}>
+      {t("task.not_human_checked")}
+    </span>
   );
 }

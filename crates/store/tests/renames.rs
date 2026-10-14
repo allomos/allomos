@@ -179,7 +179,7 @@ fn deleting_a_non_empty_area_or_iteration_is_refused_and_changes_no_file() {
     add_task(&root, APP, WAIT, &task("A01-01", "A01", Some("I01"))).unwrap();
     add_task(&root, APP, WAIT, &task("A02-01", "A02", Some("I02"))).unwrap();
     change_task(&root, APP, WAIT, |bag| {
-        ops::finish(bag, "A01-01", Some("Will"), None).map(|o| (o, "done"))
+        ops::finish(bag, "A01-01", Some("Will"), None, None).map(|o| (o, "done"))
     })
     .unwrap();
     change_task(&root, APP, WAIT, |bag| {
