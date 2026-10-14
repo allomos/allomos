@@ -500,9 +500,13 @@ pub fn new_task(
         label: None,
         holder: None,
         waiting_on: None,
+        who: None,
+        blocked_by: Vec::new(),
         next_dependency: None,
         iteration: None,
         handoff_note: None,
+        without_human_check: None,
+        human_check_steps: None,
         finished_without_owner: None,
         description,
     })
@@ -531,7 +535,7 @@ pub fn claim(
     }
     task.holder = Some(me);
     task.state = State::InProgress;
-    task.waiting_on = None;
+    clear_stop(&mut task);
     Ok(Outcome { task, warnings })
 }
 
@@ -552,38 +556,215 @@ pub fn set_label(
         });
     }
     task.label = Some(label.to_string());
+    // The top label on a finished task is the human check (Task-A03-18).
+    if task.state == State::Done && taskbag.project.labels.last().map(String::as_str) == Some(label)
+    {
+        clear_human_check(&mut task);
+    }
     Ok(Outcome::plain(task))
 }
 
-/// Park the task as `waiting`, saying what it waits on.
-pub fn wait(taskbag: &Taskbag, id: &str, me: Option<&str>, on: &str) -> Result<Outcome, Problem> {
+/// Clear what a stopped task waited on or was blocked by: it is moving on.
+fn clear_stop(task: &mut Task) {
+    task.waiting_on = None;
+    task.who = None;
+    task.blocked_by.clear();
+}
+
+/// Park the task as `waiting`: a person (or an outside event) must act. `on` says what (required),
+/// `who` optionally who; without it the owner is meant (decision 0016). Blocking tasks are cleared.
+pub fn wait(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    on: &str,
+    who: Option<&str>,
+) -> Result<Outcome, Problem> {
     let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
-    task.waiting_on = Some(non_empty(Some(on)).ok_or(Problem::WaitingOnMissing)?);
+    let on = non_empty(Some(on)).ok_or(Problem::WaitingOnMissing)?;
+    clear_stop(&mut task);
+    task.waiting_on = Some(on);
+    task.who = non_empty(who);
     task.state = State::Waiting;
     Ok(Outcome::plain(task))
 }
 
+/// One task that blocks another, with its state now (`None`: no such task any more).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Blocker {
+    pub id: String,
+    pub state: Option<State>,
+}
+
+impl Blocker {
+    /// `A01-17 (in progress)`; a dropped blocker is flagged, as it will never be done.
+    pub fn describe(&self) -> String {
+        match self.state {
+            Some(State::Dropped) => format!("{} (dropped; still blocked?)", self.id),
+            Some(state) => format!("{} ({})", self.id, state.as_str().replace('_', " ")),
+            None => format!("{} (no such task)", self.id),
+        }
+    }
+}
+
+/// The tasks blocking `task`, each with its current state, in the order `blocked_by` lists them.
+pub fn blockers(taskbag: &Taskbag, task: &Task) -> Vec<Blocker> {
+    task.blocked_by
+        .iter()
+        .map(|id| Blocker {
+            id: id.clone(),
+            state: taskbag.tasks.iter().find(|t| &t.id == id).map(|t| t.state),
+        })
+        .collect()
+}
+
+/// Whether a `blocked` task's blockers are all done. A dropped blocker never counts as done
+/// (owner, 2026-10-14). `alm` only tells; it never moves the task by itself.
+pub fn all_blockers_done(taskbag: &Taskbag, task: &Task) -> bool {
+    task.state == State::Blocked
+        && !task.blocked_by.is_empty()
+        && blockers(taskbag, task)
+            .iter()
+            .all(|b| b.state == Some(State::Done))
+}
+
+/// Mark the task `blocked` by other tasks in this taskbag that must finish first (`alm block`,
+/// decision 0016). `by` needs at least one ID; each must be a task here and not the task itself.
+/// A dropped blocker is allowed but warned about: it will never be done. What it waited on is
+/// cleared; a person part belongs in the task's next dependency.
+pub fn block(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    by: &[String],
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    check_open(&task, &[State::Done, State::Dropped])?;
+    let mut ids: Vec<String> = Vec::new();
+    for b in by.iter().flat_map(|b| b.split(',')).map(str::trim) {
+        if !b.is_empty() && !ids.iter().any(|x| x == b) {
+            ids.push(b.to_string());
+        }
+    }
+    if ids.is_empty() {
+        return Err(Problem::BlockedByMissing);
+    }
+    let mut warnings = Vec::new();
+    for b in &ids {
+        if b == &task.id {
+            return Err(Problem::BlockedBySelf {
+                id: task.id.clone(),
+            });
+        }
+        match taskbag.tasks.iter().find(|t| &t.id == b) {
+            None => return Err(Problem::BlockerUnknown { id: b.clone() }),
+            Some(t) if t.state == State::Dropped => warnings.push(Problem::BlockerDropped {
+                id: task.id.clone(),
+                blocker: b.clone(),
+            }),
+            Some(_) => {}
+        }
+    }
+    clear_stop(&mut task);
+    task.blocked_by = ids;
+    task.state = State::Blocked;
+    Ok(Outcome { task, warnings })
+}
+
+/// Move a `blocked` task on (`alm unblock`): back to `in_progress` when someone holds it, else
+/// `ready`. Its blocking tasks are cleared. `alm` does not check that they are done: the agent
+/// does (owner, 2026-10-14).
+pub fn unblock(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    if task.state != State::Blocked {
+        return Err(Problem::NotBlocked {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    clear_stop(&mut task);
+    task.state = if task.holder.is_some() {
+        State::InProgress
+    } else {
+        State::Ready
+    };
+    Ok(Outcome::plain(task))
+}
+
 /// Finish the task. `alm` does not judge whether it is really finished: the agent is given the
-/// rule before it finishes (Task-A03-15). `without_owner` records why a task is finished without
-/// the owner's check (an automatic or loop run); empty text is refused. A note already on the task
-/// is kept when none is given.
+/// rule before it finishes (Task-A03-15). `without_human_check` records why a task is finished
+/// without the human check (an automatic or loop run); empty text is refused. `steps` are how a
+/// person checks it (Markdown); given without a note, or empty, they are refused. A note without
+/// steps is accepted with the warning `human_check_steps_missing`, which says how to write them
+/// (Task-A03-18: `alm` asks, it does not refuse). What is not given stays as it was.
+///
+/// On a task that is already done, only its human check is recorded, so the holder rule does not
+/// apply: a finished task's holder is history, and the migration to `allomos/4` moves the old note
+/// this way (Task-A03-18).
 pub fn finish(
     taskbag: &Taskbag,
     id: &str,
     me: Option<&str>,
-    without_owner: Option<&str>,
+    without_human_check: Option<&str>,
+    steps: Option<&str>,
 ) -> Result<Outcome, Problem> {
     let mut task = find_task(taskbag, id)?;
-    check_holder(&task, me)?;
+    if task.state != State::Done {
+        check_holder(&task, me)?;
+    }
     check_open(&task, &[State::Dropped])?;
-    if let Some(text) = without_owner {
-        task.finished_without_owner =
-            Some(non_empty(Some(text)).ok_or(Problem::WithoutOwnerMissing)?);
+    let mut warnings = Vec::new();
+    if let Some(text) = without_human_check {
+        let note = non_empty(Some(text)).ok_or(Problem::WithoutHumanCheckMissing)?;
+        if let Some(steps) = steps {
+            let steps = steps.trim();
+            if steps.is_empty() {
+                return Err(Problem::HumanCheckStepsEmpty);
+            }
+            task.human_check_steps = Some(format!("{steps}\n"));
+        } else if task.human_check_steps.is_none() {
+            warnings.push(Problem::HumanCheckStepsMissing {
+                id: task.id.clone(),
+            });
+        }
+        task.without_human_check = Some(note);
+        task.finished_without_owner = None;
+    } else if steps.is_some() {
+        return Err(Problem::WithoutHumanCheckMissing);
     }
     task.state = State::Done;
-    task.waiting_on = None;
+    clear_stop(&mut task);
+    Ok(Outcome { task, warnings })
+}
+
+/// Clear what waits for the human check: the note, its steps, and the note's name before
+/// `allomos/4`. The task's history keeps them.
+fn clear_human_check(task: &mut Task) {
+    task.without_human_check = None;
+    task.human_check_steps = None;
+    task.finished_without_owner = None;
+}
+
+/// A person has checked a finished task (Task-A03-18): it gets the top label of the ladder and
+/// leaves "To check"; the note and the steps are cleared, and stay in its history. Only a done
+/// task can be checked. The holder rule does not apply: the person checking is rarely the agent
+/// session that held it.
+pub fn checked(taskbag: &Taskbag, id: &str) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    if task.state != State::Done {
+        return Err(Problem::NotDone {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    if let Some(top) = taskbag.project.labels.last() {
+        task.label = Some(top.clone());
+    }
+    clear_human_check(&mut task);
     Ok(Outcome::plain(task))
 }
 
@@ -672,19 +853,28 @@ pub fn set_description(
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "field", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Edit {
-    /// `ready`, `waiting` (with `waiting_on`), `done` or `dropped`. `in_progress` comes only from
-    /// claiming the task, and nothing moves a task back to `backlog`.
+    /// `ready`, `waiting` (with `waiting_on`, optionally `who`), `blocked` (with `blocked_by`),
+    /// `done` or `dropped`. `in_progress` comes only from claiming the task (or unblocking a held
+    /// one), and nothing moves a task back to `backlog`.
     State {
         state: State,
         #[serde(default)]
         waiting_on: Option<String>,
+        #[serde(default)]
+        who: Option<String>,
+        #[serde(default)]
+        blocked_by: Vec<String>,
     },
     Label {
         label: String,
     },
-    /// What the task waits on; like `alm wait`, this also makes it `waiting`.
+    /// What the task waits on; like `alm wait`, this also makes it `waiting` (its `who` stays).
     WaitingOn {
         text: String,
+    },
+    /// The tasks that block it; like `alm block`, this also makes it `blocked`.
+    BlockedBy {
+        ids: Vec<String>,
     },
     NextDependency {
         #[serde(default)]
@@ -704,11 +894,13 @@ pub enum Edit {
     Description {
         text: String,
     },
+    /// A person checked the finished task: like `alm checked` (Task-A03-18).
+    Checked,
 }
 
 /// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
-/// the name of that rule's command (`ready`, `wait`, `done`, `drop`, `label`, `needs`, `plan`,
-/// `title`; `note` and `describe` for the two changes `alm` has no command of their own for), so
+/// the name of that rule's command (`ready`, `wait`, `block`, `done`, `drop`, `label`, `needs`, `plan`,
+/// `title`, `checked`; `note` and `describe` for the two changes `alm` has no command of their own for), so
 /// the change is recorded the same way.
 pub fn edit(
     taskbag: &Taskbag,
@@ -717,11 +909,23 @@ pub fn edit(
     edit: &Edit,
 ) -> Result<(Outcome, &'static str), Problem> {
     match edit {
-        Edit::State { state, waiting_on } => match state {
+        Edit::State {
+            state,
+            waiting_on,
+            who,
+            blocked_by,
+        } => match state {
             State::Ready => make_ready(taskbag, id, me).map(|o| (o, "ready")),
-            State::Waiting => wait(taskbag, id, me, waiting_on.as_deref().unwrap_or_default())
-                .map(|o| (o, "wait")),
-            State::Done => finish(taskbag, id, me, None).map(|o| (o, "done")),
+            State::Waiting => wait(
+                taskbag,
+                id,
+                me,
+                waiting_on.as_deref().unwrap_or_default(),
+                who.as_deref(),
+            )
+            .map(|o| (o, "wait")),
+            State::Blocked => block(taskbag, id, me, blocked_by).map(|o| (o, "block")),
+            State::Done => finish(taskbag, id, me, None, None).map(|o| (o, "done")),
             State::Dropped => drop_task(taskbag, id, me).map(|o| (o, "drop")),
             State::Backlog | State::InProgress => Err(Problem::CannotSetState {
                 id: id.to_string(),
@@ -729,7 +933,11 @@ pub fn edit(
             }),
         },
         Edit::Label { label } => set_label(taskbag, id, me, label).map(|o| (o, "label")),
-        Edit::WaitingOn { text } => wait(taskbag, id, me, text).map(|o| (o, "wait")),
+        Edit::WaitingOn { text } => {
+            let who = find_task(taskbag, id)?.who;
+            wait(taskbag, id, me, text, who.as_deref()).map(|o| (o, "wait"))
+        }
+        Edit::BlockedBy { ids } => block(taskbag, id, me, ids).map(|o| (o, "block")),
         Edit::NextDependency { text } => {
             set_next(taskbag, id, me, text.as_deref()).map(|o| (o, "needs"))
         }
@@ -743,6 +951,7 @@ pub fn edit(
         Edit::Description { text } => {
             set_description(taskbag, id, me, text).map(|o| (o, "describe"))
         }
+        Edit::Checked => checked(taskbag, id).map(|o| (o, "checked")),
     }
 }
 
@@ -764,34 +973,37 @@ pub fn rename_project(
     Ok(project)
 }
 
-/// Mark an unheld `backlog` or `waiting` task `ready` (for example, the owner approved it).
-/// Its *waiting on* is cleared.
+/// Mark an unheld `backlog`, `waiting` or `blocked` task `ready` (for example, the owner approved
+/// it). What it waited on or was blocked by is cleared.
 pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
-    if task.holder.is_some() || !matches!(task.state, State::Backlog | State::Waiting) {
+    if task.holder.is_some()
+        || !matches!(task.state, State::Backlog | State::Waiting | State::Blocked)
+    {
         return Err(Problem::CannotMakeReady {
             id: task.id.clone(),
             state: task.state.as_str().to_string(),
         });
     }
     task.state = State::Ready;
-    task.waiting_on = None;
+    clear_stop(&mut task);
     Ok(Outcome::plain(task))
 }
 
-/// Drop the task: it will not be done. Its holder and *waiting on* are cleared.
+/// Drop the task: it will not be done. Its holder, *waiting on* and blockers are cleared.
 pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     task.state = State::Dropped;
     task.holder = None;
-    task.waiting_on = None;
+    clear_stop(&mut task);
     Ok(Outcome::plain(task))
 }
 
-/// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14):
+/// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14). A
+/// `blocked` or `waiting` task is never among them: skipped by its state, not by its words:
 /// earliest iteration first (unplanned tasks last), then area order, then ID. With an
 /// iteration, only the tasks planned in it; an iteration that does not exist is refused.
 pub fn next<'a>(taskbag: &'a Taskbag, iteration: Option<&str>) -> Result<Vec<&'a Task>, Problem> {
@@ -869,14 +1081,126 @@ mod tests {
         }};
     }
 
+    /// Decision 0016: `alm block` refuses an empty list, the task itself and an unknown ID; a
+    /// dropped blocker is allowed but warned about; unblocking moves it on by its holder.
+    #[test]
+    fn block_and_unblock_rules() {
+        let mut s = bag();
+        let by = |ids: &[&str]| ids.iter().map(|i| i.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            block(&s, "A01-01", None, &by(&[])),
+            Err(Problem::BlockedByMissing)
+        );
+        assert_eq!(
+            block(&s, "A01-01", None, &by(&[" ", ""])),
+            Err(Problem::BlockedByMissing)
+        );
+        assert_eq!(
+            block(&s, "A01-01", None, &by(&["A01-01"])),
+            Err(Problem::BlockedBySelf {
+                id: "A01-01".into()
+            })
+        );
+        assert_eq!(
+            block(&s, "A01-01", None, &by(&["A09-01"])),
+            Err(Problem::BlockerUnknown {
+                id: "A09-01".into()
+            })
+        );
+        // Waiting, then blocked: what it waited on is cleared; IDs are de-duplicated, commas split.
+        put!(
+            s,
+            wait(&s, "A01-01", None, "approval", Some("Ann"))
+                .unwrap()
+                .task
+        );
+        let o = block(&s, "A01-01", None, &by(&["A01-02,A02-01", "A01-02"])).unwrap();
+        assert!(o.warnings.is_empty());
+        assert_eq!(o.task.state, State::Blocked);
+        assert_eq!(o.task.blocked_by, by(&["A01-02", "A02-01"]));
+        assert_eq!(
+            (o.task.waiting_on.clone(), o.task.who.clone()),
+            (None, None)
+        );
+        put!(s, o.task);
+        // Blockers with their states; not all done.
+        let t = find_task(&s, "A01-01").unwrap();
+        assert_eq!(
+            blockers(&s, &t)
+                .iter()
+                .map(Blocker::describe)
+                .collect::<Vec<_>>(),
+            vec!["A01-02 (backlog)", "A02-01 (backlog)"]
+        );
+        assert!(!all_blockers_done(&s, &t));
+        // One done, one dropped: a dropped blocker never counts as done, and is flagged.
+        put!(s, finish(&s, "A01-02", None, None, None).unwrap().task);
+        put!(s, drop_task(&s, "A02-01", None).unwrap().task);
+        let t = find_task(&s, "A01-01").unwrap();
+        assert!(!all_blockers_done(&s, &t));
+        assert_eq!(
+            blockers(&s, &t)[1].describe(),
+            "A02-01 (dropped; still blocked?)"
+        );
+        // Blocking on a dropped task is allowed, with a warning.
+        let o = block(&s, "A01-01", None, &by(&["A02-01"])).unwrap();
+        assert_eq!(
+            o.warnings,
+            vec![Problem::BlockerDropped {
+                id: "A01-01".into(),
+                blocker: "A02-01".into()
+            }]
+        );
+        // All done: alm only tells; the task stays blocked until someone unblocks it.
+        put!(s, block(&s, "A01-01", None, &by(&["A01-02"])).unwrap().task);
+        let t = find_task(&s, "A01-01").unwrap();
+        assert!(all_blockers_done(&s, &t));
+        assert_eq!(t.state, State::Blocked);
+        // Unblock: ready when unheld, in progress when held; only a blocked task.
+        let u = unblock(&s, "A01-01", None).unwrap().task;
+        assert_eq!((u.state, u.blocked_by.len()), (State::Ready, 0));
+        assert_eq!(
+            unblock(&s, "A01-02", None),
+            Err(Problem::NotBlocked {
+                id: "A01-02".into(),
+                state: "done".into()
+            })
+        );
+        let mut held = s.clone();
+        put!(held, claim(&held, "A01-01", Some("a"), true).unwrap().task);
+        put!(
+            held,
+            block(&held, "A01-01", Some("a"), &by(&["A01-02"]))
+                .unwrap()
+                .task
+        );
+        assert_eq!(
+            unblock(&held, "A01-01", Some("a")).unwrap().task.state,
+            State::InProgress
+        );
+        // `alm ready` also moves an unheld blocked task on; a blocked task is never next.
+        assert_eq!(
+            make_ready(&s, "A01-01", None).unwrap().task.state,
+            State::Ready
+        );
+        assert!(next(&s, None).unwrap().iter().all(|t| t.id != "A01-01"));
+        // Done or dropped tasks cannot be blocked.
+        assert_eq!(
+            block(&s, "A01-02", None, &by(&["A01-01"]))
+                .unwrap_err()
+                .code(),
+            "task_closed"
+        );
+    }
+
     #[test]
     fn renaming_a_label_renames_it_on_the_tasks_too() {
         let mut s = bag();
-        s.tasks[0].label = Some("owner verified".into());
-        s.tasks[1].label = Some("owner verified".into());
+        s.tasks[0].label = Some("human verified".into());
+        s.tasks[1].label = Some("human verified".into());
         s.tasks[1].state = State::Done;
         s.tasks[2].label = Some("implemented".into());
-        let (p, tasks) = rename_label(&s, "owner verified", " human checked ").unwrap();
+        let (p, tasks) = rename_label(&s, "human verified", " human checked ").unwrap();
         assert_eq!(p.labels[3], "human checked");
         assert_eq!(p.labels.len(), 4);
         assert_eq!(tasks.len(), 2, "the done task too");
@@ -890,13 +1214,13 @@ mod tests {
             "label_not_on_ladder"
         );
         assert_eq!(
-            rename_label(&s, "owner verified", "implemented"),
+            rename_label(&s, "human verified", "implemented"),
             Err(Problem::LabelExists {
                 label: "implemented".into()
             })
         );
         assert_eq!(
-            rename_label(&s, "owner verified", " "),
+            rename_label(&s, "human verified", " "),
             Err(Problem::LabelNameMissing)
         );
     }
@@ -1000,11 +1324,11 @@ mod tests {
         assert_eq!(p.labels, ["implemented", "connected"]);
         assert_eq!((p.id.as_str(), p.name.as_str()), ("p", "P"));
         assert_eq!(set_ladder(&s, &ladder(&[" "])), Err(Problem::LadderEmpty));
-        s.tasks[0].label = Some("owner verified".into());
+        s.tasks[0].label = Some("human verified".into());
         assert_eq!(
             set_ladder(&s, &ladder(&["implemented"])),
             Err(Problem::LabelNotOnLadder {
-                label: "owner verified".into(),
+                label: "human verified".into(),
                 ladder: "implemented".into()
             })
         );
@@ -1080,7 +1404,7 @@ mod tests {
                 previous: "a".into()
             }]
         );
-        let done = finish(&s, "A01-01", Some("a"), None).unwrap().task;
+        let done = finish(&s, "A01-01", Some("a"), None, None).unwrap().task;
         put!(s, done);
         assert_eq!(
             claim(&s, "A01-01", Some("a"), false),
@@ -1127,7 +1451,10 @@ mod tests {
             })
         );
         put!(s, claim(&s, "A01-02", Some("a"), false).unwrap().task);
-        put!(s, wait(&s, "A01-02", Some("a"), "owner").unwrap().task);
+        put!(
+            s,
+            wait(&s, "A01-02", Some("a"), "owner", None).unwrap().task
+        );
         // Held by someone else: refused as held; held by me: refused, release first.
         assert!(matches!(
             make_ready(&s, "A01-02", Some("b")),
@@ -1188,10 +1515,12 @@ mod tests {
                 .task,
         );
         assert_eq!(
-            wait(&s, "A01-01", Some("a"), "  "),
+            wait(&s, "A01-01", Some("a"), "  ", None),
             Err(Problem::WaitingOnMissing)
         );
-        let w = wait(&s, "A01-01", Some("a"), "owner review").unwrap().task;
+        let w = wait(&s, "A01-01", Some("a"), "owner review", None)
+            .unwrap()
+            .task;
         assert_eq!(w.state, State::Waiting);
         assert_eq!(w.waiting_on.as_deref(), Some("owner review"));
         put!(s, w);
@@ -1212,34 +1541,105 @@ mod tests {
         assert_eq!(r.handoff_note, None);
 
         // Below the top step: finished with no warning; `alm` does not judge (Task-A03-15).
-        let d = finish(&s, "A01-01", Some("b"), None).unwrap();
+        let d = finish(&s, "A01-01", Some("b"), None, None).unwrap();
         assert_eq!(d.task.state, State::Done);
         assert!(d.warnings.is_empty());
-        assert_eq!(d.task.finished_without_owner, None);
-        // Finished without the owner's check: the note is written; empty text is refused.
+        assert_eq!(d.task.without_human_check, None);
+        // Finished without the human check: the note is written; empty text is refused, and so
+        // are steps without a note, or empty steps (Task-A03-18).
         assert_eq!(
-            finish(&s, "A01-01", Some("b"), Some("  ")).unwrap_err(),
-            Problem::WithoutOwnerMissing
+            finish(&s, "A01-01", Some("b"), Some("  "), None).unwrap_err(),
+            Problem::WithoutHumanCheckMissing
         );
-        let d = finish(&s, "A01-01", Some("b"), Some("card run, owner away"))
-            .unwrap()
-            .task;
         assert_eq!(
-            d.finished_without_owner.as_deref(),
-            Some("card run, owner away")
+            finish(&s, "A01-01", Some("b"), None, Some("1. Open it.")).unwrap_err(),
+            Problem::WithoutHumanCheckMissing
         );
-        put!(s, d);
-        // Labelled owner verified later and unheld: anyone may finish it, the note is kept.
-        let mut top = find_task(&s, "A01-01").unwrap();
-        top.label = Some("owner verified".into());
-        top.holder = None;
-        put!(s, top);
-        let d = finish(&s, "A01-01", None, None).unwrap();
+        assert_eq!(
+            finish(&s, "A01-01", Some("b"), Some("card run"), Some(" \n ")).unwrap_err(),
+            Problem::HumanCheckStepsEmpty
+        );
+        // Without steps: finished, with the warning that asks for them.
+        let d = finish(
+            &s,
+            "A01-01",
+            Some("b"),
+            Some("card run, approver away"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            d.warnings,
+            vec![Problem::HumanCheckStepsMissing {
+                id: "A01-01".into()
+            }]
+        );
+        assert_eq!(
+            d.task.without_human_check.as_deref(),
+            Some("card run, approver away")
+        );
+        let d = finish(
+            &s,
+            "A01-01",
+            Some("b"),
+            Some("card run, approver away"),
+            Some("1. Open the app.\n2. Click Save."),
+        )
+        .unwrap();
         assert!(d.warnings.is_empty());
         assert_eq!(
-            d.task.finished_without_owner.as_deref(),
-            Some("card run, owner away")
+            d.task.human_check_steps.as_deref(),
+            Some("1. Open the app.\n2. Click Save.\n")
         );
+        assert!(d.task.to_check());
+        put!(s, d.task);
+        // Already done: anyone may record its human check again, whoever held it; steps stay.
+        let again = finish(&s, "A01-01", Some("c"), Some("loop run"), None).unwrap();
+        assert!(again.warnings.is_empty());
+        assert_eq!(again.task.without_human_check.as_deref(), Some("loop run"));
+        assert!(again.task.human_check_steps.is_some());
+        // A person checks it: top label, note and steps cleared; only a done task (Task-A03-18).
+        let c = checked(&s, "A01-01").unwrap().task;
+        assert_eq!(c.label.as_deref(), Some("human verified"));
+        assert_eq!(
+            (&c.without_human_check, &c.human_check_steps),
+            (&None, &None)
+        );
+        assert!(!c.to_check());
+        assert!(matches!(
+            checked(&s, "A01-02"),
+            Err(Problem::NotDone { .. })
+        ));
+        // The top label set on a finished task is the human check too.
+        let l = set_label(&s, "A01-01", Some("b"), "human verified")
+            .unwrap()
+            .task;
+        assert_eq!(l.without_human_check, None);
+        // A lower label leaves it to check.
+        let l = set_label(&s, "A01-01", Some("b"), "implemented")
+            .unwrap()
+            .task;
+        assert!(l.to_check());
+        // The note's name before allomos/4: moved by `done`, cleared by `checked`.
+        let mut old = find_task(&s, "A01-01").unwrap();
+        old.without_human_check = None;
+        old.human_check_steps = None;
+        old.finished_without_owner = Some("loop run".into());
+        put!(s, old);
+        assert!(find_task(&s, "A01-01").unwrap().to_check());
+        let moved = finish(&s, "A01-01", None, Some("loop run"), None)
+            .unwrap()
+            .task;
+        assert_eq!(moved.finished_without_owner, None);
+        assert_eq!(moved.without_human_check.as_deref(), Some("loop run"));
+        let cleared = checked(&s, "A01-01").unwrap().task;
+        assert_eq!(cleared.finished_without_owner, None);
+        // Through the app's edit: the same rule, recorded as `checked`.
+        let (o, command) = edit(&s, "A01-01", Some("z"), &Edit::Checked).unwrap();
+        assert_eq!(command, "checked");
+        assert_eq!(o.task.label.as_deref(), Some("human verified"));
+        let e: Edit = serde_json::from_str(r#"{"field":"checked"}"#).unwrap();
+        assert_eq!(e, Edit::Checked);
     }
 
     #[test]
@@ -1294,7 +1694,7 @@ mod tests {
 
         // Planning works whoever holds the task, and on finished tasks too.
         put!(s, claim(&s, "A01-01", Some("a"), false).unwrap().task);
-        put!(s, finish(&s, "A01-01", Some("a"), None).unwrap().task);
+        put!(s, finish(&s, "A01-01", Some("a"), None, None).unwrap().task);
         let t = plan(&s, "A01-01", Some("I01")).unwrap().task;
         assert_eq!(t.iteration.as_deref(), Some("I01"));
         put!(s, t);
@@ -1455,6 +1855,8 @@ mod tests {
         let state = |st: State, on: Option<&str>| Edit::State {
             state: st,
             waiting_on: on.map(String::from),
+            who: None,
+            blocked_by: vec![],
         };
         same(
             ed(&s, state(State::Ready, None)),
@@ -1463,17 +1865,17 @@ mod tests {
         );
         same(
             ed(&s, state(State::Waiting, Some("the owner"))),
-            wait(&s, "A01-01", me, "the owner"),
+            wait(&s, "A01-01", me, "the owner", None),
             "wait",
         );
         same(
             ed(&s, state(State::Waiting, None)),
-            wait(&s, "A01-01", me, ""),
+            wait(&s, "A01-01", me, "", None),
             "wait",
         );
         same(
             ed(&s, state(State::Done, None)),
-            finish(&s, "A01-01", me, None),
+            finish(&s, "A01-01", me, None, None),
             "done",
         );
         same(
@@ -1503,7 +1905,7 @@ mod tests {
         }
         same(
             ed(&s, Edit::WaitingOn { text: "x".into() }),
-            wait(&s, "A01-01", me, "x"),
+            wait(&s, "A01-01", me, "x", None),
             "wait",
         );
         same(
@@ -1595,7 +1997,9 @@ mod tests {
             e,
             Edit::State {
                 state: State::Waiting,
-                waiting_on: Some("x".into())
+                waiting_on: Some("x".into()),
+                who: None,
+                blocked_by: vec![]
             }
         );
         let e: Edit = serde_json::from_str(r#"{"field":"iteration","iteration":null}"#).unwrap();

@@ -12,9 +12,10 @@ import { almOfferLines } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withoutKey } from "./foldFlow";
+import { FILTER_STATES, keepState, readFilter, stopText, toCheck, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
-import { TaskPane } from "./TaskPane";
+import { HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import type { Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
@@ -707,6 +708,7 @@ function HopFigure() {
  * in the window's storage (Task-A01-15). */
 type GroupBy = "area" | "iteration" | "handoffs";
 const GROUP_BY_KEY = "allomos.groupBy";
+const STATE_FILTER_KEY = "allomos.stateFilter";
 
 function readGroupBy(): GroupBy {
   try {
@@ -725,6 +727,8 @@ type Group = {
   sub?: string;
   empty: string;
   tasks: Task[];
+  /** Every task of the group when `tasks` is filtered by state. */
+  counted?: Task[];
   /** Where a new task added in this group goes; none for tasks with an unknown area. */
   newTask?: { area: string | null; iteration: string | null };
   /** The area or iteration this group is, for its Edit form (Task-A01-29); none for Unplanned and unknown areas. */
@@ -779,6 +783,24 @@ function TaskbagView({
   const [handoffDialog, setHandoffDialog] = useState<"settings" | "write" | null>(null);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
+  // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
+  // task that needs a person (Task-A03-18).
+  const [stateFilter, setStateFilter] = useState<StateFilter>(() => {
+    try {
+      return readFilter(localStorage.getItem(STATE_FILTER_KEY));
+    } catch {
+      return "all";
+    }
+  });
+  const chooseFilter = (f: StateFilter) => {
+    setStateFilter(f);
+    try {
+      localStorage.setItem(STATE_FILTER_KEY, f);
+    } catch {
+      /* storage unavailable: the choice lasts until the window closes */
+    }
+  };
+  const stop = (task: Task) => stopText(task, box?.tasks ?? [], t);
 
   // The groups in the order they are shown; the task pane's arrow keys follow this order.
   const groups: Group[] = [];
@@ -813,6 +835,16 @@ function TaskbagView({
     }
     const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
     if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
+  }
+  // With a state filter, each group lists only the tasks in that state (its count stays whole),
+  // and a group with none is left out.
+  if (stateFilter !== "all") {
+    for (let i = groups.length - 1; i >= 0; i--) {
+      const g = groups[i];
+      g.counted = g.tasks;
+      g.tasks = g.tasks.filter((task) => keepState(stateFilter, task));
+      if (g.tasks.length === 0) groups.splice(i, 1);
+    }
   }
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(groups, collapsed);
@@ -992,6 +1024,21 @@ function TaskbagView({
                   </button>
                 ))}
               </div>
+              {groupBy !== "handoffs" && (
+                <label className="state-filter small">
+                  {t("filter.label")}{" "}
+                  <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
+                    <option value="all">{t("filter.all")}</option>
+                    {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
+                    <option value="human">{t("filter.human")}</option>
+                    {FILTER_STATES.map((s) => (
+                      <option key={s} value={s}>
+                        {t(`state.${s}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
                 <button type="button" className="link small" onClick={() => foldAll(true)}>
@@ -1043,6 +1090,8 @@ function TaskbagView({
                   sub={g.sub}
                   empty={g.empty}
                   tasks={g.tasks}
+                  counted={g.counted}
+                  stop={stop}
                   iterationName={groupBy === "area" ? iterationName : undefined}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
@@ -1076,6 +1125,7 @@ function TaskbagView({
             {selected && (
               <TaskPane
                 task={selected}
+                tasks={box.tasks}
                 area={box.areas.find((a) => a.id === selected.area)}
                 iteration={iterations.find((i) => i.id === selected.iteration)}
                 onClose={() => setSelectedId(null)}
@@ -1178,6 +1228,8 @@ function TaskGroup({
   sub,
   empty,
   tasks,
+  counted,
+  stop,
   iterationName,
   selectedId,
   onSelect,
@@ -1193,6 +1245,10 @@ function TaskGroup({
   sub?: string;
   empty: string;
   tasks: Task[];
+  /** Every task of the group, for its count and progress, when `tasks` is filtered by state. */
+  counted?: Task[];
+  /** Why a stopped task is stopped: "Waiting for you: …", "Blocked by A01-17 (in progress)". */
+  stop?: (task: Task) => string | null;
   /** Given in the by-area view, so each task says which iteration it is planned in. */
   iterationName?: (id: string | null) => string | null;
   selectedId: string | null;
@@ -1211,8 +1267,9 @@ function TaskGroup({
   editForm?: ReactNode;
 }) {
   const { t } = useI18n();
-  const done = tasks.filter((t) => t.state === "done").length;
-  const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  const all = counted ?? tasks;
+  const done = all.filter((t) => t.state === "done").length;
+  const pct = all.length ? Math.round((done / all.length) * 100) : 0;
   return (
     <section className={collapsed ? "area collapsed" : "area"}>
       <header className="area-head">
@@ -1221,7 +1278,7 @@ function TaskGroup({
             {id && <span className="id">{id}</span>} {name}
           </button>
         </h2>
-        <span className="count">{t("area.count", { done, total: tasks.length })}</span>
+        <span className="count">{t("area.count", { done, total: all.length })}</span>
         {sub && <span className="sub">{sub}</span>}
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
@@ -1266,12 +1323,15 @@ function TaskGroup({
               >
                 <span className="id">{task.id}</span>
                 <span className="title">{task.title}</span>
-                <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
+                <span className="state-cell">
+                  {toCheck(task) && <HumanCheckBadge task={task} />}
+                  <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
+                </span>
                 <span className="meta">
                   {task.label && <span className="label">{task.label}</span>}
                   {iteration && <span>{t("task.iteration", { iteration })}</span>}
                   {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
-                  {task.waiting_on && <span>{t("task.waiting_on", { what: task.waiting_on })}</span>}
+                  {stop?.(task) && <span className={`stop s-${task.state}-text`}>{stop(task)}</span>}
                   {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
                 </span>
               </li>

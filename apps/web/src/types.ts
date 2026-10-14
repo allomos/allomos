@@ -1,6 +1,6 @@
 // Shapes returned by the desktop app. They mirror the Rust types in crates/core and crates/store.
 
-export type State = "backlog" | "ready" | "in_progress" | "waiting" | "done" | "dropped";
+export type State = "backlog" | "ready" | "in_progress" | "waiting" | "blocked" | "done" | "dropped";
 
 export interface Project {
   format: string;
@@ -32,12 +32,21 @@ export interface Task {
   state: State;
   label: string | null;
   holder: string | null;
+  /** For a waiting task: what a person must do. */
   waiting_on: string | null;
+  /** For a waiting task: who must act; none means the approver ("Waiting for you"). Decision 0016. */
+  who?: string | null;
+  /** For a blocked task: the tasks that must finish first (left out when none). Decision 0016. */
+  blocked_by?: string[];
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
-  /** Why the task was finished without the owner's check (Task-A03-15). */
-  finished_without_owner: string | null;
+  /** Why the task was finished without the human check, and in which run (Task-A03-15, A03-18). */
+  without_human_check: string | null;
+  /** How a person checks it, in Markdown (Task-A03-18). */
+  human_check_steps: string | null;
+  /** The note's name before allomos/4; only on a taskbag being migrated. */
+  finished_without_owner?: string | null;
   description: string;
 }
 
@@ -46,14 +55,16 @@ export interface Task {
  * Each goes through the same rule as its `alm` command; Rust decides whether it is allowed.
  */
 export type Edit =
-  | { field: "state"; state: State; waiting_on?: string | null }
+  | { field: "state"; state: State; waiting_on?: string | null; who?: string | null; blocked_by?: string[] }
   | { field: "label"; label: string }
   | { field: "waiting_on"; text: string }
+  | { field: "blocked_by"; ids: string[] }
   | { field: "next_dependency"; text: string | null }
   | { field: "handoff_note"; text: string | null }
   | { field: "iteration"; iteration: string | null }
   | { field: "title"; title: string }
-  | { field: "description"; text: string };
+  | { field: "description"; text: string }
+  | { field: "checked" };
 
 /**
  * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID

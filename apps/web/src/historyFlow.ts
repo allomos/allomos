@@ -12,9 +12,13 @@ const FIELD_KEYS: Record<string, Key> = {
   label: "pane.label",
   holder: "pane.holder",
   waiting_on: "pane.waiting_on",
+  who: "pane.who",
+  blocked_by: "pane.blocked_by",
   next_dependency: "pane.next",
   handoff_note: "pane.handoff",
-  finished_without_owner: "pane.finished_without_owner",
+  without_human_check: "pane.without_human_check",
+  human_check_steps: "pane.human_check_steps",
+  finished_without_owner: "pane.without_human_check",
   description: "pane.description",
 };
 
@@ -32,6 +36,7 @@ const SHORT = 60;
 export function valueText(field: string, value: unknown, t: T): string {
   if (value === undefined || value === null || value === "") return "—";
   if (field === "state" && typeof value === "string") return t(`state.${value}` as Key);
+  if (field === "blocked_by" && Array.isArray(value)) return value.length ? value.join(", ") : "—";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const first = text.split("\n")[0];
   return first.length > SHORT || first.length < text.trimEnd().length ? `${first.slice(0, SHORT)}…` : first;

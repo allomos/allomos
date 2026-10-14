@@ -10,6 +10,17 @@
   "bad_usage": [
     "detail"
   ],
+  "blocked_by_missing": [],
+  "blocked_by_self": [
+    "id"
+  ],
+  "blocker_dropped": [
+    "id",
+    "blocker"
+  ],
+  "blocker_unknown": [
+    "id"
+  ],
   "cannot_make_ready": [
     "id",
     "state"
@@ -40,6 +51,9 @@
   ],
   "field_missing": [],
   "field_unknown": [],
+  "finished_without_owner_renamed": [
+    "id"
+  ],
   "folder_not_empty": [
     "path"
   ],
@@ -52,6 +66,10 @@
     "file"
   ],
   "holder_missing": [],
+  "human_check_steps_empty": [],
+  "human_check_steps_missing": [
+    "id"
+  ],
   "instructions_outdated": [
     "files",
     "current"
@@ -101,6 +119,14 @@
   ],
   "not_a_taskbag": [
     "path"
+  ],
+  "not_blocked": [
+    "id",
+    "state"
+  ],
+  "not_done": [
+    "id",
+    "state"
   ],
   "not_json": [
     "detail"
@@ -173,7 +199,7 @@
     "iteration"
   ],
   "waiting_on_missing": [],
-  "without_owner_missing": [],
+  "without_human_check_missing": [],
   "write_failed": [
     "path",
     "detail"

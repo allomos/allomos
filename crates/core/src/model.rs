@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/3";
+pub const FORMAT: &str = "allomos/4";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; an older one refuses
 /// a newer taskbag (Task-A01-25), and a newer one has an agent update an older taskbag by following
@@ -15,7 +15,11 @@ pub const FORMAT: &str = "allomos/3";
 /// (Task-A03-06).
 /// 3: `events/`, one file per change, the history of changes (Task-A01-17), and a task's
 /// optional `finished_without_owner` (Task-A03-15).
-pub const FORMAT_VERSION: u32 = 3;
+/// 4: the `blocked` state with a task's `blocked_by`, and a waiting task's optional `who`
+/// (decision 0016, Task-A01-31); the human check: `finished_without_owner` becomes
+/// `without_human_check`, with optional `human_check_steps`, and the default top label is
+/// "human verified" (Task-A03-18). One migration entry 3 → 4 covers both.
+pub const FORMAT_VERSION: u32 = 4;
 
 /// The oldest format this Allomos can update (owner, 2026-10-14; Task-A01-32). An older taskbag
 /// is told it is too old (`taskbag_too_old`); between this and [`FORMAT_VERSION`] it is read, and
@@ -152,7 +156,7 @@ pub fn default_labels() -> Vec<String> {
         "implemented",
         "locally verified",
         "deployed and verified",
-        "owner verified",
+        "human verified",
     ]
     .into_iter()
     .map(String::from)
@@ -196,17 +200,21 @@ pub enum State {
     Backlog,
     Ready,
     InProgress,
+    /// A person (or an outside event) must act; `waiting_on` says what, `who` optionally who.
     Waiting,
+    /// Another task in the taskbag must finish first; `blocked_by` lists them (decision 0016).
+    Blocked,
     Done,
     Dropped,
 }
 
 impl State {
-    pub const ALL: [State; 6] = [
+    pub const ALL: [State; 7] = [
         State::Backlog,
         State::Ready,
         State::InProgress,
         State::Waiting,
+        State::Blocked,
         State::Done,
         State::Dropped,
     ];
@@ -217,6 +225,7 @@ impl State {
             State::Ready => "ready",
             State::InProgress => "in_progress",
             State::Waiting => "waiting",
+            State::Blocked => "blocked",
             State::Done => "done",
             State::Dropped => "dropped",
         }
@@ -237,9 +246,17 @@ pub struct Task {
     /// Who holds the task: a person or an agent session.
     #[serde(default)]
     pub holder: Option<String>,
-    /// What blocks the next step, in plain words.
+    /// For a `waiting` task: what a person (or an outside event) must do, in plain words.
     #[serde(default)]
     pub waiting_on: Option<String>,
+    /// For a `waiting` task: who must act, when it is not the approver (`alm wait --who`, decision
+    /// 0016). Without it the app says "Waiting for you".
+    #[serde(default)]
+    pub who: Option<String>,
+    /// For a `blocked` task: the tasks in this taskbag that must finish first (`alm block --by`,
+    /// decision 0016). Empty for every other state.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blocked_by: Vec<String>,
     #[serde(default)]
     pub next_dependency: Option<String>,
     /// The iteration the task is planned in, if any.
@@ -248,13 +265,33 @@ pub struct Task {
     /// A short note left on release for whoever picks the task up next.
     #[serde(default)]
     pub handoff_note: Option<String>,
-    /// Why the task was finished without the owner's check, and in which run: set only by
-    /// `alm done --without-owner` (Task-A03-15). Kept when the owner checks it later, so such tasks
-    /// stay searchable; the owner's check shows in the label.
+    /// Why the task was finished without the human check, and in which run: set by
+    /// `alm done --without-human-check` (Task-A03-15, renamed in Task-A03-18). While a done task
+    /// has it, the task waits for a person to check it ("To check", `alm human`). Marking it
+    /// checked (`alm checked`, or the top label on a done task) clears it; its history keeps it.
     #[serde(default)]
+    pub without_human_check: Option<String>,
+    /// How a person checks the task, in Markdown (test folder, what to open, what to click, what
+    /// they should see): `alm done --without-human-check … --steps <file.md>` (Task-A03-18).
+    /// Cleared with the note when the task is checked.
+    #[serde(default)]
+    pub human_check_steps: Option<String>,
+    /// The note's name before `allomos/4`. Read only so that the guided migration can move it
+    /// (`alm done --without-human-check`) or clear it (`alm checked`); a task that still has it is
+    /// reported (`finished_without_owner_renamed`). Never written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_without_owner: Option<String>,
     #[serde(default, skip_deserializing)]
     pub description: String,
+}
+
+impl Task {
+    /// Finished without the human check and not checked since: "To check" (Task-A03-18). A task
+    /// still carrying the note's old name counts too, so it is not lost during a migration.
+    pub fn to_check(&self) -> bool {
+        self.state == State::Done
+            && (self.without_human_check.is_some() || self.finished_without_owner.is_some())
+    }
 }
 
 /// A whole taskbag after loading: the project, its areas, iterations and tasks.

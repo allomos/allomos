@@ -94,8 +94,29 @@ problems! {
     UnknownArea { area } => "unknown_area", "The area \"{area}\" does not exist. Add areas/{area}.json or use an existing area ID.";
     LabelNotOnLadder { label, ladder } => "label_not_on_ladder", "\"{label}\" is not a step of this project's ladder ({ladder}).";
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
-    /// `alm done --without-owner` with no text, or the field empty in `task.json` (Task-A03-15).
-    WithoutOwnerMissing => "without_owner_missing", "Say why the task is finished without the owner's check, and in which run.";
+    /// A `blocked` task names no blocking task (decision 0016, Task-A01-31).
+    BlockedByMissing => "blocked_by_missing", "A blocked task must name the task(s) that must finish first: `alm block <id> --by <task-id>`.";
+    /// `blocked_by` names a task that is not in this taskbag.
+    BlockerUnknown { id } => "blocker_unknown", "There is no task \"{id}\" in this taskbag, so it cannot block another task.";
+    /// `blocked_by` names the task itself.
+    BlockedBySelf { id } => "blocked_by_self", "Task {id} cannot be blocked by itself.";
+    /// `alm unblock` on a task that is not blocked.
+    NotBlocked { id, state } => "not_blocked", "Task {id} is {state}, not blocked, so there is nothing to unblock.";
+    /// A warning: a blocking task is dropped, so it will never be done (owner, 2026-10-14).
+    BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: it will never be done, and it does not count as done. Is {id} still blocked?";
+    /// `alm done --without-human-check` with no text, or the field empty in `task.json`
+    /// (Task-A03-15; renamed from `without_owner_missing` in Task-A03-18).
+    WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check, and in which run.";
+    /// A warning: `alm done --without-human-check` without the steps for the person who checks it
+    /// (Task-A03-18). `alm` asks for them and shows how to write them; it does not refuse.
+    HumanCheckStepsMissing { id } => "human_check_steps_missing", "No human check steps for {id}: a person must be able to pick it up and test it. Write them in Markdown (the test folder, what to open, what to click, what they should see) to a file, then run `alm done {id} --without-human-check \"<why, which run>\" --steps <file.md>`.";
+    /// `--steps` names an empty file (Task-A03-18).
+    HumanCheckStepsEmpty => "human_check_steps_empty", "The human check steps are empty. Write what a person opens, clicks and should see, or leave out --steps.";
+    /// `alm checked` on a task that is not done (Task-A03-18).
+    NotDone { id, state } => "not_done", "Task {id} is {state}, not done: only a finished task is human-checked.";
+    /// A task still carries the note's name from before `allomos/4` (Task-A03-18): the guided
+    /// migration moves it with `alm`.
+    FinishedWithoutOwnerRenamed { id } => "finished_without_owner_renamed", "Task {id} carries `finished_without_owner`, the name used before allomos/4. If it has not been checked by a person since, move the note: `alm done {id} --without-human-check \"<the same note>\"`; if it has (its label is the top one), clear it: `alm checked {id}`.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";
@@ -139,8 +160,8 @@ problems! {
     LinkNotFound { link } => "link_not_found", "The file \"{link}\" does not exist.";
     /// Allomos was started with a folder that does not exist or is not a folder.
     StartupNotAFolder { path } => "startup_not_a_folder", "Allomos was started with {path}, which is not a folder, so nothing was opened.";
-    /// Only an unheld backlog or waiting task can be made ready.
-    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
+    /// Only an unheld backlog, waiting or blocked task can be made ready.
+    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
     CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
     /// A warning from `alm --commit` / `--push`: the change is saved but Git refused. `detail` is Git's own text.

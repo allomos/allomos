@@ -44,6 +44,7 @@ const CHOICE_FIELDS: &[(&str, &[&str])] = &[(
         "ready",
         "in_progress",
         "waiting",
+        "blocked",
         "done",
         "dropped",
     ],
@@ -277,14 +278,14 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
         issues.push(Issue::new(file, Some("title"), Problem::TaskTitleMissing));
     }
     if task
-        .finished_without_owner
+        .without_human_check
         .as_ref()
         .is_some_and(|t| t.trim().is_empty())
     {
         issues.push(Issue::new(
             file,
-            Some("finished_without_owner"),
-            Problem::WithoutOwnerMissing,
+            Some("without_human_check"),
+            Problem::WithoutHumanCheckMissing,
         ));
     }
     if issues.is_empty() {
@@ -295,7 +296,8 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
 }
 
 /// Cross-file checks: unique IDs, every task's area (and iteration, when it has one) exists,
-/// labels are on the project's ladder, and a waiting task says what it waits on.
+/// labels are on the project's ladder, a waiting task says what it waits on, and a blocked task
+/// names at least one other task of this taskbag that blocks it (decision 0016).
 pub fn validate_taskbag(
     project: &Project,
     areas: &[(String, Area)],
@@ -382,6 +384,34 @@ pub fn validate_taskbag(
                 Problem::WaitingOnMissing,
             ));
         }
+        // The note's name before allomos/4: the guided migration moves it with `alm`
+        // (Task-A03-18); until then `alm migrate --finish` is refused.
+        if task.finished_without_owner.is_some() {
+            issues.push(Issue::new(
+                file,
+                Some("finished_without_owner"),
+                Problem::FinishedWithoutOwnerRenamed {
+                    id: task.id.clone(),
+                },
+            ));
+        }
+        if task.state == State::Blocked && task.blocked_by.is_empty() {
+            issues.push(Issue::new(
+                file,
+                Some("blocked_by"),
+                Problem::BlockedByMissing,
+            ));
+        }
+        for b in &task.blocked_by {
+            let problem = if b == &task.id {
+                Problem::BlockedBySelf { id: b.clone() }
+            } else if !tasks.iter().any(|(_, t)| &t.id == b) {
+                Problem::BlockerUnknown { id: b.clone() }
+            } else {
+                continue;
+            };
+            issues.push(Issue::new(file, Some("blocked_by"), problem));
+        }
     }
     issues
 }
@@ -405,7 +435,7 @@ mod tests {
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/4","id":"d","name":"D","later":{"context":90}}"#,
+            r#"{"format":"allomos/5","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);
@@ -509,20 +539,36 @@ mod tests {
     }
 
     #[test]
-    fn a_task_finished_without_the_owner_carries_its_note() {
+    fn a_task_finished_without_the_human_check_carries_its_note_and_steps() {
         let t = parse_task(
+            "t.json",
+            r#"{"id":"T1","title":"x","area":"A1","state":"done","without_human_check":"card run","human_check_steps":"1. Open it."}"#,
+        )
+        .unwrap();
+        assert_eq!(t.without_human_check.as_deref(), Some("card run"));
+        assert_eq!(t.human_check_steps.as_deref(), Some("1. Open it."));
+        assert!(t.to_check());
+        let err = parse_task(
+            "t.json",
+            r#"{"id":"T1","title":"x","area":"A1","state":"done","without_human_check":" "}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err[0].field.as_deref(), Some("without_human_check"));
+        assert_eq!(err[0].problem, Problem::WithoutHumanCheckMissing);
+        // The name before allomos/4 is still read, so a migration can move it, and never written.
+        let old = parse_task(
             "t.json",
             r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
         )
         .unwrap();
-        assert_eq!(t.finished_without_owner.as_deref(), Some("card run"));
-        let err = parse_task(
-            "t.json",
-            r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":" "}"#,
-        )
-        .unwrap_err();
-        assert_eq!(err[0].field.as_deref(), Some("finished_without_owner"));
-        assert_eq!(err[0].problem, Problem::WithoutOwnerMissing);
+        assert!(old.to_check());
+        let mut fresh = old.clone();
+        fresh.finished_without_owner = None;
+        assert!(
+            !serde_json::to_string(&fresh)
+                .unwrap()
+                .contains("finished_without_owner")
+        );
     }
 
     #[test]
@@ -564,6 +610,73 @@ mod tests {
         assert!(fields.contains(&("tasks/T2/task.json", "id")));
         assert!(fields.contains(&("tasks/T2/task.json", "label")));
         assert!(fields.contains(&("tasks/T2/task.json", "waiting_on")));
+    }
+
+    /// Decision 0016: a blocked task names at least one other task of this taskbag.
+    #[test]
+    fn a_blocked_task_names_known_other_tasks() {
+        let areas = vec![(
+            "a".to_string(),
+            parse_area("a", r#"{"id":"A1","name":"Tracking"}"#).unwrap(),
+        )];
+        let task = |file: &str, json: &str| (file.to_string(), parse_task("t", json).unwrap());
+        let tasks = vec![
+            task(
+                "tasks/T1/task.json",
+                r#"{"id":"T1","title":"x","area":"A1","state":"blocked"}"#,
+            ),
+            task(
+                "tasks/T2/task.json",
+                r#"{"id":"T2","title":"y","area":"A1","state":"blocked","blocked_by":["T2","T9"]}"#,
+            ),
+            task(
+                "tasks/T3/task.json",
+                r#"{"id":"T3","title":"z","area":"A1","state":"blocked","blocked_by":["T1"]}"#,
+            ),
+            task(
+                "tasks/T4/task.json",
+                r#"{"id":"T4","title":"w","area":"A1","state":"waiting","waiting_on":"approval","who":"Ann"}"#,
+            ),
+        ];
+        let issues = validate_taskbag(&project(), &areas, &[], &tasks);
+        let got: Vec<(&str, &str)> = issues
+            .iter()
+            .map(|i| (i.file.as_str(), i.problem.code()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                ("tasks/T1/task.json", "blocked_by_missing"),
+                ("tasks/T2/task.json", "blocked_by_self"),
+                ("tasks/T2/task.json", "blocker_unknown"),
+            ]
+        );
+        assert!(
+            issues
+                .iter()
+                .all(|i| i.field.as_deref() == Some("blocked_by"))
+        );
+    }
+
+    /// Task-A03-18: the note's name before allomos/4 is reported until the migration moves it.
+    #[test]
+    fn the_old_note_name_is_reported() {
+        let areas = vec![(
+            "a".to_string(),
+            parse_area("a", r#"{"id":"A1","name":"Tracking"}"#).unwrap(),
+        )];
+        let tasks = vec![(
+            "tasks/T1/task.json".to_string(),
+            parse_task(
+                "t",
+                r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
+            )
+            .unwrap(),
+        )];
+        let issues = validate_taskbag(&project(), &areas, &[], &tasks);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].field.as_deref(), Some("finished_without_owner"));
+        assert_eq!(issues[0].problem.code(), "finished_without_owner_renamed");
     }
 
     #[test]

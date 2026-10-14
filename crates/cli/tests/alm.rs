@@ -937,7 +937,7 @@ fn brief_and_guide_tell_agents_about_allomos() {
     );
 
     let v = ok(&repo, &["guide", "customize"]);
-    assert!(v["guide"].as_str().unwrap().contains("The six states"));
+    assert!(v["guide"].as_str().unwrap().contains("The seven states"));
     let all = ok(&repo, &["guide"]);
     assert!(all["guide"].as_str().unwrap().contains("# Allomos terms"));
     let (code, v) = fj(&repo, &["guide", "nope"]);
@@ -1308,7 +1308,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v3)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v4)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -1322,13 +1322,13 @@ fn migrate_on_a_current_taskbag_changes_nothing() {
     let v = ok(&repo, &["migrate"]);
     assert_eq!(
         v["migrate"],
-        json!({ "from": "allomos/3", "to": "allomos/3", "needed": false })
+        json!({ "from": "allomos/4", "to": "allomos/4", "needed": false })
     );
     assert!(v.get("prompt").is_none());
     let v = ok(&repo, &["migrate", "--finish"]);
     assert_eq!(
         v["migrate"],
-        json!({ "from": "allomos/3", "to": "allomos/3", "changed": false })
+        json!({ "from": "allomos/4", "to": "allomos/4", "changed": false })
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
 }
@@ -1370,7 +1370,7 @@ fn a_taskbag_on_version_2_is_too_old() {
 fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "label", "A01-01", "owner verified"]);
+    ok(&repo, &["--as", "a", "label", "A01-01", "human verified"]);
     let v = ok(
         &repo,
         &[
@@ -1378,8 +1378,8 @@ fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
             "a",
             "rename",
             "label",
-            "owner verified",
-            "human checked",
+            "human verified",
+            "checked by a person",
         ],
     );
     assert_eq!(
@@ -1388,14 +1388,14 @@ fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
             "implemented",
             "locally verified",
             "deployed and verified",
-            "human checked"
+            "checked by a person"
         ])
     );
     assert_eq!(v["tasks"][0]["id"], "A01-01");
-    assert_eq!(v["tasks"][0]["label"], "human checked");
+    assert_eq!(v["tasks"][0]["label"], "checked by a person");
     assert_eq!(v["issues"], json!([]));
     let shown = ok(&repo, &["show", "A01-01"]);
-    assert_eq!(shown["task"]["label"], "human checked");
+    assert_eq!(shown["task"]["label"], "checked by a person");
     assert_eq!(
         ok(&repo, &["history", "A01-01"])["events"][0]["command"],
         "rename label"
@@ -1408,7 +1408,7 @@ fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
     );
     refused(
         &repo,
-        &["rename", "label", "human checked", "implemented"],
+        &["rename", "label", "checked by a person", "implemented"],
         1,
         "label_exists",
     );
@@ -1423,20 +1423,25 @@ fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
     assert!(String::from_utf8_lossy(&out.stdout).contains("No task carried the label."));
 }
 
+/// Task-A03-18: `alm done --without-human-check` with its steps, `alm human` (To check, To
+/// answer), `alm checked`, and the old `--without-owner` flag kept as an alias.
 #[test]
-fn a_task_finished_without_the_owner_is_noted_and_found() {
+fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     ok(&repo, &["--as", "a", "label", "A01-01", "locally verified"]);
-    // Empty text is refused, and nothing changes.
+    // Empty text is refused, and nothing changes; so are steps without a note.
     refused(
         &repo,
-        &["--as", "a", "done", "A01-01", "--without-owner", " "],
+        &["--as", "a", "done", "A01-01", "--without-human-check", " "],
         1,
-        "without_owner_missing",
+        "without_human_check_missing",
     );
+    let (code, _) = fj(&repo, &["--as", "a", "done", "A01-01", "--steps", "x.md"]);
+    assert_eq!(code, 2, "--steps needs --without-human-check");
     assert_eq!(task_file(&repo, "A01-01")["state"], "in_progress");
 
+    // Without steps: finished, and alm asks for them, saying how to write them.
     let v = ok(
         &repo,
         &[
@@ -1444,48 +1449,171 @@ fn a_task_finished_without_the_owner_is_noted_and_found() {
             "a",
             "done",
             "A01-01",
-            "--without-owner",
-            "card run, owner away",
+            "--without-human-check",
+            "card run, approver away",
+        ],
+    );
+    assert_eq!(v["warnings"][0]["code"], "human_check_steps_missing");
+    assert!(
+        v["warnings"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("--steps <file.md>")
+    );
+    assert_eq!(v["task"]["without_human_check"], "card run, approver away");
+    let file = task_file(&repo, "A01-01");
+    assert_eq!(file["without_human_check"], "card run, approver away");
+    assert_eq!(file["label"], "locally verified", "the label stays");
+    assert!(file.get("finished_without_owner").is_none());
+
+    // The steps, from a file, on the task already done; an empty file is refused.
+    fs::write(repo.join("empty.md"), " \n").unwrap();
+    refused(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "card run",
+            "--steps",
+            "empty.md",
+        ],
+        1,
+        "human_check_steps_empty",
+    );
+    let steps = "1. Open `~/allomos-tests/demo` in Allomos.\n2. Click **A01-01**.\n3. You should see the badge.\n";
+    fs::write(repo.join("steps.md"), steps).unwrap();
+    // Already done: the holder rule does not apply, only the human check is recorded.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "card run, approver away",
+            "--steps",
+            "steps.md",
         ],
     );
     assert_eq!(v["warnings"], json!([]));
-    assert_eq!(v["task"]["finished_without_owner"], "card run, owner away");
-    let file = task_file(&repo, "A01-01");
-    assert_eq!(file["finished_without_owner"], "card run, owner away");
-    assert_eq!(file["label"], "locally verified", "the label stays");
-
-    // `alm show` shows it.
-    let v = ok(&repo, &["show", "A01-01"]);
-    assert_eq!(v["task"]["finished_without_owner"], "card run, owner away");
+    assert_eq!(task_file(&repo, "A01-01")["human_check_steps"], steps);
     let out = alm(&repo, &["show", "A01-01"]);
+    let shown = String::from_utf8_lossy(&out.stdout);
     assert!(
-        String::from_utf8_lossy(&out.stdout)
-            .contains("finished without the owner's check: card run, owner away")
+        shown.contains("not human-checked: card run, approver away"),
+        "{shown}"
+    );
+    assert!(shown.contains("human check steps:\n    1. Open"), "{shown}");
+
+    // The old flag still works (alias).
+    ok(&repo, &["--as", "c", "claim", "A02-01"]);
+    ok(
+        &repo,
+        &["--as", "c", "done", "A02-01", "--without-owner", "loop run"],
+    );
+    assert_eq!(
+        task_file(&repo, "A02-01")["without_human_check"],
+        "loop run"
     );
 
-    // A task finished the usual way is not found by --without-owner.
+    // A task finished the usual way is not listed; a waiting one is To answer; backlog is not.
     ok(&repo, &["--as", "b", "claim", "A01-02"]);
     ok(&repo, &["--as", "b", "done", "A01-02"]);
-    assert!(
-        task_file(&repo, "A01-02")
-            .get("finished_without_owner")
-            .is_none()
+    ok(
+        &repo,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Wait"],
     );
-    let v = ok(&repo, &["list", "--without-owner"]);
-    let found: Vec<&Value> = v["areas"]
+    ok(
+        &repo,
+        &["add", "task", "A01-04", "--area", "A01", "--title", "Idea"],
+    );
+    ok(
+        &repo,
+        &["wait", "A01-03", "--on", "approve the card", "--who", "Ann"],
+    );
+    for flag in ["--without-human-check", "--without-owner"] {
+        let v = ok(&repo, &["list", flag]);
+        let found: Vec<&Value> = v["areas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|a| a["tasks"].as_array().unwrap())
+            .map(|t| &t["id"])
+            .collect();
+        assert_eq!(found, [&json!("A01-01"), &json!("A02-01")], "{flag}");
+    }
+    let v = ok(&repo, &["human"]);
+    let ids = |list: &Value| -> Vec<String> {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["id"].as_str().unwrap().to_string())
+            .collect()
+    };
+    assert_eq!(ids(&v["to_check"]), ["A01-01", "A02-01"]);
+    assert_eq!(ids(&v["to_answer"]), ["A01-03"]);
+    assert_eq!(
+        v["to_check"][0]["human_check_steps"], steps,
+        "--json has the steps"
+    );
+    assert_eq!(
+        ids(&ok(&repo, &["human", "--area", "A02"])["to_check"]),
+        ["A02-01"]
+    );
+    refused(&repo, &["human", "--area", "A09"], 1, "unknown_area");
+    refused(
+        &repo,
+        &["human", "--iteration", "I09"],
+        1,
+        "unknown_iteration",
+    );
+    let out = alm(&repo, &["human"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.starts_with("To check (2)\n"), "{text}");
+    assert!(
+        text.contains("not human-checked: card run, approver away"),
+        "{text}"
+    );
+    assert!(text.contains("To answer (1)"), "{text}");
+    assert!(text.contains("waiting for Ann: approve the card"), "{text}");
+    assert!(!text.contains("A01-04"), "backlog is not listed: {text}");
+    assert!(!text.contains("1. Open"), "steps only with --steps: {text}");
+    let out = alm(&repo, &["human", "--steps"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("steps:\n          1. Open"), "{text}");
+    assert!(text.contains("steps: none written"), "{text}");
+
+    // A person checked it: top label, off To check; anyone may say so; history keeps the note.
+    refused(&repo, &["checked", "A01-03"], 1, "not_done");
+    let v = ok(&repo, &["--as", "will", "checked", "A01-01"]);
+    assert_eq!(v["task"]["label"], "human verified");
+    let file = task_file(&repo, "A01-01");
+    assert!(file.get("without_human_check").is_none());
+    assert!(file.get("human_check_steps").is_none());
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "checked");
+    let note = last["changes"]
         .as_array()
         .unwrap()
         .iter()
-        .flat_map(|a| a["tasks"].as_array().unwrap())
-        .collect();
-    assert_eq!(found.len(), 1);
-    assert_eq!(found[0]["id"], "A01-01");
-
-    // The owner checks it later: the note stays, the label shows the check.
-    ok(&repo, &["--as", "a", "label", "A01-01", "owner verified"]);
-    let file = task_file(&repo, "A01-01");
-    assert_eq!(file["label"], "owner verified");
-    assert_eq!(file["finished_without_owner"], "card run, owner away");
+        .find(|c| c["field"] == "without_human_check")
+        .unwrap();
+    assert_eq!(note["from"], "card run, approver away");
+    assert_eq!(ids(&ok(&repo, &["human"])["to_check"]), ["A02-01"]);
+    // The top label set on a finished task is the human check too.
+    ok(&repo, &["--as", "c", "label", "A02-01", "human verified"]);
+    assert!(
+        task_file(&repo, "A02-01")
+            .get("without_human_check")
+            .is_none()
+    );
+    let out = alm(&repo, &["human"]);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Nothing to check."));
 }
 
 #[test]
@@ -1832,4 +1960,383 @@ fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
         "handoff_not_found",
     );
     assert!(repo.join(".allomos/taskbag/project.json").is_file());
+}
+
+/// Decision 0016 (Task-A01-31): waiting on a person, with an optional who.
+#[test]
+fn wait_says_what_and_optionally_who() {
+    let repo = filled();
+    refused(
+        &repo,
+        &["wait", "A01-01", "--on", " "],
+        1,
+        "waiting_on_missing",
+    );
+    let v = ok(
+        &repo,
+        &["wait", "A01-01", "--on", "reply on licence", "--who", "Ann"],
+    );
+    assert_eq!(v["task"]["state"], "waiting");
+    assert_eq!(v["task"]["who"], "Ann");
+    assert_eq!(task_file(&repo, "A01-01")["who"], "Ann");
+    let out = alm(&repo, &["list"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("waiting for Ann: reply on licence"), "{text}");
+    // Without --who, the owner is meant; a who left over is cleared.
+    ok(&repo, &["wait", "A01-01", "--on", "approve the card"]);
+    let file = task_file(&repo, "A01-01");
+    assert!(file.get("who").is_none(), "{file}");
+    let text = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(text.contains("waiting on: approve the card"), "{text}");
+}
+
+/// Decision 0016: `alm block` and its refusals; each blocker's state in list, show and next; a
+/// dropped blocker flagged; all done told but not acted on; one event per change.
+#[test]
+fn block_shows_blockers_and_next_only_tells() {
+    let repo = filled();
+    refused(
+        &repo,
+        &["block", "A01-02", "--by", "A01-02"],
+        1,
+        "blocked_by_self",
+    );
+    refused(
+        &repo,
+        &["block", "A01-02", "--by", "A09-09"],
+        1,
+        "blocker_unknown",
+    );
+    refused(
+        &repo,
+        &["block", "A01-02", "--by", " "],
+        1,
+        "blocked_by_missing",
+    );
+    let (code, _) = fj(&repo, &["block", "A01-02"]);
+    assert_eq!(code, 2, "--by is required");
+    assert_eq!(
+        task_file(&repo, "A01-02")["state"],
+        "backlog",
+        "nothing written"
+    );
+
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(&repo, &["block", "A01-02", "--by", "A01-01", "A02-01"]);
+    assert_eq!(v["task"]["state"], "blocked");
+    assert_eq!(v["task"]["blocked_by"], json!(["A01-01", "A02-01"]));
+    assert_eq!(
+        v["task"]["blockers"],
+        json!([{ "id": "A01-01", "state": "in_progress" }, { "id": "A02-01", "state": "backlog" }])
+    );
+    assert_eq!(
+        task_file(&repo, "A01-02")["blocked_by"],
+        json!(["A01-01", "A02-01"])
+    );
+    // People read each blocker's current state.
+    let list = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(
+        list.contains("blocked by A01-01 (in progress), A02-01 (backlog)"),
+        "{list}"
+    );
+    let v = ok(&repo, &["list", "--state", "blocked"]);
+    assert_eq!(v["areas"][0]["tasks"][0]["id"], "A01-02");
+    assert_eq!(v["areas"][0]["tasks"][0]["all_blockers_done"], false);
+    let show = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
+    assert!(
+        show.contains("blocked by: A01-01 (in progress), A02-01 (backlog)"),
+        "{show}"
+    );
+    // Not ready, so never in next; nothing to tell yet.
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["blocked"], json!([]));
+
+    // A dropped blocker is flagged, never counted as done.
+    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    ok(&repo, &["drop", "A02-01"]);
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["blocked"][0]["id"], "A01-02");
+    assert_eq!(v["blocked"][0]["all_blockers_done"], false);
+    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(next.contains("A02-01 (dropped; still blocked?)"), "{next}");
+    // Blocking on a dropped task is allowed, with a warning.
+    let v = ok(&repo, &["block", "A01-02", "--by", "A02-01"]);
+    assert_eq!(v["warnings"][0]["code"], "blocker_dropped");
+
+    // Every blocker done: next tells, and moves nothing.
+    ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
+    let before = fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap();
+    let events_before = fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .unwrap()
+        .count();
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["blocked"][0]["id"], "A01-02");
+    assert_eq!(v["blocked"][0]["all_blockers_done"], true);
+    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(
+        next.contains("A01-02: all blockers are done (A01-01 (done)) — unblock it?"),
+        "{next}"
+    );
+    assert_eq!(
+        fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap(),
+        before,
+        "next changes nothing"
+    );
+    assert_eq!(
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count(),
+        events_before
+    );
+
+    // Unblock moves it on; only a blocked task.
+    let v = ok(&repo, &["unblock", "A01-02"]);
+    assert_eq!(v["task"]["state"], "ready");
+    assert!(task_file(&repo, "A01-02").get("blocked_by").is_none());
+    refused(&repo, &["unblock", "A01-02"], 1, "not_blocked");
+    // One event per change, named after the command.
+    let v = ok(&repo, &["history", "A01-02"]);
+    let commands: Vec<&str> = v["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["command"].as_str().unwrap())
+        .collect();
+    assert_eq!(commands, ["unblock", "block", "block", "block", "add task"]);
+}
+
+/// The real 3 → 4 migration, through `alm migrate` and `--finish` (Task-A01-31).
+/// A task file as `allomos/3` wrote it: the note under its old name.
+fn with_old_note(repo: &Path, id: &str) {
+    let path = repo.join(format!(".allomos/taskbag/tasks/{id}/task.json"));
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("without_human_check"));
+    fs::write(
+        &path,
+        text.replace("without_human_check", "finished_without_owner"),
+    )
+    .unwrap();
+}
+
+/// The whole 3 → 4 migration through `alm` (A01-31 and A03-18 in one entry): waiting tasks stay
+/// waiting unless the agent moves one; the old default ladder's top step is renamed with
+/// `alm rename label`; the old note is moved with `alm done --without-human-check` (on a task
+/// another session holds) or cleared with `alm checked`; the finish is refused until no task
+/// carries the old name.
+#[test]
+fn migrate_from_3_to_4_blocked_state_and_human_check() {
+    let repo = filled();
+    ok(
+        &repo,
+        &[
+            "labels",
+            "implemented,locally verified,deployed and verified,owner verified",
+        ],
+    );
+    ok(
+        &repo,
+        &["wait", "A01-01", "--on", "the approver approves the card"],
+    );
+    ok(
+        &repo,
+        &["wait", "A01-02", "--on", "A01-01 must be finished first"],
+    );
+    // Two finished tasks with the old note: one below the top, held by its session; one checked.
+    ok(
+        &repo,
+        &["add", "task", "A02-02", "--area", "A02", "--title", "Plot"],
+    );
+    ok(&repo, &["--as", "worker", "claim", "A02-01"]);
+    ok(
+        &repo,
+        &["--as", "worker", "label", "A02-01", "locally verified"],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "worker",
+            "done",
+            "A02-01",
+            "--without-human-check",
+            "loop run",
+        ],
+    );
+    ok(&repo, &["--as", "worker", "claim", "A02-02"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "worker",
+            "done",
+            "A02-02",
+            "--without-human-check",
+            "card run",
+        ],
+    );
+    ok(
+        &repo,
+        &["--as", "worker", "label", "A02-02", "locally verified"],
+    );
+    with_old_note(&repo, "A02-01");
+    with_old_note(&repo, "A02-02");
+    // The approver checked A02-02 back then: its label was raised and the note stayed.
+    let path = repo.join(".allomos/taskbag/tasks/A02-02/task.json");
+    let text = fs::read_to_string(&path).unwrap();
+    fs::write(&path, text.replace("locally verified", "owner verified")).unwrap();
+    set_format(&repo, "allomos/3");
+    let before = task_file(&repo, "A01-01");
+
+    let v = ok(&repo, &["migrate", "--language", "en"]);
+    assert_eq!(
+        v["migrate"],
+        json!({ "from": "allomos/3", "to": "allomos/4", "needed": true })
+    );
+    let prompt = v["prompt"].as_str().unwrap();
+    assert!(prompt.contains("allomos/3 → allomos/4"), "{prompt}");
+    assert!(prompt.contains("stays `waiting`"), "{prompt}");
+    assert!(
+        prompt.contains(
+            "`alm block`, `alm wait`, `alm needs`, `alm rename label`, `alm done`, `alm checked`"
+        ),
+        "{prompt}"
+    );
+    assert!(prompt.contains("[A03-18"), "{prompt}");
+    assert!(
+        prompt.contains("show the person the whole ladder"),
+        "{prompt}"
+    );
+    assert!(prompt.contains("never guess"), "{prompt}");
+    assert!(
+        !prompt.contains("is added before version 4 is merged"),
+        "{prompt}"
+    );
+    for (language, word) in [("zh-CN", "人工检查"), ("ja", "人による確認")] {
+        let v = ok(&repo, &["migrate", "--language", language]);
+        let p = v["prompt"].as_str().unwrap();
+        assert!(p.contains("A01-31") && p.contains("A03-18"), "{language}");
+        assert!(p.contains(word), "{language}");
+    }
+    // Reading works mid-migration, and lists the old notes as To check and as issues.
+    let v = ok(&repo, &["human"]);
+    assert_eq!(v["to_check"].as_array().unwrap().len(), 2);
+    let issues: Vec<&Value> = v["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|i| i["problem"]["code"] == "finished_without_owner_renamed")
+        .collect();
+    assert_eq!(issues.len(), 2, "{v}");
+    // Mid-migration: work is refused; the entry's commands work.
+    refused(&repo, &["--as", "b", "claim", "A01-02"], 1, "taskbag_older");
+    refused(
+        &repo,
+        &["--as", "m", "migrate", "--finish"],
+        1,
+        "migration_unfinished",
+    );
+    ok(&repo, &["--as", "m", "block", "A01-02", "--by", "A01-01"]);
+    // The person answered the plan: rename the top step; move one note, clear the other.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "m",
+            "rename",
+            "label",
+            "owner verified",
+            "human verified",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "m",
+            "done",
+            "A02-01",
+            "--without-human-check",
+            "loop run",
+        ],
+    );
+    ok(&repo, &["--as", "m", "checked", "A02-02"]);
+    let v = ok(&repo, &["--as", "m", "migrate", "--finish"]);
+    assert_eq!(
+        v["migrate"],
+        json!({ "from": "allomos/3", "to": "allomos/4", "changed": true })
+    );
+    assert_eq!(task_file(&repo, "A01-01"), before, "stays waiting");
+    assert_eq!(task_file(&repo, "A01-02")["state"], "blocked");
+    let moved = task_file(&repo, "A02-01");
+    assert_eq!(moved["without_human_check"], "loop run");
+    assert_eq!(moved["holder"], "worker", "the holder stays");
+    assert!(moved.get("finished_without_owner").is_none());
+    let checked = task_file(&repo, "A02-02");
+    assert_eq!(checked["label"], "human verified");
+    assert!(checked.get("finished_without_owner").is_none());
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(project["labels"][3], "human verified");
+    let v = ok(&repo, &["human"]);
+    assert_eq!(v["to_check"][0]["id"], "A02-01");
+    assert_eq!(v["to_check"].as_array().unwrap().len(), 1);
+    ok(&repo, &["--as", "b", "claim", "A01-02"]);
+}
+
+/// A customised ladder is the project's own: `alm` renames nothing by itself, and the migration
+/// finishes with the ladder as it was once the notes are moved (the agent asks the person).
+#[test]
+fn migrate_from_3_to_4_leaves_a_customised_ladder_alone() {
+    let repo = filled();
+    ok(&repo, &["labels", "drafted,built,approved by Will,shipped"]);
+    ok(&repo, &["--as", "w", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "w",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "loop run",
+        ],
+    );
+    with_old_note(&repo, "A01-01");
+    set_format(&repo, "allomos/3");
+    let prompt = ok(&repo, &["migrate", "--language", "en"])["prompt"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(prompt.contains("customised"), "{prompt}");
+    ok(
+        &repo,
+        &[
+            "--as",
+            "m",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "loop run",
+        ],
+    );
+    ok(&repo, &["--as", "m", "migrate", "--finish"]);
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        project["labels"],
+        json!(["drafted", "built", "approved by Will", "shipped"])
+    );
+}
+
+/// A taskbag in format 4 is newer than an allomos/3 build: the older build says so
+/// (`taskbag_newer`). Shown with this build reading a format 5 taskbag, the same rule.
+#[test]
+fn a_newer_taskbag_is_refused_by_an_older_build() {
+    let repo = filled();
+    set_format(&repo, "allomos/5");
+    refused(&repo, &["list"], 4, "taskbag_newer");
 }
