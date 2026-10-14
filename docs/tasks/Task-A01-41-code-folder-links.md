@@ -34,3 +34,5 @@ Allomos's own taskbag lives in its own folder (`allomos-taskbag/`) beside the co
   **Evidence.** `cargo fmt --check` PASS; `cargo clippy --workspace --all-targets -- -D warnings` PASS; `cargo test --workspace` PASS (cli 2 + 44, core 40, store 64 + 4 + 4 + 5, desktop 25 + 1 ignored). Against the real taskbag (a scratch program calling `resolve_task_link`): the A07-04 card link → `Ok(File(".../allomos/docs/tasks/Task-A07-04-v0-2-exit-check.md"))`; `../../../../../allomos/Cargo.toml` → `LinkRefused`. Clicking in the app: NOT RUN by the agent; human check below.
 
   **Human check (steps).** Open the debug app (`target/debug/bundle/macos/Allomos.app`) on `../allomos-taskbag`, select A07-04, click the card link at the top of its description: the card opens in your editor.
+
+- 2026-10-14 — **Human verified** by the approver: in the debug app, the A07-04 card link opened the card. Task done.
