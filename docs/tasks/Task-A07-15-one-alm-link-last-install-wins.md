@@ -36,3 +36,8 @@ No second link (such as `~/.local/bin/alm`) comes before it, so `which -a alm` s
 
 - 2026-10-14: `~/.local/bin/alm` → `~/.cargo/bin/alm` on this Mac was made by hand (no procedure in the repo makes it); it put the development build ahead of the link.
 - Relation to task A07-14: its third point ("a development `alm` that wins") is covered here; "Don't ask again" per mismatch and Windows stay there.
+- 2026-10-14, implemented on `claude/a07-15-one-alm-link`:
+  - `postinstall` now always links to the app's `alm`. Scratch check (link folder redirected): nothing there, a link to the development build, a link to another program, a real file → all four end as a link to `Allomos.app/Contents/MacOS/alm`.
+  - `scripts/install-dev-alm.sh`: `cargo install`, then `sudo ln -sfn ~/.cargo/bin/alm /usr/local/bin/alm` only when the link leads elsewhere; dry run (cargo and sudo left out, link folder redirected) linked it, and a second run asked nothing. It says when this shell finds another `alm` first.
+  - Status gains `kind` (missing / development / other), `own`, `leads_to`; the banner shows the sentence, then "In use: … → …" and "This Allomos's own: …", and for a development build the button **Use this Allomos's alm…**. en, zh-CN, ja.
+  - Checks: `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings`, `cargo test --workspace` (7 `alm_command` cases, 1 new), web `typecheck`, `check:i18n` (362 texts), `test` (79), `build`: all PASS. NOT RUN: the banner in a built Allomos.app, and the real `/usr/local/bin` link (both the owner's human check).
