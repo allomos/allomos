@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
@@ -17,6 +17,8 @@ import { DescriptionHit, FilterHits, HandoffHits, Highlight, SearchBox, isSearch
 import { FILTER_STATES, filterName, hiddenByFilter, hiddenText, keepState, readFilter, stopText, toCheck, type Hidden, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
+import { RecentDialog } from "./RecentDialog";
+import { keepListed, noteOpened, parseRecentInfo, type RecentInfoMap } from "./recentFlow";
 import { HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import type { Creating } from "./createFlow";
@@ -49,12 +51,33 @@ function readRecent(): string[] {
   }
 }
 
+/** Each recent folder's project name and when it was last opened, for the start page's Open recent
+ * dialog (Task-A01-43). Kept only for folders still in the list. */
+const RECENT_INFO_KEY = "allomos.recentInfo";
+
+function readRecentInfo(): RecentInfoMap {
+  try {
+    return parseRecentInfo(localStorage.getItem(RECENT_INFO_KEY));
+  } catch {
+    return {};
+  }
+}
+
+function saveRecentInfo(info: RecentInfoMap) {
+  try {
+    localStorage.setItem(RECENT_INFO_KEY, JSON.stringify(info));
+  } catch {
+    /* storage unavailable: the dialog shows folder names only */
+  }
+}
+
 function saveRecent(list: string[]) {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(list));
   } catch {
     /* storage unavailable: the menu still shows this session's list */
   }
+  saveRecentInfo(keepListed(readRecentInfo(), list));
 }
 /** How often the window checks whether the taskbag's files changed, for example through `alm`. */
 const FOLLOW_MS = 1000;
@@ -127,6 +150,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       /* storage unavailable: nothing to remember */
     }
     const folder = projectFolder(o.root);
+    saveRecentInfo(noteOpened(readRecentInfo(), folder, o.loaded.taskbag?.project.name ?? null, new Date()));
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
     // The app knows which window shows which project, and the window is named after it (Task-A01-27).
     void messenger.setWindowProject(o.root, o.loaded.taskbag?.project.name ?? null).catch(() => undefined);
@@ -329,14 +353,16 @@ export function App({ messenger }: { messenger: Messenger }) {
   useEffect(() => {
     void messenger.setRecentFolders(recent).catch(() => undefined);
   }, [messenger, recent]);
+  const openRecent = useCallback(
+    async (folder: string) => {
+      const info = await messenger.inspectFolder(folder).catch(() => null);
+      if (info?.inspection.kind === "not_a_folder") changeRecent((list) => list.filter((f) => f !== folder));
+      await openFolder(folder);
+    },
+    [messenger, openFolder, changeRecent],
+  );
   useEffect(() => {
-    const stopOpen = messenger.onOpenRecentMenu((folder) => {
-      void (async () => {
-        const info = await messenger.inspectFolder(folder).catch(() => null);
-        if (info?.inspection.kind === "not_a_folder") changeRecent((list) => list.filter((f) => f !== folder));
-        await openFolder(folder);
-      })();
-    });
+    const stopOpen = messenger.onOpenRecentMenu((folder) => void openRecent(folder));
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
     // File → Connect with the Agents… (enabled while a taskbag is open): the wizard at step 4, or
     // step 3 while no project folder is known.
@@ -349,7 +375,24 @@ export function App({ messenger }: { messenger: Messenger }) {
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
     };
-  }, [messenger, openFolder, changeRecent, openWizard]);
+  }, [messenger, openRecent, changeRecent, openWizard]);
+
+  // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
+  // afresh when it opens (another window may have changed it).
+  const [recentDialog, setRecentDialog] = useState<RecentInfoMap | null>(null);
+  const recentButton = useRef<HTMLButtonElement>(null);
+  const showRecentDialog = () => {
+    setRecent(readRecent());
+    setRecentDialog(readRecentInfo());
+  };
+  const closeRecentDialog = useCallback(() => {
+    setRecentDialog(null);
+    recentButton.current?.focus();
+  }, []);
+  // A taskbag opened some other way (File › Open Recent) closes it.
+  useEffect(() => {
+    if (opened) setRecentDialog(null);
+  }, [opened]);
 
   return (
     <div className="app">
@@ -419,7 +462,21 @@ export function App({ messenger }: { messenger: Messenger }) {
             onOlder={setOlderShown}
           />
         )}
-        {!opened && <Welcome onOpen={() => openWizard({})} />}
+        {!opened && <Welcome onOpen={() => openWizard({})} onRecent={showRecentDialog} recentRef={recentButton} />}
+        {!opened && recentDialog && (
+          <RecentDialog
+            messenger={messenger}
+            folders={recent}
+            info={recentDialog}
+            onOpen={(folder) => {
+              setRecentDialog(null);
+              void openRecent(folder);
+            }}
+            // Removes it from the recent list only (and so from File → Open Recent); the folder stays.
+            onForget={(folder) => changeRecent((list) => list.filter((f) => f !== folder))}
+            onClose={closeRecentDialog}
+          />
+        )}
 
         {wizard && (
           <SetupWizard
@@ -640,32 +697,46 @@ function LanguagePicker() {
 
 /** The first screen with nothing open: the road show's opening slide (slogan, a task shifting
  * between agents and a teammate around the taskbag), with one button, Start, which opens the setup
- * wizard (Task-A05-03). */
-function Welcome({ onOpen }: { onOpen: () => void }) {
+ * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43). */
+function Welcome({
+  onOpen,
+  onRecent,
+  recentRef,
+}: {
+  onOpen: () => void;
+  onRecent: () => void;
+  recentRef: RefObject<HTMLButtonElement | null>;
+}) {
   const { t } = useI18n();
   return (
-    <section className="welcome">
-      <div className="welcome-grid">
-        <div className="welcome-text">
-          <p className="eyebrow">{t("welcome.eyebrow", { name: t("brand.name") })}</p>
-          {/* Three phrases: Chinese and Japanese break only between them (Safari's engine, which
-              draws the macOS window, will not break a run of CJK text marked keep-all at all). */}
-          <h1>
-            <span className="phrase">{t("welcome.title1")}</span>
-            <span className="phrase">{t("welcome.title2")}</span>
-            <em className="phrase">{t("welcome.keep")}</em>
-          </h1>
-          <p className="lede">{t("welcome.lede")}</p>
-          <div className="welcome-start">
-            <button type="button" className="primary start" onClick={onOpen}>
-              {t("welcome.open")}
-            </button>
-            <span className="muted">{t("welcome.hint")}</span>
+    <div className="welcome-wrap">
+      <section className="welcome">
+        <div className="welcome-grid">
+          <div className="welcome-text">
+            <p className="eyebrow">{t("welcome.eyebrow", { name: t("brand.name") })}</p>
+            {/* Three phrases: Chinese and Japanese break only between them (Safari's engine, which
+                draws the macOS window, will not break a run of CJK text marked keep-all at all). */}
+            <h1>
+              <span className="phrase">{t("welcome.title1")}</span>
+              <span className="phrase">{t("welcome.title2")}</span>
+              <em className="phrase">{t("welcome.keep")}</em>
+            </h1>
+            <p className="lede">{t("welcome.lede")}</p>
+            <div className="welcome-start">
+              <button type="button" className="primary start" onClick={onOpen}>
+                {t("welcome.open")}
+              </button>
+              <span className="muted">{t("welcome.hint")}</span>
+            </div>
           </div>
+          <HopFigure />
         </div>
-        <HopFigure />
-      </div>
-    </section>
+      </section>
+      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43). */}
+      <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
+        {t("welcome.open_recent")}
+      </button>
+    </div>
   );
 }
 
