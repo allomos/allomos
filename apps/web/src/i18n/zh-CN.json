@@ -439,5 +439,14 @@
   "move.body": "选择一个 AI 智能体。「换肩」会在你的项目文件夹中打开它，并预先填好请求，让它把旧任务包的任务、交接记录和项目笔记搬进新的任务包（历史记录留在 Git 里）。智能体会先在「换肩」里给你看它的计划：在你选择「继续」之前什么都不会改，旧文件夹也只会作为这个计划的一部分被删除。在你亲自发送之前，什么都不会发送。",
   "move.asked": "已打开 {agent}。请在那里阅读请求并发送。智能体把任务搬进来后，这条提示就会消失。",
   "move.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体把任务搬进来后，这条提示就会消失。",
-  "box.move_in": "AI 智能体把任务搬进新的任务包后，任务就会显示出来。"
+  "box.move_in": "AI 智能体把任务搬进新的任务包后，任务就会显示出来。",
+  "refresh.opened": "{time} 打开任务包时加载",
+  "refresh.auto": "{time} 自动刷新 · 任务包文件有变化",
+  "refresh.manual_none": "{time} 由你刷新 · 没有变化",
+  "refresh.manual_settings": "{time} 由你刷新 · 没有任务变化，领域、迭代或项目有变化",
+  "refresh.manual_tasks_one": "{time} 由你刷新 · {count} 个任务有变化（{ids}）",
+  "refresh.manual_tasks_other": "{time} 由你刷新 · {count} 个任务有变化（{ids}）",
+  "refresh.ids_more": "{ids} 等，另有 {more} 个",
+  "refresh.now": "立即刷新",
+  "refresh.now_title": "现在重新读取任务包"
 }

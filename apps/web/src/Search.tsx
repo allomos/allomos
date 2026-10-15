@@ -1,10 +1,11 @@
 // Searching the task list (Task-A01-36): the search box above the list, the marked words, and the
 // handoffs a search finds. What matches is decided in searchFlow.ts.
 
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { localTime } from "./handoffFlow";
 import { pieces, snippet, type Piece } from "./searchFlow";
+import { refreshText, type Refreshed } from "./refreshFlow";
 import type { Words } from "./stopFlow";
 import type { Handoff, Task } from "./types";
 
@@ -227,5 +228,29 @@ export function ListBanners({ search, filter, onShowAll }: { search: Words; filt
         </p>
       )}
     </div>
+  );
+}
+
+/** The quiet line under the banners (Task-A01-47): when the list was last read and how, and
+ * **Refresh now**, which reads the taskbag again whenever the person asks. */
+export function RefreshLine({ refreshed, onRefresh }: { refreshed: Refreshed; onRefresh: () => Promise<unknown> }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  return (
+    <p className="refresh-line small" role="status">
+      <span>{refreshText(refreshed, t)}</span>
+      <button
+        type="button"
+        className="link small"
+        title={t("refresh.now_title")}
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void onRefresh().finally(() => setBusy(false));
+        }}
+      >
+        {t("refresh.now")}
+      </button>
+    </p>
   );
 }

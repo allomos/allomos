@@ -13,7 +13,8 @@ import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
-import { DescriptionHit, FilterHits, HandoffHits, Highlight, ListBanners, SearchBox, isSearchShortcut } from "./Search";
+import { DescriptionHit, FilterHits, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
+import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
   FILTER_STATES,
   filterBanner,
@@ -154,8 +155,14 @@ export function App({ messenger }: { messenger: Messenger }) {
 
   /** Counts openings, so opening the same folder again reads its setup again (the wizard may be due). */
   const [openings, setOpenings] = useState(0);
+  // When the list was last read and how (Task-A01-47): opened, automatically, or by Refresh now.
+  const [refreshed, setRefreshed] = useState<Refreshed | null>(null);
+  // The taskbag's stamp at the last read, shared by the once-a-second follow and the window's own
+  // reads, so a read the window made itself is not read again and reported as automatic.
+  const stampRef = useRef<string | null>(null);
   const show = useCallback((o: Opened, message: Note | null) => {
     setOpened(o);
+    setRefreshed({ how: "opened", at: new Date() });
     setOpenings((n) => n + 1);
     setNotices(message ? [message] : []);
     setSetup(null);
@@ -273,18 +280,22 @@ export function App({ messenger }: { messenger: Messenger }) {
   const root = opened?.root;
   useEffect(() => {
     if (!root) return;
-    let last: string | null = null;
+    stampRef.current = null;
     let busy = false;
     const check = async () => {
       if (busy) return;
       busy = true;
       try {
         const now = await messenger.taskbagStamp(root);
-        if (last !== null && now !== last) {
+        if (stampRef.current !== null && now !== stampRef.current) {
           const fresh = await messenger.openTaskbag(root);
-          setOpened((o) => (o?.root === root ? fresh : o));
+          if (openedRef.current?.root === root) {
+            setOpened(fresh);
+            // "Automatically" only when the check found a change and read again (Task-A01-47).
+            setRefreshed({ how: "auto", at: new Date() });
+          }
         }
-        last = now;
+        stampRef.current = now;
       } catch {
         /* the folder may be gone for a moment; try again next time */
       } finally {
@@ -561,8 +572,25 @@ export function App({ messenger }: { messenger: Messenger }) {
             onError={(e) => setError(errorNote(e))}
             hideOlder={olderShown}
             onReload={async () => {
+              // After a change made in this window: read again, and note the stamp so the follow
+              // does not read it a second time and call it automatic (Task-A01-47).
+              const stamp = await messenger.taskbagStamp(opened.root).catch(() => null);
               const fresh = await messenger.openTaskbag(opened.root);
-              setOpened((o) => (o?.root === fresh.root ? fresh : o));
+              if (openedRef.current?.root !== fresh.root) return;
+              setOpened(fresh);
+              if (stamp !== null) stampRef.current = stamp;
+            }}
+            refreshed={refreshed}
+            onRefresh={async () => {
+              // Refresh now (Task-A01-47): always read again, then say what differs from before.
+              const root = opened.root;
+              const before = openedRef.current?.loaded.taskbag ?? null;
+              const stamp = await messenger.taskbagStamp(root).catch(() => null);
+              const fresh = await messenger.openTaskbag(root);
+              if (openedRef.current?.root !== root) return;
+              setOpened(fresh);
+              if (stamp !== null) stampRef.current = stamp;
+              setRefreshed({ how: "manual", at: new Date(), changed: whatChanged(before, fresh.loaded.taskbag) });
             }}
           />
         )}
@@ -871,6 +899,8 @@ function TaskbagView({
   onError,
   hideOlder,
   onReload,
+  refreshed,
+  onRefresh,
 }: {
   opened: Opened;
   messenger: Messenger;
@@ -879,6 +909,10 @@ function TaskbagView({
   hideOlder: boolean;
   /** Reads the taskbag again now, after a change made in this window. */
   onReload: () => Promise<void>;
+  /** When the list was last read and how (Task-A01-47). */
+  refreshed: Refreshed | null;
+  /** Refresh now: reads the taskbag again and reports what changed. */
+  onRefresh: () => Promise<void>;
 }) {
   const { t, rich } = useI18n();
   const { taskbag: box, issues } = opened.loaded;
@@ -1009,6 +1043,8 @@ function TaskbagView({
   const nothingShown = !searching && stateFilter !== "all" && filtered.length === 0;
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(found, folded);
+  // Task-A01-47: when the list was last read and how, with Refresh now, under the banners.
+  const refreshLine = refreshed && <RefreshLine refreshed={refreshed} onRefresh={() => onRefresh().catch(onError)} />;
   const foldAll = (on: boolean) => {
     if (groupBy === "handoffs") setOpenHandoffs((keys) => setKeys(keys, shownHandoffs, !on));
     else setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
@@ -1247,10 +1283,12 @@ function TaskbagView({
                 onWrite={() => setHandoffDialog("write")}
                 onSettings={() => setHandoffDialog("settings")}
                 onLink={openLink}
+                refreshLine={refreshLine}
               />
             ) : (
             <div className="areas">
               <ListBanners search={searchWords} filter={filterWords} onShowAll={() => chooseFilter("all")} />
+              {refreshLine}
               {!searching && !nothingShown && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
                   {rich("box.no_iterations", { add: <code>alm add iteration</code>, plan: <code>alm plan</code> })}

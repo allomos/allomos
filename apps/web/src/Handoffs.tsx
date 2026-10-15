@@ -3,6 +3,7 @@
 // person can write one, and change when agents must write them (Handoff settings).
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useI18n } from "./i18n";
 import { Markdown } from "./Markdown";
 import type { Messenger } from "./messenger";
@@ -29,6 +30,7 @@ export function HandoffsView({
   openKeys,
   onToggle,
   onShown,
+  refreshLine,
 }: {
   handoffs: Handoff[];
   /** The search box's words (Task-A01-36): only handoffs holding them are shown, the words marked. */
@@ -51,6 +53,8 @@ export function HandoffsView({
   onToggle: (file: string) => void;
   /** The handoffs shown now, so Collapse all / Expand all act on them. */
   onShown: (files: string[]) => void;
+  /** When the list was last read, with Refresh now (Task-A01-47), shown under the banners. */
+  refreshLine?: ReactNode;
 }) {
   const { t } = useI18n();
   const [writer, setWriter] = useState<string | null>(null);
@@ -75,6 +79,7 @@ export function HandoffsView({
   return (
     <section className="handoffs" aria-label={t("handoffs.title")}>
       <ListBanners search={searchWords} filter={filterWords} onShowAll={onShowAll} />
+      {refreshLine}
       <div className="row handoff-tools">
         <label>
           {t("handoffs.task")}{" "}
