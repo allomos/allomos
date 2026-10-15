@@ -2,8 +2,10 @@
 // task's recorded changes (Task-A01-17). Eight fields can be changed here (Task-A01-18); Rust
 // checks each change by the same rule as its `alm` command, and a refusal is shown in its words.
 // A task finished without the human check shows "Not human-checked", its steps and a Checked
-// button, which works like `alm checked` (Task-A03-18). A task with AI decisions nobody has
-// reviewed shows "AI decided", the decisions and a Reviewed button, like `alm reviewed` (Task-A03-19).
+// button, which works like `alm checked` (Task-A03-18). The iteration is chosen from a drop-down
+// whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39). A task
+// with AI decisions nobody has reviewed shows "AI decided", the decisions and a Reviewed button,
+// like `alm reviewed` (Task-A03-19).
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -11,9 +13,24 @@ import { Markdown } from "./Markdown";
 import { LatestHandoff } from "./Handoffs";
 import { localTime } from "./handoffFlow";
 import { changeLine } from "./historyFlow";
-import { blockerChoices, draftChanged, startDraft, stateChoices, toEdit, toggleBlocker, type Draft, type EditField } from "./editFlow";
+import {
+  EMPTY_NEW_ITERATION,
+  NEW_ITERATION,
+  blockerChoices,
+  draftChanged,
+  iterationChoices,
+  iterationSavable,
+  startDraft,
+  stateChoices,
+  toEdit,
+  toPaneIteration,
+  toggleBlocker,
+  type Draft,
+  type EditField,
+  type NewIterationDraft,
+} from "./editFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
-import { isProblem, type Area, type Edit, type Handoff, type Iteration, type Task, type TaskHistory } from "./types";
+import { isProblem, type Area, type Edit, type Handoff, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
   task,
@@ -31,6 +48,8 @@ export function TaskPane({
   onSaveName,
   onEdit,
   onReview,
+  nextIterationId,
+  onNewIteration,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -57,11 +76,16 @@ export function TaskPane({
   onEdit: (edit: Edit) => Promise<void>;
   /** Marks the task's AI decisions reviewed. Rejects with the Problem that refused it. */
   onReview: () => Promise<void>;
+  /** The ID "New…" will give, when known (the next free one). */
+  nextIterationId: string | null;
+  /** "New…": adds the iteration and plans this task in it. Rejects with the Problem that refused it; then nothing changed. */
+  onNewIteration: (iteration: NewIteration) => Promise<void>;
 }) {
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<EditField | null>(null);
   const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [] });
+  const [created, setCreated] = useState<NewIterationDraft>(EMPTY_NEW_ITERATION);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   // The Checked or Reviewed button asked for the person's name first (asked once, like a change).
@@ -79,6 +103,7 @@ export function TaskPane({
   const begin = (field: EditField) => {
     setEditing(field);
     setDraft(startDraft(task, field));
+    setCreated(EMPTY_NEW_ITERATION);
     setError(null);
   };
   const cancel = () => {
@@ -107,11 +132,13 @@ export function TaskPane({
       setBusy(false);
     }
   };
+  const savable = (field: EditField) => (field === "iteration" ? iterationSavable(task, draft, created) : draftChanged(task, field, draft));
   const save = async () => {
-    if (!editing || busy || !draftChanged(task, editing, draft)) return;
+    if (!editing || busy || !savable(editing)) return;
     setBusy(true);
     try {
-      await onEdit(toEdit(editing, draft));
+      if (editing === "iteration" && draft.value === NEW_ITERATION) await onNewIteration(toPaneIteration(created));
+      else await onEdit(toEdit(editing, draft));
       setEditing(null);
       setError(null);
     } catch (e) {
@@ -228,15 +255,45 @@ export function TaskPane({
         );
       case "iteration":
         return (
-          <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
-            <option value="">{t("box.unplanned")}</option>
-            {task.iteration && !iterations.some((i) => i.id === task.iteration) && <option value={task.iteration}>{task.iteration}</option>}
-            {iterations.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.release ? `${i.name} (${i.release})` : i.name}
-              </option>
-            ))}
-          </select>
+          <>
+            <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
+              {iterationChoices(task, iterations).map((c) => (
+                <option key={c.kind + c.value} value={c.value}>
+                  {c.kind === "new"
+                    ? t("edit.new_iteration")
+                    : c.kind === "none"
+                      ? t("edit.no_iteration")
+                      : [c.id, c.name, c.release && `(${c.release})`].filter(Boolean).join(" ")}
+                </option>
+              ))}
+            </select>
+            {draft.value === NEW_ITERATION && (
+              <div className="new-iteration">
+                <label className="small">
+                  <span>{t("create.name")}</span>
+                  <input
+                    type="text"
+                    value={created.name}
+                    onChange={(e) => setCreated((c) => ({ ...c, name: e.target.value }))}
+                    onKeyDown={(e) => keys(e, true)}
+                    disabled={busy}
+                    autoFocus
+                  />
+                </label>
+                <label className="small">
+                  <span>{t("create.start")}</span>
+                  <input type="date" value={created.start} onChange={(e) => setCreated((c) => ({ ...c, start: e.target.value }))} disabled={busy} />
+                </label>
+                <label className="small">
+                  <span>{t("create.end")}</span>
+                  <input type="date" value={created.end} onChange={(e) => setCreated((c) => ({ ...c, end: e.target.value }))} disabled={busy} />
+                </label>
+                <p className="muted small">
+                  {nextIterationId ? t("edit.new_iteration_hint_id", { id: nextIterationId }) : t("edit.new_iteration_hint")}
+                </p>
+              </div>
+            )}
+          </>
         );
       case "description":
       case "handoff_note":
@@ -308,7 +365,7 @@ export function TaskPane({
         {field === "waiting_on" && task.state !== "waiting" && <p className="muted small">{t("edit.waiting_on_hint")}</p>}
         {field === "blocked_by" && task.state !== "blocked" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
         <div className="editor-buttons">
-          <button type="button" className="primary" onClick={() => void save()} disabled={busy || !draftChanged(task, field, draft)}>
+          <button type="button" className="primary" onClick={() => void save()} disabled={busy || !savable(field)}>
             {busy ? t("edit.saving") : t("edit.save")}
           </button>
           <button type="button" onClick={cancel} disabled={busy}>
