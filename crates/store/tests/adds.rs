@@ -9,8 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use allomos_core::ops::IterationDetails;
 use allomos_core::{Problem, State};
 use allomos_store::{
-    Actor, DEFAULT_DIR, LOCK_FILE, Lock, NewTask, add_area, add_iteration, add_task, events, init,
-    load,
+    Actor, DEFAULT_DIR, LOCK_FILE, Lock, NewTask, add_area, add_iteration, add_iteration_and_plan,
+    add_task, events, init, load,
 };
 
 const APP: Actor<'static> = Actor {
@@ -227,6 +227,97 @@ fn refusals_have_alms_codes_and_write_nothing() {
         assert_eq!(got, Err(want));
     }
     assert_eq!(snapshot(&root), before, "a refusal changes no file");
+}
+
+/// The task pane's "New…" iteration (Task-A01-39): `alm add iteration` then `alm plan`, under one
+/// lock, two events; a refusal of either writes nothing.
+#[test]
+fn a_new_iteration_from_the_task_pane_is_added_then_planned() {
+    let root = taskbag("new-iteration");
+    add_area(&root, APP, WAIT, Some("A01"), "Tracking").unwrap();
+    add_iteration(&root, APP, WAIT, Some("I01"), "One", Default::default()).unwrap();
+    add_task(&root, APP, WAIT, &task(Some("A01-01"), "A01", Some("I01"))).unwrap();
+    let before = snapshot(&root);
+
+    // Refused: no name, a bad date, an unknown task. Nothing is written, not even the iteration.
+    let bad_date = IterationDetails {
+        end: Some("soon"),
+        ..Default::default()
+    };
+    let refused = [
+        (
+            add_iteration_and_plan(&root, APP, WAIT, "A01-01", None, " ", Default::default()),
+            Problem::IterationNameMissing,
+        ),
+        (
+            add_iteration_and_plan(&root, APP, WAIT, "A01-01", None, "Two", bad_date),
+            Problem::InvalidDate {
+                value: "soon".into(),
+            },
+        ),
+        (
+            add_iteration_and_plan(&root, APP, WAIT, "A01-99", None, "Two", Default::default()),
+            Problem::TaskNotFound {
+                id: "A01-99".into(),
+            },
+        ),
+    ];
+    let taken = add_iteration_and_plan(
+        &root,
+        APP,
+        WAIT,
+        "A01-01",
+        Some("I01"),
+        "Again",
+        Default::default(),
+    );
+    assert_eq!(
+        taken.map(|_| ()),
+        Err(Problem::DuplicateIterationId { id: "I01".into() })
+    );
+    for (got, want) in refused {
+        assert_eq!(got.map(|_| ()), Err(want));
+    }
+    assert_eq!(snapshot(&root), before, "a refusal changes no file");
+
+    // Added with the next free ID, then the task planned in it: two events, as typing both.
+    let start = events::list(&root).0.len();
+    let details = IterationDetails {
+        start: Some("2026-11-01"),
+        end: Some("2026-11-14"),
+        ..Default::default()
+    };
+    let (it, changed) =
+        add_iteration_and_plan(&root, APP, WAIT, "A01-01", None, " Two ", details).unwrap();
+    assert_eq!((it.id.as_str(), it.name.as_str()), ("I02", "Two"));
+    assert_eq!(changed.task.iteration.as_deref(), Some("I02"));
+    assert_eq!(
+        events_since(&root, start),
+        [
+            ev("add iteration", "iteration", "I02"),
+            ev("plan", "task", "A01-01")
+        ]
+    );
+    let plan = events::list(&root).0.pop().unwrap();
+    assert_eq!(plan.changes.len(), 1);
+    assert_eq!(plan.changes[0].field, "iteration");
+    let bag = load(&root).taskbag.unwrap();
+    assert_eq!(bag.iterations[1].start.as_deref(), Some("2026-11-01"));
+    assert_eq!(bag.tasks[0].iteration.as_deref(), Some("I02"));
+
+    // Waits for `alm`'s lock like every other change.
+    let held = Lock::acquire(&root, Duration::ZERO).unwrap();
+    let busy = add_iteration_and_plan(
+        &root,
+        APP,
+        Duration::from_millis(20),
+        "A01-01",
+        None,
+        "Three",
+        Default::default(),
+    );
+    assert!(matches!(busy, Err(Problem::TaskbagBusy { .. })));
+    drop(held);
 }
 
 #[test]

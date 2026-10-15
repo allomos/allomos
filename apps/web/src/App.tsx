@@ -24,7 +24,7 @@ import { GroupEditForm } from "./GroupEditForm";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -952,6 +952,11 @@ function TaskbagView({
     await messenger.editTask(opened.root, id, edit);
     await onReload().catch(() => undefined);
   };
+  // The task pane's "New…" iteration (Task-A01-39): added, then the task planned in it.
+  const planInNewIteration = async (id: string, iteration: NewIteration) => {
+    await messenger.addIterationAndPlan(opened.root, id, iteration);
+    await onReload().catch(() => undefined);
+  };
 
   // New tasks, areas and iterations (Task-A01-19): one form open at a time, with the next free IDs
   // suggested, read again whenever the taskbag reloads.
@@ -1203,6 +1208,8 @@ function TaskbagView({
                 ownerName={ownerName}
                 onSaveName={saveOwnerName}
                 onEdit={(edit) => editTask(selected.id, edit)}
+                nextIterationId={nextIds?.iteration ?? null}
+                onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 onAllHandoffs={() => {
                   setHandoffTask(selected.id);
                   choose("handoffs");

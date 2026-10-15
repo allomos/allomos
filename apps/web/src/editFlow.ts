@@ -2,7 +2,7 @@
 // from, and the change sent to Rust. Rust decides whether a change is allowed, by the same rule
 // as `alm`; nothing here refuses one.
 
-import type { Edit, State, Task } from "./types";
+import type { Edit, Iteration, NewIteration, State, Task } from "./types";
 
 /** The task pane's changeable fields. */
 export type EditField =
@@ -101,4 +101,46 @@ export function toggleBlocker(draft: Draft, id: string): Draft {
   const on = draft.blockedBy.includes(id);
   const blockedBy = on ? draft.blockedBy.filter((x) => x !== id) : [...draft.blockedBy, id].sort();
   return { ...draft, blockedBy };
+}
+
+// The iteration drop-down (Task-A01-39): "New…" first, "No iteration" second (owner,
+// 2026-10-14), then every iteration in order, by ID and name.
+
+/** The value of "New…": never an iteration ID, which is only letters, digits, `-` and `_`. */
+export const NEW_ITERATION = ":new";
+
+/** One line of the iteration drop-down. `value` is what the draft holds when it is chosen. */
+export type IterationChoice =
+  | { kind: "new"; value: typeof NEW_ITERATION }
+  | { kind: "none"; value: "" }
+  | { kind: "iteration"; value: string; id: string; name: string | null; release: string | null };
+
+/**
+ * The iteration drop-down for `task`: New…, No iteration, then each iteration. An iteration the
+ * task names that the taskbag does not list stays offered by its ID, so the list still shows where
+ * the task is.
+ */
+export function iterationChoices(task: Task, iterations: readonly Iteration[]): IterationChoice[] {
+  const known = iterations.map((i): IterationChoice => ({ kind: "iteration", value: i.id, id: i.id, name: i.name, release: i.release ?? null }));
+  const lost: IterationChoice[] =
+    task.iteration && !iterations.some((i) => i.id === task.iteration)
+      ? [{ kind: "iteration", value: task.iteration, id: task.iteration, name: null, release: null }]
+      : [];
+  return [{ kind: "new", value: NEW_ITERATION }, { kind: "none", value: "" }, ...lost, ...known];
+}
+
+/** What "New…" asks for: a name and two optional dates (`YYYY-MM-DD`, from date boxes). */
+export type NewIterationDraft = { name: string; start: string; end: string };
+
+export const EMPTY_NEW_ITERATION: NewIterationDraft = { name: "", start: "", end: "" };
+
+/** Whether the iteration editor's Save is offered: "New…" needs a name; otherwise a different choice. */
+export function iterationSavable(task: Task, draft: Draft, created: NewIterationDraft): boolean {
+  return draft.value === NEW_ITERATION ? created.name.trim() !== "" : draftChanged(task, "iteration", draft);
+}
+
+/** The new iteration Rust is asked for: the next free ID (as `alm add iteration <name>`), no release. */
+export function toPaneIteration(created: NewIterationDraft): NewIteration {
+  const orNull = (text: string) => text.trim() || null;
+  return { id: null, name: created.name.trim(), release: null, start: orNull(created.start), end: orNull(created.end) };
 }

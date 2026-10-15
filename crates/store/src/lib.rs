@@ -1400,6 +1400,51 @@ pub fn add_iteration(
     })
 }
 
+/// The task pane's "New…" iteration (Task-A01-39): a new iteration, by the rule `alm add
+/// iteration` uses (without an ID, the next free one), then task `task` planned in it by the rule `alm plan` uses,
+/// under one lock, recorded as two events (`add iteration`, `plan`): the same as typing both
+/// commands. Both rules are checked before anything is written, so a refusal of either (an empty
+/// name, a bad date, an unknown task) writes nothing.
+pub fn add_iteration_and_plan(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    task: &str,
+    id: Option<&str>,
+    name: &str,
+    details: ops::IterationDetails,
+) -> Result<(Iteration, Changed), Problem> {
+    let (lock, mut bag, issues) = lock_for_change(root, wait, Some("add iteration"))?;
+    versions::write_allowed(root, "plan")?;
+    let id = id.map_or_else(|| ops::next_iteration_id(&bag), String::from);
+    let iteration = ops::new_iteration(&bag, &id, name, details)?;
+    bag.iterations.push(iteration.clone());
+    let planned = ops::plan(&bag, task, Some(&iteration.id))?;
+    let before = bag.tasks.iter().find(|t| t.id == planned.task.id).cloned();
+    let added = actor.event(
+        "add iteration",
+        Kind::Iteration,
+        Some(&iteration.id),
+        event::changes(None, &iteration, &[]),
+    );
+    lock.record(&added, |l| l.create_iteration(&iteration))?;
+    let plan = actor.event(
+        "plan",
+        Kind::Task,
+        Some(&planned.task.id),
+        event::changes(before.as_ref(), &planned.task, event::TASK_FIELDS),
+    );
+    lock.record(&plan, |l| l.save_task(&planned.task))?;
+    Ok((
+        iteration,
+        Changed {
+            task: planned.task,
+            warnings: planned.warnings,
+            issues,
+        },
+    ))
+}
+
 /// An area renamed, the same way for `alm rename area` and the app (Task-A01-29): under the lock,
 /// by the `crates/core` rule, recorded as one `rename area` event. Its ID stays.
 pub fn rename_area(

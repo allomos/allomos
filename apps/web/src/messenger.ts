@@ -107,6 +107,12 @@ export interface Messenger {
   addIteration(root: string, iteration: NewIteration): Promise<Iteration>;
   addTask(root: string, task: NewTask): Promise<Task>;
   /**
+   * The task pane's "New…" iteration (Task-A01-39): adds the iteration as `alm add iteration`,
+   * then plans task `task` in it as `alm plan`, under one lock (two events). Resolves to the
+   * planned task; rejects with the Problem that refused either, and then nothing changed.
+   */
+  addIterationAndPlan(root: string, task: string, iteration: NewIteration): Promise<Task>;
+  /**
    * Renames an area, changes an iteration, or deletes either (Task-A01-29), under the saved name,
    * by the same rule as `alm rename area`, `alm change iteration` and `alm delete`, under the
    * taskbag's lock, recorded in its history. A delete is refused while any task is in it, done and
@@ -209,6 +215,7 @@ export const desktopMessenger: Messenger = {
   addArea: (root, id, name) => invoke<Area>("add_area", { root, id, name }),
   addIteration: (root, iteration) => invoke<Iteration>("add_iteration", { root, iteration }),
   addTask: (root, task) => invoke<Task>("add_task", { root, task }),
+  addIterationAndPlan: (root, task, iteration) => invoke<Task>("add_iteration_and_plan", { root, task, iteration }),
   renameArea: (root, id, name) => invoke<Area>("rename_area", { root, id, name }),
   changeIteration: (root, id, change) => invoke<Iteration>("change_iteration", { root, id, change }),
   deleteArea: (root, id) => invoke<void>("delete_area", { root, id }),
