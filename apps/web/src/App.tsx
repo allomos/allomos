@@ -9,6 +9,7 @@ import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
 import { almOffer } from "./almOfferFlow";
+import { UPDATE_LOOK_MS, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
@@ -42,7 +43,7 @@ import { GroupEditForm } from "./GroupEditForm";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AlmStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -458,6 +459,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       </header>
 
       <main className="main">
+        <UpdateOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />
         <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />
         {error && (
           <Banner kind="error" onClose={() => setError(null)}>
@@ -671,6 +673,83 @@ function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: u
         {t("alm.dismiss")}
       </button>
       <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={() => setHidden(true)}>
+        ×
+      </button>
+    </div>
+  );
+}
+
+/** **A newer Allomos is available** (Task-A07-16). The app asks GitHub at start and then once a
+ * day; Check for Updates… asks now and always answers. Download opens the releases page; "Skip
+ * this version" is remembered; × hides this version in this window. */
+function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e: unknown) => void }) {
+  const { t } = useI18n();
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
+  const [asked, setAsked] = useState(false);
+  const [hidden, setHidden] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    const look = (ask: boolean) =>
+      messenger
+        .updateStatus(ask)
+        .then((s) => {
+          if (!live) return;
+          setStatus(s);
+          setAsked(ask);
+        })
+        .catch(() => undefined);
+    void look(false);
+    const timer = window.setInterval(() => void look(false), UPDATE_LOOK_MS);
+    const stopMenu = messenger.onCheckUpdatesMenu(() => void look(true));
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      void stopMenu.then((f) => f()).catch(() => undefined);
+    };
+  }, [messenger]);
+  // The menu item: Check for Updates…, or Download Allomos <version>… once one is known.
+  const available = status?.available ?? null;
+  useEffect(() => {
+    const text = available ? t("menu.download_update", { latest: available }) : t("menu.check_updates");
+    void messenger.setUpdateItem(text, Boolean(available)).catch(() => undefined);
+  }, [messenger, t, available]);
+  const note = updateNote(status, asked, hidden);
+  if (!note) return null;
+  const close = () => {
+    setAsked(false);
+    if (note.kind === "offer") setHidden(note.latest);
+  };
+  if (note.kind === "current") {
+    return (
+      <Banner kind="ok" onClose={close}>
+        {t("update.up_to_date", { current: note.current })}
+      </Banner>
+    );
+  }
+  if (note.kind === "failed") {
+    return (
+      <Banner kind="error" onClose={close}>
+        {t("update.check_failed")}
+      </Banner>
+    );
+  }
+  const skip = () => {
+    void messenger.skipUpdate(note.latest).catch(() => undefined);
+    close();
+  };
+  return (
+    <div className="banner update" role="status">
+      <svg className="banner-icon" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12" />
+      </svg>
+      <span>{t("update.available", { latest: note.latest, current: note.current })}</span>
+      <button type="button" className="primary" onClick={() => messenger.openDownloadPage().catch(onError)}>
+        {t("update.download")}
+      </button>
+      <button type="button" onClick={skip}>
+        {t("update.skip")}
+      </button>
+      <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={close}>
         ×
       </button>
     </div>
