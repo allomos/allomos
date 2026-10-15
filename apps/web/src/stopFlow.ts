@@ -5,7 +5,7 @@
 // blocker is done the app only says so, as `alm` does.
 
 import type { Key } from "./i18n";
-import type { State, Task } from "./types";
+import type { Opened, State, Task } from "./types";
 
 type T = (key: Key, params?: Record<string, string | number>) => string;
 
@@ -57,15 +57,30 @@ export function humanCheckNote(task: Task): string {
   return task.without_human_check ?? task.finished_without_owner ?? "";
 }
 
-/** The list's state filter: every state, one, or every task that needs a person: to check or
- * to answer (waiting), as `alm human` lists them (Task-A03-18). */
+/** An AI agent decided something here on its own, and nobody has reviewed it yet: "AI decided"
+ * (Task-A03-19). */
+export function toReview(task: Task): boolean {
+  return (task.ai_decisions?.length ?? 0) > 0;
+}
+
+/** The opened taskbag with each task's AI decisions to review put on the task (Task-A03-19). */
+export function withDecisions(opened: Opened): Opened {
+  const box = opened.loaded.taskbag;
+  const all = opened.ai_decisions ?? {};
+  if (!box) return opened;
+  const tasks = box.tasks.map((task) => (all[task.id] ? { ...task, ai_decisions: all[task.id] } : task));
+  return { ...opened, loaded: { ...opened.loaded, taskbag: { ...box, tasks } } };
+}
+
+/** The list's state filter: every state, one, or every task that needs a person: to check, to
+ * answer (waiting) or to review (AI decisions), as `alm human` lists them (Task-A03-18, A03-19). */
 export type StateFilter = "all" | "human" | State;
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
 /** The tasks the filter keeps. */
 export function keepState(filter: StateFilter, task: Task): boolean {
-  if (filter === "human") return toCheck(task) || task.state === "waiting";
+  if (filter === "human") return toCheck(task) || task.state === "waiting" || toReview(task);
   return filter === "all" || task.state === filter;
 }
 

@@ -1821,17 +1821,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v7)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v8)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v6 section (before the project notes, Task-A03-20) is out of date too.
+    // A v7 section (before `alm ai-decided`, Task-A03-19) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v7)", "## Tasks: Allomos (v6)")
+            brief.replace("## Tasks: Allomos (v8)", "## Tasks: Allomos (v7)")
         ),
     )
     .unwrap();
@@ -2248,6 +2248,139 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     );
     let out = alm(&repo, &["human"]);
     assert!(String::from_utf8_lossy(&out.stdout).contains("Nothing to check."));
+}
+
+#[test]
+fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
+    // Task-A03-19: `alm ai-decided` records a decision in the history only; `alm human` lists it
+    // under To review; `alm reviewed` takes it off, and the history keeps both.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", " "],
+        1,
+        "ai_decision_missing",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "ai-decided", "A09-09", "x"],
+        1,
+        "task_not_found",
+    );
+    refused(&repo, &["reviewed", "A01-01"], 1, "nothing_to_review");
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "Names: alm describe, alm note — match alm title",
+        ],
+    );
+    assert_eq!(
+        v["decision"]["text"],
+        "Names: alm describe, alm note — match alm title"
+    );
+    assert_eq!(v["decision"]["by"], "a");
+    assert_eq!(v["changed_files"].as_array().unwrap().len(), 1, "{v}");
+    assert!(
+        v["changed_files"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("events/")
+    );
+    // Anyone may record one, on any task: recording changes nothing in the task.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "ai-decided",
+            "A01-01",
+            "Layout: one file per command",
+        ],
+    );
+    ok(
+        &repo,
+        &["--as", "b", "ai-decided", "A01-02", "Default: newest first"],
+    );
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "ai-decided");
+    assert_eq!(last["changes"][0]["field"], "ai_decision");
+    assert_eq!(last["changes"][0]["to"], "Layout: one file per command");
+
+    let v = ok(&repo, &["human"]);
+    let review = v["to_review"].as_array().unwrap();
+    let ids: Vec<&str> = review.iter().map(|t| t["id"].as_str().unwrap()).collect();
+    assert_eq!(
+        ids,
+        ["A01-01", "A01-02"],
+        "backlog tasks are listed too: {v}"
+    );
+    let texts: Vec<&str> = review[0]["ai_decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            "Names: alm describe, alm note — match alm title",
+            "Layout: one file per command"
+        ]
+    );
+    assert_eq!(
+        ok(&repo, &["human", "--area", "A02"])["to_review"],
+        json!([])
+    );
+    let out = alm(&repo, &["human"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("To review: AI decisions (2)"), "{text}");
+    assert!(
+        text.contains("- Layout: one file per command (b, "),
+        "{text}"
+    );
+    assert!(text.contains("`alm reviewed <id>`"), "{text}");
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["ai_decisions"].as_array().unwrap().len(), 2);
+
+    // Marking a done task checked does not review its decisions: they are separate questions.
+    ok(&repo, &["--as", "a", "label", "A01-01", "human verified"]);
+    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    assert_eq!(
+        ok(&repo, &["human"])["to_review"].as_array().unwrap().len(),
+        2
+    );
+
+    // The person reviewed them: off To review; the history keeps each decision.
+    let v = ok(&repo, &["--as", "will", "reviewed", "A01-01"]);
+    assert_eq!(v["reviewed"].as_array().unwrap().len(), 2);
+    let v = ok(&repo, &["human"]);
+    let ids: Vec<&str> = v["to_review"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["A01-02"]);
+    let last = &ok(&repo, &["history", "A01-01"])["events"][0];
+    assert_eq!(last["command"], "reviewed");
+    assert_eq!(last["by"], "will");
+    assert_eq!(last["changes"].as_array().unwrap().len(), 2);
+    assert!(last["changes"][0]["to"].is_null());
+    assert_eq!(last["changes"][1]["from"], "Layout: one file per command");
+    refused(&repo, &["reviewed", "A01-01"], 1, "nothing_to_review");
+    assert_eq!(ok(&repo, &["show", "A01-01"])["ai_decisions"], json!([]));
 }
 
 #[test]

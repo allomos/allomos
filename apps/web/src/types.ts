@@ -48,6 +48,16 @@ export interface Task {
   /** The note's name before allomos/4; only on a taskbag being migrated. */
   finished_without_owner?: string | null;
   description: string;
+  /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
+   * a field of task.json: worked out from the history and added when the taskbag is opened. */
+  ai_decisions?: AiDecision[];
+}
+
+/** One decision an agent recorded with `alm ai-decided` (crates/core/src/decision.rs). */
+export interface AiDecision {
+  at: string;
+  by?: string;
+  text: string;
 }
 
 /**
@@ -163,6 +173,8 @@ export interface Opened {
   loaded: Loaded;
   /** README-allomos.md was just written next to .allomos/ (only when creating). */
   readme_added: boolean;
+  /** Each task's AI decisions not reviewed yet, by task ID (Task-A03-19). */
+  ai_decisions?: Record<string, AiDecision[]>;
 }
 
 /** An AI agent found on this computer (see apps/desktop/src-tauri/src/agents.rs). */

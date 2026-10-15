@@ -17,6 +17,10 @@ test("task fields use the task pane's names; unknown fields stay as stored", () 
   assert.equal(fieldName("without_human_check", t), "pane.without_human_check");
   assert.equal(fieldName("finished_without_owner", t), "pane.without_human_check");
   assert.equal(fieldName("human_check_steps", t), "pane.human_check_steps");
+  // Task-A03-19: a decision recorded, then reviewed.
+  assert.equal(fieldName("ai_decision", t), "pane.ai_decision");
+  assert.equal(changeLine({ field: "ai_decision", to: "Names: alm note" }, t), "pane.ai_decision: — → Names: alm note");
+  assert.equal(changeLine({ field: "ai_decision", from: "Names: alm note" }, t), "pane.ai_decision: Names: alm note → —");
 });
 
 test("a state is worded, an empty side is a dash, long text is shortened", () => {

@@ -39,6 +39,10 @@ about the project's tasks.
   person who checks it; it is **to check** until someone marks it checked.
 - **Approver**: the person who decides and approves (cards, plans, external effects). A waiting
   task without a who waits for the approver.
+- **AI decision**: a routine choice an agent made on its own inside a task (a name, a layout, a
+  small detail with an obvious default), recorded with `alm ai-decided` in the task's history. It
+  is **to review** until the approver has reviewed it; overturning one is an ordinary change to
+  the task.
 - **Holder**: the person or agent session working a task (`--as <name>`). One holder at a time.
 - **Next dependency**: the one thing needed before the task's next label.
 - **Handoff note**: what the next holder needs to know, left when a task is released.
@@ -120,7 +124,9 @@ See:
   `--without-human-check`: only tasks finished without the human check, not checked since.
 - `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person: **To check**
   (finished without the human check, each with why; `--steps` adds how to check it) and **To
-  answer** (waiting on a person, each with what). Backlog tasks are not listed.
+  answer** (waiting on a person, each with what; backlog tasks are not listed), then
+  **To review: AI decisions** (tasks in any state with decisions not reviewed yet, each listed).
+  `--json`: `to_check`, `to_answer`, `to_review` (each task with its `ai_decisions`).
 - `alm show <id>`: one task in full, with its description.
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
@@ -143,6 +149,12 @@ Work a task:
   check again (the old `--without-owner` still works).
 - `alm checked <id>`: a person has checked the finished task: it gets the top label and leaves
   To check; the note and steps stay in its history. Run it only when the person says so.
+  It does not review the task's AI decisions.
+- `alm ai-decided <id> \"<what and why>\"`: record a routine choice you made on your own in the
+  task, in one line, for example `alm ai-decided A01-37 \"Names: alm describe, alm note — match
+  alm title\"`. Any task, any state; the task's files do not change, the history keeps it.
+- `alm reviewed <id>`: the person has reviewed the task's AI decisions: they leave To review; the
+  history keeps them. Run it only when the person says so.
   `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task).
 
 Plan:
@@ -235,6 +247,12 @@ Rules:
   that language.
 - Before a change the person must agree to, show your plan with `alm confirm` and change nothing
   unless it exits 0.
+- Routine choices inside a task (a name, a file layout, how something is built inside the task, a
+  small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
+  record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
+  `alm human`. What users will see and get used to, anything hard to undo (data formats, removing
+  things), anything that changes the plan or another task, and anything with a cost or an outside
+  effect goes to the approver first (`alm wait`).
 - After every `alm` change, run the Git commands it prints: they name only that change's files.
   Your other work is committed as usual.
 ";
@@ -310,6 +328,12 @@ mod tests {
             assert!(text.contains("handoff"), "{text}");
         }
         assert!(crate::agent_section().contains("every ready task nobody holds"));
+        // Routine choices are recorded for review (Task-A03-19).
+        for text in [guide(None).unwrap(), crate::agent_section()] {
+            assert!(text.contains("alm ai-decided <id>"), "{text}");
+            assert!(text.contains("alm reviewed <id>"), "{text}");
+            assert!(text.contains("To review: AI decisions"), "{text}");
+        }
         // Decision 0017: no `--commit` / `--push`; pull before claiming, push the claim at once,
         // and run the Git commands each change prints.
         for text in [guide(None).unwrap(), crate::agent_section()] {

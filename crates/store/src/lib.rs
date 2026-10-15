@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use fs4::{FileExt, TryLockError};
 
+use allomos_core::decision;
 use allomos_core::event::{self, Event, Kind};
 use allomos_core::ops;
 use allomos_core::{
@@ -247,8 +248,13 @@ the project notes (below) and your own handoff file.
   In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
   may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
-- Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
-  checked one: `alm checked <id>`.
+- Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
+  says they checked one: `alm checked <id>`.
+- Routine choices inside a task (a name, a file layout, a small detail with an obvious default,
+  anything cheap to undo) are yours: decide, carry on, and record each one with
+  `alm ai-decided <id> \"<what and why>\"`, so the approver can review it later (`alm human`,
+  To review: AI decisions). When they say they reviewed them: `alm reviewed <id>`. What users
+  will see and get used to, or anything hard to undo, goes to the approver first.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
   `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
 - Change a task's title, description or handoff note: `alm title <id> \"<title>\"`,
@@ -1628,6 +1634,70 @@ pub fn change_task(
     Ok(Changed {
         task: outcome.task,
         warnings: outcome.warnings,
+        issues,
+    })
+}
+
+/// What [`record_ai_decision`] or [`review_ai_decisions`] did (Task-A03-19).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Decided {
+    pub task: Task,
+    /// The decisions the change recorded or marked reviewed.
+    pub decisions: Vec<decision::Decision>,
+    /// The task's decisions still to review after the change.
+    pub pending: Vec<decision::Decision>,
+    /// Problems found in the taskbag's files while loading it.
+    pub issues: Vec<Issue>,
+}
+
+/// Every task's AI decisions not reviewed yet, by task ID (Task-A03-19), from the history.
+pub fn ai_decisions(root: &Path) -> std::collections::BTreeMap<String, Vec<decision::Decision>> {
+    decision::pending(&events::list(root).0)
+}
+
+/// Record a decision an agent made on its own in task `id` (`alm ai-decided`, Task-A03-19): one
+/// `ai-decided` event, under the lock. The task's files do not change.
+pub fn record_ai_decision(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    text: &str,
+) -> Result<Decided, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some(decision::DECIDED))?;
+    let changes = decision::decide(&bag, id, text)?;
+    let task = ops::find_task(&bag, id)?;
+    let event = actor.event(decision::DECIDED, Kind::Task, Some(&task.id), changes);
+    lock.record(&event, |_| Ok(()))?;
+    let pending = ai_decisions(root).remove(&task.id).unwrap_or_default();
+    let decisions = pending.last().cloned().into_iter().collect();
+    Ok(Decided {
+        task,
+        decisions,
+        pending,
+        issues,
+    })
+}
+
+/// Mark task `id`'s AI decisions reviewed (`alm reviewed`, the app's Reviewed button,
+/// Task-A03-19): one `reviewed` event listing each, under the lock. Refused with
+/// `nothing_to_review` when it has none. Overturning one is done by changing the task as usual.
+pub fn review_ai_decisions(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Decided, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait, Some(decision::REVIEWED))?;
+    let task = ops::find_task(&bag, id)?;
+    let decisions = ai_decisions(root).remove(&task.id).unwrap_or_default();
+    let changes = decision::review(&bag, id, &decisions)?;
+    let event = actor.event(decision::REVIEWED, Kind::Task, Some(&task.id), changes);
+    lock.record(&event, |_| Ok(()))?;
+    Ok(Decided {
+        task,
+        decisions,
+        pending: Vec::new(),
         issues,
     })
 }
