@@ -18,18 +18,19 @@ A release page shows one obvious installer per system. The `alm` command on its 
 - **Outcome.** The release page's only `.exe` is the Windows installer; `alm` alone is zipped, named `alm-only`, and the notes say which file to pick.
 - **Decisive unknowns.** None: keep `alm` alone, zip and rename it (owner, chat 2026-10-15).
 - **Files owned.** `.github/workflows/release.yml` (the two "Attach to the release" steps and the release notes); `docs/guide/src/content/docs/start/getting-started.md` and its `ja` and `zh-cn` copies (the `alm_…` file names); this card.
-- **External operations.** Proving it needs a pushed version tag (a GitHub release): the owner approves that tag on this card first. Nothing else.
+- **External operations.** One, approved (below): when this is implemented and merged, bump the version (patch) and push its tag, so GitHub builds and publishes a new release. Nothing else.
 - **Not affected.** A07-16's update notice does not read these file names.
 - **Done means mechanically.**
   - `release.yml`: Windows zips `alm.exe` into `alm-only_<v>_windows_x64.zip` (PowerShell `Compress-Archive` or `7z`, both on GitHub's Windows runner); Mac names its archive `alm-only_<v>_macos_arm64.tar.gz`; the notes list the installers first and say `alm-only` is for computers without the app.
   - The guide pages (en, ja, zh-CN) name the new files and say to unpack, then run `alm` from a terminal.
-  - After an approved tag: the release lists exactly one `.exe`; the zip opens to `alm.exe`; the guide site builds.
+  - After the release tag: the release lists exactly one `.exe`; the zip opens to `alm.exe`; the guide site builds.
   - `git diff --check`; links resolve.
 
 ## Approvals
 
 | Date | What was approved | By |
 |---|---|---|
+| 2026-10-15 | Make the task ready; when it is implemented, make GitHub create a new release (bump the version, push the tag) | owner (chat) |
 | 2026-10-15 | Open this card: keep `alm` alone, zip it and name it `alm-only` (not started; backlog) | owner (chat) |
 
 ## Notes
