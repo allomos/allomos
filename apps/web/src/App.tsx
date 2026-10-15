@@ -13,8 +13,24 @@ import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
-import { DescriptionHit, FilterHits, HandoffHits, Highlight, SearchBox, isSearchShortcut } from "./Search";
-import { FILTER_STATES, filterName, hiddenByFilter, hiddenText, keepState, readFilter, stopText, toCheck, toReview, type Hidden, type StateFilter } from "./stopFlow";
+import { DescriptionHit, FilterHits, HandoffHits, Highlight, ListBanners, SearchBox, isSearchShortcut } from "./Search";
+import {
+  FILTER_STATES,
+  filterBanner,
+  filterGroups,
+  filterName,
+  hiddenByFilter,
+  hiddenText,
+  keepState,
+  readFilter,
+  searchBanner,
+  stopText,
+  taskCount,
+  toCheck,
+  toReview,
+  type Hidden,
+  type StateFilter,
+} from "./stopFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
@@ -934,23 +950,29 @@ function TaskbagView({
     if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
   }
   // With a state filter, each group lists only the tasks in that state (its count stays whole)
-  // and says how many it hides (Task-A01-42); a group with none at all is left out, and a group
-  // whose tasks are all hidden shows only that line.
-  if (stateFilter !== "all") {
-    for (let i = groups.length - 1; i >= 0; i--) {
-      const g = groups[i];
-      g.counted = g.tasks;
-      g.tasks = g.tasks.filter((task) => keepState(stateFilter, task));
-      if (g.counted.length === 0) groups.splice(i, 1);
-    }
-  }
+  // and says how many it hides (Task-A01-42); a group with none left is not drawn, and the banner
+  // under the tabs says how many were left out (Task-A01-44).
+  const filtered = filterGroups(groups, stateFilter);
   // A search keeps only the tasks that match, and groups with none are left out; each group left
   // holds a match, so it opens even if it was collapsed (the collapsed list itself is kept).
-  const found = searchGroups(groups, terms);
+  const found = searchGroups(filtered, terms);
   const folded = collapsedWhileSearching(collapsed, found, terms);
   const foundHandoffs = searching ? handoffs.filter((h) => handoffMatches(h, terms)) : [];
   // Task-A01-42: tasks the search finds that the state filter hides, shown apart after the groups.
   const hiddenHits = searching && stateFilter !== "all" && box ? box.tasks.filter((task) => !keepState(stateFilter, task) && taskMatches(task, terms)) : [];
+  // Task-A01-44: the banners under the tabs, the search's on top and the filter's under it.
+  const kind = groupBy === "iteration" ? "iteration" : "area";
+  const foundCount = searching && box ? box.tasks.filter((task) => taskMatches(task, terms)).length : 0;
+  const searchWords = foundCount > 0 ? searchBanner("task", foundCount, query.trim(), t) : [];
+  const filterWords = !box
+    ? []
+    : searching
+      ? found.length > 0 || hiddenHits.length > 0
+        ? filterBanner(stateFilter, { kind, tasks: taskCount(found), groups: found.length, total: found.length, searchHidden: hiddenHits.length }, t)
+        : []
+      : filterBanner(stateFilter, { kind, tasks: taskCount(filtered), groups: filtered.length, total: groups.length }, t);
+  // Nothing matches the filter: only the banner shows (Task-A01-44).
+  const nothingShown = !searching && stateFilter !== "all" && filtered.length === 0;
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(found, folded);
   const foldAll = (on: boolean) => {
@@ -1138,21 +1160,20 @@ function TaskbagView({
                   </button>
                 ))}
               </div>
-              {groupBy !== "handoffs" && (
-                <label className="state-filter small">
-                  {t("filter.label")}{" "}
-                  <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
-                    <option value="all">{t("filter.all")}</option>
-                    {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
-                    <option value="human">{t("filter.human")}</option>
-                    {FILTER_STATES.map((s) => (
-                      <option key={s} value={s}>
-                        {t(`state.${s}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              {/* Task-A01-44: the Handoffs tab follows the filter too. */}
+              <label className="state-filter small">
+                {t("filter.label")}{" "}
+                <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
+                  <option value="all">{t("filter.all")}</option>
+                  {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
+                  <option value="human">{t("filter.human")}</option>
+                  {FILTER_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {t(`state.${s}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
@@ -1172,6 +1193,8 @@ function TaskbagView({
                 handoffs={handoffs}
                 terms={terms}
                 tasks={box.tasks}
+                stateFilter={stateFilter}
+                onShowAll={() => chooseFilter("all")}
                 task={handoffTask}
                 onTask={setHandoffTask}
                 onOpenTask={(id) => {
@@ -1193,7 +1216,8 @@ function TaskbagView({
               />
             ) : (
             <div className="areas">
-              {!searching && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
+              <ListBanners search={searchWords} filter={filterWords} onShowAll={() => chooseFilter("all")} />
+              {!searching && !nothingShown && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
                   {rich("box.no_iterations", { add: <code>alm add iteration</code>, plan: <code>alm plan</code> })}
                 </p>
@@ -1257,7 +1281,7 @@ function TaskbagView({
                 </p>
               )}
               {/* Task-A01-19: a new area at the end of the by-area list, a new iteration at the end of the by-iteration list. */}
-              {searching ? null : creating && creating.kind !== "task" && creating.kind === groupBy ? (
+              {searching || nothingShown ? null : creating && creating.kind !== "task" && creating.kind === groupBy ? (
                 createForm(creating)
               ) : (
                 <p className="add-group">
