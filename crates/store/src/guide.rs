@@ -1,10 +1,23 @@
 //! What `alm guide` tells an AI agent (Task-A05-02). The short brief in a project's `AGENTS.md`
 //! ([`crate::agent_section`]) names these topics; an agent reads them from `alm` when it needs
 //! them, so the details always match the installed `alm`, not a copy that went stale. English:
-//! agents read it, the app does not show it.
+//! agents read it, the app does not show it. The one exception is `run-modes` (Task-A03-21): the
+//! agent shows it to the person, so it is written in every language the Allomos app speaks
+//! ([`run_modes`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 5] = ["terms", "customize", "tasks", "commands", "workflow"];
+pub const GUIDE_TOPICS: [&str; 6] = [
+    "terms",
+    "customize",
+    "tasks",
+    "commands",
+    "workflow",
+    "run-modes",
+];
+
+/// The languages `alm guide run-modes` is written in: those of the Allomos app (`en`, `ja`,
+/// `zh-CN`, as [`crate::pick_ui_language`] picks them).
+pub const RUN_MODES_LANGUAGES: [&str; 3] = ["en", "ja", "zh-CN"];
 
 const TERMS: &str = "# Allomos terms
 
@@ -201,6 +214,9 @@ Ask the person:
 About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:
   this guide.
+- `alm guide run-modes [--language <code>]`: the explanation of quiet and normal mode to show the
+  person before an automatic or loop run, in the task language (or `--language`); written in en,
+  ja and zh-CN, otherwise in English with a line asking you to translate it.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
   folder, or where `--taskbag` says.
 - `alm migrate`: when `alm` says the taskbag is in an older format, the steps for updating it;
@@ -231,14 +247,20 @@ const WORKFLOW: &str = "# How to work the tasks
    the next one needs>\"`.
 7. Finished: only once the task has the top label of the ladder (a person has checked it: the
    human check), then `alm done <id>`. The one exception: in an automatic or loop run the
-   person set up to go on without them (for example a card run or `/loop`), you may finish a task
+   person set up to go on without them (a quiet run, step 8), you may finish a task
    below the top label with
    `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md>`; say so in
    your handoff. Write the steps so a person can pick it up and test
    it: the test folder, what to open, what to click, what they should see. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
    it, `alm checked <id>`.
-8. In such a run (a quiet run), never stop to wait for the person. A routine choice: decide it,
+8. Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
+   another), ask the person to choose quiet or normal mode: show them what
+   `alm guide run-modes` prints (in the task language), as it is, and do not start until they
+   choose. Write the choice in your handoff (under Approvals in force: \"Run mode: quiet\" or
+   \"Run mode: normal\", who chose it and when) and follow it until the run ends. In normal mode
+   you work as usual: you stop and ask whenever you need the person. In quiet mode (a quiet run),
+   never stop to wait for the person. A routine choice: decide it,
    record it with `alm ai-decided <id> \"<what and why>\"`, and carry on. A real question for the
    person: park that task with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`
    under To answer) and go on with the next ready task. Do not use `alm confirm` in such a run: it
@@ -267,6 +289,173 @@ Rules:
   Your other work is committed as usual.
 ";
 
+const RUN_MODES_EN: &str = "# Run modes: quiet or normal
+
+For the agent: before an automatic or loop run begins (a card run, `/loop`, several tasks one
+after another), show the person everything below the line, as it is, and ask them to choose
+quiet or normal mode. Do not start until they choose. Write the choice in your handoff (under
+Approvals in force: \"Run mode: quiet\" or \"Run mode: normal\", who chose it and when) and
+follow it until the run ends.
+
+---
+
+Before this run starts, please choose how I will work: **quiet mode** or **normal mode**.
+
+## Quiet mode: I go on without you
+
+- **What I do:** I work the tasks one after another and never stop to ask you. I make routine
+  choices myself (a name, a file layout, a small detail with an obvious default) and record each
+  one (`alm ai-decided`), so you can review it later.
+- **What I don't do:** I don't decide what is yours to decide: what users will see and get used
+  to, anything hard to undo, anything that changes the plan or another task, anything with a cost
+  or an outside effect. Such a question parks its task as waiting (`alm wait`), and I go on with
+  the next ready task without waiting for an answer.
+- **When you are interrupted:** not at all until the run is over. A task I finish without your
+  check is marked to check, with the steps for checking it (`--without-human-check`).
+- **How long it can run unattended:** until no ready task is left, or until my session's quota or
+  context runs out. I keep my handoff up to date, so anyone can pick the work up.
+
+When the run is over:
+
+1. Run `alm human` (or the Needs a human filter in the Allomos app) and work through its three
+   groups:
+   - **To answer:** answer each parked question, then mark the task ready again
+     (`alm ready <id>`), so a later run picks it up.
+   - **To review: AI decisions:** read each decision; keep it, or overturn it by changing the
+     task; then mark them reviewed (`alm reviewed <id>`, or the Reviewed button in the app).
+   - **To check:** follow each task's check steps. When it works, mark it checked
+     (`alm checked <id>`, or the Checked button in the app). When it does not, say what is wrong
+     in its note (`alm note <id> \"<what is wrong>\"`) and add a task for the fix: Allomos cannot
+     reopen a finished task yet.
+2. Read the run's handoff (`alm handoffs` lists them, newest first) for anything left running or
+   unfinished.
+
+## Normal mode: I ask as usual
+
+- **What I do:** I work as usual. Routine choices I still make and record myself; whenever I
+  need you (a question only you can answer, an approval, a check by hand), I stop and ask.
+- **What I don't do:** I don't go past a question without your answer.
+- **When you are interrupted:** at each such question, approval or check.
+- **How long it can run unattended:** only until the next question: the run pauses there until
+  you answer.
+
+Please stay reachable while it runs: it pauses at each question until you answer.
+";
+
+const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モードか
+
+エージェントへ：自動実行やループ実行（カード・ラン、`/loop`、複数のタスクを続けて進めるもの）を
+始める前に、下の線より後ろをそのまま相手に見せ、静かモードか通常モードかを選んでもらいます。
+選ばれるまで始めません。選ばれたモードはハンドオフに書き（Approvals in force に
+「Run mode: quiet」または「Run mode: normal」と、誰がいつ選んだか）、実行が終わるまでそれに従います。
+
+---
+
+この実行を始める前に、私の進め方を選んでください：**静かモード**か**通常モード**か。
+
+## 静かモード：あなたを待たずに進めます
+
+- **すること：** タスクを一つずつ続けて進め、あなたに聞くために止まることはありません。決まりきった
+  選択（名前、ファイルの配置、自然な既定がある小さな点）は私が決め、あとで見直せるよう一つずつ記録
+  します（`alm ai-decided`）。
+- **しないこと：** あなたが決めるべきことは決めません。利用者が目にして慣れていくもの、元に戻しにくい
+  こと、計画や他のタスクを変えること、費用や外部への影響があること。そうした質問があれば、その
+  タスクを待機中にして（`alm wait`）、答えを待たずに次の準備完了のタスクへ進みます。
+- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。あなたの確認なしに終えたタスクは、
+  確認の手順を付けて確認待ちとして残します（`--without-human-check`）。
+- **無人で続けられる長さ：** 準備完了のタスクがなくなるまで、またはこのセッションの利用枠や
+  コンテキストが尽きるまで。誰でも引き継げるよう、ハンドオフは常に最新にしておきます。
+
+実行が終わったら：
+
+1. `alm human`（または「肩代」アプリの「人の対応が必要」フィルター）を開き、三つのグループを
+   順に片付けます。
+   - **To answer（回答待ち）：** 待機中の質問に一つずつ答え、そのタスクを準備完了に戻します
+     （`alm ready <id>`）。次の実行がそれを拾います。
+   - **To review: AI decisions（レビュー待ちの AI の決定）：** 決定を一つずつ読み、そのままにするか、
+     タスクを変えて覆します。終わったらレビュー済みにします（`alm reviewed <id>`、またはアプリの
+     「レビュー済み」ボタン）。
+   - **To check（確認待ち）：** 各タスクの確認手順に従って試します。動けば確認済みにします
+     （`alm checked <id>`、またはアプリの「確認済み」ボタン）。動かなければ、何がおかしいかをメモに
+     書き（`alm note <id> \"<何がおかしいか>\"`）、直すためのタスクを追加します。終わったタスクを
+     開き直す機能は、「肩代」にはまだありません。
+2. この実行のハンドオフ（`alm handoffs` で新しい順に一覧できます）を読み、動いたままのものや
+   終わっていないものがないか確かめます。
+
+## 通常モード：いつもどおり聞きます
+
+- **すること：** いつもどおり進めます。決まりきった選択は私が決めて記録しますが、あなたが必要な
+  とき（あなたにしか答えられない質問、承認、手で試す確認）は止まって聞きます。
+- **しないこと：** あなたの答えなしに質問の先へは進みません。
+- **あなたが呼ばれるとき：** そうした質問、承認、確認のたびに。
+- **無人で続けられる長さ：** 次の質問まで。そこで実行は止まり、あなたの答えを待ちます。
+
+実行中は連絡がつくようにしておいてください。質問のたびに、答えるまで実行は止まります。
+";
+
+const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
+
+给智能体：在自动运行或循环运行（卡片连跑、`/loop`、一个接一个地做多个任务）开始之前，把下面
+分隔线之后的内容原样给对方看，请对方选择安静模式或普通模式。对方选定之前不要开始。把选择写进
+你的交接（在 Approvals in force 下写「Run mode: quiet」或「Run mode: normal」，以及谁、何时选的），
+并一直照此运行到结束。
+
+---
+
+这次运行开始之前，请选择我的工作方式：**安静模式**还是**普通模式**。
+
+## 安静模式：我不等你，继续往下做
+
+- **我会做的：** 一个接一个地处理任务，从不停下来问你。常规的选择（名称、文件布局、有明显默认值的
+  小细节）由我自己决定，并逐条记录（`alm ai-decided`），方便你之后审阅。
+- **我不会做的：** 不替你决定该由你决定的事：用户会看到并习惯的东西、难以撤销的事、会改变计划或
+  其他任务的事、有费用或对外有影响的事。遇到这类问题，我把那个任务设为等待中（`alm wait`），
+  不等回答，接着做下一个就绪的任务。
+- **什么时候打扰你：** 运行结束之前一次也不会。没有经过你检查就完成的任务，会标为待检查，并附上
+  检查步骤（`--without-human-check`）。
+- **能无人值守运行多久：** 直到没有就绪的任务，或者我这个会话的额度或上下文用完为止。我会让交接
+  一直保持最新，谁都可以接着做。
+
+运行结束后：
+
+1. 运行 `alm human`（或在「换肩」应用里用「需要人处理」筛选），依次处理三组：
+   - **To answer（待回答）：** 逐个回答被搁置的问题，然后把任务重新设为就绪（`alm ready <id>`），
+     之后的运行会接着做。
+   - **To review: AI decisions（待审阅的 AI 决定）：** 逐条阅读决定；保留它，或修改任务来推翻它；
+     然后标为已审阅（`alm reviewed <id>`，或应用里的「已审阅」按钮）。
+   - **To check（待检查）：** 按每个任务的检查步骤去试。没问题就标为已检查（`alm checked <id>`，
+     或应用里的「已检查」按钮）。有问题就在它的备注里写明哪里不对（`alm note <id> \"<哪里不对>\"`），
+     再添加一个修复任务：「换肩」目前还不能重新打开已完成的任务。
+2. 阅读这次运行的交接（`alm handoffs` 按从新到旧列出），看看有没有仍在运行或没做完的东西。
+
+## 普通模式：照常提问
+
+- **我会做的：** 照常工作。常规的选择仍由我决定并记录；每当需要你（只有你能回答的问题、批准、
+  亲手检查）时，我会停下来问你。
+- **我不会做的：** 没有你的回答，不会越过问题继续做。
+- **什么时候打扰你：** 每遇到这样的问题、批准或检查时。
+- **能无人值守运行多久：** 只到下一个问题为止：运行会停在那里，直到你回答。
+
+运行期间请保持能联系到你：每遇到一个问题，运行都会停下，直到你回答。
+";
+
+/// `alm guide run-modes` in `language` (a task language such as `ja` or `zh-CN`), or `None` when
+/// it is not written in that language (the agent then translates the English text faithfully).
+/// The person reads it, so it is written in every language of [`RUN_MODES_LANGUAGES`].
+pub fn run_modes(language: &str) -> Option<&'static str> {
+    let l = language.trim().to_lowercase().replace('_', "-");
+    let is = |code: &str| l == code || l.starts_with(&format!("{code}-"));
+    if is("en") {
+        Some(RUN_MODES_EN)
+    } else if is("ja") {
+        Some(RUN_MODES_JA)
+    } else if l == "zh" || l == "zh-cn" || l == "zh-sg" || l.starts_with("zh-hans") {
+        Some(RUN_MODES_ZH_CN)
+    } else {
+        None
+    }
+}
+
 /// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
 pub fn guide(topic: Option<&str>) -> Option<String> {
     let text = |t: &str| match t {
@@ -275,6 +464,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "tasks" => Some(TASKS),
         "commands" => Some(COMMANDS),
         "workflow" => Some(WORKFLOW),
+        "run-modes" => Some(RUN_MODES_EN),
         _ => None,
     };
     match topic {
@@ -363,6 +553,16 @@ mod tests {
             assert!(text.contains("alm reviewed <id>"), "{text}");
             assert!(text.contains("To review: AI decisions"), "{text}");
         }
+        // Before an automatic or loop run, the person chooses quiet or normal mode, from the
+        // words `alm guide run-modes` gives, and the choice goes in the handoff (Task-A03-21).
+        for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
+            let text = flat(text);
+            assert!(text.contains("alm guide run-modes"), "{text}");
+            assert!(text.contains("quiet or normal mode"), "{text}");
+            assert!(text.contains("do not start until they choose"), "{text}");
+            assert!(text.contains("handoff"), "{text}");
+            assert!(text.contains("Run mode: quiet"), "{text}");
+        }
         // Decision 0017: no `--commit` / `--push`; pull before claiming, push the claim at once,
         // and run the Git commands each change prints.
         for text in [guide(None).unwrap(), crate::agent_section()] {
@@ -375,5 +575,57 @@ mod tests {
             assert!(text.contains("until your claim is pushed"), "{text}");
             assert!(text.contains("Git commands"), "{text}");
         }
+    }
+
+    /// The run-modes explanation exists in every language the app speaks (so every task language
+    /// `alm` supports), each with both modes and the same after-run steps and commands.
+    #[test]
+    fn run_modes_is_written_in_every_language() {
+        for language in RUN_MODES_LANGUAGES {
+            let text = run_modes(language).unwrap_or_else(|| panic!("{language}"));
+            assert!(text.starts_with("# "), "{language}");
+            assert!(
+                text.contains("\n---\n"),
+                "{language}: the line before the person's part"
+            );
+            for words in [
+                "`/loop`",
+                "Run mode: quiet",
+                "Run mode: normal",
+                "`alm ai-decided`",
+                "`alm wait`",
+                "`--without-human-check`",
+                "`alm human`",
+                "To answer",
+                "`alm ready <id>`",
+                "To review: AI decisions",
+                "`alm reviewed <id>`",
+                "To check",
+                "`alm checked <id>`",
+                "`alm handoffs`",
+            ] {
+                assert!(text.contains(words), "{language}: {words}");
+            }
+            // Two modes, each with the four things the person must know.
+            assert_eq!(text.matches("\n## ").count(), 2, "{language}");
+            assert_eq!(text.matches("- **").count(), 8 + 3, "{language}");
+        }
+        // Every language the app picks has its own text, not the English one.
+        for tag in ["en-US", "ja-JP", "zh-Hans-CN", "zh_CN"] {
+            let picked = crate::pick_ui_language(&[tag]);
+            assert!(RUN_MODES_LANGUAGES.contains(&picked), "{tag}");
+            assert_eq!(run_modes(tag), run_modes(picked), "{tag}");
+        }
+        assert_ne!(run_modes("ja"), run_modes("en"));
+        assert_ne!(run_modes("zh-CN"), run_modes("en"));
+        assert_eq!(run_modes("fr"), None);
+        assert_eq!(run_modes("zh-TW"), None);
+        // `alm guide` (all topics) includes the English text.
+        assert!(
+            guide(None)
+                .unwrap()
+                .contains("# Run modes: quiet or normal")
+        );
+        assert_eq!(guide(Some("run-modes")).as_deref(), run_modes("en"));
     }
 }

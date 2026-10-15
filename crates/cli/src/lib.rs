@@ -19,8 +19,9 @@ use allomos_store::{
     Actor, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
     agent_section_for, agent_setup_request, default_root, events, find_taskbag, guide,
     id_from_name, init_with_labels, load, pick_ui_language, picked_folder, plain_path,
-    post_confirm, project_folder_of, read_answer, read_text, requests_dir, saved_ui_language,
-    task_language, taskbag_of, versions, was_seen, with_written_files, withdraw_confirm,
+    post_confirm, project_folder_of, read_answer, read_text, requests_dir, run_modes,
+    saved_ui_language, task_language, taskbag_of, versions, was_seen, with_written_files,
+    withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -100,10 +101,14 @@ enum Command {
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
     /// Print the details the brief points to: terms, what a project may customize, commands,
-    /// and how to work the tasks. All topics when none is named.
+    /// how to work the tasks, and the run modes to show the person before an automatic or loop
+    /// run. All topics (in English) when none is named.
     Guide {
         #[arg(value_parser = GUIDE_TOPICS)]
         topic: Option<String>,
+        /// For `run-modes`: the language to print it in (default: the task language).
+        #[arg(long, value_name = "CODE")]
+        language: Option<String>,
     },
     /// The language to write new and changed tasks in. Without a value: show it (run this before
     /// adding a task or changing its title or description: `alm title`, `alm describe`). With one: set it, to a language code
@@ -1708,7 +1713,40 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 prompt,
             ))
         }
-        Command::Guide { topic } => {
+        Command::Guide { topic, language } if topic.as_deref() == Some("run-modes") => {
+            // The person reads it: in the task language (Task-A03-21). Without a taskbag here,
+            // the language the app would use.
+            let language = match language {
+                Some(code) => code.trim().to_string(),
+                None => {
+                    let system: Vec<String> = sys_locale::get_locales().collect();
+                    match locate(cli, cwd)
+                        .ok()
+                        .and_then(|root| taskbag_of(&root, load(&root)).ok())
+                    {
+                        Some((bag, _)) => task_language(&bag.project, &system).language,
+                        None => saved_ui_language()
+                            .unwrap_or_else(|| pick_ui_language(&system).to_string()),
+                    }
+                }
+            };
+            let (text, written) = match run_modes(&language) {
+                Some(text) => (text.to_string(), true),
+                None => (
+                    format!(
+                        "This text is not written in {language} yet: show the person a faithful \
+                         translation into {language}, keeping commands as they are.\n\n{}",
+                        run_modes("en").unwrap_or_default()
+                    ),
+                    false,
+                ),
+            };
+            Ok(Done::new(
+                json!({ "topic": topic, "language": language, "written_in_language": written, "guide": text }),
+                text,
+            ))
+        }
+        Command::Guide { topic, .. } => {
             let text = guide(topic.as_deref()).unwrap_or_default();
             Ok(Done::new(json!({ "topic": topic, "guide": text }), text))
         }

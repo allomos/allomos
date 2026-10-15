@@ -42,7 +42,7 @@ pub use convert::{
     agent_convert_request_in,
 };
 pub use events::Actor;
-pub use guide::{GUIDE_TOPICS, guide};
+pub use guide::{GUIDE_TOPICS, RUN_MODES_LANGUAGES, guide, run_modes};
 pub use settings::{
     TaskLanguage, alm_offer_dismissed, dismiss_alm_offer, pick_ui_language, save_owner_name,
     save_ui_language, saved_owner_name, saved_ui_language, settings_dir, task_language,
@@ -244,8 +244,13 @@ the project notes (below) and your own handoff file.
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
   then check and move it on: `alm unblock <id>`.
 - Stopping before it is done: `alm release <id> --note \"<what the next one needs>\"`.
+- Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
+  another), ask the person to choose quiet or normal mode: show them what
+  `alm guide run-modes` prints (in the task language), as it is, and do not start until they
+  choose. Write the choice in your handoff (\"Run mode: quiet\" or \"Run mode: normal\", who
+  chose it and when) and follow it until the run ends. In normal mode, ask as usual.
 - Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
-  In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
+  In an automatic or loop run the person set up to go on without them (quiet mode), you
   may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
   In such a run (a quiet run), never stop to wait for the person: decide a routine choice
@@ -288,7 +293,7 @@ Allomos relies on these terms: **area** (what part of the product a task belongs
 has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
-`alm guide workflow`.
+`alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person).
 "
     )
 }

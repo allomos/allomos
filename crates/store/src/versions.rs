@@ -38,7 +38,9 @@ use allomos_core::event::{Change, Kind};
 /// run that goes on without the person (a quiet run): never wait; decide and record routine
 /// choices, park a real question with `alm wait` and go on, no `alm confirm` (Task-A00-29; how
 /// that mode is chosen: Task-A03-21).
-pub const SECTION_VERSION: u32 = 9;
+/// 10: before an automatic or loop run, the person chooses quiet or normal mode from the words
+/// `alm guide run-modes` gives, and the choice goes in the handoff (Task-A03-21).
+pub const SECTION_VERSION: u32 = 10;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);

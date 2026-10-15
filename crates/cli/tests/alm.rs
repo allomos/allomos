@@ -1714,6 +1714,54 @@ fn task_language_follows_the_app_until_set() {
     assert_eq!(v["task_language"]["language"], "zh-CN");
 }
 
+/// `alm guide run-modes` prints the explanation the person reads before an automatic or loop run,
+/// in the task language (Task-A03-21): `--language` wins, then the taskbag's task language; a
+/// language it is not written in gets the English text with a line asking for a translation.
+#[test]
+fn run_modes_follow_the_task_language() {
+    let repo = filled();
+    let settings = tmp("settings");
+    for (language, words) in [
+        ("en", "## Quiet mode"),
+        ("ja", "## 静かモード"),
+        ("zh-CN", "## 安静模式"),
+    ] {
+        let (code, v) = fj_settings(
+            &repo,
+            &settings,
+            &["guide", "run-modes", "--language", language],
+        );
+        assert_eq!(code, 0, "{v}");
+        assert_eq!(v["written_in_language"], true, "{v}");
+        let text = v["guide"].as_str().unwrap();
+        assert!(text.contains(words), "{language}: {text}");
+        for command in [
+            "`alm human`",
+            "`alm ready <id>`",
+            "`alm reviewed <id>`",
+            "`alm checked <id>`",
+        ] {
+            assert!(text.contains(command), "{language}: {command}");
+        }
+    }
+    // Without --language: the taskbag's task language.
+    fj_settings(&repo, &settings, &["task-language", "ja"]);
+    let (_, v) = fj_settings(&repo, &settings, &["guide", "run-modes"]);
+    assert_eq!(v["language"], "ja");
+    assert!(v["guide"].as_str().unwrap().contains("静かモード"), "{v}");
+    // Not written in French: English, with a line asking for a faithful translation.
+    fj_settings(&repo, &settings, &["task-language", "fr"]);
+    let (code, v) = fj_settings(&repo, &settings, &["guide", "run-modes"]);
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(v["written_in_language"], false, "{v}");
+    let text = v["guide"].as_str().unwrap();
+    assert!(
+        text.starts_with("This text is not written in fr yet"),
+        "{text}"
+    );
+    assert!(text.contains("## Quiet mode"), "{text}");
+}
+
 #[test]
 fn title_and_project_rename() {
     let repo = filled();
@@ -1821,17 +1869,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v9)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v10)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v8 section (before the quiet-run rule, Task-A00-29) is out of date too.
+    // A v9 section (before the run-mode choice, Task-A03-21) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v9)", "## Tasks: Allomos (v8)")
+            brief.replace("## Tasks: Allomos (v10)", "## Tasks: Allomos (v9)")
         ),
     )
     .unwrap();
