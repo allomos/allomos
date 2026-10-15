@@ -1,5 +1,7 @@
 # Builds Allomos for macOS (Apple Silicon) and Windows when a version tag is pushed, and attaches
-# the unsigned installers and alm to that version's GitHub release (Task-A07-11).
+# the unsigned installers and alm to that version's GitHub release (Task-A07-11). The installers
+# are the only .exe; alm alone is packed as alm-only_<v>_… (.tar.gz, .zip) so nobody takes it for
+# the installer (Task-A07-18).
 # The tag must match the app's version: tag v0.2.0 needs "version": "0.2.0" in tauri.conf.json
 # and Cargo.toml. The Mac script apps/desktop/scripts/build-windows.sh stays as a backup.
 name: Release
@@ -43,7 +45,13 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 ||
             gh release create "$TAG" --verify-tag --title "Allomos $TAG" \
-              --notes "Unsigned builds. macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.pkg (installs the app and the alm command) or Allomos_${TAG#v}_aarch64.dmg. Windows: Allomos_${TAG#v}_x64-setup.exe. How to install: https://mypals-ml.github.io/allomos/start/getting-started/"
+              --notes "Unsigned builds. Most people want an installer, which installs the app and the alm command:
+          - macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.pkg, or Allomos_${TAG#v}_aarch64.dmg
+          - Windows: Allomos_${TAG#v}_x64-setup.exe
+
+          The alm-only files hold the alm command alone, for computers without the app: alm-only_${TAG#v}_macos_arm64.tar.gz and alm-only_${TAG#v}_windows_x64.zip. Unpack, then run alm from a terminal.
+
+          How to install: https://mypals-ml.github.io/allomos/start/getting-started/"
 
   macos:
     needs: release
@@ -67,8 +75,8 @@ jobs:
       - name: Attach to the release
         run: |
           v=${{ needs.release.outputs.version }}
-          tar -czf "alm_${v}_macos_arm64.tar.gz" -C target/release alm
-          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg target/release/bundle/pkg/*.pkg "alm_${v}_macos_arm64.tar.gz"
+          tar -czf "alm-only_${v}_macos_arm64.tar.gz" -C target/release alm
+          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg target/release/bundle/pkg/*.pkg "alm-only_${v}_macos_arm64.tar.gz"
 
   windows:
     needs: release
@@ -95,5 +103,5 @@ jobs:
       - name: Attach to the release
         run: |
           v=${{ needs.release.outputs.version }}
-          cp target/release/alm.exe "alm_${v}_windows_x64.exe"
-          gh release upload "$TAG" --clobber target/release/bundle/nsis/*-setup.exe "alm_${v}_windows_x64.exe"
+          pwsh -NoProfile -Command "Compress-Archive -Path target/release/alm.exe -DestinationPath alm-only_${v}_windows_x64.zip -Force"
+          gh release upload "$TAG" --clobber target/release/bundle/nsis/*-setup.exe "alm-only_${v}_windows_x64.zip"
