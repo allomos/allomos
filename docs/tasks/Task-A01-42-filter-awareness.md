@@ -4,24 +4,23 @@
 
 ## What gets built (plain words)
 
-The **Show** filter above the task list is remembered between launches. A filter left on (for example *Backlog*) quietly hides every other task, so a task you are looking for seems missing; the approver ran into this several times, most recently with A01-41. After this card the list says what the filter hides, where you are looking (option B from the mockups), and a search finds a hidden task too (option C).
+The **Show** filter above the task list is remembered between launches. A filter left on (for example *Backlog*) quietly hides every other task, so a task you are looking for seems missing; the approver ran into this several times, most recently with A01-41. After this card the list says what the filter hides, where you are looking (option B from the mockups). Option C, a search also finding the tasks the filter hides, was built here and later replaced by [`A01-48`](./Task-A01-48-filter-and-search.md): a search under a filter now lists only the tasks passing both, and the filter banner counts the matches the filter hides.
 
 | Piece | What it is | Where |
 |---|---|---|
 | Hidden counts | Pure functions: how many tasks a filter hides in a group and in which states; the line's words; the filter's name | `apps/web/src/stopFlow.ts` (tested in `apps/web/tests/stopFlow.test.ts`) |
 | In each group (B) | Under a group's tasks: "38 more hidden by the filter: 4 Ready, 1 Waiting, 33 Done · Show all". A group whose tasks are all hidden still shows, with only that line | `apps/web/src/App.tsx` (TaskbagView, TaskGroup) |
-| In a search (C) | Tasks the search finds that the filter hides, after the groups, under "⊘ Hidden by the “Backlog” filter", with Show all; clicking one opens it in the task pane | `apps/web/src/Search.tsx` (FilterHits), `apps/web/src/App.tsx` |
+| In a search (C) | *Replaced by A01-48 (2026-10-16):* was the tasks the search finds that the filter hides, listed after the groups under "⊘ Hidden by the “Backlog” filter"; `FilterHits` is removed and the filter banner now only counts them | `apps/web/src/stopFlow.ts` (`bothBanner`), `apps/web/src/App.tsx` |
 | Texts and look | 5 texts in English, Chinese and Japanese; styles | `apps/web/src/i18n/*.json`, `apps/web/src/styles.css` |
 
 ## Details for the worker
 
-- **Outcome.** A person with a state filter on sees how many tasks it hides, and a search still finds them.
+- **Outcome.** A person with a state filter on sees how many tasks it hides. (A search still finding them was replaced by A01-48: the filter and the search now narrow the list together.)
 - **Decisive unknowns.** None. The approver chose B + C on 2026-10-14 (not A, the strip above the list; not D, resetting the filter).
 - **Choices** (routine, made by the worker):
   - A group with no tasks at all is still left out under a filter; a group whose tasks are all hidden is shown with only its "hidden" line, so no area or iteration disappears without a word.
-  - While searching, the in-group line is not shown (the search section C says it instead).
+  - While searching, the in-group line is not shown (the filter banner counts the matches the filter hides instead, A01-48).
   - States in the line follow the Show box's order (Backlog, Ready, In progress, Waiting, Blocked, Done, Dropped). "Show all" sets the filter to *All states*.
-  - Hidden search hits are not in the arrow-key order of the list; they are reached by clicking or Tab.
 - **Files owned.** The files above; this card.
 - **External operations.** None.
 - **Done means mechanically.** `npm --prefix apps/web run typecheck`, `build`, `check:i18n`, `test` pass; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` pass; a debug desktop app built.

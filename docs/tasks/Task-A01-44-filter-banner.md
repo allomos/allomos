@@ -22,7 +22,7 @@ With a **Show** filter on (for example *Needs a human*), the list used to keep e
   - The app had no search banner, so a plain one was added on top while searching ("2 tasks found for “alm”."; on the Handoffs tab "1 handoff found …"), so the filter banner's "1 of them" refers to something. It shows only when the search finds something; "Nothing found" stays as it was.
   - The Handoffs tab follows the Show filter, and the Show box now shows there too: a handoff is drawn when it names at least one task the filter keeps; one naming no task is left out under a filter; the banner counts each named task once.
   - The app's accent colour is amber, so the filter banner uses a new blue tint, as the approver's "accent (blue)" asked; the search banner stays neutral.
-  - While searching, the filter banner does not count groups left out (the search already leaves groups out); it says how many found tasks the filter shows and how many are listed below under A01-42's "Hidden by the filter" section.
+  - While searching, the filter banner does not count groups left out (the search already leaves groups out). *Changed by [`A01-48`](./Task-A01-48-filter-and-search.md):* it now says the list is the filter and the search together and how many matches the filter hides; nothing is listed below any more.
   - When nothing matches, the New area / New iteration link and the "no iterations" hint are hidden too, so only the banner shows. Unplanned and unknown-area groups count among the groups. The banner sits at the top of the list and scrolls with it.
   - Groups that stay keep A01-42's "N more hidden by the filter: … · Show all" line.
 - **Files owned.** The files above; this card.

@@ -150,10 +150,8 @@ export type FilterBannerCount = {
   tasks: number;
   /** Groups drawn. */
   groups: number;
-  /** Groups there were before the filter (or, while searching, before the filter left any out). */
+  /** Groups there were before the filter. */
   total: number;
-  /** While a search is on in a task list: how many tasks it found that the filter hides. */
-  searchHidden?: number;
 };
 
 const MARK = "\u0000";
@@ -167,50 +165,112 @@ function withWho(text: string, who: string): Words {
 
 const one = (n: number) => (n === 1 ? "one" : "other");
 
+/** Sentences joined: a space after each, except after a full-width stop (Chinese, Japanese). */
+function sentences(...parts: Words[]): Words {
+  const out: Words = [];
+  for (const words of parts) {
+    if (words.length === 0) continue;
+    if (out.length > 0 && !out[out.length - 1].text.endsWith("。")) out.push({ text: " " });
+    out.push(...words);
+  }
+  return out;
+}
+
 /**
  * The filter banner's words (Task-A01-44): "**3 tasks** need a human (…), in 2 of 7 areas. The 5
  * areas with none are left out."; with nothing to show "No task is blocked. All 12 iterations are
- * left out."; while searching "**1 of them** needs a human, in 1 area. 1 more is listed below,
- * hidden by the filter." Empty for the filter "all".
+ * left out." Empty for the filter "all". While a search is on, the task list uses `bothBanner`.
  */
 export function filterBanner(filter: StateFilter, c: FilterBannerCount, t: T): Words {
   if (filter === "all") return [];
   const verb = t(`filter.verb.${filter}_${one(c.tasks === 0 ? 1 : c.tasks)}` as Key);
-  const searching = c.searchHidden !== undefined;
-  const out: Words = [];
-  const add = (words: Words) => {
-    // Sentences ending in a full-width stop (Chinese, Japanese) need no space after it.
-    if (out.length > 0 && !out[out.length - 1].text.endsWith("。")) out.push({ text: " " });
-    out.push(...words);
-  };
   if (c.tasks === 0) {
-    if (searching) {
-      add([{ text: t("filter.banner.none_search", { verb }) }]);
-      return out;
-    }
-    add([{ text: t("filter.banner.none", { verb }) }]);
-    if (c.total > 0) add([{ text: t(`filter.all_left.${c.kind}_${one(c.total)}` as Key, { count: c.total }) }]);
-    return out;
+    return sentences(
+      [{ text: t("filter.banner.none", { verb }) }],
+      c.total > 0 ? [{ text: t(`filter.all_left.${c.kind}_${one(c.total)}` as Key, { count: c.total }) }] : [],
+    );
   }
   const where =
-    searching || c.groups >= c.total
+    c.groups >= c.total
       ? t(`filter.where.${c.kind}_${one(c.groups)}` as Key, { count: c.groups })
       : t(`filter.where_of.${c.kind}` as Key, { shown: c.groups, total: c.total });
-  if (searching) {
-    const who = t("filter.who_of_them", { count: c.tasks });
-    add(withWho(t("filter.banner.lead_search", { who: MARK, verb, where }), who));
-    if (c.searchHidden! > 0) add([{ text: t(`filter.below_${one(c.searchHidden!)}` as Key, { count: c.searchHidden! }) }]);
-    return out;
-  }
   const who = t(`filter.who_${one(c.tasks)}` as Key, { count: c.tasks });
-  add(withWho(t("filter.banner.lead", { who: MARK, verb, where }), who));
   const left = c.total - c.groups;
-  if (left > 0) add([{ text: t(`filter.left.${c.kind}_${one(left)}` as Key, { count: left }) }]);
-  return out;
+  return sentences(
+    withWho(t("filter.banner.lead", { who: MARK, verb, where }), who),
+    left > 0 ? [{ text: t(`filter.left.${c.kind}_${one(left)}` as Key, { count: left }) }] : [],
+  );
 }
 
-/** The search banner's words (Task-A01-44): "**2 tasks** found for “blocked”." */
-export function searchBanner(kind: "task" | "handoff", count: number, query: string, t: T): Words {
+/** What the banner counts when the filter and a search narrow the task list together (Task-A01-48). */
+export type BothCount = {
+  kind: "area" | "iteration";
+  /** The search's words, as typed. */
+  query: string;
+  /** Tasks listed: those that pass the filter and hold the search words. */
+  tasks: number;
+  /** Groups drawn. */
+  groups: number;
+  /** Tasks the search finds, filter aside. */
+  matches: number;
+};
+
+/**
+ * The filter banner while a search is on (Task-A01-48): the list is the filter and the search
+ * together. "Filter and search together: only tasks that are waiting and hold “alm” are listed, in
+ * 1 area. 3 more matches are hidden by the filter."; with none left "None of the tasks found for
+ * “alm” is waiting. All 3 matches are hidden by the filter." Empty for the filter "all", or when
+ * the search finds nothing at all ("Nothing found" says so).
+ */
+export function bothBanner(filter: StateFilter, c: BothCount, t: T): Words {
+  if (filter === "all" || c.matches === 0) return [];
+  const hidden = c.matches - c.tasks;
+  const hiddenWords: Words =
+    hidden > 0 ? [{ text: t(`filter.matches_hidden.${c.tasks === 0 ? "all" : "more"}_${one(hidden)}` as Key, { count: hidden }) }] : [];
+  if (c.tasks === 0) {
+    const verb = t(`filter.verb.${filter}_one` as Key);
+    return sentences([{ text: t("filter.banner.none_both", { query: c.query, verb }) }], hiddenWords);
+  }
+  const verb = t(`filter.verb.${filter}_other` as Key);
+  const where = t(`filter.where.${c.kind}_${one(c.groups)}` as Key, { count: c.groups });
+  return sentences([{ text: t("filter.banner.both", { query: c.query, verb, where }) }], hiddenWords);
+}
+
+/** The search banner's words (Task-A01-44): "**2 tasks** found for “blocked”."; under a Show filter
+ * (`filter`, its name) "**2 tasks** found for “blocked” with the “Waiting” filter on." (Task-A01-48). */
+export function searchBanner(kind: "task" | "handoff", count: number, query: string, t: T, filter?: string): Words {
   const who = t(`search.who.${kind}_${one(count)}` as Key, { count });
+  if (filter !== undefined) return withWho(t("search.banner_filtered", { who: MARK, query, filter }), who);
   return withWho(t("search.banner", { who: MARK, query }), who);
+}
+
+/**
+ * Both banners of the task list (By area, By iteration) (Task-A01-44, A01-48). `groups` are every
+ * group, `filtered` those the filter keeps, `found` those the filter and the search keep together;
+ * `matches` is how many tasks the search finds, filter aside. Clearing the search gives the filter
+ * banner alone; turning the filter off gives the search banner alone.
+ */
+export function taskListBanners(
+  o: {
+    kind: "area" | "iteration";
+    filter: StateFilter;
+    /** The search's words, as typed; empty when not searching. */
+    query: string;
+    groups: readonly { tasks: readonly Task[] }[];
+    filtered: readonly { tasks: readonly Task[] }[];
+    found: readonly { tasks: readonly Task[] }[];
+    matches: number;
+  },
+  t: T,
+): { search: Words; filter: Words } {
+  const query = o.query.trim();
+  if (!query) {
+    return { search: [], filter: filterBanner(o.filter, { kind: o.kind, tasks: taskCount(o.filtered), groups: o.filtered.length, total: o.groups.length }, t) };
+  }
+  if (o.filter === "all") return { search: o.matches > 0 ? searchBanner("task", o.matches, query, t) : [], filter: [] };
+  const shown = taskCount(o.found);
+  return {
+    search: shown > 0 ? searchBanner("task", shown, query, t, filterName(o.filter, t)) : [],
+    filter: bothBanner(o.filter, { kind: o.kind, query, tasks: shown, groups: o.found.length, matches: o.matches }, t),
+  };
 }
