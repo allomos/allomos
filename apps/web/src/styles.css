@@ -433,10 +433,9 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .search-handoffs .kind { font-size: 11.5px; font-weight: 600; color: var(--accent-ink); text-transform: uppercase; letter-spacing: .04em; }
 .search-handoffs .when { color: var(--muted); font-variant-numeric: tabular-nums; }
 .search-none { margin: 0; }
-/* Task-A01-42: what the state filter hides, in each group and in a search. */
+/* Task-A01-42: what the state filter hides, in each group. */
 .filter-hidden { margin: 0; padding: 8px 16px 10px; color: var(--muted); border-top: 1px solid var(--line); }
 .filter-hidden::before { content: "⊘ "; }
-.search-hidden .area-head .sub::before { content: "⊘ "; }
 
 /* Task-A01-44: the banners under the tabs. The search's is neutral; the Show filter's, under it, is
    in a blue tint so the two stand apart, and ends with Show all. */

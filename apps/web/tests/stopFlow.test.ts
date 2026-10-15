@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allBlockersDone, blockers, filterBanner, filterGroups, filterName, handoffGroups, hiddenByFilter, searchBanner, taskCount, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { allBlockersDone, blockers, bothBanner, filterBanner, filterGroups, filterName, handoffGroups, hiddenByFilter, searchBanner, taskCount, taskListBanners, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
 import type { Opened, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -205,22 +205,67 @@ test("nothing matches: only the banner, saying every group is left out", () => {
   assert.equal(plain(filterBanner("done", { kind: "area", tasks: 0, groups: 0, total: 0 }, t)), "No task is done.");
 });
 
-test("while searching, the filter banner counts what the search found", () => {
+test("while searching, the filter banner says the list is the filter and the search together (Task-A01-48)", () => {
   assert.equal(
-    plain(filterBanner("human", { kind: "area", tasks: 1, groups: 1, total: 1, searchHidden: 1 }, t)),
-    "**1 of them** needs a human (to check, to answer, to review), in 1 area. 1 more is listed below, hidden by the filter.",
+    plain(bothBanner("waiting", { kind: "area", query: "alm", tasks: 2, groups: 1, matches: 5 }, t)),
+    "Filter and search together: only tasks that are waiting and hold “alm” are listed, in 1 area. 3 more matches are hidden by the filter.",
   );
   assert.equal(
-    plain(filterBanner("done", { kind: "iteration", tasks: 2, groups: 2, total: 2, searchHidden: 0 }, t)),
-    "**2 of them** are done, in 2 iterations.",
+    plain(bothBanner("done", { kind: "iteration", query: "x", tasks: 2, groups: 2, matches: 3 }, t)),
+    "Filter and search together: only tasks that are done and hold “x” are listed, in 2 iterations. 1 more match is hidden by the filter.",
   );
   assert.equal(
-    plain(filterBanner("blocked", { kind: "area", tasks: 0, groups: 0, total: 0, searchHidden: 3 }, t)),
-    "None of them is blocked: they are listed below, hidden by the filter.",
+    plain(bothBanner("ready", { kind: "area", query: "x", tasks: 4, groups: 3, matches: 4 }, t)),
+    "Filter and search together: only tasks that are ready and hold “x” are listed, in 3 areas.",
   );
+  assert.equal(
+    plain(bothBanner("blocked", { kind: "area", query: "alm", tasks: 0, groups: 0, matches: 3 }, t)),
+    "None of the tasks found for “alm” is blocked. All 3 matches are hidden by the filter.",
+  );
+  assert.equal(plain(bothBanner("blocked", { kind: "area", query: "alm", tasks: 0, groups: 0, matches: 1 }, t)), "None of the tasks found for “alm” is blocked. The 1 match is hidden by the filter.");
+  // Nothing found at all: "Nothing found" says so, not the banner; no filter: no filter banner.
+  assert.deepEqual(bothBanner("blocked", { kind: "area", query: "zzz", tasks: 0, groups: 0, matches: 0 }, t), []);
+  assert.deepEqual(bothBanner("all", { kind: "area", query: "alm", tasks: 2, groups: 1, matches: 2 }, t), []);
+});
+
+test("filter and search narrow the task list together; clearing either falls back to the other (Task-A01-48)", () => {
+  const a = task({ id: "A-1", title: "alm search", state: "waiting" });
+  const b = task({ id: "A-2", title: "alm list", state: "done" });
+  const c = task({ id: "B-1", title: "other", state: "waiting", area: "B" });
+  const d = task({ id: "B-2", title: "alm too", state: "done", area: "B" });
+  const groups = [
+    { key: "a-A", tasks: [a, b] },
+    { key: "a-B", tasks: [c, d] },
+  ];
+  const holds = (x: Task) => x.title.includes("alm");
+  const search = <G extends { tasks: Task[] }>(gs: G[]) => gs.map((g) => ({ ...g, tasks: g.tasks.filter(holds) })).filter((g) => g.tasks.length > 0);
+  const matches = 3;
+  // Both on: only A-1 (waiting and holds "alm"); area B, with none, is left out.
+  const filtered = filterGroups(groups, "waiting");
+  const found = search(filtered);
+  assert.deepEqual(found.map((g) => g.tasks.map((x) => x.id)), [["A-1"]]);
+  const both = taskListBanners({ kind: "area", filter: "waiting", query: " alm ", groups, filtered, found, matches }, t);
+  assert.equal(plain(both.search), "**1 task** found for “alm” with the “Waiting” filter on.");
+  assert.equal(
+    plain(both.filter),
+    "Filter and search together: only tasks that are waiting and hold “alm” are listed, in 1 area. 2 more matches are hidden by the filter.",
+  );
+  // The search cleared: the filter banner alone.
+  const filterOnly = taskListBanners({ kind: "area", filter: "waiting", query: "", groups, filtered, found: filtered, matches: 0 }, t);
+  assert.deepEqual(filterOnly.search, []);
+  assert.equal(plain(filterOnly.filter), "**2 tasks** are waiting, in 2 areas.");
+  // The filter off: the search banner alone, counting every match.
+  const searchOnly = taskListBanners({ kind: "area", filter: "all", query: "alm", groups, filtered: groups, found: search(groups), matches }, t);
+  assert.equal(plain(searchOnly.search), "**3 tasks** found for “alm”.");
+  assert.deepEqual(searchOnly.filter, []);
+  // Every match hidden by the filter: no search banner, the filter banner says why.
+  const none = taskListBanners({ kind: "area", filter: "blocked", query: "alm", groups, filtered: [], found: [], matches }, t);
+  assert.deepEqual(none.search, []);
+  assert.equal(plain(none.filter), "None of the tasks found for “alm” is blocked. All 3 matches are hidden by the filter.");
 });
 
 test("the search banner says how much was found", () => {
   assert.equal(plain(searchBanner("task", 2, "alm", t)), "**2 tasks** found for “alm”.");
   assert.equal(plain(searchBanner("handoff", 1, "alm", t)), "**1 handoff** found for “alm”.");
+  assert.equal(plain(searchBanner("handoff", 2, "alm", t, "In progress")), "**2 handoffs** found for “alm” with the “In progress” filter on.");
 });

@@ -10,7 +10,7 @@ import type { Messenger } from "./messenger";
 import { filterHandoffs, localTime, writers } from "./handoffFlow";
 import { handoffMatches, snippet } from "./searchFlow";
 import { Highlight, ListBanners, Marked } from "./Search";
-import { filterBanner, filterGroups, handoffGroups, searchBanner, taskCount, type StateFilter } from "./stopFlow";
+import { filterBanner, filterGroups, filterName, handoffGroups, searchBanner, taskCount, type StateFilter } from "./stopFlow";
 import { isProblem } from "./types";
 import type { Handoff, HandoffSettings, Task } from "./types";
 
@@ -69,7 +69,12 @@ export function HandoffsView({
   const kept = filterGroups(handoffGroups(listed, tasks), stateFilter);
   const keptFiles = new Set(kept.map((g) => g.file));
   const shown = stateFilter === "all" ? listed : listed.filter((h) => keptFiles.has(h.file));
-  const searchWords = searching && listed.length > 0 ? searchBanner("handoff", listed.length, terms.join(" "), t) : [];
+  // Task-A01-48: under a filter, the search banner counts the handoffs the filter and the search
+  // keep together, and says the filter is on.
+  const searchWords =
+    searching && shown.length > 0
+      ? searchBanner("handoff", shown.length, terms.join(" "), t, stateFilter === "all" ? undefined : filterName(stateFilter, t))
+      : [];
   const filterWords =
     listed.length > 0 ? filterBanner(stateFilter, { kind: "handoff", tasks: taskCount(kept), groups: kept.length, total: listed.length }, t) : [];
   const shownFiles = shown.map((h) => h.file).join("\n");

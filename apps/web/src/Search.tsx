@@ -7,7 +7,7 @@ import { localTime } from "./handoffFlow";
 import { pieces, snippet, type Piece } from "./searchFlow";
 import { refreshText, type Refreshed } from "./refreshFlow";
 import type { Words } from "./stopFlow";
-import type { Handoff, Task } from "./types";
+import type { Handoff } from "./types";
 
 /** The shortcut that focuses the search box, as this computer writes it. */
 const SHORTCUT = /Mac/.test(navigator.userAgent) ? "⌘F" : "Ctrl+F";
@@ -122,73 +122,6 @@ export function HandoffHits({ handoffs, terms, onOpen }: { handoffs: Handoff[]; 
             </li>
           );
         })}
-      </ul>
-    </section>
-  );
-}
-
-/** Tasks a search finds that the state filter hides (Task-A01-42), set apart after the groups so a
- * filter left on cannot make a task look missing. Clicking one opens it in the task pane. */
-export function FilterHits({
-  tasks,
-  terms,
-  filter,
-  selectedId,
-  onSelect,
-  onShowAll,
-}: {
-  tasks: Task[];
-  terms: string[];
-  /** The filter's name, as the Show box words it. */
-  filter: string;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onShowAll: () => void;
-}) {
-  const { t } = useI18n();
-  const heading = t("search.hidden_by_filter", { filter });
-  return (
-    <section className="area search-hidden" aria-label={heading}>
-      {/* "3 found" is the title; under it, which filter hides them and Show all (approver, 2026-10-14). */}
-      <header className="area-head">
-        <h2>{t("search.handoff_count", { count: tasks.length })}</h2>
-        <span className="sub">
-          {heading}{" "}
-          <button type="button" className="link small" onClick={onShowAll}>
-            {t("filter.show_all")}
-          </button>
-        </span>
-      </header>
-      <ul className="tasks">
-        {tasks.map((task) => (
-          <li
-            key={task.id}
-            className={task.id === selectedId ? "task selected" : "task"}
-            tabIndex={0}
-            aria-current={task.id === selectedId ? "true" : undefined}
-            onClick={() => onSelect(task.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect(task.id);
-              }
-            }}
-          >
-            <span className="id">
-              <Highlight text={task.id} terms={terms} />
-            </span>
-            <span className="title">
-              <Highlight text={task.title} terms={terms} />
-            </span>
-            <span className="state-cell">
-              <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
-            </span>
-            <span className="meta">
-              {task.label && <span className="label">{task.label}</span>}
-              <DescriptionHit text={task.description ?? ""} terms={terms} />
-            </span>
-          </li>
-        ))}
       </ul>
     </section>
   );

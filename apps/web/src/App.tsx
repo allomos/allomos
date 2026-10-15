@@ -13,20 +13,16 @@ import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
-import { DescriptionHit, FilterHits, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
+import { DescriptionHit, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
   FILTER_STATES,
-  filterBanner,
   filterGroups,
-  filterName,
   hiddenByFilter,
   hiddenText,
-  keepState,
   readFilter,
-  searchBanner,
   stopText,
-  taskCount,
+  taskListBanners,
   toCheck,
   toReview,
   type Hidden,
@@ -1026,19 +1022,13 @@ function TaskbagView({
   const found = searchGroups(filtered, terms);
   const folded = collapsedWhileSearching(collapsed, found, terms);
   const foundHandoffs = searching ? handoffs.filter((h) => handoffMatches(h, terms)) : [];
-  // Task-A01-42: tasks the search finds that the state filter hides, shown apart after the groups.
-  const hiddenHits = searching && stateFilter !== "all" && box ? box.tasks.filter((task) => !keepState(stateFilter, task) && taskMatches(task, terms)) : [];
-  // Task-A01-44: the banners under the tabs, the search's on top and the filter's under it.
-  const kind = groupBy === "iteration" ? "iteration" : "area";
-  const foundCount = searching && box ? box.tasks.filter((task) => taskMatches(task, terms)).length : 0;
-  const searchWords = foundCount > 0 ? searchBanner("task", foundCount, query.trim(), t) : [];
-  const filterWords = !box
-    ? []
-    : searching
-      ? found.length > 0 || hiddenHits.length > 0
-        ? filterBanner(stateFilter, { kind, tasks: taskCount(found), groups: found.length, total: found.length, searchHidden: hiddenHits.length }, t)
-        : []
-      : filterBanner(stateFilter, { kind, tasks: taskCount(filtered), groups: filtered.length, total: groups.length }, t);
+  // Task-A01-48: with a filter on, a search lists only the tasks passing both (the search narrows
+  // `filtered`, not the whole list); tasks it finds that the filter hides are only counted.
+  const matches = searching && box ? box.tasks.filter((task) => taskMatches(task, terms)).length : 0;
+  // Task-A01-44, A01-48: the banners under the tabs, the search's on top and the filter's under it.
+  const banners = box
+    ? taskListBanners({ kind: groupBy === "iteration" ? "iteration" : "area", filter: stateFilter, query: searching ? query : "", groups, filtered, found, matches }, t)
+    : { search: [], filter: [] };
   // Nothing matches the filter: only the banner shows (Task-A01-44).
   const nothingShown = !searching && stateFilter !== "all" && filtered.length === 0;
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
@@ -1287,7 +1277,7 @@ function TaskbagView({
               />
             ) : (
             <div className="areas">
-              <ListBanners search={searchWords} filter={filterWords} onShowAll={() => chooseFilter("all")} />
+              <ListBanners search={banners.search} filter={banners.filter} onShowAll={() => chooseFilter("all")} />
               {refreshLine}
               {!searching && !nothingShown && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
@@ -1325,16 +1315,6 @@ function TaskbagView({
               {!searching && groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
                 <p className="muted">{t("box.empty")}</p>
               )}
-              {hiddenHits.length > 0 && (
-                <FilterHits
-                  tasks={hiddenHits}
-                  terms={terms}
-                  filter={filterName(stateFilter, t)}
-                  selectedId={selectedId}
-                  onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
-                  onShowAll={() => chooseFilter("all")}
-                />
-              )}
               {/* Task-A01-36: handoffs the search found, after the tasks; or that nothing was found. */}
               {searching && (
                 <HandoffHits
@@ -1347,7 +1327,8 @@ function TaskbagView({
                   }}
                 />
               )}
-              {searching && found.length === 0 && foundHandoffs.length === 0 && hiddenHits.length === 0 && (
+              {/* Matches the filter hides are not "nothing": the filter banner says so (Task-A01-48). */}
+              {searching && matches === 0 && foundHandoffs.length === 0 && (
                 <p className="muted search-none" role="status">
                   {t("search.nothing", { query: query.trim() })}
                 </p>
