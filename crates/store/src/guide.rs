@@ -219,8 +219,10 @@ About Allomos:
   ja and zh-CN, otherwise in English with a line asking you to translate it.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
   folder, or where `--taskbag` says.
-- `alm migrate`: when `alm` says the taskbag is in an older format, the steps for updating it;
-  follow them. `alm migrate --finish` ends the update once `alm list --json` reports no issues.
+- `alm move-in [--language <code>]`: when `alm` says the taskbag was written by an older
+  Allomos (`taskbag_to_move_in`), the request for moving its tasks into a new taskbag, like
+  another task system; tell the person first. It changes nothing; the person confirms the plan
+  with `alm confirm`.
 ";
 
 const WORKFLOW: &str = "# How to work the tasks

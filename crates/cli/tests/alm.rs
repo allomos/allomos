@@ -179,7 +179,6 @@ fn work_one_task_from_claim_to_done() {
     let v = ok(&sub, &["--as", "agent-a", "done", "A01-01"]);
     assert_eq!(v["task"]["state"], "done");
     assert_eq!(v["warnings"], json!([]));
-    assert_eq!(v["task"]["finished_without_owner"], Value::Null);
 
     // The files say what the command said.
     let file = task_file(&repo, "A01-01");
@@ -1811,8 +1810,7 @@ fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
         &["next"][..],
         &["list"],
         &["claim", "A01-01", "--as", "a"],
-        &["migrate"],
-        &["migrate", "--finish"],
+        &["move-in"],
     ] {
         let v = refused(&repo, args, 4, "taskbag_newer");
         let message = v["error"]["message"].as_str().unwrap();
@@ -1849,7 +1847,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
     )
     .unwrap();
     fs::write(repo.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
-    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["migrate"]] {
+    for args in [&["next"][..], &["list"], &["show", "A01-01"], &["human"]] {
         let v = ok(&repo, args);
         assert_eq!(
             v["warnings"][0]["code"], "instructions_outdated",
@@ -1996,56 +1994,122 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
     );
 }
 
-#[test]
-fn migrate_on_a_current_taskbag_changes_nothing() {
-    let repo = filled();
-    let path = repo.join(".allomos/taskbag/project.json");
-    let before = fs::read_to_string(&path).unwrap();
-    let v = ok(&repo, &["migrate"]);
-    assert_eq!(
-        v["migrate"],
-        json!({ "from": "allomos/4", "to": "allomos/4", "needed": false })
-    );
-    assert!(v.get("prompt").is_none());
-    let v = ok(&repo, &["migrate", "--finish"]);
-    assert_eq!(
-        v["migrate"],
-        json!({ "from": "allomos/4", "to": "allomos/4", "changed": false })
-    );
-    assert_eq!(fs::read_to_string(&path).unwrap(), before);
+/// Every file under `dir`, with its contents, to show that nothing changed.
+fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut out: Vec<(PathBuf, Vec<u8>)> = walk(dir)
+        .into_iter()
+        .filter(|p| p.is_file())
+        .map(|p| {
+            let bytes = fs::read(&p).unwrap();
+            (p, bytes)
+        })
+        .collect();
+    out.sort();
+    out
 }
 
-/// The owner, 2026-10-14: `allomos/3` is the oldest format this Allomos updates.
 #[test]
-fn a_taskbag_on_version_2_is_too_old() {
+fn move_in_on_a_current_taskbag_changes_nothing() {
     let repo = filled();
-    set_format(&repo, "allomos/2");
-    let path = repo.join(".allomos/taskbag/project.json");
-    let before = fs::read_to_string(&path).unwrap();
-    for args in [
-        &["list"][..],
-        &["next"],
-        &["migrate"],
-        &["migrate", "--finish"],
-        &["claim", "A01-01", "--as", "a"],
-    ] {
-        let v = refused(&repo, args, 1, "taskbag_too_old");
-        assert_eq!(v["error"]["params"]["found"], "allomos/2");
-        assert_eq!(v["error"]["params"]["oldest"], "allomos/3");
+    let before = snapshot(&repo);
+    let v = ok(&repo, &["move-in"]);
+    assert_eq!(v["move_in"], json!({ "needed": false }));
+    assert!(v.get("request").is_none());
+    assert_eq!(snapshot(&repo), before);
+}
+
+/// Owner, 2026-10-15 (Task-A01-45): a taskbag from any older Allomos is moved in by an agent,
+/// like another task system. `alm` reads and changes nothing in it, says so on every command, and
+/// `alm move-in` prints the request.
+#[test]
+fn every_older_taskbag_is_to_be_moved_in() {
+    for n in 1..=3 {
+        let repo = filled();
+        fs::write(
+            repo.join("AGENTS.md"),
+            "## Tasks: Allomos (v2)\n\nalm next\n",
+        )
+        .unwrap();
+        set_format(&repo, &format!("allomos/{n}"));
+        let before = snapshot(&repo);
+        for args in [
+            &["list"][..],
+            &["next"],
+            &["show", "A01-01"],
+            &["claim", "A01-01", "--as", "a"],
+            &["add", "task", "--area", "A01", "--title", "x"],
+            &["labels", "a,b"],
+            &["rename", "label", "implemented", "built"],
+            &["handoff", "--as", "a"],
+            &["handoff-rules"],
+        ] {
+            let v = refused(&repo, args, 1, "taskbag_to_move_in");
+            assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
+            assert_eq!(v["error"]["params"]["current"], "allomos/4");
+            let message = v["error"]["message"].as_str().unwrap();
+            assert!(message.contains("Move the tasks in"), "{message}");
+            assert!(message.contains("`alm move-in`"), "{message}");
+        }
+        // The request, naming the folder it will be renamed to; still nothing changed.
+        let v = ok(&repo, &["move-in", "--language", "en"]);
+        let old = format!("taskbag-allomos-{n}");
+        assert_eq!(v["move_in"]["needed"], true);
+        assert_eq!(v["move_in"]["prepared"], false);
+        assert_eq!(v["move_in"]["from"], format!("allomos/{n}"));
+        let named = Path::new(v["move_in"]["old"].as_str().unwrap()).to_path_buf();
+        assert!(named.ends_with(format!(".allomos/{old}")), "{named:?}");
+        let request = v["request"].as_str().unwrap();
         assert!(
-            v["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("too old for this Allomos to update")
+            request.starts_with("Please move the tasks of a taskbag written by an older Allomos")
         );
+        assert!(request.contains(&named.display().to_string()), "{request}");
+        assert!(request.contains(" init --id "), "{request}");
+        assert!(request.contains("alm confirm --title"), "{request}");
+        for language in ["zh-CN", "ja"] {
+            let v = ok(&repo, &["move-in", "--language", language]);
+            assert_eq!(v["language"], language);
+        }
+        assert_eq!(snapshot(&repo), before, "allomos/{n}: nothing written");
+        // People see the code too.
+        let out = alm(&repo, &["list"]);
+        assert_eq!(out.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&out.stderr).contains("error [taskbag_to_move_in]"));
     }
-    assert_eq!(
-        fs::read_to_string(&path).unwrap(),
-        before,
-        "nothing written"
+}
+
+/// After the app's Move the tasks in…: the new taskbag works, and `alm move-in` prints the
+/// request for the old folder beside it until the first task is moved in.
+#[test]
+fn move_in_names_the_old_folder_beside_a_new_taskbag() {
+    let repo = filled();
+    set_format(&repo, "allomos/3");
+    let root = repo.join(".allomos/taskbag");
+    let old = repo.join(".allomos/taskbag-allomos-3");
+    fs::rename(&root, &old).unwrap();
+    ok(&repo, &["init", "--name", "Demo"]);
+    let v = ok(&repo, &["move-in", "--language", "en"]);
+    assert_eq!(v["move_in"]["prepared"], true);
+    let named = Path::new(v["move_in"]["old"].as_str().unwrap()).to_path_buf();
+    assert!(named.ends_with(".allomos/taskbag-allomos-3"), "{named:?}");
+    let request = v["request"].as_str().unwrap();
+    assert!(request.contains("Allomos renamed the old taskbag (format allomos/3;"));
+    assert!(!request.contains(" init --id "), "{request}");
+    // The agent moves the tasks with `alm`; the new taskbag takes them.
+    ok(&repo, &["add", "area", "A01", "Tracking"]);
+    ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "A01-01",
+            "--area",
+            "A01",
+            "--title",
+            "Open a taskbag",
+        ],
     );
-    let out = alm(&repo, &["list"]);
-    assert!(String::from_utf8_lossy(&out.stderr).contains("error [taskbag_too_old]"));
+    let v = ok(&repo, &["move-in"]);
+    assert_eq!(v["move_in"], json!({ "needed": false }));
 }
 
 #[test]
@@ -2146,7 +2210,6 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     let file = task_file(&repo, "A01-01");
     assert_eq!(file["without_human_check"], "card run, approver away");
     assert_eq!(file["label"], "locally verified", "the label stays");
-    assert!(file.get("finished_without_owner").is_none());
 
     // The steps, from a file, on the task already done; an empty file is refused.
     fs::write(repo.join("empty.md"), " \n").unwrap();
@@ -2922,260 +2985,6 @@ fn block_shows_blockers_and_next_only_tells() {
         .map(|e| e["command"].as_str().unwrap())
         .collect();
     assert_eq!(commands, ["unblock", "block", "block", "block", "add task"]);
-}
-
-/// The real 3 → 4 migration, through `alm migrate` and `--finish` (Task-A01-31).
-/// A task file as `allomos/3` wrote it: the note under its old name.
-fn with_old_note(repo: &Path, id: &str) {
-    let path = repo.join(format!(".allomos/taskbag/tasks/{id}/task.json"));
-    let text = fs::read_to_string(&path).unwrap();
-    assert!(text.contains("without_human_check"));
-    fs::write(
-        &path,
-        text.replace("without_human_check", "finished_without_owner"),
-    )
-    .unwrap();
-}
-
-/// The whole 3 → 4 migration through `alm` (A01-31 and A03-18 in one entry): waiting tasks stay
-/// waiting unless the agent moves one; the old default ladder's top step is renamed with
-/// `alm rename label`; the old note is moved with `alm done --without-human-check` (on a task
-/// another session holds) or cleared with `alm checked`; the finish is refused until no task
-/// carries the old name.
-#[test]
-fn migrate_from_3_to_4_blocked_state_and_human_check() {
-    let repo = filled();
-    ok(
-        &repo,
-        &[
-            "labels",
-            "implemented,locally verified,deployed and verified,owner verified",
-        ],
-    );
-    ok(
-        &repo,
-        &["wait", "A01-01", "--on", "the approver approves the card"],
-    );
-    ok(
-        &repo,
-        &["wait", "A01-02", "--on", "A01-01 must be finished first"],
-    );
-    // Two finished tasks with the old note: one below the top, held by its session; one checked.
-    ok(
-        &repo,
-        &["add", "task", "A02-02", "--area", "A02", "--title", "Plot"],
-    );
-    ok(&repo, &["--as", "worker", "claim", "A02-01"]);
-    ok(
-        &repo,
-        &["--as", "worker", "label", "A02-01", "locally verified"],
-    );
-    ok(
-        &repo,
-        &[
-            "--as",
-            "worker",
-            "done",
-            "A02-01",
-            "--without-human-check",
-            "loop run",
-        ],
-    );
-    ok(&repo, &["--as", "worker", "claim", "A02-02"]);
-    ok(
-        &repo,
-        &[
-            "--as",
-            "worker",
-            "done",
-            "A02-02",
-            "--without-human-check",
-            "card run",
-        ],
-    );
-    ok(
-        &repo,
-        &["--as", "worker", "label", "A02-02", "locally verified"],
-    );
-    with_old_note(&repo, "A02-01");
-    with_old_note(&repo, "A02-02");
-    // The approver checked A02-02 back then: its label was raised and the note stayed.
-    let path = repo.join(".allomos/taskbag/tasks/A02-02/task.json");
-    let text = fs::read_to_string(&path).unwrap();
-    fs::write(&path, text.replace("locally verified", "owner verified")).unwrap();
-    set_format(&repo, "allomos/3");
-    let before = task_file(&repo, "A01-01");
-
-    let v = ok(&repo, &["migrate", "--language", "en"]);
-    assert_eq!(
-        v["migrate"],
-        json!({ "from": "allomos/3", "to": "allomos/4", "needed": true })
-    );
-    let prompt = v["prompt"].as_str().unwrap();
-    assert!(prompt.contains("allomos/3 → allomos/4"), "{prompt}");
-    assert!(prompt.contains("stays `waiting`"), "{prompt}");
-    assert!(
-        prompt.contains(
-            "`alm block`, `alm wait`, `alm needs`, `alm rename label`, `alm done`, `alm checked`"
-        ),
-        "{prompt}"
-    );
-    assert!(prompt.contains("[A03-18"), "{prompt}");
-    assert!(
-        prompt.contains("show the person the whole ladder"),
-        "{prompt}"
-    );
-    assert!(prompt.contains("never guess"), "{prompt}");
-    assert!(
-        !prompt.contains("is added before version 4 is merged"),
-        "{prompt}"
-    );
-    for (language, word) in [("zh-CN", "人工检查"), ("ja", "人による確認")] {
-        let v = ok(&repo, &["migrate", "--language", language]);
-        let p = v["prompt"].as_str().unwrap();
-        assert!(p.contains("A01-31") && p.contains("A03-18"), "{language}");
-        assert!(p.contains(word), "{language}");
-    }
-    // Reading works mid-migration, and lists the old notes as To check and as issues.
-    let v = ok(&repo, &["human"]);
-    assert_eq!(v["to_check"].as_array().unwrap().len(), 2);
-    let issues: Vec<&Value> = v["issues"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|i| i["problem"]["code"] == "finished_without_owner_renamed")
-        .collect();
-    assert_eq!(issues.len(), 2, "{v}");
-    // Mid-migration: work is refused; the entry's commands work.
-    refused(&repo, &["--as", "b", "claim", "A01-02"], 1, "taskbag_older");
-    refused(
-        &repo,
-        &["--as", "m", "migrate", "--finish"],
-        1,
-        "migration_unfinished",
-    );
-    let v = ok(&repo, &["--as", "m", "block", "A01-02", "--by", "A01-01"]);
-    // Mid-update, a change prints no Git commands of its own: the update is committed as one
-    // commit once `alm migrate --finish` has succeeded (decision 0017, row 14).
-    assert_eq!(v["git_commands"], json!([]), "{v}");
-    assert!(
-        v["git_instruction"]
-            .as_str()
-            .unwrap()
-            .contains("part of the taskbag's update"),
-        "{v}"
-    );
-    // The person answered the plan: rename the top step; move one note, clear the other.
-    ok(
-        &repo,
-        &[
-            "--as",
-            "m",
-            "rename",
-            "label",
-            "owner verified",
-            "human verified",
-        ],
-    );
-    ok(
-        &repo,
-        &[
-            "--as",
-            "m",
-            "done",
-            "A02-01",
-            "--without-human-check",
-            "loop run",
-        ],
-    );
-    ok(&repo, &["--as", "m", "checked", "A02-02"]);
-    let v = ok(&repo, &["--as", "m", "migrate", "--finish"]);
-    assert_eq!(
-        v["migrate"],
-        json!({ "from": "allomos/3", "to": "allomos/4", "changed": true })
-    );
-    // Commit only, the whole taskbag, no push.
-    let commands = v["git_commands"].as_array().unwrap();
-    assert_eq!(commands.len(), 2, "{v}");
-    assert!(commands[0].as_str().unwrap().ends_with(" add -- ."), "{v}");
-    assert!(
-        commands[1]
-            .as_str()
-            .unwrap()
-            .ends_with(" commit -m \"alm: migrate the taskbag to allomos/4\" -m \"Agent: m\" -- ."),
-        "{v}"
-    );
-    assert!(
-        v["git_instruction"]
-            .as_str()
-            .unwrap()
-            .contains("do not push")
-    );
-    assert_eq!(task_file(&repo, "A01-01"), before, "stays waiting");
-    assert_eq!(task_file(&repo, "A01-02")["state"], "blocked");
-    let moved = task_file(&repo, "A02-01");
-    assert_eq!(moved["without_human_check"], "loop run");
-    assert_eq!(moved["holder"], "worker", "the holder stays");
-    assert!(moved.get("finished_without_owner").is_none());
-    let checked = task_file(&repo, "A02-02");
-    assert_eq!(checked["label"], "human verified");
-    assert!(checked.get("finished_without_owner").is_none());
-    let project: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(project["labels"][3], "human verified");
-    let v = ok(&repo, &["human"]);
-    assert_eq!(v["to_check"][0]["id"], "A02-01");
-    assert_eq!(v["to_check"].as_array().unwrap().len(), 1);
-    ok(&repo, &["--as", "b", "claim", "A01-02"]);
-}
-
-/// A customised ladder is the project's own: `alm` renames nothing by itself, and the migration
-/// finishes with the ladder as it was once the notes are moved (the agent asks the person).
-#[test]
-fn migrate_from_3_to_4_leaves_a_customised_ladder_alone() {
-    let repo = filled();
-    ok(&repo, &["labels", "drafted,built,approved by Will,shipped"]);
-    ok(&repo, &["--as", "w", "claim", "A01-01"]);
-    ok(
-        &repo,
-        &[
-            "--as",
-            "w",
-            "done",
-            "A01-01",
-            "--without-human-check",
-            "loop run",
-        ],
-    );
-    with_old_note(&repo, "A01-01");
-    set_format(&repo, "allomos/3");
-    let prompt = ok(&repo, &["migrate", "--language", "en"])["prompt"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert!(prompt.contains("customised"), "{prompt}");
-    ok(
-        &repo,
-        &[
-            "--as",
-            "m",
-            "done",
-            "A01-01",
-            "--without-human-check",
-            "loop run",
-        ],
-    );
-    ok(&repo, &["--as", "m", "migrate", "--finish"]);
-    let project: Value = serde_json::from_str(
-        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(
-        project["labels"],
-        json!(["drafted", "built", "approved by Will", "shipped"])
-    );
 }
 
 /// A taskbag in format 4 is newer than an allomos/3 build: the older build says so

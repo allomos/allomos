@@ -124,7 +124,7 @@ export function App({ messenger }: { messenger: Messenger }) {
     [],
   );
   const [notices, setNotices] = useState<Note[]>([]);
-  // The update notice says the taskbag is older; the problem list then leaves it out.
+  // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
@@ -184,9 +184,9 @@ export function App({ messenger }: { messenger: Messenger }) {
         const state = await messenger.projectSetup(root);
         if (openedRef.current?.root === root) setSetup(state);
       } catch (e) {
-        // A newer, older or too old format is already in the problem list above the tasks
-        // (Task-A01-25, Task-A01-32).
-        if (isProblem(e) && ["taskbag_newer", "taskbag_older", "taskbag_too_old"].includes(e.code)) return;
+        // A newer format is already in the problem list above the tasks (Task-A01-25); an older
+        // Allomos's taskbag in the notice offering to move its tasks in (Task-A01-45).
+        if (isProblem(e) && ["taskbag_newer", "taskbag_to_move_in"].includes(e.code)) return;
         setError(errorNote(e));
       }
     },
@@ -469,12 +469,24 @@ export function App({ messenger }: { messenger: Messenger }) {
             {noteText(n)}
           </Banner>
         ))}
-        {/* Out of date with this Allomos (Task-A01-25): the agent updates it, from the Connect panel. */}
+        {/* Out of date with this Allomos (Task-A01-25), or an older Allomos's taskbag whose tasks
+            are to be moved in (Task-A01-45): an agent does it, from the Connect panel. */}
         {opened && (
           <VersionNotice
             messenger={messenger}
             root={opened.root}
             onUpdate={() => openWizard({ resume: { root: opened.root, at: 4 } })}
+            onMoveIn={async () => {
+              // Move the tasks in…: the old folder aside, a new taskbag in its place, then the
+              // Connect step, whose request asks the agent to move the tasks across.
+              try {
+                const fresh = await messenger.moveTaskbagAside(opened.root);
+                show(fresh, null);
+                openWizard({ resume: { root: fresh.root, at: 4 } });
+              } catch (e) {
+                setError(errorNote(e));
+              }
+            }}
             onOlder={setOlderShown}
           />
         )}
@@ -561,19 +573,26 @@ export function App({ messenger }: { messenger: Messenger }) {
 /** How often the update notice checks again: an agent's update shows without reopening. */
 const VERSION_CHECK_MS = 4000;
 
-/** "This taskbag uses an older format" or "Allomos's instructions are out of date", with
- * **Migrate the taskbag…** (owner, 2026-10-12; renamed 2026-10-14, Task-A01-32). Asked when the folder opens (every way of opening
- * one) and every few seconds while it is open. Allomos never updates the files itself. */
+/** "Allomos's instructions are out of date", with **Update the instructions…** (Task-A01-25), or
+ * "This taskbag was written by an older Allomos", with **Move the tasks in…** (Task-A01-45: the
+ * old folder is renamed aside, a new taskbag created, and an agent moves the tasks across). Asked
+ * when the folder opens (every way of opening one) and every few seconds while it is open.
+ * Allomos never changes the tasks or the instructions itself. */
 function VersionNotice({
   messenger,
   root,
   onUpdate,
+  onMoveIn,
   onOlder,
 }: {
   messenger: Messenger;
   root: string;
+  /** Open the Connect step (its request is the move-in or the update request). */
   onUpdate: () => void;
-  /** Whether this notice says the taskbag is older, so the problem list does not say it again. */
+  /** Rename the older taskbag aside and create a new one, then open the Connect step. */
+  onMoveIn: () => Promise<void>;
+  /** Whether this notice says the taskbag is from an older Allomos, so the problem list does not
+   * say it again. */
   onOlder: (shown: boolean) => void;
 }) {
   const { t } = useI18n();
@@ -593,18 +612,32 @@ function VersionNotice({
       window.clearInterval(timer);
     };
   }, [messenger, root]);
+  const [busy, setBusy] = useState(false);
   const notice = updateNotice(check);
-  const older = notice?.kind === "taskbag";
+  const older = notice?.kind === "move_in";
   useEffect(() => {
     onOlder(older);
     return () => onOlder(false);
   }, [older, onOlder]);
   if (!notice) return null;
+  const moveIn = () => {
+    setBusy(true);
+    void onMoveIn().finally(() => {
+      setBusy(false);
+      setCheck(null);
+    });
+  };
   return (
     <div className="banner update" role="status">
-      <span>{notice.kind === "taskbag" ? t("update.notice_taskbag") : t("update.notice_section", { files: notice.files })}</span>
-      <button type="button" className="primary" onClick={onUpdate}>
-        {t("update.button")}
+      <span>
+        {notice.kind === "move_in"
+          ? t("move.notice_old", { found: notice.found })
+          : notice.kind === "moving_in"
+            ? t("move.notice_waiting", { old: notice.old })
+            : t("update.notice_section", { files: notice.files })}
+      </span>
+      <button type="button" className="primary" onClick={notice.kind === "move_in" ? moveIn : onUpdate} disabled={busy}>
+        {t(notice.kind === "section" ? "update.button" : "move.button")}
       </button>
     </div>
   );
@@ -841,14 +874,14 @@ function TaskbagView({
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
-  /** The update notice already says the taskbag is older. */
+  /** The update notice already says the taskbag is from an older Allomos. */
   hideOlder: boolean;
   /** Reads the taskbag again now, after a change made in this window. */
   onReload: () => Promise<void>;
 }) {
   const { t, rich } = useI18n();
   const { taskbag: box, issues } = opened.loaded;
-  const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_older") : issues;
+  const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_to_move_in") : issues;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
   const choose = (g: GroupBy) => {
     setGroupBy(g);
@@ -1147,7 +1180,7 @@ function TaskbagView({
 
   return (
     <>
-      {/* The update notice above already says the taskbag is older (owner, 2026-10-12: once only). */}
+      {/* The update notice above already says the taskbag is from an older Allomos (owner, 2026-10-12: once only). */}
       {shownIssues.length > 0 && <Issues issues={shownIssues} onDownload={() => messenger.openDownloadPage().catch(onError)} />}
       {box ? (
         <>
@@ -1333,13 +1366,11 @@ function TaskbagView({
       ) : (
         <p className="muted">
           {t(
-            issues.some((i) => i.problem.code === "taskbag_older")
-              ? "box.needs_update"
+            issues.some((i) => i.problem.code === "taskbag_to_move_in")
+              ? "box.move_in"
               : issues.some((i) => i.problem.code === "taskbag_newer")
                 ? "box.needs_newer_app"
-                : issues.some((i) => i.problem.code === "taskbag_too_old")
-                  ? "box.too_old"
-                  : "box.no_project",
+                : "box.no_project",
           )}
         </p>
       )}

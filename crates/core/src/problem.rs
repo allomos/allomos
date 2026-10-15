@@ -61,18 +61,16 @@ problems! {
     WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of Allomos reads only \"{expected}\".";
     /// The taskbag was written by a newer Allomos (Task-A01-25). The person chooses what happens.
     TaskbagNewer { found, supported } => "taskbag_newer", "This taskbag is written in the format \"{found}\", newer than this Allomos understands (\"{supported}\"). Stop and let the person choose: update Allomos now, or let you go on working with the taskbag's files directly, from your own understanding of the newer format.";
-    /// The taskbag is in an older format that this Allomos updates: an agent is (or should be)
-    /// updating it with `alm migrate`, so only reading and the update's own commands work
-    /// (owner, 2026-10-14; Task-A01-32). `left` lists what `alm list --json` still reports.
-    TaskbagOlder { found, current, left } => "taskbag_older", "This taskbag is in the older format \"{found}\" and is being updated to \"{current}\". Until the update is finished, only reading commands and the update's own commands work, so this command was refused. Left to fix: {left}. Run `alm migrate` for the steps, and `alm migrate --finish` when nothing is left.";
-    /// The taskbag is older than the oldest format this Allomos updates (owner, 2026-10-14).
-    TaskbagTooOld { found, oldest } => "taskbag_too_old", "This taskbag is in the format \"{found}\", too old for this Allomos to update (the oldest it updates is \"{oldest}\"). Nothing was read or changed. Stop and tell the person.";
+    /// The taskbag was written by an older Allomos (any format below this one's). It is not read
+    /// or changed: an AI agent moves its tasks into a new taskbag, like another task system (owner,
+    /// 2026-10-15; Task-A01-45). The app renames the old folder aside and asks the agent;
+    /// `alm move-in` prints the same request.
+    TaskbagToMoveIn { found, current } => "taskbag_to_move_in", "This taskbag was written by an older Allomos (format \"{found}\"); this Allomos writes \"{current}\" and does not read or change older taskbags, so nothing was read or changed. Its tasks are moved into a new taskbag by an AI agent, like another task system: the person opens the project in the Allomos app and chooses Move the tasks in…, or you run `alm move-in` and follow the request it prints. Stop and tell the person.";
+    /// **Move the tasks in…** (or `alm move-in`) on a taskbag that is not from an older Allomos and
+    /// has no older taskbag waiting beside it (Task-A01-45).
+    NothingToMoveIn { path } => "nothing_to_move_in", "There is nothing to move in: the taskbag at {path} is not from an older Allomos, and no older taskbag is waiting beside it to be moved in.";
     /// A warning: Allomos's section in AGENTS.md / CLAUDE.md is out of date (Task-A01-25).
     InstructionsOutdated { files, current } => "instructions_outdated", "Allomos's section in {files} is out of date (this Allomos writes version {current}). Update it now: replace that section with the output of `alm brief`, keep the rest of the file, and commit only those files.";
-    /// This Allomos has no migration entry for a version on the way (Task-A01-32).
-    MigrationMissing { found, current } => "migration_missing", "This Allomos has no update steps from \"{found}\" to \"{current}\", so the update cannot be finished.";
-    /// `alm migrate --finish` while `alm list --json` still reports issues (owner, 2026-10-14).
-    MigrationUnfinished { left } => "migration_unfinished", "The update is not finished, so the new format was not written. Left to fix: {left}. Fix these with `alm`, check with `alm list --json`, then run `alm migrate --finish` again.";
     /// A handoff gate is not a percentage (Task-A03-06).
     InvalidPercent { value } => "invalid_percent", "\"{value}\" is not a percentage. Use a whole number from 0 to 100.";
     /// The handoff template may not be empty (Task-A03-06).
@@ -114,9 +112,6 @@ problems! {
     HumanCheckStepsEmpty => "human_check_steps_empty", "The human check steps are empty. Write what a person opens, clicks and should see, or leave out --steps.";
     /// `alm checked` on a task that is not done (Task-A03-18).
     NotDone { id, state } => "not_done", "Task {id} is {state}, not done: only a finished task is human-checked.";
-    /// A task still carries the note's name from before `allomos/4` (Task-A03-18): the guided
-    /// migration moves it with `alm`.
-    FinishedWithoutOwnerRenamed { id } => "finished_without_owner_renamed", "Task {id} carries `finished_without_owner`, the name used before allomos/4. If it has not been checked by a person since, move the note: `alm done {id} --without-human-check \"<the same note>\"`; if it has (its label is the top one), clear it: `alm checked {id}`.";
     /// `alm ai-decided` with no text (Task-A03-19).
     AiDecisionMissing => "ai_decision_missing", "Say what you decided and why, in one line: `alm ai-decided <id> \"<what and why>\"`.";
     /// `alm reviewed` (or the app's Reviewed button) on a task with no AI decisions to review (Task-A03-19).

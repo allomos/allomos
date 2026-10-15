@@ -45,8 +45,6 @@ export interface Task {
   without_human_check: string | null;
   /** How a person checks it, in Markdown (Task-A03-18). */
   human_check_steps: string | null;
-  /** The note's name before allomos/4; only on a taskbag being migrated. */
-  finished_without_owner?: string | null;
   description: string;
   /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
    * a field of task.json: worked out from the history and added when the taskbag is opened. */
@@ -232,8 +230,8 @@ export interface HandoffSettings {
 /** A taskbag's format compared with this Allomos's (crates/store/src/versions.rs). */
 export type FormatState =
   | { state: "current" }
+  /** Written by an older Allomos, in any older format: not read; its tasks are moved in (Task-A01-45). */
   | { state: "older"; found: string }
-  | { state: "too_old"; found: string; oldest: string }
   | { state: "newer"; found: string }
   | { state: "unknown" };
 
@@ -242,6 +240,10 @@ export interface VersionCheck {
   format_current: string;
   section_current: number;
   format: FormatState;
+  /** An older Allomos's taskbag whose tasks are still to be moved in (Task-A01-45): the taskbag
+   * itself (`prepared` false: Move the tasks in… renames it aside), or one already renamed aside
+   * to `old` beside a new taskbag that has no tasks yet. */
+  move_in: { old: string; found: string; prepared: boolean } | null;
   /** Instruction files holding Allomos's section; `version` null when its heading has none. */
   sections: { file: string; version: number | null }[];
 }

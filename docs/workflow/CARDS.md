@@ -57,7 +57,7 @@ Add an area by editing this table and the board in the same commit.
   1. **implemented** — code written, may not run end to end
   2. **locally verified** — the card's named checks pass locally, in the complete local app
   3. **deployed and verified** — running on the approved hosted target, hosted checks pass (only once a hosting target exists)
-  4. **human verified** — a person checked it by hand (the **human check**); the card may move to Done. Called **owner verified** until this project's taskbag is migrated to `allomos/4`.
+  4. **human verified** — a person checked it by hand (the **human check**); the card may move to Done. Called **owner verified** before this project's taskbag reached `allomos/4`.
 - Documentation or decision cards use **drafted** → **human verified** (the approver accepted it). This is one ladder for every card, set in the taskbag's `project.json` (owner, 2026-10-06).
 - Every open card names its **single next dependency** (what blocks the next label) and who it waits on.
 - Passing test counts support a label; they are never a label.

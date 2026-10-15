@@ -130,26 +130,24 @@ pub struct SetupState {
 pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
     let loaded = crate::load(root);
     let Some(bag) = loaded.taskbag else {
-        // An older taskbag is still connected: its project folder is known without reading it, so
-        // the Connect panel can hand the update to an agent (Task-A01-25). Tasks are assumed, so
-        // the wizard does not open by itself to look for them.
+        // A taskbag from an older Allomos is not read (Task-A01-45): its project folder is known
+        // without reading it, so the Connect panel can hand the move to an agent. Tasks are
+        // assumed, so the wizard does not open by itself to look for them; the window offers
+        // Move the tasks in… instead.
         if let crate::versions::FormatState::Older { .. } = crate::versions::format_state(root) {
-            if let Some(project) = crate::versions::connected_project(root) {
-                return Ok(SetupState {
-                    agents: agent_setup(&project),
-                    project_folder: Some(project),
-                    allomos_folder: allomos_folder(root),
-                    has_tasks: true,
-                });
-            }
+            let project = crate::versions::connected_project(root)
+                .unwrap_or_else(|| crate::versions::project_folder(root));
+            return Ok(SetupState {
+                agents: agent_setup(&project),
+                project_folder: Some(project),
+                allomos_folder: allomos_folder(root),
+                has_tasks: true,
+            });
         }
-        // A newer or too old format is said as itself, so the app words it in the person's
-        // language instead of quoting the English meant for agents.
-        if let Some(
-            problem @ (Problem::TaskbagNewer { .. }
-            | Problem::TaskbagOlder { .. }
-            | Problem::TaskbagTooOld { .. }),
-        ) = loaded.issues.first().map(|i| &i.problem)
+        // A newer format is said as itself, so the app words it in the person's language instead
+        // of quoting the English meant for agents.
+        if let Some(problem @ Problem::TaskbagNewer { .. }) =
+            loaded.issues.first().map(|i| &i.problem)
         {
             return Err(problem.clone());
         }

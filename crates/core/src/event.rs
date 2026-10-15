@@ -66,6 +66,7 @@ pub const TASK_FIELDS: &[&str] = &[
     "handoff_note",
     "without_human_check",
     "human_check_steps",
+    // The note's name before allomos/4: events recorded then still name it.
     "finished_without_owner",
     "description",
 ];
@@ -163,7 +164,6 @@ mod tests {
             handoff_note: None,
             without_human_check: None,
             human_check_steps: None,
-            finished_without_owner: None,
             description: String::new(),
         }
     }

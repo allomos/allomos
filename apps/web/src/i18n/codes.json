@@ -49,9 +49,6 @@
   ],
   "field_missing": [],
   "field_unknown": [],
-  "finished_without_owner_renamed": [
-    "id"
-  ],
   "folder_not_empty": [
     "path"
   ],
@@ -103,13 +100,6 @@
   "link_refused": [
     "link"
   ],
-  "migration_missing": [
-    "found",
-    "current"
-  ],
-  "migration_unfinished": [
-    "left"
-  ],
   "not_a_taskbag": [
     "path"
   ],
@@ -123,6 +113,9 @@
   ],
   "not_json": [
     "detail"
+  ],
+  "nothing_to_move_in": [
+    "path"
   ],
   "nothing_to_review": [
     "id"
@@ -167,14 +160,9 @@
   "taskbag_not_found": [
     "path"
   ],
-  "taskbag_older": [
+  "taskbag_to_move_in": [
     "found",
-    "current",
-    "left"
-  ],
-  "taskbag_too_old": [
-    "found",
-    "oldest"
+    "current"
   ],
   "taskbag_unreadable": [
     "path",

@@ -130,7 +130,6 @@ mod tests {
                 handoff_note: None,
                 without_human_check: None,
                 human_check_steps: None,
-                finished_without_owner: None,
                 description: String::new(),
             }],
         }

@@ -46,15 +46,14 @@ export function stopText(task: Task, tasks: readonly Task[], t: T): string | nul
   return null;
 }
 
-/** Finished without the human check and not checked since: "Not human-checked" (Task-A03-18).
- * A task still carrying the note's name from before allomos/4 counts too. */
+/** Finished without the human check and not checked since: "Not human-checked" (Task-A03-18). */
 export function toCheck(task: Task): boolean {
-  return task.state === "done" && !!(task.without_human_check || task.finished_without_owner);
+  return task.state === "done" && !!task.without_human_check;
 }
 
-/** Why it was finished without the human check (the note, under either name). */
+/** Why it was finished without the human check (the note). */
 export function humanCheckNote(task: Task): string {
-  return task.without_human_check ?? task.finished_without_owner ?? "";
+  return task.without_human_check ?? "";
 }
 
 /** An AI agent decided something here on its own, and nobody has reviewed it yet: "AI decided"
