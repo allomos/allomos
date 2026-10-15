@@ -10,6 +10,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use allomos_core::decision::Decision;
 use allomos_core::event::{self, Kind};
 use allomos_core::ops::{self, Outcome};
 use allomos_core::{Issue, Iteration, Problem, Project, State, Task, Taskbag};
@@ -167,6 +168,19 @@ enum Command {
     /// A person has checked a finished task: it gets the top label and leaves To check; the note
     /// and the steps stay in its history. Run it only when the person says so.
     Checked { id: String },
+    /// Record a decision you made on your own in a task (a routine choice: a name, a file layout,
+    /// a small detail with an obvious default): what you decided and why, in one line. It is kept
+    /// in the task's history; `alm human` lists it under To review: AI decisions until a person
+    /// has reviewed it.
+    #[command(name = "ai-decided")]
+    AiDecided {
+        id: String,
+        #[arg(value_name = "WHAT AND WHY")]
+        text: String,
+    },
+    /// A person has reviewed the task's AI decisions: they leave To review; the history keeps
+    /// them. Run it only when the person says so.
+    Reviewed { id: String },
     /// Show one task in full.
     Show { id: String },
     /// Show a task's history: every recorded change, newest first, with who and when.
@@ -438,6 +452,8 @@ impl Command {
             | Command::Unblock { id }
             | Command::Done { id, .. }
             | Command::Checked { id }
+            | Command::AiDecided { id, .. }
+            | Command::Reviewed { id }
             | Command::Release { id, .. }
             | Command::Needs { id, .. }
             | Command::Plan { id, .. }
@@ -529,6 +545,8 @@ impl Command {
             Command::Unblock { .. } => "unblock",
             Command::Done { .. } => "done",
             Command::Checked { .. } => "checked",
+            Command::AiDecided { .. } => "ai-decided",
+            Command::Reviewed { .. } => "reviewed",
             Command::Human { .. } => "human",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
@@ -1305,6 +1323,12 @@ fn human(
         .copied()
         .filter(|t| t.state == State::Waiting)
         .collect();
+    // Task-A03-19: tasks with AI decisions not reviewed yet, in any state.
+    let decisions = allomos_store::ai_decisions(root);
+    let to_review: Vec<(&Task, &Vec<Decision>)> = tasks
+        .iter()
+        .filter_map(|t| decisions.get(&t.id).map(|d| (*t, d)))
+        .collect();
     let mut text = String::new();
     text.push_str(&format!("To check ({})\n", to_check.len()));
     if to_check.is_empty() {
@@ -1340,8 +1364,24 @@ fn human(
             text.push_str(&format!("      {line}\n"));
         }
     }
+    text.push_str(&format!(
+        "\nTo review: AI decisions ({})\n",
+        to_review.len()
+    ));
+    if to_review.is_empty() {
+        text.push_str("  Nothing to review.\n");
+    }
+    for (t, d) in &to_review {
+        text.push_str(&format!("  {}\n", task_line(t)));
+        for line in decision_lines(d).lines() {
+            text.push_str(&format!("    {line}\n"));
+        }
+    }
     if !to_check.is_empty() {
         text.push_str("\nOnce a person has checked a task: `alm checked <id>`.\n");
+    }
+    if !to_review.is_empty() {
+        text.push_str("Once a person has reviewed a task's AI decisions: `alm reviewed <id>`.\n");
     }
     let list = |members: &[&Task]| {
         members
@@ -1349,10 +1389,29 @@ fn human(
             .map(|t| task_json_in(bag, t))
             .collect::<Vec<_>>()
     };
+    let review: Vec<Value> = to_review
+        .iter()
+        .map(|(t, d)| {
+            let mut v = task_json_in(bag, t);
+            v["ai_decisions"] = json!(d);
+            v
+        })
+        .collect();
     Ok(Done::new(
-        json!({ "taskbag": root, "to_check": list(&to_check), "to_answer": list(&to_answer) }),
+        json!({ "taskbag": root, "to_check": list(&to_check), "to_answer": list(&to_answer), "to_review": review }),
         text,
     ))
+}
+
+/// A task's AI decisions to review, one per line: "  - <text> (<by>, <at>)" (Task-A03-19).
+fn decision_lines(decisions: &[Decision]) -> String {
+    decisions
+        .iter()
+        .map(|d| match &d.by {
+            Some(by) => format!("  - {} ({by}, {})\n", d.text, d.at),
+            None => format!("  - {} ({})\n", d.text, d.at),
+        })
+        .collect()
 }
 
 /// One line about a task: ID, state, label, holder, title.
@@ -1975,6 +2034,13 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             if let Some(steps) = &task.human_check_steps {
                 text.push_str(&format!("human check steps:\n{}", indent(steps)));
             }
+            let decisions = allomos_store::ai_decisions(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            if !decisions.is_empty() {
+                text.push_str("AI decided (to review):\n");
+                text.push_str(&decision_lines(&decisions));
+            }
             let latest = handoff::latest_for(&root, &task.id);
             if let Some(h) = &latest {
                 text.push_str(&handoff_line(h));
@@ -1990,7 +2056,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "handoff": latest.as_ref().map(handoff_brief) }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "ai_decisions": decisions, "handoff": latest.as_ref().map(handoff_brief) }),
                 text,
             );
             done.issues = issues;
@@ -2172,6 +2238,50 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
             Ok(done)
         }
         Command::Checked { id } => change(cli, cwd, |bag| ops::checked(bag, id)),
+        Command::AiDecided { id, text } => {
+            let root = locate(cli, cwd)?;
+            let d = allomos_store::record_ai_decision(
+                &root,
+                Actor::alm(cli.holder.as_deref()),
+                lock_wait(),
+                id,
+                text,
+            )?;
+            let mut out = format!("{}\n", task_line(&d.task));
+            for x in &d.decisions {
+                out.push_str(&format!("  AI decided: {}\n", x.text));
+            }
+            out.push_str(&format!(
+                "{} AI decision(s) to review; `alm human` lists them for the person.\n",
+                d.pending.len()
+            ));
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task_json(&d.task), "decision": d.decisions.first(), "ai_decisions": d.pending }),
+                out,
+            );
+            done.issues = d.issues;
+            Ok(done)
+        }
+        Command::Reviewed { id } => {
+            let root = locate(cli, cwd)?;
+            let d = allomos_store::review_ai_decisions(
+                &root,
+                Actor::alm(cli.holder.as_deref()),
+                lock_wait(),
+                id,
+            )?;
+            let mut out = format!("{}\n", task_line(&d.task));
+            out.push_str(&format!("Reviewed {} AI decision(s):\n", d.decisions.len()));
+            for x in &d.decisions {
+                out.push_str(&format!("  {}\n", x.text));
+            }
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task_json(&d.task), "reviewed": d.decisions }),
+                out,
+            );
+            done.issues = d.issues;
+            Ok(done)
+        }
         Command::Human {
             iteration,
             area,

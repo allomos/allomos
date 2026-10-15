@@ -34,6 +34,8 @@ struct Opened {
     loaded: Loaded,
     /// A `README-allomos.md` was just written next to `.allomos/`.
     readme_added: bool,
+    /// Each task's AI decisions not reviewed yet, by task ID (Task-A03-19), from the history.
+    ai_decisions: std::collections::BTreeMap<String, Vec<allomos_core::decision::Decision>>,
 }
 
 /// The folder named on the command line: the first argument that is not an option.
@@ -94,6 +96,7 @@ fn inspect_folder(path: PathBuf) -> FolderInfo {
 fn open_taskbag(root: PathBuf) -> Opened {
     Opened {
         loaded: load(&root),
+        ai_decisions: allomos_store::ai_decisions(&root),
         root,
         readme_added: false,
     }
@@ -125,6 +128,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         .unwrap_or(false);
     Ok(Opened {
         loaded: load(&root),
+        ai_decisions: Default::default(),
         root,
         readme_added,
     })
@@ -240,6 +244,18 @@ fn edit_task_as(
         allomos_core::ops::edit(bag, id, actor.by, edit)
     })
     .map(|c| c.task)
+}
+
+/// The person has reviewed task `id`'s AI decisions (Task-A03-19): the same change as
+/// `alm reviewed`, made as the person's saved name.
+#[tauri::command]
+fn review_ai_decisions(root: PathBuf, id: String) -> Result<(), Problem> {
+    review_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
+}
+
+fn review_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Problem> {
+    let actor = app_actor(name)?;
+    allomos_store::review_ai_decisions(root, actor, LOCK_WAIT, id).map(|_| ())
 }
 
 #[tauri::command]
@@ -1247,6 +1263,7 @@ pub fn run() {
             owner_name,
             save_owner_name,
             edit_task,
+            review_ai_decisions,
             next_ids,
             add_area,
             add_iteration,
@@ -1560,6 +1577,36 @@ mod tests {
                 id: "A01-01".into(),
                 holder: "claude/x".into()
             })
+        );
+
+        // Task-A03-19: the agent's decision shows when the taskbag opens; the Reviewed button
+        // needs the person's name, even on a task an agent holds, and takes it away.
+        assert_eq!(
+            review_as(&root, Some("Will"), "A01-01"),
+            Err(Problem::NothingToReview {
+                id: "A01-01".into()
+            })
+        );
+        allomos_store::record_ai_decision(
+            &root,
+            allomos_store::Actor::alm(Some("claude/x")),
+            LOCK_WAIT,
+            "A01-01",
+            "Names: alm note",
+        )
+        .unwrap();
+        let opened = open_taskbag(root.clone());
+        assert_eq!(opened.ai_decisions["A01-01"][0].text, "Names: alm note");
+        assert_eq!(
+            review_as(&root, None, "A01-01"),
+            Err(Problem::HolderMissing)
+        );
+        review_as(&root, Some("Will"), "A01-01").unwrap();
+        assert!(open_taskbag(root.clone()).ai_decisions.is_empty());
+        let e = &allomos_store::events::history(&root, "A01-01").events[0];
+        assert_eq!(
+            (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
+            (Some("Will"), "app", "reviewed")
         );
         std::fs::remove_dir_all(dir).unwrap();
     }

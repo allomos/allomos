@@ -14,12 +14,12 @@ import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { DescriptionHit, FilterHits, HandoffHits, Highlight, SearchBox, isSearchShortcut } from "./Search";
-import { FILTER_STATES, filterName, hiddenByFilter, hiddenText, keepState, readFilter, stopText, toCheck, type Hidden, type StateFilter } from "./stopFlow";
+import { FILTER_STATES, filterName, hiddenByFilter, hiddenText, keepState, readFilter, stopText, toCheck, toReview, type Hidden, type StateFilter } from "./stopFlow";
 import { useFold } from "./useFold";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
 import { keepListed, noteOpened, parseRecentInfo, type RecentInfoMap } from "./recentFlow";
-import { HumanCheckBadge, TaskPane } from "./TaskPane";
+import { AiDecidedBadge, HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import type { Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
@@ -1028,6 +1028,10 @@ function TaskbagView({
     await messenger.addIterationAndPlan(opened.root, id, iteration);
     await onReload().catch(() => undefined);
   };
+  const reviewDecisions = async (id: string) => {
+    await messenger.reviewAiDecisions(opened.root, id);
+    await onReload().catch(() => undefined);
+  };
 
   // New tasks, areas and iterations (Task-A01-19): one form open at a time, with the next free IDs
   // suggested, read again whenever the taskbag reloads.
@@ -1279,6 +1283,7 @@ function TaskbagView({
                 ownerName={ownerName}
                 onSaveName={saveOwnerName}
                 onEdit={(edit) => editTask(selected.id, edit)}
+                onReview={() => reviewDecisions(selected.id)}
                 nextIterationId={nextIds?.iteration ?? null}
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 onAllHandoffs={() => {
@@ -1482,6 +1487,7 @@ function TaskGroup({
                 </span>
                 <span className="state-cell">
                   {toCheck(task) && <HumanCheckBadge task={task} />}
+                  {toReview(task) && <AiDecidedBadge task={task} />}
                   <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
                 </span>
                 <span className="meta">

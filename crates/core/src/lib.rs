@@ -4,6 +4,7 @@
 //! that describes them. It never touches the disk: callers hand it file names and
 //! file contents, and get back typed values plus a list of [`Issue`]s.
 
+pub mod decision;
 pub mod event;
 mod model;
 pub mod ops;

@@ -2,6 +2,7 @@
   "agent_not_found": [
     "agent"
   ],
+  "ai_decision_missing": [],
   "area_name_missing": [],
   "area_not_empty": [
     "id",
@@ -122,6 +123,9 @@
   ],
   "not_json": [
     "detail"
+  ],
+  "nothing_to_review": [
+    "id"
   ],
   "open_failed": [
     "path",

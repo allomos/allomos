@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
+import { withDecisions } from "./stopFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, IterationChange, NextIds } from "./types";
 
 export interface Messenger {
@@ -95,6 +96,11 @@ export interface Messenger {
    * the same Problem `alm` gives, and then nothing was changed.
    */
   editTask(root: string, id: string, edit: Edit): Promise<Task>;
+  /**
+   * The person has reviewed task `id`'s AI decisions (Task-A03-19), like `alm reviewed`: one
+   * `reviewed` event under the lock. Rejects with a Problem (`nothing_to_review`, `holder_missing`).
+   */
+  reviewAiDecisions(root: string, id: string): Promise<void>;
   /** The IDs the New forms suggest: the next free area, iteration, and task in each area (Task-A01-19). */
   nextIds(root: string): Promise<NextIds>;
   /**
@@ -164,7 +170,7 @@ export const desktopMessenger: Messenger = {
     return typeof picked === "string" ? picked : null;
   },
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
-  openTaskbag: (root) => invoke<Opened>("open_taskbag", { root }),
+  openTaskbag: (root) => invoke<Opened>("open_taskbag", { root }).then(withDecisions),
   taskbagStamp: (root) => invoke<string>("taskbag_stamp", { root }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
@@ -211,6 +217,7 @@ export const desktopMessenger: Messenger = {
   ownerName: () => invoke<string | null>("owner_name"),
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
   editTask: (root, id, edit) => invoke<Task>("edit_task", { root, id, edit }),
+  reviewAiDecisions: (root, id) => invoke<void>("review_ai_decisions", { root, id }),
   nextIds: (root) => invoke<NextIds>("next_ids", { root }),
   addArea: (root, id, name) => invoke<Area>("add_area", { root, id, name }),
   addIteration: (root, iteration) => invoke<Iteration>("add_iteration", { root, iteration }),

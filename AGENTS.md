@@ -40,7 +40,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v7)
+## Tasks: Allomos (v8)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -60,8 +60,13 @@ the project notes (below) and your own handoff file.
   In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
   may finish below it with `alm done <id> --without-human-check "<why, which run>"
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
-- Needs a human: `alm human` lists the tasks to check and to answer. When the person says they
-  checked one: `alm checked <id>`.
+- Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
+  says they checked one: `alm checked <id>`.
+- Routine choices inside a task (a name, a file layout, a small detail with an obvious default,
+  anything cheap to undo) are yours: decide, carry on, and record each one with
+  `alm ai-decided <id> "<what and why>"`, so the approver can review it later (`alm human`,
+  To review: AI decisions). When they say they reviewed them: `alm reviewed <id>`. What users
+  will see and get used to, or anything hard to undo, goes to the approver first.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
   `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>"`.
 - Change a task's title, description or handoff note: `alm title <id> "<title>"`,

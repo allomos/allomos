@@ -3,8 +3,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allBlockersDone, blockers, filterName, hiddenByFilter, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck } from "../src/stopFlow.ts";
-import type { Task } from "../src/types.ts";
+import { allBlockersDone, blockers, filterName, hiddenByFilter, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import type { Opened, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
 // The English words, with parameters filled in, as the interface shows them.
@@ -114,6 +114,36 @@ test("the filter's hidden tasks are counted by state, in the filter's order", ()
 
 test("the filter is named as the Show box words it", () => {
   assert.equal(filterName("backlog", t), "Backlog");
-  assert.equal(filterName("human", t), "Needs a human (to check, to answer)");
+  assert.equal(filterName("human", t), "Needs a human (to check, to answer, to review)");
   assert.equal(filterName("all", t), "All states");
+});
+
+test("AI decided: the decisions from the history go on their tasks, and the Needs a human filter keeps them (Task-A03-19)", () => {
+  const decision = { at: "2026-10-15T10:00:00Z", by: "claude/x", text: "Names: alm describe — match alm title" };
+  const opened: Opened = {
+    root: "/r",
+    readme_added: false,
+    loaded: {
+      taskbag: {
+        project: { format: "allomos/4", id: "P", name: "P", labels: ["human verified"] },
+        areas: [],
+        iterations: [],
+        tasks: [task({ id: "A01-01", state: "backlog" }), task({ id: "A01-02" })],
+      },
+      issues: [],
+    },
+    ai_decisions: { "A01-01": [decision] },
+  } as Opened;
+  const tasks = withDecisions(opened).loaded.taskbag!.tasks;
+  assert.deepEqual(tasks[0].ai_decisions, [decision]);
+  assert.equal(tasks[1].ai_decisions, undefined);
+  assert.equal(toReview(tasks[0]), true, "even a backlog task");
+  assert.equal(toReview(tasks[1]), false);
+  assert.equal(keepState("human", tasks[0]), true);
+  assert.equal(keepState("human", tasks[1]), false);
+  // Reviewed: the history no longer lists it, so the badge goes.
+  const after = withDecisions({ ...opened, ai_decisions: {} }).loaded.taskbag!.tasks;
+  assert.equal(toReview(after[0]), false);
+  assert.equal(withDecisions({ ...opened, ai_decisions: undefined }).loaded.taskbag!.tasks[0].ai_decisions, undefined);
+  assert.equal(t("task.ai_decided"), "AI decided");
 });

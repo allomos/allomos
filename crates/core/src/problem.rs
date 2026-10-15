@@ -117,6 +117,10 @@ problems! {
     /// A task still carries the note's name from before `allomos/4` (Task-A03-18): the guided
     /// migration moves it with `alm`.
     FinishedWithoutOwnerRenamed { id } => "finished_without_owner_renamed", "Task {id} carries `finished_without_owner`, the name used before allomos/4. If it has not been checked by a person since, move the note: `alm done {id} --without-human-check \"<the same note>\"`; if it has (its label is the top one), clear it: `alm checked {id}`.";
+    /// `alm ai-decided` with no text (Task-A03-19).
+    AiDecisionMissing => "ai_decision_missing", "Say what you decided and why, in one line: `alm ai-decided <id> \"<what and why>\"`.";
+    /// `alm reviewed` (or the app's Reviewed button) on a task with no AI decisions to review (Task-A03-19).
+    NothingToReview { id } => "nothing_to_review", "Task {id} has no AI decisions waiting for review.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";

@@ -3,7 +3,9 @@
 // checks each change by the same rule as its `alm` command, and a refusal is shown in its words.
 // A task finished without the human check shows "Not human-checked", its steps and a Checked
 // button, which works like `alm checked` (Task-A03-18). The iteration is chosen from a drop-down
-// whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39).
+// whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39). A task
+// with AI decisions nobody has reviewed shows "AI decided", the decisions and a Reviewed button,
+// like `alm reviewed` (Task-A03-19).
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -27,7 +29,7 @@ import {
   type EditField,
   type NewIterationDraft,
 } from "./editFlow";
-import { blockerText, blockers, humanCheckNote, stopText, toCheck } from "./stopFlow";
+import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
 import { isProblem, type Area, type Edit, type Handoff, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
@@ -45,6 +47,7 @@ export function TaskPane({
   ownerName,
   onSaveName,
   onEdit,
+  onReview,
   nextIterationId,
   onNewIteration,
 }: {
@@ -71,6 +74,8 @@ export function TaskPane({
   onSaveName: (name: string) => Promise<void>;
   /** Makes one change. Rejects with the Problem that refused it; then nothing changed. */
   onEdit: (edit: Edit) => Promise<void>;
+  /** Marks the task's AI decisions reviewed. Rejects with the Problem that refused it. */
+  onReview: () => Promise<void>;
   /** The ID "New…" will give, when known (the next free one). */
   nextIterationId: string | null;
   /** "New…": adds the iteration and plans this task in it. Rejects with the Problem that refused it; then nothing changed. */
@@ -83,14 +88,14 @@ export function TaskPane({
   const [created, setCreated] = useState<NewIterationDraft>(EMPTY_NEW_ITERATION);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  // The Checked button asked for the person's name first (asked once, like a change).
-  const [checking, setChecking] = useState(false);
+  // The Checked or Reviewed button asked for the person's name first (asked once, like a change).
+  const [asking, setAsking] = useState<"checked" | "reviewed" | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
   useEffect(() => {
     ref.current?.scrollTo?.({ top: 0 });
     setEditing(null);
-    setChecking(false);
+    setAsking(null);
     setError(null);
   }, [task.id]);
 
@@ -103,21 +108,23 @@ export function TaskPane({
   };
   const cancel = () => {
     setEditing(null);
-    setChecking(false);
+    setAsking(null);
     setError(null);
   };
-  /** Checked (Task-A03-18): top label, off To check; refused in Rust's words like any change. */
-  const markChecked = async () => {
+  /** Checked (Task-A03-18): top label, off To check. Reviewed (Task-A03-19): the AI decisions
+   * leave To review. Refused in Rust's words like any change. */
+  const mark = (which: "checked" | "reviewed") => (which === "checked" ? onEdit({ field: "checked" }) : onReview());
+  const markDone = async (which: "checked" | "reviewed") => {
     if (busy) return;
     if (!ownerName) {
       setEditing(null);
-      setChecking(true);
+      setAsking(which);
       return;
     }
     setBusy(true);
     try {
-      await onEdit({ field: "checked" });
-      setChecking(false);
+      await mark(which);
+      setAsking(null);
       setError(null);
     } catch (e) {
       say(e);
@@ -146,10 +153,10 @@ export function TaskPane({
     try {
       await onSaveName(name.trim());
       setError(null);
-      // Asked for by the Checked button: go on and mark it checked.
-      if (checking) {
-        await onEdit({ field: "checked" });
-        setChecking(false);
+      // Asked for by the Checked or Reviewed button: go on with it.
+      if (asking) {
+        await mark(asking);
+        setAsking(null);
       }
     } catch (e) {
       say(e);
@@ -421,15 +428,40 @@ export function TaskPane({
       {toCheck(task) && (
         <div className="pane-check">
           <HumanCheckBadge task={task} />
-          {checking && !ownerName ? (
+          {asking === "checked" && !ownerName ? (
             nameForm()
           ) : (
             <>
-              <button type="button" className="primary" onClick={() => void markChecked()} disabled={busy}>
+              <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
                 {t("pane.checked_button")}
               </button>
               <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
-              {error && !editing && <p className="banner error small">{error}</p>}
+              {error && !editing && asking !== "reviewed" && <p className="banner error small">{error}</p>}
+            </>
+          )}
+        </div>
+      )}
+      {toReview(task) && (
+        <div className="pane-check pane-review">
+          <AiDecidedBadge task={task} />
+          <h3>{t("pane.ai_decisions")}</h3>
+          <ul className="ai-decisions">
+            {(task.ai_decisions ?? []).map((d, i) => (
+              <li key={`${d.at}-${i}`}>
+                {d.text}{" "}
+                <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+              </li>
+            ))}
+          </ul>
+          {asking === "reviewed" && !ownerName ? (
+            nameForm()
+          ) : (
+            <>
+              <button type="button" className="primary" onClick={() => void markDone("reviewed")} disabled={busy}>
+                {t("pane.reviewed_button")}
+              </button>
+              <p className="muted small">{t("pane.reviewed_hint")}</p>
+              {error && !editing && asking === "reviewed" && <p className="banner error small">{error}</p>}
             </>
           )}
         </div>
@@ -485,8 +517,8 @@ export function TaskPane({
                   <span className="muted">
                     {localTime(e.at)} · {e.by || t("pane.history_someone")}
                   </span>
-                  {e.changes.map((c) => (
-                    <div key={c.field}>{changeLine(c, t)}</div>
+                  {e.changes.map((c, j) => (
+                    <div key={`${c.field}-${j}`}>{changeLine(c, t)}</div>
                   ))}
                 </li>
               ))}
@@ -506,6 +538,17 @@ export function HumanCheckBadge({ task }: { task: Task }) {
   return (
     <span className="badge to-check" title={t("task.not_human_checked_title", { why: humanCheckNote(task) })}>
       {t("task.not_human_checked")}
+    </span>
+  );
+}
+
+/** "AI decided" on a task with AI decisions nobody has reviewed yet (Task-A03-19): in the lists
+ * and the task pane; hovering says how many. */
+export function AiDecidedBadge({ task }: { task: Task }) {
+  const { t } = useI18n();
+  return (
+    <span className="badge ai-decided" title={t("task.ai_decided_title", { count: task.ai_decisions?.length ?? 0 })}>
+      {t("task.ai_decided")}
     </span>
   );
 }

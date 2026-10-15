@@ -19,6 +19,7 @@ const FIELD_KEYS: Record<string, Key> = {
   without_human_check: "pane.without_human_check",
   human_check_steps: "pane.human_check_steps",
   finished_without_owner: "pane.without_human_check",
+  ai_decision: "pane.ai_decision",
   description: "pane.description",
 };
 

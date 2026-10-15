@@ -32,7 +32,9 @@ use allomos_core::event::{Change, Kind};
 /// 6: `alm title`, `alm describe` and `alm note` change a task's text (Task-A01-37).
 /// 7: the project notes (`project-notes.md`): read them at the start, keep them true, and when to
 /// update them; every new piece of work gets its task (Task-A03-20).
-pub const SECTION_VERSION: u32 = 7;
+/// 8: routine choices are the agent's, each recorded with `alm ai-decided` for the approver to
+/// review; `alm reviewed` (Task-A03-19, owner rule A00-29).
+pub const SECTION_VERSION: u32 = 8;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
