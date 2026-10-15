@@ -523,24 +523,41 @@ fn delete_iteration(root: PathBuf, id: String) -> Result<(), Problem> {
     delete_iteration_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
 }
 
-/// Whether to offer **Install the alm command** (Task-A07-12): only in a built Mac app whose own
-/// `alm` is not the one Terminal finds, unless the person chose "Don't ask again".
+/// Whether to offer **Install the alm command** (Task-A07-12, A07-14): in a built app whose own
+/// `alm` is not the one Terminal finds (a Mac: through `/usr/local/bin`; Windows: first on PATH),
+/// unless the person chose "Don't ask again" for this same mismatch.
 #[tauri::command]
 async fn alm_command_status() -> alm_command::AlmStatus {
-    let bundled = alm_command::bundled();
-    if bundled.is_none() || allomos_store::alm_offer_dismissed() {
-        return alm_command::AlmStatus::default();
+    let dismissed = allomos_store::alm_offer_dismissed_for();
+    if cfg!(windows) {
+        let Some(own) = alm_command::windows_own() else {
+            return alm_command::AlmStatus::default();
+        };
+        let (terminal, system) = alm_command::windows_terminal();
+        return alm_command::decide(
+            Some(&own),
+            &alm_command::Place::Missing,
+            &terminal,
+            alm_command::Fix::UserPath { system },
+            dismissed.as_deref(),
+        );
     }
+    let Some(bundled) = alm_command::bundled() else {
+        return alm_command::AlmStatus::default();
+    };
     alm_command::decide(
-        bundled.as_deref(),
+        Some(&bundled),
         &alm_command::place(),
         &alm_command::terminal(),
-        false,
+        alm_command::Fix::Link,
+        dismissed.as_deref(),
     )
 }
 
-/// Link `/usr/local/bin/alm` to the app's own `alm`, asking for the Mac password. Only when the
-/// person clicks. Returns the status afterwards; `cancelled` when the password dialog was closed.
+/// Make the app's own `alm` the one Terminal finds, only when the person clicks: on a Mac, link
+/// `/usr/local/bin/alm` to it (asking for the Mac password); on Windows, put the app's folder
+/// first in the person's own PATH. Returns the status afterwards; `cancelled` when the password
+/// dialog was closed.
 #[derive(Serialize)]
 struct AlmInstalled {
     cancelled: bool,
@@ -549,6 +566,20 @@ struct AlmInstalled {
 
 #[tauri::command]
 async fn install_alm_command() -> Result<AlmInstalled, Problem> {
+    if cfg!(windows) {
+        let own = alm_command::windows_own().ok_or_else(|| Problem::WriteFailed {
+            path: "PATH".to_string(),
+            detail: "this Allomos carries no alm".to_string(),
+        })?;
+        alm_command::install_windows(&own).map_err(|detail| Problem::WriteFailed {
+            path: "PATH".to_string(),
+            detail,
+        })?;
+        return Ok(AlmInstalled {
+            cancelled: false,
+            status: alm_command_status().await,
+        });
+    }
     let bundled = alm_command::bundled().ok_or_else(|| Problem::WriteFailed {
         path: alm_command::LINK.to_string(),
         detail: "this Allomos carries no alm".to_string(),
@@ -563,10 +594,11 @@ async fn install_alm_command() -> Result<AlmInstalled, Problem> {
     })
 }
 
-/// "Don't ask again" for **Install the alm command**.
+/// "Don't ask again" for **Install the alm command**, for this mismatch only (the status's
+/// `mismatch`): when Terminal's `alm` changes, the app asks again (Task-A07-14).
 #[tauri::command]
-fn dismiss_alm_offer() {
-    let _ = allomos_store::dismiss_alm_offer();
+fn dismiss_alm_offer(mismatch: String) {
+    let _ = allomos_store::dismiss_alm_offer(&mismatch);
 }
 
 /// The computer's preferred languages, most preferred first (for example `["ja-JP", "en-JP"]`).

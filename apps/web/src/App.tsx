@@ -8,7 +8,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
-import { almOffer } from "./almOfferFlow";
+import { almDismissFor, almOffer } from "./almOfferFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
@@ -668,9 +668,10 @@ function VersionNotice({
   );
 }
 
-/** **Install the alm command** (Task-A07-12): in a built Mac app whose own `alm` is not the one
- * Terminal finds. Asked once when the window opens. Nothing is installed unless the person clicks;
- * "Don't ask again" is remembered, × hides it until the next start. */
+/** **Install the alm command** (Task-A07-12, A07-14): in a built app (Mac or Windows) whose own `alm`
+ * is not the one Terminal finds. Asked once when the window opens. Nothing is installed unless the
+ * person clicks; "Don't ask again" is remembered for this mismatch only (the app asks again when
+ * Terminal's `alm` changes), × hides it until the next start. */
 function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: unknown) => void }) {
   const { t } = useI18n();
   const [status, setStatus] = useState<AlmStatus | null>(null);
@@ -709,7 +710,7 @@ function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: u
       .finally(() => setBusy(false));
   };
   const dismiss = () => {
-    void messenger.dismissAlmOffer().catch(() => undefined);
+    void messenger.dismissAlmOffer(almDismissFor(status)).catch(() => undefined);
     setHidden(true);
   };
   return (
@@ -725,7 +726,7 @@ function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: u
       <button type="button" className="primary" onClick={install} disabled={busy}>
         {t(offer.button)}
       </button>
-      <button type="button" onClick={dismiss} disabled={busy}>
+      <button type="button" onClick={dismiss} disabled={busy} title={t("alm.dismiss_hint")}>
         {t("alm.dismiss")}
       </button>
       <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={() => setHidden(true)}>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { almOffer } from "../src/almOfferFlow.ts";
+import { almDismissFor, almOffer } from "../src/almOfferFlow.ts";
 
 const none = { offer: false, kind: null, own: null, found: null, leads_to: null, replaces_file: null, shadowed_by: null };
 const own = "/Applications/Allomos.app/Contents/MacOS/alm";
@@ -50,4 +50,12 @@ test("another alm: a real file it replaces and one found first are said too", ()
   );
   assert.deepEqual(o?.paths[0], { key: "alm.in_use", params: { found: "/opt/homebrew/bin/alm" } });
   assert.equal(o?.button, "alm.install");
+});
+
+test("Don't ask again sends back the mismatch the offer is about (Task-A07-14)", () => {
+  assert.equal(almDismissFor({ ...none, offer: true, kind: "development", mismatch: "/Users/me/.cargo/bin/alm" }), "/Users/me/.cargo/bin/alm");
+  assert.equal(almDismissFor({ ...none, offer: true, kind: "missing", mismatch: "" }), "");
+  // An older app's status had no mismatch: an empty one, as for no alm.
+  assert.equal(almDismissFor({ ...none, offer: true }), "");
+  assert.equal(almDismissFor(null), "");
 });

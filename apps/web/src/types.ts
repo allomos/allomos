@@ -277,7 +277,7 @@ export interface InstructionFiles {
   claude_md: boolean;
 }
 
-/** Whether to offer **Install the alm command** (apps/desktop/src-tauri/src/alm_command.rs, Task-A07-12, A07-15). */
+/** Whether to offer **Install the alm command** (apps/desktop/src-tauri/src/alm_command.rs, Task-A07-12, A07-14, A07-15). */
 export interface AlmStatus {
   offer: boolean;
   /** Which `alm` Terminal uses: none, one built from source, or another program. */
@@ -292,6 +292,8 @@ export interface AlmStatus {
   replaces_file: string | null;
   /** An `alm` Terminal finds first, which would still be used after installing. */
   shadowed_by: string | null;
+  /** What "Don't ask again" remembers: the path Terminal's `alm` leads to, empty when there is none (Task-A07-14). */
+  mismatch?: string | null;
 }
 
 export interface AlmInstalled {

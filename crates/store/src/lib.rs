@@ -44,7 +44,7 @@ pub use convert::{
 pub use events::Actor;
 pub use guide::{GUIDE_TOPICS, RUN_MODES_LANGUAGES, guide, run_modes};
 pub use settings::{
-    TaskLanguage, alm_offer_dismissed, dismiss_alm_offer, pick_ui_language, save_owner_name,
+    TaskLanguage, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language, save_owner_name,
     save_ui_language, saved_owner_name, saved_ui_language, settings_dir, task_language,
 };
 pub use setup::{
