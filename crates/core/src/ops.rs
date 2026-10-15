@@ -507,7 +507,6 @@ pub fn new_task(
         handoff_note: None,
         without_human_check: None,
         human_check_steps: None,
-        finished_without_owner: None,
         description,
     })
 }
@@ -703,8 +702,7 @@ pub fn unblock(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome,
 /// (Task-A03-18: `alm` asks, it does not refuse). What is not given stays as it was.
 ///
 /// On a task that is already done, only its human check is recorded, so the holder rule does not
-/// apply: a finished task's holder is history, and the migration to `allomos/4` moves the old note
-/// this way (Task-A03-18).
+/// apply: a finished task's holder is history (Task-A03-18).
 pub fn finish(
     taskbag: &Taskbag,
     id: &str,
@@ -732,7 +730,6 @@ pub fn finish(
             });
         }
         task.without_human_check = Some(note);
-        task.finished_without_owner = None;
     } else if steps.is_some() {
         return Err(Problem::WithoutHumanCheckMissing);
     }
@@ -741,12 +738,10 @@ pub fn finish(
     Ok(Outcome { task, warnings })
 }
 
-/// Clear what waits for the human check: the note, its steps, and the note's name before
-/// `allomos/4`. The task's history keeps them.
+/// Clear what waits for the human check: the note and its steps. The task's history keeps them.
 fn clear_human_check(task: &mut Task) {
     task.without_human_check = None;
     task.human_check_steps = None;
-    task.finished_without_owner = None;
 }
 
 /// A person has checked a finished task (Task-A03-18): it gets the top label of the ladder and
@@ -1620,20 +1615,23 @@ mod tests {
             .unwrap()
             .task;
         assert!(l.to_check());
-        // The note's name before allomos/4: moved by `done`, cleared by `checked`.
+        // `done` on a finished task records only its human check.
         let mut old = find_task(&s, "A01-01").unwrap();
         old.without_human_check = None;
         old.human_check_steps = None;
-        old.finished_without_owner = Some("loop run".into());
         put!(s, old);
-        assert!(find_task(&s, "A01-01").unwrap().to_check());
+        assert!(!find_task(&s, "A01-01").unwrap().to_check());
         let moved = finish(&s, "A01-01", None, Some("loop run"), None)
             .unwrap()
             .task;
-        assert_eq!(moved.finished_without_owner, None);
         assert_eq!(moved.without_human_check.as_deref(), Some("loop run"));
-        let cleared = checked(&s, "A01-01").unwrap().task;
-        assert_eq!(cleared.finished_without_owner, None);
+        assert!(
+            checked(&s, "A01-01")
+                .unwrap()
+                .task
+                .without_human_check
+                .is_none()
+        );
         // Through the app's edit: the same rule, recorded as `checked`.
         let (o, command) = edit(&s, "A01-01", Some("z"), &Edit::Checked).unwrap();
         assert_eq!(command, "checked");

@@ -595,13 +595,18 @@ fn connect_plan(
     taskbag: &Path,
 ) -> Vec<(String, String)> {
     let note = agents::shared_note(agents, language);
-    // Something is out of date (Task-A01-25): the first agent is asked to update it instead.
-    let update = versions::check_connected(taskbag).filter(|c| c.needs_update());
+    // Tasks from an older Allomos's taskbag to move in (Task-A01-45), or an out-of-date section
+    // (Task-A01-25): the first agent is asked to do that instead.
+    let check = versions::check_connected(taskbag);
+    let move_in = check.as_ref().and_then(|c| c.move_in.clone());
+    let update = check.filter(|c| !c.outdated_files().is_empty());
     agents
         .iter()
         .enumerate()
         .map(|(i, id)| {
-            let request = if let (0, Some(check)) = (i, &update) {
+            let request = if let (0, Some(m)) = (i, &move_in) {
+                allomos_store::agent_move_in_request_in(language, project, taskbag, m)
+            } else if let (0, Some(check)) = (i, &update) {
                 versions::agent_update_request_in(language, project, taskbag, check)
             } else if i == 0 {
                 agent_connect_request_in(language, project, taskbag)
@@ -685,6 +690,21 @@ async fn copy_text(text: String) -> Result<(), Problem> {
 #[tauri::command]
 fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
     versions::check_connected(&root)
+}
+
+/// **Move the tasks in…** (Task-A01-45): the taskbag at `root` was written by an older Allomos.
+/// Rename it aside (`taskbag-allomos-<n>`) and create a new, empty taskbag in its place, then load
+/// that; the Connect panel then asks the chosen agent to move the tasks across. Nothing in the
+/// old folder is changed.
+#[tauri::command]
+fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
+    versions::move_aside(&root)?;
+    Ok(Opened {
+        loaded: load(&root),
+        ai_decisions: Default::default(),
+        root,
+        readme_added: false,
+    })
 }
 
 /// The project's handoff rules (as written, and with the defaults filled in) and its template
@@ -1247,6 +1267,7 @@ pub fn run() {
             open_taskbag,
             taskbag_stamp,
             version_check,
+            move_taskbag_aside,
             taskbag_format,
             open_download_page,
             handoff_settings,
@@ -1394,6 +1415,75 @@ mod tests {
 
         // Renewed: the usual connect request again.
         std::fs::write(dir.join("AGENTS.md"), allomos_store::agent_section()).unwrap();
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
+        assert!(!version_check(taskbag).unwrap().needs_update());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Task-A01-45: an older Allomos's taskbag gets the move-in request, before and after the app
+    /// renames it aside; once the first task is moved in, the usual requests again.
+    #[test]
+    fn an_older_taskbag_gets_the_move_in_request() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-move-in-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let taskbag = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&taskbag, "p", "P").unwrap();
+        std::fs::write(dir.join("AGENTS.md"), allomos_store::agent_section()).unwrap();
+        let project = taskbag.join("project.json");
+        let text = std::fs::read_to_string(&project).unwrap();
+        std::fs::write(&project, text.replace(allomos_core::FORMAT, "allomos/2")).unwrap();
+
+        // Not renamed yet: the agent is asked to do it after the Go ahead.
+        let check = version_check(taskbag.clone()).unwrap();
+        assert!(!check.move_in.as_ref().unwrap().prepared);
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert!(plan[0].1.starts_with("Please move the tasks of a taskbag"));
+        assert!(plan[0].1.contains(" init --id "));
+        assert_eq!(manual_plan("en", &dir, &taskbag), plan[0].1);
+        // The wizard can reach the Connect step: the project folder is known without reading.
+        let setup = project_setup(taskbag.clone()).unwrap();
+        assert_eq!(setup.project_folder.as_deref(), Some(dir.as_path()));
+
+        // Move the tasks in…: the old folder aside, a new empty taskbag in its place.
+        let opened = move_taskbag_aside(taskbag.clone()).unwrap();
+        let bag = opened.loaded.taskbag.unwrap();
+        assert!(bag.tasks.is_empty());
+        let aside = dir.join(".allomos").join("taskbag-allomos-2");
+        assert_eq!(
+            std::fs::read_to_string(aside.join("project.json")).unwrap(),
+            text.replace(allomos_core::FORMAT, "allomos/2")
+        );
+        let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
+        assert!(
+            plan[0]
+                .1
+                .contains("Allomos renamed the old taskbag (format allomos/2;")
+        );
+        assert!(!plan[0].1.contains(" init --id "));
+        assert!(version_check(taskbag.clone()).unwrap().needs_update());
+        // Asking twice changes nothing.
+        assert!(move_taskbag_aside(taskbag.clone()).is_ok());
+        assert!(!dir.join(".allomos").join("taskbag-allomos-4").exists());
+
+        // The agent moved a task in: the usual request again.
+        allomos_store::add_area(
+            &taskbag,
+            allomos_store::Actor::APP,
+            std::time::Duration::from_secs(1),
+            Some("A1"),
+            "Area",
+        )
+        .unwrap();
+        allomos_store::add_task(
+            &taskbag,
+            allomos_store::Actor::APP,
+            std::time::Duration::from_secs(1),
+            &serde_json::from_str(r#"{"area":"A1","title":"Bake"}"#).unwrap(),
+        )
+        .unwrap();
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
         assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
         assert!(!version_check(taskbag).unwrap().needs_update());

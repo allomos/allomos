@@ -8,6 +8,9 @@
 
 use std::path::Path;
 
+use allomos_core::FORMAT;
+
+use crate::versions::MoveIn;
 use crate::{portable_path, relative_path, section_source, setup_steps_in, shown};
 
 /// Changes when the conversion request's steps change, so a report can say which it followed.
@@ -24,6 +27,10 @@ use crate::{portable_path, relative_path, section_source, setup_steps_in, shown}
 /// never push (decision 0017).
 pub const CONVERT_REQUEST_VERSION: u32 = 8;
 
+/// Changes when the move-in request's text changes (Task-A01-45): moving the tasks of a taskbag
+/// written by an older Allomos into a new one, on top of the conversion request's steps.
+pub const MOVE_IN_REQUEST_VERSION: u32 = 1;
+
 /// Changes when the connect request's parts change (Task-A05-03).
 /// 2: the setup part asks the person before setting up Git, and commits the taskbag itself (the
 /// app no longer runs Git, decision 0017).
@@ -32,18 +39,9 @@ pub const CONNECT_REQUEST_VERSION: u32 = 2;
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
 
-/// What is being migrated into the newest Allomos: another task system (this module's
-/// conversion), or a taskbag written by an older Allomos (`versions::migration_prompt_in`,
-/// Task-A01-32: owner, 2026-10-14, the same migration process, with its own entries).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Source {
-    OtherSystem,
-    OlderTaskbag,
-}
-
-/// The lines every migration request starts with, after its title: where the project and the
-/// taskbag are, and how to run `alm`. Agents' shells often forget exported variables between
-/// commands, so every command names the taskbag; the request says so once.
+/// The lines every request that moves tasks in starts with, after its title: where the project
+/// and the taskbag are, and how to run `alm`. Agents' shells often forget exported variables
+/// between commands, so every command names the taskbag; the request says so once.
 pub(crate) fn migration_header_in(language: &str, project: &Path, taskbag: &Path) -> String {
     let (p, t) = (shown(project), shown(taskbag));
     let alm = format!("alm --taskbag \"{t}\"");
@@ -60,22 +58,16 @@ pub(crate) fn migration_header_in(language: &str, project: &Path, taskbag: &Path
     }
 }
 
-/// The rule every migration request gives: ask the person exactly once, with the whole plan in
-/// the app (`alm confirm`), and decide the details by the request's own defaults or rules.
-pub(crate) fn ask_once_in(language: &str, source: Source) -> String {
-    let older = source == Source::OlderTaskbag;
+/// The rule the conversion request gives: ask the person exactly once, with the whole plan in the
+/// app (`alm confirm`), and decide the details by the request's own defaults.
+pub(crate) fn ask_once_in(language: &str) -> String {
     match language {
-        "zh-CN" => format!(
-            "只问用户一次：在 Allomos 应用里用 `alm confirm` 确认完整计划。不要在对话中提问；细节按下面的{}自己决定，并写进计划，用户不同意可以取消。",
-            if older { "规则" } else { "默认做法" }
-        ),
+        "zh-CN" => "只问用户一次：在 Allomos 应用里用 `alm confirm` 确认完整计划。不要在对话中提问；细节按下面的默认做法自己决定，并写进计划，用户不同意可以取消。".to_string(),
         "ja" => "ユーザーへの質問は一度だけです：Allomos アプリで `alm confirm` により計画全体を確認します。チャットでは質問しないでください。細かい点は下の決まりに従って自分で決め、計画に書きます。同意できなければユーザーはキャンセルできます。".to_string(),
-        _ => format!(
-            "Ask the person exactly once: the full plan, confirmed in the Allomos app with `alm confirm`. \
-Do not ask questions in the chat; decide the details yourself {} and put \
-them in the plan, so the person can cancel if they disagree.",
-            if older { "by the rules below" } else { "with the defaults below" }
-        ),
+        _ => "Ask the person exactly once: the full plan, confirmed in the Allomos app with `alm confirm`. \
+Do not ask questions in the chat; decide the details yourself with the defaults below and put \
+them in the plan, so the person can cancel if they disagree."
+            .to_string(),
     }
 }
 
@@ -104,7 +96,7 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
     let version = CONVERT_REQUEST_VERSION;
     let title = CONFIRM_TITLE;
     let header = migration_header_in(language, project_path, taskbag_path);
-    let ask = ask_once_in(language, Source::OtherSystem);
+    let ask = ask_once_in(language);
     match language {
         "zh-CN" => format!(
             "请找出这个项目的任务，并把它们搬进 Allomos（转换请求 v{version}）。
@@ -228,6 +220,104 @@ the card and board files you changed, and nothing else (never unrelated files su
 `git revert -m 1 <merge commit>`."
         ),
     }
+}
+
+/// The request that asks one AI agent to move the tasks of a taskbag written by an older Allomos
+/// into a new taskbag (Task-A01-45, owner 2026-10-15), in an interface language (`en`, `zh-CN`,
+/// `ja`; English otherwise): the conversion request's steps (Task-A05-02), told that the tasks to
+/// move are the old taskbag's (`move_in.old`), with everything it holds: tasks, history, handoff
+/// notes and project notes. The old folder is removed only as part of the plan the person
+/// confirms. When the app has not renamed the old folder aside yet (`alm move-in` on the old
+/// taskbag itself), the agent does that, and creates the new taskbag, after the Go ahead.
+pub fn agent_move_in_request_in(
+    language: &str,
+    project_path: &Path,
+    taskbag_path: &Path,
+    move_in: &MoveIn,
+) -> String {
+    let steps = convert_steps_in(language, project_path, taskbag_path);
+    // The conversion request's own title gives way to this one; its header and steps follow.
+    let rest = steps
+        .split_once("\n\n")
+        .map(|(_, rest)| rest)
+        .unwrap_or(&steps);
+    let version = MOVE_IN_REQUEST_VERSION;
+    let (taskbag, old) = (shown(taskbag_path), shown(&move_in.old));
+    let found = &move_in.found;
+    let current = FORMAT;
+    let alm = format!("alm --taskbag \"{taskbag}\"");
+    let (title, intro, moves) = match language {
+        "zh-CN" => (
+            format!("请把旧版 Allomos 写的任务包里的任务搬进一个新的任务包（搬入请求 v{version}）。"),
+            if move_in.prepared {
+                format!(
+                    "Allomos 已把旧任务包（格式 {found}；这个版本的 Allomos 写的是 {current}）改名放到一边：{old}，并在原处建了一个新的空任务包：{taskbag}。`alm` 不读旧格式：请直接读旧文件夹里的文件，绝不改动它们。下面步骤里说的“这个项目的任务”，就是旧文件夹里的任务；不要把别的东西当成任务系统。"
+                )
+            } else {
+                format!(
+                    "这个项目的任务包 {taskbag} 是旧版 Allomos 写的（格式 {found}；这个版本的 Allomos 写的是 {current}）。`alm` 不读也不改它：请直接读它的文件。用户同意计划后，作为计划的第一项改动，把它改名放到一边：{old}（例如 `mv \"{taskbag}\" \"{old}\"`），再在原处用 `{alm} init --id <旧 project.json 的 id> --name \"<它的名称>\"` 建新的任务包。在此之前，下面的步骤从 {taskbag} 读旧任务包，之后从 {old} 读。下面步骤里说的“这个项目的任务”，就是旧任务包里的任务；不要把别的东西当成任务系统。"
+                )
+            },
+            format!(
+                "用 `alm` 搬走旧任务包里的一切，保留 ID 和顺序（命令见 `alm guide commands`）：
+- `project.json`：标签阶梯（`alm labels`；如果最高一级是 \"owner verified\"，改叫 \"human verified\"，这是这个版本的 Allomos 对人工检查的叫法，任务上的也一起改）、任务语言（`alm task-language`）和交接规则（`alm handoff-rules`）。
+- `areas/` 和 `iterations/`：用 `alm add area`、`alm add iteration`，ID、名称和日期都相同。
+- `tasks/<id>/task.json` 和 `description.md`：每个任务用相同的 ID、标题和领域加入（`alm add task`），描述用 `alm describe <id> --from <旧的 description.md>`，迭代用 `alm plan`；然后是状态、标签、负责人、等待内容、下一个依赖和交接备注（`alm claim`、`label`、`wait`、`needs`、`ready`、`done`、`drop`、`note`）。已完成任务的 `finished_without_owner` 说明改为 `alm done <id> --without-human-check \"<原样的说明>\"`，除非它的标签是阶梯的最高一级（那就是已经有人检查过）。
+- `handoffs/`（allomos/2 起）：每份交接原文不改，用 `alm --as <它的作者> handoff --tasks <它的任务> --from <文件>`。
+- `project-notes.md`：内容写进新任务包的 `project-notes.md`（这个文件可以直接编辑）。
+- `events/`（allomos/3 起）：历史记录。`alm` 只记录它自己做的改动，所以旧事件不复制，它们留在 Git 历史里。在报告和 `project-notes.md` 里写明仍包含旧任务包的最后一次提交（在提交任何东西之前运行 `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
+对下面步骤的改动：第 3 步不要单独提交新任务包：在 Git 里它取代旧任务包，所以在第 11 步和搬迁一起提交。第 6 步没有卡片文件：保留每个任务自己的描述。第 9 步要替换的是 AGENTS.md / CLAUDE.md 里旧的 Allomos 一节。第 10 步要删除的旧状态就是旧文件夹 {old}，别的都不删：把它写进计划，用户同意后，只有当 Git 历史里有它（以前提交过）时才删除；否则保留它，并在报告里说明。"
+            ),
+        ),
+        "ja" => (
+            format!("古いバージョンの Allomos が書いたタスクバッグのタスクを、新しいタスクバッグに移してください（移し入れの依頼 v{version}）。"),
+            if move_in.prepared {
+                format!(
+                    "Allomos は古いタスクバッグ（形式 {found}。このバージョンの Allomos が書くのは {current}）を {old} に名前を変えて脇に置き、元の場所に新しい空のタスクバッグを作りました：{taskbag}。`alm` は古い形式を読みません：古いフォルダーのファイルを直接読み、決して変えないでください。下の手順の「このプロジェクトのタスク」は古いフォルダーのタスクです。ほかのものをタスク管理と見なさないでください。"
+                )
+            } else {
+                format!(
+                    "このプロジェクトのタスクバッグ {taskbag} は古いバージョンの Allomos が書いたものです（形式 {found}。このバージョンの Allomos が書くのは {current}）。`alm` はそれを読みも変えもしません：ファイルを直接読んでください。計画への同意を得たら、計画の最初の変更として、名前を {old} に変えて脇に置き（たとえば `mv \"{taskbag}\" \"{old}\"`）、元の場所に `{alm} init --id <古い project.json の id> --name \"<その名前>\"` で新しいタスクバッグを作ります。それまでは下の手順は {taskbag} の古いタスクバッグを読み、そのあとは {old} を読みます。下の手順の「このプロジェクトのタスク」は古いタスクバッグのタスクです。ほかのものをタスク管理と見なさないでください。"
+                )
+            },
+            format!(
+                "古いタスクバッグにあるものはすべて、ID と順序を保って `alm` で移します（コマンドは `alm guide commands`）：
+- `project.json`：ラベルの段階（`alm labels`。最上位が \"owner verified\" なら、このバージョンの Allomos での人による確認の呼び名 \"human verified\" にし、タスクのラベルも合わせる）、タスクの言語（`alm task-language`）、引き継ぎのルール（`alm handoff-rules`）。
+- `areas/` と `iterations/`：`alm add area`、`alm add iteration` で、同じ ID、名前、日付で。
+- `tasks/<id>/task.json` と `description.md`：タスクごとに同じ ID、題名、エリアで追加し（`alm add task`）、説明は `alm describe <id> --from <古い description.md>`、イテレーションは `alm plan` で。続いて状態、ラベル、担当者、待っている内容、次の依存、引き継ぎメモ（`alm claim`、`label`、`wait`、`needs`、`ready`、`done`、`drop`、`note`）。終わったタスクの `finished_without_owner` のメモは `alm done <id> --without-human-check \"<同じメモ>\"` にします。ただしラベルが最上位の段なら（人が確認済み）そうしません。
+- `handoffs/`（allomos/2 から）：引き継ぎごとに、文を変えずに `alm --as <書いた人> handoff --tasks <そのタスク> --from <ファイル>`。
+- `project-notes.md`：中身を新しいタスクバッグの `project-notes.md` に書きます（このファイルは直接編集してかまいません）。
+- `events/`（allomos/3 から）：履歴。`alm` は自分の変更しか履歴に残さないので、古いイベントは写しません。Git の履歴に残ります。古いタスクバッグを含む最後のコミットを、レポートと `project-notes.md` に書きます（何かをコミットする前に `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
+下の手順の変更点：手順 3 では新しいタスクバッグを単独でコミットしません。Git では古いものを置き換えるので、手順 11 で移行と一緒にコミットします。手順 6 ではカードのファイルはありません：タスク自身の説明を残します。手順 9 で置き換えるのは AGENTS.md / CLAUDE.md の古い Allomos の節です。手順 10 で消す古い状況は古いフォルダー {old} だけです：計画に書き、同意のあとで、Git の履歴にある（以前コミットされた）ときだけ消します。そうでなければ残し、レポートにそう書きます。"
+            ),
+        ),
+        _ => (
+            format!(
+                "Please move the tasks of a taskbag written by an older Allomos into a new taskbag (move-in request v{version})."
+            ),
+            if move_in.prepared {
+                format!(
+                    "Allomos renamed the old taskbag (format {found}; this Allomos writes {current}) aside, to {old}, and created a new, empty taskbag in its place, at {taskbag}. `alm` does not read the old format: read the old folder's files directly, and never change them. In the steps below, this project's tasks are the ones in the old folder; take nothing else for a task system."
+                )
+            } else {
+                format!(
+                    "This project's taskbag, {taskbag}, was written by an older Allomos (format {found}; this Allomos writes {current}). `alm` does not read or change it: read its files directly. After the person's Go ahead, as the first change of the plan, rename it aside to {old} (for example `mv \"{taskbag}\" \"{old}\"`), then create the new taskbag in its place with `{alm} init --id <the old project.json's id> --name \"<its name>\"`. Until then the steps below read the old taskbag at {taskbag}; afterwards at {old}. In the steps below, this project's tasks are the ones in the old taskbag; take nothing else for a task system."
+                )
+            },
+            format!(
+                "Move everything the old taskbag holds through `alm`, keeping IDs and order (commands: `alm guide commands`):
+- `project.json`: the label ladder (`alm labels`; if its top step is \"owner verified\", call it \"human verified\", this Allomos's name for the human check, on every task too), the task language (`alm task-language`) and the handoff rules (`alm handoff-rules`).
+- `areas/` and `iterations/`: `alm add area` and `alm add iteration`, with the same IDs, names and dates.
+- `tasks/<id>/task.json` and `description.md`: each task with the same ID, title and area (`alm add task`), its description with `alm describe <id> --from <the old description.md>`, its iteration with `alm plan`; then its state, label, holder, waiting-on, next dependency and handoff note (`alm claim`, `label`, `wait`, `needs`, `ready`, `done`, `drop`, `note`). A done task's `finished_without_owner` note becomes `alm done <id> --without-human-check \"<the same note>\"`, unless its label is the ladder's top step (then a person has checked it).
+- `handoffs/` (allomos/2 and later): each handoff, its text unchanged, with `alm --as <its writer> handoff --tasks <its tasks> --from <file>`.
+- `project-notes.md`: its content goes into the new taskbag's `project-notes.md` (you may edit that file directly).
+- `events/` (allomos/3): the history. `alm` records history only for its own changes, so the old events are not copied; they stay in Git history. Name, in the report and in `project-notes.md`, the last commit that holds the old taskbag (`git -C \"{taskbag}\" log -1 --format=%H -- .`, before anything is committed).
+Changes to the steps below: in step 3, do not commit the new taskbag on its own: in Git it replaces the old one, so it is committed with the move in step 11. In step 6 there are no card files: keep each task's own description. In step 9, what you replace is Allomos's old section in AGENTS.md / CLAUDE.md. In step 10, the old status to remove is the old folder {old}, and nothing else: name it in the plan, and after Go ahead remove it only when Git history holds it (it was committed before); otherwise keep it and say so in the report."
+            ),
+        ),
+    };
+    let source = section_source(language, taskbag_path);
+    format!("{title}\n\n{intro}\n\n{moves}\n\n{rest}\n\n{source}\n")
 }
 
 /// What **Connect with the agents** asks the first chosen agent (Task-A05-03): first the setup
@@ -361,6 +451,69 @@ mod tests {
             section.contains("--taskbag \"../tasks-home/.allomos/taskbag\""),
             "{section}"
         );
+    }
+
+    /// Task-A01-45: an older Allomos's taskbag is moved in like another task system; the request
+    /// names the old folder and everything in it, and keeps the conversion request's steps.
+    #[test]
+    fn move_in_request_names_the_old_folder_and_what_it_holds() {
+        let project = PathBuf::from("/work/bakery");
+        let taskbag = project.join(DEFAULT_DIR);
+        let old = project.join(".allomos").join("taskbag-allomos-3");
+        for prepared in [true, false] {
+            let m = MoveIn {
+                old: old.clone(),
+                found: "allomos/3".into(),
+                prepared,
+            };
+            for language in ["en", "zh-CN", "ja"] {
+                let r = agent_move_in_request_in(language, &project, &taskbag, &m);
+                assert!(
+                    r.contains(&format!("v{MOVE_IN_REQUEST_VERSION}")),
+                    "{language}"
+                );
+                assert!(r.contains(&shown(&old)), "{language}");
+                assert!(r.contains("allomos/3") && r.contains(FORMAT), "{language}");
+                // Tasks, history, handoff notes and project notes.
+                for part in [
+                    "tasks/<id>/task.json",
+                    "events/",
+                    "handoffs/",
+                    "project-notes.md",
+                    "alm describe <id> --from",
+                    "--without-human-check",
+                    "\"human verified\"",
+                ] {
+                    assert!(r.contains(part), "{language}: {part}");
+                }
+                // The conversion request's steps, with its header, its one question and the
+                // section from `alm brief`; not its title.
+                let convert = convert_steps_in(language, &project, &taskbag);
+                let (title, steps) = convert.split_once("\n\n").unwrap();
+                assert!(r.contains(steps), "{language}");
+                assert!(!r.contains(title), "{language}");
+                assert!(r.contains(&migration_header_in(language, &project, &taskbag)));
+                assert!(r.contains(&ask_once_in(language)), "{language}");
+                assert!(r.contains(&format!("alm confirm --title \"{CONFIRM_TITLE}\"")));
+                assert!(r.trim_end().ends_with(&section_source(language, &taskbag)));
+                assert!(!r.contains("--push"), "{language}");
+                assert!(!r.contains('@'), "{language}");
+                // Not prepared: the agent renames the folder aside and creates the new taskbag,
+                // after the Go ahead.
+                let init = format!("alm --taskbag \"{}\" init --id", shown(&taskbag));
+                assert_eq!(r.contains(&init), !prepared, "{language}");
+                assert_eq!(r.contains("mv \""), !prepared, "{language}");
+            }
+        }
+        let m = MoveIn {
+            old: old.clone(),
+            found: "allomos/1".into(),
+            prepared: true,
+        };
+        let en = agent_move_in_request_in("en", &project, &taskbag, &m);
+        assert!(en.starts_with("Please move the tasks of a taskbag written by an older Allomos"));
+        assert!(en.contains("Allomos renamed the old taskbag (format allomos/1"));
+        assert!(en.contains("remove it only when Git history holds it"));
     }
 
     #[test]

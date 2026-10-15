@@ -13,7 +13,7 @@ use std::time::Duration;
 use allomos_core::decision::Decision;
 use allomos_core::event::{self, Kind};
 use allomos_core::ops::{self, Outcome};
-use allomos_core::{Issue, Iteration, Problem, Project, State, Task, Taskbag};
+use allomos_core::{FORMAT, Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
     Actor, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
@@ -284,15 +284,12 @@ enum Command {
         #[arg(long)]
         iteration: Option<String>,
     },
-    /// Update a taskbag written by an older Allomos: print the guided steps for the AI agent
-    /// doing it. With --finish, write this Allomos's format once `alm list --json` reports no
-    /// issues; until then, only reading commands and the update's own commands work.
-    Migrate {
-        /// Write the new format (refused while issues remain, listing them).
-        #[arg(long)]
-        finish: bool,
-        /// The language of the steps (en, zh-CN, ja). Default: the Allomos app's language.
-        #[arg(long, value_name = "CODE", conflicts_with = "finish")]
+    /// A taskbag written by an older Allomos: print the request for the AI agent that moves its
+    /// tasks into a new taskbag, like another task system. Changes nothing.
+    #[command(name = "move-in")]
+    MoveIn {
+        /// The language of the request (en, zh-CN, ja). Default: the Allomos app's language.
+        #[arg(long, value_name = "CODE")]
         language: Option<String>,
     },
     /// When to write a handoff: the quota and context gates (with any override for you, --as).
@@ -477,7 +474,7 @@ impl Command {
             | Command::Confirm { .. }
             | Command::List { .. }
             | Command::Human { .. }
-            | Command::Migrate { .. }
+            | Command::MoveIn { .. }
             | Command::HandoffRules { .. }
             | Command::HandoffTemplate { .. }
             | Command::Handoff { .. }
@@ -507,9 +504,6 @@ impl Command {
         if let Command::HandoffTemplate { set } = self {
             return set.is_some();
         }
-        if let Command::Migrate { finish, .. } = self {
-            return *finish;
-        }
         !matches!(
             self,
             Command::List { .. }
@@ -521,6 +515,7 @@ impl Command {
                 | Command::Brief
                 | Command::Guide { .. }
                 | Command::Handoffs { .. }
+                | Command::MoveIn { .. }
         )
     }
 
@@ -563,7 +558,7 @@ impl Command {
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
             Command::Next { .. } => "next",
-            Command::Migrate { .. } => "migrate",
+            Command::MoveIn { .. } => "move-in",
             Command::HandoffRules { .. } => "handoff-rules",
             Command::HandoffTemplate { .. } => "handoff-template",
             Command::Handoff { .. } => "handoff",
@@ -616,7 +611,7 @@ fn issue_json(i: &Issue) -> Value {
 
 /// Run `alm` with these arguments from `cwd`; print the result and return the exit code.
 pub fn run(args: Vec<OsString>, cwd: &Path) -> i32 {
-    let reply = reply(args, cwd, &versions::FORMATS);
+    let reply = reply(args, cwd);
     print!("{}", reply.stdout);
     eprint!("{}", reply.stderr);
     reply.code
@@ -629,9 +624,9 @@ struct Reply {
     stderr: String,
 }
 
-/// Run `alm` against the taskbag formats in `formats` (the real ones, or a test's), and collect
-/// what it would print. Help, version and usage errors without `--json` are printed by `clap`.
-fn reply(args: Vec<OsString>, cwd: &Path, formats: &versions::Formats) -> Reply {
+/// Run `alm` and collect what it would print. Help, version and usage errors without `--json` are
+/// printed by `clap`.
+fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     let wants_json = args.iter().any(|a| a == "--json");
     let mut stdout = String::new();
     let mut stderr = String::new();
@@ -667,12 +662,12 @@ fn reply(args: Vec<OsString>, cwd: &Path, formats: &versions::Formats) -> Reply 
         }
     };
     let command = cli.command.name();
-    // Before the change: is the taskbag being updated, and which changes made in the app has no
-    // agent been told to share yet (decision 0017, row 9)?
-    let before = Before::look(&cli, cwd, formats);
+    // Before the change: which changes made in the app has no agent been told to share yet
+    // (decision 0017, row 9)?
+    let before = Before::look(&cli, cwd);
     let (result, written) = with_written_files(|| {
-        check_versions(&cli, cwd, formats).and_then(|outdated| {
-            let mut done = execute(&cli, cwd, formats)?;
+        check_versions(&cli, cwd).and_then(|outdated| {
+            let mut done = execute(&cli, cwd)?;
             done.warnings.extend(outdated);
             Ok(done)
         })
@@ -722,21 +717,21 @@ fn reply(args: Vec<OsString>, cwd: &Path, formats: &versions::Formats) -> Reply 
     }
 }
 
-/// Before a command: is the taskbag in a format this Allomos reads, and is Allomos's section in
-/// the project's instruction files current (Task-A01-25)? A newer or too old taskbag stops every
-/// command. While an older one is being updated (Task-A01-32), reading commands and the update's
-/// own (`migrate`, `handoff`, and those its entries name) work; any other command that changes the
-/// taskbag is refused with what is left to fix. An out-of-date section gives a warning telling the
-/// agent to renew it. Commands that do not work on a taskbag (`init`, `brief`, `guide`, `confirm`)
-/// are not checked.
-fn check_versions(
-    cli: &Cli,
-    cwd: &Path,
-    formats: &versions::Formats,
-) -> Result<Vec<Problem>, Problem> {
+/// Before a command: is the taskbag in the format this Allomos reads, and is Allomos's section in
+/// the project's instruction files current (Task-A01-25)? A newer taskbag stops every command
+/// (`taskbag_newer`), and so does one from an older Allomos (`taskbag_to_move_in`, Task-A01-45:
+/// nothing is read or changed; its tasks are moved into a new taskbag). An out-of-date section
+/// gives a warning telling the agent to renew it. Commands that do not work on a taskbag (`init`,
+/// `brief`, `guide`, `confirm`) and `move-in`, which prints the request for an older one, are not
+/// checked.
+fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
     if matches!(
         cli.command,
-        Command::Init { .. } | Command::Brief | Command::Guide { .. } | Command::Confirm { .. }
+        Command::Init { .. }
+            | Command::Brief
+            | Command::Guide { .. }
+            | Command::Confirm { .. }
+            | Command::MoveIn { .. }
     ) {
         return Ok(Vec::new());
     }
@@ -744,15 +739,7 @@ fn check_versions(
     let Ok(root) = locate(cli, cwd) else {
         return Ok(Vec::new());
     };
-    match formats.state(&root) {
-        versions::FormatState::Older { .. } if !cli.command.changes() => {}
-        versions::FormatState::Older { .. }
-        | versions::FormatState::Newer { .. }
-        | versions::FormatState::TooOld { .. } => {
-            versions::write_allowed_in(&root, cli.command.name(), formats)?;
-        }
-        versions::FormatState::Current | versions::FormatState::Unknown => {}
-    }
+    versions::write_allowed(&root)?;
     Ok(versions::check_connected(&root)
         .and_then(|c| c.instructions_warning())
         .into_iter()
@@ -761,26 +748,20 @@ fn check_versions(
 
 /// What `alm` knows before a change, for the Git commands it prints after it.
 struct Before {
-    /// The taskbag is being updated from an older format (Task-A01-32): its changes are committed
-    /// together once `alm migrate --finish` has succeeded.
-    mid_update: bool,
     /// Changes made in the app that no agent has been told to share yet.
     app: Option<events::AppChanges>,
 }
 
 impl Before {
-    fn look(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Before {
+    fn look(cli: &Cli, cwd: &Path) -> Before {
         let telling = (cli.command.changes() && !matches!(cli.command, Command::Init { .. }))
             || matches!(cli.command, Command::Next { .. });
-        let root = telling.then(|| locate(cli, cwd).ok()).flatten();
-        let mid_update = root
-            .as_ref()
-            .is_some_and(|r| matches!(formats.state(r), versions::FormatState::Older { .. }));
-        let app = root
-            .filter(|_| !mid_update)
+        let app = telling
+            .then(|| locate(cli, cwd).ok())
+            .flatten()
             .map(|r| events::unshared_app_changes(&r))
             .filter(|a| a.count > 0);
-        Before { mid_update, app }
+        Before { app }
     }
 }
 
@@ -829,14 +810,11 @@ fn git_commands(
 /// After a change (decision 0017): `alm` runs no Git; it tells the agent the exact commands that
 /// share this change, naming only the files it wrote (`changed_files`, `git_commands`), and
 /// any changes made in the app that are not shared yet (`app_changes`), to commit as the
-/// person's. `alm init` prints none: no agent is connected yet. While an update is unfinished,
-/// its changes are committed together after `alm migrate --finish`, which prints the commands
-/// for the whole taskbag, without a push.
+/// person's. `alm init` prints none: no agent is connected yet.
 fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
     let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) else {
         return;
     };
-    let finishing = matches!(cli.command, Command::Migrate { finish: true, .. });
     let changes = cli.command.changes() && !matches!(cli.command, Command::Init { .. });
     let mut text = String::new();
     let mut files: Vec<String> = written
@@ -867,23 +845,6 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         let (instruction, commands) = if files.is_empty() {
             (
                 "Nothing changed, so there is nothing to commit.".to_string(),
-                Vec::new(),
-            )
-        } else if finishing {
-            let to = done.fields["migrate"]["to"].as_str().unwrap_or_default();
-            (
-                "Commit the update as one commit; commit only, do not push:".to_string(),
-                git_commands(
-                    &root,
-                    &[".".to_string()],
-                    &format!("alm: migrate the taskbag to {to}"),
-                    &who,
-                    false,
-                ),
-            )
-        } else if before.mid_update {
-            (
-                "This change is part of the taskbag's update: do not commit it on its own. Once `alm migrate --finish` has succeeded, commit the update with the commands it prints (commit only; do not push).".to_string(),
                 Vec::new(),
             )
         } else if matches!(cli.command, Command::Claim { .. }) {
@@ -1341,11 +1302,7 @@ fn human(
     }
     for t in &to_check {
         text.push_str(&format!("  {}\n", task_line(t)));
-        let why = t
-            .without_human_check
-            .as_deref()
-            .or(t.finished_without_owner.as_deref())
-            .unwrap_or("-");
+        let why = t.without_human_check.as_deref().unwrap_or("-");
         text.push_str(&format!("      not human-checked: {why}\n"));
         if steps {
             match &t.human_check_steps {
@@ -1431,7 +1388,7 @@ fn task_line(t: &Task) -> String {
     )
 }
 
-fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, Problem> {
+fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     let me = cli.holder.as_deref();
     match &cli.command {
         Command::Init {
@@ -1665,29 +1622,20 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 text,
             ))
         }
-        Command::Migrate { finish: true, .. } => {
+        Command::MoveIn { language } => {
             let root = locate(cli, cwd)?;
-            let done = versions::finish_in(&root, Actor::alm(me), formats)?;
-            let text = if done.changed {
-                format!(
-                    "The update is finished: the taskbag is now in {} (was {}).\n",
-                    done.to, done.from
-                )
-            } else {
-                format!(
-                    "The taskbag is already in {}; nothing to finish.\n",
-                    done.to
-                )
-            };
-            Ok(Done::new(json!({ "taskbag": root, "migrate": done }), text))
-        }
-        Command::Migrate { language, .. } => {
-            let root = locate(cli, cwd)?;
-            let to = formats.current_format();
-            let versions::FormatState::Older { found } = formats.state(&root) else {
-                let text = format!("The taskbag is already in {to}; nothing to update.\n");
+            let Some(move_in) = versions::move_in(&root) else {
+                if let versions::FormatState::Newer { found } = versions::format_state(&root) {
+                    return Err(Problem::TaskbagNewer {
+                        found,
+                        supported: FORMAT.to_string(),
+                    });
+                }
+                let text = format!(
+                    "Nothing to move in: the taskbag is in {FORMAT}, and no older taskbag is waiting beside it.\n"
+                );
                 return Ok(Done::new(
-                    json!({ "taskbag": root, "migrate": { "from": to, "to": to, "needed": false } }),
+                    json!({ "taskbag": root, "move_in": { "needed": false } }),
                     text,
                 ));
             };
@@ -1697,20 +1645,24 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                     pick_ui_language(&system).to_string()
                 })
             });
-            let project = load(&root)
-                .taskbag
-                .and_then(|bag| project_folder_of(&root, &bag.project))
-                .unwrap_or_else(|| picked_folder(&root).unwrap_or(&root).to_path_buf());
-            let prompt =
-                versions::migration_prompt_with(&language, &project, &root, &found, formats)?;
+            // An older taskbag is not read: its project folder comes from its project.json as it is.
+            let project = versions::project_folder(&root);
+            let request =
+                allomos_store::agent_move_in_request_in(&language, &project, &root, &move_in);
             Ok(Done::new(
                 json!({
                     "taskbag": root,
-                    "migrate": { "from": found, "to": to, "needed": true },
+                    "move_in": {
+                        "needed": true,
+                        "from": move_in.found,
+                        "to": FORMAT,
+                        "old": move_in.old,
+                        "prepared": move_in.prepared,
+                    },
                     "language": language,
-                    "prompt": prompt,
+                    "request": request,
                 }),
-                prompt,
+                request,
             ))
         }
         Command::Guide { topic, language } if topic.as_deref() == Some("run-modes") => {
@@ -2057,12 +2009,7 @@ fn execute(cli: &Cli, cwd: &Path, formats: &versions::Formats) -> Result<Done, P
                 ("blocked by", blocked.as_deref()),
                 ("next dependency", task.next_dependency.as_deref()),
                 ("handoff note", task.handoff_note.as_deref()),
-                (
-                    "not human-checked",
-                    task.without_human_check
-                        .as_deref()
-                        .or(task.finished_without_owner.as_deref()),
-                ),
+                ("not human-checked", task.without_human_check.as_deref()),
             ];
             for (name, value) in fields {
                 if let Some(v) = value {
@@ -2445,250 +2392,4 @@ fn change(
     done.warnings = changed.warnings;
     done.issues = changed.issues;
     Ok(done)
-}
-
-#[cfg(test)]
-mod tests {
-    //! The update from one format to the next (Task-A01-32), run in-process against a test-only
-    //! migration entry from 4 to 5, which this Allomos does not ship. The real 3 → 4 entry is
-    //! tried through the `alm` program in `tests/alm.rs`.
-
-    use super::*;
-    use allomos_store::DEFAULT_DIR;
-    use allomos_store::versions::{Formats, Migration, Words};
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    const NOTHING: Words = Words {
-        en: "Nothing.",
-        zh_cn: "无。",
-        ja: "なし。",
-    };
-    const TEST_ENTRY: Migration = Migration {
-        from: 4,
-        changed: Words {
-            en: "The top label is now called \"person checked\".",
-            zh_cn: "最高的标签现在叫 \"person checked\"。",
-            ja: "いちばん上のラベルは \"person checked\" になりました。",
-        },
-        add: NOTHING,
-        decide: Words {
-            en: "Every task labelled \"human verified\" becomes \"person checked\": `alm rename label \"human verified\" \"person checked\"`.",
-            zh_cn: "无。",
-            ja: "なし。",
-        },
-        commands: &["rename label"],
-        check: NOTHING,
-    };
-    const TEST_FORMATS: Formats = Formats {
-        entries: &[TEST_ENTRY],
-        current: 5,
-        oldest: 4,
-    };
-
-    /// `alm --json --taskbag <root> args…` against `formats`: the exit code and the JSON.
-    fn run_json(root: &Path, formats: &versions::Formats, args: &[&str]) -> (i32, Value) {
-        let mut all: Vec<OsString> = ["alm", "--json", "--taskbag"]
-            .iter()
-            .map(OsString::from)
-            .collect();
-        all.push(root.as_os_str().to_owned());
-        all.extend(args.iter().map(OsString::from));
-        let r = reply(all, root, formats);
-        assert!(r.stderr.is_empty(), "{}", r.stderr);
-        let v: Value = serde_json::from_str(r.stdout.trim()).unwrap();
-        (r.code, v)
-    }
-
-    fn ok(root: &Path, formats: &versions::Formats, args: &[&str]) -> Value {
-        let (code, v) = run_json(root, formats, args);
-        assert_eq!(code, EXIT_OK, "{args:?}: {v}");
-        v
-    }
-
-    fn refused(root: &Path, formats: &versions::Formats, args: &[&str], problem: &str) -> Value {
-        let (code, v) = run_json(root, formats, args);
-        assert_eq!(v["error"]["code"], problem, "{args:?}: {v}");
-        assert_eq!(code, EXIT_REFUSED, "{args:?}");
-        v
-    }
-
-    /// A taskbag in today's format with one area and two tasks, A01-01 labelled "human verified".
-    fn taskbag() -> PathBuf {
-        // The time alone is not enough: two tests running at once can read the same time (the
-        // Windows clock is coarse), and the second `init` then finds the first one's taskbag.
-        static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let k = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("alm-migrate-{n}-{k}"));
-        fs::create_dir_all(dir.join(".git")).unwrap();
-        let root = dir.join(DEFAULT_DIR);
-        let real = &versions::FORMATS;
-        ok(&root, real, &["init", "--name", "Demo"]);
-        ok(&root, real, &["add", "area", "A01", "Baking"]);
-        ok(
-            &root,
-            real,
-            &["add", "task", "--area", "A01", "--title", "Bread"],
-        );
-        ok(
-            &root,
-            real,
-            &["add", "task", "--area", "A01", "--title", "Cake"],
-        );
-        ok(&root, real, &["--as", "a", "claim", "A01-01"]);
-        ok(
-            &root,
-            real,
-            &["--as", "a", "label", "A01-01", "human verified"],
-        );
-        root
-    }
-
-    fn snapshot(root: &Path) -> Vec<(PathBuf, String)> {
-        let mut all = Vec::new();
-        let mut stack = vec![root.to_path_buf()];
-        while let Some(dir) = stack.pop() {
-            for e in fs::read_dir(dir).unwrap() {
-                let p = e.unwrap().path();
-                if p.is_dir() {
-                    stack.push(p);
-                } else if p.file_name().is_some_and(|n| n != ".lock") {
-                    all.push((p.clone(), fs::read_to_string(&p).unwrap_or_default()));
-                }
-            }
-        }
-        all.sort();
-        all
-    }
-
-    #[test]
-    fn mid_update_only_reading_and_the_updates_own_commands_work() {
-        let root = taskbag();
-        let t = &TEST_FORMATS;
-        let before = snapshot(&root);
-        // Reading works.
-        for args in [
-            &["list"][..],
-            &["next"],
-            &["show", "A01-01"],
-            &["history", "A01-01"],
-            &["handoffs"],
-            &["task-language"],
-        ] {
-            ok(&root, t, args);
-        }
-        // Starting or changing work is refused, saying what is left.
-        for args in [
-            &["--as", "b", "claim", "A01-02"][..],
-            &["--as", "a", "label", "A01-01", "implemented"],
-            &["--as", "a", "done", "A01-01"],
-            &["add", "task", "--area", "A01", "--title", "Pie"],
-            &["labels", "a,b"],
-            &["plan", "A01-02"],
-            &["rename", "area", "A01", "Ovens"],
-        ] {
-            let v = refused(&root, t, args, "taskbag_older");
-            assert_eq!(v["error"]["params"]["current"], "allomos/5");
-            let message = v["error"]["message"].as_str().unwrap();
-            assert!(
-                message.contains("Left to fix: no problems reported"),
-                "{message}"
-            );
-            assert!(message.contains("`alm migrate --finish`"), "{message}");
-        }
-        assert_eq!(snapshot(&root), before, "nothing written");
-
-        // `alm migrate` prints the prompt.
-        let v = ok(&root, t, &["migrate", "--language", "en"]);
-        assert_eq!(
-            v["migrate"],
-            json!({ "from": "allomos/4", "to": "allomos/5", "needed": true })
-        );
-        let prompt = v["prompt"].as_str().unwrap();
-        assert!(prompt.contains("allomos/4 → allomos/5"), "{prompt}");
-        assert!(prompt.contains(TEST_ENTRY.changed.en));
-        assert!(prompt.contains("`alm rename label`"));
-        assert!(prompt.contains(&format!(
-            "alm --taskbag \"{}\" migrate --finish",
-            allomos_store::plain_path(&root).display()
-        )));
-        let zh = ok(&root, t, &["migrate", "--language", "zh-CN"]);
-        assert!(zh["prompt"].as_str().unwrap().contains("步骤"));
-        // A handoff may be written mid-update.
-        ok(&root, t, &["--as", "m", "handoff", "--tasks", "A01-01"]);
-        fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
-    }
-
-    #[test]
-    fn an_update_is_finished_only_when_no_issue_is_left() {
-        let root = taskbag();
-        let t = &TEST_FORMATS;
-        let project = root.join("project.json");
-        let project_before = fs::read_to_string(&project).unwrap();
-
-        // Half done: the task carries the new label, the ladder still has the old one.
-        let task = root.join("tasks/A01-01/task.json");
-        let mut v: Value = serde_json::from_str(&fs::read_to_string(&task).unwrap()).unwrap();
-        v["label"] = "person checked".into();
-        fs::write(&task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
-        let v = refused(
-            &root,
-            t,
-            &["--as", "m", "migrate", "--finish"],
-            "migration_unfinished",
-        );
-        let left = v["error"]["params"]["left"].as_str().unwrap();
-        assert!(
-            left.starts_with("1 problem(s): tasks/A01-01/task.json (label)"),
-            "{left}"
-        );
-        assert_eq!(fs::read_to_string(&project).unwrap(), project_before);
-        let v = refused(&root, t, &["--as", "m", "claim", "A01-02"], "taskbag_older");
-        assert_eq!(v["error"]["params"]["left"].as_str().unwrap(), left);
-        let listed = ok(&root, t, &["list"]);
-        assert_eq!(listed["issues"].as_array().unwrap().len(), 1);
-
-        // Put back, then do it properly through `alm`: the entry's own command.
-        v_label(&task, "human verified");
-        let renamed = ok(
-            &root,
-            t,
-            &[
-                "--as",
-                "m",
-                "rename",
-                "label",
-                "human verified",
-                "person checked",
-            ],
-        );
-        assert_eq!(renamed["tasks"][0]["id"], "A01-01");
-        assert_eq!(ok(&root, t, &["list"])["issues"], json!([]));
-        let v = ok(&root, t, &["history", "A01-01"]);
-        assert_eq!(v["events"][0]["command"], "rename label");
-
-        let v = ok(&root, t, &["--as", "m", "migrate", "--finish"]);
-        assert_eq!(
-            v["migrate"],
-            json!({ "from": "allomos/4", "to": "allomos/5", "changed": true })
-        );
-        let after = fs::read_to_string(&project).unwrap();
-        assert!(after.contains("\"format\": \"allomos/5\""), "{after}");
-        assert!(after.contains("\"person checked\""));
-        // Done: `alm migrate` says there is nothing to update.
-        // (This build reads only allomos/4, so the finished taskbag is checked by its file.)
-        let v = ok(&root, t, &["migrate"]);
-        assert_eq!(v["migrate"]["needed"], false);
-        fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
-    }
-
-    fn v_label(task: &Path, label: &str) {
-        let mut v: Value = serde_json::from_str(&fs::read_to_string(task).unwrap()).unwrap();
-        v["label"] = label.into();
-        fs::write(task, serde_json::to_string_pretty(&v).unwrap()).unwrap();
-    }
 }

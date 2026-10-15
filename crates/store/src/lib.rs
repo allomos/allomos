@@ -38,8 +38,8 @@ pub use confirm::{
     read_answer, requests_dir, was_seen, withdraw_confirm,
 };
 pub use convert::{
-    CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, agent_connect_request_in,
-    agent_convert_request_in,
+    CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, MOVE_IN_REQUEST_VERSION,
+    agent_connect_request_in, agent_convert_request_in, agent_move_in_request_in,
 };
 pub use events::Actor;
 pub use guide::{GUIDE_TOPICS, RUN_MODES_LANGUAGES, guide, run_modes};
@@ -868,7 +868,6 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             handoff_note: None,
             without_human_check: None,
             human_check_steps: None,
-            finished_without_owner: None,
             description: String::new(),
         };
         write_json(&dir.join("task.json"), &task_file_json(&task))?;
@@ -1334,26 +1333,11 @@ pub fn taskbag_of(root: &Path, loaded: Loaded) -> Result<(Taskbag, Vec<Issue>), 
 }
 
 /// Before any change, for `alm` and the app alike: refuse a taskbag in a format this Allomos does
-/// not write, or one that is being updated unless `command` (as `alm` names it) is one of the
-/// update's own ([`versions::write_allowed`], Task-A01-32); take the lock (waiting up to `wait`
-/// for another writer), then load what the change builds on. With no command, a taskbag being
-/// updated is let through and the caller checks once it knows the command.
-fn lock_for_change(
-    root: &Path,
-    wait: Duration,
-    command: Option<&str>,
-) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
-    match command {
-        Some(command) => versions::write_allowed(root, command)?,
-        None => {
-            if !matches!(
-                versions::format_state(root),
-                versions::FormatState::Older { .. }
-            ) {
-                versions::write_allowed(root, "")?;
-            }
-        }
-    }
+/// not write ([`versions::write_allowed`]: a newer one, or an older one whose tasks are to be moved
+/// in, Task-A01-45); take the lock (waiting up to `wait` for another writer), then load what the
+/// change builds on.
+fn lock_for_change(root: &Path, wait: Duration) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
+    versions::write_allowed(root)?;
     let lock = Lock::acquire(root, wait)?;
     let (bag, issues) = taskbag_of(root, lock.load())?;
     Ok((lock, bag, issues))
@@ -1377,7 +1361,7 @@ pub fn add_area(
     id: Option<&str>,
     name: &str,
 ) -> Result<Added<Area>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("add area"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let id = id.map_or_else(|| ops::next_area_id(&bag), String::from);
     let area = ops::new_area(&bag, &id, name)?;
     let event = actor.event(
@@ -1401,7 +1385,7 @@ pub fn add_iteration(
     name: &str,
     details: ops::IterationDetails,
 ) -> Result<Added<Iteration>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("add iteration"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let id = id.map_or_else(|| ops::next_iteration_id(&bag), String::from);
     let iteration = ops::new_iteration(&bag, &id, name, details)?;
     let event = actor.event(
@@ -1431,8 +1415,7 @@ pub fn add_iteration_and_plan(
     name: &str,
     details: ops::IterationDetails,
 ) -> Result<(Iteration, Changed), Problem> {
-    let (lock, mut bag, issues) = lock_for_change(root, wait, Some("add iteration"))?;
-    versions::write_allowed(root, "plan")?;
+    let (lock, mut bag, issues) = lock_for_change(root, wait)?;
     let id = id.map_or_else(|| ops::next_iteration_id(&bag), String::from);
     let iteration = ops::new_iteration(&bag, &id, name, details)?;
     bag.iterations.push(iteration.clone());
@@ -1471,7 +1454,7 @@ pub fn rename_area(
     id: &str,
     name: &str,
 ) -> Result<Added<Area>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("rename area"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let area = ops::rename_area(&bag, id, name)?;
     let before = bag.areas.iter().find(|a| a.id == area.id);
     let event = actor.event(
@@ -1497,7 +1480,7 @@ pub fn rename_label(
     old: &str,
     new: &str,
 ) -> Result<Added<RenamedLabel>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("rename label"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let (project, tasks) = ops::rename_label(&bag, old, new)?;
     let event = actor.event(
         "rename label",
@@ -1532,7 +1515,7 @@ pub fn change_iteration(
     id: &str,
     change: &ops::IterationChange,
 ) -> Result<Added<Iteration>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("change iteration"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let iteration = ops::change_iteration(&bag, id, change)?;
     let before = bag.iterations.iter().find(|i| i.id == iteration.id);
     let event = actor.event(
@@ -1557,7 +1540,7 @@ pub fn delete_area(
     wait: Duration,
     id: &str,
 ) -> Result<Added<Area>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("delete area"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let area = ops::delete_area(&bag, id)?;
     let event = actor.event(
         "delete area",
@@ -1578,7 +1561,7 @@ pub fn delete_iteration(
     wait: Duration,
     id: &str,
 ) -> Result<Added<Iteration>, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some("delete iteration"))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let iteration = ops::delete_iteration(&bag, id)?;
     let event = actor.event(
         "delete iteration",
@@ -1620,7 +1603,7 @@ pub fn add_task(
     wait: Duration,
     new: &NewTask,
 ) -> Result<Added<Task>, Problem> {
-    let (lock, mut bag, issues) = lock_for_change(root, wait, Some("add task"))?;
+    let (lock, mut bag, issues) = lock_for_change(root, wait)?;
     let id = match &new.id {
         Some(id) => id.clone(),
         None => ops::next_task_id(&bag, &new.area)?,
@@ -1669,9 +1652,8 @@ pub fn change_task(
     wait: Duration,
     rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
 ) -> Result<Changed, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, None)?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let (outcome, command) = rule(&bag)?;
-    versions::write_allowed(root, command)?;
     let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
     let described = before.is_some_and(|b| b.description != outcome.task.description);
     let event = actor.event(
@@ -1720,7 +1702,7 @@ pub fn record_ai_decision(
     id: &str,
     text: &str,
 ) -> Result<Decided, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some(decision::DECIDED))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let changes = decision::decide(&bag, id, text)?;
     let task = ops::find_task(&bag, id)?;
     let event = actor.event(decision::DECIDED, Kind::Task, Some(&task.id), changes);
@@ -1744,7 +1726,7 @@ pub fn review_ai_decisions(
     wait: Duration,
     id: &str,
 ) -> Result<Decided, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait, Some(decision::REVIEWED))?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
     let task = ops::find_task(&bag, id)?;
     let decisions = ai_decisions(root).remove(&task.id).unwrap_or_default();
     let changes = decision::review(&bag, id, &decisions)?;

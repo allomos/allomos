@@ -71,6 +71,9 @@ export interface Messenger {
   writeAgentFiles(project: string): Promise<string[]>;
   /** Whether the project of the taskbag at `root` is up to date with this Allomos; null until an agent is connected. */
   versionCheck(root: string): Promise<VersionCheck | null>;
+  /** Move the tasks in… (Task-A01-45): rename an older Allomos's taskbag aside and create a new,
+   * empty one in its place; the new one, loaded. */
+  moveTaskbagAside(root: string): Promise<Opened>;
   /** The taskbag's format compared with this Allomos's, connected or not. */
   taskbagFormat(root: string): Promise<{ format: FormatState; current: string }>;
   /** The project's handoff rules and template (Task-A03-06). */
@@ -197,6 +200,7 @@ export const desktopMessenger: Messenger = {
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
+  moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
   almCommandStatus: () => invoke<AlmStatus>("alm_command_status"),
   installAlmCommand: () => invoke<AlmInstalled>("install_alm_command"),

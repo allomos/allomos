@@ -23,8 +23,16 @@ type Step =
   /** Opening an existing taskbag at step 3 or 4: reading it first. */
   | { n: 0 }
   | { n: 1 }
-  /** `newer`: the found taskbag needs a newer Allomos; Next is disabled (Task-A01-25). */
-  | { n: 2; folder: string; at: TaskbagStep; created: Opened | null; newer?: { found: string; supported: string } | null }
+  /** `newer`: the found taskbag needs a newer Allomos; Next is disabled (Task-A01-25). `older`: it
+   * was written by an older Allomos; Next becomes Move the tasks in… (Task-A01-45). */
+  | {
+      n: 2;
+      folder: string;
+      at: TaskbagStep;
+      created: Opened | null;
+      newer?: { found: string; supported: string } | null;
+      older?: { found: string } | null;
+    }
   | { n: 3; opened: Opened; source: string }
   /** `change`: the project folder was not just chosen in step 3, so it may be changed here. */
   | { n: 4; opened: Opened; project: string; change: boolean };
@@ -84,11 +92,13 @@ export function SetupWizard({
           return;
         }
         let newer: { found: string; supported: string } | null = null;
+        let older: { found: string } | null = null;
         if (at.kind === "found") {
           const f = await messenger.taskbagFormat(at.root).catch(() => null);
           if (f?.format.state === "newer") newer = { found: f.format.found, supported: f.current };
+          if (f?.format.state === "older") older = { found: f.format.found };
         }
-        setStep({ n: 2, folder, at, created: null, newer });
+        setStep({ n: 2, folder, at, created: null, newer, older });
       } catch (e) {
         fail(e);
       }
@@ -162,6 +172,17 @@ export function SetupWizard({
       setStep({ n: 3, opened: o, source: defaultSource(setup) });
     });
 
+  /** Step 2 → 3 for an older Allomos's taskbag (Task-A01-45): rename it aside and create a new
+   * one; step 4's request then asks the agent to move the tasks across. */
+  const moveIn = () =>
+    run(async () => {
+      if (step.n !== 2 || step.at.kind !== "found") return;
+      const o = await messenger.moveTaskbagAside(step.at.root);
+      onOpened(o, false);
+      const setup = await messenger.projectSetup(o.root);
+      setStep({ n: 3, opened: o, source: defaultSource(setup) });
+    });
+
   const pickSource = async () => {
     if (step.n !== 3) return;
     const path = await messenger.pickFolder(t("folder.pick"));
@@ -205,6 +226,7 @@ export function SetupWizard({
               <p>{rich(step.created ? "wizard.created_body" : "wizard.found_body", { path: <code>{step.at.root}</code> })}</p>
               {/* No Change… here (owner, 2026-10-12): Previous goes back to choose another folder. */}
               <p className="muted">{t("wizard.git_agent")}</p>
+              {step.older && <p className="banner update">{t("move.wizard_old", { found: step.older.found })}</p>}
               {step.newer && (
                 <p className="banner error" role="alert">
                   {problem({ code: "taskbag_newer", params: step.newer })}{" "}
@@ -279,7 +301,12 @@ export function SetupWizard({
                 {t("wizard.back")}
               </button>
             )}
-            {step.n === 2 && step.at.kind === "found" && (
+            {step.n === 2 && step.at.kind === "found" && step.older && (
+              <button type="button" className="primary" onClick={() => void moveIn()} disabled={busy}>
+                {t("move.button")}
+              </button>
+            )}
+            {step.n === 2 && step.at.kind === "found" && !step.older && (
               <button type="button" className="primary" onClick={() => void toSource()} disabled={busy || Boolean(step.newer)}>
                 {t("wizard.next")}
               </button>

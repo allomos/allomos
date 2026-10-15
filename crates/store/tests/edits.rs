@@ -319,20 +319,23 @@ fn the_app_waits_for_the_lock_then_takes_it() {
 }
 
 #[test]
-fn a_too_old_taskbag_is_not_changed() {
-    let (dir, root) = taskbag("older");
-    let project = root.join("project.json");
-    let text = fs::read_to_string(&project).unwrap();
-    fs::write(
-        &project,
-        text.replace(allomos_core::FORMAT, "allomos/2").as_bytes(),
-    )
-    .unwrap();
-    let before = snapshot(&root);
-    assert!(matches!(
-        edit(&root, "A01-01", Edit::Title { title: "x".into() }),
-        Err(Problem::TaskbagTooOld { .. })
-    ));
-    assert_eq!(snapshot(&root), before);
-    fs::remove_dir_all(dir).unwrap();
+fn an_older_taskbag_is_not_changed() {
+    // Any format below this Allomos's (Task-A01-45): its tasks are moved in, never edited.
+    for older in ["allomos/1", "allomos/2", "allomos/3"] {
+        let (dir, root) = taskbag("older");
+        let project = root.join("project.json");
+        let text = fs::read_to_string(&project).unwrap();
+        fs::write(
+            &project,
+            text.replace(allomos_core::FORMAT, older).as_bytes(),
+        )
+        .unwrap();
+        let before = snapshot(&root);
+        assert!(matches!(
+            edit(&root, "A01-01", Edit::Title { title: "x".into() }),
+            Err(Problem::TaskbagToMoveIn { .. })
+        ));
+        assert_eq!(snapshot(&root), before);
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

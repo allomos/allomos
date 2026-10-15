@@ -67,15 +67,12 @@ test("the state filter keeps waiting and blocked apart", () => {
   assert.equal(readFilter(null), "all");
 });
 
-test("not human-checked: a done task with the note, under either name (Task-A03-18)", () => {
+test("not human-checked: a done task with the note (Task-A03-18)", () => {
   const finished = task({ state: "done", without_human_check: "loop run", human_check_steps: "1. Open it." });
   assert.equal(toCheck(finished), true);
   assert.equal(humanCheckNote(finished), "loop run");
   assert.equal(toCheck(task({ state: "done" })), false, "finished the usual way");
   assert.equal(toCheck(task({ state: "in_progress", without_human_check: "x" })), false, "not finished");
-  const old = task({ state: "done", finished_without_owner: "card run" });
-  assert.equal(toCheck(old), true, "a taskbag being migrated");
-  assert.equal(humanCheckNote(old), "card run");
 });
 
 test("the Needs a human filter keeps the tasks to check and to answer, not backlog", () => {

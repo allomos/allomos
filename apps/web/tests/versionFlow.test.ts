@@ -1,20 +1,26 @@
-// Tests for the update notice (Task-A01-25). Run: npm --prefix apps/web test
+// Tests for the update notice (Task-A01-25, Task-A01-45). Run: npm --prefix apps/web test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { outdatedFiles, updateNotice } from "../src/versionFlow.ts";
+import { movingTasks, outdatedFiles, updateNotice } from "../src/versionFlow.ts";
 import type { VersionCheck } from "../src/types.ts";
 
-const check = (format: VersionCheck["format"], sections: VersionCheck["sections"]): VersionCheck => ({
-  format_current: "allomos/1",
+const check = (
+  format: VersionCheck["format"],
+  sections: VersionCheck["sections"],
+  move_in: VersionCheck["move_in"] = null,
+): VersionCheck => ({
+  format_current: "allomos/4",
   section_current: 1,
   format,
+  move_in,
   sections,
 });
 
 test("nothing is shown before an agent is connected", () => {
   assert.equal(updateNotice(null), null);
   assert.deepEqual(outdatedFiles(null), []);
+  assert.equal(movingTasks(null), false);
 });
 
 test("an up-to-date project shows nothing", () => {
@@ -27,18 +33,31 @@ test("a section without a version, or an older one, is out of date", () => {
     { file: "CLAUDE.md", version: 0 },
   ]);
   assert.deepEqual(updateNotice(c), { kind: "section", files: "AGENTS.md, CLAUDE.md" });
+  assert.equal(movingTasks(updateNotice(c)), false);
 });
 
-test("an older taskbag comes first", () => {
-  const c = check({ state: "older", found: "allomos/1" }, [{ file: "AGENTS.md", version: null }]);
-  assert.deepEqual(updateNotice(c), { kind: "taskbag" });
+test("an older Allomos's taskbag offers to move its tasks in, before the section (Task-A01-45)", () => {
+  for (const found of ["allomos/1", "allomos/2", "allomos/3"]) {
+    const c = check({ state: "older", found }, [{ file: "AGENTS.md", version: null }], {
+      old: "/p/.allomos/taskbag-allomos-1",
+      found,
+      prepared: false,
+    });
+    assert.deepEqual(updateNotice(c), { kind: "move_in", found });
+    assert.equal(movingTasks(updateNotice(c)), true);
+  }
+});
+
+test("renamed aside, with no task moved in yet: the move is offered again", () => {
+  const c = check({ state: "current" }, [{ file: "AGENTS.md", version: 1 }], {
+    old: "/p/.allomos/taskbag-allomos-3",
+    found: "allomos/3",
+    prepared: true,
+  });
+  assert.deepEqual(updateNotice(c), { kind: "moving_in", found: "allomos/3", old: "/p/.allomos/taskbag-allomos-3" });
+  assert.equal(movingTasks(updateNotice(c)), true);
 });
 
 test("a newer taskbag is left to the problem list", () => {
-  assert.equal(updateNotice(check({ state: "newer", found: "allomos/2" }, [{ file: "AGENTS.md", version: 1 }])), null);
-});
-
-test("a taskbag too old to migrate is left to the problem list (Task-A01-32)", () => {
-  const c = check({ state: "too_old", found: "allomos/2", oldest: "allomos/3" }, [{ file: "AGENTS.md", version: 1 }]);
-  assert.equal(updateNotice(c), null);
+  assert.equal(updateNotice(check({ state: "newer", found: "allomos/9" }, [{ file: "AGENTS.md", version: 1 }])), null);
 });

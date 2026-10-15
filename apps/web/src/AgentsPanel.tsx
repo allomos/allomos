@@ -12,7 +12,7 @@ import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { Agent, InstructionFiles } from "./types";
-import { updateNotice } from "./versionFlow";
+import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, firstChoice, manualWritten } from "./manualFlow";
 import type { Seen } from "./manualFlow";
 
@@ -76,14 +76,19 @@ export function AgentsPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Something is out of date with this Allomos (Task-A01-25): the request is the update request,
-   * and Allomos offers no "write the files for me" (owner, 2026-10-12: the agent updates them). */
-  const [updating, setUpdating] = useState(false);
+   * and Allomos offers no "write the files for me" (owner, 2026-10-12: the agent updates them).
+   * `move`: an older Allomos's taskbag, whose tasks the agent moves in (Task-A01-45). */
+  const [updating, setUpdating] = useState<"section" | "move" | null>(null);
 
   useEffect(() => {
     let live = true;
     messenger
       .versionCheck(taskbag)
-      .then((c) => live && setUpdating(updateNotice(c) !== null))
+      .then((c) => {
+        if (!live) return;
+        const notice = updateNotice(c);
+        setUpdating(notice === null ? null : movingTasks(notice) ? "move" : "section");
+      })
       .catch(() => undefined);
     return () => {
       live = false;
@@ -124,7 +129,7 @@ export function AgentsPanel({
   const chosen = GROUPS.filter((g) => ticked.has(g.name) && picked[g.name]).map((g) => picked[g.name]);
   const manual = ticked.has(MANUAL);
   const choice = [...ticked][0] ?? null;
-  const buttons = connectActions(agents === null ? null : choice, agents?.length ?? 0, updating);
+  const buttons = connectActions(agents === null ? null : choice, agents?.length ?? 0, updating !== null);
 
   // Manual: the request (the same automatic sending types in), what the project looked like when
   // it was shown, and what the AI has written since.
@@ -224,8 +229,11 @@ export function AgentsPanel({
       onDone({
         // One agent (owner, 2026-10-12); a terminal that takes the request from the clipboard is told so.
         message: (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")
-          ? t(updating ? "update.asked_paste" : "connect.asked_paste", { agent: t(AGENT_KEY[chosen[0]]), keys: PASTE_KEYS })
-          : t(updating ? "update.asked" : "connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
+          ? t(updating === "move" ? "move.asked_paste" : updating ? "update.asked_paste" : "connect.asked_paste", {
+              agent: t(AGENT_KEY[chosen[0]]),
+              keys: PASTE_KEYS,
+            })
+          : t(updating === "move" ? "move.asked" : updating ? "update.asked" : "connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
         watch: { project, before },
       });
     } catch (e) {
@@ -278,8 +286,8 @@ export function AgentsPanel({
 
   return (
     <section className="card agents">
-      <h2>{t(updating ? "update.title" : "connect.title")}</h2>
-      <p>{t(updating ? "update.body" : "connect.body")}</p>
+      <h2>{t(updating === "move" ? "move.title" : updating ? "update.title" : "connect.title")}</h2>
+      <p>{t(updating === "move" ? "move.body" : updating ? "update.body" : "connect.body")}</p>
       {!updating && <p>{t("connect.tasks")}</p>}
       <div className="row project-row">
         <span>{rich("project.line", { path: <code>{project}</code> })}</span>

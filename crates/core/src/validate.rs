@@ -4,8 +4,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::model::{
-    Area, FORMAT, FORMAT_VERSION, Iteration, OLDEST_FORMAT_VERSION, Project, State, Task, Taskbag,
-    format_version,
+    Area, FORMAT, FORMAT_VERSION, Iteration, Project, State, Task, Taskbag, format_version,
 };
 use crate::problem::Problem;
 
@@ -103,9 +102,9 @@ fn check_id(file: &str, field: &str, id: &str, issues: &mut Vec<Issue>) {
 }
 
 pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
-    // The format first: a newer taskbag may have fields this Allomos does not know, and one older
-    // than the oldest it updates cannot be read (Task-A01-25, Task-A01-32). Between the oldest and
-    // this Allomos's, it is read: an agent is updating it (`alm migrate`).
+    // The format first: a newer taskbag may have fields this Allomos does not know (Task-A01-25),
+    // and an older one is not read at all: an AI agent moves its tasks into a new taskbag, like
+    // another task system (owner, 2026-10-15; Task-A01-45).
     if let Some(found) = serde_json::from_str::<serde_json::Value>(text)
         .ok()
         .and_then(|v| v.get("format").and_then(|f| f.as_str()).map(String::from))
@@ -121,13 +120,13 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
                     },
                 )]);
             }
-            Some(n) if n < OLDEST_FORMAT_VERSION => {
+            Some(n) if n < FORMAT_VERSION => {
                 return Err(vec![Issue::new(
                     file,
                     Some("format"),
-                    Problem::TaskbagTooOld {
+                    Problem::TaskbagToMoveIn {
                         found,
-                        oldest: format!("allomos/{OLDEST_FORMAT_VERSION}"),
+                        current: FORMAT.to_string(),
                     },
                 )]);
             }
@@ -384,17 +383,6 @@ pub fn validate_taskbag(
                 Problem::WaitingOnMissing,
             ));
         }
-        // The note's name before allomos/4: the guided migration moves it with `alm`
-        // (Task-A03-18); until then `alm migrate --finish` is refused.
-        if task.finished_without_owner.is_some() {
-            issues.push(Issue::new(
-                file,
-                Some("finished_without_owner"),
-                Problem::FinishedWithoutOwnerRenamed {
-                    id: task.id.clone(),
-                },
-            ));
-        }
         if task.state == State::Blocked && task.blocked_by.is_empty() {
             issues.push(Issue::new(
                 file,
@@ -420,7 +408,7 @@ pub fn validate_taskbag(
 mod tests {
     use super::*;
 
-    const PROJECT: &str = r#"{"format":"allomos/3","id":"demo","name":"Demo"}"#;
+    const PROJECT: &str = r#"{"format":"allomos/4","id":"demo","name":"Demo"}"#;
 
     fn project() -> Project {
         parse_project("project.json", PROJECT).unwrap()
@@ -447,7 +435,7 @@ mod tests {
     fn handoff_gates_must_be_percentages() {
         let ok = parse_project(
             "project.json",
-            r#"{"format":"allomos/3","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
+            r#"{"format":"allomos/4","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
         )
         .unwrap();
         let rules = ok.handoff.unwrap();
@@ -461,7 +449,7 @@ mod tests {
         assert_eq!(rules.applied(Some("codexy")).context_gate, 90);
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/3","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
+            r#"{"format":"allomos/4","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
         )
         .unwrap_err();
         assert_eq!(err[0].problem.code(), "invalid_percent");
@@ -495,6 +483,31 @@ mod tests {
         .unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("format"));
         assert_eq!(err[0].problem.code(), "wrong_format");
+    }
+
+    /// Task-A01-45: every format below this Allomos's is to be moved in, none is read; a newer one
+    /// is refused too.
+    #[test]
+    fn an_older_or_newer_format_is_not_read() {
+        for n in 1..FORMAT_VERSION {
+            let text = format!(r#"{{"format":"allomos/{n}","id":"d","name":"D","old_field":1}}"#);
+            let err = parse_project("project.json", &text).unwrap_err();
+            assert_eq!(err.len(), 1);
+            assert_eq!(err[0].field.as_deref(), Some("format"));
+            assert_eq!(
+                err[0].problem,
+                Problem::TaskbagToMoveIn {
+                    found: format!("allomos/{n}"),
+                    current: FORMAT.to_string(),
+                }
+            );
+        }
+        let newer = format!(
+            r#"{{"format":"allomos/{}","id":"d","name":"D"}}"#,
+            FORMAT_VERSION + 1
+        );
+        let err = parse_project("project.json", &newer).unwrap_err();
+        assert_eq!(err[0].problem.code(), "taskbag_newer");
     }
 
     #[test]
@@ -555,20 +568,15 @@ mod tests {
         .unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("without_human_check"));
         assert_eq!(err[0].problem, Problem::WithoutHumanCheckMissing);
-        // The name before allomos/4 is still read, so a migration can move it, and never written.
+        // The name before allomos/4 is not read any more (Task-A01-45): an older taskbag is
+        // moved in by an agent, never read.
         let old = parse_task(
             "t.json",
             r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
         )
-        .unwrap();
-        assert!(old.to_check());
-        let mut fresh = old.clone();
-        fresh.finished_without_owner = None;
-        assert!(
-            !serde_json::to_string(&fresh)
-                .unwrap()
-                .contains("finished_without_owner")
-        );
+        .unwrap_err();
+        assert_eq!(old[0].field.as_deref(), Some("finished_without_owner"));
+        assert_eq!(old[0].problem, Problem::FieldUnknown);
     }
 
     #[test]
@@ -656,27 +664,6 @@ mod tests {
                 .iter()
                 .all(|i| i.field.as_deref() == Some("blocked_by"))
         );
-    }
-
-    /// Task-A03-18: the note's name before allomos/4 is reported until the migration moves it.
-    #[test]
-    fn the_old_note_name_is_reported() {
-        let areas = vec![(
-            "a".to_string(),
-            parse_area("a", r#"{"id":"A1","name":"Tracking"}"#).unwrap(),
-        )];
-        let tasks = vec![(
-            "tasks/T1/task.json".to_string(),
-            parse_task(
-                "t",
-                r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
-            )
-            .unwrap(),
-        )];
-        let issues = validate_taskbag(&project(), &areas, &[], &tasks);
-        assert_eq!(issues.len(), 1);
-        assert_eq!(issues[0].field.as_deref(), Some("finished_without_owner"));
-        assert_eq!(issues[0].problem.code(), "finished_without_owner_renamed");
     }
 
     #[test]

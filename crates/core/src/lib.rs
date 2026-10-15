@@ -13,8 +13,8 @@ mod validate;
 
 pub use model::{
     AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN, FORMAT,
-    FORMAT_VERSION, Gates, HandoffRules, Iteration, OLDEST_FORMAT_VERSION, Project, State,
-    TASK_LANGUAGE_UI, Task, Taskbag, default_labels, format_version, valid_language,
+    FORMAT_VERSION, Gates, HandoffRules, Iteration, Project, State, TASK_LANGUAGE_UI, Task,
+    Taskbag, default_labels, format_version, valid_language,
 };
 pub use problem::Problem;
 pub use validate::{

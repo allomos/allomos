@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 /// `allomos/<FORMAT_VERSION>`.
 pub const FORMAT: &str = "allomos/4";
 
-/// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape; an older one refuses
-/// a newer taskbag (Task-A01-25), and a newer one has an agent update an older taskbag by following
-/// the migration entries in `crates/store/src/versions.rs` (Task-A01-32). Raising it needs an entry
-/// for the version it replaces.
+/// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape. An older Allomos
+/// refuses a newer taskbag (Task-A01-25); this one reads only its own format. A taskbag in any
+/// older format is moved into a new taskbag by an AI agent, like another task system (owner,
+/// 2026-10-15; Task-A01-45): no per-version steps are needed when the number goes up.
 ///
 /// 2: handoff rules in `project.json`, `handoff-template.md`, `project-notes.md` and `handoffs/`
 /// (Task-A03-06).
@@ -18,13 +18,8 @@ pub const FORMAT: &str = "allomos/4";
 /// 4: the `blocked` state with a task's `blocked_by`, and a waiting task's optional `who`
 /// (decision 0016, Task-A01-31); the human check: `finished_without_owner` becomes
 /// `without_human_check`, with optional `human_check_steps`, and the default top label is
-/// "human verified" (Task-A03-18). One migration entry 3 → 4 covers both.
+/// "human verified" (Task-A03-18).
 pub const FORMAT_VERSION: u32 = 4;
-
-/// The oldest format this Allomos can update (owner, 2026-10-14; Task-A01-32). An older taskbag
-/// is told it is too old (`taskbag_too_old`); between this and [`FORMAT_VERSION`] it is read, and
-/// only the update's own commands may change it until `alm migrate --finish`.
-pub const OLDEST_FORMAT_VERSION: u32 = 3;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
 /// FlipHopper's `fliphopper/1`).
@@ -276,21 +271,14 @@ pub struct Task {
     /// Cleared with the note when the task is checked.
     #[serde(default)]
     pub human_check_steps: Option<String>,
-    /// The note's name before `allomos/4`. Read only so that the guided migration can move it
-    /// (`alm done --without-human-check`) or clear it (`alm checked`); a task that still has it is
-    /// reported (`finished_without_owner_renamed`). Never written.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub finished_without_owner: Option<String>,
     #[serde(default, skip_deserializing)]
     pub description: String,
 }
 
 impl Task {
-    /// Finished without the human check and not checked since: "To check" (Task-A03-18). A task
-    /// still carrying the note's old name counts too, so it is not lost during a migration.
+    /// Finished without the human check and not checked since: "To check" (Task-A03-18).
     pub fn to_check(&self) -> bool {
-        self.state == State::Done
-            && (self.without_human_check.is_some() || self.finished_without_owner.is_some())
+        self.state == State::Done && self.without_human_check.is_some()
     }
 }
 
