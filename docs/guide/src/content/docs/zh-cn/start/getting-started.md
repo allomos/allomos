@@ -19,7 +19,10 @@ sidebar:
 - **macOS** 会说无法检查 Allomos（或它的安装器）是否含有恶意软件。选择 **完成**，打开 **系统设置 › 隐私与安全性**，向下滚动，在 Allomos 旁边选择 **仍要打开**。
 - **Windows** 会显示“Windows 已保护你的电脑”。选择 **更多信息**，再选择 **仍要运行**。
 
-在 macOS 上，`alm` 是指向 Allomos 里那一份的链接（`/usr/local/bin/alm`），所以更新 Allomos 时 `alm` 也一起更新。不装应用的 Mac 可以用只含 `alm` 的 `alm_<版本>_macos_arm64.tar.gz`：打开它，把 `alm` 移到 PATH 里的某个文件夹，例如 `/usr/local/bin`。
+在 macOS 上，`alm` 是指向 Allomos 里那一份的链接（`/usr/local/bin/alm`），所以更新 Allomos 时 `alm` 也一起更新。大多数人需要的是上面的安装器。`alm-only` 文件只含 `alm` 命令，给不装应用的电脑用；它们不是安装器：
+
+- **macOS**：`alm-only_<版本>_macos_arm64.tar.gz`。打开它，把 `alm` 移到 PATH 里的某个文件夹，例如 `/usr/local/bin`，然后在终端里运行 `alm`。
+- **Windows**：`alm-only_<版本>_windows_x64.zip`。解压后把 `alm.exe` 放进 PATH 里的某个文件夹，然后在终端里运行 `alm`（双击它只会让窗口一闪而过）。
 
 ## 2. 开始
 

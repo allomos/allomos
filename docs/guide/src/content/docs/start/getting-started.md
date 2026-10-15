@@ -19,7 +19,10 @@ Until version 1.0 these downloads are not signed, so the first time you open All
 - **macOS** says it cannot check Allomos (or its installer) for malware. Choose **Done**, open **System Settings › Privacy & Security**, scroll down and choose **Open Anyway** next to Allomos.
 - **Windows** shows "Windows protected your PC". Choose **More info**, then **Run anyway**.
 
-On macOS, `alm` is a link to the copy inside Allomos (`/usr/local/bin/alm`), so updating Allomos updates `alm` too. For a Mac without the app, `alm_<version>_macos_arm64.tar.gz` holds `alm` alone: open it and move `alm` into a folder on your PATH, such as `/usr/local/bin`.
+On macOS, `alm` is a link to the copy inside Allomos (`/usr/local/bin/alm`), so updating Allomos updates `alm` too. Most people want the installer above. The `alm-only` files hold the `alm` command alone, for a computer without the app; they are not installers:
+
+- **macOS**: `alm-only_<version>_macos_arm64.tar.gz`. Open it, move `alm` into a folder on your PATH, such as `/usr/local/bin`, then run `alm` from a terminal.
+- **Windows**: `alm-only_<version>_windows_x64.zip`. Unpack it, put `alm.exe` in a folder on your PATH, then run `alm` from a terminal (double-clicking it only flashes a window).
 
 ## 2. Start
 
