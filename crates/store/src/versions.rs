@@ -565,7 +565,7 @@ const EN: Phrases = Phrases {
     section_title: "This project was set up by an older Allomos. Please update it to this version.",
     project: "Project folder",
     taskbag: "Taskbag (Allomos's task files)",
-    read_only: "Until the update is finished, `alm` only reads, except for the update's own commands: {commands}. Commands that start or change work (claim, label, done, add …) are refused until then.",
+    read_only: "Until the update is finished, `alm` only reads, except for the update's own commands: {commands}. Commands that start or change work ({refused} …) are refused until then.",
     changes: "What changed, version by version",
     changed: "What changed",
     add: "What to add",
@@ -590,7 +590,7 @@ const ZH_CN: Phrases = Phrases {
     section_title: "这个项目是用旧版的 Allomos 设置的，请把它更新到当前版本。",
     project: "项目文件夹",
     taskbag: "任务包（Allomos 的任务文件）",
-    read_only: "更新完成之前，`alm` 只读，只有更新本身的命令可以改动：{commands}。开始或改变工作的命令（claim、label、done、add …）在此之前都会被拒绝。",
+    read_only: "更新完成之前，`alm` 只读，只有更新本身的命令可以改动：{commands}。开始或改变工作的命令（{refused} …）在此之前都会被拒绝。",
     changes: "各版本的改动",
     changed: "改了什么",
     add: "要添加什么",
@@ -615,7 +615,7 @@ const JA: Phrases = Phrases {
     section_title: "このプロジェクトは古いバージョンの Allomos で設定されました。今のバージョンに更新してください。",
     project: "プロジェクトのフォルダー",
     taskbag: "タスクバッグ（Allomos のタスクファイル）",
-    read_only: "更新が終わるまで、`alm` は読むだけで、変更できるのは更新のためのコマンドだけです：{commands}。作業を始めたり変えたりするコマンド（claim、label、done、add …）はそれまで拒否されます。",
+    read_only: "更新が終わるまで、`alm` は読むだけで、変更できるのは更新のためのコマンドだけです：{commands}。作業を始めたり変えたりするコマンド（{refused} …）はそれまで拒否されます。",
     changes: "バージョンごとの変更",
     changed: "変わったこと",
     add: "追加するもの",
@@ -641,6 +641,24 @@ fn phrases(language: &str) -> &'static Phrases {
         "ja" => &JA,
         _ => &EN,
     }
+}
+
+/// Commands the prompt names as refused while an update is unfinished: examples of commands that
+/// start or change work (A01-34).
+const REFUSED_EXAMPLES: &[&str] = &["claim", "label", "done", "add"];
+
+/// The refused examples, without any command the update itself allows (`allowed`), so the prompt
+/// never names one command as both allowed and refused (A01-34: format 4 → 5 allows `done`).
+fn refused_examples(allowed: &[&str]) -> Vec<&'static str> {
+    REFUSED_EXAMPLES
+        .iter()
+        .copied()
+        .filter(|e| {
+            !allowed
+                .iter()
+                .any(|a| a == e || a.starts_with(&format!("{e} ")))
+        })
+        .collect()
 }
 
 /// What to update: the taskbag (from `found`, through `entries`) and/or the section in `files`.
@@ -701,9 +719,17 @@ fn request(
             .iter()
             .map(|c| format!("`alm {c}`"))
             .collect();
+        let separator = if matches!(language, "zh-CN" | "ja") {
+            "、"
+        } else {
+            ", "
+        };
+        let refused = refused_examples(&formats.allowed_commands(n)).join(separator);
         out.push_str(&format!(
             "\n{}\n",
-            w.read_only.replace("{commands}", &commands.join(", "))
+            w.read_only
+                .replace("{commands}", &commands.join(", "))
+                .replace("{refused}", &refused)
         ));
         out.push_str(&format!("\n## {}\n", w.changes));
         for m in entries {
@@ -1057,6 +1083,28 @@ mod tests {
         assert_eq!(fs::read_to_string(root.join(PROJECT_FILE)).unwrap(), before);
     }
 
+    /// A01-34: no command the update allows is ever named among the refused examples, for every
+    /// format the real migrations can start from.
+    #[test]
+    fn refused_examples_never_name_an_allowed_command() {
+        for found in FORMATS.oldest..FORMATS.current {
+            let allowed = FORMATS.allowed_commands(found);
+            for example in refused_examples(&allowed) {
+                assert!(
+                    !allowed
+                        .iter()
+                        .any(|a| *a == example || a.starts_with(&format!("{example} "))),
+                    "allomos/{found}: `{example}` is allowed and refused"
+                );
+            }
+        }
+        assert_eq!(
+            refused_examples(&["done", "add task", "rename label"]),
+            vec!["claim", "label"]
+        );
+        assert_eq!(refused_examples(&[]), REFUSED_EXAMPLES.to_vec());
+    }
+
     #[test]
     fn mid_update_only_the_updates_own_commands_change_the_taskbag() {
         let (_, root) = project("mid-update");
@@ -1272,6 +1320,19 @@ mod tests {
         );
         assert!(prompt.contains("never guess"), "{prompt}");
         assert!(!prompt.contains("is added before version 4 is merged"));
+        // A01-34: `done` is one of this update's own commands, so the prompt must not also name
+        // it as refused, in any language.
+        assert!(
+            prompt.contains("Commands that start or change work (claim, label, add …)"),
+            "{prompt}"
+        );
+        for (language, refused) in [
+            ("zh-CN", "（claim、label、add …）"),
+            ("ja", "（claim、label、add …）"),
+        ] {
+            let prompt = migration_prompt_in(language, &root, &root, "allomos/3").unwrap();
+            assert!(prompt.contains(refused), "{language}: {prompt}");
+        }
         // The old name is reported, so the finish is refused and writes nothing.
         let left = load(&root).issues;
         assert_eq!(
