@@ -21,9 +21,13 @@ struct Settings {
     /// The person's name, asked once by the app; its task changes are recorded under it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     owner_name: Option<String>,
-    /// The person chose "Don't ask again" for **Install the alm command** (Task-A07-12).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    alm_offer_dismissed: bool,
+    /// The person chose "Don't ask again" for **Install the alm command** while Terminal's `alm`
+    /// led to this path (resolved; empty when Terminal found none). Only that mismatch is silenced:
+    /// when the `alm` in use changes, the app asks again (Task-A07-14). The older setting,
+    /// `alm_offer_dismissed: true` (Task-A07-12), named no path: it is still read without error,
+    /// silences nothing, and is dropped at the next save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    alm_offer_dismissed_for: Option<String>,
 }
 
 /// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
@@ -92,15 +96,17 @@ pub fn saved_owner_name() -> Option<String> {
     read_settings().owner_name
 }
 
-/// Whether the person chose "Don't ask again" for **Install the alm command** (Task-A07-12).
-pub fn alm_offer_dismissed() -> bool {
-    read_settings().alm_offer_dismissed
+/// The `alm` path for which the person chose "Don't ask again" for **Install the alm command**,
+/// if they did (Task-A07-12, A07-14).
+pub fn alm_offer_dismissed_for() -> Option<String> {
+    read_settings().alm_offer_dismissed_for
 }
 
-/// Remember "Don't ask again" for **Install the alm command**.
-pub fn dismiss_alm_offer() -> io::Result<()> {
+/// Remember "Don't ask again" for **Install the alm command**, for the mismatch it was clicked for:
+/// `mismatch` is the path Terminal's `alm` led to then (empty when Terminal found none).
+pub fn dismiss_alm_offer(mismatch: &str) -> io::Result<()> {
     let mut settings = read_settings();
-    settings.alm_offer_dismissed = true;
+    settings.alm_offer_dismissed_for = Some(mismatch.to_string());
     write_settings(&settings)
 }
 
@@ -227,10 +233,29 @@ mod tests {
         let l = task_language(&project(Some("ui")), &["ja-JP"]);
         assert_eq!((l.language.as_str(), l.source), ("zh-CN", "app"));
 
-        // "Don't ask again" for the alm command is kept beside the language (Task-A07-12).
-        assert!(!alm_offer_dismissed());
-        dismiss_alm_offer().unwrap();
-        assert!(alm_offer_dismissed());
+        // "Don't ask again" for the alm command is kept beside the language, with the path it
+        // was clicked for (Task-A07-12, A07-14).
+        assert_eq!(alm_offer_dismissed_for(), None);
+        dismiss_alm_offer("/Users/me/.cargo/bin/alm").unwrap();
+        assert_eq!(
+            alm_offer_dismissed_for().as_deref(),
+            Some("/Users/me/.cargo/bin/alm")
+        );
+        assert_eq!(saved_ui_language().as_deref(), Some("zh-CN"));
+
+        // The older setting (a plain "yes", no path) still reads, silences nothing, and the next
+        // save drops it while keeping everything else.
+        fs::write(
+            dir.join(SETTINGS_FILE),
+            "{\"ui_language\": \"zh-CN\", \"alm_offer_dismissed\": true}\n",
+        )
+        .unwrap();
+        assert_eq!(alm_offer_dismissed_for(), None);
+        assert_eq!(saved_ui_language().as_deref(), Some("zh-CN"));
+        dismiss_alm_offer("").unwrap();
+        assert_eq!(alm_offer_dismissed_for().as_deref(), Some(""));
+        let saved = fs::read_to_string(dir.join(SETTINGS_FILE)).unwrap();
+        assert!(!saved.contains("\"alm_offer_dismissed\""), "{saved}");
         assert_eq!(saved_ui_language().as_deref(), Some("zh-CN"));
 
         // A code in the taskbag wins.

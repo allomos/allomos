@@ -140,7 +140,8 @@ export interface Messenger {
   /** Links the app's own `alm` into Terminal's path, asking for the Mac password. Rejects with a Problem. */
   installAlmCommand(): Promise<AlmInstalled>;
   /** "Don't ask again" for **Install the alm command**. */
-  dismissAlmOffer(): Promise<void>;
+  /** "Don't ask again", for this mismatch only (`AlmStatus.mismatch`). */
+  dismissAlmOffer(mismatch: string): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
@@ -204,7 +205,7 @@ export const desktopMessenger: Messenger = {
   openDownloadPage: () => invoke<void>("open_download_page"),
   almCommandStatus: () => invoke<AlmStatus>("alm_command_status"),
   installAlmCommand: () => invoke<AlmInstalled>("install_alm_command"),
-  dismissAlmOffer: () => invoke<void>("dismiss_alm_offer"),
+  dismissAlmOffer: (mismatch) => invoke<void>("dismiss_alm_offer", { mismatch }),
   handoffSettings: (root) => invoke<HandoffSettings>("handoff_settings", { root }),
   setHandoffRules: (root, c) =>
     invoke<HandoffSettings>("set_handoff_rules", {

@@ -45,3 +45,9 @@ export function almOffer(status: AlmStatus | null): AlmOffer | null {
   if (status.own) paths.push({ key: "alm.own", params: { own: status.own } });
   return { lines, paths, button: kind === "development" ? "alm.switch" : "alm.install" };
 }
+
+/** What "Don't ask again" remembers (Task-A07-14): the mismatch this offer is about, the path
+ * Terminal's `alm` leads to (empty when Terminal finds none). The app asks again when it changes. */
+export function almDismissFor(status: AlmStatus | null): string {
+  return status?.mismatch ?? "";
+}
