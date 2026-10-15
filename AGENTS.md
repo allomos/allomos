@@ -13,7 +13,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
 - **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the approver to approve it ([CODING_RULES § The `alm` command](docs/workflow/CODING_RULES.md#the-alm-command)).
 - **Decisions are made by the approver.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
-- **Routine choices are the agent's; real questions go to the approver.** Inside a card, decide names, file layout, how something is built within the card's scope, and small interface details with an obvious sensible default (anything cheap to undo); note each on the card (`Decided: <choice> (<reason>).`) and record it with `alm ai-decided`. Ask the approver first about what users will see and get used to, anything hard to undo (data formats, removing things), anything that changes the plan or another card, and anything with a cost or an outside effect (above). In a quiet automatic or loop run (how it is chosen: task A03-21), never wait: park a real question with `alm wait <id> --on "<the question>"` and go on with the next ready card. Details: [CARDS § Routine choices](docs/workflow/CARDS.md#routine-choices-and-questions-for-the-approver).
+- **Routine choices are the agent's; real questions go to the approver.** Inside a card, decide names, file layout, how something is built within the card's scope, and small interface details with an obvious sensible default (anything cheap to undo); note each on the card (`Decided: <choice> (<reason>).`) and record it with `alm ai-decided`. Ask the approver first about what users will see and get used to, anything hard to undo (data formats, removing things), anything that changes the plan or another card, and anything with a cost or an outside effect (above). Before an automatic or loop run, the approver chooses quiet or normal mode from what `alm guide run-modes` prints (record it in your handoff); in a quiet run, never wait: park a real question with `alm wait <id> --on "<the question>"` and go on with the next ready card. Details: [CARDS § Routine choices](docs/workflow/CARDS.md#routine-choices-and-questions-for-the-approver).
 
 ## AI working mode
 
@@ -41,7 +41,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v9)
+## Tasks: Allomos (v10)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -57,8 +57,13 @@ the project notes (below) and your own handoff file.
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
   then check and move it on: `alm unblock <id>`.
 - Stopping before it is done: `alm release <id> --note "<what the next one needs>"`.
+- Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
+  another), ask the person to choose quiet or normal mode: show them what
+  `alm guide run-modes` prints (in the task language), as it is, and do not start until they
+  choose. Write the choice in your handoff ("Run mode: quiet" or "Run mode: normal", who
+  chose it and when) and follow it until the run ends. In normal mode, ask as usual.
 - Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
-  In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
+  In an automatic or loop run the person set up to go on without them (quiet mode), you
   may finish below it with `alm done <id> --without-human-check "<why, which run>"
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
   In such a run (a quiet run), never stop to wait for the person: decide a routine choice
@@ -101,7 +106,7 @@ Allomos relies on these terms: **area** (what part of the product a task belongs
 has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
-`alm guide workflow`.
+`alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person).
 
 This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
 `--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).
