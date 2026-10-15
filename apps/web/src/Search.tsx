@@ -5,6 +5,7 @@ import { forwardRef } from "react";
 import { useI18n } from "./i18n";
 import { localTime } from "./handoffFlow";
 import { pieces, snippet, type Piece } from "./searchFlow";
+import type { Words } from "./stopFlow";
 import type { Handoff, Task } from "./types";
 
 /** The shortcut that focuses the search box, as this computer writes it. */
@@ -189,5 +190,42 @@ export function FilterHits({
         ))}
       </ul>
     </section>
+  );
+}
+
+/** A banner's words, the strong ones in bold. */
+function Said({ words }: { words: Words }) {
+  return (
+    <>
+      {words.map((w, i) => (w.strong ? <strong key={i}>{w.text}</strong> : w.text))}
+    </>
+  );
+}
+
+/** The banners under the tabs (Task-A01-44): what the search found, in a neutral tint, on top; what
+ * the Show filter shows, in the accent (blue) tint, under it, ending with Show all. */
+export function ListBanners({ search, filter, onShowAll }: { search: Words; filter: Words; onShowAll: () => void }) {
+  const { t } = useI18n();
+  if (search.length === 0 && filter.length === 0) return null;
+  return (
+    <div className="list-banners">
+      {search.length > 0 && (
+        <p className="list-banner search-banner" role="status">
+          <span>
+            <Said words={search} />
+          </span>
+        </p>
+      )}
+      {filter.length > 0 && (
+        <p className="list-banner filter-banner" role="status">
+          <span>
+            <Said words={filter} />
+          </span>
+          <button type="button" className="small" onClick={onShowAll}>
+            {t("filter.show_all")}
+          </button>
+        </p>
+      )}
+    </div>
   );
 }

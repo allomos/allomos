@@ -8,7 +8,8 @@ import { Markdown } from "./Markdown";
 import type { Messenger } from "./messenger";
 import { filterHandoffs, localTime, writers } from "./handoffFlow";
 import { handoffMatches, snippet } from "./searchFlow";
-import { Highlight, Marked } from "./Search";
+import { Highlight, ListBanners, Marked } from "./Search";
+import { filterBanner, filterGroups, handoffGroups, searchBanner, taskCount, type StateFilter } from "./stopFlow";
 import { isProblem } from "./types";
 import type { Handoff, HandoffSettings, Task } from "./types";
 
@@ -17,6 +18,8 @@ export function HandoffsView({
   handoffs,
   terms,
   tasks,
+  stateFilter,
+  onShowAll,
   task,
   onTask,
   onOpenTask,
@@ -31,6 +34,10 @@ export function HandoffsView({
   /** The search box's words (Task-A01-36): only handoffs holding them are shown, the words marked. */
   terms: string[];
   tasks: Task[];
+  /** The list's Show filter (Task-A01-44): a handoff is shown when it names a task the filter keeps. */
+  stateFilter: StateFilter;
+  /** Turns the Show filter off. */
+  onShowAll: () => void;
   /** The task filter, kept by the window so the task pane can open the tab on one task. */
   task: string | null;
   onTask: (task: string | null) => void;
@@ -50,15 +57,24 @@ export function HandoffsView({
   const [latestOnly, setLatestOnly] = useState(true);
   // While searching, older handoffs are searched too: "Latest only" would hide what was asked for.
   const searching = terms.length > 0;
-  const shown = filterHandoffs(handoffs, { task, writer, latestOnly: latestOnly && !searching }).filter((h) =>
+  const listed = filterHandoffs(handoffs, { task, writer, latestOnly: latestOnly && !searching }).filter((h) =>
     handoffMatches(h, terms),
   );
+  // Task-A01-44: under the Show filter, each handoff is the group of the tasks it names; one naming
+  // none the filter keeps is not drawn, and the banner says how many were left out.
+  const kept = filterGroups(handoffGroups(listed, tasks), stateFilter);
+  const keptFiles = new Set(kept.map((g) => g.file));
+  const shown = stateFilter === "all" ? listed : listed.filter((h) => keptFiles.has(h.file));
+  const searchWords = searching && listed.length > 0 ? searchBanner("handoff", listed.length, terms.join(" "), t) : [];
+  const filterWords =
+    listed.length > 0 ? filterBanner(stateFilter, { kind: "handoff", tasks: taskCount(kept), groups: kept.length, total: listed.length }, t) : [];
   const shownFiles = shown.map((h) => h.file).join("\n");
   useEffect(() => onShown(shownFiles ? shownFiles.split("\n") : []), [shownFiles]);
   const titleOf = (id: string) => tasks.find((x) => x.id === id)?.title ?? "";
 
   return (
     <section className="handoffs" aria-label={t("handoffs.title")}>
+      <ListBanners search={searchWords} filter={filterWords} onShowAll={onShowAll} />
       <div className="row handoff-tools">
         <label>
           {t("handoffs.task")}{" "}
@@ -92,7 +108,7 @@ export function HandoffsView({
           {t("handoffs.settings")}
         </button>
       </div>
-      {shown.length === 0 ? (
+      {listed.length > 0 && shown.length === 0 ? null : shown.length === 0 ? (
         <p className="muted">{handoffs.length === 0
             ? t("handoffs.none")
             : searching

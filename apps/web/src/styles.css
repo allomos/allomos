@@ -13,6 +13,8 @@
   --warn-bg: #fdf1df;
   --err: #a1302a;
   --err-bg: #fbe7e5;
+  --info: #1f5fa8;
+  --info-bg: #e6effa;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
@@ -36,6 +38,8 @@
     --warn-bg: #33270f;
     --err: #f08a83;
     --err-bg: #3a1716;
+    --info: #8cbcf0;
+    --info-bg: #142a45;
     color-scheme: dark;
   }
 }
@@ -433,3 +437,14 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .filter-hidden { margin: 0; padding: 8px 16px 10px; color: var(--muted); border-top: 1px solid var(--line); }
 .filter-hidden::before { content: "⊘ "; }
 .search-hidden .area-head .sub::before { content: "⊘ "; }
+
+/* Task-A01-44: the banners under the tabs. The search's is neutral; the Show filter's, under it, is
+   in a blue tint so the two stand apart, and ends with Show all. */
+.list-banners { display: grid; gap: 6px; }
+.list-banner { margin: 0; padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); }
+.list-banner > span { flex: 1; min-width: 0; }
+.search-banner { background: var(--surface); color: var(--ink); }
+.filter-banner { background: var(--info-bg); color: var(--info); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+.filter-banner strong { color: var(--info); }
+.filter-banner button { padding: 4px 12px; color: var(--info); border-color: var(--info); background: transparent; white-space: nowrap; }
+.filter-banner button:hover { background: var(--surface); }
