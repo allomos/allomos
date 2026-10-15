@@ -32,6 +32,7 @@ import {
   type StateFilter,
 } from "./stopFlow";
 import { useFold } from "./useFold";
+import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
 import { keepListed, noteOpened, parseRecentInfo, type RecentInfoMap } from "./recentFlow";
@@ -1269,7 +1270,7 @@ function TaskbagView({
                   stop={stop}
                   iterationName={groupBy === "area" ? iterationName : undefined}
                   selectedId={selectedId}
-                  onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
+                  onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
                   collapsed={folded.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
@@ -1292,7 +1293,7 @@ function TaskbagView({
                   terms={terms}
                   filter={filterName(stateFilter, t)}
                   selectedId={selectedId}
-                  onSelect={(id) => setSelectedId((now) => (now === id ? null : id))}
+                  onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   onShowAll={() => chooseFilter("all")}
                 />
               )}
