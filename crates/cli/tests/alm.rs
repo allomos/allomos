@@ -1821,17 +1821,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v8)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v9)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v7 section (before `alm ai-decided`, Task-A03-19) is out of date too.
+    // A v8 section (before the quiet-run rule, Task-A00-29) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v8)", "## Tasks: Allomos (v7)")
+            brief.replace("## Tasks: Allomos (v9)", "## Tasks: Allomos (v8)")
         ),
     )
     .unwrap();

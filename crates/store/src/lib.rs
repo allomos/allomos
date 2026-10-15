@@ -248,13 +248,19 @@ the project notes (below) and your own handoff file.
   In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
   may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
+  In such a run (a quiet run), never stop to wait for the person: decide a routine choice
+  yourself (below); park a real question with `alm wait <id> --on \"<the question>\"` (it shows in
+  `alm human`, To answer) and go on with the next ready task; do not use `alm confirm` (it would
+  wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`.
-- Routine choices inside a task (a name, a file layout, a small detail with an obvious default,
-  anything cheap to undo) are yours: decide, carry on, and record each one with
-  `alm ai-decided <id> \"<what and why>\"`, so the approver can review it later (`alm human`,
-  To review: AI decisions). When they say they reviewed them: `alm reviewed <id>`. What users
-  will see and get used to, or anything hard to undo, goes to the approver first.
+- Routine choices inside a task (a name, a file layout, how something is built inside the task, a
+  small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
+  record each one with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it
+  later (`alm human`, To review: AI decisions). When they say they reviewed them:
+  `alm reviewed <id>`. What users will see and get used to, anything hard to undo (data formats,
+  removing things), anything that changes the plan or another task, and anything with a cost or
+  an outside effect goes to the approver first.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
   `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
 - Change a task's title, description or handoff note: `alm title <id> \"<title>\"`,

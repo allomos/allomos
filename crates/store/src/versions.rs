@@ -34,7 +34,11 @@ use allomos_core::event::{Change, Kind};
 /// update them; every new piece of work gets its task (Task-A03-20).
 /// 8: routine choices are the agent's, each recorded with `alm ai-decided` for the approver to
 /// review; `alm reviewed` (Task-A03-19, owner rule A00-29).
-pub const SECTION_VERSION: u32 = 8;
+/// 9: the dividing line between routine choices and questions for the approver, and the rule for a
+/// run that goes on without the person (a quiet run): never wait; decide and record routine
+/// choices, park a real question with `alm wait` and go on, no `alm confirm` (Task-A00-29; how
+/// that mode is chosen: Task-A03-21).
+pub const SECTION_VERSION: u32 = 9;
 
 /// How long `alm migrate --finish` waits for another writer.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
