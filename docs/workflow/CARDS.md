@@ -67,6 +67,16 @@ Add an area by editing this table and the board in the same commit.
 - The approver approving a card (`ready`) authorizes all its **local** work: source, tests, docs, commits.
 - Every **external operation** needs its own exact approval, recorded in the card's Approvals section: target, operation, cleanup. See [AGENTS.md § Always-on boundaries](../../AGENTS.md#always-on-boundaries).
 
+## Routine choices and questions for the approver
+
+An agent working a card does not stop to ask the approver about routine choices ([`Task-A00-29`](../tasks/Task-A00-29-routine-choices.md), owner, 2026-10-14). It decides, notes the choice with a one-line reason, and carries on; the approver can overturn it at the check.
+
+- **The agent decides and notes it on the card:** names, file layout, how something is built within the card's scope, small interface details with an obvious sensible default; anything cheap to undo.
+- **Goes to the approver:** what users will see and get used to, anything hard to undo (data formats, removing things), anything that changes the plan or another card, and anything with a cost or an outside effect (already reserved in [AGENTS.md § Always-on boundaries](../../AGENTS.md#always-on-boundaries)).
+- **Card note format**, a dated line in the card's Notes: `- 2026-10-14 — Decided: alm describe, alm note (match the history's describe/note and the existing alm title).` Record the same choice with `alm ai-decided <ID> "<what and why>"`, so it shows in `alm human` under To review: AI decisions until the approver runs (or asks for) `alm reviewed <ID>`.
+- **Writing a new card:** mark as open for the approver only questions of the second kind; leave a routine choice to whoever works the card instead of writing it "to be decided" (`alm guide tasks`, step 5).
+- **A quiet automatic or loop run** (one set up to go on without the approver, such as a card run or `/loop`; how this mode is chosen is task A03-21) never waits for a person: a routine choice is decided, recorded with `alm ai-decided` and the work goes on; a real question parks that card with `alm wait <ID> --on "<the question>"` (it shows in `alm human` under To answer) and the run goes on with the next ready card; `alm confirm` is not used, since it would wait until it times out.
+
 ## Claiming protocol
 
 One card is worked by exactly one session at a time. A session works in the current checkout by default; a worktree is created only when a task needs its own checkout, for example when several sessions work at once. Each such session then has its own git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from `main`. The taskbag, not memory or chat, records who holds what. Every step below is run against that taskbag (see [Where status lives](#where-status-lives)).
@@ -117,5 +127,5 @@ A short table or list: each piece, what it is in everyday words, and where it li
 
 ## Notes
 
-Dated, plain-language progress notes and evidence links. Newest last.
+Dated, plain-language progress notes and evidence links; routine choices as `Decided: <choice> (<reason>).` Newest last.
 ```

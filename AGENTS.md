@@ -13,6 +13,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
 - **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the approver to approve it ([CODING_RULES § The `alm` command](docs/workflow/CODING_RULES.md#the-alm-command)).
 - **Decisions are made by the approver.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
+- **Routine choices are the agent's; real questions go to the approver.** Inside a card, decide names, file layout, how something is built within the card's scope, and small interface details with an obvious sensible default (anything cheap to undo); note each on the card (`Decided: <choice> (<reason>).`) and record it with `alm ai-decided`. Ask the approver first about what users will see and get used to, anything hard to undo (data formats, removing things), anything that changes the plan or another card, and anything with a cost or an outside effect (above). In a quiet automatic or loop run (how it is chosen: task A03-21), never wait: park a real question with `alm wait <id> --on "<the question>"` and go on with the next ready card. Details: [CARDS § Routine choices](docs/workflow/CARDS.md#routine-choices-and-questions-for-the-approver).
 
 ## AI working mode
 
@@ -40,7 +41,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v8)
+## Tasks: Allomos (v9)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -60,13 +61,19 @@ the project notes (below) and your own handoff file.
   In an automatic or loop run the person set up to go on without them (a card run, `/loop`), you
   may finish below it with `alm done <id> --without-human-check "<why, which run>"
   --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
+  In such a run (a quiet run), never stop to wait for the person: decide a routine choice
+  yourself (below); park a real question with `alm wait <id> --on "<the question>"` (it shows in
+  `alm human`, To answer) and go on with the next ready task; do not use `alm confirm` (it would
+  wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`.
-- Routine choices inside a task (a name, a file layout, a small detail with an obvious default,
-  anything cheap to undo) are yours: decide, carry on, and record each one with
-  `alm ai-decided <id> "<what and why>"`, so the approver can review it later (`alm human`,
-  To review: AI decisions). When they say they reviewed them: `alm reviewed <id>`. What users
-  will see and get used to, or anything hard to undo, goes to the approver first.
+- Routine choices inside a task (a name, a file layout, how something is built inside the task, a
+  small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
+  record each one with `alm ai-decided <id> "<what and why>"`, so the approver can review it
+  later (`alm human`, To review: AI decisions). When they say they reviewed them:
+  `alm reviewed <id>`. What users will see and get used to, anything hard to undo (data formats,
+  removing things), anything that changes the plan or another task, and anything with a cost or
+  an outside effect goes to the approver first.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
   `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>"`.
 - Change a task's title, description or handoff note: `alm title <id> "<title>"`,

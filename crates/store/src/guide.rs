@@ -92,7 +92,12 @@ Read this before you add a task, so it fits this project.
 5. **Description** (`--description`, Markdown), in three short parts:
    - **Outcome.** One or two plain sentences.
    - **Done means.** The checks or demonstrations that prove it.
-   - **Notes.** Anything the next person needs: links, open questions, who must decide.
+   - **Notes.** Anything the next person needs: links, open questions, who must decide. Mark as
+     open for the person only what is theirs to decide: what users will see and get used to,
+     anything hard to undo (data formats, removing things), anything that changes the plan or
+     another task, anything with a cost or an outside effect. A routine choice (a name, a file
+     layout, how it is built, a small detail with an obvious default) is not an open question:
+     whoever works the task decides it and records it with `alm ai-decided`.
 6. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
    (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
 7. **One outcome per task.** If it is really two outcomes, add two tasks.
@@ -233,6 +238,11 @@ const WORKFLOW: &str = "# How to work the tasks
    it: the test folder, what to open, what to click, what they should see. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
    it, `alm checked <id>`.
+8. In such a run (a quiet run), never stop to wait for the person. A routine choice: decide it,
+   record it with `alm ai-decided <id> \"<what and why>\"`, and carry on. A real question for the
+   person: park that task with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`
+   under To answer) and go on with the next ready task. Do not use `alm confirm` in such a run: it
+   would wait until it times out.
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
@@ -246,7 +256,7 @@ Rules:
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
 - Before a change the person must agree to, show your plan with `alm confirm` and change nothing
-  unless it exits 0.
+  unless it exits 0 (in a quiet run, park it with `alm wait` instead: step 8).
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
@@ -328,6 +338,25 @@ mod tests {
             assert!(text.contains("handoff"), "{text}");
         }
         assert!(crate::agent_section().contains("every ready task nobody holds"));
+        // In a quiet run the agent never waits: decide, or park the question (Task-A00-29).
+        let flat = |t: String| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
+            let text = flat(text);
+            assert!(text.contains("never stop to wait for the person"), "{text}");
+            assert!(
+                text.contains("alm wait <id> --on \"<the question>\""),
+                "{text}"
+            );
+            assert!(text.contains("go on with the next ready task"), "{text}");
+            assert!(text.contains("it would wait until it times out"), "{text}");
+            assert!(text.contains("changes the plan or another task"), "{text}");
+        }
+        let tasks = flat(guide(Some("tasks")).unwrap());
+        assert!(
+            tasks.contains("A routine choice (a name, a file layout"),
+            "{tasks}"
+        );
+        assert!(tasks.contains("alm ai-decided"), "{tasks}");
         // Routine choices are recorded for review (Task-A03-19).
         for text in [guide(None).unwrap(), crate::agent_section()] {
             assert!(text.contains("alm ai-decided <id>"), "{text}");
