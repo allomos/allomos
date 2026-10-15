@@ -381,6 +381,47 @@ fn add_iteration(
     )
 }
 
+/// The task pane's "New…" iteration (Task-A01-39): the same rule, lock and recorded event as
+/// `alm add iteration`, then task `task` planned in it as `alm plan` would, under the same lock
+/// (two events). A refusal of either adds and plans nothing. Resolves to the planned task.
+fn add_iteration_and_plan_as(
+    root: &Path,
+    name: Option<&str>,
+    task: &str,
+    new: NewIteration,
+) -> Result<allomos_core::Task, Problem> {
+    let id = given(new.id);
+    let details = allomos_core::ops::IterationDetails {
+        release: new.release.as_deref(),
+        start: new.start.as_deref(),
+        end: new.end.as_deref(),
+    };
+    allomos_store::add_iteration_and_plan(
+        root,
+        app_actor(name)?,
+        LOCK_WAIT,
+        task,
+        id.as_deref(),
+        &new.name,
+        details,
+    )
+    .map(|(_, changed)| changed.task)
+}
+
+#[tauri::command]
+fn add_iteration_and_plan(
+    root: PathBuf,
+    task: String,
+    iteration: NewIteration,
+) -> Result<allomos_core::Task, Problem> {
+    add_iteration_and_plan_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &task,
+        iteration,
+    )
+}
+
 /// A new task from an area or iteration group (Task-A01-19): the same rule, lock and recorded event
 /// as `alm add task`; with an iteration, then planned under the same lock as `alm plan` (two
 /// events).
@@ -1209,6 +1250,7 @@ pub fn run() {
             next_ids,
             add_area,
             add_iteration,
+            add_iteration_and_plan,
             add_task,
             rename_area,
             change_iteration,
@@ -1597,6 +1639,30 @@ mod tests {
                 ("add task", Some("Will"), "app")
             ]
         );
+        // The task pane's "New…" iteration, as `messenger.addIterationAndPlan` sends it: added
+        // with the next free ID, then the task planned in it (two events, newest first).
+        assert_eq!(
+            add_iteration_and_plan_as(&root, None, "A01-01", NewIteration::default()),
+            Err(Problem::HolderMissing)
+        );
+        let pane: NewIteration = serde_json::from_value(serde_json::json!({
+            "id": null, "name": "Next", "release": null, "start": "2026-11-01", "end": null
+        }))
+        .unwrap();
+        let t = add_iteration_and_plan_as(&root, Some("Will"), "A01-01", pane).unwrap();
+        assert_eq!(t.iteration.as_deref(), Some("I08"));
+        let h = allomos_store::events::history(&root, "A01-01");
+        assert_eq!(
+            (h.events[0].command.as_str(), h.events[0].via.as_str()),
+            ("plan", "app")
+        );
+        let nameless: NewIteration =
+            serde_json::from_value(serde_json::json!({ "name": " " })).unwrap();
+        assert_eq!(
+            add_iteration_and_plan_as(&root, Some("Will"), "A01-01", nameless),
+            Err(Problem::IterationNameMissing)
+        );
+        assert_eq!(load(&root).taskbag.unwrap().iterations.len(), 2);
         let unknown: allomos_store::NewTask =
             serde_json::from_value(serde_json::json!({ "area": "A09", "title": "x" })).unwrap();
         assert_eq!(

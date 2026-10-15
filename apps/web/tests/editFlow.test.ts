@@ -2,8 +2,21 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SETTABLE_STATES, blockerChoices, draftChanged, startDraft, stateChoices, toEdit, toggleBlocker } from "../src/editFlow.ts";
-import type { Task } from "../src/types.ts";
+import {
+  EMPTY_NEW_ITERATION,
+  NEW_ITERATION,
+  SETTABLE_STATES,
+  blockerChoices,
+  draftChanged,
+  iterationChoices,
+  iterationSavable,
+  startDraft,
+  stateChoices,
+  toEdit,
+  toPaneIteration,
+  toggleBlocker,
+} from "../src/editFlow.ts";
+import type { Iteration, Task } from "../src/types.ts";
 
 const task: Task = {
   id: "A01-01",
@@ -85,4 +98,48 @@ test("blocked is a state the app sets, with the tasks that must finish first (de
     blockerChoices(task, others).map((x) => x.id),
     ["A01-02", "A02-01"],
   );
+});
+
+// The iteration drop-down (Task-A01-39).
+const iterations: Iteration[] = [
+  { id: "I01", name: "First", order: 1, release: "v0.1" },
+  { id: "I02", name: "Second", order: 2 },
+];
+
+test("the iteration list: New… first, No iteration second, then every iteration by ID and name", () => {
+  const choices = iterationChoices(task, iterations);
+  assert.deepEqual(
+    choices.map((c) => c.value),
+    [NEW_ITERATION, "", "I01", "I02"],
+  );
+  assert.deepEqual(choices[2], { kind: "iteration", value: "I01", id: "I01", name: "First", release: "v0.1" });
+  // The current one is selected when the list opens: the draft starts from it.
+  assert.equal(startDraft(task, "iteration").value, "I01");
+  assert.equal(startDraft({ ...task, iteration: null }, "iteration").value, "");
+  // An iteration the taskbag does not list stays offered, after No iteration.
+  assert.deepEqual(
+    iterationChoices({ ...task, iteration: "I09" }, iterations).map((c) => c.value),
+    [NEW_ITERATION, "", "I09", "I01", "I02"],
+  );
+  // "New…" can never be taken for an iteration ID.
+  assert.ok(!/^[A-Za-z0-9_-]+$/.test(NEW_ITERATION));
+});
+
+test("choosing an iteration plans the task, as alm plan; New… needs a name", () => {
+  const d = (value: string) => ({ value, waitingOn: "", who: "", blockedBy: [] as string[] });
+  assert.equal(iterationSavable(task, d("I01"), EMPTY_NEW_ITERATION), false);
+  assert.equal(iterationSavable(task, d("I02"), EMPTY_NEW_ITERATION), true);
+  assert.equal(iterationSavable(task, d(""), EMPTY_NEW_ITERATION), true);
+  assert.deepEqual(toEdit("iteration", d("I02")), { field: "iteration", iteration: "I02" });
+  assert.deepEqual(toEdit("iteration", d("")), { field: "iteration", iteration: null });
+  assert.equal(iterationSavable(task, d(NEW_ITERATION), EMPTY_NEW_ITERATION), false);
+  assert.equal(iterationSavable(task, d(NEW_ITERATION), { name: " ", start: "", end: "" }), false);
+  assert.equal(iterationSavable(task, d(NEW_ITERATION), { name: "Third", start: "", end: "" }), true);
+  assert.deepEqual(toPaneIteration({ name: " Third ", start: "2026-11-01", end: " " }), {
+    id: null,
+    name: "Third",
+    release: null,
+    start: "2026-11-01",
+    end: null,
+  });
 });
