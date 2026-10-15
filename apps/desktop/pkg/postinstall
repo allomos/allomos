@@ -3,9 +3,17 @@
 # a link /usr/local/bin/alm -> the alm inside Allomos.app, so updating the app updates alm too.
 # One link, and the latest install wins (owner, 2026-10-14, Task-A07-15): whatever is there, a
 # development build's link (scripts/install-dev-alm.sh) or anything else, now leads to this app.
-app_alm="${2:-/Applications}/Allomos.app/Contents/MacOS/alm"
-link=/usr/local/bin/alm
-[ -x "$app_alm" ] || exit 0
-mkdir -p /usr/local/bin
-ln -sfn "$app_alm" "$link"
+#
+# The app always goes to /Applications (build-mac-pkg.sh: install-location /Applications, not
+# relocatable), so the link names that fixed path. It does not take the folder from Installer's
+# `$2` (Task-A07-13): with another Allomos.app on the Mac the link must still lead here, so nothing
+# Installer passes may steer it. Only `$3`, the volume being installed on ("/" normally), is used:
+# to find the app and the link folder on that volume. The link itself names the path as seen when
+# the Mac runs from that volume.
+app_alm=/Applications/Allomos.app/Contents/MacOS/alm
+volume="${3:-/}"
+volume="${volume%/}"
+[ -x "$volume$app_alm" ] || exit 0
+mkdir -p "$volume/usr/local/bin"
+ln -sfn "$app_alm" "$volume/usr/local/bin/alm"
 exit 0

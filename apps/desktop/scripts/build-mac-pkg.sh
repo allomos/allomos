@@ -23,4 +23,11 @@ pkg="$out/Allomos_${version}_aarch64.pkg"
 pkgbuild --quiet --root "$work/root" --component-plist "$work/component.plist" \
   --install-location /Applications --scripts "$work/scripts" \
   --identifier io.allomos.pkg --version "$version" "$pkg"
+# Check what was built (Task-A07-13): Installer must put the app in /Applications and never move
+# it onto another Allomos.app it finds (no <relocate> entry), and postinstall must be the one here.
+pkgutil --expand "$pkg" "$work/expanded"
+info="$work/expanded/PackageInfo"
+grep -q 'install-location="/Applications"' "$info" || { echo "$pkg: install-location is not /Applications" >&2; exit 1; }
+grep -q '<relocate>' "$info" && { echo "$pkg: Allomos.app is relocatable" >&2; exit 1; }
+cmp -s "$work/expanded/Scripts/postinstall" "$here/pkg/postinstall" || { echo "$pkg: postinstall differs from pkg/postinstall" >&2; exit 1; }
 echo "$pkg"
