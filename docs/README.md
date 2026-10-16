@@ -8,8 +8,8 @@
 |---|---|---|
 | [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the taskbag (`../allomos-taskbag/.allomos/taskbag/`, read with `alm list` or the app). | status |
 | taskbag `handoffs/` and `project-notes.md` (in `../allomos-taskbag/.allomos/taskbag/`, outside this repository) | Each session's handoff (`alm handoffs`), and what every session must know: running, pitfalls, where credentials live, current truth. Replaced `AGENT_HANDOFF.md` on 2026-10-12 | handoff |
-| [guide/](./guide/) | The user guide in English, Chinese and Japanese, built with Astro Starlight; published at https://mypals-ml.github.io/allomos/ once approved ([`A07-10`](./tasks/Task-A07-10-user-guide-on-github-pages.md)) | user guide |
-| [tasks/](./tasks/) | One file per card: outcome, scope, approvals, notes | cards |
+| [guide/](./guide/) | The user guide in English, Chinese and Japanese, built with Astro Starlight; published at https://mypals-ml.github.io/allomos/ once approved (`A07-10`) | user guide |
+| taskbag `tasks/<id>/description.md` (outside this repository) | Each task's full detail: outcome, details, rules, approvals, and evidence under an **Evidence** heading (`alm show <id>`, written with `alm describe`). Replaced the card files in `docs/tasks/` on 2026-10-16 (`A00-30`) | tasks |
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
 | [product/REQUIREMENTS.md](./product/REQUIREMENTS.md) | Numbered requirements (R1…) cited by cards and tests | contract |
@@ -17,7 +17,6 @@
 | [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
 | [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md) | Agent roles and effort, starting a session, handoff timing and contents, new-session rule, switching providers | contract |
-| [workflow/CARDS.md](./workflow/CARDS.md) | Areas, card IDs and template, states and labels, approvals, a new card, Now rules (claiming and branches: `alm guide workflow`) | contract |
 | [decisions/](./decisions/README.md) | One record per decision, with status (open / proposed / accepted) | decisions |
 | [discussions/](./discussions/) | Dated records of planning discussions with the owner | history |
 | [analysis/](./analysis/) | Analyses of reference material | analysis |
@@ -42,4 +41,4 @@
 
 - A new file only for a **contract**, **evidence**, a **decision record**, a **discussion record**, or material the owner asks for, such as the [road show deck](./pitch/README.md) ([AGENTS.md § Working procedure](../AGENTS.md#working-procedure)). Status goes in the taskbag, with `alm`.
 - Supersede by editing the stale line in place; do not add a companion document.
-- Evidence of what actually ran goes under `docs/research/` or `docs/evidence/`, linked from the card.
+- Evidence of what actually ran goes under `docs/research/` or `docs/evidence/`, linked from the task's description.

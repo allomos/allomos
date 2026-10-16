@@ -32,19 +32,19 @@ The folder that holds a project's tasks, formerly the **task box**, is now the *
 
 - The folder on disk and the command option are renamed too: `.fliphopper/taskcase/`, `fh --taskcase`. FlipHopper keeps reading old `.fliphopper/seabag/` folders, so no project breaks.
 - Other names considered: 手提箱 (the owner chose 任务箱 for Chinese), taskfolder (clashes with "FlipHopper folder" and "project folder"), shoulderbag, 背包, 双肩包.
-- **Not built yet.** Until [`Task-A01-20`](../tasks/Task-A01-20-rename-seabag-to-taskcase.md) is done, the product and its documents still say "seabag". The owner checked a rename of the app itself to "Handoff" or similar and kept FlipHopper for now (2026-10-10, [`Task-A00-20`](../tasks/Task-A00-20-app-name-research.md)).
+- **Not built yet.** Until task `A01-20` is done, the product and its documents still say "seabag". The owner checked a rename of the app itself to "Handoff" or similar and kept FlipHopper for now (2026-10-10, task `A00-20`).
 
 ## Amendment 2026-10-10 (later the same day): Allomos and the taskbag
 
 **Decided by the owner, 2026-10-10.**
 
-- **The app is renamed Allomos**: Greek *állos* ("other") plus *ōmos* ("shoulder"), *the other shoulder*. Chinese name **换肩** (huàn jiān: shifting the load to the other shoulder so the carrying goes on). Japanese **アロモス**. The command is `allomos`, short alias **`alm`**; **`fh` is not kept**. The hopper icon stays. The owner registers the domains. Work: [`Task-A00-21`](../tasks/Task-A00-21-rename-to-allomos.md). This supersedes "keep FlipHopper for now".
-- **The seabag becomes the taskbag, not the taskcase**: Chinese **任务包**, Japanese **タスクバッグ**. A bag is carried on the shoulder, so the word belongs to the "other shoulder" picture. With the new app name the folder is **`.allomos/taskbag/`**; old `.fliphopper/seabag/` folders are still read. Work: [`Task-A01-20`](../tasks/Task-A01-20-rename-seabag-to-taskcase.md), done together with A00-21 so every project moves only once.
+- **The app is renamed Allomos**: Greek *állos* ("other") plus *ōmos* ("shoulder"), *the other shoulder*. Chinese name **换肩** (huàn jiān: shifting the load to the other shoulder so the carrying goes on). Japanese **アロモス**. The command is `allomos`, short alias **`alm`**; **`fh` is not kept**. The hopper icon stays. The owner registers the domains. Work: task `A00-21`. This supersedes "keep FlipHopper for now".
+- **The seabag becomes the taskbag, not the taskcase**: Chinese **任务包**, Japanese **タスクバッグ**. A bag is carried on the shoulder, so the word belongs to the "other shoulder" picture. With the new app name the folder is **`.allomos/taskbag/`**; old `.fliphopper/seabag/` folders are still read. Work: task `A01-20`, done together with A00-21 so every project moves only once.
 - Names considered on the way: Handoff, HandoffHub, TagTeamHub, Batonhop, TaskHub, ProjectHub, OtherShoulder, ShoulderShift, Spallio, Ombroca, Cambro (a registered food-service brand), Allomos ([research](../research/app-name-handoff.md)).
 
 ## Why this name
 
-The owner compared several names after a name check ([`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md#name-decision)). CrossJump, the first choice, is used by three game makers; CrossJumper is a person's name and social handles; CrossHopper reads two ways and sits near the Hopper and Grasshopper trademarks; SideHopper is a well-known Nintendo enemy. FlipHopper was free on crates.io, npm, GitHub and the `.io` and `.com` domains, and a web search found no product, company or trademark. This was not a legal trademark search; one is advised before selling under the name.
+The owner compared several names after a name check (task `A00-17`). CrossJump, the first choice, is used by three game makers; CrossJumper is a person's name and social handles; CrossHopper reads two ways and sits near the Hopper and Grasshopper trademarks; SideHopper is a well-known Nintendo enemy. FlipHopper was free on crates.io, npm, GitHub and the `.io` and `.com` domains, and a web search found no product, company or trademark. This was not a legal trademark search; one is advised before selling under the name.
 
 ## Where the old name stays
 
@@ -54,10 +54,10 @@ The owner compared several names after a name check ([`Task-A00-17`](../tasks/Ta
 - finished cards, and dated lines in any card's Notes;
 - lines that state the old name on purpose, such as "renamed from `glidebox`".
 
-Card file names never change ([CARDS.md](../workflow/CARDS.md#card-ids-and-files)), so `Task-A01-03-gb-command.md` and `Task-A00-17-rename-to-crossjump.md` keep their names.
+Card file names never change (`docs/workflow/CARDS.md`, removed 2026-10-16), so `Task-A01-03-gb-command.md` and `Task-A00-17-rename-to-crossjump.md` keep their names.
 
 ## Consequences
 
 - [0010](./0010-project-data-folder.md), [FILE-FORMAT.md](../product/FILE-FORMAT.md), [GLOSSARY.md](../GLOSSARY.md) and [REQUIREMENTS.md](../product/REQUIREMENTS.md) R87–R88 follow this record.
-- The `fh` command ([`Task-A01-03`](../tasks/Task-A01-03-gb-command.md)) is built once, with the new name.
+- The `fh` command (task `A01-03`) is built once, with the new name.
 - A seabag made by an earlier build must be created again.

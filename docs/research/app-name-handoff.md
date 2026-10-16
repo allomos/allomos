@@ -1,6 +1,6 @@
 # Research — renaming FlipHopper to "Handoff" or something like it
 
-**Evidence** for [`Task-A00-20`](../tasks/Task-A00-20-app-name-research.md). Checked by the agent on 2026-10-10. Not a legal trademark search.
+**Evidence** for task `A00-20`. Checked by the agent on 2026-10-10. Not a legal trademark search.
 
 ## In plain words
 
@@ -37,7 +37,7 @@ A product rename is bigger than the taskcase rename, and it is done once. It cov
 - the local folder;
 - the decks.
 
-This is why the taskcase rename ([`Task-A01-20`](../tasks/Task-A01-20-rename-seabag-to-taskcase.md)) waits for this answer: if the app's name changes, `.fliphopper/taskcase/` would change again, and every project would move twice.
+This is why the taskcase rename (task `A01-20`) waits for this answer: if the app's name changes, `.fliphopper/taskcase/` would change again, and every project would move twice.
 
 ## Evidence
 
@@ -76,7 +76,7 @@ Products and uses found by web search:
 - **Apps named Handoff:** the contractor-estimates app at handoff.ai on the App Store and Google Play ([App Store](https://apps.apple.com/app/id6470666320), [help](https://help.handoff.ai/en/articles/9564137-is-handoff-available-on-the-app-stores)); and an older Mac-to-iOS link sender ([MacStories](https://www.macstories.net/reviews/handoff-pushes-web-pages-from-your-computer-to-any-ios-device/)).
 - **Batonhop, Relayhop, Handhop:** no product found ([search](https://apps.apple.com/tj/app/bhop-multiplayer-game/id6444131055?mt=12) found only unrelated "bhop" games).
 
-**Limits:** registries and web search only, US results. No trademark database was searched directly. Before selling under a new name, a proper search in Japan, China and the US is advised (as in [`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md#name-check-2026-10-06-agent)).
+**Limits:** registries and web search only, US results. No trademark database was searched directly. Before selling under a new name, a proper search in Japan, China and the US is advised (as in task `A00-17`).
 
 ## Addendum 2026-10-10: "…Hub" names
 
@@ -110,4 +110,4 @@ They also name what every task tracker does, not what FlipHopper does differentl
 
 ### Allomos trademark search (2026-10-10)
 
-See [`Task-A00-21` Notes](../tasks/Task-A00-21-rename-to-allomos.md#notes): no ALLOMOS, 换肩, 換肩 or アロモス mark in WIPO's Global Brand Database (US, Japan, EU, UK, Madrid and others; China's national register is not in it and needs a CNIPA account). Similar software marks: ALLMOS (US, class 9), ALOMOS (SG/MY/ID, class 9), ALTOMOS (Japan, classes 9 and 42), allmos electronic (DE/EU, class 9). Source: [WIPO Global Brand Database](https://branddb.wipo.int/en/similarname), [coverage](https://branddb.wipo.int/en/coverage).
+See `Task-A00-21` Notes: no ALLOMOS, 换肩, 換肩 or アロモス mark in WIPO's Global Brand Database (US, Japan, EU, UK, Madrid and others; China's national register is not in it and needs a CNIPA account). Similar software marks: ALLMOS (US, class 9), ALOMOS (SG/MY/ID, class 9), ALTOMOS (Japan, classes 9 and 42), allmos electronic (DE/EU, class 9). Source: [WIPO Global Brand Database](https://branddb.wipo.int/en/similarname), [coverage](https://branddb.wipo.int/en/coverage).

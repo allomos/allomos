@@ -4,7 +4,7 @@
 |---|---|---|---|
 | **Accepted** | 2026-10-14 | 2026-10-14 | will.w.hui |
 
-Card: [`Task-A01-31`](../tasks/Task-A01-31-blocked-state.md). Accepted by the owner on 2026-10-14 (said in the owner's other session, relayed here, and confirmed by the owner in this session's chat).
+Card: task `A01-31`. Accepted by the owner on 2026-10-14 (said in the owner's other session, relayed here, and confirmed by the owner in this session's chat).
 
 ## In plain words
 
@@ -37,7 +37,7 @@ Anything outside the taskbag — an attorney's reply, a vendor's release — sta
 2. **`blocked` is new.** `alm block <id> --by A01-17 [A01-20 …]` sets the state and a new task field `blocked_by` (a list of task IDs). Each ID must be a task in the same taskbag, not the task itself. `alm unblock <id>` (or `alm ready <id>`) moves it on.
 3. **`alm` tells, the agent checks.** `alm list`, `show` and `next` print each blocker with its current state ("A01-17 (done)"). When every blocker is done, `alm next` says so ("A01-31: all blockers are done — unblock it?"); it does **not** move the task by itself (see Open point 3).
 4. **The app** shows the two states with different words and colours, in the task pane, the list, and the state filters, in every UI language (en, zh-CN, ja).
-5. **Format** goes from `allomos/3` to `allomos/4` through the guided migration of [A01-32](../tasks/Task-A01-32-guided-migration.md), not a code step: version 4's migration entry says what changed (the `blocked` state, the optional `who` and `blocked_by` fields), and `alm migrate --finish` sets the new version only when the taskbag has no issues; older Allomos builds see `taskbag_newer` and ask to be updated. **Existing `waiting` tasks stay `waiting`**: the entry does not guess which ones are really blocked by a task; an agent or the owner may move them with `alm block` afterwards. A03-18's human-check changes land in the same version 4.
+5. **Format** goes from `allomos/3` to `allomos/4` through the guided migration of `A01-32`, not a code step: version 4's migration entry says what changed (the `blocked` state, the optional `who` and `blocked_by` fields), and `alm migrate --finish` sets the new version only when the taskbag has no issues; older Allomos builds see `taskbag_newer` and ask to be updated. **Existing `waiting` tasks stay `waiting`**: the entry does not guess which ones are really blocked by a task; an agent or the owner may move them with `alm block` afterwards. A03-18's human-check changes land in the same version 4.
 
 ## Alternatives considered
 
@@ -52,7 +52,7 @@ Anything outside the taskbag — an attorney's reply, a vendor's release — sta
 
 - **Format:** `allomos/3` → `allomos/4`, through a migration entry in A01-32's guided migration (no code step; `alm upgrade` is replaced by `alm migrate`); FILE-FORMAT gains the `blocked` state, `blocked_by` and `who`, and validation rules (a `blocked` task has at least one `blocked_by`; each is a known task ID; not itself).
 - **Existing data:** nothing moves on upgrade; `waiting` tasks stay `waiting`.
-- **Contract text:** "the six states" becomes seven in `alm guide terms` / `customize`, the `alm brief` section copied into every project's AGENTS.md (this repository's [Tasks: Allomos](../../AGENTS.md#tasks-allomos-v2) included), [CARDS § States and labels](../workflow/CARDS.md#states-and-labels) and [CODING_RULES](../workflow/CODING_RULES.md). Projects with an older AGENTS.md section learn of it through `alm`'s renewed instructions ([A03-07](../tasks/Task-A03-07-renew-agent-instructions.md)).
+- **Contract text:** "the six states" becomes seven in `alm guide terms` / `customize`, the `alm brief` section copied into every project's AGENTS.md (this repository's [Tasks: Allomos](../../AGENTS.md#tasks-allomos-v2) included), CARDS § States and labels (`docs/workflow/CARDS.md`, removed 2026-10-16) and [CODING_RULES](../workflow/CODING_RULES.md). Projects with an older AGENTS.md section learn of it through `alm`'s renewed instructions (`A03-07`).
 - **Loop and `alm next`:** a `blocked` task is skipped by state, not by reading text.
 - **Progress views:** "what waits on the owner" counts only `waiting` tasks; `blocked` is shown apart.
 - **App:** new state name, colour and filter; the pane's edit form gains "Blocked by" with a task picker; texts in all three languages.

@@ -111,6 +111,9 @@ Read this before you add a task, so it fits this project.
      another task, anything with a cost or an outside effect. A routine choice (a name, a file
      layout, how it is built, a small detail with an obvious default) is not an open question:
      whoever works the task decides it and records it with `alm ai-decided`.
+   The description is the task's whole record: there is no separate card file. As the work goes
+   on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
+   checked, with numbers and logs, under an **Evidence** heading).
 6. **Branch.** Say which Git branch you are on: `--branch <name>` (`git branch --show-current`;
    alm reads no Git). The new task gets a base branch, by its real name: the branch it starts
    from and merges back into. When the branch you are on is a task's working branch, the new
@@ -267,7 +270,8 @@ const WORKFLOW: &str = "# How to work the tasks
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
    every meaningful step): `alm handoff --tasks <id> --as <your session name>`, then fill in the
    file it names, in plain words first, for any reader: you do not know who takes over, an agent
-   or a person. Evidence goes on the task's card, not in the handoff.
+   or a person. Evidence goes in the task's description (`alm describe`, under an **Evidence**
+   heading), not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
 7. Finished: only once the task has the top label of the ladder (a person has checked it: the

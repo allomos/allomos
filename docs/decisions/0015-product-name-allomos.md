@@ -30,7 +30,7 @@ The folder that holds a project's tasks, the **seabag**, is now the **taskbag**:
 
 ## Why this name
 
-Checked on 2026-10-10 and 2026-10-11 ([research](../research/app-name-handoff.md), [`Task-A00-21`](../tasks/Task-A00-21-rename-to-allomos.md)):
+Checked on 2026-10-10 and 2026-10-11 ([research](../research/app-name-handoff.md), task `A00-21`):
 - **free:** crates.io, npm and GitHub; `allomos.com`, `.io`, `.dev` and `.app` not registered;
 - **no mark:** no ALLOMOS, 换肩 or アロモス mark in WIPO's Global Brand Database, which covers the US, Japan, the EU, the UK and Madrid marks;
 - **similar marks:** ALLMOS (US, phone cases), ALTOMOS (Japan, medical supplies, broad list including software) and ALOMOS (South-East Asia), judged low risk by the agent;

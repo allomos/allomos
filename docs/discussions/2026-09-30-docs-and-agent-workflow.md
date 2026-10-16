@@ -24,7 +24,7 @@ Notable changes in the SSR project since the kickoff analysis:
 | `CLAUDE.md` imports `AGENTS.md` | [CLAUDE.md](../../CLAUDE.md) |
 | `AI-WORKFLOW.md` roles, handoff timing, new-session rule, provider switch | [workflow/AI-WORKFLOW.md](../workflow/AI-WORKFLOW.md) |
 | `AGENT_HANDOFF.md` structure | [AGENT_HANDOFF.md](../AGENT_HANDOFF.md), with a block template |
-| Card format, labels, claiming protocol, Now rules | [workflow/CARDS.md](../workflow/CARDS.md) |
+| Card format, labels, claiming protocol, Now rules | `workflow/CARDS.md` (removed 2026-10-16) |
 | Board with session registry and waiting-on-owner table | [TASK_BOARD.md](../TASK_BOARD.md) |
 | Status only on the card (generated board) | Status only on the **board row** — no generator exists yet, so one hand-edited table is the single home. Revisit when glidebox tracks itself (M3). |
 | Label ladder ending in hosted deploy + owner check | implemented → locally verified → deployed and verified → owner verified; docs cards use drafted → owner accepted |
@@ -42,4 +42,4 @@ Documents were grouped by kind: `docs/product/` (plan, requirements), `docs/work
 ## Outcomes
 
 - The owner's requirement that **agents develop glidebox** is recorded in [AGENTS.md](../../AGENTS.md) and the workflow contracts.
-- Everything else awaits the owner's review ([`Task-A00-01`](../tasks/Task-A00-01-planning-docs.md)).
+- Everything else awaits the owner's review (task `A00-01`).
