@@ -33,6 +33,8 @@ import {
   type StateFilter,
 } from "./stopFlow";
 import { useFold } from "./useFold";
+import { parseSort, sortTasks, type Sort } from "./sortFlow";
+import { SortMenu } from "./SortMenu";
 import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
@@ -1006,6 +1008,7 @@ function HopFigure() {
 type GroupBy = "area" | "iteration" | "handoffs";
 const GROUP_BY_KEY = "allomos.groupBy";
 const STATE_FILTER_KEY = "allomos.stateFilter";
+const SORT_KEY = "allomos.iterationSort";
 
 function readGroupBy(): GroupBy {
   try {
@@ -1103,6 +1106,23 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
+  // The Iterations tab's sort (Task-A01-52), remembered like the tab and the filter.
+  const [sort, setSort] = useState<Sort>(() => {
+    try {
+      return parseSort(localStorage.getItem(SORT_KEY));
+    } catch {
+      return parseSort(null);
+    }
+  });
+  const chooseSort = (s: Sort) => {
+    setSort(s);
+    try {
+      localStorage.setItem(SORT_KEY, JSON.stringify(s));
+    } catch {
+      /* storage unavailable: the choice lasts until the window closes */
+    }
+  };
+  const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
   const stop = (task: Task) => stopText(task, box?.tasks ?? [], t);
   // The search box (Task-A01-36): one search for the task list and the Handoffs tab, emptied when
   // another project opens. Cmd/Ctrl+F focuses it.
@@ -1132,13 +1152,13 @@ function TaskbagView({
         name: it.name,
         sub: iterationSub(it, t),
         empty: t("iteration.no_tasks"),
-        tasks: box.tasks.filter((task) => task.iteration === it.id),
+        tasks: inOrder(box.tasks.filter((task) => task.iteration === it.id)),
         newTask: { area: null, iteration: it.id },
         edit: { kind: "iteration", id: it.id },
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
-    const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
+    const unplanned = inOrder(box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration)));
     if (unplanned.length > 0)
       groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned, newTask: { area: null, iteration: null } });
   } else if (box) {
@@ -1378,6 +1398,7 @@ function TaskbagView({
                   ))}
                 </select>
               </label>
+              {groupBy === "iteration" && <SortMenu sort={sort} onChange={chooseSort} />}
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">

@@ -458,3 +458,22 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
 .build-app .run-modes summary { cursor: pointer; }
+
+/* Task-A01-52: the Iterations tab's sort menu. */
+.sort-menu { position: relative; display: inline-flex; }
+.sort-button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
+.sort-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.sort-button.on { border-color: var(--accent); color: var(--accent-ink); }
+.sort-popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 190px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 0;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); display: flex; flex-direction: column;
+}
+.sort-popover .sort-heading { color: var(--muted); font-size: 12px; padding: 4px 12px; }
+.sort-popover hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+.sort-popover button {
+  border: none; border-radius: 0; background: none; text-align: left; font-weight: 400;
+  padding: 5px 12px 5px 30px; position: relative;
+}
+.sort-popover button:hover { background: var(--bg); }
+.sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }

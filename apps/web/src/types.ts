@@ -185,6 +185,8 @@ export interface Opened {
   ai_decisions?: Record<string, AiDecision[]>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
+  /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */
+  last_changed?: Record<string, string>;
   /** Card files agents reported as still in the project folder (Task-A00-30). */
   cards_outside?: CardOutside[];
 }

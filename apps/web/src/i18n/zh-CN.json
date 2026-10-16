@@ -510,5 +510,17 @@
   "problem.card_not_found": "没有文件 {path}。",
   "problem.card_exists": "任务 {id} 已经有另一个卡片文件，所以没有替换它。",
   "problem.card_empty": "卡片文件 {path} 是空的，所以没有搬入任何东西。",
-  "problem.card_not_reported": "没有人报告任务 {id} 的卡片文件。"
+  "problem.card_not_reported": "没有人报告任务 {id} 的卡片文件。",
+  "sort.label": "对每个迭代中的任务排序",
+  "sort.summary": "{key}，{dir}",
+  "sort.by": "排序方式",
+  "sort.by_id": "ID",
+  "sort.by_name": "名称",
+  "sort.by_changed": "最后修改",
+  "sort.id_asc": "升序",
+  "sort.id_desc": "降序",
+  "sort.name_asc": "A → Z",
+  "sort.name_desc": "Z → A",
+  "sort.changed_asc": "最早在前",
+  "sort.changed_desc": "最新在前"
 }

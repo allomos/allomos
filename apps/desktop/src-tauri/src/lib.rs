@@ -40,6 +40,9 @@ struct Opened {
     /// Each task's base and working branch, by task ID (Task-A03-22), from the history: the New
     /// task form chooses the new task's base from the open tasks' bases.
     branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
+    /// When each task last changed, by task ID (Task-A01-52), from the history: the Iterations
+    /// tab's sort menu orders by it.
+    last_changed: std::collections::BTreeMap<String, String>,
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
     /// "N tasks keep their card files in the project folder" with **Move the cards in…**.
     cards_outside: Vec<allomos_core::card::Outside>,
@@ -112,6 +115,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
         loaded,
         ai_decisions: allomos_store::ai_decisions(&root),
         branches: allomos_store::branches(&root),
+        last_changed: allomos_store::last_changed(&root),
         cards_outside,
         root,
         readme_added: false,
@@ -146,6 +150,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         loaded: load(&root),
         ai_decisions: Default::default(),
         branches: Default::default(),
+        last_changed: Default::default(),
         cards_outside: Vec::new(),
         root,
         readme_added,
@@ -843,6 +848,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         loaded: load(&root),
         ai_decisions: Default::default(),
         branches: Default::default(),
+        last_changed: Default::default(),
         cards_outside: Vec::new(),
         root,
         readme_added: false,
@@ -2143,6 +2149,11 @@ mod tests {
             .iter()
             .map(|e| (e.command.as_str(), e.by.as_deref(), e.via.as_str()))
             .collect();
+        // Task-A01-52: the task's last change is its newest event.
+        assert_eq!(
+            open_taskbag(root.clone()).last_changed.get("A01-01"),
+            Some(&h.events[0].at)
+        );
         // Newest first.
         assert_eq!(
             seen,

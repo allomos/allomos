@@ -510,5 +510,17 @@
   "problem.card_not_found": "There is no file {path}.",
   "problem.card_exists": "Task {id} already has a different card file, so it was not replaced.",
   "problem.card_empty": "The card file {path} is empty, so nothing was moved in.",
-  "problem.card_not_reported": "No card file was reported for task {id}."
+  "problem.card_not_reported": "No card file was reported for task {id}.",
+  "sort.label": "Sort the tasks in each iteration",
+  "sort.summary": "{key}, {dir}",
+  "sort.by": "Sort by",
+  "sort.by_id": "ID",
+  "sort.by_name": "Name",
+  "sort.by_changed": "Last changed",
+  "sort.id_asc": "ascending",
+  "sort.id_desc": "descending",
+  "sort.name_asc": "A → Z",
+  "sort.name_desc": "Z → A",
+  "sort.changed_asc": "oldest first",
+  "sort.changed_desc": "newest first"
 }
