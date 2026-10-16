@@ -8,7 +8,7 @@
 //! (Task-A03-25-01), the goal prompt Allomos types into an agent for the person ([`goal`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 8] = [
+pub const GUIDE_TOPICS: [&str; 9] = [
     "terms",
     "customize",
     "tasks",
@@ -17,6 +17,7 @@ pub const GUIDE_TOPICS: [&str; 8] = [
     "run-modes",
     "agent-files",
     "goal",
+    "move-cards",
 ];
 
 /// The topics written in every language of [`RUN_MODES_LANGUAGES`], printed in the task language.
@@ -118,8 +119,10 @@ Read this before you add a task, so it fits this project.
      another task, anything with a cost or an outside effect. A routine choice (a name, a file
      layout, how it is built, a small detail with an obvious default) is not an open question:
      whoever works the task decides it and records it with `alm ai-decided`.
-   The description is the task's whole record: there is no separate card file. As the work goes
-   on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
+   The description is the task's record. A project that keeps a card file per task keeps it
+   beside the task, as `tasks/<id>/card.md` (`alm card <id> --from <file>`), linked from the
+   description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
+   goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
    checked, with numbers and logs, under an **Evidence** heading).
 6. **Branch.** Say which Git branch you are on: `--branch <name>` (`git branch --show-current`;
    alm reads no Git). The new task gets a base branch, by its real name: the branch it starts
@@ -216,6 +219,13 @@ Plan:
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`.
+- `alm cards`: the card files agents reported as still in the project folder (the app shows
+  them as \"N tasks keep their card files in the project folder\"). `alm cards found
+  <id>=<path> …`: report the card files you found there (paths relative to the project folder);
+  `<id>=` withdraws a report. `alm card <id> [--from <file>]`: move a task's card file in, as
+  `tasks/<id>/card.md`, and point the description's `Card:` link to it; a different card already
+  there is replaced only with `--replace` (to keep a moved card up to date). Same holder rule as
+  `alm describe`. See `alm guide move-cards`.
 - `alm plan <id> [<iteration>]`; `alm labels \"<a,b,…>\"`; `alm rename label \"<old>\" \"<new>\"`
   (a step of the ladder, and every task that carries it)
 - `alm task-language`: the language to write new and changed tasks in (run it before
@@ -251,12 +261,63 @@ About Allomos:
 - `alm guide goal [--language <code>]`: the goal prompt: given a person's description of an app,
   plan it into areas, iterations and ready tasks and build it release by release, recording every
   step with `alm`; same languages.
+- `alm guide move-cards`: how to find card files kept outside the taskbag, report them, and
+  move them in beside their tasks after the person's Go ahead.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
   folder, or where `--taskbag` says.
 - `alm move-in [--language <code>]`: when `alm` says the taskbag was written by an older
   Allomos (`taskbag_to_move_in`), the request for moving its tasks into a new taskbag, like
   another task system; tell the person first. It changes nothing; the person confirms the plan
   with `alm confirm`.
+";
+
+/// `alm guide move-cards` (Task-A00-30, approver 2026-10-16): Allomos does not look for card files;
+/// the agent finds them, reports them with `alm cards found`, and moves them in after the person's
+/// Go ahead (`alm confirm`).
+const MOVE_CARDS: &str = "# Moving card files in beside their tasks
+
+A card file holds one task's detail in a file of its own (its outcome, approvals, notes and
+evidence). In Allomos it lives in the taskbag, beside the task's own files, as
+`tasks/<id>/card.md`, and the task's description links to it with a line
+`Card: [card.md](card.md)`, so a task is kept in one place and the Allomos app opens its card.
+Neither `alm` nor the app looks for card files: you find them, and nothing moves until the person
+says Go ahead.
+
+1. Look first, change nothing. Find the tasks whose description links to a file outside the
+   taskbag, most often a `Card:` line pointing into the project folder (`alm list --json` gives
+   every description). Also look in the project folder for card files named after task IDs (for
+   example `docs/tasks/Task-A01-02-*.md`) that no description links to. A card file belongs to the
+   task its link or its name names. Card files without a task are never moved: list them for the
+   person. A description that holds a whole card merged into it may be split back the same way:
+   the card's part becomes the card file, the description keeps the rest and the `Card:` link.
+2. Report what you found, so the person sees it even before you ask: `alm cards found
+   <id>=<path> <id>=<path> …` (each path relative to the project folder; several in one command).
+   The Allomos app then shows \"N tasks keep their card files in the project folder\" with
+   **Move the cards in…**. `alm cards` lists the reports; `alm cards found <id>=` withdraws one.
+3. The one question. Write the plan in Markdown to a file outside the project: every card file
+   and the task it goes to (`tasks/<id>/card.md`); the links that change (each description's
+   `Card:` link; links inside a card that are relative to its old place; links in other documents
+   to a card's old place); the originals you will remove from the project folder; card files
+   without a task; tasks you cannot change (an open task held by another session: its holder
+   moves it later); and how you will commit. Then `alm confirm --title \"Move the cards in\"
+   --plan <file>`. Exit code 0 means go ahead with the whole plan; any other means change
+   nothing: tell the person and stop. (In a quiet run, do not use `alm confirm`: park the plan as
+   a question with `alm wait`.)
+4. Move each card. When it links to other files by relative paths, first write a copy outside the
+   project whose links work from `tasks/<id>/`: a link to another card becomes `../<ID>/card.md`;
+   a link to a project file becomes its path from the task's folder (the form the `Card:` links
+   used, for example `../../../../docs/x.md` when the taskbag is the project's
+   `.allomos/taskbag/`); a link to a file that no longer exists becomes plain text. Then
+   `alm card <id> --from <copy>` (without `--from`: the reported file as it is). `alm` writes
+   `tasks/<id>/card.md`, points the description's `Card:` link to it (adding one at the top when
+   there is none) and clears the report; it never replaces a different `card.md` (`card_exists`).
+   A finished or dropped task can be changed whoever is named as its holder.
+5. Finish what the plan names: remove the originals from the project folder (`git rm`), change the
+   documents that linked to a card's old place, and remove the cards folder once it is empty.
+   Commit the taskbag's changes (the Git commands `alm` printed) and the project's changes, each
+   in its own repository. Check: `alm cards` lists none, `alm list --json` reports no issues, and
+   every moved task's `Card:` link opens its `card.md`.
+6. Tell the person what moved, what did not and why, and the card files without a task.
 ";
 
 const WORKFLOW: &str = "# How to work the tasks
@@ -1031,6 +1092,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "run-modes" => Some(RUN_MODES_EN),
         "agent-files" => Some(AGENT_FILES_EN),
         "goal" => Some(GOAL_EN),
+        "move-cards" => Some(MOVE_CARDS),
         _ => None,
     };
     match topic {

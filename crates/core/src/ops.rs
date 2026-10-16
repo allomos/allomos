@@ -18,7 +18,7 @@ pub struct Outcome {
 }
 
 impl Outcome {
-    fn plain(task: Task) -> Self {
+    pub(crate) fn plain(task: Task) -> Self {
         Outcome {
             task,
             warnings: Vec::new(),
@@ -60,7 +60,12 @@ pub fn find_task(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
 }
 
 /// Refuse when someone other than `me` holds the task. An unheld task may be changed by anyone.
+/// A finished or dropped task counts as held by nobody: the holder it keeps is history, not a
+/// claim (approver, 2026-10-16, task A00-30).
 pub(crate) fn check_holder(task: &Task, me: Option<&str>) -> Result<(), Problem> {
+    if matches!(task.state, State::Done | State::Dropped) {
+        return Ok(());
+    }
     match &task.holder {
         Some(h) if Some(h.as_str()) != me => Err(Problem::TaskHeld {
             id: task.id.clone(),
@@ -2003,5 +2008,21 @@ mod tests {
         let e: Edit = serde_json::from_str(r#"{"field":"iteration","iteration":null}"#).unwrap();
         assert_eq!(e, Edit::Iteration { iteration: None });
         assert!(serde_json::from_str::<Edit>(r#"{"field":"holder","holder":"x"}"#).is_err());
+    }
+
+    #[test]
+    fn finished_and_dropped_tasks_count_as_held_by_nobody() {
+        // Approver, 2026-10-16 (Task-A00-30): the holder a finished task keeps is history.
+        let mut s = bag();
+        s.tasks[0].holder = Some("old/session".into());
+        s.tasks[0].state = State::Done;
+        assert!(set_description(&s, &s.tasks[0].id.clone(), Some("me"), "New").is_ok());
+        s.tasks[0].state = State::Dropped;
+        assert!(set_title(&s, &s.tasks[0].id.clone(), Some("me"), "New").is_ok());
+        s.tasks[0].state = State::InProgress;
+        assert!(matches!(
+            set_description(&s, &s.tasks[0].id.clone(), Some("me"), "New"),
+            Err(Problem::TaskHeld { .. })
+        ));
     }
 }

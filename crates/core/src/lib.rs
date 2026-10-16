@@ -5,6 +5,7 @@
 //! file contents, and get back typed values plus a list of [`Issue`]s.
 
 pub mod branch;
+pub mod card;
 pub mod decision;
 pub mod event;
 mod model;

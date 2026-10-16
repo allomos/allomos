@@ -170,6 +170,17 @@ problems! {
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
     CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
+    /// `alm cards found`: a card file's place must be a relative path inside the project folder
+    /// (Task-A00-30).
+    CardPathInvalid { path } => "card_path_invalid", "\"{path}\" is not a card file's place: give its path inside the project folder, relative to that folder, such as docs/tasks/A01-01.md.";
+    /// `alm cards found` / `alm card`: the card file named is not there.
+    CardNotFound { path } => "card_not_found", "There is no file {path}.";
+    /// `alm card`: the task's folder already holds another card file, which is never replaced.
+    CardExists { id } => "card_exists", "Task {id} already has a different card file (tasks/{id}/card.md), so it was not replaced. Compare the two; to replace it on purpose, add --replace.";
+    /// `alm card`: the card file given is empty.
+    CardEmpty { path } => "card_empty", "The card file {path} is empty, so nothing was moved in.";
+    /// `alm card` without `--from`, for a task no agent reported a card file for.
+    CardNotReported { id } => "card_not_reported", "No card file was reported for task {id}. Name it: `alm card {id} --from <file>`.";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

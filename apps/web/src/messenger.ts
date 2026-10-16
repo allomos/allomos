@@ -53,6 +53,13 @@ export interface Messenger {
   setRecentFolders(folders: string[]): Promise<void>;
   /** Calls `handler` when File → Connect with the Agents… is chosen. */
   onConnectMenu(handler: () => void): Promise<() => void>;
+  /** Calls `handler` when File → Move the Cards In… is chosen (Task-A00-30). */
+  onMoveCardsMenu(handler: () => void): Promise<() => void>;
+  /** Move the cards in… (Task-A00-30): opens `agent` in the project folder of the taskbag at
+   * `taskbag` with the move-cards request typed in. Nothing is sent. Rejects with a Problem. */
+  moveCards(agent: string, taskbag: string, language: string): Promise<void>;
+  /** Move the cards in… with Manual: the same request, to copy. */
+  moveCardsRequest(taskbag: string, language: string): Promise<string>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
   findAgents(): Promise<Agent[]>;
   /**
@@ -167,7 +174,7 @@ export interface Messenger {
   projectSetup(root: string): Promise<SetupState>;
   /** Records `folder` as the project folder of the taskbag at `root`. Rejects with a Problem. */
   setProjectFolder(root: string, folder: string): Promise<SetupState>;
-  /** Enables or disables File → Connect with the Agents…. */
+  /** Enables or disables File → Connect with the Agents… and File → Move the Cards In…. */
   setConnectEnabled(enabled: boolean): Promise<void>;
 }
 
@@ -178,6 +185,7 @@ export interface MenuTexts {
   clearMenu: string;
   noRecent: string;
   connect: string;
+  moveCards: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -207,6 +215,9 @@ export const desktopMessenger: Messenger = {
   setMenuTexts: (words) => invoke<void>("set_menu_texts", { words }),
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
+  onMoveCardsMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_cards", () => handler()),
+  moveCards: (agent, taskbag, language) => invoke<void>("move_cards", { agent, taskbag, language }),
+  moveCardsRequest: (taskbag, language) => invoke<string>("move_cards_request", { taskbag, language }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),

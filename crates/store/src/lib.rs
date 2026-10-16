@@ -26,6 +26,7 @@ use allomos_core::{
 };
 use serde::Serialize;
 
+pub mod cards;
 mod confirm;
 mod convert;
 pub mod events;
@@ -287,6 +288,10 @@ the project notes (below) and your own handoff file.
   `alm describe <id> --text \"<markdown>\"` (or `--from <file.md>`), `alm note <id> \"<text>\"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
+- Card files: a task's card file (its detail in a file of its own) lives beside the task in the
+  taskbag, as `tasks/<id>/card.md`, and the description's `Card:` link points to it. If tasks
+  link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
+  propose moving them in, following `alm guide move-cards`.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
@@ -320,7 +325,8 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
 `alm guide agent-files` (one set of shared rules for every agent, done once per agent),
-`alm guide goal` (the goal prompt: build an app from a description, release by release).
+`alm guide goal` (the goal prompt: build an app from a description, release by release),
+`alm guide move-cards` (card files: moving them in beside their tasks).
 "
     )
 }

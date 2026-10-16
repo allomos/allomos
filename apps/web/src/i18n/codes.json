@@ -41,6 +41,21 @@
     "id",
     "state"
   ],
+  "card_empty": [
+    "path"
+  ],
+  "card_exists": [
+    "id"
+  ],
+  "card_not_found": [
+    "path"
+  ],
+  "card_not_reported": [
+    "id"
+  ],
+  "card_path_invalid": [
+    "path"
+  ],
   "confirm_declined": [],
   "confirm_timeout": [
     "seconds"

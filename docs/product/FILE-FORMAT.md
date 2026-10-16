@@ -35,6 +35,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
     A01-01/
       task.json
       description.md
+      card.md       optional: the task's card file (A00-30)
     A01-02/
       task.json
       description.md
@@ -168,6 +169,12 @@ Empty optional fields are left out rather than written as `null`. **Unknown fiel
 
 Free Markdown: the task's outcome and details. Optional; it is not stored inside `task.json`.
 
+## `tasks/<id>/card.md` (optional)
+
+Added by task `A00-30` (approver, 2026-10-16), **without a format change**: a project that keeps a card file per task (the task's detail, approvals and evidence in a file of its own) keeps it here, beside the task, and the description links to it with a line `Card: [card.md](card.md)`, which the app opens. Free Markdown, written only with `alm card <id> --from <file>` (a different `card.md` is replaced only with `--replace`). Older Allomos versions read only `task.json` and `description.md` in a task's folder and ignore other files, so they still open a taskbag that has card files.
+
+- **Card files still in the project folder.** Allomos looks for none itself. An AI agent, told by Allomos's instructions (`alm brief`, `alm next`, `alm guide move-cards`), finds them and reports them with `alm cards found <id>=<path>`; each report is an event (`command` `cards found`, change `card_outside` with the path, relative to the project folder, as `to`; a report withdrawn, or the card moved in, has only `from`). The app shows "N tasks keep their card files in the project folder" with **Move the cards in…** from those events alone, so the report adds no file and no field. Moving a card in is one `card` event: the description's change, `card_outside` emptied, and `card` set to `card.md`.
+
 ## Writing rules (how writers take turns)
 
 Owner's choice A, 2026-10-06 (task `A01-03`).
@@ -208,7 +215,7 @@ Added by task `A01-25`. Allomos reads `format` before anything else in `project.
 - A taskbag that A01-32's guided migration was updating (`alm migrate`, `alm migrate --finish`, the "being updated" lock, `taskbag_older`, `taskbag_too_old`, `migration_missing`) is now simply older: it is moved in like the others. Those commands and problems are gone.
 - **Known limit:** another computer still running an older Allomos keeps writing to the old folder's name until it is updated; people install the new Allomos first.
 
-Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v11)` (v2: the handoff lines, A03-06; v3: the rule for finishing a task and `alm next` listing every free ready task, A03-15; v4: `alm wait --who`, `alm block` / `unblock` and the seven states, A01-31; the human check, `--without-human-check` with `--steps`, `alm human` and `alm checked`, A03-18; v5 to v11, up to the base branch at `alm claim` and `alm add task`, A03-22: listed at `SECTION_VERSION` in `crates/store/src/versions.rs`). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the instructions…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
+Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too, in its heading: `## Tasks: Allomos (v14)` (v2: the handoff lines, A03-06; v3: the rule for finishing a task and `alm next` listing every free ready task, A03-15; v4: `alm wait --who`, `alm block` / `unblock` and the seven states, A01-31; the human check, `--without-human-check` with `--steps`, `alm human` and `alm checked`, A03-18; v5 to v14, up to card files beside their tasks, A00-30: listed at `SECTION_VERSION` in `crates/store/src/versions.rs`). A heading without one, or with a lower one, is out of date: `alm` adds the warning `instructions_outdated` to every command, telling the agent to replace the section with `alm brief`'s output, and the app shows **Update the instructions…**. Both checks are made only once an agent is connected: the section is in an instruction file of the project folder (the one recorded in `project_folder`, else the folder holding `.allomos/`).
 
 ## Not yet in this version
 

@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v13)
+## Tasks: Allomos (v14)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -93,6 +93,10 @@ the project notes (below) and your own handoff file.
   `alm describe <id> --text "<markdown>"` (or `--from <file.md>`), `alm note <id> "<text>"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
+- Card files: a task's card file (its detail in a file of its own) lives beside the task in the
+  taskbag, as `tasks/<id>/card.md`, and the description's `Card:` link points to it. If tasks
+  link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
+  propose moving them in, following `alm guide move-cards`.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
@@ -126,7 +130,8 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
 `alm guide agent-files` (one set of shared rules for every agent, done once per agent),
-`alm guide goal` (the goal prompt: build an app from a description, release by release).
+`alm guide goal` (the goal prompt: build an app from a description, release by release),
+`alm guide move-cards` (card files: moving them in beside their tasks).
 
 This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
 `--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).

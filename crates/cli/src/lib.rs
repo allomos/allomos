@@ -286,6 +286,23 @@ enum Command {
     },
     /// Set the task's handoff note (what the next one needs); no text clears it.
     Note { id: String, text: Option<String> },
+    /// Card files agents reported as still in the project folder; `alm cards found <id>=<path>…`
+    /// reports the ones you found (see `alm guide move-cards`).
+    Cards {
+        #[command(subcommand)]
+        what: Option<CardsWhat>,
+    },
+    /// Move a task's card file in beside it, as tasks/<id>/card.md, and point the description's
+    /// `Card:` link to it. Without --from: the file reported with `alm cards found`.
+    Card {
+        id: String,
+        /// The card's text (for example a copy whose links you fixed). Default: the reported file.
+        #[arg(long, value_name = "FILE")]
+        from: Option<PathBuf>,
+        /// Replace a different card.md already there (to keep a moved card up to date).
+        #[arg(long)]
+        replace: bool,
+    },
     /// Change the project's name and/or ID; without either, show them.
     Project {
         #[arg(long)]
@@ -359,6 +376,16 @@ enum Command {
         /// Only the rule for checking the handoffs yourself and removing finished ones.
         #[arg(long, conflicts_with = "latest")]
         check: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum CardsWhat {
+    /// Report card files you found in the project folder: <id>=<path> (relative to the project
+    /// folder), several at once; <id>= withdraws a report.
+    Found {
+        #[arg(value_name = "ID=PATH", required = true)]
+        items: Vec<String>,
     },
 }
 
@@ -488,6 +515,7 @@ impl Command {
             | Command::Title { id, .. }
             | Command::Describe { id, .. }
             | Command::Note { id, .. }
+            | Command::Card { id, .. }
             | Command::Drop { id } => Some(id),
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Init { .. }
@@ -504,6 +532,7 @@ impl Command {
             | Command::HandoffTemplate { .. }
             | Command::Handoff { .. }
             | Command::Handoffs { .. }
+            | Command::Cards { .. }
             | Command::Next { .. } => None,
         }
     }
@@ -528,6 +557,9 @@ impl Command {
         }
         if let Command::HandoffTemplate { set } = self {
             return set.is_some();
+        }
+        if let Command::Cards { what } = self {
+            return what.is_some();
         }
         !matches!(
             self,
@@ -581,6 +613,11 @@ impl Command {
             Command::Title { .. } => "title",
             Command::Describe { .. } => "describe",
             Command::Note { .. } => "note",
+            Command::Cards { what: None } => "cards",
+            Command::Cards {
+                what: Some(CardsWhat::Found { .. }),
+            } => "cards found",
+            Command::Card { .. } => "card",
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
             Command::Next { .. } => "next",
@@ -2225,6 +2262,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 });
                 blocked.push(task_json_in(&bag, t));
             }
+            // Card files (Task-A00-30): alm looks for none; it says what agents reported, or
+            // asks the agent to look.
+            let outside = allomos_store::cards::outside(&root);
+            let cards = next_cards_line(outside.len());
+            text.push_str(&cards);
             // At the start of a session: when this agent must write its handoff (Task-A03-06).
             let rules = bag.project.handoff.clone().unwrap_or_default().applied(me);
             text.push_str(&rules_line(&rules));
@@ -2242,6 +2284,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "blocked": blocked,
                     "handoff_rules": rules,
                     "project_notes": notes,
+                    "cards_outside": outside,
+                    "cards": cards.trim_end(),
                 }),
                 text,
             );
@@ -2414,6 +2458,96 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 None => text.clone().unwrap_or_default(),
             };
             change(cli, cwd, |bag| ops::set_description(bag, id, me, &text))
+        }
+        Command::Cards { what } => {
+            let root = locate(cli, cwd)?;
+            match what {
+                None => {
+                    let (_, issues) = taskbag_of(&root, load(&root))?;
+                    let outside = allomos_store::cards::outside(&root);
+                    let mut done = Done::new(
+                        json!({ "taskbag": root, "cards_outside": outside }),
+                        cards_text(&outside),
+                    );
+                    done.issues = issues;
+                    Ok(done)
+                }
+                Some(CardsWhat::Found { items }) => {
+                    let items = items
+                        .iter()
+                        .map(|item| match item.split_once('=') {
+                            Some((id, path)) => Ok((id.trim().to_string(), path.to_string())),
+                            None => Err(Problem::BadUsage {
+                                detail: format!(
+                                    "\"{item}\" is not <id>=<path>, for example A01-01=docs/tasks/A01-01.md."
+                                ),
+                            }),
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let r =
+                        allomos_store::cards::report(&root, Actor::alm(me), lock_wait(), &items)?;
+                    let mut text = String::new();
+                    for o in &r.found {
+                        text.push_str(&format!("Reported: {}  {}\n", o.task, o.path));
+                    }
+                    for id in &r.withdrawn {
+                        text.push_str(&format!("Withdrawn: {id}\n"));
+                    }
+                    if r.found.is_empty() && r.withdrawn.is_empty() {
+                        text.push_str("Nothing new to report.\n");
+                    }
+                    text.push_str(&cards_text(&r.outside));
+                    let mut done = Done::new(
+                        json!({
+                            "taskbag": root,
+                            "found": r.found,
+                            "withdrawn": r.withdrawn,
+                            "cards_outside": r.outside,
+                        }),
+                        text,
+                    );
+                    done.issues = r.issues;
+                    Ok(done)
+                }
+            }
+        }
+        Command::Card { id, from, replace } => {
+            let root = locate(cli, cwd)?;
+            let from = from.as_ref().map(|f| cwd.join(f));
+            let m = allomos_store::cards::move_in(
+                &root,
+                Actor::alm(me),
+                lock_wait(),
+                id,
+                from.as_deref(),
+                *replace,
+            )?;
+            let mut text = format!("{}\n", task_line(&m.task));
+            text.push_str(&format!(
+                "  card file: {} (from {})\n  The description's Card: link points to it.\n",
+                m.card,
+                plain_path(&m.source).display()
+            ));
+            if let Some(path) = &m.reported {
+                text.push_str(&format!(
+                    "alm removes nothing outside the taskbag. When your confirmed plan says so, remove the original from the project folder, for example: git -C {} rm -- {}\n",
+                    quoted(&plain_path(&m.project).display().to_string()),
+                    quoted(path)
+                ));
+            }
+            let mut done = Done::new(
+                json!({
+                    "taskbag": root,
+                    "task": task_json(&m.task),
+                    "card": m.card,
+                    "source": m.source,
+                    "reported": m.reported,
+                    "original": m.original,
+                }),
+                text,
+            );
+            done.issues = m.issues;
+            Ok(done)
         }
         Command::Note { id, text } => change(cli, cwd, |bag| {
             ops::set_handoff_note(bag, id, me, text.as_deref())
@@ -2619,4 +2753,41 @@ fn change(
     done.warnings = changed.warnings;
     done.issues = changed.issues;
     Ok(done)
+}
+
+/// What `alm cards` says: the card files agents reported as still in the project folder, and what
+/// to do about them (Task-A00-30).
+fn cards_text(outside: &[allomos_core::card::Outside]) -> String {
+    if outside.is_empty() {
+        return "No card files are reported as kept in the project folder. If tasks link to card \
+files outside the taskbag, report them with `alm cards found <id>=<path>` (`alm guide move-cards`).\n"
+            .to_string();
+    }
+    let mut text = format!(
+        "{} task(s) keep their card files in the project folder:\n",
+        outside.len()
+    );
+    for o in outside {
+        let by = o.by.as_deref().unwrap_or("?");
+        text.push_str(&format!(
+            "  {}  {}  (reported by {by}, {})\n",
+            o.task, o.path, o.at
+        ));
+    }
+    text.push_str(
+        "Propose moving them in beside their tasks, and do it only after the person's Go ahead: `alm guide move-cards`.\n",
+    );
+    text
+}
+
+/// `alm next`'s line about card files (Task-A00-30): the reported ones still outside the taskbag,
+/// or, when none are, the request to look.
+fn next_cards_line(outside: usize) -> String {
+    if outside > 0 {
+        format!(
+            "Card files: {outside} task(s) keep their card files in the project folder (`alm cards`): propose moving them in beside their tasks, following `alm guide move-cards`.\n"
+        )
+    } else {
+        "Card files: if tasks link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and propose moving them in (`alm guide move-cards`).\n".to_string()
+    }
 }

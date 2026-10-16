@@ -184,6 +184,17 @@ export interface Opened {
   ai_decisions?: Record<string, AiDecision[]>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
+  /** Card files agents reported as still in the project folder (Task-A00-30). */
+  cards_outside?: CardOutside[];
+}
+
+/** A card file an agent reported as still in the project folder (`alm cards found`, Task-A00-30). */
+export interface CardOutside {
+  task: string;
+  /** Relative to the project folder, with `/`. */
+  path: string;
+  at: string;
+  by?: string;
 }
 
 /** An AI agent found on this computer (see apps/desktop/src-tauri/src/agents.rs). */

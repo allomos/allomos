@@ -487,5 +487,21 @@
   "build.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The areas, iterations and tasks the agent makes appear here as it works.",
   "build.manual_intro": "Open your AI agent in {path}, paste this request there and press Enter. The areas, iterations and tasks it makes appear here as it works.",
   "build.manual_done": "Send the copied request in your AI agent. The areas, iterations and tasks it makes appear here as it works.",
-  "build.not_started": "The taskbag is ready, but no agent was asked to build the app. To try again, choose Build a new app… on the start page with another empty folder."
+  "build.not_started": "The taskbag is ready, but no agent was asked to build the app. To try again, choose Build a new app… on the start page with another empty folder.",
+  "menu.move_cards": "Move the Cards In…",
+  "cards.notice": "{count} tasks keep their card files in the project folder. An AI agent can move each one into the taskbag, beside its task.",
+  "cards.button": "Move the cards in…",
+  "cards.title": "Move the cards in",
+  "cards.body": "Choose one of your AI agents. Allomos opens it in your project folder with a request already typed in, asking it to find the card files kept there and move each one into the taskbag, beside its task, with the task's Card: link pointing to it. The agent first shows you its plan in Allomos: nothing changes until you choose Go ahead. Nothing is sent until you send it yourself.",
+  "cards.open": "Open",
+  "cards.manual_intro": "Copy this request into an AI agent working in your project folder, and send it.",
+  "cards.asked": "Opened {agent}. Read the request there and send it. The notice goes away once the agent has moved the cards in.",
+  "cards.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The notice goes away once the agent has moved the cards in.",
+  "pane.card": "Card file",
+  "pane.card_outside": "Card file in the project folder",
+  "problem.card_path_invalid": "\"{path}\" is not a card file's place: give its path inside the project folder, relative to that folder.",
+  "problem.card_not_found": "There is no file {path}.",
+  "problem.card_exists": "Task {id} already has a different card file, so it was not replaced.",
+  "problem.card_empty": "The card file {path} is empty, so nothing was moved in.",
+  "problem.card_not_reported": "No card file was reported for task {id}."
 }
