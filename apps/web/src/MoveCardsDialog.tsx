@@ -9,12 +9,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
-import { AGENT_KEY, PASTE_KEYS } from "./AgentsPanel";
+import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
+import { MANUAL } from "./agentPickerFlow";
 import { COPIED_MS } from "./manualFlow";
-import { MANUAL, agentChoices, firstAgent } from "./buildAppFlow";
 import { isProblem } from "./types";
 import type { CardRow } from "./moveCardsFlow";
-import type { Agent } from "./types";
 
 export function MoveCardsDialog({
   messenger,
@@ -31,8 +30,8 @@ export function MoveCardsDialog({
   onClose: (message: string | null) => void;
 }) {
   const { t, problem, language } = useI18n();
-  const [agents, setAgents] = useState<Agent[] | null>(null);
-  const [agent, setAgent] = useState<string | null>(null);
+  // The shared agent picker (Task-A05-07).
+  const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Manual: the request to copy. */
@@ -42,27 +41,6 @@ export function MoveCardsDialog({
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
-
-  useEffect(() => {
-    let live = true;
-    messenger
-      .findAgents()
-      .then((found) => {
-        if (!live) return;
-        setAgents(found);
-        setAgent(firstAgent(found));
-      })
-      .catch(() => {
-        if (!live) return;
-        setAgents([]);
-        setAgent(MANUAL);
-      });
-    return () => {
-      live = false;
-    };
-  }, [messenger]);
-
-  const tool = agents?.find((a) => a.id === agent) ?? null;
 
   const open = async () => {
     if (!agent) return;
@@ -74,7 +52,7 @@ export function MoveCardsDialog({
         return;
       }
       await messenger.moveCards(agent, root, language);
-      const name = t(AGENT_KEY[agent as Agent["id"]]);
+      const name = t(AGENT_KEY[agent]);
       onClose(tool?.how === "paste" ? t("cards.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("cards.asked", { agent: name }));
     } catch (e) {
       fail(e);
@@ -120,33 +98,7 @@ export function MoveCardsDialog({
 
         <div className="dialog-body wizard-body">
           {request === null ? (
-            agents === null ? (
-              <p className="muted searching" role="status">
-                <span className="spinner" aria-hidden="true" /> {t("agents.searching")}
-              </p>
-            ) : (
-              <ul className="agent-list">
-                {agentChoices(agents).map((id) => {
-                  const found = agents.find((a) => a.id === id);
-                  return (
-                    <li key={id}>
-                      <label>
-                        <input type="radio" name="cards-agent" checked={agent === id} onChange={() => setAgent(id)} disabled={busy} />{" "}
-                        <strong>{id === MANUAL ? t("agents.manual") : t(AGENT_KEY[id as Agent["id"]])}</strong>{" "}
-                        <span className="muted">
-                          —{" "}
-                          {id === MANUAL
-                            ? t("agents.manual_how")
-                            : `${t(found?.how === "link" ? "agents.how_link" : "agents.how_paste")} (${found?.found ?? ""})`}
-                        </span>
-                      </label>
-                      {id === "claude_app" && agent === id && <p className="muted small hint">{t("agents.claude_app_trust")}</p>}
-                      {found?.how === "paste" && agent === id && <p className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</p>}
-                    </li>
-                  );
-                })}
-              </ul>
-            )
+            <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="cards-agent" />
           ) : (
             <div className="manual">
               <p className="small">{t("cards.manual_intro")}</p>

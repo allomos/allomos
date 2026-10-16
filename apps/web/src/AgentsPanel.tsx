@@ -3,38 +3,19 @@
 // the project folder, then opens it with the request typed in: add Allomos's instructions, then
 // look for the project's existing tasks and, if it finds some, ask with `alm confirm` before
 // moving them. Allomos never sends a request; the person does. **Manual** (Task-A05-06), offered
-// even when no known agent is found, shows the same request with Copy, for any other AI.
+// even when no known agent is found, shows the same request with Copy, for any other AI. The
+// agent choice is the shared picker (`AgentPicker`, Task-A05-07), which other features use too.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
-import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { Agent, InstructionFiles } from "./types";
+import type { InstructionFiles } from "./types";
 import { movingTasks, updateNotice } from "./versionFlow";
-import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, firstChoice, manualWritten } from "./manualFlow";
+import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
+import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import type { Seen } from "./manualFlow";
-
-export const AGENT_KEY: Record<Agent["id"], Key> = {
-  claude_cli: "agents.claude_cli",
-  claude_app: "agents.claude_app",
-  codex_cli: "agents.codex_cli",
-  codex_app: "agents.codex_app",
-};
-
-/** The tools of one agent, in the order the first is chosen: the app before the terminal
- * (owner, 2026-10-10; until then the terminal came first). */
-const GROUPS: { name: string; tools: Agent["id"][] }[] = [
-  { name: "Claude", tools: ["claude_app", "claude_cli"] },
-  { name: "Codex", tools: ["codex_app", "codex_cli"] },
-];
-
-/** The keys that paste in a terminal on this computer. */
-export const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";
-
-/** Show "Looking for AI agents…" only when finding them is slow. */
-const SPINNER_AFTER_MS = 200;
 
 /** What happened when the panel closes. */
 export interface ConnectResult {
@@ -67,11 +48,7 @@ export function AgentsPanel({
   onDone: (result: ConnectResult) => void;
 }) {
   const { t, rich, problem, language } = useI18n();
-  const [agents, setAgents] = useState<Agent[] | null>(null);
-  const [slow, setSlow] = useState(false);
-  /** Per group (by name): the chosen tool, or none when the group is not ticked. */
-  const [picked, setPicked] = useState<Record<string, Agent["id"]>>({});
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const { agents, slow, choice, setChoice } = useAgents(messenger);
   const [project, setProject] = useState(startProject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,40 +72,9 @@ export function AgentsPanel({
     };
   }, [messenger, taskbag]);
 
-  useEffect(() => {
-    let live = true;
-    const timer = window.setTimeout(() => live && setSlow(true), SPINNER_AFTER_MS);
-    messenger
-      .findAgents()
-      .then((found) => {
-        if (!live) return;
-        setAgents(found);
-        // In each group the first found tool is chosen; only the first group is ticked.
-        const first: Record<string, Agent["id"]> = {};
-        for (const g of GROUPS) {
-          const tool = g.tools.find((id) => found.some((a) => a.id === id));
-          if (tool) first[g.name] = tool;
-        }
-        setPicked(first);
-        setTicked(new Set([firstChoice(GROUPS.filter((g) => first[g.name]).map((g) => g.name))]));
-      })
-      .catch(() => {
-        if (!live) return;
-        setAgents([]);
-        setTicked(new Set([MANUAL]));
-      })
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      live = false;
-      window.clearTimeout(timer);
-    };
-  }, [messenger]);
-
-  // One agent (owner, 2026-10-12): choosing a group replaces the choice.
-  const toggleGroup = (name: string) => setTicked(new Set([name]));
-  const chosen = GROUPS.filter((g) => ticked.has(g.name) && picked[g.name]).map((g) => picked[g.name]);
-  const manual = ticked.has(MANUAL);
-  const choice = [...ticked][0] ?? null;
+  // One agent (owner, 2026-10-12).
+  const chosen = choice && choice !== MANUAL ? [choice] : [];
+  const manual = choice === MANUAL;
   const buttons = connectActions(agents === null ? null : choice, agents?.length ?? 0, updating !== null);
 
   // Manual: the request (the same automatic sending types in), what the project looked like when
@@ -298,109 +244,39 @@ export function AgentsPanel({
         )}
       </div>
       <p className="muted">{t("agents.taskbag", { path: taskbag })}</p>
-      {agents === null ? (
-        slow && (
-          <p className="muted searching" role="status">
-            <span className="spinner" aria-hidden="true" /> {t("agents.searching")}
-          </p>
-        )
-      ) : (
-        <>
-        {agents.length === 0 && <p>{t(updating ? "update.no_agent" : "agents.none")}</p>}
-        <ul className="agent-list">
-          {GROUPS.map((g) => {
-            const tools = g.tools
-              .map((id) => agents.find((a) => a.id === id))
-              .filter((a): a is Agent => a !== undefined);
-            if (tools.length === 0) return null;
-            const on = ticked.has(g.name);
-            return (
-              <li key={g.name}>
-                <label>
-                  <input
-                    type="radio"
-                    name="agent-group"
-                    checked={on}
-                    onChange={() => toggleGroup(g.name)}
-                    disabled={busy}
-                  />{" "}
-                  <strong>{g.name}</strong>
-                </label>
-                <ul className="agent-tools">
-                  {tools.map((a) => (
-                    <li key={a.id}>
-                      <label className={on ? undefined : "muted"}>
-                        {tools.length > 1 && (
-                          <>
-                            <input
-                              type="radio"
-                              name={`tool-${g.name}`}
-                              checked={picked[g.name] === a.id}
-                              onChange={() => setPicked((p) => ({ ...p, [g.name]: a.id }))}
-                              disabled={busy || !on}
-                            />{" "}
-                          </>
-                        )}
-                        {t(AGENT_KEY[a.id])}{" "}
-                        {/* How it will open: only for the chosen tool (owner, 2026-10-12). */}
-                        {on && picked[g.name] === a.id && (
-                          <span className="muted">
-                            — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
-                          </span>
-                        )}
-                        {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
-                        {a.id === "claude_app" && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
-                        {/* The chosen tool takes the request from the clipboard: say how, right here. */}
-                        {on && picked[g.name] === a.id && a.how === "paste" && (
-                          <span className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</span>
-                        )}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            );
-          })}
-          {/* Manual (Task-A05-06): any AI, even when none is found; the person pastes the request. */}
-          <li>
-            <label>
-              <input
-                type="radio"
-                name="agent-group"
-                checked={manual}
-                onChange={() => toggleGroup(MANUAL)}
-                disabled={busy}
-              />{" "}
-              <strong>{t("agents.manual")}</strong> <span className="muted">— {t("agents.manual_how")}</span>
-            </label>
-            {manual && (
-              <div className="manual">
-                <p className="small">{rich("manual.intro", { path: <code>{project}</code> })}</p>
-                <textarea
-                  className="manual-request"
-                  readOnly
-                  rows={8}
-                  aria-label={t("manual.request")}
-                  value={request ?? ""}
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-                <div className="row start">
-                  <button type="button" onClick={() => void copy()} disabled={busy || request === null}>
-                    {t("manual.copy")}
-                  </button>
-                  <span className="muted small" role="status">
-                    {copied ? t("manual.copied") : ""}
-                  </span>
-                </div>
-                <p className="small" role="status">
-                  {written.length > 0 ? t("manual.seen", { files: written.join(", ") }) : t("manual.waiting")}
-                </p>
-              </div>
-            )}
-          </li>
-        </ul>
-        </>
-      )}
+      {agents !== null && agents.length === 0 && <p>{t(updating ? "update.no_agent" : "agents.none")}</p>}
+      <AgentPicker
+        agents={agents}
+        slow={slow}
+        choice={choice}
+        onChoose={setChoice}
+        disabled={busy}
+        name="connect-agent"
+        manual={
+          <div className="manual">
+            <p className="small">{rich("manual.intro", { path: <code>{project}</code> })}</p>
+            <textarea
+              className="manual-request"
+              readOnly
+              rows={8}
+              aria-label={t("manual.request")}
+              value={request ?? ""}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <div className="row start">
+              <button type="button" onClick={() => void copy()} disabled={busy || request === null}>
+                {t("manual.copy")}
+              </button>
+              <span className="muted small" role="status">
+                {copied ? t("manual.copied") : ""}
+              </span>
+            </div>
+            <p className="small" role="status">
+              {written.length > 0 ? t("manual.seen", { files: written.join(", ") }) : t("manual.waiting")}
+            </p>
+          </div>
+        }
+      />
       {error && <p className="banner error">{error}</p>}
       {actionsIn ? createPortal(actions, actionsIn) : <div className="row actions">{actions}</div>}
     </section>
