@@ -718,6 +718,94 @@ async fn manual_request(
     ))
 }
 
+/// The one request **Build a new app…** types in (Task-A03-25-02): the connect request the setup
+/// wizard's first agent gets ([`connect_plan`]), then the goal request with the person's
+/// description and run mode ([`allomos_store::goal_request_in`]). Manual shows the same text.
+fn build_app_plan(
+    agent: &str,
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    description: &str,
+    quiet: bool,
+) -> String {
+    let connect = connect_plan(&[agent.to_string()], language, project, taskbag)
+        .remove(0)
+        .1;
+    let goal = allomos_store::goal_request_in(language, description, quiet);
+    format!("{}\n\n{goal}", connect.trim_end())
+}
+
+/// Check what **Build a new app…** was given: a project folder and a description.
+fn build_app_checked(project: &Path, description: &str) -> Result<(), Problem> {
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    if description.trim().is_empty() {
+        return Err(Problem::BadUsage {
+            detail: "Describe the app first.".to_string(),
+        });
+    }
+    Ok(())
+}
+
+/// **Build a new app…** with a found agent (Task-A03-25-02): open it in `project` with
+/// [`build_app_plan`] typed in. Nothing is sent: the person presses Enter.
+#[tauri::command]
+async fn build_app(
+    agent: String,
+    project: PathBuf,
+    taskbag: PathBuf,
+    language: String,
+    description: String,
+    quiet: bool,
+) -> Result<(), Problem> {
+    build_app_checked(&project, &description)?;
+    let found = agents::find_agents();
+    let Some(chosen) = found.iter().find(|a| a.id == agent) else {
+        return Err(Problem::AgentNotFound { agent });
+    };
+    let request = build_app_plan(&agent, &language, &project, &taskbag, &description, quiet);
+    agents::ask(chosen, &project, &request)
+}
+
+/// **Build a new app…** with Manual: the same request, as an agent opened through a link gets it
+/// ([`manual_request`]), for the person to copy.
+#[tauri::command]
+async fn build_app_request(
+    project: PathBuf,
+    taskbag: PathBuf,
+    language: String,
+    description: String,
+    quiet: bool,
+) -> Result<String, Problem> {
+    build_app_checked(&project, &description)?;
+    let request = build_app_plan(MANUAL, &language, &project, &taskbag, &description, quiet);
+    Ok(agents::link_request(
+        &request,
+        alm_command::own().as_deref(),
+    ))
+}
+
+/// The explanation of quiet and normal mode (Task-A03-21's `alm guide run-modes`, the person's
+/// part from its first mode on), for the **Build a new app…** dialog.
+#[tauri::command]
+fn run_modes_text(language: String) -> String {
+    run_modes_person(&language)
+}
+
+fn run_modes_person(language: &str) -> String {
+    let text = allomos_store::run_modes(language)
+        .or_else(|| allomos_store::run_modes("en"))
+        .unwrap_or_default();
+    match text.find("\n## ") {
+        Some(at) => text[at + 1..].trim_end().to_string(),
+        None => text.to_string(),
+    }
+}
+
 /// Put `text` on the clipboard: the Manual choice's **Copy** button (Task-A05-06).
 #[tauri::command]
 async fn copy_text(text: String) -> Result<(), Problem> {
@@ -1410,6 +1498,9 @@ pub fn run() {
             find_agents,
             connect_agents,
             manual_request,
+            build_app,
+            build_app_request,
+            run_modes_text,
             copy_text,
             instruction_files,
             write_agent_files,
@@ -1625,6 +1716,75 @@ mod tests {
         assert_eq!(manual, auto[0].1);
         assert!(manual.starts_with("This project was set up by an older Allomos"));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn build_a_new_app_types_the_connect_request_then_the_goal() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-build-app-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let taskbag = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&taskbag, "p", "P").unwrap();
+        let description = "A recipe box for two people.\nIt runs in the browser.";
+        for language in ["en", "zh-CN", "ja"] {
+            for quiet in [true, false] {
+                let auto =
+                    build_app_plan("claude_app", language, &dir, &taskbag, description, quiet);
+                // One request: the wizard's connect request first, then the goal request.
+                let connect = agent_connect_request_in(language, &dir, &taskbag);
+                assert!(auto.starts_with(connect.trim_end()), "{language}");
+                let goal = allomos_store::goal_request_in(language, description, quiet);
+                assert!(auto.ends_with(&goal), "{language}");
+                assert_eq!(auto, format!("{}\n\n{goal}", connect.trim_end()));
+                // The goal prompt in the task language, the description and the run mode.
+                assert!(
+                    auto.contains(allomos_store::goal(language).unwrap()),
+                    "{language}"
+                );
+                assert!(
+                    auto.contains("> A recipe box for two people.\n> It runs in the browser."),
+                    "{language}"
+                );
+                let mode = if quiet {
+                    "Run mode: quiet"
+                } else {
+                    "Run mode: normal"
+                };
+                assert!(auto.contains(mode), "{language}");
+                // Manual shows the same request, for every agent.
+                assert_eq!(
+                    build_app_plan(MANUAL, language, &dir, &taskbag, description, quiet),
+                    auto
+                );
+                assert_eq!(
+                    build_app_plan("codex_cli", language, &dir, &taskbag, description, quiet),
+                    auto
+                );
+            }
+        }
+        // Nothing to build without a description or a folder.
+        assert!(matches!(
+            build_app_checked(&dir, "  \n"),
+            Err(Problem::BadUsage { .. })
+        ));
+        assert!(matches!(
+            build_app_checked(&dir.join("missing"), description),
+            Err(Problem::StartupNotAFolder { .. })
+        ));
+        assert_eq!(build_app_checked(&dir, description), Ok(()));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_dialog_explains_both_run_modes() {
+        for language in ["en", "zh-CN", "ja"] {
+            let text = run_modes_person(language);
+            assert!(text.starts_with("## "), "{language}");
+            assert_eq!(text.matches("\n## ").count(), 1, "{language}");
+            assert!(!text.contains("For the agent"), "{language}");
+            assert!(text.contains("`alm human`"), "{language}");
+        }
     }
 
     #[test]

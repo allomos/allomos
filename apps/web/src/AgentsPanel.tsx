@@ -16,7 +16,7 @@ import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, firstChoice, manualWritten } from "./manualFlow";
 import type { Seen } from "./manualFlow";
 
-const AGENT_KEY: Record<Agent["id"], Key> = {
+export const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
   claude_app: "agents.claude_app",
   codex_cli: "agents.codex_cli",
@@ -31,7 +31,7 @@ const GROUPS: { name: string; tools: Agent["id"][] }[] = [
 ];
 
 /** The keys that paste in a terminal on this computer. */
-const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";
+export const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";
 
 /** Show "Looking for AI agents…" only when finding them is slow. */
 const SPINNER_AFTER_MS = 200;

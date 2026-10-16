@@ -65,6 +65,13 @@ export interface Messenger {
   manualRequest(project: string, taskbag: string, language: string): Promise<string>;
   /** Puts `text` on the clipboard. Rejects with a Problem. */
   copyText(text: string): Promise<void>;
+  /** Build a new app… (Task-A03-25-02): opens `agent` in `project` with one request typed in
+   * (connect, then the goal prompt with `description` and the run mode). Nothing is sent. Rejects with a Problem. */
+  buildApp(agent: string, project: string, taskbag: string, language: string, description: string, quiet: boolean): Promise<void>;
+  /** Build a new app… with Manual: the same request, to copy. Rejects with a Problem. */
+  buildAppRequest(project: string, taskbag: string, language: string, description: string, quiet: boolean): Promise<string>;
+  /** The explanation of quiet and normal mode (`alm guide run-modes`, the person's part), as Markdown. */
+  runModesText(language: string): Promise<string>;
   /** Whether `project` has AGENTS.md and CLAUDE.md. */
   instructionFiles(project: string): Promise<InstructionFiles>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
@@ -205,6 +212,11 @@ export const desktopMessenger: Messenger = {
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
   manualRequest: (project, taskbag, language) => invoke<string>("manual_request", { project, taskbag, language }),
   copyText: (text) => invoke<void>("copy_text", { text }),
+  buildApp: (agent, project, taskbag, language, description, quiet) =>
+    invoke<void>("build_app", { agent, project, taskbag, language, description, quiet }),
+  buildAppRequest: (project, taskbag, language, description, quiet) =>
+    invoke<string>("build_app_request", { project, taskbag, language, description, quiet }),
+  runModesText: (language) => invoke<string>("run_modes_text", { language }),
   instructionFiles: (project) => invoke<InstructionFiles>("instruction_files", { project }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
