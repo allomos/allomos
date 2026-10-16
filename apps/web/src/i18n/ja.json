@@ -510,5 +510,17 @@
   "problem.card_not_found": "ファイル {path} はありません。",
   "problem.card_exists": "タスク {id} にはすでに別のカードのファイルがあるため、置き換えませんでした。",
   "problem.card_empty": "カードのファイル {path} は空なので、何も移しませんでした。",
-  "problem.card_not_reported": "タスク {id} のカードのファイルは報告されていません。"
+  "problem.card_not_reported": "タスク {id} のカードのファイルは報告されていません。",
+  "sort.label": "各イテレーションのタスクを並べ替え",
+  "sort.summary": "{key}・{dir}",
+  "sort.by": "並べ替え",
+  "sort.by_id": "ID",
+  "sort.by_name": "名前",
+  "sort.by_changed": "最終更新",
+  "sort.id_asc": "昇順",
+  "sort.id_desc": "降順",
+  "sort.name_asc": "A → Z",
+  "sort.name_desc": "Z → A",
+  "sort.changed_asc": "古い順",
+  "sort.changed_desc": "新しい順"
 }
