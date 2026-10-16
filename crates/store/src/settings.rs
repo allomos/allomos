@@ -28,6 +28,14 @@ struct Settings {
     /// silences nothing, and is dropped at the next save.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     alm_offer_dismissed_for: Option<String>,
+    /// The last time the app asked GitHub for the newest release, and what it found (Task-A07-16).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    update_checked_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    update_latest: Option<String>,
+    /// The version the person chose "Skip this version" for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    update_skipped: Option<String>,
 }
 
 /// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
@@ -107,6 +115,41 @@ pub fn alm_offer_dismissed_for() -> Option<String> {
 pub fn dismiss_alm_offer(mismatch: &str) -> io::Result<()> {
     let mut settings = read_settings();
     settings.alm_offer_dismissed_for = Some(mismatch.to_string());
+    write_settings(&settings)
+}
+
+/// What the app remembers about checking for a newer Allomos (Task-A07-16).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UpdateMemory {
+    /// When GitHub last answered, in seconds since 1970.
+    pub checked_at: Option<u64>,
+    /// The newest version GitHub named then, without a leading `v`.
+    pub latest: Option<String>,
+    /// The version the person chose to skip.
+    pub skipped: Option<String>,
+}
+
+pub fn update_memory() -> UpdateMemory {
+    let s = read_settings();
+    UpdateMemory {
+        checked_at: s.update_checked_at,
+        latest: s.update_latest,
+        skipped: s.update_skipped,
+    }
+}
+
+/// Remember that GitHub named `latest` as the newest release at `checked_at`.
+pub fn save_update_check(checked_at: u64, latest: &str) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.update_checked_at = Some(checked_at);
+    settings.update_latest = Some(latest.to_string());
+    write_settings(&settings)
+}
+
+/// Remember "Skip this version" for `version`.
+pub fn skip_update(version: &str) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.update_skipped = Some(version.to_string());
     write_settings(&settings)
 }
 
@@ -274,6 +317,20 @@ mod tests {
         assert_eq!(saved_owner_name().as_deref(), Some("Will"));
         save_owner_name(" ").unwrap();
         assert_eq!(saved_owner_name(), None);
+
+        // The update check is kept beside the rest (Task-A07-16).
+        assert_eq!(update_memory(), UpdateMemory::default());
+        save_update_check(1_000, "0.1.6").unwrap();
+        skip_update("0.1.6").unwrap();
+        assert_eq!(
+            update_memory(),
+            UpdateMemory {
+                checked_at: Some(1_000),
+                latest: Some("0.1.6".into()),
+                skipped: Some("0.1.6".into()),
+            }
+        );
+        assert_eq!(saved_ui_language().as_deref(), Some("ja"));
 
         // SAFETY: as above.
         unsafe { std::env::remove_var("ALLOMOS_SETTINGS_DIR") };

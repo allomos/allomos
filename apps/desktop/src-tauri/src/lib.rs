@@ -6,6 +6,7 @@
 
 mod agents;
 mod alm_command;
+mod update;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -856,6 +857,20 @@ fn open_download_page() -> Result<(), Problem> {
         })
 }
 
+/// Whether a newer Allomos is on GitHub (Task-A07-16). `asked` when the person chose
+/// **Check for Updates…**: GitHub is asked now, and a skipped version is offered again.
+/// Otherwise GitHub is asked only when the last answer is a day old.
+#[tauri::command]
+async fn update_status(asked: bool) -> update::UpdateStatus {
+    update::check(asked)
+}
+
+/// "Skip this version" on the update notice.
+#[tauri::command]
+fn skip_update(version: String) {
+    let _ = allomos_store::skip_update(&version);
+}
+
 /// The taskbag's format compared with this Allomos's, whether or not an agent is connected: the
 /// wizard's step 2 does not go on with a newer taskbag (owner, 2026-10-12).
 #[derive(Serialize)]
@@ -1112,12 +1127,17 @@ const CLEAR_RECENT_ID: &str = "recent_clear";
 const CLEAR_RECENT_EVENT: &str = "menu:clear_recent";
 const CONNECT_ID: &str = "connect";
 const CONNECT_EVENT: &str = "menu:connect";
+const CHECK_UPDATES_ID: &str = "check_updates";
+const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
     file: Submenu<Wry>,
     new_window: MenuItem<Wry>,
     connect: MenuItem<Wry>,
+    check_updates: MenuItem<Wry>,
+    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
+    update_known: Mutex<bool>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -1205,10 +1225,38 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             file
         }
     };
+    // Check for Updates…, where the Claude app has it: under About in the app menu on macOS,
+    // in the Help menu elsewhere (approver, 2026-10-15).
+    let check_updates = MenuItem::with_id(
+        app,
+        CHECK_UPDATES_ID,
+        "Check for Updates…",
+        true,
+        None::<&str>,
+    )?;
+    let submenus: Vec<Submenu<Wry>> = menu
+        .items()?
+        .into_iter()
+        .filter_map(|item| item.as_submenu().cloned())
+        .collect();
+    if cfg!(target_os = "macos") {
+        if let Some(app_menu) = submenus.first() {
+            app_menu.insert(&check_updates, 1)?;
+        }
+    } else if let Some(help) = submenus
+        .iter()
+        .find(|s| s.text().is_ok_and(|t| t == "Help"))
+    {
+        help.append(&check_updates)?;
+    } else {
+        menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
+    }
     app.manage(MenuTexts {
         file,
         new_window,
         connect: connect_item,
+        check_updates,
+        update_known: Mutex::new(false),
         recent,
         state: Mutex::new(Recent::default()),
     });
@@ -1239,6 +1287,15 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
     let _ = fill_recent(&app, &texts.recent, &recent);
+}
+
+/// The update item's words, as the window sends them: **Check for Updates…**, or **Download
+/// Allomos <version>…** once a newer version is known, which then opens the download page, as
+/// the Claude app's **Restart to Update** item does (approver, 2026-10-15).
+#[tauri::command]
+fn set_update_item(texts: tauri::State<MenuTexts>, text: String, known: bool) {
+    let _ = texts.check_updates.set_text(text);
+    *texts.update_known.lock().unwrap_or_else(|e| e.into_inner()) = known;
 }
 
 /// Show these folders, newest first, under File → Open Recent.
@@ -1278,6 +1335,17 @@ pub fn run() {
                 let _ = open_new_window(app);
             } else if id == CONNECT_ID {
                 send(CONNECT_EVENT, None);
+            } else if id == CHECK_UPDATES_ID {
+                let known = *app
+                    .state::<MenuTexts>()
+                    .update_known
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                if known {
+                    let _ = open_download_page();
+                } else {
+                    send(CHECK_UPDATES_EVENT, None);
+                }
             } else if id == CLEAR_RECENT_ID {
                 send(CLEAR_RECENT_EVENT, None);
             } else if let Some(folder) = recent_folder(&app.state::<MenuTexts>(), id) {
@@ -1302,6 +1370,9 @@ pub fn run() {
             move_taskbag_aside,
             taskbag_format,
             open_download_page,
+            update_status,
+            skip_update,
+            set_update_item,
             handoff_settings,
             set_handoff_rules,
             set_handoff_template,

@@ -300,3 +300,17 @@ export interface AlmInstalled {
   cancelled: boolean;
   status: AlmStatus;
 }
+
+/** Whether a newer Allomos is on GitHub (Task-A07-16). */
+export interface UpdateStatus {
+  /** This Allomos's version. */
+  current: string;
+  /** The newest version known, from this check or the last one that worked. */
+  latest: string | null;
+  /** The version to offer: newer than this one, and not skipped (unless asked from the menu). */
+  newer: string | null;
+  /** A newer version than this one, even a skipped one: the menu offers it. */
+  available: string | null;
+  /** GitHub was asked now and did not answer. */
+  failed: boolean;
+}

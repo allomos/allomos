@@ -44,8 +44,9 @@ pub use convert::{
 pub use events::Actor;
 pub use guide::{GUIDE_TOPICS, RUN_MODES_LANGUAGES, guide, run_modes};
 pub use settings::{
-    TaskLanguage, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language, save_owner_name,
-    save_ui_language, saved_owner_name, saved_ui_language, settings_dir, task_language,
+    TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language,
+    save_owner_name, save_ui_language, save_update_check, saved_owner_name, saved_ui_language,
+    settings_dir, skip_update, task_language, update_memory,
 };
 pub use setup::{
     SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,

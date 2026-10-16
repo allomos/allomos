@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, InstructionFiles, Opened, SetupState, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, IterationChange, NextIds } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, InstructionFiles, Opened, SetupState, UpdateStatus, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, IterationChange, NextIds } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -135,6 +135,14 @@ export interface Messenger {
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
+  /** Whether a newer Allomos is on GitHub (Task-A07-16); `asked` from Check for Updates…. */
+  updateStatus(asked: boolean): Promise<UpdateStatus>;
+  /** "Skip this version" on the update notice. */
+  skipUpdate(version: string): Promise<void>;
+  /** Calls `handler` when Check for Updates… is chosen. */
+  onCheckUpdatesMenu(handler: () => void): Promise<() => void>;
+  /** The update menu item's words; `known` makes it open the download page. */
+  setUpdateItem(text: string, known: boolean): Promise<void>;
   /** Whether to offer **Install the alm command** (Task-A07-12). */
   almCommandStatus(): Promise<AlmStatus>;
   /** Links the app's own `alm` into Terminal's path, asking for the Mac password. Rejects with a Problem. */
@@ -203,6 +211,10 @@ export const desktopMessenger: Messenger = {
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
+  updateStatus: (asked) => invoke<UpdateStatus>("update_status", { asked }),
+  skipUpdate: (version) => invoke<void>("skip_update", { version }),
+  setUpdateItem: (text, known) => invoke<void>("set_update_item", { text, known }),
+  onCheckUpdatesMenu: (handler) => getCurrentWebviewWindow().listen("menu:check_updates", () => handler()),
   almCommandStatus: () => invoke<AlmStatus>("alm_command_status"),
   installAlmCommand: () => invoke<AlmInstalled>("install_alm_command"),
   dismissAlmOffer: (mismatch) => invoke<void>("dismiss_alm_offer", { mismatch }),
