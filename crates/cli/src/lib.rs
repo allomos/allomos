@@ -190,12 +190,27 @@ enum Command {
     Show { id: String },
     /// Show a task's history: every recorded change, newest first, with who and when.
     History { id: String },
-    /// Hold a task and start it.
+    /// Hold a task and start it. Say which branch you are on (--branch): alm records the task's
+    /// working branch and says which base to start from and merge into, with the Git commands.
     Claim {
         id: String,
         /// Take the task over from its current holder.
         #[arg(long)]
         take: bool,
+        /// The branch you are on (`git branch --show-current`; alm reads no Git). A task without a
+        /// base gets it.
+        #[arg(long, value_name = "NAME")]
+        branch: Option<String>,
+        /// The branch you will do the work on, when it is not the one you are on (for example a
+        /// new branch for its own worktree).
+        #[arg(long, value_name = "NAME")]
+        working: Option<String>,
+    },
+    /// Change the branch a task starts from and merges into (its base), by its real name.
+    Base {
+        id: String,
+        #[arg(value_name = "BRANCH")]
+        branch: String,
     },
     /// Set a task's label (a step of the project's ladder).
     Label { id: String, label: String },
@@ -385,6 +400,13 @@ enum Add {
         title: String,
         #[arg(long)]
         description: Option<String>,
+        /// The branch you are on (`git branch --show-current`; alm reads no Git). When it is a
+        /// task's working branch, the new task gets that task's base; otherwise this branch.
+        #[arg(long, value_name = "NAME")]
+        branch: Option<String>,
+        /// The base branch to use instead of the one --branch chooses.
+        #[arg(long, value_name = "NAME")]
+        base: Option<String>,
     },
 }
 
@@ -448,6 +470,7 @@ impl Command {
             Command::Show { id }
             | Command::History { id }
             | Command::Claim { id, .. }
+            | Command::Base { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
             | Command::Block { id, .. }
@@ -539,6 +562,7 @@ impl Command {
             Command::Show { .. } => "show",
             Command::History { .. } => "history",
             Command::Claim { .. } => "claim",
+            Command::Base { .. } => "base",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",
             Command::Block { .. } => "block",
@@ -1068,7 +1092,7 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Pull first, then claim it with `alm claim <id> --as <your session name>` and run the Git commands it prints right away: until your claim is pushed, other sessions do not see it.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and run the Git commands it prints right away: until your claim is pushed, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
     serde_json::to_value(t).expect("tasks serialize")
@@ -1784,6 +1808,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     area,
                     title,
                     description,
+                    branch,
+                    base,
                 } => {
                     let new = allomos_store::NewTask {
                         id: id.clone(),
@@ -1791,12 +1817,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         title: title.clone(),
                         description: description.clone(),
                         iteration: None,
+                        branch: branch.clone(),
+                        base: base.clone(),
                     };
-                    let added = allomos_store::add_task(&root, actor, lock_wait(), &new)?;
-                    let task = added.item;
-                    let text = format!("Added {}\n", task_line(&task));
-                    let done =
-                        Done::new(json!({ "taskbag": root, "task": task_json(&task) }), text);
+                    let added = allomos_store::add_task_with_base(&root, actor, lock_wait(), &new)?;
+                    let task = added.task;
+                    let mut text = format!("Added {}\n", task_line(&task));
+                    if let Some(c) = &added.base {
+                        text.push_str(&format!("  base branch: {}\n", c.english()));
+                    }
+                    let mut done = Done::new(
+                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base }),
+                        text,
+                    );
+                    done.warnings = added.warnings;
                     (done, added.issues)
                 }
             };
@@ -2019,6 +2053,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(steps) = &task.human_check_steps {
                 text.push_str(&format!("human check steps:\n{}", indent(steps)));
             }
+            let branches = allomos_store::branches(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            for (name, value) in [
+                ("base branch", &branches.base),
+                ("working branch", &branches.working),
+            ] {
+                if let Some(v) = value {
+                    text.push_str(&format!("{name}: {v}\n"));
+                }
+            }
             let decisions = allomos_store::ai_decisions(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
@@ -2041,7 +2086,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "ai_decisions": decisions, "handoff": latest.as_ref().map(handoff_brief) }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "handoff": latest.as_ref().map(handoff_brief) }),
                 text,
             );
             done.issues = issues;
@@ -2175,7 +2220,56 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Claim { id, take } => change(cli, cwd, |bag| ops::claim(bag, id, me, *take)),
+        Command::Claim {
+            id,
+            take,
+            branch,
+            working,
+        } => {
+            let root = locate(cli, cwd)?;
+            let claimed = allomos_store::claim_task(
+                &root,
+                Actor::alm(me),
+                lock_wait(),
+                id,
+                *take,
+                branch.as_deref(),
+                working.as_deref(),
+            )?;
+            let at = &claimed.branches;
+            let mut text = format!("{}\n", task_line(&claimed.changed.task));
+            let steps = branch_steps(at);
+            text.push_str(&steps.text);
+            let mut done = Done::new(
+                json!({
+                    "taskbag": root,
+                    "task": task_json(&claimed.changed.task),
+                    "branches": at.branches,
+                    "base_why": at.why,
+                    "branch_commands": { "start": steps.start, "merge": steps.merge },
+                    "branch_facts": steps.facts,
+                }),
+                text,
+            );
+            done.warnings = claimed.changed.warnings;
+            done.issues = claimed.changed.issues;
+            Ok(done)
+        }
+        Command::Base { id, branch } => {
+            let root = locate(cli, cwd)?;
+            let (task, after, issues) =
+                allomos_store::set_base(&root, Actor::alm(me), lock_wait(), id, branch)?;
+            let mut text = format!("{}\n", task_line(&task));
+            if let Some(base) = &after.base {
+                text.push_str(&format!("  base branch: {base}\n"));
+            }
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task_json(&task), "branches": after }),
+                text,
+            );
+            done.issues = issues;
+            Ok(done)
+        }
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
         Command::Wait { id, on, who } => {
             change(cli, cwd, |bag| ops::wait(bag, id, me, on, who.as_deref()))
@@ -2323,6 +2417,111 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             change(cli, cwd, |bag| ops::release(bag, id, me, note.as_deref()))
         }
     }
+}
+
+/// What `alm claim` says about branches: the base and working branch, the Git commands to start
+/// from the base and to merge back into it, and facts the agent should check (Task-A03-22). alm
+/// runs none of them (decision 0017).
+struct BranchSteps {
+    text: String,
+    start: Vec<String>,
+    merge: Vec<String>,
+    facts: Vec<String>,
+}
+
+fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
+    let mut steps = BranchSteps {
+        text: String::new(),
+        start: Vec::new(),
+        merge: Vec::new(),
+        facts: Vec::new(),
+    };
+    let Some(base) = at.branches.base.as_deref() else {
+        steps.text.push_str(
+            "This task has no base branch yet. Claim it again with --branch <the branch you are on> to record it.\n",
+        );
+        return steps;
+    };
+    let why = at.why.as_ref().map(|w| w.english(base)).unwrap_or_default();
+    steps
+        .text
+        .push_str(&format!("  base branch: {base} ({why})\n"));
+    let Some(working) = at.branches.working.as_deref() else {
+        steps.text.push_str(&format!(
+            "Start from {base} and merge back into {base}. Claim it again with --branch <the branch you are on> for the Git commands.\n"
+        ));
+        return steps;
+    };
+    steps
+        .text
+        .push_str(&format!("  working branch: {working}\n"));
+    let working = Some(working);
+    let current = at.current.as_deref();
+    let b = quoted(base);
+    match working {
+        Some(w) if w != base => {
+            let wq = quoted(w);
+            if current != Some(w) {
+                steps.start = vec![
+                    format!("git switch {b}"),
+                    "git pull --ff-only".to_string(),
+                    format!("git switch -c {wq}"),
+                ];
+            }
+            steps.merge = vec![
+                format!("git switch {b}"),
+                "git pull --ff-only".to_string(),
+                format!("git merge {wq}"),
+                "git push".to_string(),
+            ];
+        }
+        _ => {
+            if current != Some(base) {
+                steps.start.push(format!("git switch {b}"));
+            }
+            steps.start.push("git pull --ff-only".to_string());
+        }
+    }
+    if let Some(c) = current.filter(|c| *c != base) {
+        steps
+            .facts
+            .push(format!("You are on {c}, not on {base}, the task's base."));
+    }
+    steps.text.push_str(&format!(
+        "Start from {base} and merge back into {base} (alm runs no Git; these are for you):\n"
+    ));
+    if steps.start.is_empty() {
+        steps
+            .text
+            .push_str("  To start: you are on the working branch already.\n");
+    } else {
+        steps.text.push_str("  To start:\n");
+        for c in &steps.start {
+            steps.text.push_str(&format!("    {c}\n"));
+        }
+        if let Some(w) = working.filter(|w| *w != base) {
+            steps.text.push_str(&format!(
+                "    (or in a worktree of its own: git worktree add <folder> -b {} {b})\n",
+                quoted(w)
+            ));
+        }
+    }
+    if steps.merge.is_empty() {
+        steps.text.push_str(&format!(
+            "  You work on {base} itself: commit and push there; there is nothing to merge.\n"
+        ));
+    } else {
+        steps
+            .text
+            .push_str("  When the task is done, merge it into its base:\n");
+        for c in &steps.merge {
+            steps.text.push_str(&format!("    {c}\n"));
+        }
+    }
+    for f in &steps.facts {
+        steps.text.push_str(&format!("Fact: {f}\n"));
+    }
+    steps
 }
 
 /// Rewrite `project.json` under the held lock, recording what changed as `command`'s event.

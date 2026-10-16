@@ -60,7 +60,7 @@ pub fn find_task(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
 }
 
 /// Refuse when someone other than `me` holds the task. An unheld task may be changed by anyone.
-fn check_holder(task: &Task, me: Option<&str>) -> Result<(), Problem> {
+pub(crate) fn check_holder(task: &Task, me: Option<&str>) -> Result<(), Problem> {
     match &task.holder {
         Some(h) if Some(h.as_str()) != me => Err(Problem::TaskHeld {
             id: task.id.clone(),
@@ -70,7 +70,7 @@ fn check_holder(task: &Task, me: Option<&str>) -> Result<(), Problem> {
     }
 }
 
-fn check_open(task: &Task, closed: &[State]) -> Result<(), Problem> {
+pub(crate) fn check_open(task: &Task, closed: &[State]) -> Result<(), Problem> {
     if closed.contains(&task.state) {
         Err(Problem::TaskClosed {
             id: task.id.clone(),

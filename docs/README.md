@@ -17,7 +17,7 @@
 | [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
 | [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md) | Agent roles and effort, starting a session, handoff timing and contents, new-session rule, switching providers | contract |
-| [workflow/CARDS.md](./workflow/CARDS.md) | Areas, card IDs and template, states and labels, approvals, claiming protocol, Now rules | contract |
+| [workflow/CARDS.md](./workflow/CARDS.md) | Areas, card IDs and template, states and labels, approvals, a new card, Now rules (claiming and branches: `alm guide workflow`) | contract |
 | [decisions/](./decisions/README.md) | One record per decision, with status (open / proposed / accepted) | decisions |
 | [discussions/](./discussions/) | Dated records of planning discussions with the owner | history |
 | [analysis/](./analysis/) | Analyses of reference material | analysis |

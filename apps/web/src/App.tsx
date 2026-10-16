@@ -36,7 +36,7 @@ import { RecentDialog } from "./RecentDialog";
 import { keepListed, noteOpened, parseRecentInfo, type RecentInfoMap } from "./recentFlow";
 import { AiDecidedBadge, HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
-import type { Creating } from "./createFlow";
+import { baseChoice, type Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
@@ -1231,6 +1231,7 @@ function TaskbagView({
         areas={box.areas}
         iterations={iterations}
         next={nextIds}
+        base={baseChoice(box.tasks, opened.branches)}
         ownerName={ownerName}
         onSaveName={saveOwnerName}
         onAdd={add}

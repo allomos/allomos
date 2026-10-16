@@ -4,7 +4,7 @@
 
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
-import { canAdd, pickArea, refreshItem, refreshTask, startItem, startTask, toNewIteration, toNewTask, type Creating, type ItemDraft, type TaskDraft } from "./createFlow";
+import { canAdd, pickArea, refreshItem, refreshTask, startItem, startTask, toNewIteration, toNewTask, type BaseChoice, type Creating, type ItemDraft, type TaskDraft } from "./createFlow";
 import { isProblem, type Area, type Iteration, type NewIteration, type NewTask, type NextIds } from "./types";
 
 export type AddRequest =
@@ -17,6 +17,7 @@ export function CreateForm({
   areas,
   iterations,
   next,
+  base,
   ownerName,
   onSaveName,
   onAdd,
@@ -25,6 +26,8 @@ export function CreateForm({
   creating: Creating;
   areas: Area[];
   iterations: Iteration[];
+  /** The new task's base branch, from the open tasks' bases (Task-A03-22). */
+  base: BaseChoice;
   /** The suggested IDs; null until read. */
   next: NextIds | null;
   /** The person's name for the history; null until asked. */
@@ -38,7 +41,7 @@ export function CreateForm({
   const { t, problem } = useI18n();
   const areaIds = areas.map((a) => a.id);
   const [task, setTask] = useState<TaskDraft>(() =>
-    creating.kind === "task" ? startTask(creating, areaIds, next) : startTask({ kind: "task", group: "", area: null, iteration: null }, [], null),
+    creating.kind === "task" ? startTask(creating, areaIds, next, base) : startTask({ kind: "task", group: "", area: null, iteration: null }, [], null),
   );
   const itemKind = creating.kind === "area" ? "area" : "iteration";
   const [item, setItem] = useState<ItemDraft>(() => startItem(itemKind, next));
@@ -53,9 +56,9 @@ export function CreateForm({
   }, [next, itemKind]);
 
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
-  const draft = creating.kind === "task" ? task : item;
+  const ready = creating.kind === "task" ? canAdd(task, base) : canAdd(item);
   const save = async () => {
-    if (busy || !canAdd(draft)) return;
+    if (busy || !ready) return;
     setBusy(true);
     try {
       await onAdd(
@@ -164,6 +167,24 @@ export function CreateForm({
               ))}
             </select>
           </label>
+          {/* Task-A03-22: one base among the open tasks is used; several must be picked from. */}
+          {base.kind === "same" && <p className="muted small">{t("create.base_same", { base: base.base })}</p>}
+          {base.kind === "pick" && (
+            <label>
+              <span>{t("create.base")}</span>
+              <select value={task.base} onChange={(e) => setTask((d) => ({ ...d, base: e.target.value }))} disabled={busy} required>
+                <option value="" disabled>
+                  {t("create.base_pick")}
+                </option>
+                {base.bases.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+              <span className="muted small">{t("create.base_hint")}</span>
+            </label>
+          )}
           <p className="muted small">{t("create.task_hint")}</p>
         </>
       ) : (
@@ -192,7 +213,7 @@ export function CreateForm({
         </>
       )}
       <div className="editor-buttons">
-        <button type="button" className="primary" onClick={() => void save()} disabled={busy || !canAdd(draft)}>
+        <button type="button" className="primary" onClick={() => void save()} disabled={busy || !ready}>
           {busy ? t("edit.saving") : t("create.add")}
         </button>
         <button type="button" onClick={onClose} disabled={busy}>
