@@ -223,7 +223,7 @@ flowchart TD
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
   - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 9–10 choose services that use the user's own account or a free tier.
-- **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **Allomos itself**. When Iteration 1 passes its exit check, Allomos's own cards move from Markdown into a taskbag inside this repository, and the agents building Allomos track their work in it from then on ([AI-WORKFLOW § dogfooding](../workflow/AI-WORKFLOW.md#after-allomos-can-track-itself-dogfooding)). This is the first real test of every release.
+- **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **Allomos itself**. When Iteration 1 passes its exit check, Allomos's own cards move from Markdown into a taskbag inside this repository, and the agents building Allomos track their work in it from then on (done 2026-10-06, task `A01-07`). This is the first real test of every release.
 
 ## 10. Open questions
 
