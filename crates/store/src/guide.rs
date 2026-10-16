@@ -256,6 +256,10 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
 Ask the person:
 - `alm confirm --title \"<heading>\" --plan <file.md>`: shows your plan in the Allomos app and
   waits; exit 0 means go ahead, anything else means change nothing.
+- `alm progress --title \"<job>\" --step \"<what now>\" [--done <n> --of <total>]`, then
+  `alm progress --step …` at each step and `alm progress --finished \"<what happened>\"` at the
+  end: on a job the person gave you from the Allomos app, the app shows your progress in a popup.
+  `alm` only passes it on.
 
 About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:

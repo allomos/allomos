@@ -461,3 +461,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
 .build-app .run-modes summary { cursor: pointer; }
+
+/* The progress popup's chips, in the background (Task-A05-08). */
+.progress-chips { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 6px; z-index: 5; max-width: min(420px, calc(100vw - 32px)); }
+.progress-chip { display: flex; align-items: center; gap: 6px; text-align: left; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); overflow-wrap: anywhere; }
+.progress-bar { width: 100%; height: 8px; accent-color: var(--accent); }

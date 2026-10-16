@@ -60,6 +60,25 @@ fn write_whole(path: &Path, text: &str) -> io::Result<()> {
     crate::replace_file(&tmp, path)
 }
 
+/// Make the requests folder, with a `.gitignore` that keeps everything in it out of Git (its
+/// folders too, such as `progress/`).
+pub(crate) fn ensure_requests_dir(dir: &Path) -> io::Result<()> {
+    fs::create_dir_all(dir)?;
+    let ignore = dir.join(".gitignore");
+    if !ignore.exists() {
+        fs::write(
+            &ignore,
+            "# Allomos's questions to the person. Never commit them.\n*\n",
+        )?;
+    }
+    Ok(())
+}
+
+/// Write `text` to `path` in one step (for `progress`).
+pub(crate) fn write_file_whole(path: &Path, text: &str) -> io::Result<()> {
+    write_whole(path, text)
+}
+
 /// Leave a question for the person in `project`. Returns it with its new ID.
 pub fn post_confirm(
     project: &Path,
@@ -70,14 +89,7 @@ pub fn post_confirm(
 ) -> io::Result<ConfirmRequest> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let dir = requests_dir(project);
-    fs::create_dir_all(&dir)?;
-    let ignore = dir.join(".gitignore");
-    if !ignore.exists() {
-        fs::write(
-            &ignore,
-            "# Allomos's questions to the person. Never commit them.\n*\n",
-        )?;
-    }
+    ensure_requests_dir(&dir)?;
     let request = ConfirmRequest {
         id: format!(
             "{}-{}-{}",

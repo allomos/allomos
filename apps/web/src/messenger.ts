@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, ConfirmRequest, FolderInfo, InstructionFiles, Opened, SetupState, UpdateStatus, VersionCheck, FormatState, Handoff, HandoffSettings, TaskHistory, Edit, Task, Area, Iteration, NewTask, NewIteration, IterationChange, NextIds } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, NewIteration, NewTask, NextIds, Opened, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -168,6 +168,10 @@ export interface Messenger {
   agentStatus(root: string): Promise<AgentStatus>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
+  /** What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08). */
+  progressReports(project: string): Promise<Progress[]>;
+  /** The person closed a finished (or silent) report: remove it. */
+  dismissProgress(project: string, id: string): Promise<void>;
   /** The person's answer to one of them. Rejects with a Problem when it is no longer waiting. */
   answerConfirm(project: string, id: string, yes: boolean): Promise<void>;
   /** The open-folder flow's state for the taskbag at `root` (records the project folder when it is beside `.allomos/`). */
@@ -270,6 +274,8 @@ export const desktopMessenger: Messenger = {
   writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
+  progressReports: (project) => invoke<Progress[]>("progress_reports", { project }),
+  dismissProgress: (project, id) => invoke<void>("dismiss_progress", { project, id }),
   answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
   projectSetup: (root) => invoke<SetupState>("project_setup", { root }),
   setProjectFolder: (root, folder) => invoke<SetupState>("set_project_folder", { root, folder }),
