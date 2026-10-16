@@ -1,5 +1,7 @@
-// Move the cards in… (Task-A00-30): from the notice "N tasks keep their card files in the project
-// folder", or File → Move the Cards In…. The person chooses an agent (the ones found, or Manual);
+// Update the taskbag… (Task-A00-30; named so by the approver, 2026-10-17): from the notice "N tasks
+// keep their card files in the project folder", or File → Update the Taskbag…. The dialog first
+// says what Allomos found (each task, its title and where its card file is now) and what updating
+// does. The person chooses an agent (the ones found, or Manual);
 // Allomos opens it in the project folder with the move-cards request typed in, and sends nothing.
 // The agent finds the card files, shows its plan in Allomos with `alm confirm`, and changes
 // nothing until the person chooses Go ahead. Manual shows the same request with Copy.
@@ -11,16 +13,20 @@ import { AGENT_KEY, PASTE_KEYS } from "./AgentsPanel";
 import { COPIED_MS } from "./manualFlow";
 import { MANUAL, agentChoices, firstAgent } from "./buildAppFlow";
 import { isProblem } from "./types";
+import type { CardRow } from "./moveCardsFlow";
 import type { Agent } from "./types";
 
 export function MoveCardsDialog({
   messenger,
   root,
+  found,
   onClose,
 }: {
   messenger: Messenger;
   /** The open taskbag. */
   root: string;
+  /** What Allomos found: the tasks whose card file is still outside the taskbag. */
+  found: CardRow[];
   /** The dialog closes; `message` says what happened (null: Cancel). */
   onClose: (message: string | null) => void;
 }) {
@@ -94,7 +100,23 @@ export function MoveCardsDialog({
     <div className="overlay" role="presentation">
       <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
-        <p className="muted small">{t("cards.body")}</p>
+        {request === null && (
+          <>
+            <p>{found.length > 0 ? t("cards.found", { count: found.length }) : t("cards.found_none")}</p>
+            {found.length > 0 && (
+              <ul className="card-found small">
+                {found.map((c) => (
+                  <li key={c.task}>
+                    <strong>{c.task}</strong> {c.title} — <code>{c.path}</code>
+                    {c.reported && <span className="muted"> ({t("cards.reported")})</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p>{t("cards.update")}</p>
+            <p className="muted small">{t("cards.body")}</p>
+          </>
+        )}
 
         <div className="dialog-body wizard-body">
           {request === null ? (

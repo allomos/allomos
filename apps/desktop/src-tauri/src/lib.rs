@@ -41,7 +41,7 @@ struct Opened {
     /// task form chooses the new task's base from the open tasks' bases.
     branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
-    /// "N tasks keep their card files in the project folder" with **Move the cards in…**.
+    /// "N tasks keep their card files in the project folder" with **Update the taskbag…**.
     cards_outside: Vec<allomos_core::card::Outside>,
 }
 
@@ -1351,7 +1351,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let move_cards = MenuItem::with_id(
         app,
         MOVE_CARDS_ID,
-        "Move the Cards In…",
+        "Update the Taskbag…",
         // Enabled by the window while a taskbag is open.
         false,
         None::<&str>,
