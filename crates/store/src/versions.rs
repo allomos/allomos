@@ -43,7 +43,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 11: every task has a base branch by its real name; `alm claim --branch` and `alm add task
 /// --branch` tell alm the branch the agent is on, and alm says which base to start from and merge
 /// into (Task-A03-22).
-pub const SECTION_VERSION: u32 = 11;
+/// 12: shared rules live only in AGENTS.md; an agent not yet set up runs `alm guide agent-files`
+/// once; after changing shared rules, tell the person which sessions still use the old ones
+/// (Task-A03-24).
+pub const SECTION_VERSION: u32 = 12;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

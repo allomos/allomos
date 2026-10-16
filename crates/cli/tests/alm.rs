@@ -1767,6 +1767,49 @@ fn run_modes_follow_the_task_language() {
     assert!(text.contains("## Quiet mode"), "{text}");
 }
 
+/// `alm guide agent-files` (Task-A03-24): the one-time procedure for shared rules in AGENTS.md,
+/// in the task language like `run-modes`; `alm guide` (all topics) includes the English one.
+#[test]
+fn agent_files_follow_the_task_language() {
+    let repo = filled();
+    let settings = tmp("settings");
+    for (language, words) in [
+        ("en", "# Agent files"),
+        ("ja", "# エージェントのファイル"),
+        ("zh-CN", "# 智能体文件"),
+    ] {
+        let (code, v) = fj_settings(
+            &repo,
+            &settings,
+            &["guide", "agent-files", "--language", language],
+        );
+        assert_eq!(code, 0, "{v}");
+        assert_eq!(v["topic"], "agent-files", "{v}");
+        assert_eq!(v["written_in_language"], true, "{v}");
+        let text = v["guide"].as_str().unwrap();
+        assert!(text.starts_with(words), "{language}: {text}");
+        assert!(text.contains("`## Agents set up`"), "{language}");
+    }
+    fj_settings(&repo, &settings, &["task-language", "zh-CN"]);
+    let (_, v) = fj_settings(&repo, &settings, &["guide", "agent-files"]);
+    assert_eq!(v["language"], "zh-CN");
+    assert!(
+        v["guide"].as_str().unwrap().starts_with("# 智能体文件"),
+        "{v}"
+    );
+    fj_settings(&repo, &settings, &["task-language", "fr"]);
+    let (_, v) = fj_settings(&repo, &settings, &["guide", "agent-files"]);
+    assert_eq!(v["written_in_language"], false, "{v}");
+    let text = v["guide"].as_str().unwrap();
+    assert!(
+        text.starts_with("This text is not written in fr yet"),
+        "{text}"
+    );
+    assert!(text.contains("# Agent files"), "{text}");
+    let all = ok(&repo, &["guide"])["guide"].as_str().unwrap().to_string();
+    assert!(all.contains("# Agent files") && all.contains("# Run modes"));
+}
+
 #[test]
 fn title_and_project_rename() {
     let repo = filled();
@@ -1873,17 +1916,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v11)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v12)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v9 section (before the run-mode choice, Task-A03-21) is out of date too.
+    // A v11 section (before the shared rules, Task-A03-24) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v11)", "## Tasks: Allomos (v10)")
+            brief.replace("## Tasks: Allomos (v12)", "## Tasks: Allomos (v11)")
         ),
     )
     .unwrap();

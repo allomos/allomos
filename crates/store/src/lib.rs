@@ -43,7 +43,9 @@ pub use convert::{
     agent_connect_request_in, agent_convert_request_in, agent_move_in_request_in,
 };
 pub use events::Actor;
-pub use guide::{GUIDE_TOPICS, RUN_MODES_LANGUAGES, guide, run_modes};
+pub use guide::{
+    GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files, guide, localized, run_modes,
+};
 pub use settings::{
     TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language,
     save_owner_name, save_ui_language, save_update_check, saved_owner_name, saved_ui_language,
@@ -283,6 +285,16 @@ the project notes (below) and your own handoff file.
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
 
+Shared rules: every AI agent on this project follows one set of shared rules, in AGENTS.md.
+- Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file (such as
+  CLAUDE.md, GEMINI.md or `.cursor/rules/`), which only points to AGENTS.md and holds what is
+  that agent's alone.
+- If you are an agent not listed under `## Agents set up` in the project notes, or your own rule
+  file does not point to AGENTS.md, run `alm guide agent-files` and do it once for yourself
+  before other work.
+- After changing shared rules, tell the person which running sessions still use the old ones
+  (from the taskbag's holders, `alm list --state in_progress`, and `git worktree list`).
+
 Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
 task: what is running, pitfalls, where credentials live (never their values). Read it at the
 start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
@@ -300,7 +312,8 @@ Allomos relies on these terms: **area** (what part of the product a task belongs
 has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
-`alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person).
+`alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
+`alm guide agent-files` (one set of shared rules for every agent, done once per agent).
 "
     )
 }
@@ -404,8 +417,8 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 2. 打开 AGENTS.md（如果没有就新建）。
 3. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
-5. 确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到 CLAUDE.md。
-6. 如果项目是 Git 仓库，只提交 AGENTS.md 和 CLAUDE.md，作为一次提交：`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`。其他改动保持原样；除非用户要求，不要推送。
+5. 共用规则放进 AGENTS.md，每个智能体做一次：运行 `alm --taskbag \"{taskbag}\" guide agent-files` 并照做，为你自己，也为项目里已有的每个智能体规则文件（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` 之类；这些只是例子）。共用规则移到 AGENTS.md；每个智能体自己的文件只保留指向 AGENTS.md 的一行和真正属于它自己的内容；互相矛盾的规则不要替用户选，列出来问用户；把每个智能体记在任务包 project-notes.md 的 `## Agents set up` 一节下。CLAUDE.md 要包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到任何智能体自己的文件里。
+6. 如果项目是 Git 仓库，只提交 AGENTS.md、CLAUDE.md 和你改过的其他智能体文件，作为一次提交：`git -C \"{project}\" add AGENTS.md CLAUDE.md <你改过的其他智能体文件> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <你改过的其他智能体文件>`；再在任务包里只提交项目笔记：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。其他改动保持原样；除非用户要求，不要推送。
 7. 告诉用户你改了什么，以及你做的提交。"
         ),
         "ja" => format!(
@@ -420,8 +433,8 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 2. AGENTS.md を開きます（なければ作成します）。
 3. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
-5. CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節を CLAUDE.md にコピーしないでください。
-6. プロジェクトが Git リポジトリなら、AGENTS.md と CLAUDE.md だけを一つのコミットにします：`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`。ほかの変更はそのままにし、頼まれない限りプッシュしません。
+5. 共通ルールを AGENTS.md に置きます（エージェントごとに一度）：`alm --taskbag \"{taskbag}\" guide agent-files` を実行してそのとおりに行います。自分自身について、そしてプロジェクトにすでにあるすべてのエージェント用ルールファイル（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` など。これは例です）について。共通ルールは AGENTS.md に移し、各エージェント自身のファイルには AGENTS.md を指す行と本当にそのエージェントだけのことを残します。食い違うルールはどちらも選ばず、ユーザーに示して尋ねます。各エージェントをタスクバッグの project-notes.md の `## Agents set up` の節に記録します。CLAUDE.md には AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があるようにします（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節をどのエージェント自身のファイルにもコピーしないでください。
+6. プロジェクトが Git リポジトリなら、AGENTS.md、CLAUDE.md、変えたほかのエージェントのファイルだけを一つのコミットにします：`git -C \"{project}\" add AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル>`。続いてタスクバッグではプロジェクトノートだけをコミットします：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。ほかの変更はそのままにし、頼まれない限りプッシュしません。
 7. 何を変えたか、どんなコミットをしたかをユーザーに見せてください。"
         ),
         _ => format!(
@@ -445,12 +458,21 @@ Allomos's section (see the last line). Otherwise add that section.
 4. If AGENTS.md has other rules about tracking tasks or status (for example a Markdown task \
 board), change them to point to Allomos, so the rules do not conflict. Do not change \
 unrelated text, and do not add the same instructions twice.
-5. Make sure CLAUDE.md has the line that imports AGENTS.md (a plain ASCII at sign followed by \
-AGENTS.md), so Claude Code reads AGENTS.md (create \
-CLAUDE.md with just that line if it is missing). Do not copy the section into CLAUDE.md.
-6. If the project is a Git repository, commit only AGENTS.md and CLAUDE.md, as one commit: \
-`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- \
-AGENTS.md CLAUDE.md`. Leave every other change as it is; do not push unless the person asks.
+5. Shared rules in AGENTS.md, once per agent: run `alm --taskbag \"{taskbag}\" guide agent-files` \
+and follow it, for yourself and for every agent rule file already in the project (CLAUDE.md, \
+GEMINI.md, `.cursor/rules/`, `.github/copilot-instructions.md` and the like; these are examples). \
+Shared rules move into AGENTS.md; each agent's own file keeps only a pointer to AGENTS.md and what \
+is truly its own; rules that contradict each other are not chosen between but listed for the \
+person, who decides; each agent is recorded under `## Agents set up` in the taskbag's \
+project-notes.md. CLAUDE.md must have the line that imports AGENTS.md (a plain ASCII at sign \
+followed by AGENTS.md), so Claude Code reads AGENTS.md (create CLAUDE.md with just that line if it \
+is missing). Do not copy the section into any agent's own file.
+6. If the project is a Git repository, commit only AGENTS.md, CLAUDE.md and the other agent files \
+you changed, as one commit: `git -C \"{project}\" add AGENTS.md CLAUDE.md <other agent files you \
+changed> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md \
+<other agent files you changed>`; then, in the taskbag, only the project notes: \
+`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- \
+project-notes.md`. Leave every other change as it is; do not push unless the person asks.
 7. Show the user what you changed and the commits you made."
         ),
     }
@@ -1991,6 +2013,35 @@ mod tests {
         // Each step commits its own work, limited to its own paths (Task-A03-08).
         assert!(r.contains("commit -m \"Add Allomos taskbag\" -- ."));
         assert!(r.contains("commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md"));
+        // Step 5 is the one-time agent-files procedure, for every agent file already there, and
+        // the project notes record each agent (Task-A03-24).
+        for language in ["en", "zh-CN", "ja"] {
+            let r = agent_setup_request_in(language, p, b);
+            let step5 = r
+                .split("\n5. ")
+                .nth(1)
+                .unwrap()
+                .split("\n6. ")
+                .next()
+                .unwrap();
+            assert!(
+                step5.contains(&format!("alm --taskbag \"{}\" guide agent-files", shown(b))),
+                "{language}: {step5}"
+            );
+            for words in [
+                "GEMINI.md",
+                "`.cursor/rules/`",
+                "`## Agents set up`",
+                "CLAUDE.md",
+            ] {
+                assert!(step5.contains(words), "{language}: {words}");
+            }
+            assert!(
+                r.contains("commit -m \"Agents set up\" -- project-notes.md"),
+                "{language}"
+            );
+            assert!(!r.contains('@'), "{language}");
+        }
         // The Claude app turns a typed-in "@" into a full-width "＠", so the request avoids it.
         assert!(!r.contains('@'));
         assert!(
