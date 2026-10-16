@@ -2546,6 +2546,48 @@ fn handoff_rules_have_defaults_overrides_and_refusals() {
     assert!(!project.contains("handoff"), "{project}");
 }
 
+/// Whoever takes a task over is told, where its handoff is shown, to check the real state first
+/// and to repeat nothing already done; the template asks for what was done (Task-A03-23).
+#[test]
+fn show_and_next_give_the_taking_over_rules_with_a_handoff() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    let text = |args: &[&str]| String::from_utf8(alm(&repo, args).stdout).unwrap();
+    // No handoff yet: no rules.
+    assert!(ok(&repo, &["show", "A01-01"])["taking_over"].is_null());
+    assert!(ok(&repo, &["next"])["taking_over"].is_null());
+    assert!(!text(&["show", "A01-01"]).contains("Taking over"));
+    assert!(!text(&["next"]).contains("Taking over"));
+
+    let v = ok(
+        &repo,
+        &["handoff", "--as", "claude/run", "--tasks", "A01-01"],
+    );
+    let written = fs::read_to_string(v["path"].as_str().unwrap()).unwrap();
+    assert!(
+        written.contains("- **Already done, do not repeat:**"),
+        "{written}"
+    );
+
+    for args in [&["show", "A01-01"][..], &["next"][..]] {
+        let v = ok(&repo, args);
+        let rules = v["taking_over"].as_str().unwrap();
+        assert!(rules.contains("Check the real state"), "{rules}");
+        let out = text(args);
+        let flat = out.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert_eq!(
+            out.matches("Taking over from a handoff:").count(),
+            1,
+            "{out}"
+        );
+        assert!(flat.contains("git worktree list"), "{out}");
+        assert!(flat.contains("is not yours to change or remove"), "{out}");
+        assert!(flat.contains("if unsure, ask the person"), "{out}");
+        assert!(flat.contains("already done is not done again"), "{out}");
+        assert!(flat.contains("it does not authorize repeating it"), "{out}");
+    }
+}
+
 #[test]
 fn a_session_writes_one_handoff_that_the_next_one_finds() {
     let repo = filled();

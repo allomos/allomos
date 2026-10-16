@@ -246,6 +246,13 @@ const WORKFLOW: &str = "# How to work the tasks
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
    first (`alm show <id>`), and the project notes' Running and Pitfalls, which `alm next` shows
    (the whole file is the taskbag's `project-notes.md`).
+   **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
+   check the real state before trusting it: the worktree, branch and running processes it names
+   (`git worktree list`, `git status -sb`, listening ports). What the previous session still
+   holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the
+   question with `alm wait`). What the handoff lists as already done (its **Already done, do not
+   repeat** line) is not done again: a change of agent, account or session keeps the approvals
+   and what was done; it does not authorize repeating it.
 2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>
    --branch <the branch you are on>` (`git branch --show-current`; alm reads no Git), and run
    the Git commands it prints right away: until your claim is pushed, other sessions do not see
@@ -270,7 +277,8 @@ const WORKFLOW: &str = "# How to work the tasks
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
    every meaningful step): `alm handoff --tasks <id> --as <your session name>`, then fill in the
    file it names, in plain words first, for any reader: you do not know who takes over, an agent
-   or a person. Evidence goes in the task's description (`alm describe`, under an **Evidence**
+   or a person; under **Already done, do not repeat**, list each operation with an outside
+   effect that must not run twice (or none). Evidence goes in the task's description (`alm describe`, under an **Evidence**
    heading), not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
@@ -605,6 +613,19 @@ mod tests {
             assert!(text.contains("base branch, by its real name"), "{text}");
             assert!(text.contains("merges back into it"), "{text}");
             assert!(text.contains("working branch"), "{text}");
+        }
+        // Task-A03-23: the one taking over checks the real state and repeats nothing done.
+        let workflow = flat(guide(Some("workflow")).unwrap());
+        for words in [
+            "Taking over from a handoff",
+            "check the real state before trusting it",
+            "git worktree list",
+            "is not yours to change or remove; if unsure, ask the person",
+            "Already done, do not repeat",
+            "is not done again",
+            "keeps the approvals and what was done; it does not authorize repeating it",
+        ] {
+            assert!(workflow.contains(words), "{words}");
         }
         let flat_all = flat(guide(None).unwrap());
         for words in [
