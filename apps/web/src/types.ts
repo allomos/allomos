@@ -189,12 +189,17 @@ export interface Opened {
   cards_outside?: CardOutside[];
 }
 
-/** A card file an agent reported as still in the project folder (`alm cards found`, Task-A00-30). */
+/**
+ * A card file still outside the taskbag (Task-A00-30): the task's `Card:` link points there
+ * (Task-A01-51), or an agent reported it (`alm cards found`). One per task; a report wins.
+ */
 export interface CardOutside {
   task: string;
-  /** Relative to the project folder, with `/`. */
+  /** Relative to the project folder, with `/`; a linked file outside it is named in full. */
   path: string;
-  at: string;
+  source: "link" | "report";
+  /** When it was reported (reports only). */
+  at?: string;
   by?: string;
 }
 

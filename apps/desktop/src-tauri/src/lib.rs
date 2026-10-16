@@ -101,11 +101,18 @@ fn inspect_folder(path: PathBuf) -> FolderInfo {
 /// Load the taskbag at `root`.
 #[tauri::command]
 fn open_taskbag(root: PathBuf) -> Opened {
+    let loaded = load(&root);
+    // Read from the tasks' Card: links and agents' reports (Task-A01-51), so the notice shows
+    // as soon as the taskbag opens and on every reload.
+    let cards_outside = match &loaded.taskbag {
+        Some(bag) => allomos_store::cards::outside_of(&root, bag),
+        None => Vec::new(),
+    };
     Opened {
-        loaded: load(&root),
+        loaded,
         ai_decisions: allomos_store::ai_decisions(&root),
         branches: allomos_store::branches(&root),
-        cards_outside: allomos_store::cards::outside(&root),
+        cards_outside,
         root,
         readme_added: false,
     }

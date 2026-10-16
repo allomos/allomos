@@ -16,12 +16,21 @@ const opened = (ids: string[], cards: Opened["cards_outside"]): Opened =>
     cards_outside: cards,
   }) as unknown as Opened;
 
-test("the notice counts the card files agents reported, for tasks the taskbag has", () => {
-  const cards = [
-    { task: "A01-01", path: "docs/tasks/A01-01.md", at: "2026-10-16T10:00:00Z", by: "claude/x" },
-    { task: "A09-09", path: "docs/tasks/A09-09.md", at: "2026-10-16T10:00:00Z" },
+test("the notice counts the card files linked or reported, for tasks the taskbag has", () => {
+  const cards: Opened["cards_outside"] = [
+    {
+      task: "A01-01",
+      path: "docs/tasks/A01-01.md",
+      source: "report",
+      at: "2026-10-16T10:00:00Z",
+      by: "claude/x",
+    },
+    // Linked from the description (Task-A01-51): shown without any report.
+    { task: "A01-02", path: "docs/tasks/A01-02.md", source: "link" },
+    { task: "A09-09", path: "docs/tasks/A09-09.md", source: "report", at: "2026-10-16T10:00:00Z" },
   ];
-  assert.equal(cardsNotice(opened(["A01-01", "A01-02"], cards)), 1);
+  assert.equal(cardsNotice(opened(["A01-01", "A01-02"], cards)), 2);
+  assert.equal(cardsNotice(opened(["A01-02"], cards)), 1);
   assert.deepEqual(
     cardsOutside(opened(["A01-01"], cards)).map((c) => c.task),
     ["A01-01"],

@@ -420,7 +420,7 @@ pub fn connected_project(root: &Path) -> Option<std::path::PathBuf> {
     told.then_some(folder)
 }
 
-fn normalize(path: &Path) -> std::path::PathBuf {
+pub(crate) fn normalize(path: &Path) -> std::path::PathBuf {
     let mut clean = std::path::PathBuf::new();
     for part in path.components() {
         match part {
