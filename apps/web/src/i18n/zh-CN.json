@@ -521,7 +521,7 @@
   "sort.id_desc": "Z → A",
   "sort.name_asc": "A → Z",
   "sort.name_desc": "Z → A",
-  "sort.changed_asc": "最早在前",
+  "sort.changed_asc": "最旧在前",
   "sort.changed_desc": "最新在前",
   "task.modified": "修改时间 {time}"
 }
