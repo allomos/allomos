@@ -78,13 +78,13 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 ## 6. Views
 
 1. **Area list** — tasks grouped by area, with state, label, claim and waiting-on; filters by state, actor and waiting-on.
-   The same list can be grouped **by iteration** instead, with unplanned tasks last (owner, 2026-10-08; [`A01-15`](../tasks/Task-A01-15-iterations-view.md)).
+   The same list can be grouped **by iteration** instead, with unplanned tasks last (owner, 2026-10-08; `A01-15`).
 2. **Board** — columns by state (or by label).
 3. **Waiting on me** — every check/approval owed by the signed-in person; one click to approve, reject or mark checked.
 4. **Progress charts** — per-area done/open bars, state distribution, throughput per week.
 5. **Burndown + forecast** — see §7.
 6. **Timeline** — gantt generated from claim and done events.
-7. **Task detail** — a pane beside the list (owner, 2026-10-08): fields, description and links, event history ([`A01-16`](../tasks/Task-A01-16-task-pane.md)).
+7. **Task detail** — a pane beside the list (owner, 2026-10-08): fields, description and links, event history (`A01-16`).
 8. **Sessions** — which agent sessions hold which tasks right now, and whether they are alive (replaces the session registry).
 9. **Start in agent / Open session** — buttons on every task (see [D5](../decisions/0005-start-and-open-agent-sessions.md)).
 
@@ -133,7 +133,7 @@ flowchart TD
 - **The `alm` command** uses the same Rust rules on the same taskbag.
 
 **Open points:**
-1. **How the interface reaches the Rust side inside the desktop window.** The proposal is the same kind of connection a browser will later use, so the interface never changes. Iteration 1 has no local server yet (it arrives in Iteration 9), so [`Task-A01-01`](../tasks/Task-A01-01-walking-skeleton.md) picks a first connection that can switch over later without rewriting the interface.
+1. **How the interface reaches the Rust side inside the desktop window.** The proposal is the same kind of connection a browser will later use, so the interface never changes. Iteration 1 has no local server yet (it arrives in Iteration 9), so task `A01-01` picks a first connection that can switch over later without rewriting the interface.
 2. **Two writers on one taskbag.** In Iteration 1, both the desktop app and `alm` can change the same `.allomos/taskbag/`. "One writer at a time" (R75) needs a mechanism, for example a lock file or `alm` passing changes through the running desktop app. The `alm` command card decides this.
 
 ### Details
@@ -165,7 +165,7 @@ flowchart TD
 | Phase | # | Release | Usable for | What ships (products and contents) | Requirements |
 |---|---|---|---|---|---|
 | **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **Allomos's own development tasks** on a Mac; the agents building Allomos update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the taskbag (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`allomos` CLI** (short alias `alm`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · Allomos's own cards moved in from Markdown · *no server* | R91, R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
-| **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`allomos` / `alm` CLI** for Windows · one build pipeline producing both systems' builds ([`A07-02`](../tasks/Task-A07-02-build-pipeline.md)) · fixes for Windows differences (paths, line endings, the WebView2 engine) ([`A07-03`](../tasks/Task-A07-03-windows-works.md)) · **tasks grouped by iteration**: tasks get an optional iteration, set with `alm`; the list switches between by area and by iteration ([`A01-15`](../tasks/Task-A01-15-iterations-view.md), first) · **task pane** beside the list with one task's details ([`A01-16`](../tasks/Task-A01-16-task-pane.md)) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes ([`A01-17`](../tasks/Task-A01-17-change-history.md) history, [`A01-18`](../tasks/Task-A01-18-edit-task-in-app.md) edit, [`A01-19`](../tasks/Task-A01-19-create-in-app.md) create) · exit check on a Mac and a workmate's Windows machine ([`A07-04`](../tasks/Task-A07-04-v0-2-exit-check.md)) | R81, R85 (released together from here on), R1–R2 (editing in the app), R89 (iterations) |
+| **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`allomos` / `alm` CLI** for Windows · one build pipeline producing both systems' builds (`A07-02`) · fixes for Windows differences (paths, line endings, the WebView2 engine) (`A07-03`) · **tasks grouped by iteration**: tasks get an optional iteration, set with `alm`; the list switches between by area and by iteration (`A01-15`, first) · **task pane** beside the list with one task's details (`A01-16`) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes (`A01-17` history, `A01-18` edit, `A01-19` create) · exit check on a Mac and a workmate's Windows machine (`A07-04`) | R81, R85 (released together from here on), R1–R2 (editing in the app), R89 (iterations) |
 | **Next** | **3** | **v0.3 — MCP for agents** | Claude Code and Codex use Allomos through **MCP tools**, not only shell commands | **MCP server** (`alm mcp`, started by the agent on the same computer); safe retries and stale-edit checks; `alm init` and the app switch the server on in the project's `.mcp.json`, and the server sends instructions that tell agents when to use it (owner, 2026-10-07) | R11 (MCP), R63–R65 |
 | **Next** | **4** | **v0.4 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
 | **Next** | **5** | **v0.5 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
@@ -218,8 +218,8 @@ flowchart TD
 - **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
 - **Dependencies to watch:**
   - Iteration 2's exit check runs on **a workmate's Windows machine** (owner, 2026-10-04). The agent prepares an unsigned Windows build and a short step-by-step check list. The workmate installs it, runs the checks and reports the results, which are recorded on the card. Expect a Windows security warning on install, because builds are unsigned until Iteration 15.
-  - Iteration 8 needs the agent launch research ([`A03-01`](../tasks/Task-A03-01-agent-launch-research.md)).
-  - Iterations 9–10 build on the remote-access research ([`A04-01`](../tasks/Task-A04-01-remote-access-research.md)); pairing needs no email service (owner, 2026-10-14); a hosted relay (10) needs the owner's approval before it is set up.
+  - Iteration 8 needs the agent launch research (`A03-01`).
+  - Iterations 9–10 build on the remote-access research (`A04-01`); pairing needs no email service (owner, 2026-10-14); a hosted relay (10) needs the owner's approval before it is set up.
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
   - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 9–10 choose services that use the user's own account or a free tier.

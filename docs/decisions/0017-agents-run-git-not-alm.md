@@ -4,7 +4,7 @@
 |---|---|---|---|
 | **Accepted** | 2026-10-14 | 2026-10-14 | will.w.hui |
 
-Card: [`Task-A01-38`](../tasks/Task-A01-38-no-git-in-alm.md). Accepted by the owner on 2026-10-14 ("accept", in chat with session claude/a01-38-no-git-in-alm); the code may start.
+Card: task `A01-38`. Accepted by the owner on 2026-10-14 ("accept", in chat with session claude/a01-38-no-git-in-alm); the code may start.
 
 ## In plain words
 

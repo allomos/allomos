@@ -1,6 +1,6 @@
 # Remote access for companions, and the pairing email
 
-**Evidence collected 2026-10-07** for [`Task-A04-01`](../tasks/Task-A04-01-remote-access-research.md) and [decision 0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) open questions 4 and 5. Public sources only: vendors' own documentation and pricing pages, plus a few secondary articles where a vendor page could not be read (marked *secondary*). No account was created, nothing was installed or set up, and no email was sent. Free tiers change often; re-check a figure before relying on it.
+**Evidence collected 2026-10-07** for task `A04-01` and [decision 0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) open questions 4 and 5. Public sources only: vendors' own documentation and pricing pages, plus a few secondary articles where a vendor page could not be read (marked *secondary*). No account was created, nothing was installed or set up, and no email was sent. Free tiers change often; re-check a figure before relying on it.
 
 ## In plain words
 

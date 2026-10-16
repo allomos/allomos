@@ -1,8 +1,6 @@
 //! Find the AI agents on this computer and ask them to add Allomos's instructions to a
-//! project ([`Task-A03-03`]). Allomos only **opens** each agent with the request typed in;
+//! project (task A03-03). Allomos only **opens** each agent with the request typed in;
 //! the person reads it and sends it, so nothing runs or uses their plan without them.
-//!
-//! [`Task-A03-03`]: ../../../../docs/tasks/Task-A03-03-app-asks-agents-to-set-up.md
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -25,9 +23,7 @@ pub struct Agent {
 }
 
 /// A program started without a window. On Windows a windowed app's command-line child (`claude
-/// --version`) otherwise gets a console window that flashes on screen ([`Task-A07-05`]).
-///
-/// [`Task-A07-05`]: ../../../../docs/tasks/Task-A07-05-windows-agents-no-flash.md
+/// --version`) otherwise gets a console window that flashes on screen (task A07-05).
 pub fn command(program: impl AsRef<OsStr>) -> Command {
     #[allow(unused_mut)]
     let mut command = Command::new(program);
@@ -390,10 +386,8 @@ fn powershell_quote(text: &str) -> String {
 
 /// For an agent opened through a link, which starts outside any window the app controls: the
 /// line that names the app's own `alm` by its full path, only when the person's shell would find
-/// a different one ([`Task-A03-16`]; the owner's wording, 2026-10-14). `None` with no `alm` beside
+/// a different one (task A03-16; the owner's wording, 2026-10-14). `None` with no `alm` beside
 /// the app.
-///
-/// [`Task-A03-16`]: ../../../../docs/tasks/Task-A03-16-agents-use-the-apps-own-alm.md
 fn own_alm_line(own: Option<&Path>, shell: Option<&Path>) -> Option<String> {
     let own = own?;
     (shell != Some(own)).then(|| {
@@ -436,7 +430,7 @@ pub fn copy_text(text: &str) -> Result<(), Problem> {
 
 /// What a new Terminal window types (macOS): the folder of the app's own `alm` first in `PATH`,
 /// for that window only, then the agent in the project. With no `alm` beside the app, `PATH` is
-/// left as it is ([`Task-A03-16`](../../../../docs/tasks/Task-A03-16-agents-use-the-apps-own-alm.md)).
+/// left as it is (task A03-16).
 fn terminal_script(project: &Path, program: &str, alm_dir: Option<&Path>) -> String {
     let start = format!(
         "cd {} && {program}",

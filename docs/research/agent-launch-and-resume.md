@@ -1,6 +1,6 @@
 # Starting and reopening agent sessions
 
-**Evidence collected 2026-10-07** for [`Task-A03-01`](../tasks/Task-A03-01-agent-launch-research.md) and [decision 0005](../decisions/0005-start-and-open-agent-sessions.md). Sources: the vendors' own documentation (read 2026-10-07), plus `--help` output of the tools installed on the owner's Mac. **No agent was started**: no prompt was sent, no session or cloud task was created, nothing was spent.
+**Evidence collected 2026-10-07** for task `A03-01` and [decision 0005](../decisions/0005-start-and-open-agent-sessions.md). Sources: the vendors' own documentation (read 2026-10-07), plus `--help` output of the tools installed on the owner's Mac. **No agent was started**: no prompt was sent, no session or cloud task was created, nothing was spent.
 
 **Status marks:** **verified locally** — seen in the installed tool's own help on this Mac; **documented only** — in vendor documentation, not tried; **not available** — the documentation offers no such thing.
 

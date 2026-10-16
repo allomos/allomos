@@ -1,13 +1,13 @@
 # Road show deck / 路演幻灯片
 
-A ten-slide pitch deck for Allomos (换肩), in English and Simplified Chinese, organized by the three sets of [0014](../decisions/0014-main-purpose-and-three-sets.md): the main set (switch between AI agents and teammates and keep the project), AI skills, and progress management; then pricing (the local app is free, people pay only for the cloud) and the roadmap. Made 2026-10-04 ([`Task-A00-16`](../tasks/Task-A00-16-road-show-deck.md)); renamed to FlipHopper and published at new addresses 2026-10-06 ([`Task-A00-17`](../tasks/Task-A00-17-rename-to-crossjump.md)), because the first addresses were not reachable from the publishing session's account. A new main message is planned in [`Task-A00-18`](../tasks/Task-A00-18-positioning-and-deck.md). Renamed to Allomos and the taskbag (任务包) and republished at the same addresses 2026-10-12 ([`Task-A00-24`](../tasks/Task-A00-24-decks-allomos-taskbag.md)).
+A ten-slide pitch deck for Allomos (换肩), in English and Simplified Chinese, organized by the three sets of [0014](../decisions/0014-main-purpose-and-three-sets.md): the main set (switch between AI agents and teammates and keep the project), AI skills, and progress management; then pricing (the local app is free, people pay only for the cloud) and the roadmap. Made 2026-10-04 (task `A00-16`); renamed to FlipHopper and published at new addresses 2026-10-06 (task `A00-17`), because the first addresses were not reachable from the publishing session's account. A new main message is planned in task `A00-18`. Renamed to Allomos and the taskbag (任务包) and republished at the same addresses 2026-10-12 (task `A00-24`).
 
 | Version | Published address (private claude.ai Artifact) | Source in this repo |
 |---|---|---|
 | English | https://claude.ai/artifact/MGmzN64hzvRqWAMmvt1qyU | [roadshow-en.html](./roadshow-en.html) |
 | 中文 | https://claude.ai/artifact/XVe1UxXRUVt7WytcDgcABU | [roadshow-zh.html](./roadshow-zh.html) |
 
-The mark in the top bar is the app's own mark: two pairs of balls hopping through one spark, jade side to side and terracotta up and down ([`Task-A07-01`](../tasks/Task-A07-01-app-icon-hopper.md)). The app icon, the app window and the decks share it; it is also kept as [hopper-mark.svg](./hopper-mark.svg) ([`Task-A00-19`](../tasks/Task-A00-19-decks-new-mark.md)).
+The mark in the top bar is the app's own mark: two pairs of balls hopping through one spark, jade side to side and terracotta up and down (task `A07-01`). The app icon, the app window and the decks share it; it is also kept as [hopper-mark.svg](./hopper-mark.svg) (task `A00-19`).
 
 ## Using it
 

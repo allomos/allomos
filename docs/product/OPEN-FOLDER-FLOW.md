@@ -1,6 +1,6 @@
 # Opening a folder: the setup wizard, project folder, connecting agents
 
-A **contract** for what the desktop app does when a person opens a folder. Written from the owner's specification of 2026-10-09 ([`Task-A05-02`](../tasks/Task-A05-02-convert-existing-project.md)), changed by the owner on 2026-10-11 ([`Task-A05-03`](../tasks/Task-A05-03-taskbag-setup-wizard.md)): a setup wizard, and one **Connect with the agents** step instead of two. The owner's words are the source; the details below are how the app follows them.
+A **contract** for what the desktop app does when a person opens a folder. Written from the owner's specification of 2026-10-09 (task `A05-02`), changed by the owner on 2026-10-11 (task `A05-03`): a setup wizard, and one **Connect with the agents** step instead of two. The owner's words are the source; the details below are how the app follows them.
 
 ## In plain words
 
@@ -59,7 +59,7 @@ The page has no setup cards of its own (owner, 2026-10-12): when something is mi
 
 ### Windows
 
-Added by [`Task-A01-27`](../tasks/Task-A01-27-new-window.md) (owner, 2026-10-12). Each window shows one project.
+Added by task `A01-27` (owner, 2026-10-12). Each window shows one project.
 
 - **New window…** (the top bar's button, and **File → New Window…**, ⌘N) opens another window on the start page; the window it came from keeps its project. There is no File → Open Folder… (⌘O) any more: a new window's start page is where a folder is chosen.
 - **File → Open Recent** opens the folder in the window in front, as before. Menu commands act on the window in front only.
@@ -68,7 +68,7 @@ Added by [`Task-A01-27`](../tasks/Task-A01-27-new-window.md) (owner, 2026-10-12)
 
 ### Update notice
 
-Added by [`Task-A01-25`](../tasks/Task-A01-25-taskbag-format-upgrade.md) (owner, 2026-10-12); the older-taskbag part replaced by [`Task-A01-45`](../tasks/Task-A01-45-move-old-taskbag.md) (owner, 2026-10-15). The window checks whether the taskbag's format and Allomos's section in `AGENTS.md` / `CLAUDE.md` are current ([FILE-FORMAT § Format versions](./FILE-FORMAT.md#format-versions)): when a folder is opened (the start page, Open Recent, at start, through the wizard) and every few seconds while it is open (so a `git pull` or the agent's own work shows without reopening). The section is checked once an agent is connected with the project; an older taskbag always.
+Added by task `A01-25` (owner, 2026-10-12); the older-taskbag part replaced by task `A01-45` (owner, 2026-10-15). The window checks whether the taskbag's format and Allomos's section in `AGENTS.md` / `CLAUDE.md` are current ([FILE-FORMAT § Format versions](./FILE-FORMAT.md#format-versions)): when a folder is opened (the start page, Open Recent, at start, through the wizard) and every few seconds while it is open (so a `git pull` or the agent's own work shows without reopening). The section is checked once an agent is connected with the project; an older taskbag always.
 
 - **A taskbag written by an older Allomos** (any older format): its tasks are not shown. A notice above the task list says so, with **Move the tasks in…** (instead of the problem list saying it again). Choosing it renames the old folder aside (`.allomos/taskbag-allomos-<n>/`), creates a new, empty taskbag in its place with the old project's ID, name and project folder, and opens the wizard at step 4, which then says **Move the tasks in**: the chosen agent opens with the **move-in request** typed in. The agent shows its plan with `alm confirm` before it changes anything, and removes the old folder only as part of that plan. Until a task is moved in, the notice says the old folder's tasks are not moved in yet, and **Move the tasks in…** opens step 4 again.
 - The setup wizard's step 2, finding such a taskbag, says so and offers **Move the tasks in…** instead of **Next**: the same rename and new taskbag, then steps 3 and 4.

@@ -1603,7 +1603,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 },
                 w.path.display(),
                 if body.is_none() {
-                    "Fill it in, in plain words first, for any reader. Evidence goes on the task's card.\n"
+                    "Fill it in, in plain words first, for any reader. Evidence goes in the task's description (alm describe).\n"
                 } else {
                     ""
                 },

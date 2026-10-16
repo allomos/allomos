@@ -1,6 +1,6 @@
 # AI workflow and handoff
 
-How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [AGENTS.md](../../AGENTS.md) holds the short, always-loaded version of these rules; this file holds the detail. Adapted from the owner's SSR migration project (`AI-WORKFLOW.md`, `AGENT_HANDOFF.md`; see [REFERENCES.md](../REFERENCES.md)). Since 2026-10-12 handoffs live in the taskbag ([`Task-A03-06`](../tasks/Task-A03-06-agent-handoff-rules.md)); `docs/AGENT_HANDOFF.md` is retired and its history stays in Git.
+How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [AGENTS.md](../../AGENTS.md) holds the short, always-loaded version of these rules; this file holds the detail. Adapted from the owner's SSR migration project (`AI-WORKFLOW.md`, `AGENT_HANDOFF.md`; see [REFERENCES.md](../REFERENCES.md)). Since 2026-10-12 handoffs live in the taskbag (task `A03-06`); `docs/AGENT_HANDOFF.md` is retired and its history stays in Git.
 
 ## Roles and effort
 
@@ -12,8 +12,8 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [A
 ## Starting a session
 
 1. Read [AGENTS.md](../../AGENTS.md) (loaded automatically).
-2. Read [TASK_BOARD.md](../TASK_BOARD.md) (**Now**, **Waiting on the owner**), then run `alm list` against the taskbag at `../allomos-taskbag/.allomos/taskbag` ([CARDS.md § Where status lives](./CARDS.md#where-status-lives)).
-3. Resuming a card → open its card file and its latest handoff (`alm show <id>`, or `alm handoffs --task <id>`). Taking a new card → `alm guide workflow` (step 2: claiming and branches).
+2. Read [TASK_BOARD.md](../TASK_BOARD.md) (**Now**, **Waiting on the owner**), then run `alm list` against the taskbag at `../allomos-taskbag/.allomos/taskbag`.
+3. Resuming a card → `alm show <id>`: its description (the full detail) and its latest handoff (or `alm handoffs --task <id>`). Taking a new card → `alm guide workflow` (step 2: claiming and branches).
 4. Read the taskbag's `project-notes.md` (**Running** and **Pitfalls**) — they change what you do.
 5. Check the actual state before trusting notes: `git status`, `git worktree list`, running ports (`lsof -iTCP -sTCP:LISTEN`).
 6. Read only what the card and [AGENTS.md § Read by activity](../../AGENTS.md#read-by-activity) require.
@@ -31,7 +31,7 @@ How agent sessions (Claude Code, Codex) start, hand over and stop on Allomos. [A
 
 **Keep it short:**
 
-- Evidence goes on the card file, not in the handoff. Write "see card".
+- Evidence goes in the task's description (under an **Evidence** heading, written with `alm describe`), not in the handoff. Write "see the task".
 - Status goes in the taskbag's tasks, with `alm`; a one-line `alm release --note` still points the next holder at the handoff.
 - What every session must know, whatever its task, goes in the taskbag's `project-notes.md`: **Running** when you start or stop a server, create a hosted resource or change a remote; **Pitfalls** only for a lesson that would change what the next agent does; **Where credentials live**, never their values. Change lines in place.
 
@@ -56,4 +56,4 @@ The agent raises this itself; the owner should not have to ask.
 
 ## After Allomos can track itself (dogfooding)
 
-**Decided by the owner, 2026-10-04:** Allomos's own tasks are Iteration 1's first real project. When Iteration 1 (v0.1, macOS) passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), Allomos's own cards move from Markdown into a taskbag inside this repository. This workflow then changes: claims, labels and waiting-on are written with `alm` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Done 2026-10-06** ([`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md)), slightly ahead of the full exit check, at the owner's request: the taskbag is authoritative and the rules are in [CARDS.md](./CARDS.md#where-status-lives).
+**Decided by the owner, 2026-10-04:** Allomos's own tasks are Iteration 1's first real project. When Iteration 1 (v0.1, macOS) passes its exit check ([PLAN § 9](../product/PLAN.md#9-roadmap--releases)), Allomos's own cards move from Markdown into a taskbag inside this repository. This workflow then changes: claims, labels and waiting-on are written with `alm` instead of editing the board, and `TASK_BOARD.md` is retired or generated. The move is the last v0.1 card. **Done 2026-10-06** (task `A01-07`), slightly ahead of the full exit check, at the owner's request: the taskbag is authoritative and the rules are in `alm guide` and AGENTS.md; since 2026-10-16 (task `A00-30`) each task's detail is in its description, not a card file.

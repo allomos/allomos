@@ -18,7 +18,7 @@ Everything else is grouped into two more sets. All three work on the same taskba
 
 ## Decided by the owner (2026-10-06)
 
-- The order of releases in [PLAN § 9](../product/PLAN.md#9-roadmap--releases) stays. Switching agents works from the first release: [`Task-A01-03`](../tasks/Task-A01-03-gb-command.md) adds a handoff note (`alm release --note`) and `alm next`.
+- The order of releases in [PLAN § 9](../product/PLAN.md#9-roadmap--releases) stays. Switching agents works from the first release: task `A01-03` adds a handoff note (`alm release --note`) and `alm next`.
 
 - The main purpose: switching between AI agents and teammates, as discussed for the name.
 - Three sets: the main set, AI skills, progress management. Working together with teammates belongs to the main set, not to a set of its own.
@@ -26,9 +26,9 @@ Everything else is grouped into two more sets. All three work on the same taskba
 
 ## Not decided yet
 
-Recorded on [`Task-A00-18`](../tasks/Task-A00-18-positioning-and-deck.md) until the owner answers:
+Recorded on task `A00-18` until the owner answers:
 - whether AI-skills content is written by us inside the app, or links to outside material (owner, 2026-10-06: "being designed" for now);
-- whether showing each agent account's remaining quota (and suggesting when to switch) is researched, and when: parked as [`Task-A03-02`](../tasks/Task-A03-02-account-quota-idea.md);
+- whether showing each agent account's remaining quota (and suggesting when to switch) is researched, and when: parked as task `A03-02`;
 
 ## Consequences
 

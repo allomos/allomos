@@ -51,7 +51,7 @@ All 50 external links were checked; the other 49 work. Internal links, anchors, 
 
 ## Later the same day: project data folder
 
-The owner added: in the desktop application, the data source folder should be able to be set to **any folder**, including **a standalone folder** and **a subfolder of an existing project folder**. Recorded as R72–R73 (accepted) and R74–R75 (proposed) in [0010](../decisions/0010-project-data-folder.md), card [`A00-11`](../tasks/Task-A00-11-project-data-folder.md). The owner's sentence ended with a comma, so the record asks whether more kinds of location were meant.
+The owner added: in the desktop application, the data source folder should be able to be set to **any folder**, including **a standalone folder** and **a subfolder of an existing project folder**. Recorded as R72–R73 (accepted) and R74–R75 (proposed) in [0010](../decisions/0010-project-data-folder.md), card `A00-11`. The owner's sentence ended with a comma, so the record asks whether more kinds of location were meant.
 
 The owner then added that **commit and push are performed by calling `git` commands**. This is recorded as R76 (accepted): glidebox runs the user's installed `git`, so the user's own settings, credentials and hooks apply.
 
@@ -64,7 +64,7 @@ Asked whether the mobile companion should be an installed app or a phone-friendl
 | Question | Answer | Recorded in |
 |---|---|---|
 | May companions act, not only view? | Yes, for example mark a check done or approve — **by notifying/controlling the desktop app** | R77, 0009 |
-| Same network only, or from outside? | **From outside**; needs a **free or very cheap** solution | R78, 0009, card [`A04-01`](../tasks/Task-A04-01-remote-access-research.md) |
+| Same network only, or from outside? | **From outside**; needs a **free or very cheap** solution | R78, 0009, card `A04-01` |
 | How is a phone or browser allowed in? | The companion gives a valid email and an alias; the desktop user approves the email; the desktop app sends a long verification code to it; the code gives access | R79, 0009 |
 | Mobile: installed app or phone-friendly web page? | First "installed native app", then "use this" for the web page; asked again, the owner **confirmed the phone-friendly web page** | 0009, R70 |
 | Are cloud projects still needed? | Yes | 0009 |
@@ -89,7 +89,7 @@ The owner decided: tell the user to run the desktop app on a computer, and refre
 
 ## Pairing code email
 
-The owner decided the code is sent by email through a free email-sending service. Recorded as R84 in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md); the service choice was added to research card [`A04-01`](../tasks/Task-A04-01-remote-access-research.md).
+The owner decided the code is sent by email through a free email-sending service. Recorded as R84 in [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md); the service choice was added to research card `A04-01`.
 
 ## Framework follow-up
 
@@ -103,7 +103,7 @@ After the detailed comparison ([research](../research/desktop-frameworks.md)) an
 
 The owner asked whether the milestones followed rapid iteration, and said every milestone must produce a usable product, growing from a small prototype. They did not: the old milestones were layered (M1 a library, M2 view-only, editing only from M3).
 
-Re-planned in [PLAN § 9](../product/PLAN.md#9-roadmap--releases), using the roadmap-update skill, as seven releases, each an installable, usable desktop app. The first code card is now the v0.1 walking skeleton [`Task-A01-01`](../tasks/Task-A01-01-walking-skeleton.md). This replaces the "proposed plan change" below.
+Re-planned in [PLAN § 9](../product/PLAN.md#9-roadmap--releases), using the roadmap-update skill, as seven releases, each an installable, usable desktop app. The first code card is now the v0.1 walking skeleton task `A01-01`. This replaces the "proposed plan change" below.
 
 The owner then asked for a "what ships" column (apps, servers and so on) and said v0.1 is for **the current project's tasks**: glidebox tracks its own development from v0.1 (dogfooding).
 

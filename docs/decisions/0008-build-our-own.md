@@ -19,7 +19,7 @@ The [competitor investigation](../research/competitor-investigation.md) found th
 
 ## Consequences
 
-- We write our own code from the first code card, [`Task-A01-01`](../tasks/Task-A01-01-walking-skeleton.md).
+- We write our own code from the first code card, task `A01-01`.
 - Copying source from these projects requires a new owner decision and a licence review. The GPL (git-bug) in particular has obligations that apply when distributing.
 - Ordinary third-party libraries (for example a chart library or a Git library) are still allowed. Each is chosen and pinned in the card that introduces it, with its licence noted.
 - **Not decided by this record:**

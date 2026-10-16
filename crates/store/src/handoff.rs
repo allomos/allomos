@@ -38,7 +38,7 @@ pub const DEFAULT_TEMPLATE: &str = "# Handoff
 - **Running:** <!-- what, port, how to restart it, safe to stop; or none -->
 - **Approvals in force:** <!-- what is approved, and what is not -->
 
-<!-- Keep each line short. Evidence (numbers, logs, versions) goes on the task's card, not here. -->
+<!-- Keep each line short. Evidence (numbers, logs, versions) goes in the task's description, not here. -->
 ";
 
 /// The default `project-notes.md`.

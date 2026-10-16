@@ -1,5 +1,7 @@
 # Moving Allomos's tasks into the new taskbag (2026-10-12)
 
+*Since 2026-10-16 (`A00-30`) each card file's content lives in its task's description in the taskbag, and `docs/tasks/` is gone; the card links below are history.*
+
 **What happened, in plain words:** until today this project's tasks lived in a taskbag inside this repository (`.allomos/taskbag/`). They were copied, with their exact status, into the taskbag Allomos set up next to this repository, `../allomos-taskbag/.allomos/taskbag` (its own Git repository, branch `master`). The old in-repository taskbag was then removed, so status has one home again. Every task was written with the `alm` command; no taskbag file was edited by hand. The owner approved the plan in the Allomos app (`alm confirm`, "Move tasks into Allomos").
 
 ## What was copied
@@ -16,70 +18,70 @@ Nothing was dropped or duplicated: 64 card files, 64 copied tasks, 64 old tasks.
 
 | Card file | Task | Status copied (state · label · holder) |
 |---|---|---|
-| [Task-A00-01-planning-docs.md](tasks/Task-A00-01-planning-docs.md) | `A00-01` | done · owner verified |
-| [Task-A00-02-github-remote.md](tasks/Task-A00-02-github-remote.md) | `A00-02` | done |
-| [Task-A00-03-glidelines-relationship.md](tasks/Task-A00-03-glidelines-relationship.md) | `A00-03` | done · owner verified |
-| [Task-A00-04-local-and-cloud-requirements.md](tasks/Task-A00-04-local-and-cloud-requirements.md) | `A00-04` | done · owner verified |
-| [Task-A00-05-competitor-research.md](tasks/Task-A00-05-competitor-research.md) | `A00-05` | done |
-| [Task-A00-06-git-sync-proposal.md](tasks/Task-A00-06-git-sync-proposal.md) | `A00-06` | done · owner verified |
-| [Task-A00-07-open-source-base-decision.md](tasks/Task-A00-07-open-source-base-decision.md) | `A00-07` | done · owner verified |
-| [Task-A00-08-ai-generated-project-setup.md](tasks/Task-A00-08-ai-generated-project-setup.md) | `A00-08` | done · owner verified |
-| [Task-A00-09-interface-requirements.md](tasks/Task-A00-09-interface-requirements.md) | `A00-09` | done · owner verified |
-| [Task-A00-10-docs-consistency-review.md](tasks/Task-A00-10-docs-consistency-review.md) | `A00-10` | done · owner verified |
-| [Task-A00-11-project-data-folder.md](tasks/Task-A00-11-project-data-folder.md) | `A00-11` | waiting · drafted |
-| [Task-A00-12-desktop-platforms-and-shared-code.md](tasks/Task-A00-12-desktop-platforms-and-shared-code.md) | `A00-12` | done · owner verified |
-| [Task-A00-13-iterative-release-roadmap.md](tasks/Task-A00-13-iterative-release-roadmap.md) | `A00-13` | done · owner verified |
-| [Task-A00-14-areas-and-naming.md](tasks/Task-A00-14-areas-and-naming.md) | `A00-14` | waiting · drafted |
-| [Task-A00-15-free-local-app.md](tasks/Task-A00-15-free-local-app.md) | `A00-15` | waiting · drafted |
-| [Task-A00-16-road-show-deck.md](tasks/Task-A00-16-road-show-deck.md) | `A00-16` | done |
-| [Task-A00-17-rename-to-crossjump.md](tasks/Task-A00-17-rename-to-crossjump.md) | `A00-17` | done · owner verified |
-| [Task-A00-18-positioning-and-deck.md](tasks/Task-A00-18-positioning-and-deck.md) | `A00-18` | done · owner verified |
-| [Task-A00-19-decks-new-mark.md](tasks/Task-A00-19-decks-new-mark.md) | `A00-19` | done · owner verified · claude/a00-19-republish |
-| [Task-A00-20-app-name-research.md](tasks/Task-A00-20-app-name-research.md) | `A00-20` | done · owner verified |
-| [Task-A00-21-rename-to-allomos.md](tasks/Task-A00-21-rename-to-allomos.md) | `A00-21` | done · owner verified · claude/a00-21-allomos |
-| [Task-A00-22-leftover-fliphopper-names.md](tasks/Task-A00-22-leftover-fliphopper-names.md) | `A00-22` | done · owner verified · claude/a00-22-leftover-names |
-| [Task-A00-23-name-clearance.md](tasks/Task-A00-23-name-clearance.md) | `A00-23` | waiting |
-| [Task-A00-24-decks-allomos-taskbag.md](tasks/Task-A00-24-decks-allomos-taskbag.md) | `A00-24` | in progress · deployed and verified · claude/a00-24-decks |
-| [Task-A01-01-walking-skeleton.md](tasks/Task-A01-01-walking-skeleton.md) | `A01-01` | done · owner verified |
-| [Task-A01-02-ui-languages.md](tasks/Task-A01-02-ui-languages.md) | `A01-02` | done · owner verified |
-| [Task-A01-03-gb-command.md](tasks/Task-A01-03-gb-command.md) | `A01-03` | done · owner verified |
-| [Task-A01-04-startup-folder-argument.md](tasks/Task-A01-04-startup-folder-argument.md) | `A01-04` | done · owner verified |
-| [Task-A01-05-readme-in-new-folder.md](tasks/Task-A01-05-readme-in-new-folder.md) | `A01-05` | done · owner verified |
-| [Task-A01-06-show-seabag-in-file-manager.md](tasks/Task-A01-06-show-seabag-in-file-manager.md) | `A01-06` | done · owner verified |
-| [Task-A01-07-own-cards-in-seabag.md](tasks/Task-A01-07-own-cards-in-seabag.md) | `A01-07` | done · owner verified |
-| [Task-A01-08-fh-fills-move-gaps.md](tasks/Task-A01-08-fh-fills-move-gaps.md) | `A01-08` | done · owner verified |
-| [Task-A01-09-v0-1-exit-check.md](tasks/Task-A01-09-v0-1-exit-check.md) | `A01-09` | done · owner verified |
-| [Task-A01-10-file-new-window.md](tasks/Task-A01-10-file-new-window.md) | `A01-10` | done · owner verified |
-| [Task-A01-11-recent-folders-menu.md](tasks/Task-A01-11-recent-folders-menu.md) | `A01-11` | done · owner verified |
-| [Task-A01-12-fh-commit-option.md](tasks/Task-A01-12-fh-commit-option.md) | `A01-12` | done · owner verified |
-| [Task-A01-13-agent-instructions-on-init.md](tasks/Task-A01-13-agent-instructions-on-init.md) | `A01-13` | done · owner verified |
-| [Task-A01-14-init-asks-the-agent.md](tasks/Task-A01-14-init-asks-the-agent.md) | `A01-14` | done · owner verified |
-| [Task-A01-15-iterations-view.md](tasks/Task-A01-15-iterations-view.md) | `A01-15` | done · owner verified · claude/a01-15-iterations |
-| [Task-A01-16-task-pane.md](tasks/Task-A01-16-task-pane.md) | `A01-16` | done · owner verified · claude/a01-16-task-pane |
-| [Task-A01-17-change-history.md](tasks/Task-A01-17-change-history.md) | `A01-17` | backlog |
-| [Task-A01-18-edit-task-in-app.md](tasks/Task-A01-18-edit-task-in-app.md) | `A01-18` | backlog |
-| [Task-A01-19-create-in-app.md](tasks/Task-A01-19-create-in-app.md) | `A01-19` | backlog |
-| [Task-A01-20-rename-seabag-to-taskcase.md](tasks/Task-A01-20-rename-seabag-to-taskcase.md) | `A01-20` | done · owner verified |
-| [Task-A01-21-task-language.md](tasks/Task-A01-21-task-language.md) | `A01-21` | done · owner verified · claude/a01-21-task-language |
-| [Task-A02-01-burndown-and-forecast.md](tasks/Task-A02-01-burndown-and-forecast.md) | `A02-01` | backlog |
-| [Task-A03-01-agent-launch-research.md](tasks/Task-A03-01-agent-launch-research.md) | `A03-01` | waiting · drafted |
-| [Task-A03-02-account-quota-idea.md](tasks/Task-A03-02-account-quota-idea.md) | `A03-02` | backlog |
-| [Task-A03-03-app-asks-agents-to-set-up.md](tasks/Task-A03-03-app-asks-agents-to-set-up.md) | `A03-03` | done · owner verified |
-| [Task-A03-04-agent-awareness-line.md](tasks/Task-A03-04-agent-awareness-line.md) | `A03-04` | done · owner verified |
-| [Task-A03-05-agents-panel-refinements.md](tasks/Task-A03-05-agents-panel-refinements.md) | `A03-05` | done · owner verified |
-| [Task-A03-06-agent-handoff-rules.md](tasks/Task-A03-06-agent-handoff-rules.md) | `A03-06` | backlog |
-| [Task-A03-07-renew-agent-instructions.md](tasks/Task-A03-07-renew-agent-instructions.md) | `A03-07` | ready |
-| [Task-A03-08-step-commits.md](tasks/Task-A03-08-step-commits.md) | `A03-08` | done · owner verified · claude/a03-08-step-commits |
-| [Task-A04-01-remote-access-research.md](tasks/Task-A04-01-remote-access-research.md) | `A04-01` | waiting · drafted |
-| [Task-A05-01-ssr-board-import.md](tasks/Task-A05-01-ssr-board-import.md) | `A05-01` | dropped |
-| [Task-A05-02-convert-existing-project.md](tasks/Task-A05-02-convert-existing-project.md) | `A05-02` | done · owner verified · claude/a05-02-convert-project |
-| [Task-A05-03-taskbag-setup-wizard.md](tasks/Task-A05-03-taskbag-setup-wizard.md) | `A05-03` | in progress · implemented · claude/a05-03-setup-wizard |
-| [Task-A07-01-app-icon-hopper.md](tasks/Task-A07-01-app-icon-hopper.md) | `A07-01` | done · owner verified |
-| [Task-A07-02-build-pipeline.md](tasks/Task-A07-02-build-pipeline.md) | `A07-02` | done · owner verified · claude/a07-02-script-run |
-| [Task-A07-03-windows-works.md](tasks/Task-A07-03-windows-works.md) | `A07-03` | backlog |
-| [Task-A07-04-v0-2-exit-check.md](tasks/Task-A07-04-v0-2-exit-check.md) | `A07-04` | backlog |
-| [Task-A07-05-windows-agents-no-flash.md](tasks/Task-A07-05-windows-agents-no-flash.md) | `A07-05` | done · owner verified · claude/a07-05-windows-agents |
-| [Task-A07-06-windows-installer-installs-alm.md](tasks/Task-A07-06-windows-installer-installs-alm.md) | `A07-06` | done · owner verified · claude/a07-06-installer-alm |
+| task `A00-01` | `A00-01` | done · owner verified |
+| task `A00-02` | `A00-02` | done |
+| task `A00-03` | `A00-03` | done · owner verified |
+| task `A00-04` | `A00-04` | done · owner verified |
+| task `A00-05` | `A00-05` | done |
+| task `A00-06` | `A00-06` | done · owner verified |
+| task `A00-07` | `A00-07` | done · owner verified |
+| task `A00-08` | `A00-08` | done · owner verified |
+| task `A00-09` | `A00-09` | done · owner verified |
+| task `A00-10` | `A00-10` | done · owner verified |
+| task `A00-11` | `A00-11` | waiting · drafted |
+| task `A00-12` | `A00-12` | done · owner verified |
+| task `A00-13` | `A00-13` | done · owner verified |
+| task `A00-14` | `A00-14` | waiting · drafted |
+| task `A00-15` | `A00-15` | waiting · drafted |
+| task `A00-16` | `A00-16` | done |
+| task `A00-17` | `A00-17` | done · owner verified |
+| task `A00-18` | `A00-18` | done · owner verified |
+| task `A00-19` | `A00-19` | done · owner verified · claude/a00-19-republish |
+| task `A00-20` | `A00-20` | done · owner verified |
+| task `A00-21` | `A00-21` | done · owner verified · claude/a00-21-allomos |
+| task `A00-22` | `A00-22` | done · owner verified · claude/a00-22-leftover-names |
+| task `A00-23` | `A00-23` | waiting |
+| task `A00-24` | `A00-24` | in progress · deployed and verified · claude/a00-24-decks |
+| task `A01-01` | `A01-01` | done · owner verified |
+| task `A01-02` | `A01-02` | done · owner verified |
+| task `A01-03` | `A01-03` | done · owner verified |
+| task `A01-04` | `A01-04` | done · owner verified |
+| task `A01-05` | `A01-05` | done · owner verified |
+| task `A01-06` | `A01-06` | done · owner verified |
+| task `A01-07` | `A01-07` | done · owner verified |
+| task `A01-08` | `A01-08` | done · owner verified |
+| task `A01-09` | `A01-09` | done · owner verified |
+| task `A01-10` | `A01-10` | done · owner verified |
+| task `A01-11` | `A01-11` | done · owner verified |
+| task `A01-12` | `A01-12` | done · owner verified |
+| task `A01-13` | `A01-13` | done · owner verified |
+| task `A01-14` | `A01-14` | done · owner verified |
+| task `A01-15` | `A01-15` | done · owner verified · claude/a01-15-iterations |
+| task `A01-16` | `A01-16` | done · owner verified · claude/a01-16-task-pane |
+| task `A01-17` | `A01-17` | backlog |
+| task `A01-18` | `A01-18` | backlog |
+| task `A01-19` | `A01-19` | backlog |
+| task `A01-20` | `A01-20` | done · owner verified |
+| task `A01-21` | `A01-21` | done · owner verified · claude/a01-21-task-language |
+| task `A02-01` | `A02-01` | backlog |
+| task `A03-01` | `A03-01` | waiting · drafted |
+| task `A03-02` | `A03-02` | backlog |
+| task `A03-03` | `A03-03` | done · owner verified |
+| task `A03-04` | `A03-04` | done · owner verified |
+| task `A03-05` | `A03-05` | done · owner verified |
+| task `A03-06` | `A03-06` | backlog |
+| task `A03-07` | `A03-07` | ready |
+| task `A03-08` | `A03-08` | done · owner verified · claude/a03-08-step-commits |
+| task `A04-01` | `A04-01` | waiting · drafted |
+| task `A05-01` | `A05-01` | dropped |
+| task `A05-02` | `A05-02` | done · owner verified · claude/a05-02-convert-project |
+| task `A05-03` | `A05-03` | in progress · implemented · claude/a05-03-setup-wizard |
+| task `A07-01` | `A07-01` | done · owner verified |
+| task `A07-02` | `A07-02` | done · owner verified · claude/a07-02-script-run |
+| task `A07-03` | `A07-03` | backlog |
+| task `A07-04` | `A07-04` | backlog |
+| task `A07-05` | `A07-05` | done · owner verified · claude/a07-05-windows-agents |
+| task `A07-06` | `A07-06` | done · owner verified · claude/a07-06-installer-alm |
 
 ## Values that could not be copied
 

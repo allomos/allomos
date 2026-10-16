@@ -36,12 +36,12 @@ The sentence ends with a comma, so the owner may have more kinds of location in 
 
 - **Self-contained folder.** Everything that defines the project lives in its folder, so moving or copying the folder moves the project. Caches and indexes that can be rebuilt are kept outside it.
 - **Inside a Git repository** (for example, a subfolder of a code repo): Allomos uses that repository's Git and does not create a second repository nested inside.
-- **Allomos never commits or pushes unless the user asks.** One exception, set by the owner on 2026-10-12 ([`Task-A05-03`](../tasks/Task-A05-03-taskbag-setup-wizard.md)): when the setup wizard has a taskbag (step 2), it makes sure the folder holding `.allomos/` is in a Git repository, runs `git init` there when it is not (without asking), and commits the taskbag's files (and `README-allomos.md`) to it, nothing else. It never pushes.
+- **Allomos never commits or pushes unless the user asks.** One exception, set by the owner on 2026-10-12 (task `A05-03`): when the setup wizard has a taskbag (step 2), it makes sure the folder holding `.allomos/` is in a Git repository, runs `git init` there when it is not (without asking), and commits the taskbag's files (and `README-allomos.md`) to it, nothing else. It never pushes.
 - **One writer at a time.** Only one running desktop app writes to a folder at a time. A second one opens it read-only, or is refused.
 - **All Git actions use the `git` command**, not only commit and push: pull, status and diff too.
 - **If `git` is not installed**, the desktop app asks the user to install it. Projects stay usable without Git actions until then.
 - **Only standalone folders and subfolders of an existing project folder** are in scope. No special handling is planned for synced folders (Dropbox, iCloud), network drives or removable disks.
-- **Folder gone or moved** (owner, 2026-10-14; built by [`Task-A01-28`](../tasks/Task-A01-28-forget-missing-last-folder.md)). The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
+- **Folder gone or moved** (owner, 2026-10-14; built by task `A01-28`). The app shows the project as unavailable and lets the user locate it again, instead of silently creating an empty project.
 - **One Allomos project per repository.** Several Allomos projects in different subfolders of one code repository are **out of scope**.
 
 ## How this fits earlier decisions
