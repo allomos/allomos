@@ -34,7 +34,10 @@ pub const CONVERT_REQUEST_VERSION: u32 = 9;
 /// written by an older Allomos into a new one, on top of the conversion request's steps.
 /// 2: a task whose old description links to a card file in the project folder gets that card
 /// file moved in beside it (Task-A00-30).
-pub const MOVE_IN_REQUEST_VERSION: u32 = 2;
+/// 3: the other card files of the old tasks are found and moved in as `alm guide move-cards`
+/// says, since **Move the tasks in…** now covers card files too (Task-A01-45, approver
+/// 2026-10-16).
+pub const MOVE_IN_REQUEST_VERSION: u32 = 3;
 
 /// Changes when the connect request's parts change (Task-A05-03).
 /// 2: the setup part asks the person before setting up Git, and commits the taskbag itself (the
@@ -272,7 +275,7 @@ pub fn agent_move_in_request_in(
 - `handoffs/`（allomos/2 起）：每份交接原文不改，用 `alm --as <它的作者> handoff --tasks <它的任务> --from <文件>`。
 - `project-notes.md`：内容写进新任务包的 `project-notes.md`（这个文件可以直接编辑）。
 - `events/`（allomos/3 起）：历史记录。`alm` 只记录它自己做的改动，所以旧事件不复制，它们留在 Git 历史里。在报告和 `project-notes.md` 里写明仍包含旧任务包的最后一次提交（在提交任何东西之前运行 `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
-对下面步骤的改动：第 3 步不要单独提交新任务包：在 Git 里它取代旧任务包，所以在第 11 步和搬迁一起提交。第 6 步：保留每个任务自己的描述；旧描述的 `Card:` 链接指向项目文件夹里的卡片文件时，把那个卡片文件也这样搬到任务旁边（`alm card <id> --from <文件>`），旧任务文件夹里的 `card.md` 也一样。第 9 步要替换的是 AGENTS.md / CLAUDE.md 里旧的 Allomos 一节。第 10 步要删除的旧状态就是旧文件夹 {old}，别的都不删：把它写进计划，用户同意后，只有当 Git 历史里有它（以前提交过）时才删除；否则保留它，并在报告里说明。"
+对下面步骤的改动：第 3 步不要单独提交新任务包：在 Git 里它取代旧任务包，所以在第 11 步和搬迁一起提交。第 6 步：保留每个任务自己的描述；旧描述的 `Card:` 链接指向项目文件夹里的卡片文件时，把那个卡片文件也这样搬到任务旁边（`alm card <id> --from <文件>`），旧任务文件夹里的 `card.md` 也一样；这些任务的其他卡片文件（`alm guide move-cards` 第 1 步，例如以任务 ID 命名、却没有描述链接到的文件）也这样搬入，没有对应任务的卡片文件列给用户看，绝不搬。第 9 步要替换的是 AGENTS.md / CLAUDE.md 里旧的 Allomos 一节。第 10 步要删除的旧状态就是旧文件夹 {old}，别的都不删：把它写进计划，用户同意后，只有当 Git 历史里有它（以前提交过）时才删除；否则保留它，并在报告里说明。"
             ),
         ),
         "ja" => (
@@ -294,7 +297,7 @@ pub fn agent_move_in_request_in(
 - `handoffs/`（allomos/2 から）：引き継ぎごとに、文を変えずに `alm --as <書いた人> handoff --tasks <そのタスク> --from <ファイル>`。
 - `project-notes.md`：中身を新しいタスクバッグの `project-notes.md` に書きます（このファイルは直接編集してかまいません）。
 - `events/`（allomos/3 から）：履歴。`alm` は自分の変更しか履歴に残さないので、古いイベントは写しません。Git の履歴に残ります。古いタスクバッグを含む最後のコミットを、レポートと `project-notes.md` に書きます（何かをコミットする前に `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
-下の手順の変更点：手順 3 では新しいタスクバッグを単独でコミットしません。Git では古いものを置き換えるので、手順 11 で移行と一緒にコミットします。手順 6 ではタスク自身の説明を残します。古い説明の `Card:` リンクがプロジェクトのフォルダーにあるカードのファイルを指していれば、そのカードのファイルも同じようにタスクの隣に移します（`alm card <id> --from <ファイル>`）。古いタスクのフォルダーにある `card.md` も同じです。手順 9 で置き換えるのは AGENTS.md / CLAUDE.md の古い Allomos の節です。手順 10 で消す古い状況は古いフォルダー {old} だけです：計画に書き、同意のあとで、Git の履歴にある（以前コミットされた）ときだけ消します。そうでなければ残し、レポートにそう書きます。"
+下の手順の変更点：手順 3 では新しいタスクバッグを単独でコミットしません。Git では古いものを置き換えるので、手順 11 で移行と一緒にコミットします。手順 6 ではタスク自身の説明を残します。古い説明の `Card:` リンクがプロジェクトのフォルダーにあるカードのファイルを指していれば、そのカードのファイルも同じようにタスクの隣に移します（`alm card <id> --from <ファイル>`）。古いタスクのフォルダーにある `card.md` も同じです。これらのタスクのほかのカードのファイル（`alm guide move-cards` の手順 1。たとえばタスクの ID の名前なのにどの説明からもリンクされていないもの）も同じように移し、タスクのないカードのファイルはユーザーに一覧で見せ、決して移しません。手順 9 で置き換えるのは AGENTS.md / CLAUDE.md の古い Allomos の節です。手順 10 で消す古い状況は古いフォルダー {old} だけです：計画に書き、同意のあとで、Git の履歴にある（以前コミットされた）ときだけ消します。そうでなければ残し、レポートにそう書きます。"
             ),
         ),
         _ => (
@@ -318,12 +321,32 @@ pub fn agent_move_in_request_in(
 - `handoffs/` (allomos/2 and later): each handoff, its text unchanged, with `alm --as <its writer> handoff --tasks <its tasks> --from <file>`.
 - `project-notes.md`: its content goes into the new taskbag's `project-notes.md` (you may edit that file directly).
 - `events/` (allomos/3): the history. `alm` records history only for its own changes, so the old events are not copied; they stay in Git history. Name, in the report and in `project-notes.md`, the last commit that holds the old taskbag (`git -C \"{taskbag}\" log -1 --format=%H -- .`, before anything is committed).
-Changes to the steps below: in step 3, do not commit the new taskbag on its own: in Git it replaces the old one, so it is committed with the move in step 11. In step 6, keep each task's own description; when the old description's `Card:` link points to a card file in the project folder, move that card file in beside the task the same way (`alm card <id> --from <file>`), and so a `card.md` in the old task folder. In step 9, what you replace is Allomos's old section in AGENTS.md / CLAUDE.md. In step 10, the old status to remove is the old folder {old}, and nothing else: name it in the plan, and after Go ahead remove it only when Git history holds it (it was committed before); otherwise keep it and say so in the report."
+Changes to the steps below: in step 3, do not commit the new taskbag on its own: in Git it replaces the old one, so it is committed with the move in step 11. In step 6, keep each task's own description; when the old description's `Card:` link points to a card file in the project folder, move that card file in beside the task the same way (`alm card <id> --from <file>`), and so a `card.md` in the old task folder; other card files of these tasks (`alm guide move-cards`, step 1: for example ones named after a task ID that no description links to) move in the same way, and card files without a task are listed for the person, never moved. In step 9, what you replace is Allomos's old section in AGENTS.md / CLAUDE.md. In step 10, the old status to remove is the old folder {old}, and nothing else: name it in the plan, and after Go ahead remove it only when Git history holds it (it was committed before); otherwise keep it and say so in the report."
             ),
         ),
     };
     let source = section_source(language, taskbag_path);
     format!("{title}\n\n{intro}\n\n{moves}\n\n{rest}\n\n{source}\n")
+}
+
+/// What **Move the tasks in…** types into the agent the person chooses, and what `alm move-in`
+/// prints (Task-A01-45, approver 2026-10-16: one button and one request instead of Move the tasks
+/// in… and Move the cards in…). It covers whichever applies to the taskbag at `taskbag`:
+/// - a taskbag from an older Allomos, or one renamed aside beside a new taskbag with no tasks
+///   ([`versions::move_in`](crate::versions::move_in)): the move-in request
+///   ([`agent_move_in_request_in`]), which also moves the old tasks' card files in;
+/// - otherwise: the move-cards request
+///   ([`agent_move_cards_request_in`](crate::cards::agent_move_cards_request_in)), for card files
+///   kept outside the taskbag, reported with `alm cards found` or still to be found.
+///
+/// Both cannot apply at once: card files are reported only for tasks a current taskbag has, and an
+/// older taskbag is not read (its card files are the move-in request's), while a new taskbag
+/// waiting for the old one's tasks has none. `project` is the recorded project folder.
+pub fn agent_move_tasks_in_request_in(language: &str, project: &Path, taskbag: &Path) -> String {
+    match crate::versions::move_in(taskbag) {
+        Some(m) => agent_move_in_request_in(language, project, taskbag, &m),
+        None => crate::cards::agent_move_cards_request_in(language, project, taskbag),
+    }
 }
 
 /// What **Connect with the agents** asks the first chosen agent (Task-A05-03): first the setup

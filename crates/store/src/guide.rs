@@ -271,10 +271,12 @@ About Allomos:
   move them in beside their tasks after the person's Go ahead.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
   folder, or where `--taskbag` says.
-- `alm move-in [--language <code>]`: when `alm` says the taskbag was written by an older
-  Allomos (`taskbag_to_move_in`), the request for moving its tasks into a new taskbag, like
-  another task system; tell the person first. It changes nothing; the person confirms the plan
-  with `alm confirm`.
+- `alm move-in [--language <code>]`: the request the Allomos app's **Move the tasks in…** types
+  into an agent. When `alm` says the taskbag was written by an older Allomos
+  (`taskbag_to_move_in`): moving its tasks, and their card files, into a new taskbag, like
+  another task system; tell the person first. Otherwise: moving card files kept outside the
+  taskbag in beside their tasks (`alm guide move-cards`). It changes nothing; the person confirms
+  the plan with `alm confirm`.
 ";
 
 /// `alm guide move-cards` (Task-A00-30, approver 2026-10-16): Allomos does not look for card files;
@@ -299,13 +301,14 @@ says Go ahead.
 2. Report what you found, so the person sees it even before you ask: `alm cards found
    <id>=<path> <id>=<path> …` (each path relative to the project folder; several in one command).
    The Allomos app then shows \"N tasks keep their card files in the project folder\" with
-   **Move the cards in…**. `alm cards` lists the reports; `alm cards found <id>=` withdraws one.
+   **Move the tasks in…**, which opens an agent with this guide's request typed in (`alm move-in`
+   prints it). `alm cards` lists the reports; `alm cards found <id>=` withdraws one.
 3. The one question. Write the plan in Markdown to a file outside the project: every card file
    and the task it goes to (`tasks/<id>/card.md`); the links that change (each description's
    `Card:` link; links inside a card that are relative to its old place; links in other documents
    to a card's old place); the originals you will remove from the project folder; card files
    without a task; tasks you cannot change (an open task held by another session: its holder
-   moves it later); and how you will commit. Then `alm confirm --title \"Move the cards in\"
+   moves it later); and how you will commit. Then `alm confirm --title \"Move the tasks in\"
    --plan <file>`. Exit code 0 means go ahead with the whole plan; any other means change
    nothing: tell the person and stop. (In a quiet run, do not use `alm confirm`: park the plan as
    a question with `alm wait`.)

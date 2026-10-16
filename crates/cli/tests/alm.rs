@@ -2065,17 +2065,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v14)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v15)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v13 section (before card files beside their tasks, Task-A00-30) is out of date too.
+    // A v14 section (before Move the tasks in… covered card files, Task-A01-45) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v14)", "## Tasks: Allomos (v13)")
+            brief.replace("## Tasks: Allomos (v15)", "## Tasks: Allomos (v14)")
         ),
     )
     .unwrap();
@@ -2206,14 +2206,30 @@ fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     out
 }
 
+/// Approver, 2026-10-16 (Task-A01-45): one Move the tasks in…. On a current taskbag its request
+/// is the move-cards one (card files kept outside the taskbag), and it changes nothing.
 #[test]
-fn move_in_on_a_current_taskbag_changes_nothing() {
+fn move_in_on_a_current_taskbag_asks_for_the_card_files() {
     let repo = filled();
     let before = snapshot(&repo);
-    let v = ok(&repo, &["move-in"]);
+    let v = ok(&repo, &["move-in", "--language", "en"]);
     assert_eq!(v["move_in"], json!({ "needed": false }));
-    assert!(v.get("request").is_none());
+    assert_eq!(v["cards_outside"], json!([]));
+    let request = v["request"].as_str().unwrap();
+    assert!(
+        request.starts_with("Please move this project's card files into Allomos's taskbag"),
+        "{request}"
+    );
+    assert!(request.contains("guide move-cards"), "{request}");
     assert_eq!(snapshot(&repo), before);
+    // Card files an agent reported are listed with it.
+    fs::create_dir_all(repo.join("docs/tasks")).unwrap();
+    fs::write(repo.join("docs/tasks/A01-01.md"), "# A01-01\n").unwrap();
+    ok(&repo, &["cards", "found", "A01-01=docs/tasks/A01-01.md"]);
+    let v = ok(&repo, &["move-in", "--language", "ja"]);
+    assert_eq!(v["cards_outside"][0]["task"], "A01-01");
+    assert_eq!(v["cards_outside"][0]["path"], "docs/tasks/A01-01.md");
+    assert!(v["request"].as_str().unwrap().contains("カードの移し入れの依頼"));
 }
 
 /// Owner, 2026-10-15 (Task-A01-45): a taskbag from any older Allomos is moved in by an agent,
@@ -2306,8 +2322,14 @@ fn move_in_names_the_old_folder_beside_a_new_taskbag() {
             "Open a taskbag",
         ],
     );
-    let v = ok(&repo, &["move-in"]);
+    let v = ok(&repo, &["move-in", "--language", "en"]);
     assert_eq!(v["move_in"], json!({ "needed": false }));
+    assert!(
+        v["request"]
+            .as_str()
+            .unwrap()
+            .starts_with("Please move this project's card files")
+    );
 }
 
 #[test]

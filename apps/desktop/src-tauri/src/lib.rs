@@ -41,7 +41,7 @@ struct Opened {
     /// task form chooses the new task's base from the open tasks' bases.
     branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
-    /// "N tasks keep their card files in the project folder" with **Move the cards in…**.
+    /// "N tasks keep their card files in the project folder" with **Move the tasks in…**.
     cards_outside: Vec<allomos_core::card::Outside>,
 }
 
@@ -1022,19 +1022,21 @@ fn set_project_folder(root: PathBuf, folder: PathBuf) -> Result<SetupState, Prob
     setup_state(&root)
 }
 
-/// File → Connect with the Agents… and File → Move the Cards In… are offered only while a
+/// File → Connect with the Agents… and File → Move the Tasks In… are offered only while a
 /// taskbag is open.
 #[tauri::command]
 fn set_connect_enabled(texts: tauri::State<MenuTexts>, enabled: bool) {
     let _ = texts.connect.set_enabled(enabled);
-    let _ = texts.move_cards.set_enabled(enabled);
+    let _ = texts.move_tasks_in.set_enabled(enabled);
 }
 
-/// **Move the cards in…** (Task-A00-30): open the chosen agent in the project folder of the
-/// taskbag at `taskbag`, with the move-cards request typed in. Nothing is sent: the person sends
-/// it; the agent shows its plan in the app (`alm confirm`) before anything changes.
+/// **Move the tasks in…** (Task-A01-45, approver 2026-10-16: one button for an older taskbag and
+/// for card files kept outside the taskbag, Task-A00-30): open the chosen agent in the project
+/// folder of the taskbag at `taskbag`, with the request for whichever applies typed in
+/// ([`allomos_store::agent_move_tasks_in_request_in`]). Nothing is sent: the person sends it; the
+/// agent shows its plan in the app (`alm confirm`) before anything changes.
 #[tauri::command]
-async fn move_cards(agent: String, taskbag: PathBuf, language: String) -> Result<(), Problem> {
+async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Result<(), Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -1045,16 +1047,16 @@ async fn move_cards(agent: String, taskbag: PathBuf, language: String) -> Result
     let Some(chosen) = found.iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    let request = allomos_store::cards::agent_move_cards_request_in(&language, &project, &taskbag);
+    let request = allomos_store::agent_move_tasks_in_request_in(&language, &project, &taskbag);
     agents::ask(chosen, &project, &request)
 }
 
-/// **Move the cards in…** with Manual: the same request, as an agent opened through a link gets
+/// **Move the tasks in…** with Manual: the same request, as an agent opened through a link gets
 /// it, for the person to copy.
 #[tauri::command]
-fn move_cards_request(taskbag: PathBuf, language: String) -> String {
+fn move_tasks_in_request(taskbag: PathBuf, language: String) -> String {
     let project = allomos_store::versions::project_folder(&taskbag);
-    let request = allomos_store::cards::agent_move_cards_request_in(&language, &project, &taskbag);
+    let request = allomos_store::agent_move_tasks_in_request_in(&language, &project, &taskbag);
     agents::link_request(&request, alm_command::own().as_deref())
 }
 
@@ -1259,8 +1261,8 @@ const CLEAR_RECENT_ID: &str = "recent_clear";
 const CLEAR_RECENT_EVENT: &str = "menu:clear_recent";
 const CONNECT_ID: &str = "connect";
 const CONNECT_EVENT: &str = "menu:connect";
-const MOVE_CARDS_ID: &str = "move_cards";
-const MOVE_CARDS_EVENT: &str = "menu:move_cards";
+const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
+const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 
@@ -1269,7 +1271,7 @@ struct MenuTexts {
     file: Submenu<Wry>,
     new_window: MenuItem<Wry>,
     connect: MenuItem<Wry>,
-    move_cards: MenuItem<Wry>,
+    move_tasks_in: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
     update_known: Mutex<bool>,
@@ -1340,11 +1342,12 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         false,
         None::<&str>,
     )?;
-    // Card files kept in the project folder are moved in by an agent (Task-A00-30).
-    let move_cards = MenuItem::with_id(
+    // An older taskbag's tasks and card files kept in the project folder are moved in by an
+    // agent: one item for both (Task-A01-45, Task-A00-30).
+    let move_tasks_in = MenuItem::with_id(
         app,
-        MOVE_CARDS_ID,
-        "Move the Cards In…",
+        MOVE_TASKS_IN_ID,
+        "Move the Tasks In…",
         // Enabled by the window while a taskbag is open.
         false,
         None::<&str>,
@@ -1357,7 +1360,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .find(|s| s.text().is_ok_and(|t| t == "File"));
     let file = match existing {
         Some(file) => {
-            file.prepend_items(&[&new_window, &recent, &connect_item, &move_cards])?;
+            file.prepend_items(&[&new_window, &recent, &connect_item, &move_tasks_in])?;
             file.insert(&PredefinedMenuItem::separator(app)?, 4)?;
             file
         }
@@ -1366,7 +1369,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
                 app,
                 "File",
                 true,
-                &[&new_window, &recent, &connect_item, &move_cards],
+                &[&new_window, &recent, &connect_item, &move_tasks_in],
             )?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
@@ -1403,7 +1406,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         file,
         new_window,
         connect: connect_item,
-        move_cards,
+        move_tasks_in,
         check_updates,
         update_known: Mutex::new(false),
         recent,
@@ -1422,7 +1425,7 @@ struct MenuWords {
     clear_menu: String,
     no_recent: String,
     connect: String,
-    move_cards: String,
+    move_tasks_in: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1433,7 +1436,7 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.new_window.set_text(words.new_window);
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
-    let _ = texts.move_cards.set_text(words.move_cards);
+    let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -1486,8 +1489,8 @@ pub fn run() {
                 let _ = open_new_window(app);
             } else if id == CONNECT_ID {
                 send(CONNECT_EVENT, None);
-            } else if id == MOVE_CARDS_ID {
-                send(MOVE_CARDS_EVENT, None);
+            } else if id == MOVE_TASKS_IN_ID {
+                send(MOVE_TASKS_IN_EVENT, None);
             } else if id == CHECK_UPDATES_ID {
                 let known = *app
                     .state::<MenuTexts>()
@@ -1557,8 +1560,8 @@ pub fn run() {
             manual_request,
             build_app,
             build_app_request,
-            move_cards,
-            move_cards_request,
+            move_tasks_in,
+            move_tasks_in_request,
             run_modes_text,
             copy_text,
             instruction_files,

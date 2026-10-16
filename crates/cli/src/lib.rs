@@ -326,8 +326,9 @@ enum Command {
         #[arg(long)]
         iteration: Option<String>,
     },
-    /// A taskbag written by an older Allomos: print the request for the AI agent that moves its
-    /// tasks into a new taskbag, like another task system. Changes nothing.
+    /// Print the request the app's Move the tasks in… gives an AI agent: for a taskbag written by
+    /// an older Allomos, moving its tasks into a new taskbag, like another task system; otherwise,
+    /// moving card files kept outside the taskbag in beside their tasks. Changes nothing.
     #[command(name = "move-in")]
     MoveIn {
         /// The language of the request (en, zh-CN, ja). Default: the Allomos app's language.
@@ -1697,21 +1698,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         Command::MoveIn { language } => {
             let root = locate(cli, cwd)?;
-            let Some(move_in) = versions::move_in(&root) else {
-                if let versions::FormatState::Newer { found } = versions::format_state(&root) {
-                    return Err(Problem::TaskbagNewer {
-                        found,
-                        supported: FORMAT.to_string(),
-                    });
-                }
-                let text = format!(
-                    "Nothing to move in: the taskbag is in {FORMAT}, and no older taskbag is waiting beside it.\n"
-                );
-                return Ok(Done::new(
-                    json!({ "taskbag": root, "move_in": { "needed": false } }),
-                    text,
-                ));
-            };
+            if let versions::FormatState::Newer { found } = versions::format_state(&root) {
+                return Err(Problem::TaskbagNewer {
+                    found,
+                    supported: FORMAT.to_string(),
+                });
+            }
             let language = language.clone().unwrap_or_else(|| {
                 saved_ui_language().unwrap_or_else(|| {
                     let system: Vec<String> = sys_locale::get_locales().collect();
@@ -1720,8 +1712,23 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             });
             // An older taskbag is not read: its project folder comes from its project.json as it is.
             let project = versions::project_folder(&root);
+            // One request for Move the tasks in… (Task-A01-45): the move-in request for an older
+            // taskbag, otherwise the move-cards request for card files kept outside the taskbag.
             let request =
-                allomos_store::agent_move_in_request_in(&language, &project, &root, &move_in);
+                allomos_store::agent_move_tasks_in_request_in(&language, &project, &root);
+            let Some(move_in) = versions::move_in(&root) else {
+                let cards = allomos_store::cards::outside(&root);
+                return Ok(Done::new(
+                    json!({
+                        "taskbag": root,
+                        "move_in": { "needed": false },
+                        "cards_outside": cards,
+                        "language": language,
+                        "request": request,
+                    }),
+                    request,
+                ));
+            };
             Ok(Done::new(
                 json!({
                     "taskbag": root,

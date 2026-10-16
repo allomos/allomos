@@ -52,7 +52,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 14: card files live beside their tasks (`tasks/<id>/card.md`); an agent that finds tasks
 /// linking to card files outside the taskbag reports them (`alm cards found`) and proposes moving
 /// them in (`alm guide move-cards`) (Task-A00-30).
-pub const SECTION_VERSION: u32 = 14;
+/// 15: the person can start that with **Move the tasks in…** in the app, one button for an older
+/// taskbag and for card files, whose request `alm move-in` prints (Task-A01-45).
+pub const SECTION_VERSION: u32 = 15;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -741,6 +743,40 @@ mod tests {
             assert!(c.needs_update());
             assert_eq!(snapshot(&dir), before, "allomos/{n}: nothing changed");
         }
+    }
+
+    /// Approver, 2026-10-16 (Task-A01-45): one Move the tasks in… and one request. An older
+    /// taskbag, before and after it is renamed aside, gets the move-in request (which moves its
+    /// card files too); a current one gets the move-cards request.
+    #[test]
+    fn move_the_tasks_in_asks_for_whichever_applies() {
+        use crate::{agent_move_tasks_in_request_in, cards};
+        let (dir, root) = project("one-request");
+        for language in ["en", "zh-CN", "ja"] {
+            let r = agent_move_tasks_in_request_in(language, &dir, &root);
+            assert_eq!(
+                r,
+                cards::agent_move_cards_request_in(language, &dir, &root),
+                "{language}"
+            );
+        }
+        set_project_format(&root, "allomos/3");
+        let older = move_in(&root).unwrap();
+        assert!(!older.prepared);
+        for language in ["en", "zh-CN", "ja"] {
+            let r = agent_move_tasks_in_request_in(language, &dir, &root);
+            assert_eq!(
+                r,
+                crate::agent_move_in_request_in(language, &dir, &root, &older),
+                "{language}"
+            );
+            assert!(r.contains("alm card <id> --from"), "{language}");
+            assert!(r.contains("guide move-cards"), "{language}");
+        }
+        let prepared = move_aside(&root).unwrap();
+        let r = agent_move_tasks_in_request_in("en", &dir, &root);
+        assert!(r.contains(&format!("to {}", shown(&prepared.old))), "{r}");
+        assert!(r.contains("other card files of these tasks"), "{r}");
     }
 
     /// The app's Move the tasks in…: the old folder is renamed aside, keeping every file, and a
