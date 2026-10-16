@@ -1,4 +1,4 @@
-# Cards, labels and claiming
+# Cards and labels
 
 A **contract** for how work is recorded on Allomos. Since [`Task-A01-07`](../tasks/Task-A01-07-own-cards-in-seabag.md) (2026-10-06) Allomos tracks itself: **status lives in Allomos's taskbag** (since 2026-10-12 outside this repository, at `../allomos-taskbag/.allomos/taskbag`; [report](../allomos-conversion.md)), changed with the `alm` command ([CODING_RULES § The `alm` command](./CODING_RULES.md#the-fh-command)). Each card's detail is its own file in [docs/tasks/](../tasks/). [TASK_BOARD.md](../TASK_BOARD.md) keeps only **Now** and **Waiting on the owner**, until it is removed or generated from the taskbag (owner, 2026-10-06).
 
@@ -45,7 +45,7 @@ Add an area by editing this table and the board in the same commit.
 **Only in the taskbag** (`../allomos-taskbag/.allomos/taskbag`, its own Git repository next to this one): each card is a task with the card's number as its ID (`A01-07`), and its state, label, holder and waiting-on are that task's fields. The card file holds the outcome, scope, approvals and dated progress notes — never a copy of the state. The task's `description.md` links to the card file.
 
 - **Change status only with `alm`.** Every checkout and worktree shares the one taskbag outside this repository; point `alm` at it: `export ALLOMOS_TASKBAG=/Users/wanghui/coding/glidepace/allomos-taskbag/.allomos/taskbag` (or `--taskbag` on each command). Branches made before 2026-10-12 still hold an old copy at `.allomos/taskbag/`; never change it. `alm` never runs Git ([0017](../decisions/0017-agents-run-git-not-alm.md)): after every status change it prints the `git add`, `git commit` and `git push` commands for that change's files only, in the taskbag's repository; run them, and leave other changes in the taskbag as they are (another session's may be among them).
-- **Who you are:** `export ALLOMOS_HOLDER=<your branch>` (for example `claude/a01-05-readme`), or `--as <branch>` on each command.
+- **Who you are:** `export ALLOMOS_HOLDER=<your session name>` (for example `claude/a01-05-readme`), or `--as <session name>` on each command.
 - **Next dependency:** `alm needs <ID> "<the one thing needed for the next label>"`. For a waiting task, its *waiting on* says it; for a blocked task, `alm show <ID>` lists each blocking card with its state.
 - **Seeing status:** `alm list` (all, by area), `alm list --state in_progress` (who holds what — this replaces the old Sessions table), `alm list --state done`, `alm show <ID>`, `alm next`. The app shows the same when it opens this repository.
 
@@ -78,20 +78,11 @@ An agent working a card does not stop to ask the approver about routine choices 
 - **Before an automatic or loop run** (a card run, `/loop`, several cards one after another), the agent asks the approver to choose **quiet** or **normal** mode, showing what `alm guide run-modes` prints (in the task language: what the agent will and won't do in each mode, when the approver is interrupted, how long it can run unattended, and, for quiet mode, what to do when it is over), and starts only once they choose ([`Task-A03-21`](../tasks/Task-A03-21-run-modes.md)). It writes the choice in its handoff, under Approvals in force (`Run mode: quiet` or `Run mode: normal`, who chose it and when), and follows it until the run ends. In **normal mode** it works as usual and stops at each question until the approver answers, so the approver stays reachable.
 - **A quiet automatic or loop run** (quiet mode: set up to go on without the approver) never waits for a person: a routine choice is decided, recorded with `alm ai-decided` and the work goes on; a real question parks that card with `alm wait <ID> --on "<the question>"` (it shows in `alm human` under To answer) and the run goes on with the next ready card; `alm confirm` is not used, since it would wait until it times out.
 
-## Claiming protocol
+## A new card
 
-One card is worked by exactly one session at a time. A session works in the current checkout by default; a worktree is created only when a task needs its own checkout, for example when several sessions work at once. Each such session then has its own git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from `main`. The taskbag, not memory or chat, records who holds what. Every step below is run against that taskbag (see [Where status lives](#where-status-lives)).
+Claiming, branches and the steps of working a card are `alm`'s to tell, not this file's: `alm guide workflow` (and the brief in [AGENTS.md](../../AGENTS.md#tasks-allomos)) says how to claim a task, which branch it starts from and merges into, and how to finish or release it ([`Task-A03-22`](../tasks/Task-A03-22-branch-rules.md)).
 
-1. **Pull before claiming:** `git -C <taskbag> pull --ff-only` once the taskbag's repository has a remote, then `alm next` (or `alm list --state ready`).
-2. **Claim in a commit of its own.** `alm claim <ID> --as <branch>`, run the Git commands it prints right away (they commit and push the claim alone), then start work. Until the claim is pushed, other sessions do not see it. `alm claim` refuses a task someone else holds (`task_held`), and the lock stops two sessions on this computer from both winning.
-3. **A card held by another session is read-only to you.** If its card file holds a stale fact, correct only that fact. `alm claim --take` is only for a session whose holder has stopped (for example its quota ran out) and says so in the handoff.
-4. **Two claims from different computers:** the second to push gets a merge conflict in that task's `task.json` — keep whichever landed first and claim a different card.
-5. **Labels, waiting and blocked:** `alm label <ID> "<label>"`; `alm wait <ID> --on "<what>" [--who "<who>"]` when a person must act; `alm block <ID> --by <card ID>` when another card must finish first. When `alm next` says all its blockers are done, check, then `alm unblock <ID>`; `alm` never moves it by itself. After each, run the Git commands it prints.
-6. **Finish** after the human check: `alm label <ID> "human verified"`, `alm done <ID>`. In a quiet loop or card run (without the approver), `alm done <ID> --without-human-check "<why, which run>" --steps <file.md>`; the approver finds it with `alm human` (or the app's **Needs a human** filter), checks it with the steps, and marks it with the app's **Checked** button or `alm checked <ID>`. After a quiet run the approver also answers its parked questions (To answer, then `alm ready <ID>`), reviews its AI decisions (`alm reviewed <ID>`) and reads the run's handoff, as `alm guide run-modes` says. After each, run the Git commands it prints.
-7. **Release** a card you stop short of Done: `alm release <ID> --note "<what the next session needs>"`, and make sure your handoff (`alm handoff --as <session> --tasks <ID>`) says where you stopped; run the Git commands each prints.
-8. **Clean up after a merge.** If you worked in a worktree: once your card's branch is merged into `main` and pushed, and the owner no longer needs the app built in it for a check, stop anything still running from the worktree, then remove **your own** worktree (`git worktree remove .claude/worktrees/<name>`, which also deletes its `target/`) and delete the merged local branch (`git branch -d <branch>`). Never remove another session's worktree. The branch on GitHub stays unless the owner asks. Rules for build output: [CODING_RULES.md § Build output](./CODING_RULES.md#build-output-target).
-9. **A new card:** write its file in `docs/tasks/`, then `alm add task <ID> --area <area> --title "<title>" --description "Card: [docs/tasks/<file>](../../../../../allomos/docs/tasks/<file>)"`; it starts in `backlog`. When the owner approves it: `alm ready <ID>`. A card that will not be done: `alm drop <ID>`.
-10. **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
+- **A new card:** write its file in `docs/tasks/`, then `alm add task <ID> --area <area> --title "<title>" --branch <the branch you are on> --description "Card: [docs/tasks/<file>](../../../../../allomos/docs/tasks/<file>)"`; it starts in `backlog`. When the owner approves it: `alm ready <ID>`. A card that will not be done: `alm drop <ID>`.
 
 ## Now — rules
 
@@ -101,6 +92,7 @@ One card is worked by exactly one session at a time. A session works in the curr
 - Now never repeats what a card says; every line names a card that exists.
 - Headings name states (Now, Waiting on the owner, Blocked, Done), never topics.
 - Before committing a board edit, read Now from the top; if two lines disagree, correct the older one in place.
+- **Now** is shared text: rewrite it only when a card is claimed or finished, never for mid-flight progress.
 
 ## Card template
 

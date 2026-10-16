@@ -37,6 +37,9 @@ struct Opened {
     readme_added: bool,
     /// Each task's AI decisions not reviewed yet, by task ID (Task-A03-19), from the history.
     ai_decisions: std::collections::BTreeMap<String, Vec<allomos_core::decision::Decision>>,
+    /// Each task's base and working branch, by task ID (Task-A03-22), from the history: the New
+    /// task form chooses the new task's base from the open tasks' bases.
+    branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
 }
 
 /// The folder named on the command line: the first argument that is not an option.
@@ -98,6 +101,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
     Opened {
         loaded: load(&root),
         ai_decisions: allomos_store::ai_decisions(&root),
+        branches: allomos_store::branches(&root),
         root,
         readme_added: false,
     }
@@ -130,6 +134,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
     Ok(Opened {
         loaded: load(&root),
         ai_decisions: Default::default(),
+        branches: Default::default(),
         root,
         readme_added,
     })
@@ -448,6 +453,8 @@ fn add_task_as(
     mut new: allomos_store::NewTask,
 ) -> Result<allomos_core::Task, Problem> {
     new.id = given(new.id);
+    // The person is on no branch: the window sends only the base it chose (Task-A03-22).
+    new.branch = None;
     allomos_store::add_task(root, app_actor(name)?, LOCK_WAIT, &new).map(|t| t.item)
 }
 
@@ -735,6 +742,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
     Ok(Opened {
         loaded: load(&root),
         ai_decisions: Default::default(),
+        branches: Default::default(),
         root,
         readme_added: false,
     })
@@ -1865,6 +1873,8 @@ mod tests {
             (t.id.as_str(), t.iteration.as_deref(), t.state),
             ("A01-01", Some("I07"), allomos_core::State::Backlog)
         );
+        // Task-A03-22: with no base sent, none is recorded.
+        assert!(open_taskbag(root.clone()).branches.is_empty());
         let h = allomos_store::events::history(&root, "A01-01");
         let seen: Vec<_> = h
             .events
@@ -1910,6 +1920,17 @@ mod tests {
             Err(Problem::UnknownArea { area: "A09".into() })
         );
         assert_eq!(load(&root).taskbag.unwrap().tasks.len(), 1);
+
+        // Task-A03-22: the base the person picked is recorded in the `add task` event and shows
+        // when the taskbag opens; a `branch` sent by mistake chooses nothing.
+        let picked: allomos_store::NewTask = serde_json::from_value(serde_json::json!({
+            "area": "A01", "title": "On a branch", "base": "storage-v2", "branch": "claude/x"
+        }))
+        .unwrap();
+        let t = add_task_as(&root, Some("Will"), picked).unwrap();
+        let opened = open_taskbag(root.clone());
+        assert_eq!(opened.branches[&t.id].base.as_deref(), Some("storage-v2"));
+        assert_eq!(opened.branches[&t.id].working, None);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use fs4::{FileExt, TryLockError};
 
+use allomos_core::branch;
 use allomos_core::decision;
 use allomos_core::event::{self, Event, Kind};
 use allomos_core::ops;
@@ -238,8 +239,11 @@ the project notes (below) and your own handoff file.
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
   Pitfalls), or `alm list`.
-- Take a task: pull first, then `alm claim <id> --as <your session name>`, and run the Git
-  commands it prints right away: until your claim is pushed, other sessions do not see it.
+- Take a task: pull first, then `alm claim <id> --as <your session name> --branch <the branch
+  you are on>` (`git branch --show-current`), and run the Git commands it prints right away:
+  until your claim is pushed, other sessions do not see it. Every task has a base branch, by its
+  real name: it starts from it and merges back into it; the claim records your working branch
+  and prints the base to start from and merge into, with the Git commands.
 - Report progress: `alm label <id> \"<label>\"`.
 - Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
@@ -268,7 +272,9 @@ the project notes (below) and your own handoff file.
   removing things), anything that changes the plan or another task, and anything with a cost or
   an outside effect goes to the approver first.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
-  `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\"`.
+  `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --branch
+  <the branch you are on>`: on a task's working branch, the new task shares that task's base;
+  otherwise the base is the branch you are on. alm prints which and why; `--base` overrides it.
 - Change a task's title, description or handoff note: `alm title <id> \"<title>\"`,
   `alm describe <id> --text \"<markdown>\"` (or `--from <file.md>`), `alm note <id> \"<text>\"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
@@ -1591,6 +1597,23 @@ pub struct NewTask {
     /// The app only: plan it there too, as `alm plan` would (owner, 2026-10-14).
     #[serde(default)]
     pub iteration: Option<String>,
+    /// The branch the agent is on (`alm add task --branch`), which chooses the base (Task-A03-22).
+    #[serde(default)]
+    pub branch: Option<String>,
+    /// The base given (`--base`, or the person's pick in the app): it wins over `branch`.
+    #[serde(default)]
+    pub base: Option<String>,
+}
+
+/// What [`add_task_with_base`] did: the task, the base it got and why, and warnings.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AddedTask {
+    pub task: Task,
+    /// The base the task got, and why; `None` when neither a branch nor a base was given.
+    pub base: Option<branch::Choice>,
+    /// `branch_missing`, or `base_differs` for each task the adding session holds on another base.
+    pub warnings: Vec<Problem>,
+    pub issues: Vec<Issue>,
 }
 
 /// A new task in backlog, the same way for `alm add task` and the app (Task-A01-19): under the
@@ -1604,12 +1627,46 @@ pub fn add_task(
     wait: Duration,
     new: &NewTask,
 ) -> Result<Added<Task>, Problem> {
+    add_task_with_base(root, actor, wait, new).map(|a| Added {
+        item: a.task,
+        issues: a.issues,
+    })
+}
+
+/// [`add_task`], telling also which base the task got and why (Task-A03-22). The base is chosen
+/// by [`branch::choose_base`] under the same lock and recorded in the `add task` event as a
+/// `base_branch` change; `task.json` does not change shape.
+pub fn add_task_with_base(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    new: &NewTask,
+) -> Result<AddedTask, Problem> {
     let (lock, mut bag, issues) = lock_for_change(root, wait)?;
     let id = match &new.id {
         Some(id) => id.clone(),
         None => ops::next_task_id(&bag, &new.area)?,
     };
     let task = ops::new_task(&bag, &id, &new.area, &new.title, new.description.as_deref())?;
+    let recorded = branches(root);
+    let filled = |v: &Option<String>| v.clone().filter(|b| !b.trim().is_empty());
+    let base = branch::choose_base(
+        &bag,
+        &recorded,
+        filled(&new.branch).as_deref(),
+        filled(&new.base).as_deref(),
+    )?;
+    let mut warnings = Vec::new();
+    match &base {
+        Some(c) => warnings.extend(branch::other_bases(
+            &bag, &recorded, actor.by, &task.id, &c.base,
+        )),
+        // The app adds without a branch when no open task has a base: nothing to say.
+        None if actor.via == "alm" => warnings.push(Problem::BranchMissing {
+            id: task.id.clone(),
+        }),
+        None => {}
+    }
     bag.tasks.push(task.clone());
     let planned = match new
         .iteration
@@ -1620,15 +1677,19 @@ pub fn add_task(
         Some(iteration) => Some(ops::plan(&bag, &task.id, Some(iteration))?.task),
         None => None,
     };
-    let added = actor.event(
-        "add task",
-        Kind::Task,
-        Some(&task.id),
-        event::changes(None, &task, event::TASK_FIELDS),
-    );
+    let mut changes = event::changes(None, &task, event::TASK_FIELDS);
+    if let Some(c) = &base {
+        changes.extend(branch::change(branch::BASE, None, &c.base));
+    }
+    let added = actor.event("add task", Kind::Task, Some(&task.id), changes);
     lock.record(&added, |l| l.create_task(&task))?;
     let Some(planned) = planned else {
-        return Ok(Added { item: task, issues });
+        return Ok(AddedTask {
+            task,
+            base,
+            warnings,
+            issues,
+        });
     };
     let plan = actor.event(
         "plan",
@@ -1637,8 +1698,10 @@ pub fn add_task(
         event::changes(Some(&task), &planned, event::TASK_FIELDS),
     );
     lock.record(&plan, |l| l.save_task(&planned))?;
-    Ok(Added {
-        item: planned,
+    Ok(AddedTask {
+        task: planned,
+        base,
+        warnings,
         issues,
     })
 }
@@ -1675,6 +1738,72 @@ pub fn change_task(
         warnings: outcome.warnings,
         issues,
     })
+}
+
+/// Every task's branches (base and working), by task ID (Task-A03-22), from the history.
+pub fn branches(root: &Path) -> std::collections::BTreeMap<String, branch::Branches> {
+    branch::recorded(&events::list(root).0)
+}
+
+/// What [`claim_task`] did: the change, and the task's branches after it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Claimed {
+    pub changed: Changed,
+    /// What the claim recorded, or found, about the task's branches.
+    pub branches: branch::AtClaim,
+}
+
+/// Claim task `id` (`alm claim`, Task-A03-22): the claim rule, plus its branches. `current` is the
+/// branch the agent is on, `working` the branch the work is done on (default `current`). A task
+/// without a base gets `current`. One `claim` event holds both the task's changes and the branch
+/// changes.
+pub fn claim_task(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    take: bool,
+    current: Option<&str>,
+    working: Option<&str>,
+) -> Result<Claimed, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let outcome = ops::claim(&bag, id, actor.by, take)?;
+    let before = branches(root).remove(id).unwrap_or_default();
+    let at = branch::at_claim(id, &before, current, working)?;
+    let old = bag.tasks.iter().find(|t| t.id == outcome.task.id);
+    let mut changes = event::changes(old, &outcome.task, event::TASK_FIELDS);
+    changes.extend(at.changes.iter().cloned());
+    let event = actor.event("claim", Kind::Task, Some(&outcome.task.id), changes);
+    lock.record(&event, |l| l.save_task(&outcome.task))?;
+    let mut warnings = outcome.warnings;
+    warnings.extend(at.warnings.iter().cloned());
+    Ok(Claimed {
+        changed: Changed {
+            task: outcome.task,
+            warnings,
+            issues,
+        },
+        branches: at,
+    })
+}
+
+/// Change task `id`'s base to `name` (`alm base`, Task-A03-22): one `base` event, under the lock;
+/// the task's files do not change. Returns the task and its branches after it.
+pub fn set_base(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    name: &str,
+) -> Result<(Task, branch::Branches, Vec<Issue>), Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let recorded = branches(root);
+    let changes = branch::set_base(&bag, &recorded, id, actor.by, name)?;
+    let task = ops::find_task(&bag, id)?;
+    let event = actor.event(branch::SET_BASE, Kind::Task, Some(&task.id), changes);
+    lock.record(&event, |_| Ok(()))?;
+    let after = branches(root).remove(&task.id).unwrap_or_default();
+    Ok((task, after, issues))
 }
 
 /// What [`record_ai_decision`] or [`review_ai_decisions`] did (Task-A03-19).

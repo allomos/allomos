@@ -30,8 +30,8 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 
 ## Working procedure
 
-1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Format, labels and claiming: [docs/workflow/CARDS.md](docs/workflow/CARDS.md).
-2. **A session works in the current checkout by default**, holding **one** card. A worktree is created only when a task needs its own checkout, for example when several sessions work at once: each then has its own git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from `main`. Claim before you work, following the [claiming protocol](docs/workflow/CARDS.md#claiming-protocol).
+1. **The unit of work is one observable outcome**, written as one card: a file in [docs/tasks/](docs/tasks/) and a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Format and labels: [docs/workflow/CARDS.md](docs/workflow/CARDS.md); claiming and branches: `alm guide workflow`.
+2. **A session works in the current checkout by default**, holding **one** card. A worktree is created only when a task needs its own checkout, for example when several sessions work at once: each then has its own git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from the task's base branch, which `alm claim` names. Claim before you work, as `alm guide workflow` says.
 3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. Card files hold detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the approver's open questions.
 4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → human verified (Done: the human check, called *owner verified* until the taskbag is migrated to `allomos/4`). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
@@ -41,7 +41,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v10)
+## Tasks: Allomos (v11)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -50,8 +50,11 @@ the project notes (below) and your own handoff file.
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
   Pitfalls), or `alm list`.
-- Take a task: pull first, then `alm claim <id> --as <your session name>`, and run the Git
-  commands it prints right away: until your claim is pushed, other sessions do not see it.
+- Take a task: pull first, then `alm claim <id> --as <your session name> --branch <the branch
+  you are on>` (`git branch --show-current`), and run the Git commands it prints right away:
+  until your claim is pushed, other sessions do not see it. Every task has a base branch, by its
+  real name: it starts from it and merges back into it; the claim records your working branch
+  and prints the base to start from and merge into, with the Git commands.
 - Report progress: `alm label <id> "<label>"`.
 - Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
@@ -80,7 +83,9 @@ the project notes (below) and your own handoff file.
   removing things), anything that changes the plan or another task, and anything with a cost or
   an outside effect goes to the approver first.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
-  `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>"`.
+  `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --branch
+  <the branch you are on>`: on a task's working branch, the new task shares that task's base;
+  otherwise the base is the branch you are on. alm prints which and why; `--base` overrides it.
 - Change a task's title, description or handoff note: `alm title <id> "<title>"`,
   `alm describe <id> --text "<markdown>"` (or `--from <file.md>`), `alm note <id> "<text>"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in

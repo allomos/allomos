@@ -116,6 +116,13 @@ problems! {
     AiDecisionMissing => "ai_decision_missing", "Say what you decided and why, in one line: `alm ai-decided <id> \"<what and why>\"`.";
     /// `alm reviewed` (or the app's Reviewed button) on a task with no AI decisions to review (Task-A03-19).
     NothingToReview { id } => "nothing_to_review", "Task {id} has no AI decisions waiting for review.";
+    /// A branch name that is not one: empty, with a space, or starting with `-` (Task-A03-22).
+    BranchInvalid { name } => "branch_invalid", "\"{name}\" is not a branch name. Give the branch's real name, as Git shows it (for example main).";
+    /// A warning: `alm add task` or `alm claim` was not told which branch the agent is on, so the
+    /// task's branches were not recorded (Task-A03-22). alm reads no Git.
+    BranchMissing { id } => "branch_missing", "alm was not told which branch you are on, so task {id}'s branches were not recorded. Pass --branch <name>: read it with `git branch --show-current` (alm reads no Git).";
+    /// A warning: the session adding a task holds another task on a different base (Task-A03-22).
+    BaseDiffers { held, held_base, base } => "base_differs", "You hold {held}, which starts from and merges into {held_base}, but the new task got the base {base}. Decide which is right: keep it, or change the new task's base with `alm base <its id> {held_base}`.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";

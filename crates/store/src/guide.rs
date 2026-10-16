@@ -111,9 +111,15 @@ Read this before you add a task, so it fits this project.
      another task, anything with a cost or an outside effect. A routine choice (a name, a file
      layout, how it is built, a small detail with an obvious default) is not an open question:
      whoever works the task decides it and records it with `alm ai-decided`.
-6. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
+6. **Branch.** Say which Git branch you are on: `--branch <name>` (`git branch --show-current`;
+   alm reads no Git). The new task gets a base branch, by its real name: the branch it starts
+   from and merges back into. When the branch you are on is a task's working branch, the new
+   task shares that task's base; otherwise its base is the branch you are on. alm prints which
+   and why; `--base <name>` chooses another. When you hold a task on another base, alm says so:
+   decide which is right, and change it with `alm base <id> <branch>` if needed.
+7. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
    (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
-7. **One outcome per task.** If it is really two outcomes, add two tasks.
+8. **One outcome per task.** If it is really two outcomes, add two tasks.
 
 When the project shares its tasks through Git, run the Git commands `alm add task` prints, so
 others see the new task.
@@ -149,7 +155,11 @@ See:
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
 Work a task:
-- `alm claim <id>`: you hold it; state in progress. `--take` only when its holder has stopped.
+- `alm claim <id> --branch <the branch you are on> [--working <name>]`: you hold it; state in
+  progress. It records the working branch (`--working`, default the branch you are on), gives a
+  task without a base the branch you are on, prints the base to start from and merge into with
+  the Git commands (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
+  you are not on the base. `--take` only when its holder has stopped.
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).
@@ -182,8 +192,10 @@ Plan:
   [--start …] [--end …]` (an empty value clears a release or date). IDs stay.
 - `alm delete area <id>`, `alm delete iteration <id>`: refused while any task is in it, done and
   dropped ones too (plan them elsewhere first).
-- `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]`: without
-  an ID, the next free one in the area. Read `alm guide tasks` first.
+- `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]
+  --branch <the branch you are on> [--base <name>]`: without an ID, the next free one in the
+  area; the base branch as `alm guide tasks` says. Read `alm guide tasks` first.
+- `alm base <id> <branch>`: change the branch a task starts from and merges into.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`.
@@ -231,9 +243,20 @@ const WORKFLOW: &str = "# How to work the tasks
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
    first (`alm show <id>`), and the project notes' Running and Pitfalls, which `alm next` shows
    (the whole file is the taskbag's `project-notes.md`).
-2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>`, and run
+2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>
+   --branch <the branch you are on>` (`git branch --show-current`; alm reads no Git), and run
    the Git commands it prints right away: until your claim is pushed, other sessions do not see
    it and may take the task too. A task someone else holds is not yours to change.
+   **Branches.** Every task has a base branch, by its real name (`main`, `master`,
+   `storage-v2`…): it starts from it and merges back into it; merging one base branch into
+   another is a task of its own. The claim records your working branch, the one you work on
+   (`--working <name>` when it is not the one you are on, for example a new branch for a
+   worktree of its own),
+   prints which base to start from and merge into with the Git commands, and says so when you
+   are not on the base. A task without a base gets the branch you are on. Work in the current
+   checkout by default; make a worktree of its own only when the task needs one (for example
+   when several sessions work at once). Once the task's branch is merged into its base, remove
+   your own worktree and the merged branch; never another session's.
 3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
    with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
@@ -565,6 +588,34 @@ mod tests {
             assert!(text.contains("handoff"), "{text}");
             assert!(text.contains("Run mode: quiet"), "{text}");
         }
+        // Task-A03-22: the agent tells alm the branch it is on; every task has a base branch by
+        // its real name, which the claim names with the Git commands. Guide and brief agree.
+        for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
+            let text = flat(text);
+            assert!(
+                text.contains(
+                    "alm claim <id> --as <your session name> --branch <the branch you are on>"
+                ),
+                "{text}"
+            );
+            assert!(text.contains("base branch, by its real name"), "{text}");
+            assert!(text.contains("merges back into it"), "{text}");
+            assert!(text.contains("working branch"), "{text}");
+        }
+        let flat_all = flat(guide(None).unwrap());
+        for words in [
+            "A task without a base gets the branch you are on",
+            "merging one base branch into another is a task of its own",
+            "--branch <the branch you are on> [--base <name>]",
+            "alm base <id> <branch>",
+            "--working <name>",
+        ] {
+            assert!(flat_all.contains(words), "{words}");
+        }
+        assert!(
+            flat(crate::agent_section()).contains("`--base` overrides it"),
+            "brief"
+        );
         // Decision 0017: no `--commit` / `--push`; pull before claiming, push the claim at once,
         // and run the Git commands each change prints.
         for text in [guide(None).unwrap(), crate::agent_section()] {

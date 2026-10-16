@@ -51,6 +51,13 @@ export interface Task {
   ai_decisions?: AiDecision[];
 }
 
+/** A task's branches (crates/core/src/branch.rs, Task-A03-22): the base it starts from and
+ * merges into, and the branch the work is done on. Not fields of task.json: from the history. */
+export interface Branches {
+  base?: string;
+  working?: string;
+}
+
 /** One decision an agent recorded with `alm ai-decided` (crates/core/src/decision.rs). */
 export interface AiDecision {
   at: string;
@@ -84,6 +91,8 @@ export interface NewTask {
   title: string;
   description: string | null;
   iteration: string | null;
+  /** The base branch the person chose, or that every open task shares (Task-A03-22). */
+  base: string | null;
 }
 
 /** A new iteration from the New iteration form (Task-A01-19). No ID means the next free one. */
@@ -173,6 +182,8 @@ export interface Opened {
   readme_added: boolean;
   /** Each task's AI decisions not reviewed yet, by task ID (Task-A03-19). */
   ai_decisions?: Record<string, AiDecision[]>;
+  /** Each task's base and working branch, by task ID (Task-A03-22). */
+  branches?: Record<string, Branches>;
 }
 
 /** An AI agent found on this computer (see apps/desktop/src-tauri/src/agents.rs). */

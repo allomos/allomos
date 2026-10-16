@@ -11,6 +11,11 @@
   "bad_usage": [
     "detail"
   ],
+  "base_differs": [
+    "held",
+    "held_base",
+    "base"
+  ],
   "blocked_by_missing": [],
   "blocked_by_self": [
     "id"
@@ -20,6 +25,12 @@
     "blocker"
   ],
   "blocker_unknown": [
+    "id"
+  ],
+  "branch_invalid": [
+    "name"
+  ],
+  "branch_missing": [
     "id"
   ],
   "cannot_make_ready": [

@@ -160,8 +160,12 @@ fn work_one_task_from_claim_to_done() {
     let sub = repo.join("src");
     fs::create_dir_all(&sub).unwrap();
 
-    let v = ok(&sub, &["--as", "agent-a", "claim", "A01-01"]);
+    let v = ok(
+        &sub,
+        &["--as", "agent-a", "claim", "A01-01", "--branch", "main"],
+    );
     assert_eq!(v["command"], "claim");
+    assert_eq!(v["branches"], json!({ "base": "main", "working": "main" }));
     assert_eq!(v["task"]["state"], "in_progress");
     assert_eq!(v["task"]["holder"], "agent-a");
     assert_eq!(v["warnings"], serde_json::json!([]));
@@ -293,7 +297,7 @@ fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
         "{rule}"
     );
     assert!(
-        rule.contains("Pull first, then claim it with `alm claim <id> --as <your session name>`")
+        rule.contains("Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>`")
     );
     assert!(rule.contains("until your claim is pushed"), "{rule}");
     assert!(!rule.contains("--push"), "{rule}");
@@ -832,8 +836,10 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
     for args in [
         &["init"][..],
         &["add", "area", "A01", "Tracking"],
-        &["add", "task", "--area", "A01", "--title", "T"],
-        &["--as", "a", "claim", "A01-01"],
+        &[
+            "add", "task", "--area", "A01", "--title", "T", "--branch", "main",
+        ],
+        &["--as", "a", "claim", "A01-01", "--branch", "main"],
         &["--as", "a", "label", "A01-01", "human verified"],
         &["--as", "a", "handoff", "--tasks", "A01-01"],
         &["--as", "a", "done", "A01-01"],
@@ -1867,7 +1873,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v10)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v11)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -1877,7 +1883,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v10)", "## Tasks: Allomos (v9)")
+            brief.replace("## Tasks: Allomos (v11)", "## Tasks: Allomos (v10)")
         ),
     )
     .unwrap();
@@ -2994,4 +3000,168 @@ fn a_newer_taskbag_is_refused_by_an_older_build() {
     let repo = filled();
     set_format(&repo, "allomos/5");
     refused(&repo, &["list"], 4, "taskbag_newer");
+}
+
+/// Task-A03-22: each task records its base branch by its real name; `alm add task --branch`
+/// chooses it from the branch the agent is on; `alm claim --branch` records the working branch and
+/// prints the base to start from and merge into. Only events change: task.json keeps its shape.
+#[test]
+fn tasks_record_their_base_branch_and_claims_say_where_to_merge() {
+    let repo = filled();
+    // Tasks made before (here: without --branch) have no base.
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["branches"], json!({}));
+
+    // A task without a base gets the branch the agent is on at claim.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "s1",
+            "claim",
+            "A01-01",
+            "--branch",
+            "storage-v2",
+            "--working",
+            "claude/a01-01",
+        ],
+    );
+    assert_eq!(
+        v["branches"],
+        json!({ "base": "storage-v2", "working": "claude/a01-01" })
+    );
+    assert_eq!(v["base_why"]["why"], "none_before");
+    assert_eq!(
+        v["branch_commands"]["start"],
+        json!([
+            "git switch storage-v2",
+            "git pull --ff-only",
+            "git switch -c claude/a01-01"
+        ])
+    );
+    assert_eq!(v["branch_commands"]["merge"][2], "git merge claude/a01-01");
+    assert_eq!(v["branch_facts"], json!([]));
+    // task.json has no new field: the branches are in the claim's event.
+    let file = task_file(&repo, "A01-01");
+    assert!(file.get("base_branch").is_none() && file.get("working_branch").is_none());
+    let h = ok(&repo, &["history", "A01-01"]);
+    let fields: Vec<&str> = h["events"][0]["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["field"].as_str().unwrap())
+        .collect();
+    assert!(
+        fields.contains(&"base_branch") && fields.contains(&"working_branch"),
+        "{h}"
+    );
+
+    // On a task's working branch, a new task shares that task's base.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "s1",
+            "add",
+            "task",
+            "--area",
+            "A01",
+            "--title",
+            "Next",
+            "--branch",
+            "claude/a01-01",
+        ],
+    );
+    assert_eq!(v["base"]["base"], "storage-v2");
+    assert_eq!(v["base"]["why"], "working_branch_of");
+    assert_eq!(v["base"]["task"], "A01-01");
+    assert_eq!(v["warnings"], json!([]));
+    let next = v["task"]["id"].as_str().unwrap().to_string();
+
+    // On another branch, the base is that branch itself; the session holding a task on another
+    // base is told, and may change it with `alm base`.
+    let v = ok(
+        &repo,
+        &[
+            "--as", "s1", "add", "task", "--area", "A02", "--title", "Other", "--branch", "master",
+        ],
+    );
+    assert_eq!(v["base"]["base"], "master");
+    assert_eq!(v["base"]["why"], "current_branch");
+    assert_eq!(v["warnings"][0]["code"], "base_differs");
+    assert_eq!(v["warnings"][0]["params"]["held_base"], "storage-v2");
+    let other = v["task"]["id"].as_str().unwrap().to_string();
+    let v = ok(&repo, &["--as", "s1", "base", &other, "storage-v2"]);
+    assert_eq!(v["branches"]["base"], "storage-v2");
+    // --base overrides the choice.
+    let v = ok(
+        &repo,
+        &[
+            "add", "task", "--area", "A02", "--title", "Given", "--branch", "master", "--base",
+            "main",
+        ],
+    );
+    assert_eq!(
+        (&v["base"]["base"], &v["base"]["why"]),
+        (&json!("main"), &json!("given"))
+    );
+    refused(
+        &repo,
+        &[
+            "add",
+            "task",
+            "--area",
+            "A02",
+            "--title",
+            "Bad",
+            "--base",
+            "my branch",
+        ],
+        1,
+        "branch_invalid",
+    );
+    // Without --branch: added, no base, and a warning.
+    let v = ok(
+        &repo,
+        &["add", "task", "--area", "A02", "--title", "Unsaid"],
+    );
+    assert_eq!(v["base"], Value::Null);
+    assert_eq!(v["warnings"][0]["code"], "branch_missing");
+
+    // A claim on another branch than the base lists it as a fact; the base is kept.
+    let v = ok(
+        &repo,
+        &["--as", "s2", "claim", &next, "--branch", "claude/a01-01"],
+    );
+    assert_eq!(
+        v["branches"],
+        json!({ "base": "storage-v2", "working": "claude/a01-01" })
+    );
+    assert_eq!(v["base_why"]["why"], "recorded");
+    assert_eq!(v["branch_commands"]["start"], json!([]));
+    assert_eq!(
+        v["branch_facts"],
+        json!(["You are on claude/a01-01, not on storage-v2, the task's base."])
+    );
+    // Working on the base itself: nothing to merge.
+    let v = ok(
+        &repo,
+        &["--as", "s3", "claim", &other, "--branch", "storage-v2"],
+    );
+    assert_eq!(v["branch_commands"]["start"], json!(["git pull --ff-only"]));
+    assert_eq!(v["branch_commands"]["merge"], json!([]));
+    let text = String::from_utf8(alm(&repo, &["--as", "s3", "show", &other]).stdout).unwrap();
+    assert!(
+        text.contains("base branch: storage-v2\nworking branch: storage-v2\n"),
+        "{text}"
+    );
+    // Someone else's task: its base is not yours to change.
+    refused(
+        &repo,
+        &["--as", "s1", "base", &other, "main"],
+        1,
+        "task_held",
+    );
+    let (_, list) = fj(&repo, &["list"]);
+    assert_eq!(list["issues"], json!([]));
 }

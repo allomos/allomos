@@ -64,6 +64,7 @@ fn task(id: &str, area: &str, iteration: Option<&str>) -> NewTask {
         title: "Do it".into(),
         description: None,
         iteration: iteration.map(String::from),
+        ..NewTask::default()
     }
 }
 

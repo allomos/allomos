@@ -40,7 +40,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// that mode is chosen: Task-A03-21).
 /// 10: before an automatic or loop run, the person chooses quiet or normal mode from the words
 /// `alm guide run-modes` gives, and the choice goes in the handoff (Task-A03-21).
-pub const SECTION_VERSION: u32 = 10;
+/// 11: every task has a base branch by its real name; `alm claim --branch` and `alm add task
+/// --branch` tell alm the branch the agent is on, and alm says which base to start from and merge
+/// into (Task-A03-22).
+pub const SECTION_VERSION: u32 = 11;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
