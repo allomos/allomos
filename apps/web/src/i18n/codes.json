@@ -37,6 +37,10 @@
     "id",
     "state"
   ],
+  "cannot_reopen": [
+    "id",
+    "state"
+  ],
   "cannot_set_state": [
     "id",
     "state"
@@ -154,6 +158,7 @@
   "read_failed": [
     "detail"
   ],
+  "reopen_note_missing": [],
   "request_not_found": [
     "id"
   ],

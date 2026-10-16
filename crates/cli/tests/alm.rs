@@ -618,6 +618,107 @@ fn needs_ready_drop_and_init_options() {
     assert!(!empty.join(".allomos/taskbag").exists());
 }
 
+/// Task-A01-50: `alm reopen` turns a done or dropped task into a ready one held by nobody, with
+/// the reason in its history; any other state, and a reopen without a reason, are refused.
+#[test]
+fn reopen_a_done_or_dropped_task() {
+    let repo = filled();
+    // Only done or dropped tasks; a reason is required.
+    refused(
+        &repo,
+        &["reopen", "A01-01", "--note", "x"],
+        1,
+        "cannot_reopen",
+    );
+    assert_eq!(
+        alm(&repo, &["reopen", "A01-01"]).status.code(),
+        Some(2),
+        "--note is required"
+    );
+    // Done without the human check, with a label: reopened by someone else (finished tasks are
+    // held by nobody); label and human-check record cleared, handoff note and description kept.
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["--as", "a", "label", "A01-01", "implemented"]);
+    ok(&repo, &["--as", "a", "note", "A01-01", "see the log"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "loop run",
+        ],
+    );
+    refused(
+        &repo,
+        &["--as", "b", "reopen", "A01-01", "--note", " "],
+        1,
+        "reopen_note_missing",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "reopen",
+            "A01-01",
+            "--note",
+            "The check failed: no total",
+        ],
+    );
+    let t = &v["task"];
+    assert_eq!(t["state"], "ready");
+    for field in [
+        "holder",
+        "label",
+        "without_human_check",
+        "human_check_steps",
+    ] {
+        assert_eq!(t[field], Value::Null, "{field}");
+    }
+    assert_eq!(t["handoff_note"], "see the log");
+    let file = task_file(&repo, "A01-01");
+    assert_eq!(file["state"], "ready");
+    assert!(file.get("label").is_none_or(Value::is_null));
+    // The history: who, the command, the cleared fields and the reason.
+    let h = ok(&repo, &["history", "A01-01"]);
+    let e = &h["events"][0];
+    assert_eq!((&e["command"], &e["by"]), (&json!("reopen"), &json!("b")));
+    let changes = e["changes"].as_array().unwrap();
+    let change = |f: &str| changes.iter().find(|c| c["field"] == f).cloned();
+    assert_eq!(
+        change("state"),
+        Some(json!({ "field": "state", "from": "done", "to": "ready" }))
+    );
+    assert_eq!(
+        change("label"),
+        Some(json!({ "field": "label", "from": "implemented" }))
+    );
+    assert_eq!(
+        change("reopen_note"),
+        Some(json!({ "field": "reopen_note", "to": "The check failed: no total" }))
+    );
+    assert!(change("without_human_check").is_some());
+    // It is ready for anyone: next lists it, and another session claims it.
+    let next = ok(&repo, &["next"]);
+    assert!(next["tasks"].to_string().contains("A01-01"), "{next}");
+    ok(&repo, &["--as", "c", "claim", "A01-01"]);
+    refused(
+        &repo,
+        &["reopen", "A01-01", "--note", "x"],
+        1,
+        "cannot_reopen",
+    );
+    // A dropped task too.
+    ok(&repo, &["drop", "A01-02"]);
+    let v = ok(&repo, &["reopen", "A01-02", "--note", "Wanted after all"]);
+    assert_eq!(v["task"]["state"], "ready");
+    let out = alm(&repo, &["history", "A01-02"]);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("reopen_note: — → Wanted after all"));
+}
+
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .arg("-C")

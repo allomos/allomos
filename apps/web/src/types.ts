@@ -79,7 +79,8 @@ export type Edit =
   | { field: "iteration"; iteration: string | null }
   | { field: "title"; title: string }
   | { field: "description"; text: string }
-  | { field: "checked" };
+  | { field: "checked" }
+  | { field: "reopen"; note: string };
 
 /**
  * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID

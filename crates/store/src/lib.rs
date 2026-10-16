@@ -1755,12 +1755,9 @@ pub fn change_task(
     let (outcome, command) = rule(&bag)?;
     let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
     let described = before.is_some_and(|b| b.description != outcome.task.description);
-    let event = actor.event(
-        command,
-        Kind::Task,
-        Some(&outcome.task.id),
-        event::changes(before, &outcome.task, event::TASK_FIELDS),
-    );
+    let mut changes = event::changes(before, &outcome.task, event::TASK_FIELDS);
+    changes.extend(outcome.recorded.iter().cloned());
+    let event = actor.event(command, Kind::Task, Some(&outcome.task.id), changes);
     lock.record(&event, |l| {
         l.save_task(&outcome.task)?;
         if described {

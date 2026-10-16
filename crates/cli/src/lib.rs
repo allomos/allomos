@@ -312,6 +312,14 @@ enum Command {
     },
     /// Drop a task: it will not be done.
     Drop { id: String },
+    /// Reopen a done or dropped task: it becomes ready, held by nobody, with why in its history.
+    /// Its label and human-check record are cleared (both stay in the history).
+    Reopen {
+        id: String,
+        /// Why it is reopened: the more work on the same outcome.
+        #[arg(long, value_name = "TEXT")]
+        note: String,
+    },
     /// List the ready tasks that no one holds, with the rule for choosing one.
     Next {
         /// Only tasks planned in this iteration.
@@ -516,7 +524,8 @@ impl Command {
             | Command::Describe { id, .. }
             | Command::Note { id, .. }
             | Command::Card { id, .. }
-            | Command::Drop { id } => Some(id),
+            | Command::Drop { id }
+            | Command::Reopen { id, .. } => Some(id),
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Init { .. }
             | Command::Labels { .. }
@@ -620,6 +629,7 @@ impl Command {
             Command::Card { .. } => "card",
             Command::Project { .. } => "project",
             Command::Drop { .. } => "drop",
+            Command::Reopen { .. } => "reopen",
             Command::Next { .. } => "next",
             Command::MoveIn { .. } => "move-in",
             Command::HandoffRules { .. } => "handoff-rules",
@@ -2575,6 +2585,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         Command::Ready { id } => change(cli, cwd, |bag| ops::make_ready(bag, id, me)),
         Command::Drop { id } => change(cli, cwd, |bag| ops::drop_task(bag, id, me)),
+        Command::Reopen { id, note } => change(cli, cwd, |bag| ops::reopen(bag, id, note)),
         Command::Release { id, note } => {
             change(cli, cwd, |bag| ops::release(bag, id, me, note.as_deref()))
         }
