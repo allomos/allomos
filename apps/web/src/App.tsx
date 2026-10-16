@@ -14,7 +14,7 @@ import { updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
-import { latestFor } from "./handoffFlow";
+import { latestFor, localTime } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { DescriptionHit, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
@@ -1465,6 +1465,7 @@ function TaskbagView({
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
+                  modified={opened.last_changed}
                   collapsed={folded.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
                   onNewTask={
@@ -1625,6 +1626,7 @@ function TaskGroup({
   selectedId,
   onSelect,
   terms,
+  modified,
   collapsed,
   onToggle,
   onNewTask,
@@ -1645,6 +1647,8 @@ function TaskGroup({
   onShowAll?: () => void;
   /** Why a stopped task is stopped: "Waiting for you: …", "Blocked by A01-17 (in progress)". */
   stop?: (task: Task) => string | null;
+  /** When each task last changed (UTC), by task ID (Task-A01-52), shown at the row's right. */
+  modified?: Record<string, string>;
   /** Given in the by-area view, so each task says which iteration it is planned in. */
   iterationName?: (id: string | null) => string | null;
   selectedId: string | null;
@@ -1738,6 +1742,11 @@ function TaskGroup({
                   {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
                   <DescriptionHit text={task.description ?? ""} terms={terms} />
                 </span>
+                {modified?.[task.id] && (
+                  <time className="modified" dateTime={modified[task.id]} title={t("task.modified", { time: localTime(modified[task.id]) })}>
+                    {localTime(modified[task.id])}
+                  </time>
+                )}
               </li>
             );
           })}

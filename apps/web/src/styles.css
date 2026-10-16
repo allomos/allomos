@@ -229,7 +229,7 @@ button.link:hover { text-decoration: underline; }
 .task:last-child { border-bottom: 0; }
 .task .id { color: var(--muted); }
 .task .title { min-width: 0; }
-.task .meta { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12.5px; }
+.task .meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12.5px; }
 .task .meta:empty { display: none; }
 .label { color: var(--ok); }
 .task { cursor: pointer; }
@@ -477,3 +477,5 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 }
 .sort-popover button:hover { background: var(--bg); }
 .sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }
+/* Task-A01-52: when the task was last modified, in the row's bottom-right corner. */
+.task .modified { grid-column: 3; grid-row: 2; align-self: end; justify-self: end; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
