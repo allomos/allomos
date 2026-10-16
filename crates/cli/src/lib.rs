@@ -16,10 +16,10 @@ use allomos_core::ops::{self, Outcome};
 use allomos_core::{FORMAT, Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
-    Actor, GUIDE_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions, agent_section,
-    agent_section_for, agent_setup_request, default_root, events, find_taskbag, guide,
-    id_from_name, init_with_labels, load, pick_ui_language, picked_folder, plain_path,
-    post_confirm, project_folder_of, read_answer, read_text, requests_dir, run_modes,
+    Actor, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions,
+    agent_section, agent_section_for, agent_setup_request, default_root, events, find_taskbag,
+    guide, id_from_name, init_with_labels, load, localized, pick_ui_language, picked_folder,
+    plain_path, post_confirm, project_folder_of, read_answer, read_text, requests_dir,
     saved_ui_language, task_language, taskbag_of, versions, was_seen, with_written_files,
     withdraw_confirm,
 };
@@ -101,12 +101,14 @@ enum Command {
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
     /// Print the details the brief points to: terms, what a project may customize, commands,
-    /// how to work the tasks, and the run modes to show the person before an automatic or loop
-    /// run. All topics (in English) when none is named.
+    /// how to work the tasks, the run modes to show the person before an automatic or loop run,
+    /// and the one-time procedure that puts every agent's shared rules in AGENTS.md. All topics
+    /// (in English) when none is named.
     Guide {
         #[arg(value_parser = GUIDE_TOPICS)]
         topic: Option<String>,
-        /// For `run-modes`: the language to print it in (default: the task language).
+        /// For `run-modes` and `agent-files`: the language to print it in (default: the task
+        /// language).
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
     },
@@ -1689,9 +1691,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 request,
             ))
         }
-        Command::Guide { topic, language } if topic.as_deref() == Some("run-modes") => {
-            // The person reads it: in the task language (Task-A03-21). Without a taskbag here,
-            // the language the app would use.
+        Command::Guide {
+            topic: Some(name),
+            language,
+        } if LOCALIZED_TOPICS.contains(&name.as_str()) => {
+            // The person reads it (or reads along): in the task language (Task-A03-21,
+            // Task-A03-24). Without a taskbag here, the language the app would use.
+            let topic = Some(name.clone());
             let language = match language {
                 Some(code) => code.trim().to_string(),
                 None => {
@@ -1706,13 +1712,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     }
                 }
             };
-            let (text, written) = match run_modes(&language) {
+            let (text, written) = match localized(name, &language) {
                 Some(text) => (text.to_string(), true),
                 None => (
                     format!(
                         "This text is not written in {language} yet: show the person a faithful \
                          translation into {language}, keeping commands as they are.\n\n{}",
-                        run_modes("en").unwrap_or_default()
+                        localized(name, "en").unwrap_or_default()
                     ),
                     false,
                 ),

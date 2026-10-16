@@ -48,8 +48,7 @@ The agent raises this itself; the owner should not have to ask.
 
 ## Switching provider (Claude ↔ Codex) or environment
 
-- Both providers read the same [AGENTS.md](../../AGENTS.md); `CLAUDE.md` only imports it. Never maintain competing copies of rules.
-- A running agent is not assumed to have reloaded edited rules; it rereads them at its next assignment or resume.
+- The first two rules here (one set of shared rules; running sessions keep the old ones until they restart) now live in AGENTS.md's Allomos section and `alm guide agent-files` (task `A03-24`): shared rules only in [AGENTS.md](../../AGENTS.md), each agent's own file only a pointer to it, and after a change the person is told which sessions still use the old rules.
 - Before the new environment writes anything, establish which files, worktree and running processes the old session still owns (from its handoff and `git worktree list`).
 - For **claude.ai (web) projects**: a local `CLAUDE.md` is not loaded automatically. Add `AGENTS.md`, this file and the current board as project knowledge, and paste an instruction to follow them. Never upload `.env` files, tokens or a whole working directory.
 - A switch preserves decisions, approvals, evidence and consumed attempts; it does not authorize repeating operations.

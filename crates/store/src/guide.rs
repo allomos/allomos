@@ -1,21 +1,26 @@
 //! What `alm guide` tells an AI agent (Task-A05-02). The short brief in a project's `AGENTS.md`
 //! ([`crate::agent_section`]) names these topics; an agent reads them from `alm` when it needs
 //! them, so the details always match the installed `alm`, not a copy that went stale. English:
-//! agents read it, the app does not show it. The one exception is `run-modes` (Task-A03-21): the
-//! agent shows it to the person, so it is written in every language the Allomos app speaks
-//! ([`run_modes`]).
+//! agents read it, the app does not show it. Two exceptions are written in every language the
+//! Allomos app speaks: `run-modes` (Task-A03-21), which the agent shows to the person
+//! ([`run_modes`]), and `agent-files` (Task-A03-24), the one-time procedure that puts every
+//! agent's shared rules in AGENTS.md, which the person may read along ([`agent_files`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 6] = [
+pub const GUIDE_TOPICS: [&str; 7] = [
     "terms",
     "customize",
     "tasks",
     "commands",
     "workflow",
     "run-modes",
+    "agent-files",
 ];
 
-/// The languages `alm guide run-modes` is written in: those of the Allomos app (`en`, `ja`,
+/// The topics written in every language of [`RUN_MODES_LANGUAGES`], printed in the task language.
+pub const LOCALIZED_TOPICS: [&str; 2] = ["run-modes", "agent-files"];
+
+/// The languages `alm guide run-modes` and `alm guide agent-files` are written in: those of the Allomos app (`en`, `ja`,
 /// `zh-CN`, as [`crate::pick_ui_language`] picks them).
 pub const RUN_MODES_LANGUAGES: [&str; 3] = ["en", "ja", "zh-CN"];
 
@@ -232,6 +237,8 @@ About Allomos:
 - `alm guide run-modes [--language <code>]`: the explanation of quiet and normal mode to show the
   person before an automatic or loop run, in the task language (or `--language`); written in en,
   ja and zh-CN, otherwise in English with a line asking you to translate it.
+- `alm guide agent-files [--language <code>]`: the one-time procedure that moves the rules every
+  AI agent shares into AGENTS.md and leaves each agent's own file a pointer to it; same languages.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
   folder, or where `--taskbag` says.
 - `alm move-in [--language <code>]`: when `alm` says the taskbag was written by an older
@@ -480,14 +487,183 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 /// it is not written in that language (the agent then translates the English text faithfully).
 /// The person reads it, so it is written in every language of [`RUN_MODES_LANGUAGES`].
 pub fn run_modes(language: &str) -> Option<&'static str> {
+    match written_in(language)? {
+        "ja" => Some(RUN_MODES_JA),
+        "zh-CN" => Some(RUN_MODES_ZH_CN),
+        _ => Some(RUN_MODES_EN),
+    }
+}
+
+const AGENT_FILES_EN: &str = "# Agent files: one set of shared rules, in AGENTS.md
+
+Every AI agent working on this project reads one set of shared rules, in AGENTS.md. Each
+agent's own rule file only points to AGENTS.md and holds what is truly its own. Do the steps
+below once for each agent: when Allomos is set up in a project (for the agent doing the setup
+and every agent file already there), and whenever you are an agent not listed under
+`## Agents set up` in the project notes, or your own rule file does not point to AGENTS.md. Do it
+before other work. `alm` checks nothing here: you look and change the files; the person settles
+contradictions.
+
+1. **Find every agent rule file in the project.** For example: AGENTS.md, CLAUDE.md, GEMINI.md,
+   `.cursor/rules/` (or an older `.cursorrules`), `.github/copilot-instructions.md`,
+   `.windsurfrules`, and any other file an AI tool reads as its instructions. These are
+   examples, not a closed list: you know your own tool's file; include it even if it is not
+   named here. Look in the project folder (and the subfolders a tool reads), not in the
+   person's home folder.
+2. **Move the rules every agent shares into AGENTS.md.** A rule that applies to any agent on the
+   project (how to build, test and commit, where tasks live, what needs approval) belongs in
+   AGENTS.md, once. Each agent's own file keeps only:
+   - a pointer to AGENTS.md: an import line where the tool supports one (Claude Code: a line
+     holding just `@AGENTS.md`), otherwise one sentence: \"Read and follow AGENTS.md.\";
+   - what applies to that agent alone (its model or effort settings, its own tools and
+     commands).
+   A tool that reads AGENTS.md by itself needs no pointer, but shared rules in its own file
+   still move. Create a file for your own tool only when it reads nothing else. Do not change
+   what any rule means, and do not copy Allomos's section (`alm brief`) into an agent's own file.
+3. **Contradictions are not yours to settle.** When two files say different things about the
+   same matter (one says push after every commit, another says never push), do not choose
+   between them: leave both where they are, list each pair for the person (the files, and the
+   two rules word for word) and ask which one holds. In a quiet run, park the question with
+   `alm wait <id> --on \"<the question>\"` on the task you hold, and move everything else.
+4. **Record the agent as set up** in the taskbag's `project-notes.md`, under `## Agents set up`
+   (add that section when it is missing): one line per agent, with its file and the date, for
+   example `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`. Then commit only those
+   files. In the project: AGENTS.md and the agent files you changed
+   (`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`).
+   In the taskbag: `project-notes.md`
+   (`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
+   Leave every other change as it is. Push as the project's rules say; when they say nothing,
+   only when the person asks.
+5. **Tell the person** what moved, which files now point to AGENTS.md, and the contradictions
+   waiting for their answer.
+
+From then on:
+- Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file.
+- After changing shared rules, tell the person which running sessions still use the old ones:
+  those holding tasks in progress (`alm list --state in_progress`) and the worktrees they work in
+  (`git worktree list`). A session reads the new rules when it starts again.
+";
+
+const AGENT_FILES_ZH_CN: &str = "# 智能体文件：一套共用规则，放在 AGENTS.md
+
+在这个项目上工作的每个 AI 智能体都读同一套共用规则，放在 AGENTS.md 里。每个智能体自己的规则文件
+只指向 AGENTS.md，并只保留真正属于它自己的内容。下面的步骤对每个智能体做一次：在项目里设置
+Allomos 时（为做设置的智能体，以及已有的每个智能体文件），以及每当你是一个没有列在项目笔记
+`## Agents set up` 一节下的智能体，或者你自己的规则文件没有指向 AGENTS.md 时。在做其他工作之前
+完成。`alm` 在这里什么都不检查：由你查看并修改文件；有矛盾时由用户决定。
+
+1. **找出项目里的每个智能体规则文件。** 例如：AGENTS.md、CLAUDE.md、GEMINI.md、
+   `.cursor/rules/`（或较旧的 `.cursorrules`）、`.github/copilot-instructions.md`、
+   `.windsurfrules`，以及任何 AI 工具当作自己说明来读的其他文件。这些只是例子，不是完整的清单：
+   你知道你自己工具的文件；即使这里没有列出，也要算上。在项目文件夹（以及工具会读的子文件夹）里
+   找，不要去用户的主文件夹找。
+2. **把每个智能体共用的规则移到 AGENTS.md。** 适用于项目上任何智能体的规则（如何构建、测试和
+   提交，任务放在哪里，什么需要批准）放在 AGENTS.md 里，只写一次。每个智能体自己的文件只保留：
+   - 指向 AGENTS.md 的一行：工具支持导入时用导入行（Claude Code：只含 `@AGENTS.md` 的一行），
+     否则用一句话：“Read and follow AGENTS.md.”；
+   - 只适用于这个智能体的内容（它的模型或推理强度设置，它自己的工具和命令）。
+   自己会读 AGENTS.md 的工具不需要指向行，但它自己文件里的共用规则仍要移走。只有当你的工具不读
+   其他任何文件时，才为它新建文件。不要改变任何规则的意思，也不要把 Allomos 的一节（`alm brief`）
+   复制到某个智能体自己的文件里。
+3. **矛盾不由你来定。** 两个文件对同一件事说法不同时（一个说每次提交后推送，另一个说从不推送），
+   不要二选一：两条都原样留着，把每一对列给用户（哪两个文件，两条规则逐字照录），问哪条为准。
+   在安静运行中，用 `alm wait <id> --on \"<the question>\"` 把问题挂在你持有的任务上，其余照常移动。
+4. **记录这个智能体已设置好**：在任务包的 `project-notes.md` 里 `## Agents set up` 一节下（没有就
+   添加这一节），每个智能体一行，写明它的文件和日期，例如
+   `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。然后只提交这些文件。在项目里：
+   AGENTS.md 和你改过的智能体文件
+   （`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
+   在任务包里：`project-notes.md`
+   （`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
+   其他改动保持原样。按项目规则推送；规则没说时，只在用户要求时推送。
+5. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，以及哪些矛盾在等他们回答。
+
+此后：
+- 共用规则只放在 AGENTS.md；不要把共用规则加到某个智能体自己的文件里。
+- 改了共用规则之后，告诉用户哪些正在运行的会话还在用旧规则：持有进行中任务的会话
+  （`alm list --state in_progress`）和它们工作的工作树（`git worktree list`）。会话重新开始时
+  才会读到新规则。
+";
+
+const AGENT_FILES_JA: &str = "# エージェントのファイル：共通ルールは一つ、AGENTS.md に
+
+このプロジェクトで働くすべての AI エージェントは、AGENTS.md にある一つの共通ルールを読みます。
+各エージェント自身のルールファイルは AGENTS.md を指すだけで、本当にそのエージェントだけのことを
+持ちます。下の手順はエージェントごとに一度行います。プロジェクトに Allomos を設定するとき（設定を
+するエージェントと、すでにあるすべてのエージェントのファイルについて）、そして、プロジェクトノートの
+`## Agents set up` の節に載っていないエージェントであるとき、または自分のルールファイルが
+AGENTS.md を指していないときです。ほかの作業の前に行います。ここで `alm` は何も確かめません。
+ファイルを見て変えるのはあなたで、食い違いを決めるのはユーザーです。
+
+1. **プロジェクトのエージェント用ルールファイルをすべて見つけます。** たとえば AGENTS.md、
+   CLAUDE.md、GEMINI.md、`.cursor/rules/`（古い `.cursorrules`）、
+   `.github/copilot-instructions.md`、`.windsurfrules`、そのほか AI ツールが自分への指示として
+   読むファイル。これは例であって、すべてではありません。自分のツールのファイルは知っているはず
+   なので、ここになくても含めます。探すのはプロジェクトのフォルダー（とツールが読むサブフォルダー）
+   で、ユーザーのホームフォルダーではありません。
+2. **すべてのエージェントに共通のルールを AGENTS.md に移します。** プロジェクトのどのエージェント
+   にも当てはまるルール（ビルド、テスト、コミットのしかた、タスクの置き場所、承認が要るもの）は
+   AGENTS.md に一度だけ書きます。各エージェント自身のファイルに残すのは次だけです。
+   - AGENTS.md を指す行：ツールが読み込みに対応していれば読み込みの行（Claude Code では
+     `@AGENTS.md` だけの行）、そうでなければ一文「Read and follow AGENTS.md.」。
+   - そのエージェントだけに当てはまること（モデルや推論の強さの設定、そのツール自身の道具や
+     コマンド）。
+   AGENTS.md を自分で読むツールには指す行は要りませんが、そのファイルにある共通ルールは移します。
+   自分のツール用のファイルを新しく作るのは、そのツールがほかに何も読まないときだけです。どの
+   ルールも意味を変えず、Allomos の節（`alm brief`）をエージェント自身のファイルにコピーしません。
+3. **食い違いはあなたが決めません。** 二つのファイルが同じことについて違うことを言っているとき
+   （一方はコミットのたびにプッシュ、もう一方はプッシュしない）、どちらかを選びません。両方を
+   そのまま残し、組ごとにユーザーへ示して（どのファイルか、二つのルールをそのまま）、どちらに従うか
+   尋ねます。静かな実行では、持っているタスクに `alm wait <id> --on \"<the question>\"` で質問を
+   残し、ほかはそのまま移します。
+4. **エージェントを設定済みとして記録します。** タスクバッグの `project-notes.md` の
+   `## Agents set up` の節（なければ加えます）に、エージェントごとに一行、そのファイルと日付を
+   書きます。たとえば `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。それから、
+   それらのファイルだけをコミットします。プロジェクトでは AGENTS.md と変えたエージェントのファイル
+   （`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
+   タスクバッグでは `project-notes.md`
+   （`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
+   ほかの変更はそのままにします。プッシュはプロジェクトのルールに従い、ルールに何もなければ
+   ユーザーに頼まれたときだけにします。
+5. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どの
+   食い違いが答えを待っているか。
+
+これから先：
+- 共通ルールは AGENTS.md にだけ置きます。共通ルールをあるエージェント自身のファイルに足しません。
+- 共通ルールを変えたら、まだ古いルールで動いているセッションをユーザーに伝えます：進行中の
+  タスクを持つセッション（`alm list --state in_progress`）と、それが作業しているワークツリー
+  （`git worktree list`）。セッションは次に始めるときに新しいルールを読みます。
+";
+
+/// `alm guide agent-files` in `language`, or `None` when it is not written in that language.
+pub fn agent_files(language: &str) -> Option<&'static str> {
+    match written_in(language)? {
+        "ja" => Some(AGENT_FILES_JA),
+        "zh-CN" => Some(AGENT_FILES_ZH_CN),
+        _ => Some(AGENT_FILES_EN),
+    }
+}
+
+/// A topic of [`LOCALIZED_TOPICS`] in `language`, or `None` when the topic is not one of them or
+/// is not written in that language (the agent then translates the English text faithfully).
+pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
+    match topic {
+        "run-modes" => run_modes(language),
+        "agent-files" => agent_files(language),
+        _ => None,
+    }
+}
+
+/// Which of [`RUN_MODES_LANGUAGES`] a task language is written in, if any.
+fn written_in(language: &str) -> Option<&'static str> {
     let l = language.trim().to_lowercase().replace('_', "-");
     let is = |code: &str| l == code || l.starts_with(&format!("{code}-"));
     if is("en") {
-        Some(RUN_MODES_EN)
+        Some("en")
     } else if is("ja") {
-        Some(RUN_MODES_JA)
+        Some("ja")
     } else if l == "zh" || l == "zh-cn" || l == "zh-sg" || l.starts_with("zh-hans") {
-        Some(RUN_MODES_ZH_CN)
+        Some("zh-CN")
     } else {
         None
     }
@@ -502,6 +678,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "commands" => Some(COMMANDS),
         "workflow" => Some(WORKFLOW),
         "run-modes" => Some(RUN_MODES_EN),
+        "agent-files" => Some(AGENT_FILES_EN),
         _ => None,
     };
     match topic {
@@ -652,6 +829,84 @@ mod tests {
             );
             assert!(text.contains("until your claim is pushed"), "{text}");
             assert!(text.contains("Git commands"), "{text}");
+        }
+    }
+
+    /// `alm guide agent-files` (Task-A03-24): the one-time procedure, written in every language
+    /// the app speaks, general (examples, not a closed list), with the same steps and commands;
+    /// the brief carries the three standing rules and names the topic.
+    #[test]
+    fn agent_files_is_written_in_every_language_and_the_brief_carries_its_rules() {
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        for language in RUN_MODES_LANGUAGES {
+            let text = agent_files(language).unwrap_or_else(|| panic!("{language}"));
+            assert!(text.starts_with("# "), "{language}");
+            for words in [
+                "AGENTS.md",
+                "CLAUDE.md",
+                "GEMINI.md",
+                "`.cursor/rules/`",
+                "`.github/copilot-instructions.md`",
+                "`.windsurfrules`",
+                "`@AGENTS.md`",
+                "Read and follow AGENTS.md.",
+                "`alm brief`",
+                "`alm wait <id> --on \"<the question>\"`",
+                "`project-notes.md`",
+                "`## Agents set up`",
+                "-- project-notes.md`",
+                "-- <those files>`",
+                "`alm list --state in_progress`",
+                "`git worktree list`",
+            ] {
+                assert!(text.contains(words), "{language}: {words}");
+            }
+            // Five numbered steps, then two standing rules.
+            for step in 1..=5 {
+                assert!(
+                    text.contains(&format!("\n{step}. **")),
+                    "{language}: {step}"
+                );
+            }
+            assert!(!text.contains("\n6. "), "{language}");
+            assert_eq!(text.matches("\n- ").count(), 2, "{language}");
+            assert_eq!(text.matches("\n   - ").count(), 2, "{language}");
+            assert_eq!(localized("agent-files", language), Some(text));
+        }
+        let en = flat(agent_files("en").unwrap());
+        for words in [
+            "These are examples, not a closed list",
+            "Contradictions are not yours to settle",
+            "do not choose between them",
+            "list each pair for the person",
+            "commit only those files",
+            "Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file",
+        ] {
+            assert!(en.contains(words), "{words}");
+        }
+        assert_ne!(agent_files("ja"), agent_files("en"));
+        assert_ne!(agent_files("zh-CN"), agent_files("en"));
+        assert_eq!(agent_files("zh-Hans-CN"), agent_files("zh-CN"));
+        assert_eq!(agent_files("fr"), None);
+        assert_eq!(localized("terms", "en"), None);
+        assert_eq!(guide(Some("agent-files")).as_deref(), agent_files("en"));
+        assert!(guide(None).unwrap().contains("# Agent files"));
+        for topic in LOCALIZED_TOPICS {
+            assert!(GUIDE_TOPICS.contains(&topic), "{topic}");
+        }
+        // The brief's three standing rules.
+        let brief = flat(&crate::agent_section());
+        for words in [
+            "Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file",
+            "If you are an agent not listed under `## Agents set up` in the project notes, or your \
+             own rule file does not point to AGENTS.md, run `alm guide agent-files` and do it once \
+             for yourself before other work",
+            "After changing shared rules, tell the person which running sessions still use the \
+             old ones",
+            "`alm list --state in_progress`",
+            "`git worktree list`",
+        ] {
+            assert!(brief.contains(&flat(words)), "{words}");
         }
     }
 

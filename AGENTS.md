@@ -41,7 +41,7 @@ Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WO
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v11)
+## Tasks: Allomos (v12)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -94,6 +94,16 @@ the project notes (below) and your own handoff file.
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
 
+Shared rules: every AI agent on this project follows one set of shared rules, in AGENTS.md.
+- Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file (such as
+  CLAUDE.md, GEMINI.md or `.cursor/rules/`), which only points to AGENTS.md and holds what is
+  that agent's alone.
+- If you are an agent not listed under `## Agents set up` in the project notes, or your own rule
+  file does not point to AGENTS.md, run `alm guide agent-files` and do it once for yourself
+  before other work.
+- After changing shared rules, tell the person which running sessions still use the old ones
+  (from the taskbag's holders, `alm list --state in_progress`, and `git worktree list`).
+
 Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
 task: what is running, pitfalls, where credentials live (never their values). Read it at the
 start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
@@ -111,7 +121,8 @@ Allomos relies on these terms: **area** (what part of the product a task belongs
 has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
-`alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person).
+`alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
+`alm guide agent-files` (one set of shared rules for every agent, done once per agent).
 
 This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
 `--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).

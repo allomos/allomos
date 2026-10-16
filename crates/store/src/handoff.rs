@@ -66,6 +66,11 @@ None yet.
 ## Where credentials live
 
 Never their values. None yet.
+
+## Agents set up
+
+AI agents whose rule files follow AGENTS.md (`alm guide agent-files`): agent, its file, date.
+None yet.
 ";
 
 /// What `alm next` and `alm handoff` show of `project-notes.md` (Task-A03-20): facts only, read
