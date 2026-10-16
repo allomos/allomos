@@ -286,14 +286,15 @@ enum Command {
     },
     /// Set the task's handoff note (what the next one needs); no text clears it.
     Note { id: String, text: Option<String> },
-    /// Card files agents reported as still in the project folder; `alm cards found <id>=<path>…`
-    /// reports the ones you found (see `alm guide move-cards`).
+    /// Card files still outside the taskbag (linked from a task's description, or reported);
+    /// `alm cards found <id>=<path>…` reports others you found (see `alm guide move-cards`).
     Cards {
         #[command(subcommand)]
         what: Option<CardsWhat>,
     },
     /// Move a task's card file in beside it, as tasks/<id>/card.md, and point the description's
-    /// `Card:` link to it. Without --from: the file reported with `alm cards found`.
+    /// `Card:` link to it. Without --from: the file reported with `alm cards found`, else the one
+    /// the `Card:` link points to.
     Card {
         id: String,
         /// The card's text (for example a copy whose links you fixed). Default: the reported file.
@@ -2077,6 +2078,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if text.is_empty() {
                 text.push_str("No tasks.\n");
             }
+            // The card files still outside the taskbag, which the app's notice counts
+            // (Task-A01-51): the same facts as `alm cards`.
+            let mut fields = fields;
+            fields["cards_outside"] = json!(allomos_store::cards::outside_of(&root, &bag));
             let mut done = Done::new(fields, text);
             done.issues = issues;
             Ok(done)
@@ -2544,6 +2549,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     quoted(&plain_path(&m.project).display().to_string()),
                     quoted(path)
                 ));
+            } else if let Some(original) = &m.original {
+                // Linked from the description, not reported (Task-A01-51).
+                text.push_str(&format!(
+                    "alm removes nothing outside the taskbag. When your confirmed plan says so, remove the original, for example: git rm -- {}\n",
+                    quoted(&plain_path(original).display().to_string())
+                ));
             }
             let mut done = Done::new(
                 json!({
@@ -2770,8 +2781,9 @@ fn change(
 /// to do about them (Task-A00-30).
 fn cards_text(outside: &[allomos_core::card::Outside]) -> String {
     if outside.is_empty() {
-        return "No card files are reported as kept in the project folder. If tasks link to card \
-files outside the taskbag, report them with `alm cards found <id>=<path>` (`alm guide move-cards`).\n"
+        return "No task's Card: link points outside the taskbag, and no card files are reported as \
+kept in the project folder. If you find others, report them with `alm cards found <id>=<path>` \
+(`alm guide move-cards`).\n"
             .to_string();
     }
     let mut text = format!(
@@ -2779,11 +2791,15 @@ files outside the taskbag, report them with `alm cards found <id>=<path>` (`alm 
         outside.len()
     );
     for o in outside {
-        let by = o.by.as_deref().unwrap_or("?");
-        text.push_str(&format!(
-            "  {}  {}  (reported by {by}, {})\n",
-            o.task, o.path, o.at
-        ));
+        let how = match o.source {
+            allomos_core::card::Source::Link => "its Card: link".to_string(),
+            allomos_core::card::Source::Report => format!(
+                "reported by {}, {}",
+                o.by.as_deref().unwrap_or("?"),
+                o.at.as_deref().unwrap_or("?")
+            ),
+        };
+        text.push_str(&format!("  {}  {}  ({how})\n", o.task, o.path));
     }
     text.push_str(
         "Propose moving them in beside their tasks, and do it only after the person's Go ahead: `alm guide move-cards`.\n",
@@ -2791,8 +2807,8 @@ files outside the taskbag, report them with `alm cards found <id>=<path>` (`alm 
     text
 }
 
-/// `alm next`'s line about card files (Task-A00-30): the reported ones still outside the taskbag,
-/// or, when none are, the request to look.
+/// `alm next`'s line about card files (Task-A00-30): the ones still outside the taskbag (linked
+/// or reported), or, when none are, the request to look.
 fn next_cards_line(outside: usize) -> String {
     if outside > 0 {
         format!(

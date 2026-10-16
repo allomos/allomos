@@ -184,7 +184,7 @@ problems! {
     /// `alm card`: the card file given is empty.
     CardEmpty { path } => "card_empty", "The card file {path} is empty, so nothing was moved in.";
     /// `alm card` without `--from`, for a task no agent reported a card file for.
-    CardNotReported { id } => "card_not_reported", "No card file was reported for task {id}. Name it: `alm card {id} --from <file>`.";
+    CardNotReported { id } => "card_not_reported", "No card file was reported for task {id}, and its description links to none outside its folder. Name it: `alm card {id} --from <file>`.";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

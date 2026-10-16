@@ -4,14 +4,17 @@
 //! the taskbag, beside the task's files, as `tasks/<id>/card.md`, and the `Card:` link in the
 //! task's description points to it, so a task is kept in one place.
 //!
-//! Neither `alm` nor the app looks for card files. An AI agent, told by Allomos's instructions,
-//! finds the ones a project still keeps in its own folder and reports them
+//! A card still outside the taskbag is known in two ways. `alm` and the app read each task's
+//! `Card:` link in its description ([`pointer`]; Task-A01-51, approver 2026-10-16: a narrow check
+//! of their own, which only says where the link points). And an AI agent, told by Allomos's
+//! instructions, finds any others a project still keeps in its own folder and reports them
 //! (`alm cards found <id>=<path>`); the report lives only in the history, as a `cards found` event
 //! whose change `card_outside` has the path as its `to`. Moving a card in (`alm card <id>`)
 //! writes `card.md`, points the description's link to it, and records one `card` event that
-//! empties `card_outside`. A task's card still outside is therefore worked out from the events
-//! alone, and the taskbag's format does not change: older Allomos versions read only `task.json`
-//! and `description.md` in a task's folder, and accept any field name in an event's changes.
+//! empties `card_outside`. A task's card still outside is therefore worked out from the
+//! description and the events alone, and the taskbag's format does not change: older Allomos
+//! versions read only `task.json` and `description.md` in a task's folder, and accept any field
+//! name in an event's changes.
 
 use std::collections::BTreeMap;
 
@@ -34,17 +37,90 @@ pub const FOUND: &str = "cards found";
 /// The command that moves a card file in.
 pub const MOVED: &str = "card";
 
-/// A card file an agent reported as still in the project folder.
+/// How a card file still outside the taskbag is known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Source {
+    /// An agent reported it (`alm cards found`).
+    Report,
+    /// The task's description links to it ([`pointer`]).
+    Link,
+}
+
+/// A card file still outside the taskbag: reported by an agent, or linked from the task's
+/// description. A task has at most one; a report wins over the link.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Outside {
     pub task: String,
-    /// Its place, relative to the project folder, with `/`.
+    /// Its place, relative to the project folder, with `/`; a linked file outside the project
+    /// folder is named in full.
     pub path: String,
+    pub source: Source,
     /// When it was reported, in UTC.
-    pub at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
     /// Who reported it (`--as`), when known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub by: Option<String>,
+}
+
+/// Where a task's description says its card file is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Pointer {
+    /// A Markdown link `[…](<target>)`, relative to the task's folder in the taskbag.
+    Link(String),
+    /// A plain path (`docs/tasks/A01-01.md`, maybe in backticks), relative to the project folder.
+    Path(String),
+}
+
+/// What starts a card line, in the task languages: `Card:`, `卡片：`, `カード：` (full-width or
+/// plain colon).
+const MARKERS: [&str; 5] = ["Card:", "卡片：", "卡片:", "カード：", "カード:"];
+
+/// The card file `description` points to: the first `Card:` marker anywhere in a line (also
+/// `**Card:**`, and in Chinese or Japanese) followed by a Markdown link or a plain path to a `.md`
+/// file. A marker followed by anything else (`` `Card:` link ``, `Card: [..](..)` in prose) is
+/// passed over. The part after `#` is dropped. `None` when there is no such pointer.
+pub fn pointer(description: &str) -> Option<Pointer> {
+    for line in description.lines() {
+        let mut at = 0;
+        while let Some((start, marker)) = MARKERS
+            .iter()
+            .filter_map(|m| line[at..].find(m).map(|i| (at + i, *m)))
+            .min_by_key(|(i, _)| *i)
+        {
+            at = start + marker.len();
+            if let Some(p) = pointer_after(&line[at..]) {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+/// The pointer right after a card marker, if it is one.
+fn pointer_after(rest: &str) -> Option<Pointer> {
+    let rest = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '*');
+    if let Some(inner) = rest.strip_prefix('[') {
+        let middle = inner.find("](")?;
+        let after = &inner[middle + 2..];
+        let target = after[..after.find(')')?].trim();
+        let target = target.trim_start_matches('<').trim_end_matches('>');
+        return card_target(target).map(Pointer::Link);
+    }
+    let rest = rest.trim_start_matches('`').trim_start();
+    let end = rest
+        .find(|c: char| c.is_whitespace() || "`)（(，。、；".contains(c))
+        .unwrap_or(rest.len());
+    let token = rest[..end].trim_end_matches(['.', ',', ';']);
+    card_target(token).map(Pointer::Path)
+}
+
+/// `target` without its `#…` part, when it names a `.md` file and no scheme or drive.
+fn card_target(target: &str) -> Option<String> {
+    let file = target.split('#').next().unwrap_or_default().trim();
+    let named = file.len() > 3 && file.to_ascii_lowercase().ends_with(".md");
+    (named && !file.contains(':')).then(|| file.to_string())
 }
 
 /// A card file's place as reported: relative to the project folder, written with `/`, never
@@ -114,7 +190,8 @@ pub fn outside(events: &[Event]) -> BTreeMap<String, Outside> {
                         Outside {
                             task: id.to_string(),
                             path: path.clone(),
-                            at: e.at.clone(),
+                            source: Source::Report,
+                            at: Some(e.at.clone()),
                             by: e.by.clone(),
                         },
                     );
@@ -296,6 +373,56 @@ mod tests {
         let withdrawn = report(&b, "A01-01", "", Some("docs/tasks/A01-01.md")).unwrap();
         events.push(event(FOUND, "A01-01", withdrawn));
         assert!(outside(&events).is_empty());
+    }
+
+    #[test]
+    fn the_card_pointer_is_read_from_the_description() {
+        let link = |t: &str| Some(Pointer::Link(t.into()));
+        let path = |t: &str| Some(Pointer::Path(t.into()));
+        assert_eq!(
+            pointer("Card: [docs/tasks/A.md](../../../../docs/tasks/A.md#x)\n\nMore."),
+            link("../../../../docs/tasks/A.md")
+        );
+        assert_eq!(
+            pointer("**Notes.** Asked. Card: [A](../x/A.md). Later."),
+            link("../x/A.md")
+        );
+        assert_eq!(pointer("**Card:** [A](<../A.md>)"), link("../A.md"));
+        assert_eq!(
+            pointer("**备注。** 卡片：[docs/tasks/A.md](../../A.md)"),
+            link("../../A.md")
+        );
+        assert_eq!(pointer("カード: [A](a/A.md)"), link("a/A.md"));
+        assert_eq!(
+            pointer("**Notes.** Card: docs/tasks/A.md. Why: x"),
+            path("docs/tasks/A.md")
+        );
+        assert_eq!(
+            pointer("Card: `docs/tasks/A.md` in the repo"),
+            path("docs/tasks/A.md")
+        );
+        assert_eq!(
+            pointer("**备注。** 基于 A07-06。卡片：docs/tasks/A.md"),
+            path("docs/tasks/A.md")
+        );
+        assert_eq!(pointer("Card: [card.md](card.md)"), link("card.md"));
+        // Prose about card lines is passed over; a later real one is still found.
+        assert_eq!(
+            pointer(
+                "The `Card:` link, as `Card: [..](..)` or `Card: [<path>](…)`.\nCard: [A](../A.md)"
+            ),
+            link("../A.md")
+        );
+        for none in [
+            "",
+            "No card.",
+            "Card: none yet",
+            "Card: [site](https://example.com/A.md)",
+            "Card: [A](C:/A.md)",
+            "Card: [A](../A.txt)",
+        ] {
+            assert_eq!(pointer(none), None, "{none}");
+        }
     }
 
     #[test]
