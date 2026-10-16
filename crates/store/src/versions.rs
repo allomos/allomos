@@ -49,7 +49,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 13: a goal run: given a goal, the agent follows `alm guide goal`, adds the areas and iterations
 /// and readies its own tasks, the person having approved in advance by submitting the goal;
 /// outside effects still wait for the approver (Task-A03-25-01).
-pub const SECTION_VERSION: u32 = 13;
+/// 14: card files live beside their tasks (`tasks/<id>/card.md`); an agent that finds tasks
+/// linking to card files outside the taskbag reports them (`alm cards found`) and proposes moving
+/// them in (`alm guide move-cards`) (Task-A00-30).
+pub const SECTION_VERSION: u32 = 14;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

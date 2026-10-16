@@ -1964,17 +1964,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v13)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v14)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v12 section (before the goal run, Task-A03-25-01) is out of date too.
+    // A v13 section (before card files beside their tasks, Task-A00-30) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v13)", "## Tasks: Allomos (v12)")
+            brief.replace("## Tasks: Allomos (v14)", "## Tasks: Allomos (v13)")
         ),
     )
     .unwrap();
@@ -3297,4 +3297,132 @@ fn tasks_record_their_base_branch_and_claims_say_where_to_merge() {
     );
     let (_, list) = fj(&repo, &["list"]);
     assert_eq!(list["issues"], json!([]));
+}
+
+/// Card files beside their tasks (Task-A00-30): the agent reports the card files it found in the
+/// project folder, `alm cards` and `alm next` show them, `alm card` moves one in and points the
+/// description's link to it, and a finished task held by an old session can be changed too.
+#[test]
+fn card_files_are_reported_and_moved_in_beside_their_tasks() {
+    let repo = filled();
+    fs::create_dir_all(repo.join("docs/tasks")).unwrap();
+    fs::write(repo.join("docs/tasks/A01-01.md"), "# A01-01\n\nCard.\n").unwrap();
+    fs::write(repo.join("docs/tasks/A01-02.md"), "# A01-02\n\nCard.\n").unwrap();
+    // Nothing reported yet: alm asks the agent to look.
+    let v = ok(&repo, &["next"]);
+    assert!(v["cards"].as_str().unwrap().contains("alm cards found"));
+    assert_eq!(ok(&repo, &["cards"])["cards_outside"], json!([]));
+
+    refused(&repo, &["cards", "found", "A01-01"], 2, "bad_usage");
+    refused(
+        &repo,
+        &["cards", "found", "A01-01=docs/none.md"],
+        1,
+        "card_not_found",
+    );
+    refused(
+        &repo,
+        &["cards", "found", "A01-01=../x.md"],
+        1,
+        "card_path_invalid",
+    );
+    refused(
+        &repo,
+        &["cards", "found", "A09-09=docs/tasks/A01-01.md"],
+        1,
+        "task_not_found",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "claude/finder",
+            "cards",
+            "found",
+            "A01-01=docs/tasks/A01-01.md",
+            "A01-02=docs/tasks/A01-02.md",
+        ],
+    );
+    assert_eq!(v["found"].as_array().unwrap().len(), 2);
+    assert_eq!(v["cards_outside"].as_array().unwrap().len(), 2);
+    assert!(
+        v["changed_files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|f| f.as_str().unwrap().starts_with("events/"))
+    );
+    let v = ok(&repo, &["next"]);
+    assert!(v["cards"].as_str().unwrap().contains("2 task(s)"));
+
+    // A01-01 is finished by an old session: still changeable.
+    ok(&repo, &["--as", "old/session", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "old/session",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
+    let v = ok(&repo, &["--as", "claude/mover", "card", "A01-01"]);
+    assert_eq!(v["card"], "tasks/A01-01/card.md");
+    let bag = repo.join(".allomos/taskbag");
+    assert_eq!(
+        fs::read_to_string(bag.join("tasks/A01-01/card.md")).unwrap(),
+        "# A01-01\n\nCard.\n"
+    );
+    assert_eq!(
+        fs::read_to_string(bag.join("tasks/A01-01/description.md")).unwrap(),
+        "Card: [card.md](card.md)\n\nA person opens a folder.\n"
+    );
+    let files: Vec<&str> = v["changed_files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f.as_str().unwrap())
+        .collect();
+    assert!(files.contains(&"tasks/A01-01/card.md"), "{files:?}");
+    assert!(files.contains(&"tasks/A01-01/description.md"), "{files:?}");
+    // The original stays; alm says how to remove it.
+    assert!(repo.join("docs/tasks/A01-01.md").is_file());
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "claude/mover",
+            "card",
+            "A01-02",
+            "--from",
+            "docs/tasks/A01-02.md",
+        ],
+    );
+    assert!(String::from_utf8_lossy(&out.stdout).contains("rm -- docs/tasks/A01-02.md"));
+    assert_eq!(ok(&repo, &["cards"])["cards_outside"], json!([]));
+    // A different card is not replaced by accident.
+    fs::write(repo.join("new.md"), "New\n").unwrap();
+    refused(
+        &repo,
+        &["card", "A01-02", "--from", "new.md"],
+        1,
+        "card_exists",
+    );
+    ok(&repo, &["card", "A01-02", "--from", "new.md", "--replace"]);
+    refused(&repo, &["card", "A02-01"], 1, "card_not_reported");
+    // An open task another session holds is still theirs.
+    ok(&repo, &["--as", "other", "claim", "A02-01"]);
+    refused(
+        &repo,
+        &["--as", "me", "card", "A02-01", "--from", "new.md"],
+        1,
+        "task_held",
+    );
+    // History names the moves; the taskbag has no problems.
+    let h = ok(&repo, &["history", "A01-01"]);
+    assert!(h.to_string().contains("card_outside"));
+    assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
+    fs::remove_dir_all(repo).unwrap();
 }

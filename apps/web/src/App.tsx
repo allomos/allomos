@@ -7,6 +7,8 @@ import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
+import { MoveCardsDialog } from "./MoveCardsDialog";
+import { cardsNotice } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
@@ -126,6 +128,8 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [notices, setNotices] = useState<Note[]>([]);
   /** The start page's Build a new app… dialog (Task-A03-25-02). */
   const [building, setBuilding] = useState(false);
+  /** Move the cards in… is open (Task-A00-30): the notice's button or File → Move the Cards In…. */
+  const [movingCards, setMovingCards] = useState(false);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
@@ -372,6 +376,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         clearMenu: t("menu.clear_recent"),
         noRecent: t("menu.no_recent"),
         connect: t("menu.connect"),
+        moveCards: t("menu.move_cards"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -398,10 +403,15 @@ export function App({ messenger }: { messenger: Messenger }) {
       const root = openedRef.current?.root;
       if (root) openWizard({ resume: { root, at: 4 } });
     });
+    // File → Move the Cards In… (enabled while a taskbag is open, Task-A00-30).
+    const stopCards = messenger.onMoveCardsMenu(() => {
+      if (openedRef.current) setMovingCards(true);
+    });
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
+      void stopCards.then((f) => f()).catch(() => undefined);
     };
   }, [messenger, openRecent, changeRecent, openWizard]);
 
@@ -502,6 +512,26 @@ export function App({ messenger }: { messenger: Messenger }) {
               }
             }}
             onOlder={setOlderShown}
+          />
+        )}
+        {/* Card files an agent reported as still in the project folder (Task-A00-30): Allomos looks
+            for none itself. */}
+        {opened && cardsNotice(opened) > 0 && (
+          <div className="banner update" role="status">
+            <span>{t("cards.notice", { count: cardsNotice(opened) })}</span>
+            <button type="button" className="primary" onClick={() => setMovingCards(true)}>
+              {t("cards.button")}
+            </button>
+          </div>
+        )}
+        {opened && movingCards && (
+          <MoveCardsDialog
+            messenger={messenger}
+            root={opened.root}
+            onClose={(message) => {
+              setMovingCards(false);
+              if (message) setNotices((list) => [...list, { text: message }]);
+            }}
           />
         )}
         {!opened && (
