@@ -10,12 +10,17 @@
 // setting up Git, and commits the taskbag itself.
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import { AgentsPanel } from "./AgentsPanel";
+import { MoveCardsPanel } from "./MoveCardsDialog";
+import { cardRows } from "./moveCardsFlow";
+import type { CardRow } from "./moveCardsFlow";
+import { updateNotice } from "./versionFlow";
 import type { ConnectResult } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
-import { defaultSource, resumeAt, taskbagStep } from "./setupFlow";
-import type { TaskbagStep } from "./setupFlow";
+import { defaultSource, resumeAt, stepFourPage, taskbagStep } from "./setupFlow";
+import type { StepFourPage, TaskbagStep } from "./setupFlow";
 import { isProblem } from "./types";
 import type { Opened, SetupState } from "./types";
 
@@ -74,6 +79,38 @@ export function SetupWizard({
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
+
+  /** Step 4 shows what the project needs (Task-A05-09): worked out when step 4 is reached. */
+  const [four, setFour] = useState<{ page: StepFourPage; setup: SetupState | null; found: CardRow[]; tasks: number } | null>(null);
+  /** Connect an agent anyway: the agents page, whatever the project needs. */
+  const [anyway, setAnyway] = useState(false);
+  const fourRoot = step.n === 4 ? step.opened.root : null;
+  useEffect(() => {
+    setFour(null);
+    setAnyway(false);
+    if (!fourRoot) return;
+    let live = true;
+    void (async () => {
+      try {
+        const [setup, check, fresh] = await Promise.all([
+          messenger.projectSetup(fourRoot),
+          messenger.versionCheck(fourRoot).catch(() => null),
+          messenger.openTaskbag(fourRoot),
+        ]);
+        if (!live) return;
+        const found = cardRows(fresh);
+        const page = stepFourPage(setup, updateNotice(check) !== null, found.length, false);
+        setFour({ page, setup, found, tasks: fresh.loaded.taskbag?.tasks.length ?? 0 });
+      } catch {
+        // Unsure what the project needs: the agents page, as before.
+        if (live) setFour({ page: "agents", setup: null, found: [], tasks: 0 });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [messenger, fourRoot]);
+  const fourPage: StepFourPage | null = anyway ? "agents" : (four?.page ?? null);
 
   /** Step 2 for `folder`: does it have `.allomos`? */
   const look = useCallback(
@@ -266,7 +303,61 @@ export function SetupWizard({
             </>
           )}
 
-          {step.n === 4 && (
+          {step.n === 4 && fourPage === null && (
+            <p className="muted searching" role="status">
+              <span className="spinner" aria-hidden="true" /> {t("wizard.checking")}
+            </p>
+          )}
+
+          {step.n === 4 && fourPage === "cards" && four && (
+            <>
+              <h3>{t("cards.title")}</h3>
+              <MoveCardsPanel
+                messenger={messenger}
+                root={step.opened.root}
+                found={four.found}
+                actionsIn={footer}
+                cancelLabel={t("agents.later")}
+                onClose={(message) => onClose({ message })}
+                extra={
+                  <p>
+                    <button type="button" className="link" onClick={() => setAnyway(true)}>
+                      {t("wizard.connect_anyway")}
+                    </button>
+                  </p>
+                }
+              />
+            </>
+          )}
+
+          {step.n === 4 && fourPage === "done" && four && (
+            <>
+              <h3>{t("done.title")}</h3>
+              <p>{t("done.body")}</p>
+              <p>{rich("project.line", { path: <code>{step.project}</code> })}</p>
+              <p className="muted">{t("agents.taskbag", { path: step.opened.root })}</p>
+              <p>
+                {t("agentline.line", {
+                  state: `Codex ${four.setup?.agents.codex ? "✓" : "✗"}  Claude Code ${four.setup?.agents.claude ? "✓" : "✗"}`,
+                })}
+              </p>
+              <p>{t("done.tasks", { count: four.tasks })}</p>
+              <p>
+                <button type="button" className="link" onClick={() => setAnyway(true)}>
+                  {t("wizard.connect_anyway")}
+                </button>
+              </p>
+              {footer &&
+                createPortal(
+                  <button type="button" className="primary" onClick={() => onClose({ message: null })}>
+                    {t("manual.done")}
+                  </button>,
+                  footer,
+                )}
+            </>
+          )}
+
+          {step.n === 4 && fourPage === "agents" && (
             <>
               <AgentsPanel
                 messenger={messenger}
@@ -283,7 +374,7 @@ export function SetupWizard({
 
         {error && <p className="banner error">{error}</p>}
 
-        {/* Step 4's buttons (Not now, Connect) sit where Cancel and Next are on the other steps. */}
+        {/* Step 4's buttons (Not now, Connect; Open; Done) sit where Cancel and Next are on the other steps. */}
         {step.n === 4 && <div className="row" ref={setFooter} />}
 
         {step.n !== 4 && (
