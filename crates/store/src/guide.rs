@@ -4,10 +4,11 @@
 //! agents read it, the app does not show it. Two exceptions are written in every language the
 //! Allomos app speaks: `run-modes` (Task-A03-21), which the agent shows to the person
 //! ([`run_modes`]), and `agent-files` (Task-A03-24), the one-time procedure that puts every
-//! agent's shared rules in AGENTS.md, which the person may read along ([`agent_files`]).
+//! agent's shared rules in AGENTS.md, which the person may read along ([`agent_files`]); and `goal`
+//! (Task-A03-25-01), the goal prompt Allomos types into an agent for the person ([`goal`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 7] = [
+pub const GUIDE_TOPICS: [&str; 8] = [
     "terms",
     "customize",
     "tasks",
@@ -15,12 +16,13 @@ pub const GUIDE_TOPICS: [&str; 7] = [
     "workflow",
     "run-modes",
     "agent-files",
+    "goal",
 ];
 
 /// The topics written in every language of [`RUN_MODES_LANGUAGES`], printed in the task language.
-pub const LOCALIZED_TOPICS: [&str; 2] = ["run-modes", "agent-files"];
+pub const LOCALIZED_TOPICS: [&str; 3] = ["run-modes", "agent-files", "goal"];
 
-/// The languages `alm guide run-modes` and `alm guide agent-files` are written in: those of the Allomos app (`en`, `ja`,
+/// The languages `alm guide run-modes`, `alm guide agent-files` and `alm guide goal` are written in: those of the Allomos app (`en`, `ja`,
 /// `zh-CN`, as [`crate::pick_ui_language`] picks them).
 pub const RUN_MODES_LANGUAGES: [&str; 3] = ["en", "ja", "zh-CN"];
 
@@ -101,7 +103,7 @@ Read this before you add a task, so it fits this project.
 1. **Look first.** `alm list` shows the areas and the task IDs already used; `alm show <id>` shows
    how an existing task is written. Follow what you see.
 2. **Area.** Use an area that exists. Add a new one (`alm add area <id> \"<name>\"`) only when the
-   person asks for it or agrees to it.
+   person asks for it or agrees to it, or in a goal run (below).
 3. **ID.** Leave it out: `alm add task --area <area> --title \"…\"` takes the next free number in
    the area (A01-04 after A01-03). Give an ID only to follow a pattern the project already uses,
    for example a child task `A01-03-01` under `A01-03`.
@@ -128,6 +130,13 @@ Read this before you add a task, so it fits this project.
 7. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
    (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
 8. **One outcome per task.** If it is really two outcomes, add two tasks.
+
+**The exception: a goal run** (approver, 2026-10-16). When the person has given you a goal, an app
+to build from their description, and you follow `alm guide goal`, the person approved the plan in
+advance by submitting the goal. Then you add the areas and iterations, plan the tasks in them and
+make them ready yourself (`alm ready <id>`). Record that approval once, on the goal task (its
+title starts with `Goal:`). Anything with an outside effect still waits for the approver
+(`alm wait`).
 
 When the project shares its tasks through Git, run the Git commands `alm add task` prints, so
 others see the new task.
@@ -239,6 +248,9 @@ About Allomos:
   ja and zh-CN, otherwise in English with a line asking you to translate it.
 - `alm guide agent-files [--language <code>]`: the one-time procedure that moves the rules every
   AI agent shares into AGENTS.md and leaves each agent's own file a pointer to it; same languages.
+- `alm guide goal [--language <code>]`: the goal prompt: given a person's description of an app,
+  plan it into areas, iterations and ready tasks and build it release by release, recording every
+  step with `alm`; same languages.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
   folder, or where `--taskbag` says.
 - `alm move-in [--language <code>]`: when `alm` says the taskbag was written by an older
@@ -309,6 +321,13 @@ const WORKFLOW: &str = "# How to work the tasks
    person: park that task with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`
    under To answer) and go on with the next ready task. Do not use `alm confirm` in such a run: it
    would wait until it times out.
+9. **A goal run** (`alm guide goal`): when the person gives you a goal, an app to build from their
+   description, follow the goal prompt `alm guide goal` prints (in the task language). It is the
+   one exception to asking the person before planning (approver, 2026-10-16): submitting the goal
+   approved the plan in advance, recorded once on the goal task (its title starts with `Goal:`),
+   so you add the areas and iterations and make your own tasks ready. Anything with an outside
+   effect still waits for the approver (`alm wait`). There is no spend cap: the quota gate of
+   `alm handoff-rules` is the limit. Given the goal again, continue from `alm next`.
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
@@ -328,7 +347,8 @@ Rules:
   record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
   `alm human`. What users will see and get used to, anything hard to undo (data formats, removing
   things), anything that changes the plan or another task, and anything with a cost or an outside
-  effect goes to the approver first (`alm wait`).
+  effect goes to the approver first (`alm wait`). In a goal run (step 9) the plan was approved in
+  advance; outside effects still go to the approver.
 - After every `alm` change, run the Git commands it prints: they name only that change's files.
   Your other work is committed as usual.
 ";
@@ -644,12 +664,295 @@ pub fn agent_files(language: &str) -> Option<&'static str> {
     }
 }
 
+/// The version of the goal prompt (`alm guide goal`, Task-A03-25-01). Raise it whenever the
+/// prompt's wording changes; every text names it as `goal prompt v<n>`, and the goal task records
+/// the version it was planned with.
+///
+/// 1: the four phases (clarify once, plan, build, finish), `/goal` with a condition judged from the
+/// conversation alone, and continuing from `alm next` (Task-A03-25-01).
+pub const GOAL_PROMPT_VERSION: u32 = 1;
+
+const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v1)
+
+For the agent: this is the goal prompt. A person has described an app they want (their words
+come with this prompt). You plan it into areas, iterations and tasks, make the tasks ready
+yourself, and build it iteration by iteration, recording every step with `alm`, so the person, or
+another agent taking over, sees exactly where the work stands. Follow the four phases in order.
+Write tasks in the task language (`alm task-language`); IDs, commands and code stay as they are.
+
+**Goal-run mode.** Submitting the goal approved the plan in advance (approver, 2026-10-16): in
+this run you add the areas and iterations and make your own tasks ready, without asking. Record
+that approval once, on the goal task (phase 2). Everything else in AGENTS.md still holds: anything
+with an outside effect (creating accounts or a Git remote, API keys, payment, deployment, sending
+anything) waits for the approver with `alm wait`, and you go on with other ready tasks. There is
+no spend cap: the quota is the limit (`alm handoff-rules`: near 3% left, write your handoff and
+stop; the same prompt continues later).
+
+**Already started?** First run `alm list`. If a task whose title starts with `Goal:` is there, the
+goal is already planned: do not plan it again. Read its latest handoff (`alm show <id>`) and the
+project notes, then continue from `alm next` (phase 3), or with phase 4 when every other task of
+the goal is finished. If the words given now ask for something the goal task's spec does not hold,
+add it as tasks in a new iteration and add it to the spec.
+
+## 1. Clarify, only if needed
+
+If the description leaves something essential open (what the app is for, who uses it, where it
+must run), ask the person once, right now, all your questions together in one message, and wait
+for the answer. If the request that started you named no run mode, ask in the same message: show
+what `alm guide run-modes` prints. Ask nothing else, then or later: every other choice is yours (a
+name, a stack, a layout, a detail with a sensible default). Make it and record it with
+`alm ai-decided <id> \"<what and why>\"`, for the person to review later; it never blocks the run.
+
+## 2. Plan
+
+1. **The goal task.** `alm add area \"<the app's name>\"` for the app as a whole, then
+   `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
+   are on>`. Its description (`alm describe <id> --from <file.md>`) holds the spec: what the app
+   does and for whom, and the acceptance criteria the finished app must meet, each one a thing a
+   person can try. End it with this line: \"Goal run (goal prompt v1): the person approved this
+   plan in advance by submitting the goal on <date>; the agent makes the areas, iterations and
+   ready tasks. Outside effects still wait for the approver.\" The title's `Goal:` marks the goal
+   task for every later session: keep it.
+2. **Areas** from the app's parts (for example its screens, its data, its server):
+   `alm add area \"<name>\"`.
+3. **Iterations** as a roadmap of releases, each ending in a version the person can try:
+   `alm add iteration \"<name>\" --release v0.1`, then v0.2 and so on; dates empty unless known.
+   v0.1 is the smallest app that works end to end; each later release adds to it.
+4. **Tasks** in them: `alm add task --area <id> --title \"<outcome>\" --branch <the branch you
+   are on>` (as `alm guide tasks` says: one observable outcome each, about one session and one
+   commit), then `alm plan <id> <iteration>`. The last task of each iteration, in the app's area,
+   is that release's acceptance check: try the release against its part of the spec, and write
+   the steps for the person to try it.
+5. **Ready, then order.** `alm ready <id>` for every task, the goal task too. Then
+   `alm block <id> --by <task-id>` for each task that needs another first: each acceptance check
+   by the other tasks of its iteration, the first tasks of an iteration by the previous
+   iteration's check, and the goal task by the last check.
+
+## 3. Build
+
+Iteration by iteration, one task at a time: `alm next`, then `alm claim <id> --as <your session
+name> --branch <the branch you are on>` (run the Git commands it prints), do the work and commit
+it, `alm label <id> \"<label>\"` as each step is proven, and finish it as the run mode says:
+- quiet mode: `alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`,
+  the steps telling the person how to try it;
+- normal mode: at the top label, once the person has checked it: `alm done <id>`.
+
+When `alm next` says all of a task's blockers are done, check it, then `alm unblock <id>`. A task
+with an outside effect: `alm wait <id> --on \"<what the approver must do>\"`, then go on with the
+next ready task. A task that needs another one first: add that task if it is missing, then
+`alm block`. A task given up: `alm drop <id>`, with the reason in its note (`alm note`). Write your
+handoff (`alm handoff`) after every task, and follow `alm handoff-rules`.
+
+## 4. Finish
+
+When the last iteration's acceptance check is done: `alm unblock` the goal task, check the whole
+app against the spec's acceptance criteria, and leave the goal task waiting for the person's human
+check: `alm wait <id> --on \"Try the app: <how>\"`. If the goal turns out to be impossible, the
+goal task waits on the person instead, with the reason. Then print `alm list --json` and stop.
+
+## Keep going until it is finished
+
+Where your tool has `/goal` (Claude Code, Codex), the goal is set with this condition, which can be
+judged from the conversation alone:
+
+    The latest `alm list --json` printed in this conversation shows every task of the goal done,
+    dropped or waiting on the person (a task blocked only by waiting tasks counts as waiting).
+
+The request that started you may have set it already; otherwise set it yourself where your tool
+lets you. Without `/goal`, the same holds: keep going, task after task, until that condition is
+true, and print `alm list --json` to show it. Stop earlier only at the quota gate, with your
+handoff written; given this prompt again, you continue from `alm next`.
+";
+
+const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v1)
+
+给智能体：这是目标提示。有人描述了他们想要的应用（他们的原话随这段提示一起给出）。你把它规划成
+领域、迭代和任务，自己把任务设为就绪，然后一个迭代接一个迭代地把它做出来，每一步都用 `alm`
+记录，这样那个人，或者接手的另一个智能体，都能确切看到工作进行到了哪里。按顺序完成下面四个阶段。
+任务用任务语言书写（`alm task-language`）；ID、命令和代码保持原样。
+
+**目标运行模式。** 提交目标就是事先批准了计划（批准人，2026-10-16）：在这次运行中，你自己添加
+领域和迭代，自己把任务设为就绪，不用询问。把这项批准在目标任务上记录一次（阶段 2）。AGENTS.md 里
+的其他规则照旧：任何对外有影响的事（创建账号或 Git 远程仓库、API 密钥、付款、部署、发送任何东西）
+都用 `alm wait` 等批准人处理，你接着做其他就绪的任务。没有花费上限：额度就是限制
+（`alm handoff-rules`：剩余接近 3% 时，写好交接并停下；之后用同一段提示继续）。
+
+**已经开始过了？** 先运行 `alm list`。如果其中有标题以 `Goal:` 开头的任务，说明目标已经规划过：
+不要重新规划。读它最新的交接（`alm show <id>`）和项目笔记，然后从 `alm next` 继续（阶段 3）；
+如果目标的其他任务都已结束，就进入阶段 4。如果这次给出的话要求了目标任务的规格里没有的东西，
+把它作为新迭代里的任务添加进来，并补进规格。
+
+## 1. 澄清，仅在需要时
+
+如果描述里有关键的东西没说清（应用是做什么的、谁来用、必须在哪里运行），现在就问那个人一次：把所有
+问题放在一条消息里一起问，然后等回答。如果启动你的请求没有指定运行模式，就在同一条消息里问：给对方
+看 `alm guide run-modes` 输出的内容。除此之外，现在和以后都不再问：其他每个选择都由你来做（名称、
+技术栈、布局、有合理默认值的细节）。做出选择，并用 `alm ai-decided <id> \"<what and why>\"` 记录，
+供那个人之后审阅；它从不阻挡运行。
+
+## 2. 规划
+
+1. **目标任务。** 先用 `alm add area \"<the app's name>\"` 为整个应用添加一个领域，再运行
+   `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
+   are on>`。它的描述（`alm describe <id> --from <file.md>`）写规格：应用做什么、为谁做，以及完成的
+   应用必须满足的验收标准，每一条都是一个人能亲手试的事。最后加上这一行：
+   “Goal run (goal prompt v1)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
+   就绪的任务由智能体来建。对外有影响的事仍然等批准人处理。”标题里的 `Goal:` 让之后的每个会话都能认出目标任务：保留它。
+2. **领域**，按应用的组成部分划分（例如它的界面、数据、服务器）：`alm add area \"<name>\"`。
+3. **迭代**，作为一份发布路线图，每个迭代结束时都有一个对方能试用的版本：
+   `alm add iteration \"<name>\" --release v0.1`，然后 v0.2，依此类推；日期不知道就留空。v0.1 是
+   能从头到尾跑通的最小应用；之后的每次发布在它上面增加功能。
+4. **任务**，放进这些迭代：`alm add task --area <id> --title \"<outcome>\" --branch <the branch
+   you are on>`（按 `alm guide tasks` 所说：每个任务一个可观察的结果，大约一个会话、一次提交），
+   然后 `alm plan <id> <iteration>`。每个迭代的最后一个任务放在应用的领域里，是这次发布的验收检查：
+   对照规格中属于它的部分试用这个版本，并写下让那个人试用的步骤。
+5. **先就绪，再排顺序。** 对每个任务运行 `alm ready <id>`，目标任务也一样。然后对每个需要先等别的
+   任务的任务运行 `alm block <id> --by <task-id>`：每个验收检查被它所在迭代的其他任务阻塞，每个迭代
+   最先做的任务被上一个迭代的检查阻塞，目标任务被最后一个检查阻塞。
+
+## 3. 构建
+
+一个迭代接一个迭代，一次一个任务：`alm next`，然后 `alm claim <id> --as <your session name>
+--branch <the branch you are on>`（运行它打印的 Git 命令），做完工作并提交，每证明一步就
+`alm label <id> \"<label>\"`，再按运行模式完成它：
+- 安静模式：`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`，
+  步骤告诉那个人怎么试用；
+- 普通模式：达到最高标签、那个人检查过之后：`alm done <id>`。
+
+当 `alm next` 说某个任务的阻塞任务都已完成时，检查一下，然后 `alm unblock <id>`。对外有影响的任务：
+`alm wait <id> --on \"<what the approver must do>\"`，然后接着做下一个就绪的任务。需要先做另一个任务
+的任务：如果那个任务还没有，就添加它，然后 `alm block`。放弃的任务：`alm drop <id>`，把原因写进它的
+备注（`alm note`）。每完成一个任务就写交接（`alm handoff`），并遵守 `alm handoff-rules`。
+
+## 4. 收尾
+
+最后一个迭代的验收检查完成后：对目标任务运行 `alm unblock`，对照规格的验收标准检查整个应用，然后让
+目标任务等待那个人的人工检查：`alm wait <id> --on \"Try the app: <how>\"`。如果发现目标做不到，目标
+任务改为等待那个人，并写明原因。然后打印 `alm list --json`，停下。
+
+## 一直做到完成
+
+如果你的工具有 `/goal`（Claude Code、Codex），就用下面这个条件设定目标，它只看对话本身就能判断：
+
+    The latest `alm list --json` printed in this conversation shows every task of the goal done,
+    dropped or waiting on the person (a task blocked only by waiting tasks counts as waiting).
+
+（意思是：这次对话里最新打印的 `alm list --json` 显示，目标的每个任务都已完成、已放弃或在等待那个人；
+只被等待中的任务阻塞的任务算作等待。）启动你的请求可能已经设定了它；否则在你的工具允许时自己设定。
+没有 `/goal` 时也一样：一个任务接一个任务地做下去，直到这个条件成立，并打印 `alm list --json` 来表明。
+只有到了额度关口才提前停下，并写好交接；再次收到这段提示时，从 `alm next` 继续。
+";
+
+const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v1)
+
+エージェントへ：これはゴールのプロンプトです。ある人が、欲しいアプリを説明しました（その人の言葉は
+このプロンプトと一緒に渡されます）。あなたはそれをエリア、イテレーション、タスクに計画し、タスクを
+自分で準備完了にし、イテレーションごとに作っていきます。一歩ごとに `alm` で記録するので、その人も、
+引き継ぐ別のエージェントも、作業がどこまで進んだかを正確に見られます。下の四つの段階を順に進めます。
+タスクはタスクの言語で書きます（`alm task-language`）。ID、コマンド、コードはそのままです。
+
+**ゴール実行モード。** ゴールを出したことで、計画は前もって承認されています（承認者、2026-10-16）。
+この実行では、エリアとイテレーションを自分で加え、自分のタスクを聞かずに準備完了にします。その承認は
+ゴールのタスクに一度だけ記録します（段階 2）。AGENTS.md のほかのルールはそのままです。外部への影響が
+あること（アカウントや Git のリモートの作成、API キー、支払い、デプロイ、何かを送ること）は
+`alm wait` で承認者を待ち、ほかの準備完了のタスクを進めます。費用の上限はありません。上限は利用枠です
+（`alm handoff-rules`：残りが 3% 近くになったらハンドオフを書いて止まり、同じプロンプトであとで続けます）。
+
+**もう始まっている？** まず `alm list` を実行します。タイトルが `Goal:` で始まるタスクがあれば、
+ゴールはもう計画済みです。計画し直しません。その最新のハンドオフ（`alm show <id>`）とプロジェクト
+ノートを読み、`alm next` から続けます（段階 3）。ゴールのほかのタスクがすべて終わっていれば段階 4 に
+進みます。今回の言葉が、ゴールのタスクの仕様にないものを求めているなら、新しいイテレーションの
+タスクとして加え、仕様にも加えます。
+
+## 1. 確かめる（必要なときだけ）
+
+説明に、欠かせないことが抜けているなら（アプリが何のためか、誰が使うか、どこで動く必要があるか）、
+今すぐその人に一度だけ、すべての質問を一つのメッセージにまとめて聞き、答えを待ちます。あなたを
+始めた依頼に実行モードがなければ、同じメッセージで聞きます。`alm guide run-modes` の出力を見せます。
+それ以外は、今もあとも聞きません。ほかの選択はすべてあなたのものです（名前、技術の組み合わせ、配置、
+自然な既定がある細かな点）。決めて、`alm ai-decided <id> \"<what and why>\"` で記録し、あとでその人が
+見直せるようにします。実行を止めることはありません。
+
+## 2. 計画する
+
+1. **ゴールのタスク。** アプリ全体のために `alm add area \"<the app's name>\"`、続けて
+   `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
+   are on>`。その説明（`alm describe <id> --from <file.md>`）に仕様を書きます。アプリが何をし、
+   誰のためのものか、そして完成したアプリが満たすべき受け入れ基準。基準はどれも、人が試せることに
+   します。最後にこの一行を書きます：「Goal run (goal prompt v1)：この人は <date> にゴールを出して、
+   この計画を前もって承認しました。エリア、イテレーション、準備完了のタスクはエージェントが作ります。
+   外部への影響があることは、引き続き承認者を待ちます。」タイトルの `Goal:` は、あとのすべての
+   セッションにゴールのタスクを示す印です。消さずに残します。
+2. **エリア**はアプリの部分から（たとえば画面、データ、サーバー）：`alm add area \"<name>\"`。
+3. **イテレーション**はリリースの道筋として作り、どれも最後にその人が試せる版で終わります：
+   `alm add iteration \"<name>\" --release v0.1`、続けて v0.2 と順に。日付は分からなければ空のまま。
+   v0.1 は最初から最後まで動く一番小さなアプリで、あとのリリースはそこに足していきます。
+4. **タスク**をそこに：`alm add task --area <id> --title \"<outcome>\" --branch <the branch you
+   are on>`（`alm guide tasks` のとおり、一つのタスクに一つの見て分かる結果、だいたい一つの
+   セッションと一つのコミット）、続けて `alm plan <id> <iteration>`。各イテレーションの最後の
+   タスクは、アプリのエリアに置く、そのリリースの受け入れ確認です。仕様のうちその部分に照らして
+   リリースを試し、その人が試すための手順を書きます。
+5. **準備完了にしてから、順番を付けます。** すべてのタスクに `alm ready <id>`、ゴールのタスクにも。
+   それから、先にほかのタスクが要るタスクごとに `alm block <id> --by <task-id>`。各受け入れ確認は
+   同じイテレーションのほかのタスクで、各イテレーションの最初のタスクは前のイテレーションの確認で、
+   ゴールのタスクは最後の確認でブロックします。
+
+## 3. 作る
+
+イテレーションごとに、一度に一つのタスク：`alm next`、続けて `alm claim <id> --as <your session
+name> --branch <the branch you are on>`（表示される Git コマンドを実行します）、作業をしてコミット
+し、一歩ずつ確かめるたびに `alm label <id> \"<label>\"`、そして実行モードのとおりに終えます：
+- 静かモード：`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`。
+  手順にはその人が試すしかたを書きます。
+- 通常モード：一番上のラベルで、その人が確認したあとに `alm done <id>`。
+
+`alm next` があるタスクのブロック元がすべて完了したと言ったら、確かめてから `alm unblock <id>`。
+外部への影響があるタスク：`alm wait <id> --on \"<what the approver must do>\"`、そして次の準備完了の
+タスクへ。先に別のタスクが要るタスク：そのタスクがなければ加え、`alm block`。やめたタスク：
+`alm drop <id>`、理由はメモに（`alm note`）。タスクを一つ終えるたびにハンドオフを書き
+（`alm handoff`）、`alm handoff-rules` に従います。
+
+## 4. 仕上げる
+
+最後のイテレーションの受け入れ確認が終わったら：ゴールのタスクを `alm unblock` し、仕様の受け入れ
+基準に照らしてアプリ全体を確かめ、ゴールのタスクをその人の確認待ちにします：
+`alm wait <id> --on \"Try the app: <how>\"`。ゴールが無理だと分かったら、代わりにゴールのタスクを
+理由を付けてその人の待ちにします。それから `alm list --json` を表示して止まります。
+
+## 終わるまで続ける
+
+あなたのツールに `/goal` があれば（Claude Code、Codex）、ゴールは次の条件で設定します。会話だけを
+見て判断できる条件です：
+
+    The latest `alm list --json` printed in this conversation shows every task of the goal done,
+    dropped or waiting on the person (a task blocked only by waiting tasks counts as waiting).
+
+（意味：この会話で最後に表示した `alm list --json` で、ゴールのタスクがすべて完了、中止、または
+その人の待ちになっている。待機中のタスクだけにブロックされているタスクは待ちに数える。）あなたを
+始めた依頼がもう設定しているかもしれません。そうでなければ、ツールが許すなら自分で設定します。
+`/goal` がなくても同じです。この条件が成り立つまでタスクを次々に進め、`alm list --json` を表示して
+示します。それより早く止まるのは利用枠の関門だけで、そのときはハンドオフを書いてからです。この
+プロンプトをもう一度渡されたら、`alm next` から続けます。
+";
+
+/// `alm guide goal` in `language`, or `None` when it is not written in that language (the agent
+/// then follows a faithful translation of the English text). Allomos types it into the agent for
+/// the person, who may read along, so it is written in every language of [`RUN_MODES_LANGUAGES`].
+pub fn goal(language: &str) -> Option<&'static str> {
+    match written_in(language)? {
+        "ja" => Some(GOAL_JA),
+        "zh-CN" => Some(GOAL_ZH_CN),
+        _ => Some(GOAL_EN),
+    }
+}
+
 /// A topic of [`LOCALIZED_TOPICS`] in `language`, or `None` when the topic is not one of them or
 /// is not written in that language (the agent then translates the English text faithfully).
 pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
     match topic {
         "run-modes" => run_modes(language),
         "agent-files" => agent_files(language),
+        "goal" => goal(language),
         _ => None,
     }
 }
@@ -679,6 +982,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "workflow" => Some(WORKFLOW),
         "run-modes" => Some(RUN_MODES_EN),
         "agent-files" => Some(AGENT_FILES_EN),
+        "goal" => Some(GOAL_EN),
         _ => None,
     };
     match topic {
@@ -908,6 +1212,144 @@ mod tests {
         ] {
             assert!(brief.contains(&flat(words)), "{words}");
         }
+    }
+
+    /// `alm guide goal` (Task-A03-25-01): the versioned goal prompt, written in every language the
+    /// app speaks, each with the four phases, the commands of each phase, the `/goal` condition
+    /// judged from the conversation alone, the rule for continuing, and the goal-run exception.
+    #[test]
+    fn goal_is_written_in_every_language_with_its_phases_and_condition() {
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        let condition = "The latest `alm list --json` printed in this conversation shows every \
+                         task of the goal done, dropped or waiting on the person (a task blocked \
+                         only by waiting tasks counts as waiting).";
+        for language in RUN_MODES_LANGUAGES {
+            let text = goal(language).unwrap_or_else(|| panic!("{language}"));
+            assert!(text.starts_with("# "), "{language}");
+            assert!(
+                text.lines()
+                    .next()
+                    .unwrap()
+                    .contains(&format!("(goal prompt v{GOAL_PROMPT_VERSION})")),
+                "{language}"
+            );
+            // The four phases, in order, and the part on keeping going.
+            let mut at = 0;
+            for phase in 1..=4 {
+                let found = text[at..]
+                    .find(&format!("\n## {phase}. "))
+                    .unwrap_or_else(|| panic!("{language}: phase {phase}"));
+                at += found + 1;
+            }
+            assert!(!text.contains("\n## 5. "), "{language}");
+            assert_eq!(text.matches("\n## ").count(), 5, "{language}");
+            for words in [
+                // Clarify: one round, everything else recorded.
+                "`alm guide run-modes`",
+                "`alm ai-decided <id> \"<what and why>\"`",
+                // Plan.
+                "`alm add area \"<the app's name>\"`",
+                "--title \"Goal: <the app, in one line>\"",
+                "`alm describe <id> --from <file.md>`",
+                "Goal run (goal prompt v1)",
+                "`alm add area \"<name>\"`",
+                "`alm add iteration \"<name>\" --release v0.1`",
+                "`alm plan <id> <iteration>`",
+                "`alm guide tasks`",
+                "`alm ready <id>`",
+                "`alm block <id> --by <task-id>`",
+                // Build.
+                "`alm next`",
+                "--branch <the branch you are on>",
+                "`alm label <id> \"<label>\"`",
+                "`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`",
+                "`alm done <id>`",
+                "`alm unblock <id>`",
+                "`alm wait <id> --on \"<what the approver must do>\"`",
+                "`alm drop <id>`",
+                "`alm handoff`",
+                "`alm handoff-rules`",
+                // Finish.
+                "`alm wait <id> --on \"Try the app: <how>\"`",
+                // Keep going: `/goal`, its condition, and continuing.
+                "`/goal`",
+                "Claude Code",
+                "Codex",
+                "`alm list --json`",
+                "`alm list`",
+                "`Goal:`",
+                "`alm show <id>`",
+                "3%",
+                "2026-10-16",
+                "AGENTS.md",
+            ] {
+                assert!(text.contains(words), "{language}: {words}");
+            }
+            // The condition is given word for word in English, so a checker reads the same text.
+            assert!(flat(text).contains(condition), "{language}");
+            assert_eq!(localized("goal", language), Some(text));
+        }
+        let en = flat(goal("en").unwrap());
+        for words in [
+            "ask the person once, right now, all your questions together in one message",
+            "Ask nothing else, then or later",
+            "Submitting the goal approved the plan in advance",
+            "make your own tasks ready, without asking",
+            "Record that approval once, on the goal task",
+            "waits for the approver with `alm wait`, and you go on with other ready tasks",
+            "There is no spend cap",
+            "do not plan it again",
+            "continue from `alm next`",
+            "each ending in a version the person can try",
+            "dates empty unless known",
+            "is that release's acceptance check",
+            "waiting for the person's human check",
+            "which can be judged from the conversation alone",
+            "Without `/goal`, the same holds: keep going",
+        ] {
+            assert!(en.contains(words), "{words}");
+        }
+        assert_ne!(goal("ja"), goal("en"));
+        assert_ne!(goal("zh-CN"), goal("en"));
+        assert_eq!(goal("zh-Hans-CN"), goal("zh-CN"));
+        assert_eq!(goal("fr"), None);
+        assert_eq!(guide(Some("goal")).as_deref(), goal("en"));
+        assert!(guide(None).unwrap().contains("# Goal run"));
+        // The exception it makes, said by `alm guide tasks`, `alm guide workflow` and the brief:
+        // the agent adds areas and iterations and readies its own tasks, approved in advance by
+        // the goal, recorded once on the goal task; outside effects still wait; no spend cap.
+        let tasks = flat(&guide(Some("tasks")).unwrap());
+        let workflow = flat(&guide(Some("workflow")).unwrap());
+        let brief = flat(&crate::agent_section());
+        for text in [&tasks, &workflow, &brief] {
+            for words in [
+                "alm guide goal",
+                "approved the plan in advance",
+                "(its title starts with `Goal:`)",
+                "still waits for the approver",
+            ] {
+                assert!(text.contains(words), "{words}: {text}");
+            }
+        }
+        assert!(tasks.contains("make them ready yourself (`alm ready <id>`)"));
+        assert!(tasks.contains("Record that approval once, on the goal task"));
+        assert!(tasks.contains("or in a goal run (below)"), "{tasks}");
+        for text in [&workflow, &brief] {
+            assert!(text.contains("recorded once on the goal task"), "{text}");
+            assert!(text.contains("make your own tasks ready"), "{text}");
+        }
+        for text in [&workflow, &brief] {
+            assert!(text.contains("spend cap"), "{text}");
+            assert!(
+                text.contains("the quota gate of `alm handoff-rules`"),
+                "{text}"
+            );
+        }
+        assert!(workflow.contains("Given the goal again, continue from `alm next`"));
+        assert!(
+            flat(&guide(Some("commands")).unwrap())
+                .contains("`alm guide goal [--language <code>]`")
+        );
     }
 
     /// The run-modes explanation exists in every language the app speaks (so every task language

@@ -46,7 +46,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 12: shared rules live only in AGENTS.md; an agent not yet set up runs `alm guide agent-files`
 /// once; after changing shared rules, tell the person which sessions still use the old ones
 /// (Task-A03-24).
-pub const SECTION_VERSION: u32 = 12;
+/// 13: a goal run: given a goal, the agent follows `alm guide goal`, adds the areas and iterations
+/// and readies its own tasks, the person having approved in advance by submitting the goal;
+/// outside effects still wait for the approver (Task-A03-25-01).
+pub const SECTION_VERSION: u32 = 13;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

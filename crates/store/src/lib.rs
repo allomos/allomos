@@ -44,7 +44,8 @@ pub use convert::{
 };
 pub use events::Actor;
 pub use guide::{
-    GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files, guide, localized, run_modes,
+    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files, goal,
+    guide, localized, run_modes,
 };
 pub use settings::{
     TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language,
@@ -256,6 +257,11 @@ the project notes (below) and your own handoff file.
   `alm guide run-modes` prints (in the task language), as it is, and do not start until they
   choose. Write the choice in your handoff (\"Run mode: quiet\" or \"Run mode: normal\", who
   chose it and when) and follow it until the run ends. In normal mode, ask as usual.
+- Goal run: when the person gives you a goal (an app to build from their description), follow
+  what `alm guide goal` prints (in the task language). Submitting the goal approved the plan in
+  advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
+  iterations and make your own tasks ready. Anything with an outside effect still waits for the
+  approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
 - Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
   In an automatic or loop run the person set up to go on without them (quiet mode), you
   may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
@@ -313,7 +319,8 @@ has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, 
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
-`alm guide agent-files` (one set of shared rules for every agent, done once per agent).
+`alm guide agent-files` (one set of shared rules for every agent, done once per agent),
+`alm guide goal` (the goal prompt: build an app from a description, release by release).
 "
     )
 }
