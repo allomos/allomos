@@ -5,7 +5,8 @@
 // button, which works like `alm checked` (Task-A03-18). The iteration is chosen from a drop-down
 // whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39). A task
 // with AI decisions nobody has reviewed shows "AI decided", the decisions and a Reviewed button,
-// like `alm reviewed` (Task-A03-19).
+// like `alm reviewed` (Task-A03-19). A done or dropped task has Reopen…, which asks why and works
+// like `alm reopen` (Task-A01-50).
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -29,6 +30,7 @@ import {
   type EditField,
   type NewIterationDraft,
 } from "./editFlow";
+import { canReopen, reopenEdit } from "./reopenFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
 import { isProblem, type Area, type Edit, type Handoff, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
@@ -91,16 +93,20 @@ export function TaskPane({
   // The Checked or Reviewed button asked for the person's name first (asked once, like a change).
   const [asking, setAsking] = useState<"checked" | "reviewed" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Reopen… (Task-A01-50): the reason being written; null while the form is closed.
+  const [reason, setReason] = useState<string | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
   useEffect(() => {
     ref.current?.scrollTo?.({ top: 0 });
     setEditing(null);
     setAsking(null);
+    setReason(null);
     setError(null);
   }, [task.id]);
 
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
   const begin = (field: EditField) => {
+    setReason(null);
     setEditing(field);
     setDraft(startDraft(task, field));
     setCreated(EMPTY_NEW_ITERATION);
@@ -109,7 +115,23 @@ export function TaskPane({
   const cancel = () => {
     setEditing(null);
     setAsking(null);
+    setReason(null);
     setError(null);
+  };
+  /** Reopen (Task-A01-50): through the same rule as `alm reopen`; refused in Rust's words. */
+  const reopen = async () => {
+    const edit = reopenEdit(reason ?? "");
+    if (!edit || busy) return;
+    setBusy(true);
+    try {
+      await onEdit(edit);
+      setReason(null);
+      setError(null);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
   };
   /** Checked (Task-A03-18): top label, off To check. Reviewed (Task-A03-19): the AI decisions
    * leave To review. Refused in Rust's words like any change. */
@@ -436,7 +458,7 @@ export function TaskPane({
                 {t("pane.checked_button")}
               </button>
               <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
-              {error && !editing && asking !== "reviewed" && <p className="banner error small">{error}</p>}
+              {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
             </>
           )}
         </div>
@@ -464,6 +486,54 @@ export function TaskPane({
               {error && !editing && asking === "reviewed" && <p className="banner error small">{error}</p>}
             </>
           )}
+        </div>
+      )}
+      {canReopen(task) && (
+        <div className="pane-check pane-reopen">
+          {reason === null ? (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setAsking(null);
+                setError(null);
+                setReason("");
+              }}
+              disabled={busy}
+            >
+              {t("pane.reopen_button")}
+            </button>
+          ) : !ownerName ? (
+            nameForm()
+          ) : (
+            <div className="editor">
+              <textarea
+                value={reason}
+                rows={3}
+                placeholder={t("pane.reopen_placeholder")}
+                aria-label={t("pane.reopen_note")}
+                onChange={(e) => setReason(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancel();
+                  }
+                }}
+                disabled={busy}
+                autoFocus
+              />
+              <div className="editor-buttons">
+                <button type="button" className="primary" onClick={() => void reopen()} disabled={busy || !reopenEdit(reason)}>
+                  {busy ? t("edit.saving") : t("pane.reopen_save")}
+                </button>
+                <button type="button" onClick={cancel} disabled={busy}>
+                  {t("edit.cancel")}
+                </button>
+              </div>
+              {error && <p className="banner error small">{error}</p>}
+            </div>
+          )}
+          <p className="muted small">{t("pane.reopen_hint")}</p>
         </div>
       )}
       <dl className="fields">

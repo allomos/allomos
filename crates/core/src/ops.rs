@@ -5,6 +5,7 @@
 //! the taskbag, applies one change and writes the result, all while holding the
 //! taskbag's lock (see `crates/store`).
 
+use crate::event::Change;
 use crate::model::{Area, Iteration, Project, State, Task, Taskbag};
 use crate::problem::Problem;
 use crate::validate::valid_date;
@@ -15,6 +16,9 @@ use serde::Deserialize;
 pub struct Outcome {
     pub task: Task,
     pub warnings: Vec<Problem>,
+    /// Changes recorded only in the task's history, not in its files, such as why a task was
+    /// reopened (`reopen_note`, Task-A01-50). The writer adds them to the change's event.
+    pub recorded: Vec<Change>,
 }
 
 impl Outcome {
@@ -22,6 +26,15 @@ impl Outcome {
         Outcome {
             task,
             warnings: Vec::new(),
+            recorded: Vec::new(),
+        }
+    }
+
+    fn warned(task: Task, warnings: Vec<Problem>) -> Self {
+        Outcome {
+            task,
+            warnings,
+            recorded: Vec::new(),
         }
     }
 }
@@ -540,7 +553,7 @@ pub fn claim(
     task.holder = Some(me);
     task.state = State::InProgress;
     clear_stop(&mut task);
-    Ok(Outcome { task, warnings })
+    Ok(Outcome::warned(task, warnings))
 }
 
 /// Set the task's label. It must be a step on the project's ladder.
@@ -675,7 +688,7 @@ pub fn block(
     clear_stop(&mut task);
     task.blocked_by = ids;
     task.state = State::Blocked;
-    Ok(Outcome { task, warnings })
+    Ok(Outcome::warned(task, warnings))
 }
 
 /// Move a `blocked` task on (`alm unblock`): back to `in_progress` when someone holds it, else
@@ -740,7 +753,7 @@ pub fn finish(
     }
     task.state = State::Done;
     clear_stop(&mut task);
-    Ok(Outcome { task, warnings })
+    Ok(Outcome::warned(task, warnings))
 }
 
 /// Clear what waits for the human check: the note and its steps. The task's history keeps them.
@@ -896,6 +909,10 @@ pub enum Edit {
     },
     /// A person checked the finished task: like `alm checked` (Task-A03-18).
     Checked,
+    /// Reopen a done or dropped task, saying why: like `alm reopen` (Task-A01-50).
+    Reopen {
+        note: String,
+    },
 }
 
 /// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
@@ -952,6 +969,7 @@ pub fn edit(
             set_description(taskbag, id, me, text).map(|o| (o, "describe"))
         }
         Edit::Checked => checked(taskbag, id).map(|o| (o, "checked")),
+        Edit::Reopen { note } => reopen(taskbag, id, note).map(|o| (o, "reopen")),
     }
 }
 
@@ -1000,6 +1018,39 @@ pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcom
     task.holder = None;
     clear_stop(&mut task);
     Ok(Outcome::plain(task))
+}
+
+/// The history-only field that says why a task was reopened (Task-A01-50): its `to` is the note.
+pub const REOPEN_NOTE: &str = "reopen_note";
+
+/// Reopen a finished task (`alm reopen`, the app's **Reopen…**, Task-A01-50): a `done` or
+/// `dropped` task becomes `ready`, held by nobody, so more work on the same outcome stays on the
+/// same task. `note` says why (required); it is recorded in the task's history only
+/// ([`REOPEN_NOTE`]), not in its files. The new work has proven nothing yet, so the label is
+/// cleared, and so is the human-check record (the note and its steps); both stay in the history.
+/// The description, handoff note and next dependency are kept. Any other state is refused
+/// (`cannot_reopen`). The holder rule does not apply: a finished task is held by nobody (A00-30).
+pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    if !matches!(task.state, State::Done | State::Dropped) {
+        return Err(Problem::CannotReopen {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    let note = non_empty(Some(note)).ok_or(Problem::ReopenNoteMissing)?;
+    task.state = State::Ready;
+    task.holder = None;
+    task.label = None;
+    clear_stop(&mut task);
+    clear_human_check(&mut task);
+    let mut outcome = Outcome::plain(task);
+    outcome.recorded.push(Change {
+        field: REOPEN_NOTE.to_string(),
+        from: None,
+        to: Some(serde_json::Value::String(note)),
+    });
+    Ok(outcome)
 }
 
 /// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14). A
@@ -1190,6 +1241,78 @@ mod tests {
                 .unwrap_err()
                 .code(),
             "task_closed"
+        );
+    }
+
+    /// Task-A01-50: reopening a done or dropped task.
+    #[test]
+    fn reopen_rules() {
+        let mut s = bag();
+        assert_eq!(
+            reopen(&s, "A01-01", "why"),
+            Err(Problem::CannotReopen {
+                id: "A01-01".into(),
+                state: "backlog".into()
+            })
+        );
+        put!(s, claim(&s, "A01-01", Some("a"), false).unwrap().task);
+        put!(
+            s,
+            set_label(&s, "A01-01", Some("a"), "implemented")
+                .unwrap()
+                .task
+        );
+        put!(
+            s,
+            set_next(&s, "A01-01", Some("a"), Some("a look"))
+                .unwrap()
+                .task
+        );
+        put!(
+            s,
+            finish(&s, "A01-01", Some("a"), Some("loop"), Some("steps"))
+                .unwrap()
+                .task
+        );
+        assert_eq!(reopen(&s, "A01-01", "  "), Err(Problem::ReopenNoteMissing));
+        let o = reopen(&s, "A01-01", " failed its check ").unwrap();
+        let t = &o.task;
+        assert_eq!((t.state, &t.holder, &t.label), (State::Ready, &None, &None));
+        assert_eq!(
+            (&t.without_human_check, &t.human_check_steps),
+            (&None, &None)
+        );
+        assert_eq!(t.next_dependency.as_deref(), Some("a look"));
+        assert_eq!(t.description, find_task(&s, "A01-01").unwrap().description);
+        assert_eq!(
+            o.recorded,
+            vec![Change {
+                field: REOPEN_NOTE.into(),
+                from: None,
+                to: Some("failed its check".into()),
+            }]
+        );
+        // The app's Reopen… goes through the same rule.
+        let (e, command) = edit(
+            &s,
+            "A01-01",
+            Some("Will"),
+            &Edit::Reopen {
+                note: "failed its check".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!((e, command), (o, "reopen"));
+        // Dropped tasks too; a held task is not reopened.
+        put!(s, drop_task(&s, "A02-01", None).unwrap().task);
+        assert_eq!(
+            reopen(&s, "A02-01", "wanted").unwrap().task.state,
+            State::Ready
+        );
+        put!(s, claim(&s, "A01-02", Some("a"), false).unwrap().task);
+        assert_eq!(
+            reopen(&s, "A01-02", "x").unwrap_err().code(),
+            "cannot_reopen"
         );
     }
 

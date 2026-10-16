@@ -112,6 +112,10 @@ problems! {
     HumanCheckStepsEmpty => "human_check_steps_empty", "The human check steps are empty. Write what a person opens, clicks and should see, or leave out --steps.";
     /// `alm checked` on a task that is not done (Task-A03-18).
     NotDone { id, state } => "not_done", "Task {id} is {state}, not done: only a finished task is human-checked.";
+    /// `alm reopen` (or the app's Reopen…) on a task that is not done or dropped (Task-A01-50).
+    CannotReopen { id, state } => "cannot_reopen", "Task {id} is {state}: only a done or dropped task can be reopened. It is still open, so carry on with it as it is.";
+    /// `alm reopen` (or the app's Reopen…) without saying why (Task-A01-50).
+    ReopenNoteMissing => "reopen_note_missing", "Say why the task is reopened: `alm reopen <id> --note \"<why>\"`.";
     /// `alm ai-decided` with no text (Task-A03-19).
     AiDecisionMissing => "ai_decision_missing", "Say what you decided and why, in one line: `alm ai-decided <id> \"<what and why>\"`.";
     /// `alm reviewed` (or the app's Reviewed button) on a task with no AI decisions to review (Task-A03-19).

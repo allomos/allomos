@@ -2028,6 +2028,42 @@ mod tests {
             (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
             (Some("Will"), "app", "reviewed")
         );
+
+        // Task-A01-50: Reopen… on a finished task, as the interface sends it; the reason goes in
+        // the history under the person's name. An open task is refused as `alm reopen` refuses.
+        let reopen: allomos_core::ops::Edit = serde_json::from_value(
+            serde_json::json!({ "field": "reopen", "note": "The check failed" }),
+        )
+        .unwrap();
+        assert_eq!(
+            edit_task_as(&root, Some("Will"), "A01-01", &reopen)
+                .unwrap_err()
+                .code(),
+            "cannot_reopen"
+        );
+        allomos_store::change_task(
+            &root,
+            allomos_store::Actor::alm(Some("claude/x")),
+            LOCK_WAIT,
+            |bag| {
+                allomos_core::ops::finish(bag, "A01-01", Some("claude/x"), None, None)
+                    .map(|o| (o, "done"))
+            },
+        )
+        .unwrap();
+        let task = edit_task_as(&root, Some("Will"), "A01-01", &reopen).unwrap();
+        assert_eq!(
+            (task.state, task.holder, task.label),
+            (allomos_core::State::Ready, None, None)
+        );
+        let e = &allomos_store::events::history(&root, "A01-01").events[0];
+        assert_eq!(
+            (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
+            (Some("Will"), "app", "reopen")
+        );
+        assert!(e.changes.iter().any(
+            |c| c.field == "reopen_note" && c.to == Some(serde_json::json!("The check failed"))
+        ));
         std::fs::remove_dir_all(dir).unwrap();
     }
 

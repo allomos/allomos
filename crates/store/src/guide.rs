@@ -132,7 +132,9 @@ Read this before you add a task, so it fits this project.
    decide which is right, and change it with `alm base <id> <branch>` if needed.
 7. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
    (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
-8. **One outcome per task.** If it is really two outcomes, add two tasks.
+8. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
+   outcome of a done or dropped task is not a new task: reopen that one
+   (`alm reopen <id> --note \"<why>\"`).
 
 **The exception: a goal run** (approver, 2026-10-16). When the person has given you a goal, an app
 to build from their description, and you follow `alm guide goal`, the person approved the plan in
@@ -204,6 +206,10 @@ Work a task:
 - `alm reviewed <id>`: the person has reviewed the task's AI decisions: they leave To review; the
   history keeps them. Run it only when the person says so.
   `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task).
+- `alm reopen <id> --note \"<why>\"`: more work on a done or dropped task's outcome (it failed its
+  check, or the person wants more): it becomes ready, held by nobody, and the history records who
+  reopened it, when and why. Its label and its human-check record are cleared (the history keeps
+  them); its description and handoff note stay. Any other state is refused. Claim it as usual.
 
 Plan:
 - `alm add area [<id>] \"<name>\"`, `alm add iteration [<id>] \"<name>\" [--release …] [--start …]
@@ -370,7 +376,10 @@ const WORKFLOW: &str = "# How to work the tasks
    your handoff. Write the steps so a person can pick it up and test
    it: the test folder, what to open, what to click, what they should see. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
-   it, `alm checked <id>`.
+   it, `alm checked <id>`. When a finished task needs more work on the same outcome (it failed
+   its check, or the person asks for more), reopen it instead of adding a task:
+   `alm reopen <id> --note \"<why>\"` makes it ready again, held by nobody, with the reason in
+   its history; then claim it as usual.
 8. Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
    another), ask the person to choose quiet or normal mode: show them what
    `alm guide run-modes` prints (in the task language), as it is, and do not start until they
@@ -449,9 +458,9 @@ When the run is over:
    - **To review: AI decisions:** read each decision; keep it, or overturn it by changing the
      task; then mark them reviewed (`alm reviewed <id>`, or the Reviewed button in the app).
    - **To check:** follow each task's check steps. When it works, mark it checked
-     (`alm checked <id>`, or the Checked button in the app). When it does not, say what is wrong
-     in its note (`alm note <id> \"<what is wrong>\"`) and add a task for the fix: Allomos cannot
-     reopen a finished task yet.
+     (`alm checked <id>`, or the Checked button in the app). When it does not, reopen it with
+     what is wrong (`alm reopen <id> --note \"<what is wrong>\"`, or the Reopen… button in the
+     app): it becomes ready again, with the reason in its history, so a later run picks it up.
 2. Read the run's handoff (`alm handoffs` lists them, newest first) for anything left running or
    unfinished.
 
@@ -501,9 +510,8 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
      タスクを変えて覆します。終わったらレビュー済みにします（`alm reviewed <id>`、またはアプリの
      「レビュー済み」ボタン）。
    - **To check（確認待ち）：** 各タスクの確認手順に従って試します。動けば確認済みにします
-     （`alm checked <id>`、またはアプリの「確認済み」ボタン）。動かなければ、何がおかしいかをメモに
-     書き（`alm note <id> \"<何がおかしいか>\"`）、直すためのタスクを追加します。終わったタスクを
-     開き直す機能は、「肩代」にはまだありません。
+     （`alm checked <id>`、またはアプリの「確認済み」ボタン）。動かなければ、何がおかしいかを書いて
+     再開します（`alm reopen <id> --note \"<何がおかしいか>\"`、またはアプリの「再開…」ボタン）。タスクは理由を履歴に残して準備完了に戻り、次の実行がそれを拾います。
 2. この実行のハンドオフ（`alm handoffs` で新しい順に一覧できます）を読み、動いたままのものや
    終わっていないものがないか確かめます。
 
@@ -549,8 +557,8 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
    - **To review: AI decisions（待审阅的 AI 决定）：** 逐条阅读决定；保留它，或修改任务来推翻它；
      然后标为已审阅（`alm reviewed <id>`，或应用里的「已审阅」按钮）。
    - **To check（待检查）：** 按每个任务的检查步骤去试。没问题就标为已检查（`alm checked <id>`，
-     或应用里的「已检查」按钮）。有问题就在它的备注里写明哪里不对（`alm note <id> \"<哪里不对>\"`），
-     再添加一个修复任务：「换肩」目前还不能重新打开已完成的任务。
+     或应用里的「已检查」按钮）。有问题就写明哪里不对并重新打开它（`alm reopen <id> --note \"<哪里不对>\"`，
+     或应用里的「重新打开…」按钮）：它会重新变为就绪，原因记在历史里，之后的运行会接着做。
 2. 阅读这次运行的交接（`alm handoffs` 按从新到旧列出），看看有没有仍在运行或没做完的东西。
 
 ## 普通模式：照常提问
@@ -1509,10 +1517,13 @@ mod tests {
                 "`alm reviewed <id>`",
                 "To check",
                 "`alm checked <id>`",
+                "`alm reopen <id> --note",
                 "`alm handoffs`",
             ] {
                 assert!(text.contains(words), "{language}: {words}");
             }
+            // Task-A01-50: a finished task can be reopened now.
+            assert!(!text.contains("cannot reopen"), "{language}");
             // Two modes, each with the four things the person must know.
             assert_eq!(text.matches("\n## ").count(), 2, "{language}");
             assert_eq!(text.matches("- **").count(), 8 + 3, "{language}");
@@ -1527,6 +1538,12 @@ mod tests {
         assert_ne!(run_modes("zh-CN"), run_modes("en"));
         assert_eq!(run_modes("fr"), None);
         assert_eq!(run_modes("zh-TW"), None);
+        // Task-A01-50: the commands and the workflow say how to reopen a finished task.
+        for topic in ["commands", "workflow", "tasks"] {
+            let text = guide(Some(topic)).unwrap();
+            assert!(text.contains("`alm reopen <id> --note"), "{topic}");
+            assert!(!text.contains("cannot reopen"), "{topic}");
+        }
         // `alm guide` (all topics) includes the English text.
         assert!(
             guide(None)
