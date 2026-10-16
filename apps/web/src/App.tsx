@@ -6,6 +6,7 @@ import { AgentLine } from "./AgentLine";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SetupWizard } from "./SetupWizard";
+import { BuildAppDialog } from "./BuildAppDialog";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
@@ -123,6 +124,8 @@ export function App({ messenger }: { messenger: Messenger }) {
     [],
   );
   const [notices, setNotices] = useState<Note[]>([]);
+  /** The start page's Build a new app… dialog (Task-A03-25-02). */
+  const [building, setBuilding] = useState(false);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
@@ -457,7 +460,8 @@ export function App({ messenger }: { messenger: Messenger }) {
           </div>
         )}
         <LanguagePicker />
-        {/* With nothing open, the welcome page's Start button is the only way in. New window… opens
+        {/* With nothing open, the welcome page's Start button is the only way in (and Build a new
+            app…, Task-A03-25-02). New window… opens
             another window on the start page (owner, 2026-10-12). */}
         {opened && (
           <button type="button" className="primary" onClick={() => void messenger.newWindow().catch((e) => setError(errorNote(e)))}>
@@ -500,7 +504,29 @@ export function App({ messenger }: { messenger: Messenger }) {
             onOlder={setOlderShown}
           />
         )}
-        {!opened && <Welcome onOpen={() => openWizard({})} onRecent={showRecentDialog} recentRef={recentButton} />}
+        {!opened && (
+          <Welcome
+            onOpen={() => openWizard({})}
+            onBuild={() => setBuilding(true)}
+            onRecent={showRecentDialog}
+            recentRef={recentButton}
+          />
+        )}
+        {building && (
+          <BuildAppDialog
+            messenger={messenger}
+            onOpened={(o) => {
+              show(o, { key: o.readme_added ? "notice.created_here_readme" : "notice.created_nested" });
+              // The dialog asks the agent itself: the setup wizard does not open on its own.
+              setSkipped(true);
+            }}
+            onSetup={setSetup}
+            onClose={(message) => {
+              setBuilding(false);
+              if (message) setNotices((list) => [...list, { text: message }]);
+            }}
+          />
+        )}
         {!opened && recentDialog && (
           <RecentDialog
             messenger={messenger}
@@ -854,10 +880,13 @@ function LanguagePicker() {
  * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43). */
 function Welcome({
   onOpen,
+  onBuild,
   onRecent,
   recentRef,
 }: {
   onOpen: () => void;
+  /** Build a new app… (Task-A03-25-02). */
+  onBuild: () => void;
   onRecent: () => void;
   recentRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -881,6 +910,10 @@ function Welcome({
                 {t("welcome.open")}
               </button>
               <span className="muted">{t("welcome.hint")}</span>
+              {/* Start from a description instead (Task-A03-25-02). */}
+              <button type="button" className="start build" onClick={onBuild}>
+                {t("build.button")}
+              </button>
             </div>
           </div>
           <HopFigure />

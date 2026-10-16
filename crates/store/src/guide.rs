@@ -946,6 +946,54 @@ pub fn goal(language: &str) -> Option<&'static str> {
     }
 }
 
+/// The part of the goal request that follows the connect request when a person starts a new app
+/// from the start page's **Build a new app…** (Task-A03-25-02): the person's description, the run
+/// mode they chose, then the goal prompt ([`goal`]) in `language` (English when it is not written
+/// in that language). Allomos types it in; the person sends it.
+pub fn goal_request_in(language: &str, description: &str, quiet: bool) -> String {
+    let words = description
+        .trim()
+        .lines()
+        .map(|line| format!("> {line}").trim_end().to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let prompt = goal(language).unwrap_or(GOAL_EN);
+    let (heading, intro, mode, said) = match written_in(language) {
+        Some("zh-CN") => (
+            "然后：构建应用（第一、二部分完成后）",
+            "这个人在 Allomos 的“构建新应用…”中开始了这项工作，并在下面描述了想要的应用。请按照后面的目标提示，把它做出来。",
+            if quiet {
+                "运行模式：安静模式（Run mode: quiet），这个人在 Allomos 中开始这个目标时选择的。"
+            } else {
+                "运行模式：普通模式（Run mode: normal），这个人在 Allomos 中开始这个目标时选择的。"
+            },
+            "这个人的描述：",
+        ),
+        Some("ja") => (
+            "そのあと：アプリを作る（第一部と第二部が終わってから）",
+            "この人は Allomos の「新しいアプリを作る…」からこの作業を始め、欲しいアプリを下に書きました。続くゴールのプロンプトに従って、それを作ってください。",
+            if quiet {
+                "実行モード：静かモード（Run mode: quiet）。この人が Allomos でこのゴールを始めるときに選びました。"
+            } else {
+                "実行モード：通常モード（Run mode: normal）。この人が Allomos でこのゴールを始めるときに選びました。"
+            },
+            "この人の説明：",
+        ),
+        _ => (
+            "Then: build the app (after parts 1 and 2)",
+            "The person started this from Allomos's Build a new app… and described the app they \
+want below. Build it by following the goal prompt that comes next.",
+            if quiet {
+                "Run mode: quiet (the person chose it in Allomos when starting this goal)."
+            } else {
+                "Run mode: normal (the person chose it in Allomos when starting this goal)."
+            },
+            "The person's description:",
+        ),
+    };
+    format!("## {heading}\n\n{intro}\n\n{mode}\n\n{said}\n\n{words}\n\n{prompt}")
+}
+
 /// A topic of [`LOCALIZED_TOPICS`] in `language`, or `None` when the topic is not one of them or
 /// is not written in that language (the agent then translates the English text faithfully).
 pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
@@ -1354,6 +1402,28 @@ mod tests {
 
     /// The run-modes explanation exists in every language the app speaks (so every task language
     /// `alm` supports), each with both modes and the same after-run steps and commands.
+    #[test]
+    fn goal_request_carries_the_description_the_mode_and_the_prompt() {
+        for language in RUN_MODES_LANGUAGES {
+            let quiet = goal_request_in(language, "  A to-do list\n\nwith dates  \n", true);
+            assert!(quiet.starts_with("## "), "{language}");
+            assert!(
+                quiet.contains("> A to-do list\n>\n> with dates\n"),
+                "{language}"
+            );
+            assert!(quiet.contains("Run mode: quiet"), "{language}");
+            assert!(!quiet.contains("Run mode: normal"), "{language}");
+            assert!(quiet.ends_with(goal(language).unwrap()), "{language}");
+            let normal = goal_request_in(language, "x", false);
+            assert!(normal.contains("Run mode: normal"), "{language}");
+        }
+        // A language the prompt is not written in gets the English request.
+        assert_eq!(
+            goal_request_in("fr", "x", true),
+            goal_request_in("en", "x", true)
+        );
+    }
+
     #[test]
     fn run_modes_is_written_in_every_language() {
         for language in RUN_MODES_LANGUAGES {
