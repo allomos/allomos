@@ -102,12 +102,12 @@ enum Command {
     Brief,
     /// Print the details the brief points to: terms, what a project may customize, commands,
     /// how to work the tasks, the run modes to show the person before an automatic or loop run,
-    /// and the one-time procedure that puts every agent's shared rules in AGENTS.md. All topics
-    /// (in English) when none is named.
+    /// the one-time procedure that puts every agent's shared rules in AGENTS.md, and the goal
+    /// prompt that builds an app from a description. All topics (in English) when none is named.
     Guide {
         #[arg(value_parser = GUIDE_TOPICS)]
         topic: Option<String>,
-        /// For `run-modes` and `agent-files`: the language to print it in (default: the task
+        /// For `run-modes`, `agent-files` and `goal`: the language to print it in (default: the task
         /// language).
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
@@ -1714,6 +1714,16 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             };
             let (text, written) = match localized(name, &language) {
                 Some(text) => (text.to_string(), true),
+                // The goal prompt is the agent's to follow, not to show (Task-A03-25-01).
+                None if name == "goal" => (
+                    format!(
+                        "This text is not written in {language} yet: follow a faithful translation \
+                         of it into {language}, keeping commands as they are, and write the tasks \
+                         in {language}.\n\n{}",
+                        localized(name, "en").unwrap_or_default()
+                    ),
+                    false,
+                ),
                 None => (
                     format!(
                         "This text is not written in {language} yet: show the person a faithful \

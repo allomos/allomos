@@ -1810,6 +1810,54 @@ fn agent_files_follow_the_task_language() {
     assert!(all.contains("# Agent files") && all.contains("# Run modes"));
 }
 
+/// `alm guide goal` (Task-A03-25-01): the goal prompt, in the task language like `run-modes`;
+/// in another language, the English text with a first line asking the agent to follow a faithful
+/// translation; `alm guide` (all topics) includes the English one.
+#[test]
+fn goal_follows_the_task_language() {
+    let repo = filled();
+    let settings = tmp("settings");
+    for (language, words) in [
+        ("en", "# Goal run"),
+        ("ja", "# ゴール実行"),
+        ("zh-CN", "# 目标运行"),
+    ] {
+        let (code, v) = fj_settings(&repo, &settings, &["guide", "goal", "--language", language]);
+        assert_eq!(code, 0, "{v}");
+        assert_eq!(v["topic"], "goal", "{v}");
+        assert_eq!(v["written_in_language"], true, "{v}");
+        let text = v["guide"].as_str().unwrap();
+        assert!(text.starts_with(words), "{language}: {text}");
+        assert!(text.contains("(goal prompt v1)"), "{language}");
+        assert!(text.contains("## 4. "), "{language}");
+        assert!(text.contains("`/goal`"), "{language}");
+    }
+    fj_settings(&repo, &settings, &["task-language", "ja"]);
+    let (_, v) = fj_settings(&repo, &settings, &["guide", "goal"]);
+    assert_eq!(v["language"], "ja");
+    assert!(
+        v["guide"].as_str().unwrap().starts_with("# ゴール実行"),
+        "{v}"
+    );
+    fj_settings(&repo, &settings, &["task-language", "fr"]);
+    let (_, v) = fj_settings(&repo, &settings, &["guide", "goal"]);
+    assert_eq!(v["written_in_language"], false, "{v}");
+    let text = v["guide"].as_str().unwrap();
+    assert!(
+        text.starts_with(
+            "This text is not written in fr yet: follow a faithful translation of it into fr"
+        ),
+        "{text}"
+    );
+    assert!(text.contains("# Goal run"), "{text}");
+    let all = ok(&repo, &["guide"])["guide"].as_str().unwrap().to_string();
+    assert!(all.contains("# Goal run") && all.contains("# Agent files"));
+    // The brief names the topic and the goal-run exception.
+    let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
+    assert!(brief.contains("`alm guide goal`"), "{brief}");
+    assert!(brief.contains("Goal run:"), "{brief}");
+}
+
 #[test]
 fn title_and_project_rename() {
     let repo = filled();
@@ -1916,17 +1964,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v12)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v13)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v11 section (before the shared rules, Task-A03-24) is out of date too.
+    // A v12 section (before the goal run, Task-A03-25-01) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v12)", "## Tasks: Allomos (v11)")
+            brief.replace("## Tasks: Allomos (v13)", "## Tasks: Allomos (v12)")
         ),
     )
     .unwrap();

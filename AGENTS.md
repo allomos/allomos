@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v12)
+## Tasks: Allomos (v13)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -63,6 +63,11 @@ the project notes (below) and your own handoff file.
   `alm guide run-modes` prints (in the task language), as it is, and do not start until they
   choose. Write the choice in your handoff ("Run mode: quiet" or "Run mode: normal", who
   chose it and when) and follow it until the run ends. In normal mode, ask as usual.
+- Goal run: when the person gives you a goal (an app to build from their description), follow
+  what `alm guide goal` prints (in the task language). Submitting the goal approved the plan in
+  advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
+  iterations and make your own tasks ready. Anything with an outside effect still waits for the
+  approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
 - Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
   In an automatic or loop run the person set up to go on without them (quiet mode), you
   may finish below it with `alm done <id> --without-human-check "<why, which run>"
@@ -120,7 +125,8 @@ has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, 
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
-`alm guide agent-files` (one set of shared rules for every agent, done once per agent).
+`alm guide agent-files` (one set of shared rules for every agent, done once per agent),
+`alm guide goal` (the goal prompt: build an app from a description, release by release).
 
 This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
 `--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).
