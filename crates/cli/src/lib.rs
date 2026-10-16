@@ -2074,6 +2074,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let latest = handoff::latest_for(&root, &task.id);
             if let Some(h) = &latest {
                 text.push_str(&handoff_line(h));
+                // Whoever takes over checks before trusting it and repeats nothing (Task-A03-23).
+                text.push_str(handoff::TAKING_OVER);
             }
             if ops::all_blockers_done(&bag, &task) {
                 text.push_str(&format!(
@@ -2086,7 +2088,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "handoff": latest.as_ref().map(handoff_brief) }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "handoff": latest.as_ref().map(handoff_brief), "taking_over": latest.as_ref().map(|_| handoff::TAKING_OVER) }),
                 text,
             );
             done.issues = issues;
@@ -2160,6 +2162,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if !tasks.is_empty() {
                 text.push('\n');
             }
+            // Once, when a listed task has a handoff: the rules for taking over (Task-A03-23).
+            let taking_over = listed
+                .iter()
+                .any(|v| !v["handoff"].is_null())
+                .then_some(handoff::TAKING_OVER);
+            if let Some(rules) = taking_over {
+                text.push_str(rules);
+                text.push('\n');
+            }
             text.push_str(&instruction);
             text.push('\n');
             // Blocked tasks are skipped by their state; `alm` tells when one may go on, or when a
@@ -2211,6 +2222,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "taskbag": root,
                     "tasks": listed,
                     "instruction": instruction,
+                    "taking_over": taking_over,
                     "blocked": blocked,
                     "handoff_rules": rules,
                     "project_notes": notes,

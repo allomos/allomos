@@ -37,8 +37,17 @@ pub const DEFAULT_TEMPLATE: &str = "# Handoff
 - **Uncommitted changes:** <!-- file, and why; or none -->
 - **Running:** <!-- what, port, how to restart it, safe to stop; or none -->
 - **Approvals in force:** <!-- what is approved, and what is not -->
+- **Already done, do not repeat:** <!-- operations with an outside effect that must not run twice (an email sent, a deployment, SQL applied, a hosted resource or remote created or changed); or none -->
 
 <!-- Keep each line short. Evidence (numbers, logs, versions) goes in the task's description, not here. -->
+";
+
+/// What `alm next` and `alm show` add when they show a task's handoff (Task-A03-23, approver
+/// 2026-10-16): the rules for the one taking over, not only for the one writing. `alm` checks
+/// nothing itself; the agent does ("alm tells; the agent checks").
+pub const TAKING_OVER: &str = "Taking over from a handoff:
+1. Check the real state before trusting the handoff: the worktree, branch and running processes it names (`git worktree list`, `git status -sb`, listening ports). What the previous session still holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the question with `alm wait`).
+2. What the handoff lists as already done is not done again. A change of agent, account or session keeps the approvals and what was done; it does not authorize repeating it.
 ";
 
 /// The default `project-notes.md`.
@@ -604,6 +613,32 @@ mod tests {
         assert!(a.created && b.created);
         assert_ne!(a.path, b.path);
         assert_eq!(list(&root).len(), 2);
+    }
+
+    /// The template asks for what must not run twice (Task-A03-23).
+    #[test]
+    fn the_template_lists_what_was_already_done() {
+        let restart = DEFAULT_TEMPLATE.split("## Restart details").nth(1).unwrap();
+        assert!(restart.contains("- **Already done, do not repeat:**"));
+        assert!(restart.contains("must not run twice"));
+        assert!(restart.contains("or none"));
+    }
+
+    /// The taking-over rules, in plain words (Task-A03-23).
+    #[test]
+    fn the_taking_over_rules_say_check_and_do_not_repeat() {
+        let flat = TAKING_OVER.split_whitespace().collect::<Vec<_>>().join(" ");
+        for words in [
+            "Check the real state before trusting the handoff",
+            "git worktree list",
+            "listening ports",
+            "still holds is not yours to change or remove",
+            "if unsure, ask the person",
+            "already done is not done again",
+            "keeps the approvals and what was done; it does not authorize repeating it",
+        ] {
+            assert!(flat.contains(words), "{words}");
+        }
     }
 
     #[test]
