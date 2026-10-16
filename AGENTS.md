@@ -11,7 +11,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 - **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
 - **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
-- **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the approver to approve it ([CODING_RULES § The `alm` command](docs/workflow/CODING_RULES.md#the-alm-command)).
+- **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the approver to approve it; refusing invalid input (an unknown ID, a bad date, the holder rule) is not such a check ([CODING_RULES § How `alm` behaves](docs/workflow/CODING_RULES.md#how-alm-behaves)).
 - **Decisions are made by the approver.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
 - **Routine choices are the agent's; real questions go to the approver.** Inside a card, decide names, file layout, how something is built within the card's scope, and small interface details with an obvious sensible default (anything cheap to undo); record each with `alm ai-decided`. Ask the approver first about what users will see and get used to, anything hard to undo (data formats, removing things), anything that changes the plan or another card, and anything with a cost or an outside effect (above). Before an automatic or loop run, the approver chooses quiet or normal mode from what `alm guide run-modes` prints (record it in your handoff); in a quiet run, never wait: park a real question with `alm wait <id> --on "<the question>"` and go on with the next ready card. Details: `alm guide tasks` (step 5) and `alm guide workflow`.
 
@@ -22,11 +22,9 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 | Everyday implementation, debugging, tests, docs, authorized commits | selected model, Medium reasoning | selected model, Medium effort where supported |
 | Difficult architecture, security, data-model or forecasting decisions; focused review of a risky change | same model, highest reasoning | same model, higher effort (Extra high; Max only for the hardest bounded question) |
 
-- One worker owns everyday progress within its card. Raise effort for a specific hard question, then return to routine effort. Model and effort are separate; never claim a model or effort switch that did not happen.
-- Delegate only bounded, independent work with exact file ownership and acceptance criteria. Do not duplicate reading, implementation or review across agents.
+- One worker owns everyday progress within its card. Raise effort for a specific hard question, then return to routine effort. Model and effort are separate; if an effort level cannot be set, say so once and keep the actual setting; never claim a model or effort switch that did not happen.
+- Delegate only bounded, independent work with exact file ownership, acceptance criteria and minimum checks; the delegate reports to the worker, not the approver. Do not duplicate reading, implementation or review across agents.
 - A provider or session change preserves decisions, approvals and evidence; it does not authorize repeating operations.
-
-Details and handoff contents: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md).
 
 ## Working procedure
 
@@ -129,7 +127,7 @@ This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.
 
 ## Handoff — write it continuously
 
-Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids>`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template, and the Git commands that share it; fill it in, plain words first, for any reader (evidence goes in the task's description), then run those commands. Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the approver the exact prompt for a new session. Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`). Rules: [docs/workflow/AI-WORKFLOW.md](docs/workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
+Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids>`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template, and the Git commands that share it; fill it in, plain words first, for any reader (evidence goes in the task's description), then run those commands. Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the approver the exact prompt for a new session, and do not start the next task in the same message (the approver decides whether to switch). Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`).
 
 ## Read by activity
 

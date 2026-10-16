@@ -16,7 +16,7 @@
 | [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Allomos project; proposed validation/adoption rules | contract |
 | [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
-| [workflow/AI-WORKFLOW.md](./workflow/AI-WORKFLOW.md) | Agent roles and effort, starting a session, handoff timing and contents, new-session rule, switching providers | contract |
+| [workflow/CODING_RULES.md](./workflow/CODING_RULES.md) | Rules for this repository's code: layout, versions, checks, how `alm` behaves, running and building the app. How agents work is told by `alm` and [AGENTS.md](../AGENTS.md) | contract |
 | [decisions/](./decisions/README.md) | One record per decision, with status (open / proposed / accepted) | decisions |
 | [discussions/](./discussions/) | Dated records of planning discussions with the owner | history |
 | [analysis/](./analysis/) | Analyses of reference material | analysis |

@@ -4,7 +4,7 @@
 //! `allomos-store`, and prints the result: plain lines for people, or one JSON object
 //! for agents (`--json`). It never asks for typed input, and never runs or reads Git: after a
 //! change it prints the Git commands for exactly the files that change wrote, and the agent runs
-//! them (decision 0017). The contract is in `docs/workflow/CODING_RULES.md` § The `alm` command.
+//! them (decision 0017). The contract is in `docs/workflow/CODING_RULES.md` § How `alm` behaves.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};

@@ -16,4 +16,4 @@ The session wrote a restart snapshot in this file. On 2026-10-04 its contents we
 
 ## Lesson
 
-A handoff updates the existing handoff file and the board; it does not create a new document. See [AI-WORKFLOW § Handoff](../workflow/AI-WORKFLOW.md#handoff-timing-and-contents).
+A handoff updates the existing handoff file and the board; it does not create a new document. See AI-WORKFLOW § Handoff (removed 2026-10-16).

@@ -22,7 +22,7 @@ Notable changes in the SSR project since the kickoff analysis:
 |---|---|
 | `AGENTS.md` always-on boundaries, AI working mode, working procedure, read by activity | [AGENTS.md](../../AGENTS.md), shortened and made project-neutral |
 | `CLAUDE.md` imports `AGENTS.md` | [CLAUDE.md](../../CLAUDE.md) |
-| `AI-WORKFLOW.md` roles, handoff timing, new-session rule, provider switch | [workflow/AI-WORKFLOW.md](../workflow/AI-WORKFLOW.md) |
+| `AI-WORKFLOW.md` roles, handoff timing, new-session rule, provider switch | workflow/AI-WORKFLOW.md (removed 2026-10-16) |
 | `AGENT_HANDOFF.md` structure | [AGENT_HANDOFF.md](../AGENT_HANDOFF.md), with a block template |
 | Card format, labels, claiming protocol, Now rules | `workflow/CARDS.md` (removed 2026-10-16) |
 | Board with session registry and waiting-on-owner table | [TASK_BOARD.md](../TASK_BOARD.md) |
