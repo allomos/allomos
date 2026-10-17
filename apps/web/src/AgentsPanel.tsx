@@ -18,8 +18,7 @@ import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { agentOpened } from "./ProgressDialog";
-import { agentFilesCommand, notSetUp } from "./agentSetupFlow";
-import { GROUPS } from "./agentPickerFlow";
+import { useSetupNotes } from "./AgentSetupNote";
 import type { Seen } from "./manualFlow";
 
 /** What happened when the panel closes. */
@@ -129,52 +128,8 @@ export function AgentsPanel({
     };
   }, [messenger, manual, before, project, taskbag]);
 
-  // Agents set up (Task-A03-24): read when the panel opens and again while it stays open, so the
-  // note goes away once the agent adds its line. Unreadable: no note (nothing to say).
-  const [setUp, setSetUp] = useState<string[] | null>(null);
-  const [promptCopied, setPromptCopied] = useState<string | null>(null);
-  const promptTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(promptTimer.current), []);
-  useEffect(() => {
-    let live = true;
-    const look = () =>
-      messenger
-        .agentsSetUp(taskbag)
-        .then((entries) => live && setSetUp(entries))
-        .catch(() => undefined);
-    void look();
-    const timer = window.setInterval(() => void look(), MANUAL_LOOK_MS);
-    return () => {
-      live = false;
-      window.clearInterval(timer);
-    };
-  }, [messenger, taskbag]);
-  const needSetup = setUp === null ? [] : notSetUp(GROUPS.map((g) => g.name), setUp);
-
-  const copyPrompt = async (group: string) => {
-    setError(null);
-    try {
-      await messenger.copyText(t("agents.setup_prompt", { command: agentFilesCommand(project, taskbag) }));
-      setPromptCopied(group);
-      window.clearTimeout(promptTimer.current);
-      promptTimer.current = window.setTimeout(() => setPromptCopied(null), COPIED_MS);
-    } catch (e) {
-      fail(e);
-    }
-  };
-
-  const setupNote = (group: string) =>
-    needSetup.includes(group) ? (
-      <div className="row start setup-note">
-        <span className="muted small">{t("agents.not_set_up")}</span>
-        <button type="button" className="link" onClick={() => void copyPrompt(group)} disabled={busy}>
-          {t("agents.copy_prompt")}
-        </button>
-        <span className="muted small" role="status">
-          {promptCopied === group ? t("manual.copied") : ""}
-        </span>
-      </div>
-    ) : null;
+  // Agents set up (Task-A03-24): the note under each agent not yet set up.
+  const { note: setupNote } = useSetupNotes(messenger, project, taskbag, (e) => fail(e));
 
   const copy = async () => {
     if (request === null) return;
@@ -305,7 +260,7 @@ export function AgentsPanel({
         onChoose={setChoice}
         disabled={busy}
         name="connect-agent"
-        groupNote={setupNote}
+        groupNote={(group) => setupNote(group, busy)}
         manual={
           <div className="manual">
             <p className="small">{rich("manual.intro", { path: <code>{project}</code> })}</p>
