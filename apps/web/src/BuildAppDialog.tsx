@@ -40,6 +40,8 @@ export function BuildAppDialog({
   const { t, rich, problem, language } = useI18n();
   const [folder, setFolder] = useState<FolderCheck | null>(null);
   const [description, setDescription] = useState("");
+  /** The description box is shown only while the person writes (the box was almost invisible). */
+  const [editing, setEditing] = useState(false);
   // The shared agent picker (Task-A05-07).
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   const [mode, setMode] = useState<RunMode>(FIRST_MODE);
@@ -145,18 +147,36 @@ export function BuildAppDialog({
                 </button>
               </div>
 
-              <h3>
-                <label htmlFor="build-description">{t("build.description_title")}</label>
-              </h3>
-              <textarea
-                id="build-description"
-                className="build-description"
-                rows={5}
-                value={description}
-                placeholder={t("build.description_placeholder")}
-                onChange={(e) => setDescription(e.currentTarget.value)}
-                disabled={locked}
-              />
+              <h3>{t("build.description_title")}</h3>
+              {editing ? (
+                <>
+                  <textarea
+                    id="build-description"
+                    className="build-description"
+                    rows={5}
+                    autoFocus
+                    value={description}
+                    aria-label={t("build.description_title")}
+                    placeholder={t("build.description_placeholder")}
+                    onChange={(e) => setDescription(e.currentTarget.value)}
+                    disabled={locked}
+                  />
+                  <div className="row start">
+                    <button type="button" onClick={() => setEditing(false)}>
+                      {t("build.description_done")}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="row start">
+                    <button type="button" onClick={() => setEditing(true)} disabled={locked}>
+                      {t(description.trim() === "" ? "build.description_write" : "build.description_edit")}
+                    </button>
+                  </div>
+                  {description.trim() !== "" && <p className="build-description-text">{description}</p>}
+                </>
+              )}
 
               <h3>{t("build.agent_title")}</h3>
               <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="build-agent" />
