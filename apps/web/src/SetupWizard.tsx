@@ -291,7 +291,7 @@ export function SetupWizard({
             <>
               {step.created && (
                 <>
-                  <p className="banner update" role="status">
+                  <p className="banner ok" role="status">
                     {/* One run of text: the banner lays out its children side by side. */}
                     <span>{rich("wizard.created_body", { path: <code>{step.opened.root}</code> })}</span>
                   </p>
