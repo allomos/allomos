@@ -292,7 +292,8 @@ export function SetupWizard({
               {step.created && (
                 <>
                   <p className="banner update" role="status">
-                    {rich("wizard.created_body", { path: <code>{step.opened.root}</code> })}
+                    {/* One run of text: the banner lays out its children side by side. */}
+                    <span>{rich("wizard.created_body", { path: <code>{step.opened.root}</code> })}</span>
                   </p>
                   <p className="muted">{t("wizard.git_agent")}</p>
                 </>
