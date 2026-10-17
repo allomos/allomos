@@ -9,7 +9,8 @@
 // and changes nothing until the person chooses Go ahead. Manual shows the same request with Copy.
 // An agent found on this computer with no line under `## Agents set up` in the project notes is
 // one more thing it does (Task-A03-24, approver 2026-10-17): the request then also asks for the
-// shared rules to be set up once (`alm guide agent-files`) and each agent recorded.
+// shared rules to be set up once (`alm guide agent-files`) and each agent recorded. A taskbag with
+// no tasks is too (approver 2026-10-17): the agent looks for the tasks the project already keeps.
 // `MoveCardsPanel` is the dialog's content, also shown as the setup wizard's step 4 when a
 // connected project has card files to move in (Task-A05-09).
 
@@ -31,6 +32,7 @@ export function MoveCardsDialog({
   found,
   moveIn,
   agents,
+  noTasks,
   onClose,
 }: {
   messenger: Messenger;
@@ -38,6 +40,8 @@ export function MoveCardsDialog({
   root: string;
   /** The agents not yet set up for the project (Task-A03-24). */
   agents?: string[];
+  /** The taskbag has no tasks yet: the agent looks for the project's own (Task-A03-24). */
+  noTasks?: boolean;
   /** What Allomos found: the tasks whose card file is still outside the taskbag. */
   found: CardRow[];
   /** An older taskbag renamed aside, whose tasks are to be moved in (Task-A01-45). */
@@ -50,7 +54,7 @@ export function MoveCardsDialog({
     <div className="overlay" role="presentation">
       <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
-        <MoveCardsPanel messenger={messenger} root={root} found={found} moveIn={moveIn} agents={agents} onClose={onClose} />
+        <MoveCardsPanel messenger={messenger} root={root} found={found} moveIn={moveIn} agents={agents} noTasks={noTasks} onClose={onClose} />
       </section>
     </div>
   );
@@ -64,6 +68,7 @@ export function MoveCardsPanel({
   found,
   moveIn,
   agents: setUp = [],
+  noTasks = false,
   onClose,
   actionsIn,
   cancelLabel,
@@ -76,6 +81,8 @@ export function MoveCardsPanel({
   moveIn?: MoveIn | null;
   /** The agents not yet set up for the project (Task-A03-24): the request also sets them up. */
   agents?: string[];
+  /** The taskbag has no tasks yet: the request asks the agent to look for the project's own. */
+  noTasks?: boolean;
   onClose: (message: string | null) => void;
   /** Where the buttons go (the wizard's bottom row); otherwise a row of their own. */
   actionsIn?: HTMLElement | null;
@@ -99,7 +106,7 @@ export function MoveCardsPanel({
 
   /** Whether card files are part of it: some were found, or nothing else is to be done (then the
    * agent looks for card files no link names, as before). */
-  const cardsPart = found.length > 0 || setUp.length === 0;
+  const cardsPart = !noTasks && (found.length > 0 || setUp.length === 0);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
@@ -116,7 +123,7 @@ export function MoveCardsPanel({
       agentOpened(root, moveIn ? "move_in" : "cards");
       const name = t(AGENT_KEY[agent]);
       // Only agents to set up: the request does nothing else, and the message says so.
-      const kind = moveIn ? "move" : cardsPart ? "cards" : "setup";
+      const kind = moveIn ? "move" : noTasks ? "empty" : cardsPart ? "cards" : "setup";
       if (tool?.how === "paste") {
         onClose(t(`${kind}.asked_paste`, { agent: name, keys: PASTE_KEYS }));
       } else {
@@ -209,6 +216,12 @@ export function MoveCardsPanel({
         </>
       )}
 
+      {request === null && !moveIn && noTasks && (
+        <>
+          <p>{t("empty.found")}</p>
+          <p className="muted small">{t("empty.body")}</p>
+        </>
+      )}
       {request === null && setUp.length > 0 && (
         <>
           <p>{t("setup.found", { agents: setUp.join(language === "en" ? ", " : "、") })}</p>

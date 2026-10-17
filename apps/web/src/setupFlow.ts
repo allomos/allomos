@@ -75,18 +75,21 @@ export type StepFourPage = "agents" | "cards" | "done";
 
 /** Step 4's page: Update the taskbag while an older taskbag's tasks wait to be moved in
  * (`movingIn`, Task-A01-45: the same panel as for card files); else Connect with the agents (or its
- * update panel) when agents are not told, there are no tasks yet, Allomos's instructions are out
- * of date (`needsUpdate`), or the person chose Connect an agent anyway; else Update the taskbag
- * while card files are outside it; else Setup done. */
+ * update panel) when agents are not told, Allomos's instructions are out of date (`needsUpdate`),
+ * or the person chose Connect an agent anyway; else Update the taskbag while card files are outside
+ * it, the taskbag has no tasks yet, or an agent found on this computer is not registered under
+ * `## Agents set up` (`agentsMissing`; approver 2026-10-17, Task-A03-24: a connected project is
+ * told to update the taskbag, not to connect again); else Setup done. */
 export function stepFourPage(
   setup: SetupState,
   needsUpdate: boolean,
   cardsOutside: number,
   anyway: boolean,
   movingIn = false,
+  agentsMissing = 0,
 ): StepFourPage {
   if (anyway) return "agents";
   if (movingIn && setup.project_folder) return "cards";
-  if (needsUpdate || !setup.project_folder || offerConnect(setup, false)) return "agents";
-  return cardsOutside > 0 ? "cards" : "done";
+  if (needsUpdate || !setup.project_folder || !(setup.agents.codex && setup.agents.claude)) return "agents";
+  return cardsOutside > 0 || !setup.has_tasks || agentsMissing > 0 ? "cards" : "done";
 }

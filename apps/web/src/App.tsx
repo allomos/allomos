@@ -594,6 +594,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             found={cardRows(opened)}
             moveIn={movingCards.moveIn}
             agents={notSetUpYet}
+            noTasks={(opened.loaded.taskbag?.tasks.length ?? 1) === 0}
             onClose={(message) => {
               setMovingCards(null);
               if (message) setNotices((list) => [...list, { text: message }]);
