@@ -2,7 +2,7 @@
 
 > **Last updated:** 2026-10-06
 
-**Card status no longer lives here.** Since task `A01-07` (2026-10-06) Allomos tracks itself: every card is a task in Allomos's taskbag (since 2026-10-12 at `../allomos-taskbag/.allomos/taskbag`, outside this repository; [report](./allomos-conversion.md)), changed only with the `alm` command. See it with `alm list` (who holds what: `alm list --state in_progress`; what to pick up: `alm next`) or by opening this folder in the Allomos app. Rules: `alm guide` (terms, tasks, workflow). Each task's full detail lives in its description in the taskbag (`alm show <id>`); the card files in `docs/tasks/` were moved there on 2026-10-16 (`A00-30`).
+**Card status no longer lives here.** Since task `A01-07` (2026-10-06) Allomos tracks itself: every card is a task in Allomos's taskbag (since 2026-10-12 at `../allomos-taskbag/.allomos/taskbag`, outside this repository; [report](./allomos-conversion.md)), changed only with the `alm` command. See it with `alm list` (who holds what: `alm list --state in_progress`; what to pick up: `alm next`) or by opening this folder in the Allomos app. Rules: `alm guide` (terms, tasks, workflow). Each task's full detail lives in its description in the taskbag (`alm show <id>`); the card files that were in `docs/tasks/` sit beside their tasks in the taskbag as `tasks/<id>/card.md`, opened by the description's `Card:` link (`A00-30`, 2026-10-16/17).
 
 This page keeps only **Now** and **Waiting on the owner**, until it is removed or generated from the taskbag (owner, 2026-10-06).
 

@@ -1,6 +1,6 @@
 # Moving Allomos's tasks into the new taskbag (2026-10-12)
 
-*Since 2026-10-16 (`A00-30`) each card file's content lives in its task's description in the taskbag, and `docs/tasks/` is gone; the card links below are history.*
+*Since 2026-10-17 (`A00-30`) each card file lives in the taskbag beside its task, as `tasks/<id>/card.md`, and the description's link is `Card: [card.md](card.md)`; the card links below are history.*
 
 **What happened, in plain words:** until today this project's tasks lived in a taskbag inside this repository (`.allomos/taskbag/`). They were copied, with their exact status, into the taskbag Allomos set up next to this repository, `../allomos-taskbag/.allomos/taskbag` (its own Git repository, branch `master`). The old in-repository taskbag was then removed, so status has one home again. Every task was written with the `alm` command; no taskbag file was edited by hand. The owner approved the plan in the Allomos app (`alm confirm`, "Move tasks into Allomos").
 

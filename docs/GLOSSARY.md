@@ -7,7 +7,7 @@ Plain meanings of the words used in Allomos's documents and product.
 | **Agent** | An AI coding assistant working on tasks — Claude Code or Codex. In Allomos also a project member type that acts through a token and cannot approve. |
 | **Session** | One running conversation of an agent, usually in its own git worktree and branch (e.g. `claude/w01-core-model-3f2a`). |
 | **Worktree** | A separate working folder of the same git repository, checked out on its own branch, so several sessions can work at once without disturbing each other. |
-| **Card / task** | One unit of work with one observable outcome. In this repo a card is a task in Allomos's taskbag, with its full detail in the task's description (until 2026-10-16 a file in `docs/tasks/`); in the product it is a task record. |
+| **Card / task** | One unit of work with one observable outcome. In this repo a card is a task in Allomos's taskbag, with its full detail in the task's description and, for older tasks, a card file beside it in the taskbag (`tasks/<id>/card.md`; until 2026-10-17 in `docs/tasks/`); in the product it is a task record. |
 | **Area** | *What* part of the product a task belongs to, named after what users can do (Allomos's own: A00 Planning … A07 Platform & release; `alm list`). Each task has exactly one area. Formerly "workstream" — the SSR project's word, which Allomos maps to area. Other tools say epic, component or track. Renameable per project (R90). |
 | **State** | Where a task is in its life: backlog, ready, in progress, waiting, blocked, done, dropped. |
 | **Label** | The last *proven* step of a task's progress, from a fixed ladder (e.g. implemented → locally verified → deployed and verified → human verified). The only allowed progress claim. |
