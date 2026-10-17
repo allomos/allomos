@@ -6,30 +6,15 @@
 // into the agent (connect, then the goal prompt); the person presses Enter. Manual shows the same
 // request with Copy.
 
-import type { Agent, Inspection } from "./types";
+import type { Inspection } from "./types";
 
 /** The Manual choice: no agent is opened; the person copies the request. */
 export const MANUAL = "manual";
-
-/** The agent tools in the order the first found one is chosen: as in Connect with the agents
- * (the app before the terminal; Claude before Codex). */
-export const TOOL_ORDER: Agent["id"][] = ["claude_app", "claude_cli", "codex_app", "codex_cli"];
 
 export type RunMode = "quiet" | "normal";
 
 /** Quiet is ticked first (A03-25, approver 2026-10-16). */
 export const FIRST_MODE: RunMode = "quiet";
-
-/** The found tools, in [`TOOL_ORDER`], followed by Manual. */
-export function agentChoices(found: Agent[]): string[] {
-  const ids = TOOL_ORDER.filter((id) => found.some((a) => a.id === id));
-  return [...ids, MANUAL];
-}
-
-/** The choice ticked first: the first found tool, else Manual. */
-export function firstAgent(found: Agent[]): string {
-  return agentChoices(found)[0];
-}
 
 /** What the chosen folder allows: only an empty one (nothing but hidden entries) is used, so the
  * agent builds the app in a folder of its own. */

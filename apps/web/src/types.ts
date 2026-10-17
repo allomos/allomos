@@ -290,6 +290,22 @@ export interface ConfirmRequest {
   until: number;
 }
 
+/** What an AI agent reports about a job the app gave it (`alm progress`, Task-A05-08). */
+export interface Progress {
+  /** One report per agent. */
+  id: string;
+  title: string;
+  step?: string;
+  done?: number;
+  of?: number;
+  /** The job is over: what happened. */
+  finished?: string;
+  from?: string;
+  /** Seconds since 1970. */
+  started: number;
+  updated: number;
+}
+
 /** Where the open taskbag stands in the open-folder flow (crates/store/src/setup.rs). */
 export interface SetupState {
   /** The folder holding `.allomos/`. */

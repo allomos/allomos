@@ -32,6 +32,7 @@ mod convert;
 pub mod events;
 mod guide;
 pub mod handoff;
+pub mod progress;
 mod settings;
 mod setup;
 pub mod versions;

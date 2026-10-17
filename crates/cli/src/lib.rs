@@ -139,6 +139,25 @@ enum Command {
         #[arg(long, default_value_t = 600, value_name = "SECONDS")]
         timeout: u64,
     },
+    /// Tell the person in the Allomos app what you are doing on a job it gave you: the app shows
+    /// a progress popup. Start with --title and --step, report each step, and end with --finished.
+    Progress {
+        /// The job (needed to start one; later reports keep it).
+        #[arg(long)]
+        title: Option<String>,
+        /// What you are doing now.
+        #[arg(long)]
+        step: Option<String>,
+        /// Steps done so far, of --of.
+        #[arg(long, value_name = "N")]
+        done: Option<u32>,
+        /// All steps, when you know the count.
+        #[arg(long, value_name = "N")]
+        of: Option<u32>,
+        /// The job is over: what happened.
+        #[arg(long, value_name = "TEXT")]
+        finished: Option<String>,
+    },
     /// List tasks, grouped by area (or by iteration with --by iteration).
     List {
         #[arg(long)]
@@ -535,6 +554,7 @@ impl Command {
             | Command::Brief
             | Command::Guide { .. }
             | Command::Confirm { .. }
+            | Command::Progress { .. }
             | Command::List { .. }
             | Command::Human { .. }
             | Command::MoveIn { .. }
@@ -579,6 +599,7 @@ impl Command {
                 | Command::History { .. }
                 | Command::Next { .. }
                 | Command::Confirm { .. }
+                | Command::Progress { .. }
                 | Command::Brief
                 | Command::Guide { .. }
                 | Command::Handoffs { .. }
@@ -590,6 +611,7 @@ impl Command {
         match self {
             Command::Init { .. } => "init",
             Command::Confirm { .. } => "confirm",
+            Command::Progress { .. } => "progress",
             Command::Labels { .. } => "labels",
             Command::TaskLanguage { .. } => "task-language",
             Command::Brief => "brief",
@@ -1532,6 +1554,43 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             plan,
             timeout,
         } => confirm(cli, cwd, title, plan, *timeout),
+        Command::Progress {
+            title,
+            step,
+            done,
+            of,
+            finished,
+        } => {
+            // Passed on to the app as it is (Task-A05-08); alm checks nothing.
+            let project = confirm_project(cli, cwd);
+            let p = allomos_store::progress::report(
+                &project,
+                cli.holder.as_deref(),
+                &allomos_store::progress::Report {
+                    title: title.as_deref(),
+                    step: step.as_deref(),
+                    done: *done,
+                    of: *of,
+                    finished: finished.as_deref(),
+                },
+            )?;
+            let count = match (p.done, p.of) {
+                (Some(d), Some(o)) => format!(" ({d} of {o})"),
+                _ => String::new(),
+            };
+            let text = match &p.finished {
+                Some(f) => format!("Shown in the Allomos app: {}: finished: {f}\n", p.title),
+                None => format!(
+                    "Shown in the Allomos app: {}: {}{count}\n",
+                    p.title,
+                    p.step.as_deref().unwrap_or("…")
+                ),
+            };
+            Ok(Done::new(
+                json!({ "progress": p, "project": project }),
+                text,
+            ))
+        }
         Command::Brief => {
             // With a taskbag, the section names it when it is outside the project folder.
             let text = match locate(cli, cwd) {

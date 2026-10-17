@@ -5,10 +5,11 @@ import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { ProgressDialog } from "./ProgressDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
 import { MoveCardsDialog } from "./MoveCardsDialog";
-import { cardsNotice } from "./moveCardsFlow";
+import { cardRows, cardsNotice } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
@@ -130,7 +131,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [notices, setNotices] = useState<Note[]>([]);
   /** The start page's Build a new app… dialog (Task-A03-25-02). */
   const [building, setBuilding] = useState(false);
-  /** Move the cards in… is open (Task-A00-30): the notice's button or File → Move the Cards In…. */
+  /** Update the taskbag… is open (Task-A00-30): the notice's button or File → Update the Taskbag…. */
   const [movingCards, setMovingCards] = useState(false);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
@@ -405,7 +406,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       const root = openedRef.current?.root;
       if (root) openWizard({ resume: { root, at: 4 } });
     });
-    // File → Move the Cards In… (enabled while a taskbag is open, Task-A00-30).
+    // File → Update the Taskbag… (enabled while a taskbag is open, Task-A00-30).
     const stopCards = messenger.onMoveCardsMenu(() => {
       if (openedRef.current) setMovingCards(true);
     });
@@ -516,8 +517,8 @@ export function App({ messenger }: { messenger: Messenger }) {
             onOlder={setOlderShown}
           />
         )}
-        {/* Card files an agent reported as still in the project folder (Task-A00-30): Allomos looks
-            for none itself. */}
+        {/* Card files still in the project folder (Task-A00-30): named by the tasks' Card: links
+            (Task-A01-51) or reported by an agent. */}
         {opened && cardsNotice(opened) > 0 && (
           <div className="banner update" role="status">
             <span>{t("cards.notice", { count: cardsNotice(opened) })}</span>
@@ -530,6 +531,7 @@ export function App({ messenger }: { messenger: Messenger }) {
           <MoveCardsDialog
             messenger={messenger}
             root={opened.root}
+            found={cardRows(opened)}
             onClose={(message) => {
               setMovingCards(false);
               if (message) setNotices((list) => [...list, { text: message }]);
@@ -610,6 +612,10 @@ export function App({ messenger }: { messenger: Messenger }) {
             }}
           />
         )}
+
+        {/* What an agent reports with `alm progress` while it works (Task-A05-08); before the
+            questions, so a question shows on top. */}
+        {opened && <ProgressDialog messenger={messenger} project={projectFolder(opened.root)} root={opened.root} />}
 
         {/* Questions an agent asks with `alm confirm` about the folder this window shows (Task-A05-02). */}
         {/* `alm confirm` asks about the folder holding `.allomos/`, where its --taskbag points. */}

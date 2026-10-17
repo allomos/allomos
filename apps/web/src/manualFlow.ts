@@ -18,12 +18,6 @@ export const COPIED_MS = 2000;
 /** How often the Manual choice looks whether the AI has finished. */
 export const MANUAL_LOOK_MS = 2000;
 
-/** The choice ticked first: the first agent group with a found tool, else Manual (which is
- * offered even when no known agent is found). */
-export function firstChoice(foundGroups: string[]): string {
-  return foundGroups[0] ?? MANUAL;
-}
-
 /** The step's buttons besides Not now. `primary`: Connect opens the chosen agent; Done closes
  * the Manual choice. `write`: Allomos may add the instructions itself (no agent found, and
  * nothing is out of date: an update is the agent's work). */

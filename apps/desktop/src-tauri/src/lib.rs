@@ -14,6 +14,7 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use allomos_core::{Loaded, Problem};
+use allomos_store::progress::{Job, with_progress_in};
 use allomos_store::{
     AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
     add_readme_if_empty, agent_connect_request_in, agent_setup, agent_setup_request_in,
@@ -44,7 +45,7 @@ struct Opened {
     /// tab's sort menu orders by it.
     last_changed: std::collections::BTreeMap<String, String>,
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
-    /// "N tasks keep their card files in the project folder" with **Move the cards in…**.
+    /// "N tasks keep their card files in the project folder" with **Update the taskbag…**.
     cards_outside: Vec<allomos_core::card::Outside>,
 }
 
@@ -651,6 +652,25 @@ fn connect_plan(
     project: &Path,
     taskbag: &Path,
 ) -> Vec<(String, String)> {
+    connect_plan_with(agents, language, project, taskbag, true)
+}
+
+/// [`connect_plan`]; `progress`: the first agent's request asks it to report its progress to the
+/// app (Task-A05-08), unless a larger job's request does (Build a new app…).
+fn connect_plan_with(
+    agents: &[String],
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    progress: bool,
+) -> Vec<(String, String)> {
+    let job = |job: Job, request: String| {
+        if progress {
+            with_progress_in(language, job, &request)
+        } else {
+            request
+        }
+    };
     let note = agents::shared_note(agents, language);
     // Tasks from an older Allomos's taskbag to move in (Task-A01-45), or an out-of-date section
     // (Task-A01-25): the first agent is asked to do that instead.
@@ -661,12 +681,22 @@ fn connect_plan(
         .iter()
         .enumerate()
         .map(|(i, id)| {
+            // The first agent does the job and reports its progress to the app (Task-A05-08).
             let request = if let (0, Some(m)) = (i, &move_in) {
-                allomos_store::agent_move_in_request_in(language, project, taskbag, m)
+                job(
+                    Job::MoveIn,
+                    allomos_store::agent_move_in_request_in(language, project, taskbag, m),
+                )
             } else if let (0, Some(check)) = (i, &update) {
-                versions::agent_update_request_in(language, project, taskbag, check)
+                job(
+                    Job::Update,
+                    versions::agent_update_request_in(language, project, taskbag, check),
+                )
             } else if i == 0 {
-                agent_connect_request_in(language, project, taskbag)
+                job(
+                    Job::Connect,
+                    agent_connect_request_in(language, project, taskbag),
+                )
             } else {
                 agent_setup_request_in(language, project, taskbag)
             };
@@ -746,11 +776,16 @@ fn build_app_plan(
     description: &str,
     quiet: bool,
 ) -> String {
-    let connect = connect_plan(&[agent.to_string()], language, project, taskbag)
+    let connect = connect_plan_with(&[agent.to_string()], language, project, taskbag, false)
         .remove(0)
         .1;
     let goal = allomos_store::goal_request_in(language, description, quiet);
-    format!("{}\n\n{goal}", connect.trim_end())
+    // The whole job is building the app: one progress request, at the end.
+    with_progress_in(
+        language,
+        Job::BuildApp,
+        &format!("{}\n\n{goal}", connect.trim_end()),
+    )
 }
 
 /// Check what **Build a new app…** was given: a project folder and a description.
@@ -1058,7 +1093,11 @@ async fn move_cards(agent: String, taskbag: PathBuf, language: String) -> Result
     let Some(chosen) = found.iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    let request = allomos_store::cards::agent_move_cards_request_in(&language, &project, &taskbag);
+    let request = with_progress_in(
+        &language,
+        Job::Cards,
+        &allomos_store::cards::agent_move_cards_request_in(&language, &project, &taskbag),
+    );
     agents::ask(chosen, &project, &request)
 }
 
@@ -1067,8 +1106,25 @@ async fn move_cards(agent: String, taskbag: PathBuf, language: String) -> Result
 #[tauri::command]
 fn move_cards_request(taskbag: PathBuf, language: String) -> String {
     let project = allomos_store::versions::project_folder(&taskbag);
-    let request = allomos_store::cards::agent_move_cards_request_in(&language, &project, &taskbag);
+    let request = with_progress_in(
+        &language,
+        Job::Cards,
+        &allomos_store::cards::agent_move_cards_request_in(&language, &project, &taskbag),
+    );
     agents::link_request(&request, alm_command::own().as_deref())
+}
+
+/// What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08), the
+/// earliest started first.
+#[tauri::command]
+fn progress_reports(project: PathBuf) -> Vec<allomos_store::progress::Progress> {
+    allomos_store::progress::reports(&project)
+}
+
+/// The person closed a finished (or silent) report: remove it.
+#[tauri::command]
+fn dismiss_progress(project: PathBuf, id: String) {
+    allomos_store::progress::dismiss(&project, &id)
 }
 
 /// Questions an agent is asking about `project` with `alm confirm`, oldest first. Listing them
@@ -1357,7 +1413,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let move_cards = MenuItem::with_id(
         app,
         MOVE_CARDS_ID,
-        "Move the Cards In…",
+        "Update the Taskbag…",
         // Enabled by the window while a taskbag is open.
         false,
         None::<&str>,
@@ -1579,6 +1635,8 @@ pub fn run() {
             agent_status,
             confirm_requests,
             answer_confirm_request,
+            progress_reports,
+            dismiss_progress,
             project_setup,
             set_project_folder,
             set_connect_enabled,
@@ -1690,7 +1748,14 @@ mod tests {
         // Renewed: the usual connect request again.
         std::fs::write(dir.join("AGENTS.md"), allomos_store::agent_section()).unwrap();
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
-        assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
+        assert_eq!(
+            plan[0].1,
+            with_progress_in(
+                "en",
+                Job::Connect,
+                &agent_connect_request_in("en", &dir, &taskbag)
+            )
+        );
         assert!(!version_check(taskbag).unwrap().needs_update());
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -1759,7 +1824,14 @@ mod tests {
         )
         .unwrap();
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
-        assert_eq!(plan[0].1, agent_connect_request_in("en", &dir, &taskbag));
+        assert_eq!(
+            plan[0].1,
+            with_progress_in(
+                "en",
+                Job::Connect,
+                &agent_connect_request_in("en", &dir, &taskbag)
+            )
+        );
         assert!(!version_check(taskbag).unwrap().needs_update());
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -1779,7 +1851,11 @@ mod tests {
         }
         assert_eq!(
             manual_plan("en", &dir, &taskbag),
-            agent_connect_request_in("en", &dir, &taskbag)
+            with_progress_in(
+                "en",
+                Job::Connect,
+                &agent_connect_request_in("en", &dir, &taskbag)
+            )
         );
         // Out of date: the update request, as automatic sending.
         std::fs::write(dir.join("AGENTS.md"), "## Tasks: Allomos\n\nalm next\n").unwrap();
@@ -1807,8 +1883,17 @@ mod tests {
                 let connect = agent_connect_request_in(language, &dir, &taskbag);
                 assert!(auto.starts_with(connect.trim_end()), "{language}");
                 let goal = allomos_store::goal_request_in(language, description, quiet);
-                assert!(auto.ends_with(&goal), "{language}");
-                assert_eq!(auto, format!("{}\n\n{goal}", connect.trim_end()));
+                assert!(auto.contains(goal.trim_end()), "{language}");
+                // One progress request, for the whole job (Task-A05-08).
+                assert_eq!(
+                    auto,
+                    with_progress_in(
+                        language,
+                        Job::BuildApp,
+                        &format!("{}\n\n{goal}", connect.trim_end())
+                    )
+                );
+                assert_eq!(auto.matches("alm progress --finished").count(), 1);
                 // The goal prompt in the task language, the description and the run mode.
                 assert!(
                     auto.contains(allomos_store::goal(language).unwrap()),
@@ -1881,7 +1966,12 @@ mod tests {
     fn the_first_agent_also_looks_for_tasks() {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(allomos_store::DEFAULT_DIR);
-        let connect = agent_connect_request_in("en", &project, &taskbag);
+        // Only the first agent does the job, so only it reports progress (Task-A05-08).
+        let connect = with_progress_in(
+            "en",
+            Job::Connect,
+            &agent_connect_request_in("en", &project, &taskbag),
+        );
         let setup = agent_setup_request_in("en", &project, &taskbag);
 
         // One agent: the connect request, with no note.

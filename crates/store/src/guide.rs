@@ -256,6 +256,10 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
 Ask the person:
 - `alm confirm --title \"<heading>\" --plan <file.md>`: shows your plan in the Allomos app and
   waits; exit 0 means go ahead, anything else means change nothing.
+- `alm progress --title \"<job>\" --step \"<what now>\" [--done <n> --of <total>]`, then
+  `alm progress --step …` at each step and `alm progress --finished \"<what happened>\"` at the
+  end: on a job the person gave you from the Allomos app, the app shows your progress in a popup.
+  `alm` only passes it on.
 
 About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:
@@ -302,14 +306,14 @@ until the person says Go ahead.
    file, so the person sees it even before you ask: `alm cards found <id>=<path> <id>=<path> …`
    (each path relative to the project folder; several in one command; a report wins over the
    task's link). The Allomos app shows \"N tasks keep their card files in the project folder\"
-   with **Move the cards in…**. `alm cards` lists them; `alm cards found <id>=` withdraws a
+   with **Update the taskbag…**. `alm cards` lists them; `alm cards found <id>=` withdraws a
    report.
 3. The one question. Write the plan in Markdown to a file outside the project: every card file
    and the task it goes to (`tasks/<id>/card.md`); the links that change (each description's
    `Card:` link; links inside a card that are relative to its old place; links in other documents
    to a card's old place); the originals you will remove from the project folder; card files
    without a task; tasks you cannot change (an open task held by another session: its holder
-   moves it later); and how you will commit. Then `alm confirm --title \"Move the cards in\"
+   moves it later); and how you will commit. Then `alm confirm --title \"Update the taskbag\"
    --plan <file>`. Exit code 0 means go ahead with the whole plan; any other means change
    nothing: tell the person and stop. (In a quiet run, do not use `alm confirm`: park the plan as
    a question with `alm wait`.)
