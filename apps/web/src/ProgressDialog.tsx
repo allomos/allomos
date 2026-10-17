@@ -15,6 +15,7 @@ import type { Progress } from "./types";
 import { WAITING_ID, arrange, fraction, progressState, stillWaiting } from "./progressFlow";
 import type { Job, Waiting } from "./progressFlow";
 import type { Key } from "./i18n";
+import { IconLoader } from "./IconLoader";
 
 const JOB_EVENT = "allomos:agent-opened";
 
@@ -122,7 +123,7 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
         <div className="progress-chips">
           {chips.map((p) => (
             <button key={p.id} type="button" className="progress-chip" onClick={() => toFront(p.id)}>
-              {progressState(p, now) === "working" && <span className="spinner" aria-hidden="true" />}
+              {progressState(p, now) === "working" && <IconLoader />}
               {progressState(p, now) === "finished"
                 ? t("progress.chip_finished", { title: p.title })
                 : `${p.title}: ${p.step ?? t("progress.starting")}${count(p)}`}
@@ -153,7 +154,7 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
             ) : (
               <>
                 <p className="searching" role="status">
-                  {progressState(popup, now) === "working" && <span className="spinner" aria-hidden="true" />}
+                  {(popup.id === WAITING_ID || progressState(popup, now) === "working") && <IconLoader />}
                   <span>
                     {popup.step ?? t("progress.starting")}
                     {count(popup)}
