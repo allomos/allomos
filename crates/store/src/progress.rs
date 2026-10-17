@@ -94,10 +94,10 @@ fn read(path: &Path) -> Option<Progress> {
     serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
 }
 
-/// Record `report` as `from`'s progress in `project`. A report while the agent's job is still
-/// open updates it (a missing title, step or count keeps the last one); otherwise it starts a new
-/// job, which needs a title. Refused: no title for a new job, `--done` above `--of`, or nothing
-/// to say.
+/// Record `report` as `from`'s progress in `project`. A report with a title starts a new job (an
+/// earlier one left open, for example by an agent that stopped, is replaced, counts and all).
+/// Without one, it updates the agent's open job (a missing step or count keeps the last one);
+/// with no open job it is refused. Also refused: `--done` above `--of`, or nothing to say.
 pub fn report(project: &Path, from: Option<&str>, report: &Report) -> Result<Progress, Problem> {
     let usage = |detail: &str| Problem::BadUsage {
         detail: detail.to_string(),
@@ -116,7 +116,7 @@ pub fn report(project: &Path, from: Option<&str>, report: &Report) -> Result<Pro
     let dir = progress_dir(project);
     let id = key(from);
     let path = dir.join(format!("{id}.json"));
-    let open = read(&path).filter(|p| p.finished.is_none());
+    let open = read(&path).filter(|p| p.finished.is_none() && title.is_none());
     let at = now();
     let mut p = match open {
         Some(p) => p,
@@ -341,6 +341,31 @@ mod tests {
             report(&dir, me, &Report::default()),
             Err(Problem::BadUsage { .. })
         ));
+        // Naming the job again starts it afresh: the old step and count are gone.
+        let again = report(
+            &dir,
+            me,
+            &Report {
+                title: Some("Update the taskbag"),
+                step: Some("Reading"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (again.step.as_deref(), again.done, again.of),
+            (Some("Reading"), None, None)
+        );
+        report(
+            &dir,
+            me,
+            &Report {
+                done: Some(2),
+                of: Some(3),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         // Another agent has its own report.
         report(
             &dir,
