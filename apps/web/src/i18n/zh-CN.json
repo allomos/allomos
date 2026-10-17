@@ -245,7 +245,7 @@
   "wizard.next": "下一步",
   "wizard.cancel": "取消",
   "wizard.created_title": "任务包已建立",
-  "wizard.created_body": "新的空任务包位于 {path}。",
+  "wizard.created_body": "「换肩」在 {path} 中新建了一个空任务包，并将使用它。",
   "project.line": "项目文件夹：{path}",
   "connect.tasks": "这个智能体还会查找项目已有的任务，例如任务看板、卡片文件或待办清单。如果找到，它会在「换肩」里给你看计划，只有你选择“继续”后才会把任务搬进任务包。",
   "welcome.eyebrow": "{name} · 在 AI 智能体和队友之间来回切换",

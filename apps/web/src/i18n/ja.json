@@ -245,7 +245,7 @@
   "wizard.next": "次へ",
   "wizard.cancel": "キャンセル",
   "wizard.created_title": "タスクバッグを作りました",
-  "wizard.created_body": "新しい空のタスクバッグは {path} にあります。",
+  "wizard.created_body": "「肩代」は {path} に新しい空のタスクバッグを作り、これを使います。",
   "project.line": "プロジェクトのフォルダー：{path}",
   "connect.tasks": "このエージェントは、プロジェクトがすでに持っているタスク（タスクボード、カードのファイル、TODO リストなど）も探します。見つかれば、「肩代」の画面に計画を表示し、あなたが「進める」を選んだときだけタスクバッグに移します。",
   "welcome.eyebrow": "{name} · AI エージェントと仲間のあいだを行き来する",

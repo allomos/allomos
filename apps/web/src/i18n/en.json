@@ -245,7 +245,7 @@
   "wizard.next": "Next",
   "wizard.cancel": "Cancel",
   "wizard.created_title": "Taskbag created",
-  "wizard.created_body": "The new, empty taskbag is in {path}.",
+  "wizard.created_body": "Allomos created a new, empty taskbag in {path} and will use it.",
   "project.line": "Project folder: {path}",
   "connect.tasks": "The agent will also look for tasks the project already keeps, such as a task board, card files or a to-do list. If it finds some, it shows you its plan here in Allomos and moves them into the taskbag only if you choose Go ahead.",
   "welcome.eyebrow": "{name} · Shift between AI agents and teammates",
