@@ -100,8 +100,9 @@ button.link:hover { text-decoration: underline; }
 /* Link buttons sit at the top of a column elsewhere; in a line of text they sit in the middle. */
 .agent-line button.link, .agents .row button.link { align-self: center; font-size: inherit; line-height: inherit; }
 .agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-/* Update the taskbag…: what Allomos found; a long list scrolls (Task-A01-51). */
-.card-found { margin: 0 0 8px; padding: 6px 8px 6px 24px; max-height: 160px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 2px; }
+/* Update the taskbag…: what Allomos found (Task-A01-51). */
+/* About 4 rows, then it scrolls; never squeezed by the wizard's body (flex: none). */
+.card-found { flex: none; box-sizing: border-box; margin: 0 0 8px; padding: 6px 8px 6px 24px; line-height: 1.5; max-height: calc(6em + 20px); overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; display: grid; align-content: start; gap: 2px; }
 .card-found code { overflow-wrap: anywhere; }
 .agent-tools { list-style: none; margin: 4px 0 0; padding: 0 0 0 24px; display: grid; gap: 4px; }
 .searching { display: flex; align-items: center; gap: 8px; }
