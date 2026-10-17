@@ -134,10 +134,10 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
               </p>
             )}
             {progressState(popup, now) === "finished" ? (
-              // The agent's own words (`alm progress --finished`), as plain text.
-              <p className="progress-finished" role="status">
+              // The agent's own words (`alm progress --finished`), quoted as such.
+              <blockquote className="progress-finished" role="status">
                 <span aria-hidden="true">✓</span> <span>{popup.finished}</span>
-              </p>
+              </blockquote>
             ) : (
               <>
                 <p className="searching" role="status">
