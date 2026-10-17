@@ -75,6 +75,8 @@ export function MoveCardsPanel({
   /** Manual: the request to copy. */
   const [request, setRequest] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** The list of what Allomos found, in a popup of its own (approver, 2026-10-17). */
+  const [listing, setListing] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
@@ -163,14 +165,11 @@ export function MoveCardsPanel({
         <>
           <p>{found.length > 0 ? t("cards.found", { count: found.length }) : t("cards.found_none")}</p>
           {found.length > 0 && (
-            <ul className="card-found small">
-              {found.map((c) => (
-                <li key={c.task}>
-                  <strong>{c.task}</strong> {c.title} — <code>{c.path}</code>
-                  {c.reported && <span className="muted"> ({t("cards.reported")})</span>}
-                </li>
-              ))}
-            </ul>
+            <p>
+              <button type="button" onClick={() => setListing(true)}>
+                {t("cards.show_list", { count: found.length })}
+              </button>
+            </p>
           )}
           <p>{t("cards.update")}</p>
           <p className="muted small">{t("cards.body")}</p>
@@ -185,6 +184,29 @@ export function MoveCardsPanel({
       {error && <p className="banner error">{error}</p>}
 
       {actionsIn ? createPortal(actions, actionsIn) : actionsIn === undefined && <div className="row">{actions}</div>}
+
+      {listing &&
+        createPortal(
+          <div className="overlay above" role="presentation">
+            <section className="dialog card-list-dialog" role="dialog" aria-modal="true" aria-labelledby="cards-list-title">
+              <h2 id="cards-list-title">{t("cards.list_title", { count: found.length })}</h2>
+              <ul className="dialog-body card-found small">
+                {found.map((c) => (
+                  <li key={c.task}>
+                    <strong>{c.task}</strong> {c.title} — <code>{c.path}</code>
+                    {c.reported && <span className="muted"> ({t("cards.reported")})</span>}
+                  </li>
+                ))}
+              </ul>
+              <div className="row">
+                <button type="button" className="primary" onClick={() => setListing(false)}>
+                  {t("progress.close")}
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

@@ -101,8 +101,12 @@ button.link:hover { text-decoration: underline; }
 .agent-line button.link, .agents .row button.link { align-self: center; font-size: inherit; line-height: inherit; }
 .agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 /* Update the taskbag…: what Allomos found (Task-A01-51). */
-/* About 4 rows, then it scrolls; never squeezed by the wizard's body (flex: none). */
-.card-found { flex: none; box-sizing: border-box; margin: 0 0 8px; padding: 6px 8px 6px 24px; line-height: 1.5; max-height: calc(6em + 20px); overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; display: grid; align-content: start; gap: 2px; }
+/* The list's own popup: scrolls inside the dialog. */
+.card-found { margin: 0; padding: 0 0 0 20px; line-height: 1.5; display: grid; align-content: start; gap: 4px; }
+.dialog.card-list-dialog { grid-template-rows: auto minmax(0, 1fr) auto; }
+.dialog-body.card-found { padding: 10px 0 10px 20px; }
+/* A popup opened from another popup (the list from Update the taskbag…). */
+.overlay.above { z-index: 15; }
 .card-found code { overflow-wrap: anywhere; }
 .agent-tools { list-style: none; margin: 4px 0 0; padding: 0 0 0 24px; display: grid; gap: 4px; }
 .searching { display: flex; align-items: center; gap: 8px; }
