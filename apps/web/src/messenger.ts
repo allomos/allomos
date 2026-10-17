@@ -83,6 +83,8 @@ export interface Messenger {
   runModesText(language: string): Promise<string>;
   /** Whether `project` has AGENTS.md and CLAUDE.md. */
   instructionFiles(project: string): Promise<InstructionFiles>;
+  /** The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24). */
+  agentsSetUp(taskbag: string): Promise<string[]>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
   /** Whether the project of the taskbag at `root` is up to date with this Allomos; null until an agent is connected. */
@@ -235,6 +237,7 @@ export const desktopMessenger: Messenger = {
     invoke<string>("build_app_request", { project, taskbag, language, description, quiet }),
   runModesText: (language) => invoke<string>("run_modes_text", { language }),
   instructionFiles: (project) => invoke<InstructionFiles>("instruction_files", { project }),
+  agentsSetUp: (taskbag) => invoke<string[]>("agents_set_up", { taskbag }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),

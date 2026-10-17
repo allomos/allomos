@@ -1055,6 +1055,14 @@ fn instruction_files(project: PathBuf) -> InstructionFiles {
     }
 }
 
+/// The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24): the agents
+/// panel shows "Not set up for this project yet." on an agent with no entry. Only that section is
+/// read; nothing else is checked.
+#[tauri::command]
+fn agents_set_up(taskbag: PathBuf) -> Vec<String> {
+    allomos_store::handoff::agents_set_up(&taskbag)
+}
+
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
 /// here when AGENTS.md or CLAUDE.md sits beside `.allomos/`), whether that folder's agent
 /// instructions mention Allomos, and whether the taskbag has tasks.
@@ -1644,6 +1652,7 @@ pub fn run() {
             run_modes_text,
             copy_text,
             instruction_files,
+            agents_set_up,
             write_agent_files,
             agent_status,
             confirm_requests,

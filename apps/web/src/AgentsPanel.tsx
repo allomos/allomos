@@ -5,6 +5,8 @@
 // moving them. Allomos never sends a request; the person does. **Manual** (Task-A05-06), offered
 // even when no known agent is found, shows the same request with Copy, for any other AI. The
 // agent choice is the shared picker (`AgentPicker`, Task-A05-07), which other features use too.
+// An agent with no entry under `## Agents set up` in the project notes shows "Not set up for this
+// project yet." with Copy prompt (Task-A03-24, approver 2026-10-16); the app checks nothing else.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -16,6 +18,8 @@ import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { agentOpened } from "./ProgressDialog";
+import { agentFilesCommand, notSetUp } from "./agentSetupFlow";
+import { GROUPS } from "./agentPickerFlow";
 import type { Seen } from "./manualFlow";
 
 /** What happened when the panel closes. */
@@ -124,6 +128,53 @@ export function AgentsPanel({
       window.clearInterval(timer);
     };
   }, [messenger, manual, before, project, taskbag]);
+
+  // Agents set up (Task-A03-24): read when the panel opens and again while it stays open, so the
+  // note goes away once the agent adds its line. Unreadable: no note (nothing to say).
+  const [setUp, setSetUp] = useState<string[] | null>(null);
+  const [promptCopied, setPromptCopied] = useState<string | null>(null);
+  const promptTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(promptTimer.current), []);
+  useEffect(() => {
+    let live = true;
+    const look = () =>
+      messenger
+        .agentsSetUp(taskbag)
+        .then((entries) => live && setSetUp(entries))
+        .catch(() => undefined);
+    void look();
+    const timer = window.setInterval(() => void look(), MANUAL_LOOK_MS);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [messenger, taskbag]);
+  const needSetup = setUp === null ? [] : notSetUp(GROUPS.map((g) => g.name), setUp);
+
+  const copyPrompt = async (group: string) => {
+    setError(null);
+    try {
+      await messenger.copyText(t("agents.setup_prompt", { command: agentFilesCommand(project, taskbag) }));
+      setPromptCopied(group);
+      window.clearTimeout(promptTimer.current);
+      promptTimer.current = window.setTimeout(() => setPromptCopied(null), COPIED_MS);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const setupNote = (group: string) =>
+    needSetup.includes(group) ? (
+      <div className="row start setup-note">
+        <span className="muted small">{t("agents.not_set_up")}</span>
+        <button type="button" className="link" onClick={() => void copyPrompt(group)} disabled={busy}>
+          {t("agents.copy_prompt")}
+        </button>
+        <span className="muted small" role="status">
+          {promptCopied === group ? t("manual.copied") : ""}
+        </span>
+      </div>
+    ) : null;
 
   const copy = async () => {
     if (request === null) return;
@@ -254,6 +305,7 @@ export function AgentsPanel({
         onChoose={setChoice}
         disabled={busy}
         name="connect-agent"
+        groupNote={setupNote}
         manual={
           <div className="manual">
             <p className="small">{rich("manual.intro", { path: <code>{project}</code> })}</p>
