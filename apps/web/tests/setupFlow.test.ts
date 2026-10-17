@@ -82,10 +82,14 @@ test("step 4 shows what the project needs: connect, update the taskbag, or setup
   // Connected and nothing to do: Setup done; with cards outside: Update the taskbag.
   assert.equal(stepFourPage(ready, false, 0, false), "done");
   assert.equal(stepFourPage(ready, false, 3, false), "cards");
-  // Out of date, not told, no tasks yet, or Connect an agent anyway: the agents page.
+  // Out of date, not told, or Connect an agent anyway: the agents page.
   assert.equal(stepFourPage(ready, true, 3, false), "agents");
   assert.equal(stepFourPage(setup({ project_folder: "/p", agents: { codex: true, claude: false }, has_tasks: true }), false, 3, false), "agents");
-  assert.equal(stepFourPage(setup({ project_folder: "/p", agents: told }), false, 0, false), "agents");
+  // Told, but no tasks yet or an agent not registered under Agents set up: Update the taskbag
+  // (approver 2026-10-17, Task-A03-24), not Connect again.
+  assert.equal(stepFourPage(setup({ project_folder: "/p", agents: told }), false, 0, false), "cards");
+  assert.equal(stepFourPage(ready, false, 0, false, false, 1), "cards");
+  assert.equal(stepFourPage(ready, false, 0, false, false, 0), "done");
   assert.equal(stepFourPage(ready, false, 0, true), "agents");
   assert.equal(stepFourPage(setup({ agents: told, has_tasks: true }), false, 0, false), "agents", "no project folder");
   // An older taskbag's tasks waiting to be moved in: Update the taskbag, the card files' panel

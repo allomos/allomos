@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use crate::convert::{agent_move_in_request_in, migration_header_in};
+use crate::convert::{agent_convert_request_in, agent_move_in_request_in, migration_header_in};
 use crate::{cards, shown, versions};
 
 /// Changes when the text of [`agents_set_up_request_in`] changes.
@@ -79,20 +79,28 @@ The notice in Allomos goes away once each agent named above has its line.
     }
 }
 
-/// What **Update the taskbag…** asks of the agent the person chooses, from the app: whichever of
-/// [`agent_move_tasks_in_request_in`](crate::agent_move_tasks_in_request_in) applies (an older
-/// taskbag's tasks, or card files kept outside the taskbag), then, when `agents` names agents not
-/// yet set up, [`agents_set_up_request_in`] after it, as one request (approver 2026-10-17: one
-/// request covers every update due). With agents to set up and no card file known to be outside
-/// the taskbag, the setup request comes alone, without a search for card files.
+/// What **Update the taskbag…** asks of the agent the person chooses, from the app, as one request
+/// (approver 2026-10-17: one request covers every update due):
+/// - an older taskbag's tasks to move in ([`agent_move_in_request_in`]); else
+/// - a taskbag with no tasks: look for the tasks the project already keeps and move them in after
+///   the person's Go ahead ([`agent_convert_request_in`]; approver 2026-10-17: a connected project
+///   with no tasks is told to update the taskbag, not to connect again); else
+/// - card files kept outside the taskbag
+///   ([`agent_move_cards_request_in`](cards::agent_move_cards_request_in)), when some are known or
+///   nothing else is to be done (the agent still looks for card files no link names);
+/// - then, when `agents` names agents not yet set up, [`agents_set_up_request_in`] after it.
 pub fn agent_update_taskbag_request_in(
     language: &str,
     project: &Path,
     taskbag: &Path,
     agents: &[String],
 ) -> String {
+    let no_tasks = crate::load(taskbag)
+        .taskbag
+        .is_some_and(|bag| bag.tasks.is_empty());
     let first = match versions::move_in(taskbag) {
         Some(m) => Some(agent_move_in_request_in(language, project, taskbag, &m)),
+        None if no_tasks => Some(agent_convert_request_in(language, project, taskbag)),
         None if agents.is_empty() || !cards::outside(taskbag).is_empty() => Some(
             cards::agent_move_cards_request_in(language, project, taskbag),
         ),
@@ -156,12 +164,35 @@ mod tests {
         init(&tb, "p", "P").unwrap();
         let none: [String; 0] = [];
         let codex = ["Codex".to_string()];
-        // Nobody to set up: as before, the move-cards request.
+        // No tasks yet: look for the project's own tasks, and set up the agents named.
+        let r = agent_update_taskbag_request_in("en", &p, &tb, &none);
+        assert!(
+            r.contains("conversion request") && !r.contains("agent setup request"),
+            "{r}"
+        );
+        let r = agent_update_taskbag_request_in("en", &p, &tb, &codex);
+        assert!(r.contains("conversion request") && r.contains("agent setup request"));
+        // With a task: nobody to set up is the move-cards request, as before.
+        crate::add_area(
+            &tb,
+            crate::Actor::APP,
+            std::time::Duration::from_secs(1),
+            Some("A1"),
+            "Area",
+        )
+        .unwrap();
+        crate::add_task(
+            &tb,
+            crate::Actor::APP,
+            std::time::Duration::from_secs(1),
+            &serde_json::from_str(r#"{"area":"A1","title":"Bake"}"#).unwrap(),
+        )
+        .unwrap();
         let r = agent_update_taskbag_request_in("en", &p, &tb, &none);
         assert!(r.contains("move-cards request") && !r.contains("agent setup request"));
         // Agents to set up and no card file outside: the setup request alone.
         let r = agent_update_taskbag_request_in("en", &p, &tb, &codex);
         assert!(r.contains("agent setup request") && !r.contains("move-cards request"));
-        assert!(r.contains(": Codex."));
+        assert!(!r.contains("conversion request") && r.contains(": Codex."));
     }
 }
