@@ -395,8 +395,9 @@ export function SetupWizard({
                 {t("wizard.back")}
               </button>
             )}
+            {/* Previous: back to step 1 after Create taskbag (approver, 2026-10-17); otherwise to step 2. */}
             {step.n === 3 && (
-              <button type="button" onClick={() => void look(step.opened.root)} disabled={busy}>
+              <button type="button" onClick={() => (step.created ? setStep({ n: 1 }) : void look(step.opened.root))} disabled={busy}>
                 {t("wizard.back")}
               </button>
             )}
