@@ -163,7 +163,7 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
                       {t("progress.close")}
                     </button>
                   )}
-                  <button type="button" className="primary" onClick={() => toBackground(popup.id)}>
+                  <button type="button" onClick={() => toBackground(popup.id)}>
                     {t("progress.background")}
                   </button>
                 </>
