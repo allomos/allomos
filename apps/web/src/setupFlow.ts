@@ -73,11 +73,20 @@ export function neverConnected(setup: SetupState): boolean {
 /** What the wizard's step 4 shows (Task-A05-09, approver 2026-10-17). */
 export type StepFourPage = "agents" | "cards" | "done";
 
-/** Step 4's page: Connect with the agents (or its update panel) when agents are not told, there are
- * no tasks yet, Allomos's instructions or taskbag are out of date (`needsUpdate`), or the person
- * chose Connect an agent anyway; else Update the taskbag while card files are outside it; else
- * Setup done. */
-export function stepFourPage(setup: SetupState, needsUpdate: boolean, cardsOutside: number, anyway: boolean): StepFourPage {
-  if (anyway || needsUpdate || !setup.project_folder || offerConnect(setup, false)) return "agents";
+/** Step 4's page: Update the taskbag while an older taskbag's tasks wait to be moved in
+ * (`movingIn`, Task-A01-45: the same panel as for card files); else Connect with the agents (or its
+ * update panel) when agents are not told, there are no tasks yet, Allomos's instructions are out
+ * of date (`needsUpdate`), or the person chose Connect an agent anyway; else Update the taskbag
+ * while card files are outside it; else Setup done. */
+export function stepFourPage(
+  setup: SetupState,
+  needsUpdate: boolean,
+  cardsOutside: number,
+  anyway: boolean,
+  movingIn = false,
+): StepFourPage {
+  if (anyway) return "agents";
+  if (movingIn && setup.project_folder) return "cards";
+  if (needsUpdate || !setup.project_folder || offerConnect(setup, false)) return "agents";
   return cardsOutside > 0 ? "cards" : "done";
 }

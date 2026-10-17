@@ -2070,7 +2070,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v14 section (before Move the tasks in… covered card files, Task-A01-45) is out of date too.
+    // A v14 section (before Update the taskbag… covered an older taskbag, Task-A01-45) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
@@ -2206,7 +2206,7 @@ fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     out
 }
 
-/// Approver, 2026-10-16 (Task-A01-45): one Move the tasks in…. On a current taskbag its request
+/// Approver, 2026-10-16 (Task-A01-45): one Update the taskbag…. On a current taskbag its request
 /// is the move-cards one (card files kept outside the taskbag), and it changes nothing.
 #[test]
 fn move_in_on_a_current_taskbag_asks_for_the_card_files() {
@@ -2229,7 +2229,12 @@ fn move_in_on_a_current_taskbag_asks_for_the_card_files() {
     let v = ok(&repo, &["move-in", "--language", "ja"]);
     assert_eq!(v["cards_outside"][0]["task"], "A01-01");
     assert_eq!(v["cards_outside"][0]["path"], "docs/tasks/A01-01.md");
-    assert!(v["request"].as_str().unwrap().contains("カードの移し入れの依頼"));
+    assert!(
+        v["request"]
+            .as_str()
+            .unwrap()
+            .contains("カードの移し入れの依頼")
+    );
 }
 
 /// Owner, 2026-10-15 (Task-A01-45): a taskbag from any older Allomos is moved in by an agent,
@@ -2261,7 +2266,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
             assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
             assert_eq!(v["error"]["params"]["current"], "allomos/4");
             let message = v["error"]["message"].as_str().unwrap();
-            assert!(message.contains("Move the tasks in"), "{message}");
+            assert!(message.contains("Update the taskbag…"), "{message}");
             assert!(message.contains("`alm move-in`"), "{message}");
         }
         // The request, naming the folder it will be renamed to; still nothing changed.
@@ -2291,7 +2296,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
     }
 }
 
-/// After the app's Move the tasks in…: the new taskbag works, and `alm move-in` prints the
+/// After the app's Update the taskbag… on an older taskbag: the new taskbag works, and `alm move-in` prints the
 /// request for the old folder beside it until the first task is moved in.
 #[test]
 fn move_in_names_the_old_folder_beside_a_new_taskbag() {

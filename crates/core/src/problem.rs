@@ -65,7 +65,7 @@ problems! {
     /// or changed: an AI agent moves its tasks into a new taskbag, like another task system (owner,
     /// 2026-10-15; Task-A01-45). The app renames the old folder aside and asks the agent;
     /// `alm move-in` prints the same request.
-    TaskbagToMoveIn { found, current } => "taskbag_to_move_in", "This taskbag was written by an older Allomos (format \"{found}\"); this Allomos writes \"{current}\" and does not read or change older taskbags, so nothing was read or changed. Its tasks are moved into a new taskbag by an AI agent, like another task system: the person opens the project in the Allomos app and chooses Move the tasks in…, or you run `alm move-in` and follow the request it prints. Stop and tell the person.";
+    TaskbagToMoveIn { found, current } => "taskbag_to_move_in", "This taskbag was written by an older Allomos (format \"{found}\"); this Allomos writes \"{current}\" and does not read or change older taskbags, so nothing was read or changed. Its tasks are moved into a new taskbag by an AI agent, like another task system: the person opens the project in the Allomos app and chooses Update the taskbag…, or you run `alm move-in` and follow the request it prints. Stop and tell the person.";
     /// **Move the tasks in…** (or `alm move-in`) on a taskbag that is not from an older Allomos and
     /// has no older taskbag waiting beside it (Task-A01-45).
     NothingToMoveIn { path } => "nothing_to_move_in", "There is nothing to move in: the taskbag at {path} is not from an older Allomos, and no older taskbag is waiting beside it to be moved in.";

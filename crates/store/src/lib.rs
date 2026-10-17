@@ -294,7 +294,7 @@ the project notes (below) and your own handoff file.
   taskbag, as `tasks/<id>/card.md`, and the description's `Card:` link points to it. If tasks
   link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
   propose moving them in, following `alm guide move-cards`; the person can also start it with
-  **Move the tasks in…** in the Allomos app (`alm move-in` prints that request).
+  **Update the taskbag…** in the Allomos app (`alm move-in` prints that request).
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.

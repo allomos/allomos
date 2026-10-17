@@ -1,10 +1,12 @@
-// Update the taskbag… (Task-A00-30; named so by the approver, 2026-10-17): from the notice "N tasks
-// keep their card files in the project folder", or File → Update the Taskbag…. The dialog first
-// says what Allomos found (each task, its title and where its card file is now) and what updating
-// does. The person chooses an agent (the ones found, or Manual);
-// Allomos opens it in the project folder with the move-cards request typed in, and sends nothing.
-// The agent finds the card files, shows its plan in Allomos with `alm confirm`, and changes
-// nothing until the person chooses Go ahead. Manual shows the same request with Copy.
+// Update the taskbag… (Task-A00-30; named so by the approver, 2026-10-17; one button for card files
+// and an older Allomos's taskbag since Task-A01-45, approver 2026-10-16): from the notice "N tasks
+// keep their card files in the project folder", the notice "This taskbag was written by an older
+// Allomos" (after the old folder is renamed aside), or File → Update the Taskbag…. The dialog
+// first says what Allomos found (each task, its title and where its card file is now, or the older
+// taskbag) and what updating does. The person chooses an agent (the ones found, or Manual);
+// Allomos opens it in the project folder with the request for whichever applies typed in (`alm
+// move-in` prints it), and sends nothing. The agent shows its plan in Allomos with `alm confirm`,
+// and changes nothing until the person chooses Go ahead. Manual shows the same request with Copy.
 // `MoveCardsPanel` is the dialog's content, also shown as the setup wizard's step 4 when a
 // connected project has card files to move in (Task-A05-09).
 
@@ -18,12 +20,13 @@ import { MANUAL } from "./agentPickerFlow";
 import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
 import { isProblem } from "./types";
-import type { CardRow } from "./moveCardsFlow";
+import type { CardRow, MoveIn } from "./moveCardsFlow";
 
 export function MoveCardsDialog({
   messenger,
   root,
   found,
+  moveIn,
   onClose,
 }: {
   messenger: Messenger;
@@ -31,6 +34,8 @@ export function MoveCardsDialog({
   root: string;
   /** What Allomos found: the tasks whose card file is still outside the taskbag. */
   found: CardRow[];
+  /** An older taskbag renamed aside, whose tasks are to be moved in (Task-A01-45). */
+  moveIn?: MoveIn | null;
   /** The dialog closes; `message` says what happened (null: Cancel). */
   onClose: (message: string | null) => void;
 }) {
@@ -39,7 +44,7 @@ export function MoveCardsDialog({
     <div className="overlay" role="presentation">
       <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
-        <MoveCardsPanel messenger={messenger} root={root} found={found} onClose={onClose} />
+        <MoveCardsPanel messenger={messenger} root={root} found={found} moveIn={moveIn} onClose={onClose} />
       </section>
     </div>
   );
@@ -51,6 +56,7 @@ export function MoveCardsPanel({
   messenger,
   root,
   found,
+  moveIn,
   onClose,
   actionsIn,
   cancelLabel,
@@ -59,6 +65,8 @@ export function MoveCardsPanel({
   messenger: Messenger;
   root: string;
   found: CardRow[];
+  /** An older taskbag renamed aside: the dialog asks for its tasks to be moved in (Task-A01-45). */
+  moveIn?: MoveIn | null;
   onClose: (message: string | null) => void;
   /** Where the buttons go (the wizard's bottom row); otherwise a row of their own. */
   actionsIn?: HTMLElement | null;
@@ -88,13 +96,17 @@ export function MoveCardsPanel({
     setError(null);
     try {
       if (agent === MANUAL) {
-        setRequest(await messenger.moveCardsRequest(root, language));
+        setRequest(await messenger.moveTasksInRequest(root, language));
         return;
       }
-      await messenger.moveCards(agent, root, language);
-      agentOpened(root, "cards");
+      await messenger.moveTasksIn(agent, root, language);
+      agentOpened(root, moveIn ? "move_in" : "cards");
       const name = t(AGENT_KEY[agent]);
-      onClose(tool?.how === "paste" ? t("cards.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("cards.asked", { agent: name }));
+      if (tool?.how === "paste") {
+        onClose(t(moveIn ? "move.asked_paste" : "cards.asked_paste", { agent: name, keys: PASTE_KEYS }));
+      } else {
+        onClose(t(moveIn ? "move.asked" : "cards.asked", { agent: name }));
+      }
     } catch (e) {
       fail(e);
     } finally {
@@ -161,7 +173,13 @@ export function MoveCardsPanel({
 
   return (
     <>
-      {request === null && (
+      {request === null && moveIn && (
+        <>
+          <p>{t("move.found", { found: moveIn.found, old: moveIn.old })}</p>
+          <p className="muted small">{t("move.body")}</p>
+        </>
+      )}
+      {request === null && !moveIn && (
         <>
           <p>{found.length > 0 ? t("cards.found", { count: found.length }) : t("cards.found_none")}</p>
           {found.length > 0 && (

@@ -11,10 +11,10 @@ export function outdatedFiles(check: VersionCheck | null): string[] {
 
 /** What the notice above the task list says, or null for no notice. The check is null before an
  * agent is connected, unless an older taskbag's tasks are to be moved in (Task-A01-45):
- * - `move_in`: the taskbag was written by an older Allomos; **Move the tasks in…** renames it
- *   aside, creates a new taskbag and opens the Connect step, where an agent is asked to move them;
- * - `moving_in`: that was done, and the new taskbag has no tasks yet: **Move the tasks in…** opens
- *   the Connect step again;
+ * - `move_in`: the taskbag was written by an older Allomos; **Update the taskbag…** renames it
+ *   aside, creates a new taskbag and opens its dialog, where an agent is asked to move them;
+ * - `moving_in`: that was done, and the new taskbag has no tasks yet: **Update the taskbag…** opens
+ *   the dialog again;
  * - `section`: Allomos's instructions are out of date.
  * A newer taskbag is not here: it cannot be read, and the problem list says "update Allomos now". */
 export type UpdateNotice =

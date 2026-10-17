@@ -346,7 +346,7 @@ enum Command {
         #[arg(long)]
         iteration: Option<String>,
     },
-    /// Print the request the app's Move the tasks in… gives an AI agent: for a taskbag written by
+    /// Print the request the app's Update the taskbag… gives an AI agent: for a taskbag written by
     /// an older Allomos, moving its tasks into a new taskbag, like another task system; otherwise,
     /// moving card files kept outside the taskbag in beside their tasks. Changes nothing.
     #[command(name = "move-in")]
@@ -1772,10 +1772,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             });
             // An older taskbag is not read: its project folder comes from its project.json as it is.
             let project = versions::project_folder(&root);
-            // One request for Move the tasks in… (Task-A01-45): the move-in request for an older
+            // One request for Update the taskbag… (Task-A01-45): the move-in request for an older
             // taskbag, otherwise the move-cards request for card files kept outside the taskbag.
-            let request =
-                allomos_store::agent_move_tasks_in_request_in(&language, &project, &root);
+            let request = allomos_store::agent_move_tasks_in_request_in(&language, &project, &root);
             let Some(move_in) = versions::move_in(&root) else {
                 let cards = allomos_store::cards::outside(&root);
                 return Ok(Done::new(

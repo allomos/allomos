@@ -88,4 +88,10 @@ test("step 4 shows what the project needs: connect, update the taskbag, or setup
   assert.equal(stepFourPage(setup({ project_folder: "/p", agents: told }), false, 0, false), "agents");
   assert.equal(stepFourPage(ready, false, 0, true), "agents");
   assert.equal(stepFourPage(setup({ agents: told, has_tasks: true }), false, 0, false), "agents", "no project folder");
+  // An older taskbag's tasks waiting to be moved in: Update the taskbag, the card files' panel
+  // (Task-A01-45), even with no tasks and agents not told; Connect an agent anyway still wins.
+  const fresh = setup({ project_folder: "/p", agents: { codex: false, claude: false }, has_tasks: false });
+  assert.equal(stepFourPage(fresh, true, 0, false, true), "cards");
+  assert.equal(stepFourPage(fresh, true, 0, true, true), "agents");
+  assert.equal(stepFourPage(setup({ agents: told }), true, 0, false, true), "agents", "no project folder");
 });

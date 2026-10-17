@@ -2,9 +2,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardRows, cardsNotice, cardsOutside } from "../src/moveCardsFlow.ts";
+import { cardRows, cardsNotice, cardsOutside, tasksInStart } from "../src/moveCardsFlow.ts";
 import { changeLine } from "../src/historyFlow.ts";
-import type { Opened, Task } from "../src/types.ts";
+import type { Opened, Task, VersionCheck } from "../src/types.ts";
 
 const task = (id: string) => ({ id, title: `Title of ${id}` }) as Task;
 
@@ -63,4 +63,19 @@ test("history names the card changes in the interface's words", () => {
     changeLine({ field: "card_outside", from: "docs/tasks/A01-01.md" }, t as never),
     "pane.card_outside: docs/tasks/A01-01.md → —",
   );
+});
+
+// Approver, 2026-10-16 (Task-A01-45): one Update the taskbag… for an older taskbag and for card files.
+test("Update the taskbag… renames an older taskbag aside first, then asks for its tasks", () => {
+  const check = (move_in: VersionCheck["move_in"]) => ({ move_in }) as VersionCheck;
+  assert.deepEqual(tasksInStart(null), { aside: false, moveIn: null });
+  assert.deepEqual(tasksInStart(check(null)), { aside: false, moveIn: null }, "card files");
+  assert.deepEqual(tasksInStart(check({ old: "/p/.allomos/taskbag", found: "allomos/3", prepared: false })), {
+    aside: true,
+    moveIn: null,
+  });
+  assert.deepEqual(tasksInStart(check({ old: "/p/.allomos/taskbag-allomos-3", found: "allomos/3", prepared: true })), {
+    aside: false,
+    moveIn: { found: "allomos/3", old: "/p/.allomos/taskbag-allomos-3" },
+  });
 });

@@ -52,7 +52,7 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 14: card files live beside their tasks (`tasks/<id>/card.md`); an agent that finds tasks
 /// linking to card files outside the taskbag reports them (`alm cards found`) and proposes moving
 /// them in (`alm guide move-cards`) (Task-A00-30).
-/// 15: the person can start that with **Move the tasks in…** in the app, one button for an older
+/// 15: the person can start that with **Update the taskbag…** in the app, one button for an older
 /// taskbag and for card files, whose request `alm move-in` prints (Task-A01-45).
 pub const SECTION_VERSION: u32 = 15;
 
@@ -257,7 +257,7 @@ pub fn move_in(root: &Path) -> Option<MoveIn> {
     }
 }
 
-/// The app's **Move the tasks in…** (Task-A01-45): rename the older taskbag at `root` aside
+/// The app's **Update the taskbag…** on an older taskbag (Task-A01-45): rename the older taskbag at `root` aside
 /// ([`aside_name`]) and create a new, empty taskbag in its place with the old project's ID and name
 /// (and its recorded project folder), so an agent can move the tasks across through `alm`. Only
 /// the rename and a fresh taskbag: nothing in the old folder is read beyond `project.json`'s ID,
@@ -745,7 +745,7 @@ mod tests {
         }
     }
 
-    /// Approver, 2026-10-16 (Task-A01-45): one Move the tasks in… and one request. An older
+    /// Approver, 2026-10-16 (Task-A01-45): one Update the taskbag… and one request. An older
     /// taskbag, before and after it is renamed aside, gets the move-in request (which moves its
     /// card files too); a current one gets the move-cards request.
     #[test]
@@ -779,7 +779,7 @@ mod tests {
         assert!(r.contains("other card files of these tasks"), "{r}");
     }
 
-    /// The app's Move the tasks in…: the old folder is renamed aside, keeping every file, and a
+    /// The app's Update the taskbag… on an older taskbag: the old folder is renamed aside, keeping every file, and a
     /// new, empty taskbag takes its place with the old project's ID, name and project folder.
     #[test]
     fn moving_aside_keeps_the_old_folder_and_makes_a_new_taskbag() {

@@ -35,7 +35,7 @@ pub const CONVERT_REQUEST_VERSION: u32 = 9;
 /// 2: a task whose old description links to a card file in the project folder gets that card
 /// file moved in beside it (Task-A00-30).
 /// 3: the other card files of the old tasks are found and moved in as `alm guide move-cards`
-/// says, since **Move the tasks in…** now covers card files too (Task-A01-45, approver
+/// says, since **Update the taskbag…** now covers an older taskbag too (Task-A01-45, approver
 /// 2026-10-16).
 pub const MOVE_IN_REQUEST_VERSION: u32 = 3;
 
@@ -329,9 +329,9 @@ Changes to the steps below: in step 3, do not commit the new taskbag on its own:
     format!("{title}\n\n{intro}\n\n{moves}\n\n{rest}\n\n{source}\n")
 }
 
-/// What **Move the tasks in…** types into the agent the person chooses, and what `alm move-in`
+/// What **Update the taskbag…** types into the agent the person chooses, and what `alm move-in`
 /// prints (Task-A01-45, approver 2026-10-16: one button and one request instead of Move the tasks
-/// in… and Move the cards in…). It covers whichever applies to the taskbag at `taskbag`:
+/// in… and Move the cards in…, Update the taskbag… since A01-51). It covers whichever applies to the taskbag at `taskbag`:
 /// - a taskbag from an older Allomos, or one renamed aside beside a new taskbag with no tasks
 ///   ([`versions::move_in`](crate::versions::move_in)): the move-in request
 ///   ([`agent_move_in_request_in`]), which also moves the old tasks' card files in;

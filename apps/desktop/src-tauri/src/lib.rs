@@ -1816,6 +1816,13 @@ mod tests {
         );
         assert!(!plan[0].1.contains(" init --id "));
         assert!(version_check(taskbag.clone()).unwrap().needs_update());
+        // Update the taskbag… asks for the move-in, reported as that job (Task-A01-45); once the
+        // tasks are in, it is about card files (below).
+        assert_eq!(tasks_in_job(&taskbag), Job::MoveIn);
+        assert!(
+            move_tasks_in_request(taskbag.clone(), "en".into())
+                .contains("Allomos renamed the old taskbag (format allomos/2;")
+        );
         // Asking twice changes nothing.
         assert!(move_taskbag_aside(taskbag.clone()).is_ok());
         assert!(!dir.join(".allomos").join("taskbag-allomos-4").exists());
@@ -1845,6 +1852,7 @@ mod tests {
                 &agent_connect_request_in("en", &dir, &taskbag)
             )
         );
+        assert_eq!(tasks_in_job(&taskbag), Job::Cards);
         assert!(!version_check(taskbag).unwrap().needs_update());
         std::fs::remove_dir_all(&dir).unwrap();
     }

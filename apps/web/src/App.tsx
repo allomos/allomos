@@ -9,7 +9,8 @@ import { ProgressDialog } from "./ProgressDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
 import { MoveCardsDialog } from "./MoveCardsDialog";
-import { cardRows, cardsNotice } from "./moveCardsFlow";
+import { cardRows, cardsNotice, tasksInStart } from "./moveCardsFlow";
+import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
@@ -131,8 +132,9 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [notices, setNotices] = useState<Note[]>([]);
   /** The start page's Build a new app… dialog (Task-A03-25-02). */
   const [building, setBuilding] = useState(false);
-  /** Update the taskbag… is open (Task-A00-30): the notice's button or File → Update the Taskbag…. */
-  const [movingCards, setMovingCards] = useState(false);
+  /** Update the taskbag… is open (Task-A00-30, Task-A01-45): a notice's button or File → Update the
+   * Taskbag…; `moveIn`: for an older taskbag renamed aside, otherwise for card files. */
+  const [movingCards, setMovingCards] = useState<{ moveIn: MoveIn | null } | null>(null);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
@@ -186,6 +188,27 @@ export function App({ messenger }: { messenger: Messenger }) {
     // The app knows which window shows which project, and the window is named after it (Task-A01-27).
     void messenger.setWindowProject(o.root, o.loaded.taskbag?.project.name ?? null).catch(() => undefined);
   }, [changeRecent, messenger]);
+
+  /** Update the taskbag… (Task-A01-45, approver 2026-10-16: one button for an older taskbag and
+   * for card files kept outside the taskbag): an older taskbag is first renamed aside, with a new
+   * taskbag in its place; then the one dialog asks an agent for whichever applies. */
+  const openTasksIn = useCallback(async () => {
+    const root = openedRef.current?.root;
+    if (!root) return;
+    try {
+      let start = tasksInStart(await messenger.versionCheck(root).catch(() => null));
+      if (start.aside) {
+        const fresh = await messenger.moveTaskbagAside(root);
+        show(fresh, null);
+        // The dialog asks the agent itself: the setup wizard does not open on its own.
+        setSkipped(true);
+        start = tasksInStart(await messenger.versionCheck(fresh.root).catch(() => null));
+      }
+      setMovingCards({ moveIn: start.moveIn });
+    } catch (e) {
+      setError(errorNote(e));
+    }
+  }, [messenger, show]);
 
   /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open taskbag's project folder,
    * agent instructions and tasks, and whether the person put off connecting agents this time. */
@@ -379,7 +402,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         clearMenu: t("menu.clear_recent"),
         noRecent: t("menu.no_recent"),
         connect: t("menu.connect"),
-        moveCards: t("menu.move_cards"),
+        moveTasksIn: t("menu.move_cards"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -406,17 +429,15 @@ export function App({ messenger }: { messenger: Messenger }) {
       const root = openedRef.current?.root;
       if (root) openWizard({ resume: { root, at: 4 } });
     });
-    // File → Update the Taskbag… (enabled while a taskbag is open, Task-A00-30).
-    const stopCards = messenger.onMoveCardsMenu(() => {
-      if (openedRef.current) setMovingCards(true);
-    });
+    // File → Update the Taskbag… (enabled while a taskbag is open, Task-A00-30, Task-A01-45).
+    const stopCards = messenger.onMoveTasksInMenu(() => void openTasksIn());
     return () => {
       void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
       void stopCards.then((f) => f()).catch(() => undefined);
     };
-  }, [messenger, openRecent, changeRecent, openWizard]);
+  }, [messenger, openRecent, changeRecent, openWizard, openTasksIn]);
 
   // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
   // afresh when it opens (another window may have changed it).
@@ -496,24 +517,15 @@ export function App({ messenger }: { messenger: Messenger }) {
             {noteText(n)}
           </Banner>
         ))}
-        {/* Out of date with this Allomos (Task-A01-25), or an older Allomos's taskbag whose tasks
-            are to be moved in (Task-A01-45): an agent does it, from the Connect panel. */}
+        {/* Out of date with this Allomos (Task-A01-25): an agent does it, from the Connect panel;
+            or an older Allomos's taskbag whose tasks are to be moved in (Task-A01-45): Update the
+            taskbag…, the same dialog as for card files. */}
         {opened && (
           <VersionNotice
             messenger={messenger}
             root={opened.root}
             onUpdate={() => openWizard({ resume: { root: opened.root, at: 4 } })}
-            onMoveIn={async () => {
-              // Move the tasks in…: the old folder aside, a new taskbag in its place, then the
-              // Connect step, whose request asks the agent to move the tasks across.
-              try {
-                const fresh = await messenger.moveTaskbagAside(opened.root);
-                show(fresh, null);
-                openWizard({ resume: { root: fresh.root, at: 4 } });
-              } catch (e) {
-                setError(errorNote(e));
-              }
-            }}
+            onMoveIn={openTasksIn}
             onOlder={setOlderShown}
           />
         )}
@@ -522,7 +534,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         {opened && cardsNotice(opened) > 0 && (
           <div className="banner update" role="status">
             <span>{t("cards.notice", { count: cardsNotice(opened) })}</span>
-            <button type="button" className="primary" onClick={() => setMovingCards(true)}>
+            <button type="button" className="primary" onClick={() => void openTasksIn()}>
               {t("cards.button")}
             </button>
           </div>
@@ -532,8 +544,9 @@ export function App({ messenger }: { messenger: Messenger }) {
             messenger={messenger}
             root={opened.root}
             found={cardRows(opened)}
+            moveIn={movingCards.moveIn}
             onClose={(message) => {
-              setMovingCards(false);
+              setMovingCards(null);
               if (message) setNotices((list) => [...list, { text: message }]);
             }}
           />
@@ -665,8 +678,9 @@ export function App({ messenger }: { messenger: Messenger }) {
 const VERSION_CHECK_MS = 4000;
 
 /** "Allomos's instructions are out of date", with **Update the instructions…** (Task-A01-25), or
- * "This taskbag was written by an older Allomos", with **Move the tasks in…** (Task-A01-45: the
- * old folder is renamed aside, a new taskbag created, and an agent moves the tasks across). Asked
+ * "This taskbag was written by an older Allomos", with **Update the taskbag…** (Task-A01-45: the
+ * old folder is renamed aside, a new taskbag created, and an agent moves the tasks across, from
+ * the same dialog as card files). Asked
  * when the folder opens (every way of opening one) and every few seconds while it is open.
  * Allomos never changes the tasks or the instructions itself. */
 function VersionNotice({
@@ -678,9 +692,10 @@ function VersionNotice({
 }: {
   messenger: Messenger;
   root: string;
-  /** Open the Connect step (its request is the move-in or the update request). */
+  /** Open the Connect step (its request is the update request). */
   onUpdate: () => void;
-  /** Rename the older taskbag aside and create a new one, then open the Connect step. */
+  /** Update the taskbag…: rename the older taskbag aside (unless it already is), then open the
+   * dialog that asks an agent to move the tasks in. */
   onMoveIn: () => Promise<void>;
   /** Whether this notice says the taskbag is from an older Allomos, so the problem list does not
    * say it again. */
@@ -727,8 +742,8 @@ function VersionNotice({
             ? t("move.notice_waiting", { old: notice.old })
             : t("update.notice_section", { files: notice.files })}
       </span>
-      <button type="button" className="primary" onClick={notice.kind === "move_in" ? moveIn : onUpdate} disabled={busy}>
-        {t(notice.kind === "section" ? "update.button" : "move.button")}
+      <button type="button" className="primary" onClick={notice.kind === "section" ? onUpdate : moveIn} disabled={busy}>
+        {t(notice.kind === "section" ? "update.button" : "cards.button")}
       </button>
     </div>
   );
