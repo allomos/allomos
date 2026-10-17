@@ -915,7 +915,8 @@ function LanguagePicker() {
 
 /** The first screen with nothing open: the road show's opening slide (slogan, a task shifting
  * between agents and a teammate around the taskbag), with one button, Start, which opens the setup
- * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43). */
+ * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43) and Build a new app…
+ * (Task-A03-25-02). */
 function Welcome({
   onOpen,
   onBuild,
@@ -948,19 +949,21 @@ function Welcome({
                 {t("welcome.open")}
               </button>
               <span className="muted">{t("welcome.hint")}</span>
-              {/* Start from a description instead (Task-A03-25-02). */}
-              <button type="button" className="start build" onClick={onBuild}>
-                {t("build.button")}
-              </button>
             </div>
           </div>
           <HopFigure />
         </div>
       </section>
-      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43). */}
-      <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
-        {t("welcome.open_recent")}
-      </button>
+      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43); to its right, start
+          from a description instead (owner, 2026-10-17; Task-A03-25-02). */}
+      <div className="welcome-under">
+        <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
+          {t("welcome.open_recent")}
+        </button>
+        <button type="button" className="welcome-build" onClick={onBuild}>
+          {t("build.button")}
+        </button>
+      </div>
     </div>
   );
 }

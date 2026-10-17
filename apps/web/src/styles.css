@@ -460,8 +460,9 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .refresh-line { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .refresh-line button.link { align-self: baseline; font-size: inherit; }
 .refresh-line button.link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
-/* Build a new app… (Task-A03-25-02): the second button of the start page, and its dialog. */
-.welcome .start.build { flex-basis: 100%; max-width: max-content; }
+/* Build a new app… (Task-A03-25-02): under the start page's card, right of Open recent…, and its
+   dialog. */
+.welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
 .build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
