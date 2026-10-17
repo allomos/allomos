@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v14)
+## Tasks: Allomos (v15)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -96,7 +96,8 @@ the project notes (below) and your own handoff file.
 - Card files: a task's card file (its detail in a file of its own) lives beside the task in the
   taskbag, as `tasks/<id>/card.md`, and the description's `Card:` link points to it. If tasks
   link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
-  propose moving them in, following `alm guide move-cards`.
+  propose moving them in, following `alm guide move-cards`; the person can also start it with
+  **Update the taskbag…** in the Allomos app (`alm move-in` prints that request).
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.

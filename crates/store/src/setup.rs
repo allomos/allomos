@@ -133,7 +133,7 @@ pub fn setup_state(root: &Path) -> Result<SetupState, Problem> {
         // A taskbag from an older Allomos is not read (Task-A01-45): its project folder is known
         // without reading it, so the Connect panel can hand the move to an agent. Tasks are
         // assumed, so the wizard does not open by itself to look for them; the window offers
-        // Move the tasks in… instead.
+        // Update the taskbag… instead.
         if let crate::versions::FormatState::Older { .. } = crate::versions::format_state(root) {
             let project = crate::versions::connected_project(root)
                 .unwrap_or_else(|| crate::versions::project_folder(root));

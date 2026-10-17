@@ -14,8 +14,8 @@ import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import { AgentsPanel } from "./AgentsPanel";
 import { MoveCardsPanel } from "./MoveCardsDialog";
-import { cardRows } from "./moveCardsFlow";
-import type { CardRow } from "./moveCardsFlow";
+import { cardRows, tasksInStart } from "./moveCardsFlow";
+import type { CardRow, MoveIn } from "./moveCardsFlow";
 import { updateNotice } from "./versionFlow";
 import type { ConnectResult } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
@@ -29,7 +29,7 @@ type Step =
   | { n: 0 }
   | { n: 1 }
   /** `newer`: the found taskbag needs a newer Allomos; Next is disabled (Task-A01-25). `older`: it
-   * was written by an older Allomos; Next becomes Move the tasks in… (Task-A01-45). */
+   * was written by an older Allomos; Next becomes Update the taskbag… (Task-A01-45). */
   | {
       n: 2;
       folder: string;
@@ -83,7 +83,13 @@ export function SetupWizard({
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
   /** Step 4 shows what the project needs (Task-A05-09): worked out when step 4 is reached. */
-  const [four, setFour] = useState<{ page: StepFourPage; setup: SetupState | null; found: CardRow[]; tasks: number } | null>(null);
+  const [four, setFour] = useState<{
+    page: StepFourPage;
+    setup: SetupState | null;
+    found: CardRow[];
+    moveIn: MoveIn | null;
+    tasks: number;
+  } | null>(null);
   /** Connect an agent anyway: the agents page, whatever the project needs. */
   const [anyway, setAnyway] = useState(false);
   const fourRoot = step.n === 4 ? step.opened.root : null;
@@ -101,11 +107,14 @@ export function SetupWizard({
         ]);
         if (!live) return;
         const found = cardRows(fresh);
-        const page = stepFourPage(setup, updateNotice(check) !== null, found.length, false);
-        setFour({ page, setup, found, tasks: fresh.loaded.taskbag?.tasks.length ?? 0 });
+        // An older taskbag already renamed aside: its tasks are moved in from the same panel as
+        // card files (Task-A01-45).
+        const { moveIn } = tasksInStart(check);
+        const page = stepFourPage(setup, updateNotice(check) !== null, found.length, false, moveIn !== null);
+        setFour({ page, setup, found, moveIn, tasks: fresh.loaded.taskbag?.tasks.length ?? 0 });
       } catch {
         // Unsure what the project needs: the agents page, as before.
-        if (live) setFour({ page: "agents", setup: null, found: [], tasks: 0 });
+        if (live) setFour({ page: "agents", setup: null, found: [], moveIn: null, tasks: 0 });
       }
     })();
     return () => {
@@ -215,7 +224,7 @@ export function SetupWizard({
     });
 
   /** Step 2 → 3 for an older Allomos's taskbag (Task-A01-45): rename it aside and create a new
-   * one; step 4's request then asks the agent to move the tasks across. */
+   * one; step 4's Update the taskbag then asks the agent to move the tasks across. */
   const moveIn = () =>
     run(async () => {
       if (step.n !== 2 || step.at.kind !== "found") return;
@@ -324,6 +333,7 @@ export function SetupWizard({
                 messenger={messenger}
                 root={step.opened.root}
                 found={four.found}
+                moveIn={four.moveIn}
                 actionsIn={footer}
                 cancelLabel={t("agents.later")}
                 onClose={(message) => onClose({ message })}
@@ -403,7 +413,7 @@ export function SetupWizard({
             )}
             {step.n === 2 && step.at.kind === "found" && step.older && (
               <button type="button" className="primary" onClick={() => void moveIn()} disabled={busy}>
-                {t("move.button")}
+                {t("cards.button")}
               </button>
             )}
             {step.n === 2 && step.at.kind === "found" && !step.older && (

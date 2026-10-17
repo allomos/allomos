@@ -19,7 +19,9 @@ use crate::{lf, lock_for_change, read_text, shown, versions, write_atomic};
 /// Changes when the text of [`agent_move_cards_request_in`] changes.
 pub const MOVE_CARDS_REQUEST_VERSION: u32 = 2;
 
-/// What **Move the cards in…** types into the agent the person chooses (Task-A00-30), in an
+/// What **Update the taskbag…** types into the agent the person chooses when the taskbag is not
+/// from an older Allomos (Task-A00-30; one button since Task-A01-45, through
+/// [`agent_move_tasks_in_request_in`](crate::agent_move_tasks_in_request_in)), in an
 /// interface language (`en`, `zh-CN`, `ja`; English otherwise): find the card files the project
 /// still keeps in its own folder and move them in beside their tasks, following
 /// `alm guide move-cards`, with the person's Go ahead in the app. Nothing is sent: the person

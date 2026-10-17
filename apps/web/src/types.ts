@@ -271,7 +271,7 @@ export interface VersionCheck {
   section_current: number;
   format: FormatState;
   /** An older Allomos's taskbag whose tasks are still to be moved in (Task-A01-45): the taskbag
-   * itself (`prepared` false: Move the tasks in… renames it aside), or one already renamed aside
+   * itself (`prepared` false: Update the taskbag… renames it aside), or one already renamed aside
    * to `old` beside a new taskbag that has no tasks yet. */
   move_in: { old: string; found: string; prepared: boolean } | null;
   /** Instruction files holding Allomos's section; `version` null when its heading has none. */

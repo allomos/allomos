@@ -53,13 +53,15 @@ export interface Messenger {
   setRecentFolders(folders: string[]): Promise<void>;
   /** Calls `handler` when File → Connect with the Agents… is chosen. */
   onConnectMenu(handler: () => void): Promise<() => void>;
-  /** Calls `handler` when File → Move the Cards In… is chosen (Task-A00-30). */
-  onMoveCardsMenu(handler: () => void): Promise<() => void>;
-  /** Move the cards in… (Task-A00-30): opens `agent` in the project folder of the taskbag at
-   * `taskbag` with the move-cards request typed in. Nothing is sent. Rejects with a Problem. */
-  moveCards(agent: string, taskbag: string, language: string): Promise<void>;
-  /** Move the cards in… with Manual: the same request, to copy. */
-  moveCardsRequest(taskbag: string, language: string): Promise<string>;
+  /** Calls `handler` when File → Update the Taskbag… is chosen (Task-A00-30, Task-A01-45). */
+  onMoveTasksInMenu(handler: () => void): Promise<() => void>;
+  /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
+   * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
+   * request for whichever applies typed in (`alm move-in` prints it). Nothing is sent. Rejects
+   * with a Problem. */
+  moveTasksIn(agent: string, taskbag: string, language: string): Promise<void>;
+  /** Update the taskbag… with Manual: the same request, to copy. */
+  moveTasksInRequest(taskbag: string, language: string): Promise<string>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
   findAgents(): Promise<Agent[]>;
   /**
@@ -85,7 +87,7 @@ export interface Messenger {
   writeAgentFiles(project: string): Promise<string[]>;
   /** Whether the project of the taskbag at `root` is up to date with this Allomos; null until an agent is connected. */
   versionCheck(root: string): Promise<VersionCheck | null>;
-  /** Move the tasks in… (Task-A01-45): rename an older Allomos's taskbag aside and create a new,
+  /** Update the taskbag… on an older Allomos's taskbag (Task-A01-45): rename it aside and create a new,
    * empty one in its place; the new one, loaded. */
   moveTaskbagAside(root: string): Promise<Opened>;
   /** The taskbag's format compared with this Allomos's, connected or not. */
@@ -189,7 +191,7 @@ export interface MenuTexts {
   clearMenu: string;
   noRecent: string;
   connect: string;
-  moveCards: string;
+  moveTasksIn: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -219,9 +221,9 @@ export const desktopMessenger: Messenger = {
   setMenuTexts: (words) => invoke<void>("set_menu_texts", { words }),
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
-  onMoveCardsMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_cards", () => handler()),
-  moveCards: (agent, taskbag, language) => invoke<void>("move_cards", { agent, taskbag, language }),
-  moveCardsRequest: (taskbag, language) => invoke<string>("move_cards_request", { taskbag, language }),
+  onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
+  moveTasksIn: (agent, taskbag, language) => invoke<void>("move_tasks_in", { agent, taskbag, language }),
+  moveTasksInRequest: (taskbag, language) => invoke<string>("move_tasks_in_request", { taskbag, language }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
