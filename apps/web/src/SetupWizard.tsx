@@ -38,7 +38,8 @@ type Step =
       newer?: { found: string; supported: string } | null;
       older?: { found: string } | null;
     }
-  | { n: 3; opened: Opened; source: string }
+  /** `created`: the taskbag was just made in step 2, so step 3 says where it is. */
+  | { n: 3; opened: Opened; source: string; created?: boolean }
   /** `change`: the project folder was not just chosen in step 3, so it may be changed here. */
   | { n: 4; opened: Opened; project: string; change: boolean };
 
@@ -191,12 +192,15 @@ export function SetupWizard({
     }
   };
 
+  /** Step 2 → 3 for a folder with no taskbag: Create taskbag (in the bottom row, where Next is on
+   * the other steps; approver, 2026-10-17) makes it and goes on to step 3. */
   const create = () =>
     run(async () => {
       if (step.n !== 2 || step.at.kind !== "missing") return;
       const o = await messenger.createTaskbag(step.at.suggestedRoot, folderName(step.folder), language);
       onOpened(o, true);
-      setStep({ ...step, at: { kind: "found", root: o.root, buttons: ["next"] }, created: o });
+      const setup = await messenger.projectSetup(o.root);
+      setStep({ n: 3, opened: o, source: defaultSource(setup), created: true });
     });
 
   /** Step 2 → 3: open the taskbag, and offer its recorded project folder or the step-1 folder. */
@@ -280,16 +284,16 @@ export function SetupWizard({
               <h3>{t("wizard.missing_title")}</h3>
               <p>{rich("wizard.missing_body", { dir, folder: <code>{step.folder}</code> })}</p>
               <p className="muted">{t("wizard.git_agent")}</p>
-              <div className="row start">
-                <button type="button" className="primary" onClick={() => void create()} disabled={busy}>
-                  {t("wizard.create")}
-                </button>
-              </div>
             </>
           )}
 
           {step.n === 3 && (
             <>
+              {step.created && (
+                <p className="banner update" role="status">
+                  {rich("wizard.created_body", { path: <code>{step.opened.root}</code> })}
+                </p>
+              )}
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
               <p>
@@ -400,6 +404,11 @@ export function SetupWizard({
             {step.n === 2 && step.at.kind === "found" && !step.older && (
               <button type="button" className="primary" onClick={() => void toSource()} disabled={busy || Boolean(step.newer)}>
                 {t("wizard.next")}
+              </button>
+            )}
+            {step.n === 2 && step.at.kind === "missing" && (
+              <button type="button" className="primary" onClick={() => void create()} disabled={busy}>
+                {t("wizard.create")}
               </button>
             )}
             {step.n === 3 && (
