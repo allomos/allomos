@@ -170,7 +170,7 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
                 </button>
               ) : progressState(popup, now) === "quiet" ? (
                 <button type="button" onClick={() => hideQuiet(popup)}>
-                  {t("progress.hide")}
+                  {t("progress.close")}
                 </button>
               ) : (
                 <button type="button" onClick={() => toBackground(popup.id)}>
