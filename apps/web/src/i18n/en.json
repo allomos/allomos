@@ -236,7 +236,7 @@
   "wizard.found_body": "Allomos will use the taskbag in {path}. To use another one, choose Previous and pick a different folder.",
   "wizard.missing_title": "No taskbag in this folder yet",
   "wizard.missing_body": "Allomos will create {dir} in {folder}, with an empty taskbag inside. Nothing else in the folder changes.",
-  "wizard.git_agent": "Allomos does not run Git. In step 4, the AI agent you connect asks you whether to keep this folder in Git (if it is not yet), then commits the taskbag; nothing is pushed.",
+  "wizard.git_agent": "In step 4, the AI agent you connect asks you whether to keep this folder in Git (if it is not yet), then commits the taskbag; nothing is pushed.",
   "wizard.create": "Create taskbag",
   "wizard.source_title": "Connect the folder that holds your project",
   "wizard.source_body": "The project folder holds the project's code and documents, and the instruction files AI agents read when a session starts (AGENTS.md and CLAUDE.md). Agents work in this folder. It is usually the folder that holds the taskbag; choose another one if the taskbag is kept apart from the project.",
