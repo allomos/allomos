@@ -38,8 +38,9 @@ type Step =
       newer?: { found: string; supported: string } | null;
       older?: { found: string } | null;
     }
-  /** `created`: the taskbag was just made in step 2, so step 3 says where it is. */
-  | { n: 3; opened: Opened; source: string; created?: boolean }
+  /** `taskbag`: step 3 says where the taskbag is: just made in step 2, or found in the folder
+   * chosen in step 1 (which then skips step 2; approver, 2026-10-17). */
+  | { n: 3; opened: Opened; source: string; taskbag?: "created" | "found" }
   /** `change`: the project folder was not just chosen in step 3, so it may be changed here. */
   | { n: 4; opened: Opened; project: string; change: boolean };
 
@@ -136,6 +137,14 @@ export function SetupWizard({
           if (f?.format.state === "newer") newer = { found: f.format.found, supported: f.current };
           if (f?.format.state === "older") older = { found: f.format.found };
         }
+        // A taskbag this Allomos reads: straight on to step 3, which says it was found there.
+        if (at.kind === "found" && !newer && !older) {
+          const o = await messenger.openTaskbag(at.root);
+          onOpened(o, false);
+          const setup = await messenger.projectSetup(o.root);
+          setStep({ n: 3, opened: o, source: defaultSource(setup), taskbag: "found" });
+          return;
+        }
         setStep({ n: 2, folder, at, created: null, newer, older });
       } catch (e) {
         fail(e);
@@ -200,7 +209,7 @@ export function SetupWizard({
       const o = await messenger.createTaskbag(step.at.suggestedRoot, folderName(step.folder), language);
       onOpened(o, true);
       const setup = await messenger.projectSetup(o.root);
-      setStep({ n: 3, opened: o, source: defaultSource(setup), created: true });
+      setStep({ n: 3, opened: o, source: defaultSource(setup), taskbag: "created" });
     });
 
   /** Step 2 → 3: open the taskbag, and offer its recorded project folder or the step-1 folder. */
@@ -283,16 +292,20 @@ export function SetupWizard({
             <>
               <h3>{t("wizard.missing_title")}</h3>
               <p>{rich("wizard.missing_body", { dir, folder: <code>{step.folder}</code> })}</p>
-              <p className="muted">{t("wizard.git_agent")}</p>
             </>
           )}
 
           {step.n === 3 && (
             <>
-              {step.created && (
-                <p className="banner update" role="status">
-                  {rich("wizard.created_body", { path: <code>{step.opened.root}</code> })}
-                </p>
+              {step.taskbag && (
+                <>
+                  <p className="banner update" role="status">
+                    {rich(step.taskbag === "created" ? "wizard.created_body" : "wizard.found_note", {
+                      path: <code>{step.opened.root}</code>,
+                    })}
+                  </p>
+                  <p className="muted">{t("wizard.git_agent")}</p>
+                </>
               )}
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
@@ -392,7 +405,7 @@ export function SetupWizard({
               </button>
             )}
             {step.n === 3 && (
-              <button type="button" onClick={() => void look(step.opened.root)} disabled={busy}>
+              <button type="button" onClick={() => setStep({ n: 1 })} disabled={busy}>
                 {t("wizard.back")}
               </button>
             )}

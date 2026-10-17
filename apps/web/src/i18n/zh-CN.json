@@ -234,6 +234,7 @@
   "wizard.choose_hint": "选择存放任务包的文件夹。通常就是项目自己的文件夹：{dir} 会建在其中。",
   "wizard.found_title": "这个文件夹已有任务包",
   "wizard.found_body": "「换肩」将使用 {path} 中的任务包。要使用其他任务包，请点“上一步”，再选择别的文件夹。",
+  "wizard.found_note": "这个文件夹已有任务包：{path}。要使用其他任务包，请点“上一步”，再选择别的文件夹。",
   "wizard.missing_title": "这个文件夹里还没有任务包",
   "wizard.missing_body": "「换肩」将在 {folder} 中建立 {dir}，里面是一个空的任务包。文件夹中的其他内容不会改变。",
   "wizard.git_agent": "在第 4 步，你连接的 AI 智能体会问你是否用 Git 管理这个文件夹（如果还没有），然后提交任务包；不会推送任何东西。",
