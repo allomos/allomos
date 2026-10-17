@@ -516,7 +516,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 /* Build a new app… (Task-A03-25-02): under the start page's card, right of Open recent…, and its
    dialog. */
 .welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
-.build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--surface); }
+.description-dialog { width: min(560px, 100%); }
+.description-dialog .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--surface); }
 .build-app .build-description-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; }
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }

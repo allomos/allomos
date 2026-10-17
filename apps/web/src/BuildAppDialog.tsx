@@ -7,6 +7,7 @@
 // project opens behind the dialog and follows the taskbag as the agent works.
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
@@ -40,8 +41,9 @@ export function BuildAppDialog({
   const { t, rich, problem, language } = useI18n();
   const [folder, setFolder] = useState<FolderCheck | null>(null);
   const [description, setDescription] = useState("");
-  /** The description box is shown only while the person writes (the box was almost invisible). */
+  /** The description is written in a pop-up (the inline box was almost invisible); `draft` is its text until OK. */
   const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   // The shared agent picker (Task-A05-07).
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   const [mode, setMode] = useState<RunMode>(FIRST_MODE);
@@ -148,35 +150,19 @@ export function BuildAppDialog({
               </div>
 
               <h3>{t("build.description_title")}</h3>
-              {editing ? (
-                <>
-                  <textarea
-                    id="build-description"
-                    className="build-description"
-                    rows={5}
-                    autoFocus
-                    value={description}
-                    aria-label={t("build.description_title")}
-                    placeholder={t("build.description_placeholder")}
-                    onChange={(e) => setDescription(e.currentTarget.value)}
-                    disabled={locked}
-                  />
-                  <div className="row start">
-                    <button type="button" onClick={() => setEditing(false)}>
-                      {t("build.description_done")}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="row start">
-                    <button type="button" onClick={() => setEditing(true)} disabled={locked}>
-                      {t(description.trim() === "" ? "build.description_write" : "build.description_edit")}
-                    </button>
-                  </div>
-                  {description.trim() !== "" && <p className="build-description-text">{description}</p>}
-                </>
-              )}
+              <div className="row start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(description);
+                    setEditing(true);
+                  }}
+                  disabled={locked}
+                >
+                  {t(description.trim() === "" ? "build.description_write" : "build.description_edit")}
+                </button>
+              </div>
+              {description.trim() !== "" && <p className="build-description-text">{description}</p>}
 
               <h3>{t("build.agent_title")}</h3>
               <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="build-agent" />
@@ -248,6 +234,39 @@ export function BuildAppDialog({
           )}
         </div>
       </section>
+      {editing &&
+        createPortal(
+          <div className="overlay above" role="presentation">
+            <section className="dialog description-dialog" role="dialog" aria-modal="true" aria-labelledby="build-description-title">
+              <h2 id="build-description-title">{t("build.description_title")}</h2>
+              <textarea
+                className="build-description"
+                rows={8}
+                autoFocus
+                value={draft}
+                aria-labelledby="build-description-title"
+                placeholder={t("build.description_placeholder")}
+                onChange={(e) => setDraft(e.currentTarget.value)}
+              />
+              <div className="row">
+                <button type="button" onClick={() => setEditing(false)}>
+                  {t("wizard.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => {
+                    setDescription(draft);
+                    setEditing(false);
+                  }}
+                >
+                  {t("build.description_done")}
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
