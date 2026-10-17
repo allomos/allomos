@@ -58,6 +58,8 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
     if (waiting && !stillWaiting(waiting, reports)) setWaiting(null);
   }, [waiting, reports]);
   const [background, setBackground] = useState<Set<string>>(new Set());
+  /** Quiet reports the person closed, with the time of the report they closed (see `arrange`). */
+  const [closed, setClosed] = useState<Map<string, number>>(new Map());
   const [now, setNow] = useState(() => Date.now() / 1000);
 
   useEffect(() => {
@@ -87,6 +89,16 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
       next.delete(id);
       return next;
     });
+  /** A quiet agent's popup: hidden, the report kept, so a later report brings it back. */
+  const hideQuiet = (p: Progress) => {
+    toFront(p.id);
+    if (p.id === WAITING_ID) {
+      setWaiting(null);
+      return;
+    }
+    setClosed((c) => new Map(c).set(p.id, p.updated));
+  };
+  /** A finished job's popup: removed. */
   const close = (id: string) => {
     toFront(id);
     if (id === WAITING_ID) {
@@ -101,7 +113,7 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
   const shown: Progress[] = waiting
     ? [{ id: WAITING_ID, title: t(JOB_TITLE[waiting.job]), step: t("progress.waiting"), started: waiting.since, updated: waiting.since }, ...reports]
     : reports;
-  const { popup, chips } = arrange(shown, background);
+  const { popup, chips } = arrange(shown, background, closed);
   const count = (p: Progress) => (p.done !== undefined && p.of ? ` (${t("progress.count", { done: p.done, of: p.of })})` : "");
 
   return (
@@ -156,17 +168,14 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
                 <button type="button" className="primary" onClick={() => close(popup.id)}>
                   {t("progress.close")}
                 </button>
+              ) : progressState(popup, now) === "quiet" ? (
+                <button type="button" onClick={() => hideQuiet(popup)}>
+                  {t("progress.hide")}
+                </button>
               ) : (
-                <>
-                  {progressState(popup, now) === "quiet" && (
-                    <button type="button" onClick={() => close(popup.id)}>
-                      {t("progress.close")}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => toBackground(popup.id)}>
-                    {t("progress.background")}
-                  </button>
-                </>
+                <button type="button" onClick={() => toBackground(popup.id)}>
+                  {t("progress.background")}
+                </button>
               )}
             </div>
           </section>

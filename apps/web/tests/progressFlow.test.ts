@@ -39,3 +39,12 @@ test("the waiting popup shows from the moment the agent is opened until its firs
   assert.equal(stillWaiting(waiting, [report("a", { updated: 2001 })]), false);
   assert.equal(stillWaiting(null, []), false);
 });
+
+test("a quiet report the person closed stays hidden until its agent reports again", () => {
+  const quiet = report("a", { updated: 1000 });
+  const closed = new Map([["a", 1000]]);
+  assert.equal(arrange([quiet, report("b")], new Set(), closed).popup?.id, "b");
+  assert.deepEqual(arrange([quiet], new Set(["a"]), closed), { popup: null, chips: [] });
+  // The agent reports again (a step, or that it finished): the popup comes back.
+  assert.equal(arrange([report("a", { updated: 1300 })], new Set(), closed).popup?.id, "a");
+});

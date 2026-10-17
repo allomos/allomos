@@ -44,10 +44,17 @@ export function fraction(p: Progress): number | null {
   return Math.min(1, Math.max(0, p.done / p.of));
 }
 
-/** The report the popup shows (the earliest not in the background), and the ones shown as chips. */
-export function arrange(reports: Progress[], background: ReadonlySet<string>): { popup: Progress | null; chips: Progress[] } {
+/** The report the popup shows (the earliest not in the background), and the ones shown as chips.
+ * `closed`: quiet reports the person closed, with the time of the report they closed; each stays
+ * hidden until its agent reports again (approver, 2026-10-17). */
+export function arrange(
+  reports: Progress[],
+  background: ReadonlySet<string>,
+  closed: ReadonlyMap<string, number> = new Map(),
+): { popup: Progress | null; chips: Progress[] } {
+  const open = reports.filter((p) => !(closed.has(p.id) && p.updated <= (closed.get(p.id) ?? 0)));
   return {
-    popup: reports.find((p) => !background.has(p.id)) ?? null,
-    chips: reports.filter((p) => background.has(p.id)),
+    popup: open.find((p) => !background.has(p.id)) ?? null,
+    chips: open.filter((p) => background.has(p.id)),
   };
 }
