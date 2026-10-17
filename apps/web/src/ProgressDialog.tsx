@@ -123,11 +123,20 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
           <section className="dialog progress-dialog" role="dialog" aria-modal="true" aria-labelledby="progress-title">
             <h2 id="progress-title">{popup.title}</h2>
             {popup.id !== WAITING_ID && (
-              <p className="muted">{popup.from ? t("progress.from", { from: popup.from }) : t("progress.from_unknown")}</p>
+              <p className="muted">
+                {progressState(popup, now) === "finished"
+                  ? popup.from
+                    ? t("progress.finished_from", { from: popup.from })
+                    : t("progress.finished_unknown")
+                  : popup.from
+                    ? t("progress.from", { from: popup.from })
+                    : t("progress.from_unknown")}
+              </p>
             )}
             {progressState(popup, now) === "finished" ? (
-              <p className="banner update" role="status">
-                {popup.finished}
+              // The agent's own words (`alm progress --finished`), as plain text.
+              <p className="progress-finished" role="status">
+                <span aria-hidden="true">✓</span> <span>{popup.finished}</span>
               </p>
             ) : (
               <>

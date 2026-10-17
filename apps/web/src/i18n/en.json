@@ -46,6 +46,8 @@
   "confirm.cancelled": "Cancelled: nothing was changed. To ask again, tell the AI agent in its window, for example \"I changed my mind — please show me the plan again\", or choose File → Connect with the Agents… to start again with any agent.",
   "progress.from": "{from} is working on this job:",
   "progress.from_unknown": "An AI agent is working on this job:",
+  "progress.finished_from": "{from} finished this job:",
+  "progress.finished_unknown": "An AI agent finished this job:",
   "progress.starting": "Starting…",
   "progress.waiting": "Waiting for the AI agent to respond… Send the request in the agent's window if you have not yet.",
   "progress.job_connect": "Connect with the agents",
