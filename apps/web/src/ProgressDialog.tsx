@@ -4,19 +4,59 @@
 // everything: the job, the step, a bar when the agent counts its steps. **Go to background** puts
 // it away; a chip in the corner brings it back. Finished, it says what happened and Close removes
 // it; an agent silent for 10 minutes is named as such, so the window is never stuck. An
-// `alm confirm` question shows on top (ConfirmDialog comes later in the window).
+// `alm confirm` question shows on top (ConfirmDialog comes later in the window). From the moment
+// the app opens an agent for a job (`agentOpened`), the popup says it is waiting for the agent,
+// until the agent's first report takes its place (approver, 2026-10-17).
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import type { Progress } from "./types";
-import { arrange, fraction, progressState } from "./progressFlow";
+import { WAITING_ID, arrange, fraction, progressState, stillWaiting } from "./progressFlow";
+import type { Job, Waiting } from "./progressFlow";
+import type { Key } from "./i18n";
+
+const JOB_EVENT = "allomos:agent-opened";
+
+const JOB_TITLE: Record<Job, Key> = {
+  connect: "progress.job_connect",
+  update: "progress.job_update",
+  move_in: "progress.job_move_in",
+  cards: "progress.job_cards",
+  build_app: "progress.job_build_app",
+};
+
+/** The app has opened an agent for `job` on the taskbag at `root`: the window's progress popup
+ * shows "Waiting for the AI agent to respond…" at once. */
+export function agentOpened(root: string, job: Job) {
+  const detail: Waiting = { root, job, since: Date.now() / 1000 };
+  window.dispatchEvent(new CustomEvent<Waiting>(JOB_EVENT, { detail }));
+}
 
 const LOOK_MS = 1000;
 
-export function ProgressDialog({ messenger, project }: { messenger: Messenger; project: string }) {
+export function ProgressDialog({ messenger, project, root }: { messenger: Messenger; project: string; root: string }) {
   const { t } = useI18n();
   const [reports, setReports] = useState<Progress[]>([]);
+  const [waiting, setWaiting] = useState<Waiting | null>(null);
+  useEffect(() => {
+    const opened = (e: Event) => {
+      const w = (e as CustomEvent<Waiting>).detail;
+      if (w.root !== root) return;
+      setWaiting(w);
+      setNow(w.since);
+      setBackground((b) => {
+        const next = new Set(b);
+        next.delete(WAITING_ID);
+        return next;
+      });
+    };
+    window.addEventListener(JOB_EVENT, opened);
+    return () => window.removeEventListener(JOB_EVENT, opened);
+  }, [root]);
+  useEffect(() => {
+    if (waiting && !stillWaiting(waiting, reports)) setWaiting(null);
+  }, [waiting, reports]);
   const [background, setBackground] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now() / 1000);
 
@@ -48,12 +88,20 @@ export function ProgressDialog({ messenger, project }: { messenger: Messenger; p
       return next;
     });
   const close = (id: string) => {
-    setReports((list) => list.filter((p) => p.id !== id));
     toFront(id);
+    if (id === WAITING_ID) {
+      setWaiting(null);
+      return;
+    }
+    setReports((list) => list.filter((p) => p.id !== id));
     void messenger.dismissProgress(project, id).catch(() => undefined);
   };
 
-  const { popup, chips } = arrange(reports, background);
+  // Until the agent's first report, an entry of the window's own: waiting for it to respond.
+  const shown: Progress[] = waiting
+    ? [{ id: WAITING_ID, title: t(JOB_TITLE[waiting.job]), step: t("progress.waiting"), started: waiting.since, updated: waiting.since }, ...reports]
+    : reports;
+  const { popup, chips } = arrange(shown, background);
   const count = (p: Progress) => (p.done !== undefined && p.of ? ` (${t("progress.count", { done: p.done, of: p.of })})` : "");
 
   return (
@@ -62,7 +110,7 @@ export function ProgressDialog({ messenger, project }: { messenger: Messenger; p
         <div className="progress-chips">
           {chips.map((p) => (
             <button key={p.id} type="button" className="progress-chip" onClick={() => toFront(p.id)}>
-              {progressState(p, now) === "working" && <span className="spinner" aria-hidden="true" />}{" "}
+              {progressState(p, now) === "working" && <span className="spinner" aria-hidden="true" />}
               {progressState(p, now) === "finished"
                 ? t("progress.chip_finished", { title: p.title })
                 : `${p.title}: ${p.step ?? t("progress.starting")}${count(p)}`}
@@ -74,17 +122,21 @@ export function ProgressDialog({ messenger, project }: { messenger: Messenger; p
         <div className="overlay" role="presentation">
           <section className="dialog progress-dialog" role="dialog" aria-modal="true" aria-labelledby="progress-title">
             <h2 id="progress-title">{popup.title}</h2>
-            <p className="muted">{popup.from ? t("progress.from", { from: popup.from }) : t("progress.from_unknown")}</p>
+            {popup.id !== WAITING_ID && (
+              <p className="muted">{popup.from ? t("progress.from", { from: popup.from }) : t("progress.from_unknown")}</p>
+            )}
             {progressState(popup, now) === "finished" ? (
               <p className="banner update" role="status">
                 {popup.finished}
               </p>
             ) : (
               <>
-                <p role="status">
-                  {progressState(popup, now) === "working" && <span className="spinner" aria-hidden="true" />}{" "}
-                  {popup.step ?? t("progress.starting")}
-                  {count(popup)}
+                <p className="searching" role="status">
+                  {progressState(popup, now) === "working" && <span className="spinner" aria-hidden="true" />}
+                  <span>
+                    {popup.step ?? t("progress.starting")}
+                    {count(popup)}
+                  </span>
                 </p>
                 {fraction(popup) !== null && <progress className="progress-bar" value={fraction(popup) ?? 0} max={1} />}
                 {progressState(popup, now) === "quiet" && <p className="banner error">{t("progress.quiet")}</p>}

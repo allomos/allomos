@@ -8,6 +8,25 @@
 
 import type { Progress } from "./types";
 
+/** The jobs the app hands to an agent; their titles match what `alm progress` is asked to say. */
+export type Job = "connect" | "update" | "move_in" | "cards" | "build_app";
+
+/** The app just opened an agent for `job` on the taskbag at `root`, at `since` (seconds). */
+export interface Waiting {
+  root: string;
+  job: Job;
+  since: number;
+}
+
+/** The id of the waiting entry (no agent report uses it: theirs come from `--as`). */
+export const WAITING_ID = "waiting:app";
+
+/** Whether the waiting entry still shows: until a report arrives that was written after the agent
+ * was opened (a few seconds of clock difference allowed). */
+export function stillWaiting(waiting: Waiting | null, reports: Progress[]): boolean {
+  return waiting !== null && !reports.some((p) => p.updated >= waiting.since - 5);
+}
+
 /** An agent that has not reported for this long may have stopped. */
 export const QUIET_AFTER_S = 10 * 60;
 

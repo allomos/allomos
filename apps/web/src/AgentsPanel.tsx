@@ -15,6 +15,7 @@ import type { InstructionFiles } from "./types";
 import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
+import { agentOpened } from "./ProgressDialog";
 import type { Seen } from "./manualFlow";
 
 /** What happened when the panel closes. */
@@ -172,6 +173,7 @@ export function AgentsPanel({
     try {
       const before = await filesNow();
       await messenger.connectAgents(chosen, project, taskbag, language);
+      agentOpened(taskbag, updating === "move" ? "move_in" : updating ? "update" : "connect");
       onDone({
         // One agent (owner, 2026-10-12); a terminal that takes the request from the clipboard is told so.
         message: (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")

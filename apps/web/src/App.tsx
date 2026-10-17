@@ -613,7 +613,7 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {/* What an agent reports with `alm progress` while it works (Task-A05-08); before the
             questions, so a question shows on top. */}
-        {opened && <ProgressDialog messenger={messenger} project={projectFolder(opened.root)} />}
+        {opened && <ProgressDialog messenger={messenger} project={projectFolder(opened.root)} root={opened.root} />}
 
         {/* Questions an agent asks with `alm confirm` about the folder this window shows (Task-A05-02). */}
         {/* `alm confirm` asks about the folder holding `.allomos/`, where its --taskbag points. */}

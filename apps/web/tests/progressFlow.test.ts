@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { QUIET_AFTER_S, arrange, fraction, progressState } from "../src/progressFlow.ts";
+import { QUIET_AFTER_S, arrange, fraction, progressState, stillWaiting } from "../src/progressFlow.ts";
 import type { Progress } from "../src/types.ts";
 
 const report = (id: string, more: Partial<Progress> = {}): Progress => ({ id, title: "Update the taskbag", started: 100, updated: 1000, ...more });
@@ -29,4 +29,13 @@ test("the popup shows the earliest report not in the background; the others are 
   assert.deepEqual(chips.map((p) => p.id), ["a", "c"]);
   assert.equal(arrange(list, new Set(["a", "b", "c"])).popup, null);
   assert.deepEqual(arrange([], new Set()), { popup: null, chips: [] });
+});
+
+test("the waiting popup shows from the moment the agent is opened until its first report", () => {
+  const waiting = { root: "/p/.allomos/taskbag", job: "cards" as const, since: 2000 };
+  assert.equal(stillWaiting(waiting, []), true);
+  // An old report (an earlier job, not closed yet) does not end the wait.
+  assert.equal(stillWaiting(waiting, [report("a", { updated: 1000, finished: "done" })]), true);
+  assert.equal(stillWaiting(waiting, [report("a", { updated: 2001 })]), false);
+  assert.equal(stillWaiting(null, []), false);
 });

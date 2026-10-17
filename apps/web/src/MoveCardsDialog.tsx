@@ -15,6 +15,7 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL } from "./agentPickerFlow";
+import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
 import { isProblem } from "./types";
 import type { CardRow } from "./moveCardsFlow";
@@ -89,6 +90,7 @@ export function MoveCardsPanel({
         return;
       }
       await messenger.moveCards(agent, root, language);
+      agentOpened(root, "cards");
       const name = t(AGENT_KEY[agent]);
       onClose(tool?.how === "paste" ? t("cards.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("cards.asked", { agent: name }));
     } catch (e) {

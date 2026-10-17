@@ -11,6 +11,7 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { Markdown } from "./Markdown";
+import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
 import { FIRST_MODE, MANUAL, canStart, checkFolder } from "./buildAppFlow";
 import type { FolderCheck, RunMode } from "./buildAppFlow";
@@ -97,6 +98,7 @@ export function BuildAppDialog({
         return;
       }
       await messenger.buildApp(agent, folder.folder, o.root, language, description, quiet);
+      agentOpened(o.root, "build_app");
       const name = t(AGENT_KEY[agent]);
       onClose(tool?.how === "paste" ? t("build.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("build.asked", { agent: name }));
     } catch (e) {
