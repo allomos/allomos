@@ -57,11 +57,12 @@ export interface Messenger {
   onMoveTasksInMenu(handler: () => void): Promise<() => void>;
   /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
-   * request for whichever applies typed in (`alm move-in` prints it). Nothing is sent. Rejects
+   * request for whichever applies typed in (`alm move-in` prints it), plus setting up `agents`, the
+   * agents not yet set up (Task-A03-24). Nothing is sent. Rejects
    * with a Problem. */
-  moveTasksIn(agent: string, taskbag: string, language: string): Promise<void>;
+  moveTasksIn(agent: string, taskbag: string, language: string, agents: string[]): Promise<void>;
   /** Update the taskbag… with Manual: the same request, to copy. */
-  moveTasksInRequest(taskbag: string, language: string): Promise<string>;
+  moveTasksInRequest(taskbag: string, language: string, agents: string[]): Promise<string>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
   findAgents(): Promise<Agent[]>;
   /**
@@ -224,8 +225,9 @@ export const desktopMessenger: Messenger = {
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
-  moveTasksIn: (agent, taskbag, language) => invoke<void>("move_tasks_in", { agent, taskbag, language }),
-  moveTasksInRequest: (taskbag, language) => invoke<string>("move_tasks_in_request", { taskbag, language }),
+  moveTasksIn: (agent, taskbag, language, agents) => invoke<void>("move_tasks_in", { agent, taskbag, language, agents }),
+  moveTasksInRequest: (taskbag, language, agents) =>
+    invoke<string>("move_tasks_in_request", { taskbag, language, agents }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
