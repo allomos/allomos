@@ -13,7 +13,6 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import { AgentsPanel } from "./AgentsPanel";
-import { AgentSetupNotes } from "./AgentSetupNote";
 import { MoveCardsPanel } from "./MoveCardsDialog";
 import { cardRows, tasksInStart } from "./moveCardsFlow";
 import type { CardRow, MoveIn } from "./moveCardsFlow";
@@ -361,12 +360,6 @@ export function SetupWizard({
                 })}
               </p>
               <p>{t("done.tasks", { count: four.tasks })}</p>
-              <AgentSetupNotes
-                messenger={messenger}
-                project={step.project}
-                taskbag={step.opened.root}
-                onError={(e) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }))}
-              />
               <p>
                 <button type="button" className="link" onClick={() => setAnyway(true)}>
                   {t("wizard.connect_anyway")}

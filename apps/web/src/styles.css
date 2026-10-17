@@ -109,8 +109,6 @@ button.link:hover { text-decoration: underline; }
 .overlay.above { z-index: 15; }
 .card-found code { overflow-wrap: anywhere; }
 .agent-tools { list-style: none; margin: 4px 0 0; padding: 0 0 0 24px; display: grid; gap: 4px; }
-/* An agent not yet listed under Agents set up (Task-A03-24): its note and Copy prompt, under its name. */
-.agent-list .setup-note { margin: 2px 0 0 24px; justify-content: flex-start; align-items: baseline; }
 .searching { display: flex; align-items: center; gap: 8px; }
 .spinner { display: inline-block; flex: none; vertical-align: -2px; box-sizing: border-box; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

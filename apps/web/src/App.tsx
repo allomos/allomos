@@ -12,7 +12,9 @@ import { MoveCardsDialog } from "./MoveCardsDialog";
 import { cardRows, cardsNotice, tasksInStart } from "./moveCardsFlow";
 import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
-import { updateNotice } from "./versionFlow";
+import { movingTasks, updateNotice } from "./versionFlow";
+import { foundGroups } from "./agentPickerFlow";
+import { notSetUp, setupNotice } from "./agentSetupFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
@@ -137,6 +139,8 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [movingCards, setMovingCards] = useState<{ moveIn: MoveIn | null } | null>(null);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
+  /** The update notice offers Update the taskbag… for an older taskbag (moving its tasks in). */
+  const [movingShown, setMovingShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
   const [recent, setRecent] = useState<string[]>(readRecent);
   const changeRecent = useCallback((change: (list: string[]) => string[]) => {
@@ -209,6 +213,39 @@ export function App({ messenger }: { messenger: Messenger }) {
       setError(errorNote(e));
     }
   }, [messenger, show]);
+
+  /** The agents found on this computer with no line under `## Agents set up` in the open taskbag's
+   * project notes (Task-A03-24): read when a taskbag opens and every few seconds, so the notice
+   * goes away once the agent adds its lines. Unreadable: none (nothing to say). */
+  const [notSetUpYet, setNotSetUpYet] = useState<string[]>([]);
+  const [foundAgents, setFoundAgents] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .findAgents()
+      .then((found) => live && setFoundAgents(foundGroups(found).map((g) => g.name)))
+      .catch(() => live && setFoundAgents([]));
+    return () => {
+      live = false;
+    };
+  }, [messenger]);
+  const openRoot = opened?.root ?? null;
+  useEffect(() => {
+    setNotSetUpYet([]);
+    if (!openRoot || !foundAgents?.length) return;
+    let live = true;
+    const look = () =>
+      messenger
+        .agentsSetUp(openRoot)
+        .then((entries) => live && setNotSetUpYet((was) => same(was, notSetUp(foundAgents, entries))))
+        .catch(() => undefined);
+    void look();
+    const timer = window.setInterval(() => void look(), VERSION_CHECK_MS);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [messenger, openRoot, foundAgents]);
 
   /** The open-folder flow (docs/product/OPEN-FOLDER-FLOW.md): the open taskbag's project folder,
    * agent instructions and tasks, and whether the person put off connecting agents this time. */
@@ -527,6 +564,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             onUpdate={() => openWizard({ resume: { root: opened.root, at: 4 } })}
             onMoveIn={openTasksIn}
             onOlder={setOlderShown}
+            onMoving={setMovingShown}
           />
         )}
         {/* Card files still in the project folder (Task-A00-30): named by the tasks' Card: links
@@ -539,12 +577,23 @@ export function App({ messenger }: { messenger: Messenger }) {
             </button>
           </div>
         )}
+        {/* An agent found on this computer not yet set up for the project (Task-A03-24, approver
+            2026-10-17): one more thing Update the taskbag… does. */}
+        {opened && setupNotice(notSetUpYet, !!setup && !neverConnected(setup), cardsNotice(opened) > 0 || movingShown) && (
+          <div className="banner update" role="status">
+            <span>{t("setup.notice", { agents: agentNames(notSetUpYet, language) })}</span>
+            <button type="button" className="primary" onClick={() => void openTasksIn()}>
+              {t("cards.button")}
+            </button>
+          </div>
+        )}
         {opened && movingCards && (
           <MoveCardsDialog
             messenger={messenger}
             root={opened.root}
             found={cardRows(opened)}
             moveIn={movingCards.moveIn}
+            agents={notSetUpYet}
             onClose={(message) => {
               setMovingCards(null);
               if (message) setNotices((list) => [...list, { text: message }]);
@@ -677,6 +726,16 @@ export function App({ messenger }: { messenger: Messenger }) {
 /** How often the update notice checks again: an agent's update shows without reopening. */
 const VERSION_CHECK_MS = 4000;
 
+/** `next` when it lists other names than `was`, else `was` (no new render every few seconds). */
+function same(was: string[], next: string[]): string[] {
+  return was.length === next.length && was.every((n, i) => n === next[i]) ? was : next;
+}
+
+/** Agent names in a sentence: "Claude, Codex"; "Claude、Codex" in Chinese and Japanese. */
+function agentNames(names: string[], language: Language): string {
+  return names.join(language === "en" ? ", " : "、");
+}
+
 /** "Allomos's instructions are out of date", with **Update the instructions…** (Task-A01-25), or
  * "This taskbag was written by an older Allomos", with **Update the taskbag…** (Task-A01-45: the
  * old folder is renamed aside, a new taskbag created, and an agent moves the tasks across, from
@@ -689,6 +748,7 @@ function VersionNotice({
   onUpdate,
   onMoveIn,
   onOlder,
+  onMoving,
 }: {
   messenger: Messenger;
   root: string;
@@ -700,6 +760,9 @@ function VersionNotice({
   /** Whether this notice says the taskbag is from an older Allomos, so the problem list does not
    * say it again. */
   onOlder: (shown: boolean) => void;
+  /** Whether this notice offers Update the taskbag… for an older taskbag's tasks (Task-A03-24:
+   * the agents notice then waits, as that request covers them too). */
+  onMoving: (shown: boolean) => void;
 }) {
   const { t } = useI18n();
   const [check, setCheck] = useState<VersionCheck | null>(null);
@@ -725,6 +788,11 @@ function VersionNotice({
     onOlder(older);
     return () => onOlder(false);
   }, [older, onOlder]);
+  const moving = movingTasks(notice);
+  useEffect(() => {
+    onMoving(moving);
+    return () => onMoving(false);
+  }, [moving, onMoving]);
   if (!notice) return null;
   const moveIn = () => {
     setBusy(true);

@@ -1099,10 +1099,16 @@ fn tasks_in_job(taskbag: &Path) -> Job {
 /// **Update the taskbag…** (Task-A01-45, approver 2026-10-16: one button for an older taskbag and
 /// for card files kept outside the taskbag, Task-A00-30): open the chosen agent in the project
 /// folder of the taskbag at `taskbag`, with the request for whichever applies typed in
-/// ([`allomos_store::agent_move_tasks_in_request_in`]). Nothing is sent: the person sends it; the
+/// ([`allomos_store::agent_update_taskbag_request_in`]; `agents`: the agents found on this
+/// computer with no line under `## Agents set up`, Task-A03-24). Nothing is sent: the person sends it; the
 /// agent shows its plan in the app (`alm confirm`) before anything changes.
 #[tauri::command]
-async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Result<(), Problem> {
+async fn move_tasks_in(
+    agent: String,
+    taskbag: PathBuf,
+    language: String,
+    agents: Vec<String>,
+) -> Result<(), Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -1116,7 +1122,7 @@ async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Res
     let request = with_progress_in(
         &language,
         tasks_in_job(&taskbag),
-        &allomos_store::agent_move_tasks_in_request_in(&language, &project, &taskbag),
+        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag, &agents),
     );
     agents::ask(chosen, &project, &request)
 }
@@ -1124,12 +1130,12 @@ async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Res
 /// **Update the taskbag…** with Manual: the same request, as an agent opened through a link gets
 /// it, for the person to copy.
 #[tauri::command]
-fn move_tasks_in_request(taskbag: PathBuf, language: String) -> String {
+fn move_tasks_in_request(taskbag: PathBuf, language: String, agents: Vec<String>) -> String {
     let project = allomos_store::versions::project_folder(&taskbag);
     let request = with_progress_in(
         &language,
         tasks_in_job(&taskbag),
-        &allomos_store::agent_move_tasks_in_request_in(&language, &project, &taskbag),
+        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag, &agents),
     );
     agents::link_request(&request, alm_command::own().as_deref())
 }
@@ -1829,8 +1835,14 @@ mod tests {
         // tasks are in, it is about card files (below).
         assert_eq!(tasks_in_job(&taskbag), Job::MoveIn);
         assert!(
-            move_tasks_in_request(taskbag.clone(), "en".into())
+            move_tasks_in_request(taskbag.clone(), "en".into(), Vec::new())
                 .contains("Allomos renamed the old taskbag (format allomos/2;")
+        );
+        // An agent not yet set up (Task-A03-24): the same request also asks for its setup.
+        let both = move_tasks_in_request(taskbag.clone(), "en".into(), vec!["Codex".into()]);
+        assert!(
+            both.contains("Allomos renamed the old taskbag")
+                && both.contains("agent setup request")
         );
         // Asking twice changes nothing.
         assert!(move_taskbag_aside(taskbag.clone()).is_ok());

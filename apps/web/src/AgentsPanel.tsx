@@ -5,8 +5,6 @@
 // moving them. Allomos never sends a request; the person does. **Manual** (Task-A05-06), offered
 // even when no known agent is found, shows the same request with Copy, for any other AI. The
 // agent choice is the shared picker (`AgentPicker`, Task-A05-07), which other features use too.
-// An agent with no entry under `## Agents set up` in the project notes shows "Not set up for this
-// project yet." with Copy prompt (Task-A03-24, approver 2026-10-16); the app checks nothing else.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -18,7 +16,6 @@ import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { agentOpened } from "./ProgressDialog";
-import { useSetupNotes } from "./AgentSetupNote";
 import type { Seen } from "./manualFlow";
 
 /** What happened when the panel closes. */
@@ -127,9 +124,6 @@ export function AgentsPanel({
       window.clearInterval(timer);
     };
   }, [messenger, manual, before, project, taskbag]);
-
-  // Agents set up (Task-A03-24): the note under each agent not yet set up.
-  const { note: setupNote } = useSetupNotes(messenger, project, taskbag, (e) => fail(e));
 
   const copy = async () => {
     if (request === null) return;
@@ -260,7 +254,6 @@ export function AgentsPanel({
         onChoose={setChoice}
         disabled={busy}
         name="connect-agent"
-        groupNote={(group) => setupNote(group, busy)}
         manual={
           <div className="manual">
             <p className="small">{rich("manual.intro", { path: <code>{project}</code> })}</p>
