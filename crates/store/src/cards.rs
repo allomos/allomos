@@ -1,21 +1,23 @@
-//! Card files kept beside their tasks, on disk (Task-A00-30): what agents reported as still in
-//! the project folder, recording such reports, and moving a card file into `tasks/<id>/card.md`.
-//! The rules are in `allomos_core::card`; nothing here looks for card files by itself.
+//! Card files kept beside their tasks, on disk (Task-A00-30): the card files still outside the
+//! taskbag (linked from a task's description, Task-A01-51, or reported by an agent), recording
+//! such reports, and moving a card file into `tasks/<id>/card.md`. The rules are in
+//! `allomos_core::card`; nothing here searches folders for card files: only the `Card:` links
+//! are read.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use allomos_core::card::{self, Outside};
+use allomos_core::card::{self, Outside, Pointer, Source};
 use allomos_core::event::Kind;
-use allomos_core::{Issue, Problem, Task};
+use allomos_core::{Issue, Problem, Task, Taskbag};
 
 use crate::convert::migration_header_in;
 use crate::events::{self, Actor};
 use crate::{lf, lock_for_change, read_text, shown, versions, write_atomic};
 
 /// Changes when the text of [`agent_move_cards_request_in`] changes.
-pub const MOVE_CARDS_REQUEST_VERSION: u32 = 1;
+pub const MOVE_CARDS_REQUEST_VERSION: u32 = 2;
 
 /// What **Move the tasks in…** types into the agent the person chooses when the taskbag is not
 /// from an older Allomos (Task-A00-30; one button since Task-A01-45, through
@@ -34,7 +36,7 @@ pub fn agent_move_cards_request_in(language: &str, project: &Path, taskbag: &Pat
 
 {header}
 
-按 `{guide}` 打印的步骤做：先用 `alm cards` 看其他智能体已经报告的卡片文件，自己找出其余的，用 `alm cards found` 报告；然后用 `alm confirm` 在 Allomos 应用里给用户看完整计划。用户选择“继续”之前，什么都不要改。
+按 `{guide}` 打印的步骤做：先用 `alm cards` 看链接到任务包外的卡片文件和其他智能体已经报告的卡片文件，自己找出其余的，用 `alm cards found` 报告；然后用 `alm confirm` 在 Allomos 应用里给用户看完整计划。用户选择“继续”之前，什么都不要改。
 "
         ),
         "ja" => format!(
@@ -42,7 +44,7 @@ pub fn agent_move_cards_request_in(language: &str, project: &Path, taskbag: &Pat
 
 {header}
 
-`{guide}` が表示する手順に従ってください：まず `alm cards` でほかのエージェントがすでに報告したカードのファイルを見て、残りを自分で探し、`alm cards found` で報告します。続いて `alm confirm` で計画全体を Allomos アプリでユーザーに見せます。ユーザーが「進める」を選ぶまで何も変えないでください。
+`{guide}` が表示する手順に従ってください：まず `alm cards` で、タスクバッグの外にリンクしているカードのファイルと、ほかのエージェントがすでに報告したカードのファイルを見て、残りを自分で探し、`alm cards found` で報告します。続いて `alm confirm` で計画全体を Allomos アプリでユーザーに見せます。ユーザーが「進める」を選ぶまで何も変えないでください。
 "
         ),
         _ => format!(
@@ -50,26 +52,91 @@ pub fn agent_move_cards_request_in(language: &str, project: &Path, taskbag: &Pat
 
 {header}
 
-Follow what `{guide}` prints: first see what `alm cards` lists (card files agents already reported), find any others yourself and report them with `alm cards found`; then show the whole plan to the person in the Allomos app with `alm confirm`. Change nothing until the person chooses Go ahead.
+Follow what `{guide}` prints: first see what `alm cards` lists (card files the tasks' `Card:` links point to outside the taskbag, and ones agents already reported), find any others yourself and report them with `alm cards found`; then show the whole plan to the person in the Allomos app with `alm confirm`. Change nothing until the person chooses Go ahead.
 "
         ),
     }
 }
 
-/// The card files agents reported as still in the project folder, for tasks this taskbag has,
-/// in task order (the notice "N tasks keep their card files in the project folder").
+/// The card files still outside the taskbag, one per task at most, in task order (the notice
+/// "N tasks keep their card files in the project folder"): what an agent reported, else where the
+/// task's `Card:` link points when that is outside the task's own folder ([`linked_file`]).
 pub fn outside(root: &Path) -> Vec<Outside> {
-    let reported = card::outside(&events::list(root).0);
-    if reported.is_empty() {
-        return Vec::new();
+    match crate::load(root).taskbag {
+        Some(bag) => outside_of(root, &bag),
+        None => Vec::new(),
     }
-    let Some(bag) = crate::load(root).taskbag else {
-        return Vec::new();
-    };
+}
+
+/// [`outside`] for the taskbag at `root`, already loaded as `bag`.
+pub fn outside_of(root: &Path, bag: &Taskbag) -> Vec<Outside> {
+    let reported = card::outside(&events::list(root).0);
+    let places = Places::of(root);
     bag.tasks
         .iter()
-        .filter_map(|t| reported.get(&t.id).cloned())
+        .filter_map(|t| {
+            reported.get(&t.id).cloned().or_else(|| {
+                let file = places.linked_file(t)?;
+                Some(Outside {
+                    task: t.id.clone(),
+                    path: places.shown(&file),
+                    source: Source::Link,
+                    at: None,
+                    by: None,
+                })
+            })
+        })
         .collect()
+}
+
+/// The taskbag and its project folder, made absolute, for reading card links.
+struct Places {
+    root: PathBuf,
+    project: PathBuf,
+}
+
+impl Places {
+    fn of(root: &Path) -> Self {
+        let absolute = |p: &Path| {
+            p.canonicalize().unwrap_or_else(|_| {
+                versions::normalize(&std::env::current_dir().unwrap_or_default().join(p))
+            })
+        };
+        Places {
+            root: absolute(root),
+            project: absolute(&versions::project_folder(root)),
+        }
+    }
+
+    /// The file task `t`'s `Card:` link points to, when that is outside the task's own folder: a
+    /// Markdown link is read from `tasks/<id>/` (the file need not exist), a plain path from the
+    /// project folder (only when the file is there).
+    fn linked_file(&self, t: &Task) -> Option<PathBuf> {
+        let own = self.root.join("tasks").join(&t.id);
+        let file = match card::pointer(&t.description)? {
+            Pointer::Link(link) => versions::normalize(&own.join(link)),
+            Pointer::Path(path) => {
+                let file = versions::normalize(&self.project.join(path));
+                if !file.is_file() {
+                    return None;
+                }
+                file
+            }
+        };
+        (!file.starts_with(&own)).then_some(file)
+    }
+
+    /// `file` relative to the project folder, with `/`, else in full.
+    fn shown(&self, file: &Path) -> String {
+        match file.strip_prefix(&self.project) {
+            Ok(rel) => rel
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/"),
+            Err(_) => shown(file),
+        }
+    }
 }
 
 /// What [`report`] recorded.
@@ -165,7 +232,8 @@ pub struct Moved {
 /// Move task `id`'s card file in (`alm card <id> [--from <file>]`): write it as
 /// `tasks/<id>/card.md`, point the description's `Card:` link to it, and clear the task's report,
 /// in one `card` event, under the lock. The text comes from `from` (an agent may first fix the
-/// card's links there), else from the file reported for the task. A different `card.md` already
+/// card's links there), else from the file reported for the task, else from the one its `Card:`
+/// link points to outside its folder (Task-A01-51). A different `card.md` already
 /// there is replaced only with `replace` (`alm card --replace`, to keep a moved card up to date),
 /// else refused (`card_exists`); the same text again only fixes the link.
 pub fn move_in(
@@ -183,7 +251,14 @@ pub fn move_in(
     // An unknown task is named as such before anything about its card.
     allomos_core::ops::find_task(&bag, id)?;
     let project = versions::project_folder(root);
-    let original = reported.as_ref().map(|p| project.join(p));
+    let original = match &reported {
+        Some(p) => Some(project.join(p)),
+        None => bag
+            .tasks
+            .iter()
+            .find(|t| t.id == id)
+            .and_then(|t| Places::of(root).linked_file(t)),
+    };
     let source = match (from, &original) {
         (Some(f), _) => f.to_path_buf(),
         (None, Some(o)) => o.clone(),
@@ -399,6 +474,89 @@ mod tests {
     }
 
     #[test]
+    fn a_card_linked_from_the_description_is_outside_without_a_report() {
+        let (dir, root) = project("linked");
+        let me = Actor::alm(Some("claude/x"));
+        // A plain path, read from the project folder; a link to a missing file still counts.
+        for (id, description) in [
+            (
+                "A01-02",
+                "**Notes.** Card: `docs/tasks/A01-02.md` in the repo.",
+            ),
+            ("A01-03", "Card: [gone](../../../../docs/tasks/gone.md)"),
+            ("A01-04", "Card: docs/tasks/missing.md"),
+            ("A01-05", "Card: [card.md](card.md)"),
+        ] {
+            add_task(
+                &root,
+                me,
+                WAIT,
+                &NewTask {
+                    id: Some(id.into()),
+                    area: "A01".into(),
+                    title: id.into(),
+                    description: Some(description.into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        fs::write(dir.join("docs/tasks/A01-02.md"), "# A01-02\n").unwrap();
+        let listed = |root: &Path| -> Vec<(String, String, Source)> {
+            outside(root)
+                .into_iter()
+                .map(|o| (o.task, o.path, o.source))
+                .collect()
+        };
+        assert_eq!(
+            listed(&root),
+            [
+                ("A01-01".into(), "docs/tasks/A01-01.md".into(), Source::Link),
+                ("A01-02".into(), "docs/tasks/A01-02.md".into(), Source::Link),
+                ("A01-03".into(), "docs/tasks/gone.md".into(), Source::Link),
+            ]
+        );
+        // A report wins over the link, and the task is counted once.
+        report(
+            &root,
+            me,
+            WAIT,
+            &[("A01-02".into(), "docs/tasks/A01-01.md".into())],
+        )
+        .unwrap();
+        let after = outside(&root);
+        assert_eq!(after.len(), 3);
+        assert_eq!(after[1].source, Source::Report);
+        assert_eq!(after[1].path, "docs/tasks/A01-01.md");
+        // Moved in from the link alone, without --from or a report.
+        let moved = move_in(&root, me, WAIT, "A01-01", None, false).unwrap();
+        assert_eq!(moved.reported, None);
+        assert_eq!(
+            moved.original,
+            Some(dir.join("docs/tasks/A01-01.md").canonicalize().unwrap())
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("tasks/A01-01/card.md")).unwrap(),
+            "# A01-01\n\nThe card.\n"
+        );
+        assert_eq!(
+            listed(&root)
+                .iter()
+                .map(|l| l.0.as_str())
+                .collect::<Vec<_>>(),
+            ["A01-02", "A01-03"]
+        );
+        // A link to a missing file cannot be moved without --from.
+        assert!(matches!(
+            move_in(&root, me, WAIT, "A01-03", None, false),
+            Err(Problem::CardNotFound { .. })
+        ));
+        // Reading links changes nothing on disk.
+        assert!(crate::load(&root).issues.is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn a_report_can_be_withdrawn() {
         let (dir, root) = project("withdraw");
         let me = Actor::alm(Some("claude/x"));
@@ -411,7 +569,10 @@ mod tests {
         .unwrap();
         let r = report(&root, me, WAIT, &[("A01-01".into(), String::new())]).unwrap();
         assert_eq!(r.withdrawn, ["A01-01"]);
-        assert!(outside(&root).is_empty());
+        // What is left is the description's link, which a report never hides for good.
+        let left = outside(&root);
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].source, Source::Link);
         fs::remove_dir_all(dir).unwrap();
     }
 }

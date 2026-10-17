@@ -1,6 +1,6 @@
 # Coding rules
 
-A **contract** for code in this repository. Created by task `A01-01`. Extend it in the card that needs a new rule. A card is a task in Allomos's taskbag: its detail, and the evidence of each check (PASS / FAIL / NOT RUN, numbers, logs) under an **Evidence** heading, go in the task's description (`alm describe`); there are no card files in this repository.
+A **contract** for code in this repository. Created by task `A01-01`. Extend it in the card that needs a new rule. A card is a task in Allomos's taskbag: its detail, and the evidence of each check (PASS / FAIL / NOT RUN, numbers, logs) under an **Evidence** heading, go in the task's description (`alm describe`); older tasks also keep a card file beside the task in the taskbag (`tasks/<id>/card.md`). There are no card files in this repository.
 
 ## Layout
 

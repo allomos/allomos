@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultSource, directStep, neverConnected, newFiles, offerConnect, resumeAt, stillMissing, taskbagStep } from "../src/setupFlow.ts";
+import { defaultSource, directStep, neverConnected, newFiles, offerConnect, resumeAt, stepFourPage, stillMissing, taskbagStep } from "../src/setupFlow.ts";
 import type { SetupState } from "../src/types.ts";
 
 test("a folder with .allomos goes on with Next (no Change)", () => {
@@ -74,4 +74,18 @@ test("Not now goes back to the start page only when no agent was ever told", () 
   assert.equal(neverConnected(setup({ agents: { codex: true, claude: false } })), false);
   assert.equal(neverConnected(setup({ agents: { codex: false, claude: true } })), false);
   assert.equal(neverConnected(setup({ agents: { codex: true, claude: true } })), false);
+});
+
+test("step 4 shows what the project needs: connect, update the taskbag, or setup done", () => {
+  const told = { codex: true, claude: true };
+  const ready = setup({ project_folder: "/p", agents: told, has_tasks: true });
+  // Connected and nothing to do: Setup done; with cards outside: Update the taskbag.
+  assert.equal(stepFourPage(ready, false, 0, false), "done");
+  assert.equal(stepFourPage(ready, false, 3, false), "cards");
+  // Out of date, not told, no tasks yet, or Connect an agent anyway: the agents page.
+  assert.equal(stepFourPage(ready, true, 3, false), "agents");
+  assert.equal(stepFourPage(setup({ project_folder: "/p", agents: { codex: true, claude: false }, has_tasks: true }), false, 3, false), "agents");
+  assert.equal(stepFourPage(setup({ project_folder: "/p", agents: told }), false, 0, false), "agents");
+  assert.equal(stepFourPage(ready, false, 0, true), "agents");
+  assert.equal(stepFourPage(setup({ agents: told, has_tasks: true }), false, 0, false), "agents", "no project folder");
 });

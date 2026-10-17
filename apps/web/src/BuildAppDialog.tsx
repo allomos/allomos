@@ -9,13 +9,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
-import { AGENT_KEY, PASTE_KEYS } from "./AgentsPanel";
+import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { Markdown } from "./Markdown";
+import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
-import { FIRST_MODE, MANUAL, agentChoices, canStart, checkFolder, firstAgent } from "./buildAppFlow";
+import { FIRST_MODE, MANUAL, canStart, checkFolder } from "./buildAppFlow";
 import type { FolderCheck, RunMode } from "./buildAppFlow";
 import { isProblem } from "./types";
-import type { Agent, Opened, SetupState } from "./types";
+import type { Opened, SetupState } from "./types";
 
 /** The project's name: the folder's own name. */
 function folderName(path: string): string {
@@ -39,8 +40,8 @@ export function BuildAppDialog({
   const { t, rich, problem, language } = useI18n();
   const [folder, setFolder] = useState<FolderCheck | null>(null);
   const [description, setDescription] = useState("");
-  const [agents, setAgents] = useState<Agent[] | null>(null);
-  const [agent, setAgent] = useState<string | null>(null);
+  // The shared agent picker (Task-A05-07).
+  const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   const [mode, setMode] = useState<RunMode>(FIRST_MODE);
   const [modes, setModes] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -54,25 +55,6 @@ export function BuildAppDialog({
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
-
-  useEffect(() => {
-    let live = true;
-    messenger
-      .findAgents()
-      .then((found) => {
-        if (!live) return;
-        setAgents(found);
-        setAgent(firstAgent(found));
-      })
-      .catch(() => {
-        if (!live) return;
-        setAgents([]);
-        setAgent(MANUAL);
-      });
-    return () => {
-      live = false;
-    };
-  }, [messenger]);
 
   useEffect(() => {
     let live = true;
@@ -96,7 +78,6 @@ export function BuildAppDialog({
     }
   };
 
-  const tool = agents?.find((a) => a.id === agent) ?? null;
   const quiet = mode === "quiet";
 
   const start = async () => {
@@ -117,7 +98,8 @@ export function BuildAppDialog({
         return;
       }
       await messenger.buildApp(agent, folder.folder, o.root, language, description, quiet);
-      const name = t(AGENT_KEY[agent as Agent["id"]]);
+      agentOpened(o.root, "build_app");
+      const name = t(AGENT_KEY[agent]);
       onClose(tool?.how === "paste" ? t("build.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("build.asked", { agent: name }));
     } catch (e) {
       fail(e);
@@ -177,41 +159,7 @@ export function BuildAppDialog({
               />
 
               <h3>{t("build.agent_title")}</h3>
-              {agents === null ? (
-                <p className="muted searching" role="status">
-                  <span className="spinner" aria-hidden="true" /> {t("agents.searching")}
-                </p>
-              ) : (
-                <ul className="agent-list">
-                  {agentChoices(agents).map((id) => {
-                    const found = agents.find((a) => a.id === id);
-                    return (
-                      <li key={id}>
-                        <label>
-                          <input
-                            type="radio"
-                            name="build-agent"
-                            checked={agent === id}
-                            onChange={() => setAgent(id)}
-                            disabled={busy}
-                          />{" "}
-                          <strong>{id === MANUAL ? t("agents.manual") : t(AGENT_KEY[id as Agent["id"]])}</strong>{" "}
-                          <span className="muted">
-                            —{" "}
-                            {id === MANUAL
-                              ? t("agents.manual_how")
-                              : `${t(found?.how === "link" ? "agents.how_link" : "agents.how_paste")} (${found?.found ?? ""})`}
-                          </span>
-                        </label>
-                        {id === "claude_app" && agent === id && <p className="muted small hint">{t("agents.claude_app_trust")}</p>}
-                        {found?.how === "paste" && agent === id && (
-                          <p className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="build-agent" />
 
               <h3>{t("build.mode_title")}</h3>
               <ul className="agent-list">

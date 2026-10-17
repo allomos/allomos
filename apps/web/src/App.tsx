@@ -5,16 +5,17 @@ import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { ProgressDialog } from "./ProgressDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
 import { MoveCardsDialog } from "./MoveCardsDialog";
-import { cardsNotice } from "./moveCardsFlow";
+import { cardRows, cardsNotice } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
-import { latestFor } from "./handoffFlow";
+import { latestFor, localTime } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { DescriptionHit, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
@@ -33,6 +34,8 @@ import {
   type StateFilter,
 } from "./stopFlow";
 import { useFold } from "./useFold";
+import { parseSort, sortTasks, type Sort } from "./sortFlow";
+import { SortMenu } from "./SortMenu";
 import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
@@ -128,7 +131,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   const [notices, setNotices] = useState<Note[]>([]);
   /** The start page's Build a new app… dialog (Task-A03-25-02). */
   const [building, setBuilding] = useState(false);
-  /** Move the cards in… is open (Task-A00-30): the notice's button or File → Move the Cards In…. */
+  /** Update the taskbag… is open (Task-A00-30): the notice's button or File → Update the Taskbag…. */
   const [movingCards, setMovingCards] = useState(false);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
@@ -403,7 +406,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       const root = openedRef.current?.root;
       if (root) openWizard({ resume: { root, at: 4 } });
     });
-    // File → Move the Cards In… (enabled while a taskbag is open, Task-A00-30).
+    // File → Update the Taskbag… (enabled while a taskbag is open, Task-A00-30).
     const stopCards = messenger.onMoveCardsMenu(() => {
       if (openedRef.current) setMovingCards(true);
     });
@@ -514,8 +517,8 @@ export function App({ messenger }: { messenger: Messenger }) {
             onOlder={setOlderShown}
           />
         )}
-        {/* Card files an agent reported as still in the project folder (Task-A00-30): Allomos looks
-            for none itself. */}
+        {/* Card files still in the project folder (Task-A00-30): named by the tasks' Card: links
+            (Task-A01-51) or reported by an agent. */}
         {opened && cardsNotice(opened) > 0 && (
           <div className="banner update" role="status">
             <span>{t("cards.notice", { count: cardsNotice(opened) })}</span>
@@ -528,6 +531,7 @@ export function App({ messenger }: { messenger: Messenger }) {
           <MoveCardsDialog
             messenger={messenger}
             root={opened.root}
+            found={cardRows(opened)}
             onClose={(message) => {
               setMovingCards(false);
               if (message) setNotices((list) => [...list, { text: message }]);
@@ -608,6 +612,10 @@ export function App({ messenger }: { messenger: Messenger }) {
             }}
           />
         )}
+
+        {/* What an agent reports with `alm progress` while it works (Task-A05-08); before the
+            questions, so a question shows on top. */}
+        {opened && <ProgressDialog messenger={messenger} project={projectFolder(opened.root)} root={opened.root} />}
 
         {/* Questions an agent asks with `alm confirm` about the folder this window shows (Task-A05-02). */}
         {/* `alm confirm` asks about the folder holding `.allomos/`, where its --taskbag points. */}
@@ -907,7 +915,8 @@ function LanguagePicker() {
 
 /** The first screen with nothing open: the road show's opening slide (slogan, a task shifting
  * between agents and a teammate around the taskbag), with one button, Start, which opens the setup
- * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43). */
+ * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43) and Build a new app…
+ * (Task-A03-25-02). */
 function Welcome({
   onOpen,
   onBuild,
@@ -940,19 +949,21 @@ function Welcome({
                 {t("welcome.open")}
               </button>
               <span className="muted">{t("welcome.hint")}</span>
-              {/* Start from a description instead (Task-A03-25-02). */}
-              <button type="button" className="start build" onClick={onBuild}>
-                {t("build.button")}
-              </button>
             </div>
           </div>
           <HopFigure />
         </div>
       </section>
-      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43). */}
-      <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
-        {t("welcome.open_recent")}
-      </button>
+      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43); to its right, start
+          from a description instead (owner, 2026-10-17; Task-A03-25-02). */}
+      <div className="welcome-under">
+        <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
+          {t("welcome.open_recent")}
+        </button>
+        <button type="button" className="welcome-build" onClick={onBuild}>
+          {t("build.button")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1006,6 +1017,7 @@ function HopFigure() {
 type GroupBy = "area" | "iteration" | "handoffs";
 const GROUP_BY_KEY = "allomos.groupBy";
 const STATE_FILTER_KEY = "allomos.stateFilter";
+const SORT_KEY = "allomos.iterationSort";
 
 function readGroupBy(): GroupBy {
   try {
@@ -1103,6 +1115,23 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
+  // The Iterations tab's sort (Task-A01-52), remembered like the tab and the filter.
+  const [sort, setSort] = useState<Sort>(() => {
+    try {
+      return parseSort(localStorage.getItem(SORT_KEY));
+    } catch {
+      return parseSort(null);
+    }
+  });
+  const chooseSort = (s: Sort) => {
+    setSort(s);
+    try {
+      localStorage.setItem(SORT_KEY, JSON.stringify(s));
+    } catch {
+      /* storage unavailable: the choice lasts until the window closes */
+    }
+  };
+  const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
   const stop = (task: Task) => stopText(task, box?.tasks ?? [], t);
   // The search box (Task-A01-36): one search for the task list and the Handoffs tab, emptied when
   // another project opens. Cmd/Ctrl+F focuses it.
@@ -1132,13 +1161,13 @@ function TaskbagView({
         name: it.name,
         sub: iterationSub(it, t),
         empty: t("iteration.no_tasks"),
-        tasks: box.tasks.filter((task) => task.iteration === it.id),
+        tasks: inOrder(box.tasks.filter((task) => task.iteration === it.id)),
         newTask: { area: null, iteration: it.id },
         edit: { kind: "iteration", id: it.id },
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
-    const unplanned = box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration));
+    const unplanned = inOrder(box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration)));
     if (unplanned.length > 0)
       groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned, newTask: { area: null, iteration: null } });
   } else if (box) {
@@ -1378,6 +1407,7 @@ function TaskbagView({
                   ))}
                 </select>
               </label>
+              {groupBy === "iteration" && <SortMenu sort={sort} onChange={chooseSort} />}
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
@@ -1444,6 +1474,7 @@ function TaskbagView({
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
+                  modified={opened.last_changed}
                   collapsed={folded.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
                   onNewTask={
@@ -1604,6 +1635,7 @@ function TaskGroup({
   selectedId,
   onSelect,
   terms,
+  modified,
   collapsed,
   onToggle,
   onNewTask,
@@ -1624,6 +1656,8 @@ function TaskGroup({
   onShowAll?: () => void;
   /** Why a stopped task is stopped: "Waiting for you: …", "Blocked by A01-17 (in progress)". */
   stop?: (task: Task) => string | null;
+  /** When each task last changed (UTC), by task ID (Task-A01-52), shown at the row's right. */
+  modified?: Record<string, string>;
   /** Given in the by-area view, so each task says which iteration it is planned in. */
   iterationName?: (id: string | null) => string | null;
   selectedId: string | null;
@@ -1717,6 +1751,11 @@ function TaskGroup({
                   {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
                   <DescriptionHit text={task.description ?? ""} terms={terms} />
                 </span>
+                {modified?.[task.id] && (
+                  <time className="modified" dateTime={modified[task.id]} title={t("task.modified", { time: localTime(modified[task.id]) })}>
+                    {localTime(modified[task.id])}
+                  </time>
+                )}
               </li>
             );
           })}

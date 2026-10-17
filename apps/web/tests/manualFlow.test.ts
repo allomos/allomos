@@ -2,14 +2,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MANUAL, connectActions, firstChoice, manualWritten } from "../src/manualFlow.ts";
+import { MANUAL, connectActions, manualWritten } from "../src/manualFlow.ts";
 import type { Seen } from "../src/manualFlow.ts";
-
-test("the first found agent group is chosen first; with none found, Manual", () => {
-  assert.equal(firstChoice(["Claude", "Codex"]), "Claude");
-  assert.equal(firstChoice(["Codex"]), "Codex");
-  assert.equal(firstChoice([]), MANUAL);
-});
 
 test("Manual closes with Done, even when no known agent is found", () => {
   assert.deepEqual(connectActions(MANUAL, 2, false), { primary: "done", write: false });

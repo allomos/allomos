@@ -185,16 +185,23 @@ export interface Opened {
   ai_decisions?: Record<string, AiDecision[]>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
+  /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */
+  last_changed?: Record<string, string>;
   /** Card files agents reported as still in the project folder (Task-A00-30). */
   cards_outside?: CardOutside[];
 }
 
-/** A card file an agent reported as still in the project folder (`alm cards found`, Task-A00-30). */
+/**
+ * A card file still outside the taskbag (Task-A00-30): the task's `Card:` link points there
+ * (Task-A01-51), or an agent reported it (`alm cards found`). One per task; a report wins.
+ */
 export interface CardOutside {
   task: string;
-  /** Relative to the project folder, with `/`. */
+  /** Relative to the project folder, with `/`; a linked file outside it is named in full. */
   path: string;
-  at: string;
+  source: "link" | "report";
+  /** When it was reported (reports only). */
+  at?: string;
   by?: string;
 }
 
@@ -281,6 +288,22 @@ export interface ConfirmRequest {
   /** Seconds since 1970. */
   asked: number;
   until: number;
+}
+
+/** What an AI agent reports about a job the app gave it (`alm progress`, Task-A05-08). */
+export interface Progress {
+  /** One report per agent. */
+  id: string;
+  title: string;
+  step?: string;
+  done?: number;
+  of?: number;
+  /** The job is over: what happened. */
+  finished?: string;
+  from?: string;
+  /** Seconds since 1970. */
+  started: number;
+  updated: number;
 }
 
 /** Where the open taskbag stands in the open-folder flow (crates/store/src/setup.rs). */

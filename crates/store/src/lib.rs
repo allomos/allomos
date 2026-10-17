@@ -32,6 +32,7 @@ mod convert;
 pub mod events;
 mod guide;
 pub mod handoff;
+pub mod progress;
 mod settings;
 mod setup;
 pub mod versions;
@@ -1777,6 +1778,22 @@ pub fn change_task(
 /// Every task's branches (base and working), by task ID (Task-A03-22), from the history.
 pub fn branches(root: &Path) -> std::collections::BTreeMap<String, branch::Branches> {
     branch::recorded(&events::list(root).0)
+}
+
+/// When each task last changed, by task ID (Task-A01-52): the newest `at` among its events, in
+/// UTC. The Iterations tab sorts by it. A task with no recorded change is left out.
+pub fn last_changed(root: &Path) -> std::collections::BTreeMap<String, String> {
+    let mut out: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    for e in events::list(root).0 {
+        let (Kind::Task, Some(id)) = (e.kind, e.id) else {
+            continue;
+        };
+        let at = out.entry(id).or_default();
+        if e.at > *at {
+            *at = e.at;
+        }
+    }
+    out
 }
 
 /// What [`claim_task`] did: the change, and the task's branches after it.

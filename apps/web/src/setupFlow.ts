@@ -69,3 +69,15 @@ export function resumeAt(setup: SetupState, wanted: 3 | 4): 3 | 4 {
 export function neverConnected(setup: SetupState): boolean {
   return !setup.agents.codex && !setup.agents.claude;
 }
+
+/** What the wizard's step 4 shows (Task-A05-09, approver 2026-10-17). */
+export type StepFourPage = "agents" | "cards" | "done";
+
+/** Step 4's page: Connect with the agents (or its update panel) when agents are not told, there are
+ * no tasks yet, Allomos's instructions or taskbag are out of date (`needsUpdate`), or the person
+ * chose Connect an agent anyway; else Update the taskbag while card files are outside it; else
+ * Setup done. */
+export function stepFourPage(setup: SetupState, needsUpdate: boolean, cardsOutside: number, anyway: boolean): StepFourPage {
+  if (anyway || needsUpdate || !setup.project_folder || offerConnect(setup, false)) return "agents";
+  return cardsOutside > 0 ? "cards" : "done";
+}

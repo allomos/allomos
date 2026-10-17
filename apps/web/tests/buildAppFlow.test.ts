@@ -2,20 +2,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FIRST_MODE, MANUAL, agentChoices, canStart, checkFolder, firstAgent } from "../src/buildAppFlow.ts";
+import { FIRST_MODE, MANUAL, canStart, checkFolder } from "../src/buildAppFlow.ts";
 import type { Agent } from "../src/types.ts";
 
 const agent = (id: Agent["id"]): Agent => ({ id, found: id, how: id.endsWith("app") ? "link" : "paste" });
-
-test("found agents are offered in the usual order, with Manual last; the first is ticked", () => {
-  const found = [agent("codex_cli"), agent("claude_cli"), agent("claude_app")];
-  assert.deepEqual(agentChoices(found), ["claude_app", "claude_cli", "codex_cli", MANUAL]);
-  assert.equal(firstAgent(found), "claude_app");
-  assert.equal(firstAgent([agent("codex_app")]), "codex_app");
-  // No agent found: Manual alone.
-  assert.deepEqual(agentChoices([]), [MANUAL]);
-  assert.equal(firstAgent([]), MANUAL);
-});
 
 test("quiet mode is ticked first", () => {
   assert.equal(FIRST_MODE, "quiet");

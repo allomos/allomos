@@ -100,9 +100,17 @@ button.link:hover { text-decoration: underline; }
 /* Link buttons sit at the top of a column elsewhere; in a line of text they sit in the middle. */
 .agent-line button.link, .agents .row button.link { align-self: center; font-size: inherit; line-height: inherit; }
 .agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+/* Update the taskbag…: what Allomos found (Task-A01-51). */
+/* The list's own popup: scrolls inside the dialog. */
+.card-found { margin: 0; padding: 0 0 0 20px; line-height: 1.5; display: grid; align-content: start; gap: 4px; }
+.dialog.card-list-dialog { grid-template-rows: auto minmax(0, 1fr) auto; }
+.dialog-body.card-found { padding: 10px 0 10px 20px; }
+/* A popup opened from another popup (the list from Update the taskbag…). */
+.overlay.above { z-index: 15; }
+.card-found code { overflow-wrap: anywhere; }
 .agent-tools { list-style: none; margin: 4px 0 0; padding: 0 0 0 24px; display: grid; gap: 4px; }
 .searching { display: flex; align-items: center; gap: 8px; }
-.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner { display: inline-block; flex: none; vertical-align: -2px; box-sizing: border-box; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 .agents .row { align-items: center; }
@@ -229,7 +237,7 @@ button.link:hover { text-decoration: underline; }
 .task:last-child { border-bottom: 0; }
 .task .id { color: var(--muted); }
 .task .title { min-width: 0; }
-.task .meta { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12.5px; }
+.task .meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12.5px; }
 .task .meta:empty { display: none; }
 .label { color: var(--ok); }
 .task { cursor: pointer; }
@@ -452,9 +460,38 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .refresh-line { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .refresh-line button.link { align-self: baseline; font-size: inherit; }
 .refresh-line button.link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
-/* Build a new app… (Task-A03-25-02): the second button of the start page, and its dialog. */
-.welcome .start.build { flex-basis: 100%; max-width: max-content; }
+/* Build a new app… (Task-A03-25-02): under the start page's card, right of Open recent…, and its
+   dialog. */
+.welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
 .build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
 .build-app .run-modes summary { cursor: pointer; }
+
+/* Task-A01-52: the Iterations tab's sort menu. */
+.sort-menu { position: relative; display: inline-flex; }
+.sort-button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
+.sort-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.sort-button.on { border-color: var(--accent); color: var(--accent-ink); }
+.sort-popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 190px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 0;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); display: flex; flex-direction: column;
+}
+.sort-popover .sort-heading { color: var(--muted); font-size: 12px; padding: 4px 12px; }
+.sort-popover hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+.sort-popover button {
+  border: none; border-radius: 0; background: none; text-align: left; font-weight: 400;
+  padding: 5px 12px 5px 30px; position: relative;
+}
+.sort-popover button:hover { background: var(--bg); }
+.sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }
+/* Task-A01-52: when the task was last modified, in the row's bottom-right corner. */
+.task .modified { grid-column: 3; grid-row: 2; align-self: end; justify-self: end; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The progress popup's chips, in the background (Task-A05-08). */
+.progress-chips { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 6px; z-index: 5; max-width: min(420px, calc(100vw - 32px)); }
+.progress-chip { display: flex; align-items: center; gap: 6px; text-align: left; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); overflow-wrap: anywhere; }
+.progress-finished { display: flex; gap: 8px; margin: 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--line); overflow-wrap: anywhere; }
+.progress-finished > span:first-child { color: var(--ok); font-weight: 600; }
+.progress-bar { width: 100%; height: 8px; accent-color: var(--accent); }

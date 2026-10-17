@@ -3549,3 +3549,96 @@ fn card_files_are_reported_and_moved_in_beside_their_tasks() {
     assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
     fs::remove_dir_all(repo).unwrap();
 }
+
+/// Tasks whose `Card:` link points outside their folder (Task-A01-51): `alm cards`, `alm next`
+/// and `alm list --json` list them without any report, a report wins without counting the task
+/// twice, `alm card` moves one in from its link, and reading the links changes nothing.
+#[test]
+fn card_links_outside_the_taskbag_are_listed_without_a_report() {
+    let repo = filled();
+    fs::create_dir_all(repo.join("docs/tasks")).unwrap();
+    fs::write(repo.join("docs/tasks/A01-01.md"), "# A01-01\n\nCard.\n").unwrap();
+    fs::write(repo.join("docs/tasks/A01-02.md"), "# A01-02\n\nCard.\n").unwrap();
+    ok(
+        &repo,
+        &[
+            "describe",
+            "A01-01",
+            "--text",
+            "Card: [docs/tasks/A01-01.md](../../../../docs/tasks/A01-01.md)\n\nMore.",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "describe",
+            "A01-02",
+            "--text",
+            "**Notes.** Card: docs/tasks/A01-02.md.",
+        ],
+    );
+    let bag = repo.join(".allomos/taskbag");
+    let stamp = |dir: &Path| {
+        let mut all = Vec::new();
+        for e in fs::read_dir(dir.join("events")).unwrap() {
+            all.push(e.unwrap().path());
+        }
+        all.len()
+    };
+    let events = stamp(&bag);
+    let v = ok(&repo, &["cards"]);
+    let listed: Vec<(&str, &str, &str)> = v["cards_outside"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            (
+                c["task"].as_str().unwrap(),
+                c["path"].as_str().unwrap(),
+                c["source"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            ("A01-01", "docs/tasks/A01-01.md", "link"),
+            ("A01-02", "docs/tasks/A01-02.md", "link")
+        ]
+    );
+    let text = String::from_utf8_lossy(&alm(&repo, &["cards"]).stdout).to_string();
+    assert!(
+        text.contains("2 task(s)") && text.contains("its Card: link"),
+        "{text}"
+    );
+    assert_eq!(ok(&repo, &["list"])["cards_outside"], v["cards_outside"]);
+    assert_eq!(
+        ok(&repo, &["list", "--by", "iteration"])["cards_outside"],
+        v["cards_outside"]
+    );
+    assert!(
+        ok(&repo, &["next"])["cards"]
+            .as_str()
+            .unwrap()
+            .contains("2 task(s)")
+    );
+    // Listing wrote nothing.
+    assert_eq!(stamp(&bag), events);
+    // A report wins and the task still counts once.
+    ok(&repo, &["cards", "found", "A01-02=docs/tasks/A01-01.md"]);
+    let v = ok(&repo, &["cards"]);
+    assert_eq!(v["cards_outside"].as_array().unwrap().len(), 2);
+    assert_eq!(v["cards_outside"][1]["source"], "report");
+    // Moved in from the link alone.
+    let out = alm(&repo, &["card", "A01-01"]);
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("rm -- "));
+    assert_eq!(
+        fs::read_to_string(bag.join("tasks/A01-01/card.md")).unwrap(),
+        "# A01-01\n\nCard.\n"
+    );
+    let v = ok(&repo, &["cards"]);
+    assert_eq!(v["cards_outside"].as_array().unwrap().len(), 1);
+    assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
+    fs::remove_dir_all(repo).unwrap();
+}
