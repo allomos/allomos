@@ -234,7 +234,6 @@
   "wizard.choose_hint": "Choose the folder where the taskbag should go. Usually this is your project's own folder: {dir} is then created inside it.",
   "wizard.found_title": "This folder already has a taskbag",
   "wizard.found_body": "Allomos will use the taskbag in {path}. To use another one, choose Previous and pick a different folder.",
-  "wizard.found_note": "This folder already has a taskbag: {path}. To use another one, choose Previous and pick a different folder.",
   "wizard.missing_title": "No taskbag in this folder yet",
   "wizard.missing_body": "Allomos will create {dir} in {folder}, with an empty taskbag inside. Nothing else in the folder changes.",
   "wizard.git_agent": "In step 4, the AI agent you connect asks you whether to keep this folder in Git (if it is not yet), then commits the taskbag; nothing is pushed.",
