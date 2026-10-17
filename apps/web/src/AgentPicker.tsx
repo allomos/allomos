@@ -65,6 +65,7 @@ export function AgentPicker({
   disabled,
   name,
   manual,
+  groupNote,
 }: {
   /** The agents found; null while looking. */
   agents: Agent[] | null;
@@ -77,6 +78,8 @@ export function AgentPicker({
   name: string;
   /** Shown under Manual while it is chosen (for example the request with Copy). */
   manual?: ReactNode;
+  /** Shown under an agent's name, whether chosen or not (the agents panel's setup note). */
+  groupNote?: (group: string) => ReactNode;
 }) {
   const { t } = useI18n();
   /** The tool last chosen in each group, so choosing the group again keeps it. */
@@ -110,6 +113,7 @@ export function AgentPicker({
               />{" "}
               <strong>{g.name}</strong>
             </label>
+            {groupNote?.(g.name)}
             <ul className="agent-tools">
               {g.tools.map((a) => {
                 const picked = on && choice === a.id;

@@ -113,6 +113,28 @@ pub fn project_notes(root: &Path) -> ProjectNotes {
     }
 }
 
+/// The entries under the project notes' `## Agents set up` section (Task-A03-24): each list item
+/// (`- ` or `* `) as written, without its marker; empty when the file or the section is missing.
+/// The app's agents panel reads only this; it judges nothing about the entries.
+pub fn agents_set_up(root: &Path) -> Vec<String> {
+    let Some(text) = crate::read_text(&root.join(NOTES_FILE))
+        .ok()
+        .map(|t| crate::lf(&t))
+    else {
+        return Vec::new();
+    };
+    notes_section(&text, "agents set up")
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| {
+            let l = l.trim_start();
+            l.strip_prefix("- ").or_else(|| l.strip_prefix("* "))
+        })
+        .map(|e| e.trim().to_string())
+        .filter(|e| !e.is_empty())
+        .collect()
+}
+
 /// The text under the first `## ` heading that starts with `name` (any case), up to the next
 /// heading of the same or a higher level; trimmed. `None` when there is no such heading.
 fn notes_section(text: &str, name: &str) -> Option<String> {
@@ -520,6 +542,29 @@ mod tests {
         let notes = project_notes(&root);
         assert!(!notes.found);
         assert_eq!((notes.changed, notes.running), (None, None));
+    }
+
+    #[test]
+    fn agents_set_up_are_the_list_items_of_that_section() {
+        let root = tmp("agents");
+        init(&root, "p", "P").unwrap();
+        // A new taskbag: the section says "None yet." and lists nobody.
+        assert!(agents_set_up(&root).is_empty());
+        fs::write(
+            root.join(NOTES_FILE),
+            "## Running\r\n- not an agent\r\n\r\n## Agents set up\r\n\r\nAgent, its file, date.\r\n\r\n- Claude Code: `CLAUDE.md` imports AGENTS.md. 2026-10-16.\r\n* Codex: reads AGENTS.md.\r\n-   \r\n\r\n## Pitfalls\r\n- not an agent either\r\n",
+        )
+        .unwrap();
+        assert_eq!(
+            agents_set_up(&root),
+            [
+                "Claude Code: `CLAUDE.md` imports AGENTS.md. 2026-10-16.",
+                "Codex: reads AGENTS.md."
+            ]
+        );
+        // No file: nobody is set up, not an error.
+        fs::remove_file(root.join(NOTES_FILE)).unwrap();
+        assert!(agents_set_up(&root).is_empty());
     }
 
     #[test]
