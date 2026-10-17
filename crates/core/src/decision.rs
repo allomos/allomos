@@ -143,6 +143,8 @@ mod tests {
             command: command.into(),
             kind: Kind::Task,
             id: Some(id.into()),
+            agent: None,
+            tool: None,
             changes,
         }
     }

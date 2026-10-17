@@ -1055,9 +1055,9 @@ fn instruction_files(project: PathBuf) -> InstructionFiles {
     }
 }
 
-/// The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24): the agents
-/// panel shows "Not set up for this project yet." on an agent with no entry. Only that section is
-/// read; nothing else is checked.
+/// The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24): whether the
+/// agent used last is registered decides which agents **Update the taskbag…** offers
+/// (Task-A03-27). Only that section is read; nothing else is checked.
 #[tauri::command]
 fn agents_set_up(taskbag: PathBuf) -> Vec<String> {
     allomos_store::handoff::agents_set_up(&taskbag)
@@ -1087,10 +1087,13 @@ fn set_connect_enabled(texts: tauri::State<MenuTexts>, enabled: bool) {
 }
 
 /// The job **Update the taskbag…** asks an agent to do, for its progress popup (Task-A05-08):
-/// moving an older Allomos's tasks in, or card files kept outside the taskbag.
+/// moving an older Allomos's tasks in, renewing an out-of-date section (Task-A03-27), or card
+/// files kept outside the taskbag.
 fn tasks_in_job(taskbag: &Path) -> Job {
     if versions::move_in(taskbag).is_some() {
         Job::MoveIn
+    } else if versions::check_connected(taskbag).is_some_and(|c| !c.outdated_files().is_empty()) {
+        Job::Update
     } else {
         Job::Cards
     }
@@ -1099,16 +1102,10 @@ fn tasks_in_job(taskbag: &Path) -> Job {
 /// **Update the taskbag…** (Task-A01-45, approver 2026-10-16: one button for an older taskbag and
 /// for card files kept outside the taskbag, Task-A00-30): open the chosen agent in the project
 /// folder of the taskbag at `taskbag`, with the request for whichever applies typed in
-/// ([`allomos_store::agent_update_taskbag_request_in`]; `agents`: the agents found on this
-/// computer with no line under `## Agents set up`, Task-A03-24). Nothing is sent: the person sends it; the
-/// agent shows its plan in the app (`alm confirm`) before anything changes.
+/// ([`allomos_store::agent_update_taskbag_request_in`]). Nothing is sent: the person sends it;
+/// the agent shows its plan in the app (`alm confirm`) before anything changes.
 #[tauri::command]
-async fn move_tasks_in(
-    agent: String,
-    taskbag: PathBuf,
-    language: String,
-    agents: Vec<String>,
-) -> Result<(), Problem> {
+async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Result<(), Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -1122,7 +1119,7 @@ async fn move_tasks_in(
     let request = with_progress_in(
         &language,
         tasks_in_job(&taskbag),
-        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag, &agents),
+        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag),
     );
     agents::ask(chosen, &project, &request)
 }
@@ -1130,14 +1127,21 @@ async fn move_tasks_in(
 /// **Update the taskbag…** with Manual: the same request, as an agent opened through a link gets
 /// it, for the person to copy.
 #[tauri::command]
-fn move_tasks_in_request(taskbag: PathBuf, language: String, agents: Vec<String>) -> String {
+fn move_tasks_in_request(taskbag: PathBuf, language: String) -> String {
     let project = allomos_store::versions::project_folder(&taskbag);
     let request = with_progress_in(
         &language,
         tasks_in_job(&taskbag),
-        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag, &agents),
+        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag),
     );
     agents::link_request(&request, alm_command::own().as_deref())
+}
+
+/// The agent `alm` last ran under for a task in the taskbag at `root`, from its events
+/// (Task-A03-27); none when no event records one.
+#[tauri::command]
+fn last_agent(root: PathBuf) -> Option<allomos_store::events::LastAgent> {
+    allomos_store::events::last_agent(&root)
 }
 
 /// What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08), the
@@ -1659,6 +1663,7 @@ pub fn run() {
             copy_text,
             instruction_files,
             agents_set_up,
+            last_agent,
             write_agent_files,
             agent_status,
             confirm_requests,
@@ -1834,16 +1839,10 @@ mod tests {
         // Update the taskbag… asks for the move-in, reported as that job (Task-A01-45); once the
         // tasks are in, it is about card files (below).
         assert_eq!(tasks_in_job(&taskbag), Job::MoveIn);
-        assert!(
-            move_tasks_in_request(taskbag.clone(), "en".into(), Vec::new())
-                .contains("Allomos renamed the old taskbag (format allomos/2;")
-        );
-        // An agent not yet set up (Task-A03-24): the same request also asks for its setup.
-        let both = move_tasks_in_request(taskbag.clone(), "en".into(), vec!["Codex".into()]);
-        assert!(
-            both.contains("Allomos renamed the old taskbag")
-                && both.contains("agent setup request")
-        );
+        let request = move_tasks_in_request(taskbag.clone(), "en".into());
+        assert!(request.contains("Allomos renamed the old taskbag (format allomos/2;"));
+        // No agent setup in it (Task-A03-27): each agent registers itself.
+        assert!(!request.contains("agent setup request"));
         // Asking twice changes nothing.
         assert!(move_taskbag_aside(taskbag.clone()).is_ok());
         assert!(!dir.join(".allomos").join("taskbag-allomos-4").exists());

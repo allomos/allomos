@@ -26,7 +26,6 @@ use allomos_core::{
 };
 use serde::Serialize;
 
-mod agent_setup;
 pub mod cards;
 mod confirm;
 mod convert;
@@ -36,10 +35,8 @@ pub mod handoff;
 pub mod progress;
 mod settings;
 mod setup;
+mod update_taskbag;
 pub mod versions;
-pub use agent_setup::{
-    AGENTS_SET_UP_REQUEST_VERSION, agent_update_taskbag_request_in, agents_set_up_request_in,
-};
 pub use confirm::{
     ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
     read_answer, requests_dir, was_seen, withdraw_confirm,
@@ -63,6 +60,7 @@ pub use setup::{
     SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
     setup_state,
 };
+pub use update_taskbag::agent_update_taskbag_request_in;
 
 /// Where a project's taskbag lives inside the folder the user picked.
 /// Always used for a new taskbag, also in an empty folder, so every tool looks in one place.

@@ -7,10 +7,11 @@
 // Allomos opens it in the project folder with the request for whichever applies typed in (`alm
 // move-in` prints it), and sends nothing. The agent shows its plan in Allomos with `alm confirm`,
 // and changes nothing until the person chooses Go ahead. Manual shows the same request with Copy.
-// An agent found on this computer with no line under `## Agents set up` in the project notes is
-// one more thing it does (Task-A03-24, approver 2026-10-17): the request then also asks for the
-// shared rules to be set up once (`alm guide agent-files`) and each agent recorded. A taskbag with
-// no tasks is too (approver 2026-10-17): the agent looks for the tasks the project already keeps.
+// It also renews an out-of-date Allomos section in the instruction files (Task-A03-27: one of the
+// three cases the taskbag needs updating). Which agents it offers follows the approver's rule
+// (2026-10-18, `updateTaskbagFlow.ts`): only the agent used last while it is not registered under
+// `## Agents set up`, else every agent. A taskbag with no tasks is not a reason to show it, but
+// File → Update the Taskbag… then asks the agent to look for the tasks the project already keeps.
 // `MoveCardsPanel` is the dialog's content, also shown as the setup wizard's step 4 when a
 // connected project has card files to move in (Task-A05-09).
 
@@ -21,6 +22,8 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL } from "./agentPickerFlow";
+import type { OfferFacts } from "./AgentPicker";
+import { lastUsed, readOpened, saveOpened } from "./updateTaskbagFlow";
 import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
 import { isProblem } from "./types";
@@ -31,15 +34,15 @@ export function MoveCardsDialog({
   root,
   found,
   moveIn,
-  agents,
+  section,
   noTasks,
   onClose,
 }: {
   messenger: Messenger;
   /** The open taskbag. */
   root: string;
-  /** The agents not yet set up for the project (Task-A03-24). */
-  agents?: string[];
+  /** The instruction files whose Allomos section is out of date, as one text (Task-A03-27). */
+  section?: string | null;
   /** The taskbag has no tasks yet: the agent looks for the project's own (Task-A03-24). */
   noTasks?: boolean;
   /** What Allomos found: the tasks whose card file is still outside the taskbag. */
@@ -54,7 +57,7 @@ export function MoveCardsDialog({
     <div className="overlay" role="presentation">
       <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
-        <MoveCardsPanel messenger={messenger} root={root} found={found} moveIn={moveIn} agents={agents} noTasks={noTasks} onClose={onClose} />
+        <MoveCardsPanel messenger={messenger} root={root} found={found} moveIn={moveIn} section={section} noTasks={noTasks} onClose={onClose} />
       </section>
     </div>
   );
@@ -67,7 +70,7 @@ export function MoveCardsPanel({
   root,
   found,
   moveIn,
-  agents: setUp = [],
+  section = null,
   noTasks = false,
   onClose,
   actionsIn,
@@ -79,8 +82,8 @@ export function MoveCardsPanel({
   found: CardRow[];
   /** An older taskbag renamed aside: the dialog asks for its tasks to be moved in (Task-A01-45). */
   moveIn?: MoveIn | null;
-  /** The agents not yet set up for the project (Task-A03-24): the request also sets them up. */
-  agents?: string[];
+  /** The instruction files whose Allomos section is out of date: the request renews it too. */
+  section?: string | null;
   /** The taskbag has no tasks yet: the request asks the agent to look for the project's own. */
   noTasks?: boolean;
   onClose: (message: string | null) => void;
@@ -92,8 +95,22 @@ export function MoveCardsPanel({
   extra?: ReactNode;
 }) {
   const { t, problem, language } = useI18n();
-  // The shared agent picker (Task-A05-07).
-  const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
+  // The agent used last and who is registered, for the choice of agents (Task-A03-27).
+  const [facts, setFacts] = useState<OfferFacts | null>(null);
+  useEffect(() => {
+    let live = true;
+    setFacts(null);
+    void Promise.all([messenger.lastAgent(root).catch(() => null), messenger.agentsSetUp(root).catch(() => null)]).then(
+      ([last, entries]) => live && setFacts({ last: lastUsed(last, readOpened(root)), entries }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [messenger, root]);
+  // The shared agent picker (Task-A05-07), narrowed by that rule.
+  const { agents, slow, choice: agent, setChoice: setAgent, tool, offer } = useAgents(messenger, facts);
+  /** The one agent offered, when the rule offers only it. */
+  const only = offer && offer.kind !== "all" ? offer.group : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Manual: the request to copy. */
@@ -106,7 +123,7 @@ export function MoveCardsPanel({
 
   /** Whether card files are part of it: some were found, or nothing else is to be done (then the
    * agent looks for card files no link names, as before). */
-  const cardsPart = !noTasks && (found.length > 0 || setUp.length === 0);
+  const cardsPart = found.length > 0 || (!section && !noTasks);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
@@ -116,14 +133,14 @@ export function MoveCardsPanel({
     setError(null);
     try {
       if (agent === MANUAL) {
-        setRequest(await messenger.moveTasksInRequest(root, language, setUp));
+        setRequest(await messenger.moveTasksInRequest(root, language));
         return;
       }
-      await messenger.moveTasksIn(agent, root, language, setUp);
-      agentOpened(root, moveIn ? "move_in" : "cards");
+      await messenger.moveTasksIn(agent, root, language);
+      saveOpened(root, agent);
+      agentOpened(root, moveIn ? "move_in" : section ? "update" : "cards");
       const name = t(AGENT_KEY[agent]);
-      // Only agents to set up: the request does nothing else, and the message says so.
-      const kind = moveIn ? "move" : noTasks ? "empty" : cardsPart ? "cards" : "setup";
+      const kind = moveIn ? "move" : section ? "update" : cardsPart ? "cards" : "empty";
       if (tool?.how === "paste") {
         onClose(t(`${kind}.asked_paste`, { agent: name, keys: PASTE_KEYS }));
       } else {
@@ -168,10 +185,18 @@ export function MoveCardsPanel({
   const chooser = (
     <>
       {request === null ? (
-        <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="cards-agent" />
+        <AgentPicker
+          agents={agents}
+          slow={slow}
+          choice={agent}
+          onChoose={setAgent}
+          disabled={busy}
+          name="cards-agent"
+          manualTo={only ?? undefined}
+        />
       ) : (
         <div className="manual">
-          <p className="small">{t("cards.manual_intro")}</p>
+          <p className="small">{only ? t("cards.manual_intro_to", { agent: only }) : t("cards.manual_intro")}</p>
           <textarea
             className="manual-request"
             readOnly
@@ -201,6 +226,12 @@ export function MoveCardsPanel({
           <p className="muted small">{t("move.body")}</p>
         </>
       )}
+      {request === null && !moveIn && section && (
+        <>
+          <p>{t("update.notice_section", { files: section })}</p>
+          {!cardsPart && <p className="muted small">{t("update.body")}</p>}
+        </>
+      )}
       {request === null && !moveIn && cardsPart && (
         <>
           <p>{found.length > 0 ? t("cards.found", { count: found.length }) : t("cards.found_none")}</p>
@@ -216,18 +247,15 @@ export function MoveCardsPanel({
         </>
       )}
 
-      {request === null && !moveIn && noTasks && (
+      {request === null && !moveIn && !section && !cardsPart && (
         <>
           <p>{t("empty.found")}</p>
           <p className="muted small">{t("empty.body")}</p>
         </>
       )}
-      {request === null && setUp.length > 0 && (
-        <>
-          <p>{t("setup.found", { agents: setUp.join(language === "en" ? ", " : "、") })}</p>
-          <p className="muted small">{t("setup.body")}</p>
-        </>
-      )}
+      {/* Only the agent used last, not registered yet (Task-A03-27): say why. */}
+      {request === null && offer?.kind === "only" && <p className="small">{t("cards.only_agent", { agent: offer.group })}</p>}
+      {request === null && offer?.kind === "manual" && <p className="small">{t("cards.only_manual", { agent: offer.group })}</p>}
 
       {extra}
 

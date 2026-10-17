@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, NewIteration, NewTask, NextIds, Opened, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, LastAgent, IterationChange, NewIteration, NewTask, NextIds, Opened, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -57,12 +57,13 @@ export interface Messenger {
   onMoveTasksInMenu(handler: () => void): Promise<() => void>;
   /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
-   * request for whichever applies typed in (`alm move-in` prints it), plus setting up `agents`, the
-   * agents not yet set up (Task-A03-24). Nothing is sent. Rejects
-   * with a Problem. */
-  moveTasksIn(agent: string, taskbag: string, language: string, agents: string[]): Promise<void>;
+   * request for whichever applies typed in (`alm move-in` prints it; Task-A03-27: an out-of-date
+   * section too). Nothing is sent. Rejects with a Problem. */
+  moveTasksIn(agent: string, taskbag: string, language: string): Promise<void>;
   /** Update the taskbag… with Manual: the same request, to copy. */
-  moveTasksInRequest(taskbag: string, language: string, agents: string[]): Promise<string>;
+  moveTasksInRequest(taskbag: string, language: string): Promise<string>;
+  /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
+  lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
   findAgents(): Promise<Agent[]>;
   /**
@@ -84,7 +85,8 @@ export interface Messenger {
   runModesText(language: string): Promise<string>;
   /** Whether `project` has AGENTS.md and CLAUDE.md. */
   instructionFiles(project: string): Promise<InstructionFiles>;
-  /** The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24). */
+  /** The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24): which agents
+   * are registered, for Update the taskbag…'s choice of agents (Task-A03-27). */
   agentsSetUp(taskbag: string): Promise<string[]>;
   /** Writes Allomos's section into the project's AGENTS.md and CLAUDE.md; resolves to the files changed. */
   writeAgentFiles(project: string): Promise<string[]>;
@@ -225,9 +227,9 @@ export const desktopMessenger: Messenger = {
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
-  moveTasksIn: (agent, taskbag, language, agents) => invoke<void>("move_tasks_in", { agent, taskbag, language, agents }),
-  moveTasksInRequest: (taskbag, language, agents) =>
-    invoke<string>("move_tasks_in_request", { taskbag, language, agents }),
+  moveTasksIn: (agent, taskbag, language) => invoke<void>("move_tasks_in", { agent, taskbag, language }),
+  moveTasksInRequest: (taskbag, language) => invoke<string>("move_tasks_in_request", { taskbag, language }),
+  lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),

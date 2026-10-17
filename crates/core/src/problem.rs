@@ -174,6 +174,9 @@ problems! {
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
     CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
+    /// `alm claim` while card files are kept outside the taskbag (Task-A03-27, approver
+    /// 2026-10-18): the taskbag is updated first, then tasks are worked.
+    ClaimCardsOutside { count, tasks } => "claim_cards_outside", "{count} tasks keep their card files outside the taskbag ({tasks}), so no task can be claimed until they are moved in. First follow `alm guide move-cards`: it shows the person the plan before anything changes (in a quiet run, park that question with `alm wait` and stop). Then claim again.";
     /// `alm cards found`: a card file's place must be a relative path inside the project folder
     /// (Task-A00-30).
     CardPathInvalid { path } => "card_path_invalid", "\"{path}\" is not a card file's place: give its path inside the project folder, relative to that folder, such as docs/tasks/A01-01.md.";

@@ -46,6 +46,12 @@ impl<'a> Actor<'a> {
         id: Option<&str>,
         changes: Vec<Change>,
     ) -> Event {
+        // The agent `alm` runs under, from its environment (Task-A03-27); the app records none.
+        let (agent, tool) = match self.via {
+            "alm" => allomos_core::event::agent_from_env(|name| std::env::var(name).ok())
+                .map_or((None, None), |(agent, tool)| (Some(agent), tool)),
+            _ => (None, None),
+        };
         Event {
             at: now().0,
             by: self.by.map(String::from),
@@ -53,6 +59,8 @@ impl<'a> Actor<'a> {
             command: command.to_string(),
             kind,
             id: id.map(String::from),
+            agent,
+            tool,
             changes,
         }
     }
@@ -181,6 +189,34 @@ pub fn last_agent_use(root: &Path) -> Option<LastUse> {
         })
 }
 
+/// The agent `alm` last ran under for a task (Task-A03-27): the newest event that changed a task
+/// and records an agent ([`Event::agent`]), with its tool when known. **Update the taskbag…**
+/// offers only that agent while it is not registered under `## Agents set up`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LastAgent {
+    /// `claude` or `codex`.
+    pub agent: String,
+    /// `claude_cli` or `claude_app`, when the environment told it.
+    pub tool: Option<String>,
+    /// `2026-10-13T14:02:05Z`, UTC.
+    pub at: String,
+}
+
+pub fn last_agent(root: &Path) -> Option<LastAgent> {
+    list(root)
+        .0
+        .into_iter()
+        .rev()
+        .filter(|e| e.kind == Kind::Task && !e.changes.is_empty())
+        .find_map(|e| {
+            Some(LastAgent {
+                agent: e.agent?,
+                tool: e.tool,
+                at: e.at,
+            })
+        })
+}
+
 /// Changes made in the app that no agent has been told to share yet (decision 0017, row 9): the
 /// app's events after the newest change made through `alm`, and the files they touch that still
 /// exist, relative to the taskbag. The next `alm` change lists them with the Git commands to
@@ -297,6 +333,113 @@ mod tests {
             assert!(name.ends_with(".json"));
             assert!(seen.insert(name));
         }
+    }
+
+    fn event(
+        at: &str,
+        kind: Kind,
+        agent: Option<&str>,
+        tool: Option<&str>,
+        changed: bool,
+    ) -> Event {
+        Event {
+            at: at.into(),
+            by: Some("s".into()),
+            via: "alm".into(),
+            command: "label".into(),
+            kind,
+            id: Some("A01-01".into()),
+            agent: agent.map(String::from),
+            tool: tool.map(String::from),
+            changes: if changed {
+                vec![Change {
+                    field: "label".into(),
+                    from: None,
+                    to: Some("implemented".into()),
+                }]
+            } else {
+                Vec::new()
+            },
+        }
+    }
+
+    #[test]
+    fn the_last_agent_is_the_newest_task_change_that_records_one() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-test-last-agent-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(last_agent(&dir), None);
+        let put = |name: &str, e: &Event| {
+            fs::create_dir_all(dir.join(EVENTS_DIR)).unwrap();
+            fs::write(dir.join(EVENTS_DIR).join(name), json_text(e)).unwrap();
+        };
+        // Older events record no agent: none found.
+        put(
+            "2026-10-13-100000-000-aaaaaa.json",
+            &event("2026-10-13T10:00:00Z", Kind::Task, None, None, true),
+        );
+        assert_eq!(last_agent(&dir), None);
+        put(
+            "2026-10-14-100000-000-aaaaaa.json",
+            &event(
+                "2026-10-14T10:00:00Z",
+                Kind::Task,
+                Some("claude"),
+                Some("claude_cli"),
+                true,
+            ),
+        );
+        let claude = Some(LastAgent {
+            agent: "claude".into(),
+            tool: Some("claude_cli".into()),
+            at: "2026-10-14T10:00:00Z".into(),
+        });
+        assert_eq!(last_agent(&dir), claude);
+        // Newer events that changed no task, or record no agent, do not count.
+        put(
+            "2026-10-15-100000-000-aaaaaa.json",
+            &event(
+                "2026-10-15T10:00:00Z",
+                Kind::Area,
+                Some("codex"),
+                None,
+                true,
+            ),
+        );
+        put(
+            "2026-10-15-110000-000-aaaaaa.json",
+            &event(
+                "2026-10-15T11:00:00Z",
+                Kind::Task,
+                Some("codex"),
+                None,
+                false,
+            ),
+        );
+        put(
+            "2026-10-15-120000-000-aaaaaa.json",
+            &event("2026-10-15T12:00:00Z", Kind::Task, None, None, true),
+        );
+        assert_eq!(last_agent(&dir), claude);
+        put(
+            "2026-10-16-100000-000-aaaaaa.json",
+            &event(
+                "2026-10-16T10:00:00Z",
+                Kind::Task,
+                Some("codex"),
+                None,
+                true,
+            ),
+        );
+        assert_eq!(
+            last_agent(&dir).map(|a| (a.agent, a.tool)),
+            Some(("codex".into(), None))
+        );
     }
 
     #[test]

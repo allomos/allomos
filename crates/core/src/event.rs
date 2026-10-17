@@ -48,7 +48,45 @@ pub struct Event {
     /// The item's ID; for the project, the project's ID (left out when unknown).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Which AI agent ran `alm` (Task-A03-27, approver 2026-10-18): `claude` or `codex`, judged
+    /// from the environment `alm` runs in ([`agent_from_env`]). Left out when unsure, for the
+    /// app's changes, and in events recorded before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// The agent's tool, when the environment tells it: `claude_cli` (Claude Code in a terminal)
+    /// or `claude_app` (the Claude app), as the app names its agent tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
     pub changes: Vec<Change>,
+}
+
+/// The agent an `alm` command runs under, judged from its environment (`var` reads one variable):
+/// Claude Code sets `CLAUDECODE=1`, and `CLAUDE_CODE_ENTRYPOINT` says whether it runs in a
+/// terminal (`cli`) or in the Claude app (`claude-desktop`); Codex sets `CODEX_THREAD_ID` (or
+/// `CODEX_SANDBOX` / `CODEX_SANDBOX_NETWORK_DISABLED` in its sandbox) in the commands it runs.
+/// Signs of both, or of neither: `None` (unsure, nothing recorded).
+pub fn agent_from_env(var: impl Fn(&str) -> Option<String>) -> Option<(String, Option<String>)> {
+    let set = |name: &str| var(name).is_some_and(|v| !v.is_empty());
+    let claude = var("CLAUDECODE").as_deref() == Some("1");
+    let codex = [
+        "CODEX_THREAD_ID",
+        "CODEX_SANDBOX",
+        "CODEX_SANDBOX_NETWORK_DISABLED",
+    ]
+    .into_iter()
+    .any(set);
+    match (claude, codex) {
+        (true, false) => {
+            let tool = match var("CLAUDE_CODE_ENTRYPOINT").as_deref() {
+                Some("cli") => Some("claude_cli".to_string()),
+                Some("claude-desktop") => Some("claude_app".to_string()),
+                _ => None,
+            };
+            Some(("claude".to_string(), tool))
+        }
+        (false, true) => Some(("codex".to_string(), None)),
+        _ => None,
+    }
 }
 
 /// The order a task's fields are listed in an event, as the task pane shows them.
@@ -218,6 +256,8 @@ mod tests {
             command: "release".into(),
             kind: Kind::Task,
             id: Some("A01-01".into()),
+            agent: None,
+            tool: None,
             changes: vec![Change {
                 field: "holder".into(),
                 from: Some("claude/x".into()),
@@ -235,5 +275,66 @@ mod tests {
         );
         let back: Event = serde_json::from_value(v).unwrap();
         assert_eq!(back, e);
+    }
+
+    #[test]
+    fn an_event_records_the_agent_and_its_tool_when_known() {
+        let e: Event = serde_json::from_value(serde_json::json!({
+            "at": "2026-10-18T09:00:00Z", "via": "alm", "command": "claim", "kind": "task",
+            "id": "A01-01", "agent": "claude", "tool": "claude_cli", "changes": []
+        }))
+        .unwrap();
+        assert_eq!(e.agent.as_deref(), Some("claude"));
+        assert_eq!(e.tool.as_deref(), Some("claude_cli"));
+        // An older event has neither, and is stored back without them.
+        let old: Event = serde_json::from_value(serde_json::json!({
+            "at": "2026-10-13T14:02:05Z", "via": "alm", "command": "claim", "kind": "task",
+            "changes": []
+        }))
+        .unwrap();
+        assert_eq!((old.agent.as_deref(), old.tool.as_deref()), (None, None));
+        assert!(serde_json::to_value(&old).unwrap().get("agent").is_none());
+    }
+
+    fn env<'a>(vars: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            vars.iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, v)| v.to_string())
+        }
+    }
+
+    #[test]
+    fn the_agent_is_judged_from_the_environment() {
+        let seen = |vars: &[(&str, &str)]| agent_from_env(env(vars));
+        let claude = |tool: Option<&str>| Some(("claude".to_string(), tool.map(String::from)));
+        assert_eq!(
+            seen(&[("CLAUDECODE", "1"), ("CLAUDE_CODE_ENTRYPOINT", "cli")]),
+            claude(Some("claude_cli"))
+        );
+        assert_eq!(
+            seen(&[
+                ("CLAUDECODE", "1"),
+                ("CLAUDE_CODE_ENTRYPOINT", "claude-desktop")
+            ]),
+            claude(Some("claude_app"))
+        );
+        assert_eq!(
+            seen(&[("CLAUDECODE", "1"), ("CLAUDE_CODE_ENTRYPOINT", "sdk-ts")]),
+            claude(None)
+        );
+        assert_eq!(seen(&[("CLAUDECODE", "1")]), claude(None));
+        let codex = Some(("codex".to_string(), None));
+        assert_eq!(seen(&[("CODEX_THREAD_ID", "t1")]), codex);
+        assert_eq!(seen(&[("CODEX_SANDBOX", "seatbelt")]), codex);
+        assert_eq!(seen(&[("CODEX_SANDBOX_NETWORK_DISABLED", "1")]), codex);
+        // Unsure: nothing recorded.
+        assert_eq!(seen(&[]), None);
+        assert_eq!(seen(&[("CLAUDECODE", "0")]), None);
+        assert_eq!(seen(&[("CODEX_THREAD_ID", "")]), None);
+        assert_eq!(
+            seen(&[("CLAUDECODE", "1"), ("CODEX_THREAD_ID", "t1")]),
+            None
+        );
     }
 }

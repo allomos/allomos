@@ -214,6 +214,16 @@ export interface Agent {
   how: "link" | "paste";
 }
 
+/** The agent `alm` last ran under for a task (crates/store `events::last_agent`, Task-A03-27). */
+export interface LastAgent {
+  /** `claude` or `codex`. */
+  agent: string;
+  /** `claude_cli` or `claude_app`, when the environment told it. */
+  tool: string | null;
+  /** UTC. */
+  at: string;
+}
+
 /** Do the AI agents know about this project? (apps/desktop: `agent_status`) */
 export interface AgentStatus {
   project: string;

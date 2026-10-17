@@ -4,7 +4,7 @@
 // only for it; Manual comes last. Each feature keeps its own request, buttons and Manual text:
 // `useAgents` finds the agents and holds the choice, `AgentPicker` draws it.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
@@ -12,6 +12,8 @@ import type { Messenger } from "./messenger";
 import type { Agent } from "./types";
 import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf } from "./agentPickerFlow";
 import type { Choice } from "./agentPickerFlow";
+import { offer as offerFor, offered } from "./updateTaskbagFlow";
+import type { LastUsed, Offer } from "./updateTaskbagFlow";
 
 export const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -26,9 +28,18 @@ export const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";
 /** Show "Looking for AI agents…" only when finding them is slow. */
 const SPINNER_AFTER_MS = 200;
 
-/** The agents on this computer and the person's choice; Manual alone when finding them fails. */
-export function useAgents(messenger: Messenger) {
-  const [agents, setAgents] = useState<Agent[] | null>(null);
+/** What Update the taskbag…'s choice of agents is worked out from (Task-A03-27): the agent used
+ * last, and the entries under `## Agents set up` (null: unreadable). */
+export interface OfferFacts {
+  last: LastUsed | null;
+  entries: string[] | null;
+}
+
+/** The agents on this computer and the person's choice; Manual alone when finding them fails.
+ * `facts` narrows them by the rule of Update the taskbag… (Task-A03-27); null while they are still
+ * being read (shown as looking); left out: every agent found. */
+export function useAgents(messenger: Messenger, facts?: OfferFacts | null) {
+  const [found, setFound] = useState<Agent[] | null>(null);
   const [slow, setSlow] = useState(false);
   const [choice, setChoice] = useState<Choice | null>(null);
   useEffect(() => {
@@ -36,25 +47,25 @@ export function useAgents(messenger: Messenger) {
     const timer = window.setTimeout(() => live && setSlow(true), SPINNER_AFTER_MS);
     messenger
       .findAgents()
-      .then((found) => {
-        if (!live) return;
-        setAgents(found);
-        setChoice(firstChoice(found));
-      })
-      .catch(() => {
-        if (!live) return;
-        setAgents([]);
-        setChoice(MANUAL);
-      })
+      .then((list) => live && setFound(list))
+      .catch(() => live && setFound([]))
       .finally(() => window.clearTimeout(timer));
     return () => {
       live = false;
       window.clearTimeout(timer);
     };
   }, [messenger]);
+  const offer = useMemo<Offer | null>(
+    () => (found === null || facts === null ? null : facts === undefined ? { kind: "all" } : offerFor(found, facts.last, facts.entries)),
+    [found, facts],
+  );
+  const agents = useMemo(() => (found === null || offer === null ? null : offered(found, offer)), [found, offer]);
+  useEffect(() => {
+    if (agents) setChoice(firstChoice(agents));
+  }, [agents]);
   /** The chosen tool as found (null for Manual or while looking). */
   const tool = agents?.find((a) => a.id === choice) ?? null;
-  return { agents, slow, choice, setChoice, tool };
+  return { agents, slow, choice, setChoice, tool, offer };
 }
 
 export function AgentPicker({
@@ -65,6 +76,7 @@ export function AgentPicker({
   disabled,
   name,
   manual,
+  manualTo,
 }: {
   /** The agents found; null while looking. */
   agents: Agent[] | null;
@@ -77,6 +89,9 @@ export function AgentPicker({
   name: string;
   /** Shown under Manual while it is chosen (for example the request with Copy). */
   manual?: ReactNode;
+  /** The one agent the request is for (Update the taskbag…, Task-A03-27): Manual says to paste
+   * it into that agent rather than any. */
+  manualTo?: string;
 }) {
   const { t } = useI18n();
   /** The tool last chosen in each group, so choosing the group again keeps it. */
@@ -152,7 +167,8 @@ export function AgentPicker({
       <li>
         <label>
           <input type="radio" name={`${name}-group`} checked={choice === MANUAL} onChange={() => onChoose(MANUAL)} disabled={disabled} />{" "}
-          <strong>{t("agents.manual")}</strong> <span className="muted">— {t("agents.manual_how")}</span>
+          <strong>{t("agents.manual")}</strong>{" "}
+          <span className="muted">— {manualTo ? t("agents.manual_how_to", { agent: manualTo }) : t("agents.manual_how")}</span>
         </label>
         {choice === MANUAL && manual}
       </li>

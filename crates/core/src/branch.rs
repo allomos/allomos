@@ -342,6 +342,8 @@ mod tests {
             command: "claim".into(),
             kind: Kind::Task,
             id: Some(id.into()),
+            agent: None,
+            tool: None,
             changes,
         }
     }

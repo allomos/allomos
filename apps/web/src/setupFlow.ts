@@ -30,11 +30,12 @@ export function defaultSource(setup: SetupState): string {
 }
 
 /** Whether opening a taskbag goes on to Connect with the agents by itself: a project folder is
- * known, and either an agent is not told about Allomos or the taskbag has no tasks yet. "Not now"
+ * known and an agent is not told about Allomos. A taskbag with no tasks yet is no reason
+ * (approver 2026-10-18, Task-A03-27: not to connect again, nor to update the taskbag). "Not now"
  * holds until the folder is opened again. */
 export function offerConnect(setup: SetupState, skipped: boolean): boolean {
   if (skipped || !setup.project_folder) return false;
-  return !(setup.agents.codex && setup.agents.claude) || !setup.has_tasks;
+  return !(setup.agents.codex && setup.agents.claude);
 }
 
 /** The instruction files that were missing before agents were connected and exist now. */
@@ -51,8 +52,7 @@ export function stillMissing(before: InstructionFiles, now: InstructionFiles): b
 }
 
 /** Opening a taskbag directly (not through the wizard): the wizard step to open by itself, or
- * none. No project folder known: step 3. Known, but an agent is not told or there are no tasks:
- * step 4 (owner, 2026-10-12: the wizard replaces the page's own setup cards). */
+ * none. No project folder known: step 3. Known, but an agent is not told: step 4 (owner, 2026-10-12: the wizard replaces the page's own setup cards). */
 export function directStep(setup: SetupState, skipped: boolean): 3 | 4 | null {
   if (skipped) return null;
   if (!setup.project_folder) return 3;
@@ -74,22 +74,21 @@ export function neverConnected(setup: SetupState): boolean {
 export type StepFourPage = "agents" | "cards" | "done";
 
 /** Step 4's page: Update the taskbag while an older taskbag's tasks wait to be moved in
- * (`movingIn`, Task-A01-45: the same panel as for card files); else Connect with the agents (or its
- * update panel) when agents are not told, Allomos's instructions are out of date (`needsUpdate`),
- * or the person chose Connect an agent anyway; else Update the taskbag while card files are outside
- * it, the taskbag has no tasks yet, or an agent found on this computer is not registered under
- * `## Agents set up` (`agentsMissing`; approver 2026-10-17, Task-A03-24: a connected project is
- * told to update the taskbag, not to connect again); else Setup done. */
+ * (`movingIn`, Task-A01-45: the same panel as for card files); else Connect with the agents when
+ * agents are not told or the person chose Connect an agent anyway; else Update the taskbag when it
+ * needs updating (approver 2026-10-18, Task-A03-27): card files outside it, or Allomos's
+ * instructions out of date (`needsUpdate`); else Setup done. A taskbag with no tasks yet is not a
+ * reason, and neither is an agent not registered under `## Agents set up`: each agent registers
+ * itself when it starts work. */
 export function stepFourPage(
   setup: SetupState,
   needsUpdate: boolean,
   cardsOutside: number,
   anyway: boolean,
   movingIn = false,
-  agentsMissing = 0,
 ): StepFourPage {
   if (anyway) return "agents";
   if (movingIn && setup.project_folder) return "cards";
-  if (needsUpdate || !setup.project_folder || !(setup.agents.codex && setup.agents.claude)) return "agents";
-  return cardsOutside > 0 || !setup.has_tasks || agentsMissing > 0 ? "cards" : "done";
+  if (!setup.project_folder || !(setup.agents.codex && setup.agents.claude)) return "agents";
+  return needsUpdate || cardsOutside > 0 ? "cards" : "done";
 }

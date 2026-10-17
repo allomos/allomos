@@ -115,7 +115,7 @@ pub fn project_notes(root: &Path) -> ProjectNotes {
 
 /// The entries under the project notes' `## Agents set up` section (Task-A03-24): each list item
 /// (`- ` or `* `) as written, without its marker; empty when the file or the section is missing.
-/// The app's agents panel reads only this; it judges nothing about the entries.
+/// The app reads only this, for which agents **Update the taskbag…** offers (Task-A03-27).
 pub fn agents_set_up(root: &Path) -> Vec<String> {
     let Some(text) = crate::read_text(&root.join(NOTES_FILE))
         .ok()

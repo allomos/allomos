@@ -34,6 +34,11 @@ fn alm(dir: &Path, args: &[&str]) -> Output {
         .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
+        .env_remove("CLAUDECODE")
+        .env_remove("CLAUDE_CODE_ENTRYPOINT")
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CODEX_SANDBOX")
+        .env_remove("CODEX_SANDBOX_NETWORK_DISABLED")
         .output()
         .unwrap()
 }
@@ -3440,6 +3445,20 @@ fn card_files_are_reported_and_moved_in_beside_their_tasks() {
     let v = ok(&repo, &["next"]);
     assert!(v["cards"].as_str().unwrap().contains("alm cards found"));
     assert_eq!(ok(&repo, &["cards"])["cards_outside"], json!([]));
+    // A01-01 is finished by an old session (before the card files were reported: `alm claim`
+    // refuses while some are outside the taskbag, Task-A03-27).
+    ok(&repo, &["--as", "old/session", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "old/session",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
 
     refused(&repo, &["cards", "found", "A01-01"], 2, "bad_usage");
     refused(
@@ -3483,19 +3502,7 @@ fn card_files_are_reported_and_moved_in_beside_their_tasks() {
     let v = ok(&repo, &["next"]);
     assert!(v["cards"].as_str().unwrap().contains("2 task(s)"));
 
-    // A01-01 is finished by an old session: still changeable.
-    ok(&repo, &["--as", "old/session", "claim", "A01-01"]);
-    ok(
-        &repo,
-        &[
-            "--as",
-            "old/session",
-            "done",
-            "A01-01",
-            "--without-human-check",
-            "test run",
-        ],
-    );
+    // A01-01 was finished by an old session before: still changeable.
     let v = ok(&repo, &["--as", "claude/mover", "card", "A01-01"]);
     assert_eq!(v["card"], "tasks/A01-01/card.md");
     let bag = repo.join(".allomos/taskbag");
@@ -3646,4 +3653,113 @@ fn card_links_outside_the_taskbag_are_listed_without_a_report() {
     assert_eq!(v["cards_outside"].as_array().unwrap().len(), 1);
     assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
     fs::remove_dir_all(repo).unwrap();
+}
+
+/// The newest event file's JSON.
+fn newest_event(repo: &Path) -> Value {
+    let dir = repo.join(".allomos/taskbag/events");
+    let mut names: Vec<_> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    names.sort();
+    let text = fs::read_to_string(dir.join(names.last().unwrap())).unwrap();
+    serde_json::from_str(&text).unwrap()
+}
+
+/// Approver, 2026-10-18 (Task-A03-27): every event `alm` writes names the agent it runs under,
+/// judged from the environment; unsure, it names none.
+#[test]
+fn events_record_the_agent_alm_runs_under() {
+    let repo = filled();
+    // No agent's signs (the helper removes them): nothing recorded.
+    let e = newest_event(&repo);
+    assert!(e.get("agent").is_none() && e.get("tool").is_none(), "{e}");
+    let run = |vars: &[(&str, &str)], args: &[&str]| {
+        let mut c = Command::new(ALM);
+        c.current_dir(&repo).args(args);
+        for name in [
+            "ALLOMOS_TASKBAG",
+            "ALLOMOS_HOLDER",
+            "CLAUDECODE",
+            "CLAUDE_CODE_ENTRYPOINT",
+            "CODEX_THREAD_ID",
+            "CODEX_SANDBOX",
+            "CODEX_SANDBOX_NETWORK_DISABLED",
+        ] {
+            c.env_remove(name);
+        }
+        for (k, v) in vars {
+            c.env(k, v);
+        }
+        assert!(c.output().unwrap().status.success(), "{args:?}");
+        newest_event(&repo)
+    };
+    let e = run(
+        &[("CLAUDECODE", "1"), ("CLAUDE_CODE_ENTRYPOINT", "cli")],
+        &["--as", "s1", "claim", "A01-01"],
+    );
+    assert_eq!(
+        (&e["agent"], &e["tool"]),
+        (&json!("claude"), &json!("claude_cli")),
+        "{e}"
+    );
+    let e = run(
+        &[
+            ("CLAUDECODE", "1"),
+            ("CLAUDE_CODE_ENTRYPOINT", "claude-desktop"),
+        ],
+        &["--as", "s1", "label", "A01-01", "implemented"],
+    );
+    assert_eq!(
+        (&e["agent"], &e["tool"]),
+        (&json!("claude"), &json!("claude_app")),
+        "{e}"
+    );
+    let e = run(
+        &[("CODEX_THREAD_ID", "t1")],
+        &["--as", "s2", "claim", "A01-02"],
+    );
+    assert_eq!(e["agent"], "codex", "{e}");
+    assert!(e.get("tool").is_none(), "{e}");
+    // Signs of both: unsure.
+    let e = run(
+        &[("CLAUDECODE", "1"), ("CODEX_THREAD_ID", "t1")],
+        &["--as", "s3", "claim", "A02-01"],
+    );
+    assert!(e.get("agent").is_none(), "{e}");
+    // The events still read without issues.
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+}
+
+/// Approver, 2026-10-18 (Task-A03-27): while card files are kept outside the taskbag, `alm claim`
+/// refuses and says to move them in first (`alm guide move-cards`); nothing changes.
+#[test]
+fn claim_waits_until_card_files_are_moved_in() {
+    let repo = filled();
+    fs::create_dir_all(repo.join("docs/tasks")).unwrap();
+    fs::write(repo.join("docs/tasks/A01-01.md"), "# A01-01\n").unwrap();
+    ok(&repo, &["cards", "found", "A01-01=docs/tasks/A01-01.md"]);
+    let before = snapshot(&repo);
+    // Any task, not only the one whose card file is outside.
+    let v = refused(
+        &repo,
+        &["--as", "a", "claim", "A01-02"],
+        1,
+        "claim_cards_outside",
+    );
+    assert_eq!(v["error"]["params"]["count"], "1", "{v}");
+    assert_eq!(v["error"]["params"]["tasks"], "A01-01", "{v}");
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("alm guide move-cards"),
+        "{v}"
+    );
+    assert_eq!(snapshot(&repo), before);
+    // Once the card is moved in, claiming works.
+    ok(&repo, &["card", "A01-01"]);
+    ok(&repo, &["--as", "a", "claim", "A01-02"]);
 }

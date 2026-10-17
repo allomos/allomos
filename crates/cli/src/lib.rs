@@ -2379,6 +2379,16 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             working,
         } => {
             let root = locate(cli, cwd)?;
+            // The taskbag is updated before any task is worked (Task-A03-27, approver
+            // 2026-10-18): card files kept outside it are moved in first.
+            let outside = allomos_store::cards::outside(&root);
+            if !outside.is_empty() {
+                let tasks: Vec<&str> = outside.iter().map(|c| c.task.as_str()).collect();
+                return Err(Problem::ClaimCardsOutside {
+                    count: outside.len().to_string(),
+                    tasks: tasks.join(", "),
+                });
+            }
             let claimed = allomos_store::claim_task(
                 &root,
                 Actor::alm(me),

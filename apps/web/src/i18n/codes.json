@@ -60,6 +60,10 @@
   "card_path_invalid": [
     "path"
   ],
+  "claim_cards_outside": [
+    "count",
+    "tasks"
+  ],
   "confirm_declined": [],
   "confirm_timeout": [
     "seconds"

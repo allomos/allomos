@@ -15,8 +15,6 @@ import { useI18n } from "./i18n";
 import { AgentsPanel } from "./AgentsPanel";
 import { MoveCardsPanel } from "./MoveCardsDialog";
 import { cardRows, tasksInStart } from "./moveCardsFlow";
-import { foundGroups } from "./agentPickerFlow";
-import { notSetUp } from "./agentSetupFlow";
 import type { CardRow, MoveIn } from "./moveCardsFlow";
 import { updateNotice } from "./versionFlow";
 import type { ConnectResult } from "./AgentsPanel";
@@ -91,8 +89,8 @@ export function SetupWizard({
     found: CardRow[];
     moveIn: MoveIn | null;
     tasks: number;
-    /** Agents found on this computer not registered under Agents set up (Task-A03-24). */
-    agents: string[];
+    /** The instruction files whose Allomos section is out of date (Task-A03-27). */
+    section: string | null;
   } | null>(null);
   /** Connect an agent anyway: the agents page, whatever the project needs. */
   const [anyway, setAnyway] = useState(false);
@@ -104,25 +102,23 @@ export function SetupWizard({
     let live = true;
     void (async () => {
       try {
-        const [setup, check, fresh, found_agents, entries] = await Promise.all([
+        const [setup, check, fresh] = await Promise.all([
           messenger.projectSetup(fourRoot),
           messenger.versionCheck(fourRoot).catch(() => null),
           messenger.openTaskbag(fourRoot),
-          messenger.findAgents().catch(() => []),
-          messenger.agentsSetUp(fourRoot).catch(() => null),
         ]);
         if (!live) return;
         const found = cardRows(fresh);
         // An older taskbag already renamed aside: its tasks are moved in from the same panel as
         // card files (Task-A01-45).
         const { moveIn } = tasksInStart(check);
-        // Unreadable notes: nobody counted as missing (nothing to say).
-        const agents = entries === null ? [] : notSetUp(foundGroups(found_agents).map((g) => g.name), entries);
-        const page = stepFourPage(setup, updateNotice(check) !== null, found.length, false, moveIn !== null, agents.length);
-        setFour({ page, setup, found, moveIn, tasks: fresh.loaded.taskbag?.tasks.length ?? 0, agents });
+        const notice = updateNotice(check);
+        const section = notice?.kind === "section" ? notice.files : null;
+        const page = stepFourPage(setup, notice !== null, found.length, false, moveIn !== null);
+        setFour({ page, setup, found, moveIn, tasks: fresh.loaded.taskbag?.tasks.length ?? 0, section });
       } catch {
         // Unsure what the project needs: the agents page, as before.
-        if (live) setFour({ page: "agents", setup: null, found: [], moveIn: null, tasks: 0, agents: [] });
+        if (live) setFour({ page: "agents", setup: null, found: [], moveIn: null, tasks: 0, section: null });
       }
     })();
     return () => {
@@ -342,7 +338,7 @@ export function SetupWizard({
                 root={step.opened.root}
                 found={four.found}
                 moveIn={four.moveIn}
-                agents={four.agents}
+                section={four.section}
                 noTasks={four.tasks === 0}
                 actionsIn={footer}
                 cancelLabel={t("agents.later")}

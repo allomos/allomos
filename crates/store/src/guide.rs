@@ -181,7 +181,9 @@ Work a task:
   progress. It records the working branch (`--working`, default the branch you are on), gives a
   task without a base the branch you are on, prints the base to start from and merge into with
   the Git commands (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
-  you are not on the base. `--take` only when its holder has stopped.
+  you are not on the base. `--take` only when its holder has stopped. While card files are kept
+  outside the taskbag it refuses (`claim_cards_outside`): move them in first (`alm guide
+  move-cards`).
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).
