@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 -12 612 342" width="612" height="342" role="img" aria-labelledby="t">
+<title id="t">Burndown drawn as a glide path: 60 tasks left at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.</title>
+<rect x="-39.5" y="-11.5" width="611" height="341" rx="14" fill="#101C2D" stroke="#22344A"/>
+<g fill="#93A5BA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif" font-size="11" font-weight="600" text-anchor="middle">
+<text transform="translate(-14,150) rotate(-90)">Tasks left</text><text x="280" y="312">Time (weeks)</text></g>
+<g stroke="#22344A" stroke-width="1"><line x1="40" y1="40" x2="520" y2="40"/><line x1="40" y1="150" x2="520" y2="150"/><line x1="40" y1="260" x2="400" y2="260"/></g>
+<g fill="#93A5BA" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'PingFang SC', 'Hiragino Sans', monospace" font-size="11" font-weight="500" text-anchor="end">
+<text x="30" y="44">60</text><text x="30" y="154">30</text><text x="30" y="264">0</text></g>
+<polygon points="220,135.3 460,260 490,260" fill="#F0A63A" fill-opacity="0.18"/>
+<g fill="none" stroke="#F0A63A" stroke-width="2" stroke-dasharray="6 6"><polyline points="220,135.3 460,260"/><polyline points="220,135.3 490,260"/></g>
+<polyline points="40,40.0 70,51.0 100,69.3 130,80.3 160,102.3 190,120.7 220,135.3" fill="none" stroke="#E5EDF6" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="220" cy="135.3" r="6" fill="#101C2D" stroke="#E5EDF6" stroke-width="2.5"/>
+<line x1="400" y1="260" x2="520" y2="260" stroke="#E5EDF6" stroke-width="4"/>
+<circle cx="460" cy="260" r="5" fill="#F0A63A"/><circle cx="490" cy="260" r="5" fill="#F0A63A"/>
+<g fill="#F4BC63" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'PingFang SC', 'Hiragino Sans', monospace" font-size="12" font-weight="600" text-anchor="middle">
+<text x="460" y="282">50% likely · wk 14</text><text x="482" y="298">85% likely · wk 15</text></g>
+<g fill="#93A5BA" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'PingFang SC', 'Hiragino Sans', monospace" font-size="11" font-weight="500" text-anchor="middle">
+<text x="40" y="284">wk 0</text><text x="220" y="284">today · wk 6</text></g>
+<text x="228" y="122" fill="#93A5BA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif" font-size="11">34 tasks left</text>
+</svg>
