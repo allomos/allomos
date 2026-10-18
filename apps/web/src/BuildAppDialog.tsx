@@ -156,7 +156,9 @@ export function BuildAppDialog({
               {folder === null && <p className="muted">{t("build.folder_hint")}</p>}
               {folder?.kind === "ok" && <p>{rich("build.folder_ok", { path: <code>{folder.folder}</code> })}</p>}
               {folder?.kind === "not_empty" && (
-                <p className="banner error">{rich("build.folder_not_empty", { path: <code>{folder.folder}</code> })}</p>
+                <p className="banner error">
+                  <span>{rich("build.folder_not_empty", { path: <code>{folder.folder}</code> })}</span>
+                </p>
               )}
               {folder?.kind === "not_a_folder" && <p className="banner error">{t("error.not_a_folder", { path: folder.path })}</p>}
               <div className="row start">
@@ -169,7 +171,9 @@ export function BuildAppDialog({
                 <>
                   <h3>{t("build.taskbag_title")}</h3>
                   <p>{rich("build.taskbag_at", { path: <code>{root}</code> })}</p>
-                  {refused && <p className="banner error">{rich("build.taskbag_has_one", { path: <code>{refused}</code> })}</p>}
+                  {refused && <p className="banner error">
+                      <span>{rich("build.taskbag_has_one", { path: <code>{refused}</code> })}</span>
+                    </p>}
                   <div className="row start">
                     <button type="button" onClick={() => void chooseTaskbag()} disabled={locked}>
                       {t("build.taskbag_change")}
