@@ -1929,7 +1929,7 @@ fn goal_follows_the_task_language() {
         assert_eq!(v["written_in_language"], true, "{v}");
         let text = v["guide"].as_str().unwrap();
         assert!(text.starts_with(words), "{language}: {text}");
-        assert!(text.contains("(goal prompt v1)"), "{language}");
+        assert!(text.contains("(goal prompt v2)"), "{language}");
         assert!(text.contains("## 4. "), "{language}");
         assert!(text.contains("`/goal`"), "{language}");
     }
@@ -2065,7 +2065,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v15)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v16)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2075,7 +2075,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v15)", "## Tasks: Allomos (v14)")
+            brief.replace("## Tasks: Allomos (v16)", "## Tasks: Allomos (v15)")
         ),
     )
     .unwrap();

@@ -142,7 +142,7 @@ test("AI decided: the decisions from the history go on their tasks, and the Need
   const after = withDecisions({ ...opened, ai_decisions: {} }).loaded.taskbag!.tasks;
   assert.equal(toReview(after[0]), false);
   assert.equal(withDecisions({ ...opened, ai_decisions: undefined }).loaded.taskbag!.tasks[0].ai_decisions, undefined);
-  assert.equal(t("task.ai_decided"), "AI decided");
+  assert.equal(t("task.ai_decided"), "AI decisions to review");
 });
 
 // Task-A01-44: groups with nothing left after the filter are not drawn; the banner says what it shows.

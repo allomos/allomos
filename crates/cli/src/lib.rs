@@ -255,13 +255,12 @@ enum Command {
     /// Move a blocked task on (ready, or in progress when someone holds it). `alm` does not check
     /// its blockers: you do.
     Unblock { id: String },
-    /// Finish a task. Finish it at the top label (a person has checked it); in an automatic or
-    /// loop run, a task may be finished below it with --without-human-check and --steps. On a task
-    /// already done, only its human check is recorded again.
+    /// Finish a task. Finish it at the top label (a person has checked it); when only a person's
+    /// hands-on check is left, in any run mode, finish it below it with --without-human-check and
+    /// --steps. On a task already done, only its human check is recorded again.
     Done {
         id: String,
-        /// Why the task is finished without the human check, and in which run (an automatic or
-        /// loop run). Recorded in the task's file; `alm human` lists it under To check.
+        /// Why the task is finished without the human check. Recorded in the task's file; `alm human` lists it under To check.
         /// `--without-owner` is its old name.
         #[arg(long, value_name = "TEXT", alias = "without-owner")]
         without_human_check: Option<String>,

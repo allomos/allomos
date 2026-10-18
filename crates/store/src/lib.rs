@@ -269,14 +269,16 @@ the project notes (below) and your own handoff file.
   advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
   iterations and make your own tasks ready. Anything with an outside effect still waits for the
   approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
-- Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
-  In an automatic or loop run the person set up to go on without them (quiet mode), you
-  may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
-  --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
-  In such a run (a quiet run), never stop to wait for the person: decide a routine choice
-  yourself (below); park a real question with `alm wait <id> --on \"<the question>\"` (it shows in
-  `alm human`, To answer) and go on with the next ready task; do not use `alm confirm` (it would
-  wait until it times out).
+- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
+  When the work is finished and only a person's hands-on check is left, in quiet and normal
+  mode alike, finish it below the top label with `alm done <id> --without-human-check \"<why>\"
+  --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
+  `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
+  a real question, an approval or an outside effect.
+  In an automatic or loop run the person set up to go on without them (a quiet run), never
+  stop to wait for the person: decide a routine choice yourself (below); park a real question
+  with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`, To answer) and go on
+  with the next ready task; do not use `alm confirm` (it would wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a

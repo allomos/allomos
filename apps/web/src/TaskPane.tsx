@@ -4,7 +4,7 @@
 // A task finished without the human check shows "Not human-checked", its steps and a Checked
 // button, which works like `alm checked` (Task-A03-18). The iteration is chosen from a drop-down
 // whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39). A task
-// with AI decisions nobody has reviewed shows "AI decided", the decisions and a Reviewed button,
+// with AI decisions nobody has reviewed shows "AI decisions to review", the decisions and a Reviewed button,
 // like `alm reviewed` (Task-A03-19). A done or dropped task has Reopen…, which asks why and works
 // like `alm reopen` (Task-A01-50).
 
@@ -612,7 +612,7 @@ export function HumanCheckBadge({ task }: { task: Task }) {
   );
 }
 
-/** "AI decided" on a task with AI decisions nobody has reviewed yet (Task-A03-19): in the lists
+/** "AI decisions to review" on a task with AI decisions nobody has reviewed yet (Task-A03-19): in the lists
  * and the task pane; hovering says how many. */
 export function AiDecidedBadge({ task }: { task: Task }) {
   const { t } = useI18n();
