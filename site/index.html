@@ -5,67 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Allomos</title>
 <meta name="description" content="Switch AI agents and teammates without losing the project. A free local app for macOS and Windows; the project travels in a taskbag of plain files in your own repository.">
-<link rel="icon" href="images/logo.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
 <meta property="og:title" content="Allomos — switch agents, switch teammates, keep the project">
 <meta property="og:description" content="When one AI agent or account runs out, another picks up where it stopped.">
 <meta property="og:url" content="https://www.allomos.com/">
-<style>
-:root {
-  --bg: #fbfcfe; --surface: #ffffff; --text: #12223a; --muted: #55667c;
-  --line: #e2e7ee; --teal: #2a9d8f; --coral: #e76f51; --gold: #e9c46a;
-  --link: #1f7a6f;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0e1726; --surface: #152136; --text: #e8edf4; --muted: #9aa8bb;
-    --line: #26344c; --link: #5cc8ba; }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text);
-  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-a { color: var(--link); }
-.wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; color: var(--text); text-decoration: none; }
-.brand img { width: 32px; height: 32px; }
-nav a { margin-left: 18px; color: var(--muted); text-decoration: none; font-size: 15px; }
-nav a:hover { color: var(--text); }
-.hero { padding: 48px 0 32px; text-align: center; }
-.hero h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.02em; }
-.hero p { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
-.btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-.btn { display: inline-block; padding: 11px 22px; border-radius: 8px; font-weight: 600; text-decoration: none; }
-.btn.primary { background: var(--teal); color: #fff; }
-.btn.secondary { border: 1px solid var(--line); color: var(--text); background: var(--surface); }
-.tags { margin-top: 22px; color: var(--muted); font-size: 14px; }
-.figure { text-align: center; margin: 24px 0 8px; }
-.figure img { max-width: 100%; height: auto; }
-section { padding: 40px 0; border-top: 1px solid var(--line); }
-section h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
-.lead { color: var(--muted); max-width: 680px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 20px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
-.card h3 { margin: 0 0 6px; font-size: 18px; }
-.card .kicker { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-.card p { margin: 0; color: var(--muted); font-size: 15px; }
-.k1 { color: var(--teal); } .k2 { color: var(--coral); } .k3 { color: #c99a2e; }
-ul.facts { padding-left: 20px; } ul.facts li { margin: 4px 0; }
-pre { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.note { font-size: 14px; color: var(--muted); }
-footer { padding: 32px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.dark-only { display: none; }
-@media (prefers-color-scheme: dark) { .dark-only { display: inline; } .light-only { display: none; } }
-@media (max-width: 560px) { nav a:not(:last-child) { display: none; } }
-</style>
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="wrap">
   <header>
-    <a class="brand" href="/"><img src="images/logo.svg" alt="">Allomos</a>
+    <a class="brand" href="/"><img src="/images/logo.svg" alt="">Allomos</a>
     <nav>
       <a href="#what">What it does</a>
       <a href="#pricing">Pricing</a>
       <a href="https://github.com/allomos/allomos">GitHub</a>
+      <span class="lang"><a href="/" aria-current="page" lang="en">EN</a><a href="/zh/" lang="zh-CN">中文</a><a href="/ja/" lang="ja">日本語</a></span>
     </nav>
   </header>
 
@@ -80,8 +37,8 @@ footer { padding: 32px 0 48px; border-top: 1px solid var(--line); color: var(--m
   </div>
 
   <div class="figure">
-    <img class="light-only" src="images/hop-en-light.svg" width="560" alt="A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.">
-    <img class="dark-only" src="images/hop-en-dark.svg" width="560" alt="">
+    <img class="light-only" src="/images/hop-en-light.svg" width="560" alt="A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.">
+    <img class="dark-only" src="/images/hop-en-dark.svg" width="560" alt="">
   </div>
 
   <section id="problem">
@@ -116,8 +73,8 @@ alm next
 A01-03  Sign-in page  ready · note: tests next
 alm claim A01-03</code></pre>
     <div class="figure">
-      <img class="light-only" src="images/glide-path-en-light.svg" width="612" alt="Burndown drawn as a glide path: 60 tasks left at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.">
-      <img class="dark-only" src="images/glide-path-en-dark.svg" width="612" alt="">
+      <img class="light-only" src="/images/glide-path-en-light.svg" width="612" alt="Burndown drawn as a glide path: 60 tasks left at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.">
+      <img class="dark-only" src="/images/glide-path-en-dark.svg" width="612" alt="">
     </div>
     <p class="note" style="text-align:center">An example of the forecast to come, not real data.</p>
   </section>
