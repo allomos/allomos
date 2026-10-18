@@ -2065,17 +2065,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v15)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v16)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v14 section (before Update the taskbag… covered an older taskbag, Task-A01-45) is out of date too.
+    // A v15 section (before personal details were kept out like credentials, Task-A03-29) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v15)", "## Tasks: Allomos (v14)")
+            brief.replace("## Tasks: Allomos (v16)", "## Tasks: Allomos (v15)")
         ),
     )
     .unwrap();
@@ -2102,6 +2102,9 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
         "a credential moves",
         "Change lines in place",
         "commit and push that file with Git yourself",
+        "Personal details are kept out like credentials",
+        "email address, account or user name",
+        "Write a placeholder such as `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up",
         "every new piece of work (a new card, a new outcome) gets its own task",
         "`alm guide tasks`",
     ] {

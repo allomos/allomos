@@ -320,6 +320,11 @@ file aside), you edit it directly, and you keep it true while you work: update i
 or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
 that would change what the next session does, or a credential moves. Change lines in place and
 remove lines that are no longer true; then commit and push that file with Git yourself.
+Personal details are kept out like credentials: never write a person's or an account's email
+address, account or user name, phone number, home address or local network address into the
+project notes, a handoff, a task, a document or the code. Write a placeholder such as
+`<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
+Git history keeps whatever was written, even after it is removed.
 
 `alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
 `git commit`, `git push`), naming only that change's files: run them, and leave other changes as

@@ -36,7 +36,8 @@ about the project's tasks.
   Markdown files tracked by Git. Change it only with `alm`, except the project notes and your
   own handoff file.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
-  task (what is running, pitfalls, where credentials live, never their values). Edited directly
+  task (what is running, pitfalls, where credentials live, never their values; no personal
+  details such as email addresses or account names, only placeholders). Edited directly
   and kept true while the project is built; `alm next` shows its Running and Pitfalls.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
@@ -417,6 +418,11 @@ Rules:
   a hosted resource or a Git remote, learn a pitfall that would change what the next session
   does, or a credential moves; change lines in place, remove lines no longer true, and commit and
   push that file yourself.
+- Never write credentials or personal details (a person's or an account's email address, account
+  or user name, phone number, home address, local network address) into the project notes, a
+  handoff, a task, a document or the code: write a placeholder such as
+  `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Git history keeps
+  whatever was written, even after it is removed.
 - Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in

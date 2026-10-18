@@ -65,7 +65,8 @@ None yet.
 
 ## Where credentials live
 
-Never their values. None yet.
+Never their values, and no personal details (email addresses, account names): write a
+placeholder such as `<ACCOUNT_EMAIL>` and how to look it up. None yet.
 
 ## Agents set up
 
