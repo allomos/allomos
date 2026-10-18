@@ -210,6 +210,9 @@
   "unknown_iteration": [
     "iteration"
   ],
+  "update_failed": [
+    "detail"
+  ],
   "waiting_on_missing": [],
   "without_human_check_missing": [],
   "write_failed": [

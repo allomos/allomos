@@ -1010,9 +1010,31 @@ fn open_download_page() -> Result<(), Problem> {
 /// Whether a newer Allomos is on GitHub (Task-A07-16). `asked` when the person chose
 /// **Check for Updates…**: GitHub is asked now, and a skipped version is offered again.
 /// Otherwise GitHub is asked only when the last answer is a day old.
+///
+/// When a newer version is known, its installer is downloaded and checked in the background
+/// (Task-A07-17); once it is ready every window hears `update:ready` and asks again.
 #[tauri::command]
-async fn update_status(asked: bool) -> update::UpdateStatus {
-    update::check(asked)
+async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
+    let status = update::check(asked);
+    if let (Some(version), None) = (&status.available, &status.ready) {
+        update::prepare_in_background(version.clone(), move || {
+            let _ = app.emit(UPDATE_READY_EVENT, ());
+        });
+    }
+    status
+}
+
+/// **Restart to Update to Allomos <version>** (Task-A07-17): run the checked installer and
+/// quit; the new version starts by itself. If the person cancels macOS's password prompt,
+/// nothing changes. A failure is told to every window, and this version keeps running.
+fn restart_to_update(app: AppHandle) {
+    tauri::async_runtime::spawn_blocking(move || match update::restart_to_update() {
+        Ok(update::Restart::Quit) => app.exit(0),
+        Ok(update::Restart::Cancelled) => {}
+        Err(detail) => {
+            let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+        }
+    });
 }
 
 /// "Skip this version" on the update notice.
@@ -1358,6 +1380,20 @@ const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
+const UPDATE_READY_EVENT: &str = "update:ready";
+const UPDATE_FAILED_EVENT: &str = "update:failed";
+
+/// What the update menu item does when chosen (Task-A07-16, Task-A07-17).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum UpdateAction {
+    /// **Check for Updates…**: the window asks GitHub now.
+    #[default]
+    Check,
+    /// **Download Allomos <version>…**: open the download page.
+    Download,
+    /// **Restart to Update to Allomos <version>**: install the checked download.
+    Restart,
+}
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
@@ -1366,8 +1402,9 @@ struct MenuTexts {
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
-    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
-    update_known: Mutex<bool>,
+    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
+    /// **Restart to Update to Allomos <version>** (Task-A07-17).
+    update_action: Mutex<UpdateAction>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -1501,7 +1538,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         connect: connect_item,
         move_tasks_in,
         check_updates,
-        update_known: Mutex::new(false),
+        update_action: Mutex::new(UpdateAction::Check),
         recent,
         state: Mutex::new(Recent::default()),
     });
@@ -1536,13 +1573,22 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = fill_recent(&app, &texts.recent, &recent);
 }
 
-/// The update item's words, as the window sends them: **Check for Updates…**, or **Download
-/// Allomos <version>…** once a newer version is known, which then opens the download page, as
-/// the Claude app's **Restart to Update** item does (approver, 2026-10-15).
+/// The update item's words and what it does, as the window sends them: **Check for Updates…**
+/// (`check`); **Download Allomos <version>…** once a newer version is known, which opens the
+/// download page (`download`, Task-A07-16); **Restart to Update to Allomos <version>** once its
+/// installer is downloaded and checked, as the Claude app has it (`restart`, Task-A07-17).
 #[tauri::command]
-fn set_update_item(texts: tauri::State<MenuTexts>, text: String, known: bool) {
+fn set_update_item(texts: tauri::State<MenuTexts>, text: String, action: String) {
     let _ = texts.check_updates.set_text(text);
-    *texts.update_known.lock().unwrap_or_else(|e| e.into_inner()) = known;
+    let action = match action.as_str() {
+        "download" => UpdateAction::Download,
+        "restart" => UpdateAction::Restart,
+        _ => UpdateAction::Check,
+    };
+    *texts
+        .update_action
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = action;
 }
 
 /// Show these folders, newest first, under File → Open Recent.
@@ -1585,15 +1631,17 @@ pub fn run() {
             } else if id == MOVE_TASKS_IN_ID {
                 send(MOVE_TASKS_IN_EVENT, None);
             } else if id == CHECK_UPDATES_ID {
-                let known = *app
+                let action = *app
                     .state::<MenuTexts>()
-                    .update_known
+                    .update_action
                     .lock()
                     .unwrap_or_else(|e| e.into_inner());
-                if known {
-                    let _ = open_download_page();
-                } else {
-                    send(CHECK_UPDATES_EVENT, None);
+                match action {
+                    UpdateAction::Check => send(CHECK_UPDATES_EVENT, None),
+                    UpdateAction::Download => {
+                        let _ = open_download_page();
+                    }
+                    UpdateAction::Restart => restart_to_update(app.clone()),
                 }
             } else if id == CLEAR_RECENT_ID {
                 send(CLEAR_RECENT_EVENT, None);

@@ -14,6 +14,20 @@ export type UpdateNote =
   /** Only after Check for Updates…: GitHub did not answer. */
   | { kind: "failed" };
 
+/** What the update menu item does: Check for Updates…; Download Allomos <version>… (opens the
+ * download page, Task-A07-16); Restart to Update to Allomos <version> (Task-A07-17). */
+export type UpdateMenuItem =
+  | { action: "check" }
+  | { action: "download"; latest: string }
+  | { action: "restart"; latest: string };
+
+export function updateMenuItem(status: UpdateStatus | null): UpdateMenuItem {
+  const available = status?.available ?? null;
+  if (!available) return { action: "check" };
+  if (status?.ready === available) return { action: "restart", latest: available };
+  return { action: "download", latest: available };
+}
+
 /**
  * What to show. A check on its own (at start, then once a day) shows only an offer and stays
  * quiet otherwise; Check for Updates… (`asked`) always answers. `hidden` is the version the
