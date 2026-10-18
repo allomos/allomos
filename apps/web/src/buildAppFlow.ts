@@ -40,3 +40,27 @@ export function checkFolder(i: Inspection): FolderCheck {
 export function canStart(folder: FolderCheck | null, description: string, agent: string | null): boolean {
   return folder?.kind === "ok" && description.trim() !== "" && agent !== null;
 }
+
+/** Where the taskbag goes (Task-A03-25-04). By default it is `<app folder>/.allomos/taskbag`; the
+ * person may choose another folder, which gets a new taskbag in its `.allomos/taskbag/`. A folder
+ * that already holds a taskbag is refused, because each taskbag has one project folder (approver,
+ * 2026-10-18): the dialog says so and keeps the place it had. */
+export type TaskbagCheck = { kind: "ok"; root: string } | { kind: "has_taskbag"; root: string } | { kind: "not_a_folder"; path: string };
+
+export function checkTaskbagFolder(i: Inspection): TaskbagCheck {
+  switch (i.kind) {
+    case "empty":
+    case "no_taskbag":
+      return { kind: "ok", root: i.suggested_root };
+    case "found":
+      return { kind: "has_taskbag", root: i.root };
+    case "not_a_folder":
+      return { kind: "not_a_folder", path: i.path };
+  }
+}
+
+/** The taskbag Start creates: the one the person chose, otherwise the app folder's own. */
+export function taskbagRoot(folder: FolderCheck | null, chosen: string | null): string | null {
+  if (folder?.kind !== "ok") return null;
+  return chosen ?? folder.root;
+}

@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 
 /// GitHub's answer for the newest published release (drafts and pre-releases are left out).
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/mypals-ml/allomos/releases/latest";
+const LATEST_RELEASE_API: &str = "https://api.github.com/repos/allomos/allomos/releases/latest";
 /// How long one answer is trusted before GitHub is asked again (approver, 2026-10-15).
 pub const CHECK_EVERY_SECS: u64 = 24 * 60 * 60;
 /// How long to wait for GitHub before giving up.

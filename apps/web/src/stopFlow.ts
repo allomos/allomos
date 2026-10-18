@@ -56,7 +56,7 @@ export function humanCheckNote(task: Task): string {
   return task.without_human_check ?? "";
 }
 
-/** An AI agent decided something here on its own, and nobody has reviewed it yet: "AI decided"
+/** An AI agent decided something here on its own, and nobody has reviewed it yet: "AI decisions to review"
  * (Task-A03-19). */
 export function toReview(task: Task): boolean {
   return (task.ai_decisions?.length ?? 0) > 0;

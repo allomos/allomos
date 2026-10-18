@@ -349,7 +349,7 @@ button.link:hover { text-decoration: underline; }
 .badge.to-check { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--warn-bg); color: var(--warn); border: 1px dashed var(--warn); }
 .pane-check { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
 .pane-check .muted { flex-basis: 100%; }
-/* Task-A03-19: "AI decided" and the decisions to review. */
+/* Task-A03-19: "AI decisions to review" and the decisions to review. */
 .badge.ai-decided { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); border: 1px dashed var(--ok); }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
 .pane-review .ai-decisions { padding-left: 20px; }
@@ -516,7 +516,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 /* Build a new app… (Task-A03-25-02): under the start page's card, right of Open recent…, and its
    dialog. */
 .welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
-.build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
+.build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; min-height: 7.5em; }
+.build-app .banner code { overflow-wrap: anywhere; }
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
 .build-app .run-modes summary { cursor: pointer; }

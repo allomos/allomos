@@ -269,14 +269,16 @@ the project notes (below) and your own handoff file.
   advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
   iterations and make your own tasks ready. Anything with an outside effect still waits for the
   approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
-- Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
-  In an automatic or loop run the person set up to go on without them (quiet mode), you
-  may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
-  --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
-  In such a run (a quiet run), never stop to wait for the person: decide a routine choice
-  yourself (below); park a real question with `alm wait <id> --on \"<the question>\"` (it shows in
-  `alm human`, To answer) and go on with the next ready task; do not use `alm confirm` (it would
-  wait until it times out).
+- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
+  When the work is finished and only a person's hands-on check is left, in quiet and normal
+  mode alike, finish it below the top label with `alm done <id> --without-human-check \"<why>\"
+  --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
+  `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
+  a real question, an approval or an outside effect.
+  In an automatic or loop run the person set up to go on without them (a quiet run), never
+  stop to wait for the person: decide a routine choice yourself (below); park a real question
+  with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`, To answer) and go on
+  with the next ready task; do not use `alm confirm` (it would wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
@@ -368,8 +370,41 @@ pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
 }
 
 /// [`agent_section`], plus where the taskbag is when it is not inside `project` (written relative
-/// to `project`, so the file works on every computer that has both folders side by side).
+/// to `project`, so the file works on every computer that has both folders side by side), plus
+/// where the code and the taskbag are kept online when the project notes say (Task-A03-30).
 pub fn agent_section_for(project: &Path, taskbag: &Path) -> String {
+    format!(
+        "{}{}",
+        taskbag_place(project, taskbag),
+        repositories_lines(
+            &handoff::project_notes(taskbag)
+                .repositories
+                .unwrap_or_default()
+        )
+    )
+}
+
+/// The lines naming where the code and the taskbag are kept online (the project notes'
+/// `## Repositories` items, as written), for a copy without its taskbag beside it, as an agent in
+/// the cloud has (Task-A03-30). Empty when the notes name none.
+pub fn repositories_lines(items: &[String]) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    let mut list = String::new();
+    for item in items {
+        list.push_str(&format!("- {item}\n"));
+    }
+    format!(
+        "
+Where this project is kept online (the project notes' `## Repositories`). Working from a copy
+without the taskbag beside it, in the cloud for example, clone what is missing from here:
+{list}"
+    )
+}
+
+/// [`agent_section`], plus where the taskbag is when it is not inside `project`.
+fn taskbag_place(project: &Path, taskbag: &Path) -> String {
     let section = agent_section();
     // Tidy `.` and `..` first: `/work/app/../tasks` is not inside `/work/app`.
     let (project, taskbag) = (&tidy(project), &tidy(taskbag));
@@ -1990,6 +2025,32 @@ mod tests {
             agent_section_for(&project, &project.join("./.allomos/taskbag")),
             agent_section()
         );
+    }
+
+    #[test]
+    fn the_section_names_the_repositories_the_project_notes_list() {
+        let base = tmp("brief-repos");
+        let (project, taskbag) = (base.join("app"), base.join("tasks/.allomos/taskbag"));
+        fs::create_dir_all(&project).unwrap();
+        init(&taskbag, "p", "P").unwrap();
+        // None listed yet: the section as before.
+        let plain = agent_section_for(&project, &taskbag);
+        assert!(!plain.contains("kept online"), "{plain}");
+        fs::write(
+            taskbag.join(handoff::NOTES_FILE),
+            "## Repositories\n\n- Code: https://github.com/o/app\n- Taskbag: https://github.com/o/app-tasks\n",
+        )
+        .unwrap();
+        let section = agent_section_for(&project, &taskbag);
+        assert!(section.starts_with(&plain), "{section}");
+        assert!(
+            section.ends_with(
+                "- Code: https://github.com/o/app\n- Taskbag: https://github.com/o/app-tasks\n"
+            ),
+            "{section}"
+        );
+        assert!(section.contains("in the cloud for example"), "{section}");
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]

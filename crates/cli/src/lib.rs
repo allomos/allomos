@@ -255,13 +255,12 @@ enum Command {
     /// Move a blocked task on (ready, or in progress when someone holds it). `alm` does not check
     /// its blockers: you do.
     Unblock { id: String },
-    /// Finish a task. Finish it at the top label (a person has checked it); in an automatic or
-    /// loop run, a task may be finished below it with --without-human-check and --steps. On a task
-    /// already done, only its human check is recorded again.
+    /// Finish a task. Finish it at the top label (a person has checked it); when only a person's
+    /// hands-on check is left, in any run mode, finish it below it with --without-human-check and
+    /// --steps. On a task already done, only its human check is recorded again.
     Done {
         id: String,
-        /// Why the task is finished without the human check, and in which run (an automatic or
-        /// loop run). Recorded in the task's file; `alm human` lists it under To check.
+        /// Why the task is finished without the human check. Recorded in the task's file; `alm human` lists it under To check.
         /// `--without-owner` is its old name.
         #[arg(long, value_name = "TEXT", alias = "without-owner")]
         without_human_check: Option<String>,
@@ -1268,6 +1267,21 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
                         text.push_str(&format!("  {line}\n"));
                     }
                 }
+            }
+        }
+    }
+    // Where the code and the taskbag are kept online, for an agent working from a copy elsewhere
+    // (Task-A03-30). alm reads no remote; the agent fills the section from its own Git remotes.
+    match n.repositories.as_deref() {
+        None => text.push_str(&format!(
+            "Repositories: no such section. Add `## Repositories` to {} with where the code and this taskbag are kept online (each folder's Git remote, the address only), so an agent working from a copy elsewhere, in the cloud for example, finds both.\n",
+            n.file
+        )),
+        Some([]) => text.push_str("Repositories: none named.\n"),
+        Some(items) => {
+            text.push_str("Repositories:\n");
+            for item in items {
+                text.push_str(&format!("  - {item}\n"));
             }
         }
     }

@@ -63,6 +63,12 @@ Nothing.
 
 None yet.
 
+## Repositories
+
+Where the code and this taskbag are kept online, one list item each, so an agent working from a
+copy elsewhere (in the cloud, say) can find both: `- Code: https://github.com/<owner>/<repo>`.
+The address only: never a token or a personal detail. None yet.
+
 ## Where credentials live
 
 Never their values, and no personal details (email addresses, account names): write a
@@ -90,6 +96,9 @@ pub struct ProjectNotes {
     pub running: Option<String>,
     /// The text of its `## Pitfalls` section; `None` when there is no such section.
     pub pitfalls: Option<String>,
+    /// The list items of its `## Repositories` section (Task-A03-30): where the code and the
+    /// taskbag are kept online, as written; `None` when there is no such section.
+    pub repositories: Option<Vec<String>>,
 }
 
 /// The taskbag's project notes, as far as they can be read.
@@ -111,6 +120,10 @@ pub fn project_notes(root: &Path) -> ProjectNotes {
         changed: text.as_ref().and(changed),
         running: text.as_deref().and_then(|t| notes_section(t, "running")),
         pitfalls: text.as_deref().and_then(|t| notes_section(t, "pitfalls")),
+        repositories: text
+            .as_deref()
+            .and_then(|t| notes_section(t, "repositories"))
+            .map(|s| list_items(&s)),
     }
 }
 
@@ -124,8 +137,13 @@ pub fn agents_set_up(root: &Path) -> Vec<String> {
     else {
         return Vec::new();
     };
-    notes_section(&text, "agents set up")
-        .unwrap_or_default()
+    list_items(&notes_section(&text, "agents set up").unwrap_or_default())
+}
+
+/// Each list item (`- ` or `* `) of a section as written, without its marker; other lines are
+/// left out.
+fn list_items(section: &str) -> Vec<String> {
+    section
         .lines()
         .filter_map(|l| {
             let l = l.trim_start();
@@ -566,6 +584,29 @@ mod tests {
         // No file: nobody is set up, not an error.
         fs::remove_file(root.join(NOTES_FILE)).unwrap();
         assert!(agents_set_up(&root).is_empty());
+    }
+
+    #[test]
+    fn repositories_are_the_list_items_of_that_section() {
+        let root = tmp("repos");
+        init(&root, "p", "P").unwrap();
+        // A new taskbag: the section is there and names none.
+        assert_eq!(project_notes(&root).repositories, Some(Vec::new()));
+        fs::write(
+            root.join(NOTES_FILE),
+            "## Repositories\r\n\r\nWhere they are.\r\n\r\n- Code: https://github.com/o/app\r\n* Taskbag: https://github.com/o/app-tasks\r\n\r\n## Pitfalls\r\n- not a repository\r\n",
+        )
+        .unwrap();
+        assert_eq!(
+            project_notes(&root).repositories.unwrap(),
+            [
+                "Code: https://github.com/o/app",
+                "Taskbag: https://github.com/o/app-tasks"
+            ]
+        );
+        // An older file without the section: `None`, for `alm next` to say so.
+        fs::write(root.join(NOTES_FILE), "## Running\nNothing.\n").unwrap();
+        assert_eq!(project_notes(&root).repositories, None);
     }
 
     #[test]

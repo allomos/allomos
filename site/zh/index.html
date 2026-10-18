@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>换肩 Allomos</title>
+<meta name="description" content="换智能体，换队友，项目不断线。免费的 macOS 和 Windows 本地应用；项目装在任务包里，就是你自己代码仓库里的普通文件。">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="换肩 Allomos：换智能体，换队友，项目不断线">
+<meta property="og:description" content="一个 AI 智能体或账号的额度用完了，另一个从停下的地方接着做。">
+<meta property="og:url" content="https://www.allomos.com/zh/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a href="#what">功能</a>
+      <a href="#pricing">价格</a>
+      <a href="https://github.com/allomos/allomos">GitHub</a>
+      <span class="lang"><a href="/" lang="en">EN</a><a href="/zh/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1><span>换智能体，</span><span>换队友，</span><br><span>项目不断线。</span></h1>
+    <p>一个 AI 智能体或账号的额度用完了，另一个从停下的地方接着做。把工作交给队友时，也不会有东西落在聊天记录里。项目装在它的<strong>任务包</strong>里：就是你自己代码仓库里的普通文件。</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/allomos/allomos/releases">下载 macOS 版</a>
+      <a class="btn secondary" href="https://github.com/allomos/allomos">在 GitHub 上查看</a>
+    </div>
+    <div class="tags">本地应用免费 &nbsp;·&nbsp; macOS · Windows &nbsp;·&nbsp; Claude Code · Codex &nbsp;·&nbsp; 云端服务按需付费</div>
+  </div>
+
+  <div class="figure">
+    <img class="light-only" src="/images/hop-zh-CN-light.svg" width="560" alt="任务在额度用完时从 Claude Code（账号 1）转到 Codex（账号 2），交接时再转到队友手里；三方读写的是代码仓库里的同一个任务包。">
+    <img class="dark-only" src="/images/hop-zh-CN-dark.svg" width="560" alt="">
+  </div>
+
+  <section id="problem">
+    <h2>每换一次手，线索就断一次</h2>
+    <p class="lead">Vibe Coding 靠很多会话一起推进：Claude Code、Codex、好几个账号、好几个人。额度可能毫无预警地让会话中断，下一个会话只能从零开始。在一个真实的多智能体项目里：</p>
+    <ul class="facts">
+      <li><strong>185 KB</strong> 的交接笔记，每个新会话接手都得从头读一遍；</li>
+      <li><strong>6</strong> 个地方要手工同步同一张任务卡的状态；</li>
+      <li><strong>3</strong> 个会话同时抢任务，最后靠 Git 合并冲突来裁决；</li>
+      <li><strong>0</strong> 人能回答“到底什么时候能做完？”</li>
+    </ul>
+  </section>
+
+  <section id="what">
+    <h2>一条主线，两组助力</h2>
+    <div class="cards">
+      <div class="card"><div class="kicker k1">切换</div><h3>智能体和队友</h3><p>在 AI 智能体和队友之间来回切换，项目一点不丢。所有智能体用同一套 <code>alm</code> 命令；一步交接，一步接手。</p></div>
+      <div class="card"><div class="kicker k2">AI 技能</div><h3>和智能体合作，越做越好</h3><p>了解每个智能体擅长什么，切换时该交接什么，把流程跑顺：一个成果一张任务卡，一级一级地验证，任何东西离开你的电脑前都要你同意。</p></div>
+      <div class="card"><div class="kicker k3">进度管理</div><h3>走到哪了，何时落地</h3><p>按领域看进度，列出等你处理的事项，燃尽图按真实速度给出预计交付日期。<em>（计划中）</em></p></div>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2>Claude 额度用完，Codex 接着干</h2>
+    <p class="lead">任务、验证阶段和交接笔记都是 <code>.allomos/taskbag/</code> 下的普通文本文件，用你自己的 Git 管理版本，不锁在某个智能体的记忆或某个账号里。</p>
+<pre><code># Claude Code · 账号 1 · 额度快用完
+alm label A01-03 "implemented"
+alm release A01-03 --note "form done; tests next"
+
+# Codex · 账号 2 · 一分钟后
+alm next
+A01-03  Sign-in page  ready · note: tests next
+alm claim A01-03</code></pre>
+    <div class="figure">
+      <img class="light-only" src="/images/glide-path-zh-CN-light.svg" width="612" alt="把燃尽图画成滑翔进近路线：第 0 周剩余 60 个任务，第 6 周剩余 34 个；第 14 周前完成的把握约五成，第 15 周前约八成五。">
+      <img class="dark-only" src="/images/glide-path-zh-CN-dark.svg" width="612" alt="">
+    </div>
+    <p class="note" style="text-align:center">这是将来预测功能的示意图，不是真实数据。</p>
+  </section>
+
+  <section id="pricing">
+    <h2>本地免费用，用云端才收费</h2>
+    <div class="cards">
+      <div class="card"><div class="kicker k1">本地应用</div><h3>免费</h3><p>不用注册，不用绑卡，没有试用期限。除非你主动分享，数据只留在你的电脑和代码仓库里。</p></div>
+      <div class="card"><div class="kicker k2">云端</div><h3>按需</h3><p>团队实时共享、邮箱邀请和角色权限。价格待定。</p></div>
+    </div>
+  </section>
+
+  <section id="status">
+    <h2>早期开发中</h2>
+    <p class="lead">v0.1（macOS 本地任务跟踪）已发布；v0.2（macOS 和 Windows、应用内编辑）正在进行。欢迎在 <a href="https://github.com/allomos/allomos">GitHub</a> 上关注或试用。</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
