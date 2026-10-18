@@ -1271,6 +1271,21 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
             }
         }
     }
+    // Where the code and the taskbag are kept online, for an agent working from a copy elsewhere
+    // (Task-A03-30). alm reads no remote; the agent fills the section from its own Git remotes.
+    match n.repositories.as_deref() {
+        None => text.push_str(&format!(
+            "Repositories: no such section. Add `## Repositories` to {} with where the code and this taskbag are kept online (each folder's Git remote, the address only), so an agent working from a copy elsewhere, in the cloud for example, finds both.\n",
+            n.file
+        )),
+        Some([]) => text.push_str("Repositories: none named.\n"),
+        Some(items) => {
+            text.push_str("Repositories:\n");
+            for item in items {
+                text.push_str(&format!("  - {item}\n"));
+            }
+        }
+    }
     text
 }
 

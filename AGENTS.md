@@ -137,6 +137,11 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
 `--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).
 
+Where this project is kept online (the project notes' `## Repositories`). Working from a copy
+without the taskbag beside it, in the cloud for example, clone what is missing from here:
+- Code: https://github.com/allomos/allomos (public)
+- Taskbag: https://github.com/allomos/allomos-taskbag (private; clone it to `../allomos-taskbag` beside the code)
+
 ## Handoff — write it continuously
 
 Quota can end a session without warning, and whoever continues may be another agent or a person. Write your handoff with `alm handoff --as <your session name> --tasks <ids>`: it gives you this session's file in the taskbag's `handoffs/`, made from the project's template, and the Git commands that share it; fill it in, plain words first, for any reader (evidence goes in the task's description), then run those commands. Update it after every meaningful step (a task finished, a finding, a commit, a process started or stopped). `alm handoff-rules` gives this project's gates, and `alm next` repeats them at the start of a session: near **3% left** in the 5-hour window, start nothing new, finish the handoff and stop; at about **70% context used**, bring the handoff up to date, push, and give the approver the exact prompt for a new session, and do not start the next task in the same message (the approver decides whether to switch). Check usage at step boundaries where the tool exposes it (Claude Code: `get_usage`).
