@@ -22,7 +22,9 @@ use allomos_store::{
     project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
-use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::AboutMetadata;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
 #[derive(Serialize)]
@@ -1357,8 +1359,12 @@ const CONNECT_EVENT: &str = "menu:connect";
 const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
-/// The website the About window names (Task-A07-22).
+/// The website the About window links to, and the words it shows (Task-A07-22).
 const WEBSITE: &str = "https://www.allomos.com";
+const WEBSITE_LABEL: &str = "www.allomos.com";
+/// About Allomos on macOS, where the app shows the About window itself (`show_about`).
+#[cfg(target_os = "macos")]
+const ABOUT_ID: &str = "about";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
@@ -1486,7 +1492,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .filter_map(|item| item.as_submenu().cloned())
         .collect();
     // The default About item, first in the app menu on macOS and in the Help menu elsewhere,
-    // is replaced by one that also names the website (Task-A07-22).
+    // is replaced by one that also gives the website (Task-A07-22).
     let about = about_item(app)?;
     if cfg!(target_os = "macos") {
         if let Some(app_menu) = submenus.first() {
@@ -1517,8 +1523,17 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     Ok(menu)
 }
 
-/// About Allomos, as the default menu has it, with the website added: macOS shows it under the
-/// version (its About window has no website field), Windows and Linux in their website field.
+/// About Allomos, with the website. On macOS the item opens the system's About window itself
+/// (`show_about`), so the website is a link that opens in the default browser: the default
+/// item can only show plain text there. Windows and Linux keep the default item, with the
+/// website in its website field.
+#[cfg(target_os = "macos")]
+fn about_item(app: &AppHandle) -> tauri::Result<MenuItem<Wry>> {
+    let name = &app.package_info().name;
+    MenuItem::with_id(app, ABOUT_ID, format!("About {name}"), true, None::<&str>)
+}
+
+#[cfg(not(target_os = "macos"))]
 fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
     let info = app.package_info();
     let config = app.config();
@@ -1528,11 +1543,76 @@ fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
         copyright: config.bundle.copyright.clone(),
         authors: config.bundle.publisher.clone().map(|p| vec![p]),
         website: Some(WEBSITE.to_string()),
-        website_label: Some("www.allomos.com".to_string()),
-        credits: Some("www.allomos.com".to_string()),
+        website_label: Some(WEBSITE_LABEL.to_string()),
         ..Default::default()
     };
     PredefinedMenuItem::about(app, None, Some(metadata))
+}
+
+/// The system's About window with the name, the version, and the website as a centred link.
+#[cfg(target_os = "macos")]
+fn show_about(app: &AppHandle) {
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2::{AnyThread, MainThreadMarker};
+    use objc2_app_kit::{
+        NSAboutPanelOptionApplicationName, NSAboutPanelOptionApplicationVersion,
+        NSAboutPanelOptionCredits, NSApplication, NSFont, NSFontAttributeName, NSLinkAttributeName,
+        NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignment,
+    };
+    use objc2_foundation::{NSAttributedString, NSDictionary, NSString, NSURL};
+
+    // Menu events arrive on the main thread; anywhere else the window is not shown.
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    let Some(url) = NSURL::URLWithString(&NSString::from_str(WEBSITE)) else {
+        return;
+    };
+    let info = app.package_info();
+    let style = NSMutableParagraphStyle::new();
+    style.setAlignment(NSTextAlignment::Center);
+    let font = NSFont::systemFontOfSize(NSFont::smallSystemFontSize());
+    let attributes: Retained<NSDictionary<NSString, AnyObject>> = unsafe {
+        NSDictionary::from_retained_objects(
+            &[
+                NSLinkAttributeName,
+                NSParagraphStyleAttributeName,
+                NSFontAttributeName,
+            ],
+            &[
+                Retained::into_super(Retained::into_super(url)),
+                Retained::into_super(Retained::into_super(Retained::into_super(style))),
+                Retained::into_super(Retained::into_super(font)),
+            ],
+        )
+    };
+    let credits = unsafe {
+        NSAttributedString::initWithString_attributes(
+            NSAttributedString::alloc(),
+            &NSString::from_str(WEBSITE_LABEL),
+            Some(&attributes),
+        )
+    };
+    let options: Retained<NSDictionary<NSString, AnyObject>> = unsafe {
+        NSDictionary::from_retained_objects(
+            &[
+                NSAboutPanelOptionApplicationName,
+                NSAboutPanelOptionApplicationVersion,
+                NSAboutPanelOptionCredits,
+            ],
+            &[
+                Retained::into_super(Retained::into_super(NSString::from_str(&info.name))),
+                Retained::into_super(Retained::into_super(NSString::from_str(
+                    &info.version.to_string(),
+                ))),
+                Retained::into_super(Retained::into_super(credits)),
+            ],
+        )
+    };
+    let ns_app = NSApplication::sharedApplication(mtm);
+    unsafe { ns_app.orderFrontStandardAboutPanelWithOptions(&options) };
+    ns_app.activate();
 }
 
 /// The menu's words in the interface's language, as the interface sends them.
@@ -1605,6 +1685,11 @@ pub fn run() {
                     };
                 }
             };
+            #[cfg(target_os = "macos")]
+            if id == ABOUT_ID {
+                show_about(app);
+                return;
+            }
             if id == NEW_WINDOW_ID {
                 let _ = open_new_window(app);
             } else if id == CONNECT_ID {
