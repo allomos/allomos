@@ -363,8 +363,41 @@ pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
 }
 
 /// [`agent_section`], plus where the taskbag is when it is not inside `project` (written relative
-/// to `project`, so the file works on every computer that has both folders side by side).
+/// to `project`, so the file works on every computer that has both folders side by side), plus
+/// where the code and the taskbag are kept online when the project notes say (Task-A03-30).
 pub fn agent_section_for(project: &Path, taskbag: &Path) -> String {
+    format!(
+        "{}{}",
+        taskbag_place(project, taskbag),
+        repositories_lines(
+            &handoff::project_notes(taskbag)
+                .repositories
+                .unwrap_or_default()
+        )
+    )
+}
+
+/// The lines naming where the code and the taskbag are kept online (the project notes'
+/// `## Repositories` items, as written), for a copy without its taskbag beside it, as an agent in
+/// the cloud has (Task-A03-30). Empty when the notes name none.
+pub fn repositories_lines(items: &[String]) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    let mut list = String::new();
+    for item in items {
+        list.push_str(&format!("- {item}\n"));
+    }
+    format!(
+        "
+Where this project is kept online (the project notes' `## Repositories`). Working from a copy
+without the taskbag beside it, in the cloud for example, clone what is missing from here:
+{list}"
+    )
+}
+
+/// [`agent_section`], plus where the taskbag is when it is not inside `project`.
+fn taskbag_place(project: &Path, taskbag: &Path) -> String {
     let section = agent_section();
     // Tidy `.` and `..` first: `/work/app/../tasks` is not inside `/work/app`.
     let (project, taskbag) = (&tidy(project), &tidy(taskbag));
@@ -1985,6 +2018,32 @@ mod tests {
             agent_section_for(&project, &project.join("./.allomos/taskbag")),
             agent_section()
         );
+    }
+
+    #[test]
+    fn the_section_names_the_repositories_the_project_notes_list() {
+        let base = tmp("brief-repos");
+        let (project, taskbag) = (base.join("app"), base.join("tasks/.allomos/taskbag"));
+        fs::create_dir_all(&project).unwrap();
+        init(&taskbag, "p", "P").unwrap();
+        // None listed yet: the section as before.
+        let plain = agent_section_for(&project, &taskbag);
+        assert!(!plain.contains("kept online"), "{plain}");
+        fs::write(
+            taskbag.join(handoff::NOTES_FILE),
+            "## Repositories\n\n- Code: https://github.com/o/app\n- Taskbag: https://github.com/o/app-tasks\n",
+        )
+        .unwrap();
+        let section = agent_section_for(&project, &taskbag);
+        assert!(section.starts_with(&plain), "{section}");
+        assert!(
+            section.ends_with(
+                "- Code: https://github.com/o/app\n- Taskbag: https://github.com/o/app-tasks\n"
+            ),
+            "{section}"
+        );
+        assert!(section.contains("in the cloud for example"), "{section}");
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
