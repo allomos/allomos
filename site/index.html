@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Allomos</title>
+<meta name="description" content="Switch AI agents and teammates without losing the project. A free local app for macOS and Windows; the project travels in a taskbag of plain files in your own repository.">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Allomos — switch agents, switch teammates, keep the project">
+<meta property="og:description" content="When one AI agent or account runs out, another picks up where it stopped.">
+<meta property="og:url" content="https://www.allomos.com/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/"><img src="/images/logo.svg" alt="">Allomos</a>
+    <nav>
+      <a href="#what">What it does</a>
+      <a href="#pricing">Pricing</a>
+      <a href="https://github.com/allomos/allomos">GitHub</a>
+      <span class="lang"><a href="/" aria-current="page" lang="en">EN</a><a href="/zh/" lang="zh-CN">中文</a><a href="/ja/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1>Switch agents. Switch teammates.<br>Keep the project.</h1>
+    <p>When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its <strong>taskbag</strong>: plain files in your own repository.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/allomos/allomos/releases">Download for macOS</a>
+      <a class="btn secondary" href="https://github.com/allomos/allomos">View on GitHub</a>
+    </div>
+    <div class="tags">Local app · free &nbsp;·&nbsp; macOS · Windows &nbsp;·&nbsp; Claude Code · Codex &nbsp;·&nbsp; Cloud · optional</div>
+  </div>
+
+  <div class="figure">
+    <img class="light-only" src="/images/hop-en-light.svg" width="560" alt="A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository.">
+    <img class="dark-only" src="/images/hop-en-dark.svg" width="560" alt="">
+  </div>
+
+  <section id="problem">
+    <h2>Every switch loses the thread</h2>
+    <p class="lead">Vibe coding runs on many sessions: Claude Code, Codex, several accounts, several people. A quota can end a session without warning, and the next one starts cold. In one real multi-agent project:</p>
+    <ul class="facts">
+      <li><strong>185 KB</strong> of handoff notes that each new session re-read to resume;</li>
+      <li><strong>6</strong> places where one task's status was copied by hand;</li>
+      <li><strong>3</strong> sessions claiming tasks at once, settled by merge conflict;</li>
+      <li><strong>0</strong> answers to “when will it be done?”</li>
+    </ul>
+  </section>
+
+  <section id="what">
+    <h2>One main job, two that make it better</h2>
+    <div class="cards">
+      <div class="card"><div class="kicker k1">Switch</div><h3>Agents and teammates</h3><p>Shift the project between AI agents and people without losing anything. The same <code>alm</code> commands for every agent; handoff and resume in one step.</p></div>
+      <div class="card"><div class="kicker k2">AI skills</div><h3>Work better with agents</h3><p>Learn what each agent is good at, what to hand over at a switch, and a simple process: one task per outcome, proven steps, your approval before anything leaves your machine.</p></div>
+      <div class="card"><div class="kicker k3">Progress</div><h3>Where it stands, when it lands</h3><p>Progress by area, what waits on you, and a burndown with a forecast finish date from your real pace. <em>(planned)</em></p></div>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2>Claude runs out, Codex picks up</h2>
+    <p class="lead">Tasks, proven steps and handoff notes live as readable files in <code>.allomos/taskbag/</code>, versioned by your own Git — not inside one agent's memory or one account.</p>
+<pre><code># Claude Code · account 1 · quota nearly used
+alm label A01-03 "implemented"
+alm release A01-03 --note "form done; tests next"
+
+# Codex · account 2 · a minute later
+alm next
+A01-03  Sign-in page  ready · note: tests next
+alm claim A01-03</code></pre>
+    <div class="figure">
+      <img class="light-only" src="/images/glide-path-en-light.svg" width="612" alt="Burndown drawn as a glide path: 60 tasks left at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.">
+      <img class="dark-only" src="/images/glide-path-en-dark.svg" width="612" alt="">
+    </div>
+    <p class="note" style="text-align:center">An example of the forecast to come, not real data.</p>
+  </section>
+
+  <section id="pricing">
+    <h2>Free on your machine. Pay only for the cloud.</h2>
+    <div class="cards">
+      <div class="card"><div class="kicker k1">Local app</div><h3>Free</h3><p>No account, no card, no trial clock. Your tasks stay on your machine and in your repository.</p></div>
+      <div class="card"><div class="kicker k2">Cloud</div><h3>Optional</h3><p>Live sharing, email invitations and roles for teams. Pricing to be announced.</p></div>
+    </div>
+  </section>
+
+  <section id="status">
+    <h2>Early development</h2>
+    <p class="lead">v0.1, the macOS local tracker, is out. v0.2 (macOS and Windows, editing in the app) is in progress. Follow along or try it on <a href="https://github.com/allomos/allomos">GitHub</a>.</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT licence</span>
+    <span><a href="https://github.com/allomos/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>

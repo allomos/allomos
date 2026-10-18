@@ -36,8 +36,9 @@ about the project's tasks.
   Markdown files tracked by Git. Change it only with `alm`, except the project notes and your
   own handoff file.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
-  task (what is running, pitfalls, where credentials live, never their values). Edited directly
-  and kept true while the project is built; `alm next` shows its Running and Pitfalls.
+  task (what is running, pitfalls, where the code and the taskbag are kept online, where
+  credentials live, never their values). Edited directly and kept true while the project is
+  built; `alm next` shows its Running, Pitfalls and Repositories.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
 - **Task**: one observable outcome: what a person or agent can do when it is done. It has an
@@ -341,8 +342,8 @@ const WORKFLOW: &str = "# How to work the tasks
 
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
-   first (`alm show <id>`), and the project notes' Running and Pitfalls, which `alm next` shows
-   (the whole file is the taskbag's `project-notes.md`).
+   first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
+   `alm next` shows (the whole file is the taskbag's `project-notes.md`).
    **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
    check the real state before trusting it: the worktree, branch and running processes it names
    (`git worktree list`, `git status -sb`, listening ports). What the previous session still
