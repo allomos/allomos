@@ -22,7 +22,7 @@ use allomos_store::{
     project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
 #[derive(Serialize)]
@@ -1357,6 +1357,8 @@ const CONNECT_EVENT: &str = "menu:connect";
 const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
+/// The website the About window names (Task-A07-22).
+const WEBSITE: &str = "https://www.allomos.com";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
@@ -1483,14 +1485,21 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .into_iter()
         .filter_map(|item| item.as_submenu().cloned())
         .collect();
+    // The default About item, first in the app menu on macOS and in the Help menu elsewhere,
+    // is replaced by one that also names the website (Task-A07-22).
+    let about = about_item(app)?;
     if cfg!(target_os = "macos") {
         if let Some(app_menu) = submenus.first() {
+            app_menu.remove_at(0)?;
+            app_menu.insert(&about, 0)?;
             app_menu.insert(&check_updates, 1)?;
         }
     } else if let Some(help) = submenus
         .iter()
         .find(|s| s.text().is_ok_and(|t| t == "Help"))
     {
+        help.remove_at(0)?;
+        help.insert(&about, 0)?;
         help.append(&check_updates)?;
     } else {
         menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
@@ -1506,6 +1515,24 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         state: Mutex::new(Recent::default()),
     });
     Ok(menu)
+}
+
+/// About Allomos, as the default menu has it, with the website added: macOS shows it under the
+/// version (its About window has no website field), Windows and Linux in their website field.
+fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
+    let info = app.package_info();
+    let config = app.config();
+    let metadata = AboutMetadata {
+        name: Some(info.name.clone()),
+        version: Some(info.version.to_string()),
+        copyright: config.bundle.copyright.clone(),
+        authors: config.bundle.publisher.clone().map(|p| vec![p]),
+        website: Some(WEBSITE.to_string()),
+        website_label: Some("www.allomos.com".to_string()),
+        credits: Some("www.allomos.com".to_string()),
+        ..Default::default()
+    };
+    PredefinedMenuItem::about(app, None, Some(metadata))
 }
 
 /// The menu's words in the interface's language, as the interface sends them.
