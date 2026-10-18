@@ -992,7 +992,7 @@ fn write_handoff(
 
 /// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
 /// while it is private). A fixed address: the window cannot ask to open any other.
-const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos/releases";
+const DOWNLOAD_URL: &str = "https://github.com/allomos/allomos/releases";
 
 /// Open the download page in the web browser, for a taskbag that needs a newer Allomos.
 #[tauri::command]

@@ -51,7 +51,7 @@ jobs:
 
           The alm-only files hold the alm command alone, for computers without the app: alm-only_${TAG#v}_macos_arm64.tar.gz and alm-only_${TAG#v}_windows_x64.zip. Unpack, then run alm from a terminal.
 
-          How to install: https://mypals-ml.github.io/allomos/start/getting-started/"
+          How to install: https://allomos.github.io/allomos/start/getting-started/"
 
   macos:
     needs: release

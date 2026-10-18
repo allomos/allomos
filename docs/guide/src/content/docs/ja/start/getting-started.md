@@ -9,7 +9,7 @@ sidebar:
 
 ## 1. アプリを手に入れる
 
-[リリースページ](https://github.com/mypals-ml/allomos/releases/latest)から最新版をダウンロードします。
+[リリースページ](https://github.com/allomos/allomos/releases/latest)から最新版をダウンロードします。
 
 - **macOS**（Apple シリコンの Mac：M1 以降）：`Allomos_<バージョン>_aarch64.pkg`。開いてインストーラーに従います。Mac のパスワードを一度たずねられ、「肩代」を「アプリケーション」に入れ、`alm` コマンドも一緒に入れます。（または `Allomos_<バージョン>_aarch64.dmg`：開いて Allomos を「アプリケーション」にドラッグします。そのあと「肩代」が **alm コマンドをインストール** を勧めます。）
 - **Windows**：`Allomos_<バージョン>_x64-setup.exe`。実行するだけです。管理者の権限はいりません。`alm` コマンドも一緒に入ります。

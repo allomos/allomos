@@ -9,7 +9,7 @@ This page takes you from a first start to an AI agent working from your taskbag.
 
 ## 1. Get the app
 
-Download the newest version from the [releases page](https://github.com/mypals-ml/allomos/releases/latest):
+Download the newest version from the [releases page](https://github.com/allomos/allomos/releases/latest):
 
 - **macOS** (Apple Silicon Macs: M1 or newer): `Allomos_<version>_aarch64.pkg`. Open it and follow the installer; it asks for your Mac password once, puts Allomos in Applications and installs the `alm` command too. (Or `Allomos_<version>_aarch64.dmg`: open it and drag Allomos into Applications; Allomos then offers **Install the alm command**.)
 - **Windows**: `Allomos_<version>_x64-setup.exe`. Run it; it needs no administrator rights, and it installs the `alm` command too.
