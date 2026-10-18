@@ -13,7 +13,7 @@ import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { Markdown } from "./Markdown";
 import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
-import { FIRST_MODE, MANUAL, canStart, checkFolder } from "./buildAppFlow";
+import { FIRST_MODE, MANUAL, canStart, checkFolder, checkTaskbagFolder, taskbagRoot } from "./buildAppFlow";
 import type { FolderCheck, RunMode } from "./buildAppFlow";
 import { isProblem } from "./types";
 import type { Opened, SetupState } from "./types";
@@ -40,6 +40,11 @@ export function BuildAppDialog({
   const { t, rich, problem, language } = useI18n();
   const [folder, setFolder] = useState<FolderCheck | null>(null);
   const [description, setDescription] = useState("");
+  /** The taskbag's place the person chose instead of the app folder's own (Task-A03-25-04). */
+  const [chosenRoot, setChosenRoot] = useState<string | null>(null);
+  /** The place just refused: it already holds a taskbag. */
+  const [refused, setRefused] = useState<string | null>(null);
+  const root = taskbagRoot(folder, chosenRoot);
   // The shared agent picker (Task-A05-07).
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   const [mode, setMode] = useState<RunMode>(FIRST_MODE);
@@ -78,17 +83,32 @@ export function BuildAppDialog({
     }
   };
 
+  const chooseTaskbag = async () => {
+    const path = await messenger.pickFolder(t("build.taskbag_pick"));
+    if (!path) return;
+    setError(null);
+    setRefused(null);
+    try {
+      const check = checkTaskbagFolder((await messenger.inspectFolder(path)).inspection);
+      if (check.kind === "ok") setChosenRoot(check.root);
+      else if (check.kind === "has_taskbag") setRefused(check.root);
+      else setError(t("error.not_a_folder", { path: check.path }));
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const quiet = mode === "quiet";
 
   const start = async () => {
-    if (folder?.kind !== "ok" || !agent) return;
+    if (folder?.kind !== "ok" || !root || !agent) return;
     setBusy(true);
     setError(null);
     try {
       // As the setup wizard: the taskbag in `.allomos/taskbag/`, and the folder as the project folder.
       let o = created;
       if (!o) {
-        o = await messenger.createTaskbag(folder.root, folderName(folder.folder), language);
+        o = await messenger.createTaskbag(root, folderName(folder.folder), language);
         setCreated(o);
         onOpened(o);
         onSetup(await messenger.setProjectFolder(o.root, folder.folder));
@@ -144,6 +164,31 @@ export function BuildAppDialog({
                   {t("wizard.choose")}
                 </button>
               </div>
+
+              {folder?.kind === "ok" && root && (
+                <>
+                  <h3>{t("build.taskbag_title")}</h3>
+                  <p>{rich("build.taskbag_at", { path: <code>{root}</code> })}</p>
+                  {refused && <p className="banner error">{rich("build.taskbag_has_one", { path: <code>{refused}</code> })}</p>}
+                  <div className="row start">
+                    <button type="button" onClick={() => void chooseTaskbag()} disabled={locked}>
+                      {t("build.taskbag_change")}
+                    </button>
+                    {chosenRoot && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChosenRoot(null);
+                          setRefused(null);
+                        }}
+                        disabled={locked}
+                      >
+                        {t("build.taskbag_default")}
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
 
               <h3>
                 <label htmlFor="build-description">{t("build.description_title")}</label>
