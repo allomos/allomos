@@ -103,7 +103,9 @@ pub struct ProjectNotes {
 
 /// The taskbag's project notes, as far as they can be read.
 pub fn project_notes(root: &Path) -> ProjectNotes {
-    let path = root.join(NOTES_FILE);
+    // Without `.` and `..` (Task-A03-32): a relative `--taskbag` used from a worktree would
+    // otherwise print as `.../worktree/../../../../taskbag/...`.
+    let path = crate::tidy(root).join(NOTES_FILE);
     let text = crate::read_text(&path).ok().map(|t| crate::lf(&t));
     let changed = fs::metadata(&path)
         .and_then(|m| m.modified())

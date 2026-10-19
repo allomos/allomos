@@ -424,7 +424,7 @@ This project's taskbag is not inside this folder: it is at `{at}`. Run every `al
 }
 
 /// `path` without `.` and `..` parts, worked out from the text alone (the disk is not asked).
-fn tidy(path: &Path) -> PathBuf {
+pub fn tidy(path: &Path) -> PathBuf {
     let mut clean = PathBuf::new();
     for part in path.components() {
         match part {

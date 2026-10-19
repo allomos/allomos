@@ -20,7 +20,7 @@ use allomos_store::{
     agent_section, agent_section_for, agent_setup_request, default_root, events, find_taskbag,
     guide, id_from_name, init_with_labels, load, localized, pick_ui_language, picked_folder,
     plain_path, post_confirm, project_folder_of, read_answer, read_text, requests_dir,
-    saved_ui_language, task_language, taskbag_of, versions, was_seen, with_written_files,
+    saved_ui_language, task_language, taskbag_of, tidy, versions, was_seen, with_written_files,
     withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
@@ -1035,7 +1035,17 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
     };
     match &cli.taskbag {
         Some(path) => {
-            let path = cwd.join(path);
+            // Without `.` and `..`, so every path alm prints is tidy (Task-A03-32); as given
+            // when tidying it would miss the taskbag (a symbolic link followed by `..`).
+            let given = cwd.join(path);
+            let tidy = tidy(&given);
+            let path = if tidy.join("project.json").is_file()
+                || default_root(&tidy).join("project.json").is_file()
+            {
+                tidy
+            } else {
+                given
+            };
             if path.join("project.json").is_file() {
                 Ok(path)
             } else if default_root(&path).join("project.json").is_file() {
@@ -1246,12 +1256,12 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
         return format!(
             "Project notes: this taskbag has no {} yet ({}).\n",
             n.file,
-            n.path.display()
+            plain_path(&n.path).display()
         );
     }
     let mut text = format!(
         "Project notes ({}, last changed {}):\n",
-        n.path.display(),
+        plain_path(&n.path).display(),
         n.changed.as_deref().unwrap_or("unknown")
     );
     for (name, section) in [("Running", &n.running), ("Pitfalls", &n.pitfalls)] {
@@ -1298,7 +1308,7 @@ fn notes_reminder(n: &handoff::ProjectNotes) -> String {
     format!(
         "If what is running or a pitfall changed, update `{}` too ({when}): {}\n",
         n.file,
-        n.path.display()
+        plain_path(&n.path).display()
     )
 }
 

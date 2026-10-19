@@ -2195,6 +2195,40 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
     );
 }
 
+/// The project notes' path is printed full and tidy (Task-A03-32): from a worktree with a
+/// relative `--taskbag`, no `.` or `..` is left in it.
+#[test]
+fn project_notes_path_is_tidy_from_a_worktree() {
+    let base = tmp("notes-path");
+    let bag = base.join("bag");
+    fs::create_dir_all(&bag).unwrap();
+    ok(&bag, &["init"]);
+    let worktree = base.join("code/.claude/worktrees/one");
+    fs::create_dir_all(&worktree).unwrap();
+    let rel = "./../../../../bag/.allomos/taskbag";
+    let want = fs::canonicalize(&bag)
+        .unwrap()
+        .join(".allomos/taskbag/project-notes.md");
+    let v = ok(&worktree, &["--taskbag", rel, "next"]);
+    assert_eq!(v["project_notes"]["path"], want.display().to_string());
+    for args in [
+        vec!["--taskbag", rel, "next"],
+        vec!["--taskbag", rel, "handoff", "--as", "s/one"],
+    ] {
+        let out = alm(&worktree, &args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        let text = String::from_utf8(out.stdout).unwrap();
+        assert!(
+            text.contains(&want.display().to_string()),
+            "{args:?}: {text}"
+        );
+        assert!(
+            !text.contains("/../") && !text.contains("/./"),
+            "{args:?}: {text}"
+        );
+    }
+}
+
 /// Every file under `dir`, with its contents, to show that nothing changed.
 fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut out: Vec<(PathBuf, Vec<u8>)> = walk(dir)
