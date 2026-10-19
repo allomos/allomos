@@ -32,12 +32,12 @@ test("the project source starts as the step-1 folder, or the one already recorde
   assert.equal(defaultSource(setup({ project_folder: "/code/app" })), "/code/app");
 });
 
-test("Connect with the agents is offered when agents are not told", () => {
+test("step 4 is offered when agents are not told or there are no tasks", () => {
   const told = { codex: true, claude: true };
   assert.equal(offerConnect(setup(), false), false, "no project folder yet");
   assert.equal(offerConnect(setup({ project_folder: "/p" }), false), true);
-  // No tasks yet is no reason (Task-A03-27).
-  assert.equal(offerConnect(setup({ project_folder: "/p", agents: told }), false), false, "no tasks");
+  // No tasks yet: step 4 asks to update the taskbag (approver 2026-10-19, Task-A03-27).
+  assert.equal(offerConnect(setup({ project_folder: "/p", agents: told }), false), true, "no tasks");
   assert.equal(offerConnect(setup({ project_folder: "/p", agents: { codex: true, claude: false } , has_tasks: true }), false), true);
   assert.equal(offerConnect(setup({ project_folder: "/p", agents: told, has_tasks: true }), false), false);
   assert.equal(offerConnect(setup({ project_folder: "/p" }), true), false, "Not now holds");
@@ -59,7 +59,7 @@ test("opening a taskbag directly opens the wizard at the step that is missing", 
   const told = { codex: true, claude: true };
   assert.equal(directStep(setup(), false), 3, "no project folder: step 3");
   assert.equal(directStep(setup({ project_folder: "/p" }), false), 4, "agents not told: step 4");
-  assert.equal(directStep(setup({ project_folder: "/p", agents: told }), false), null, "no tasks: no reason (Task-A03-27)");
+  assert.equal(directStep(setup({ project_folder: "/p", agents: told }), false), 4, "no tasks: step 4");
   assert.equal(directStep(setup({ project_folder: "/p", agents: told, has_tasks: true }), false), null, "all set");
   assert.equal(directStep(setup(), true), null, "closed this time: not again until reopened");
 });
@@ -86,8 +86,9 @@ test("step 4 shows what the project needs: connect, update the taskbag, or setup
   // Out of date: Update the taskbag (Task-A03-27); not told: the agents page.
   assert.equal(stepFourPage(ready, true, 0, false), "cards");
   assert.equal(stepFourPage(setup({ project_folder: "/p", agents: { codex: true, claude: false }, has_tasks: true }), false, 3, false), "agents");
-  // Told, but no tasks yet: Setup done (approver 2026-10-18, Task-A03-27: not a reason to update).
-  assert.equal(stepFourPage(setup({ project_folder: "/p", agents: told }), false, 0, false), "done");
+  // Told, but no tasks yet: Update the taskbag, the agent looks for the project's own tasks
+  // (approver 2026-10-19, Task-A03-27).
+  assert.equal(stepFourPage(setup({ project_folder: "/p", agents: told }), false, 0, false), "cards");
   assert.equal(stepFourPage(ready, false, 0, true), "agents");
   assert.equal(stepFourPage(setup({ agents: told, has_tasks: true }), false, 0, false), "agents", "no project folder");
   // An older taskbag's tasks waiting to be moved in: Update the taskbag, the card files' panel

@@ -14,20 +14,25 @@ use crate::versions;
 /// The request, in an interface language (`en`, `zh-CN`, `ja`; English otherwise):
 /// - an older taskbag's tasks to move in ([`agent_move_in_request_in`], which renews the section
 ///   too); else
-/// - an out-of-date section ([`versions::agent_update_request_in`]), then card files kept outside
-///   the taskbag ([`cards::agent_move_cards_request_in`]) when some are known; else
-/// - with neither: a taskbag with no tasks asks the agent to look for the tasks the project
-///   already keeps ([`agent_convert_request_in`]); one with tasks, for card files no link names
-///   (the move-cards request). File → Update the Taskbag… opens it at any time.
+/// - an out-of-date section ([`versions::agent_update_request_in`]), card files kept outside the
+///   taskbag ([`cards::agent_move_cards_request_in`]) when some are known, and, for a taskbag with
+///   no tasks yet, looking for the tasks the project already keeps ([`agent_convert_request_in`];
+///   approver 2026-10-19: the wizard's step 4 asks for it), each that applies; else
+/// - with none of them: card files no link names (the move-cards request). File → Update the
+///   Taskbag… opens it at any time.
 pub fn agent_update_taskbag_request_in(language: &str, project: &Path, taskbag: &Path) -> String {
     if let Some(m) = versions::move_in(taskbag) {
         return agent_move_in_request_in(language, project, taskbag, &m);
     }
     let section = versions::check_connected(taskbag).filter(|c| !c.outdated_files().is_empty());
     let cards = !cards::outside(taskbag).is_empty();
+    let no_tasks = crate::load(taskbag)
+        .taskbag
+        .is_some_and(|bag| bag.tasks.is_empty());
     let parts: Vec<String> = [
         section.map(|c| versions::agent_update_request_in(language, project, taskbag, &c)),
         cards.then(|| cards::agent_move_cards_request_in(language, project, taskbag)),
+        no_tasks.then(|| agent_convert_request_in(language, project, taskbag)),
     ]
     .into_iter()
     .flatten()
@@ -40,14 +45,7 @@ pub fn agent_update_taskbag_request_in(language: &str, project: &Path, taskbag: 
             .join("\n\n---\n\n")
             + "\n";
     }
-    let no_tasks = crate::load(taskbag)
-        .taskbag
-        .is_some_and(|bag| bag.tasks.is_empty());
-    if no_tasks {
-        agent_convert_request_in(language, project, taskbag)
-    } else {
-        cards::agent_move_cards_request_in(language, project, taskbag)
-    }
+    cards::agent_move_cards_request_in(language, project, taskbag)
 }
 
 #[cfg(test)]
@@ -77,6 +75,14 @@ mod tests {
         let r = agent_update_taskbag_request_in("en", &p, &tb);
         assert!(r.contains("conversion request"), "{r}");
         assert!(!r.contains("agent setup request"), "{r}");
+        // No tasks and an out-of-date section: both.
+        fs::write(p.join("AGENTS.md"), "## Tasks: Allomos (v1)\n\nalm next\n").unwrap();
+        let r = agent_update_taskbag_request_in("en", &p, &tb);
+        assert!(
+            r.contains("conversion request") && r.contains("AGENTS.md"),
+            "{r}"
+        );
+        fs::remove_file(p.join("AGENTS.md")).unwrap();
         // With a task: the agent looks for card files no link names.
         crate::add_area(
             &tb,

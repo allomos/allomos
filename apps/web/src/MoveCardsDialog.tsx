@@ -247,7 +247,7 @@ export function MoveCardsPanel({
         </>
       )}
 
-      {request === null && !moveIn && !section && !cardsPart && (
+      {request === null && !moveIn && noTasks && (
         <>
           <p>{t("empty.found")}</p>
           <p className="muted small">{t("empty.body")}</p>
