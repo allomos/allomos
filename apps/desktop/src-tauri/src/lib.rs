@@ -1365,6 +1365,12 @@ const WEBSITE_LABEL: &str = "www.allomos.com";
 /// About Allomos on macOS, where the app shows the About window itself (`show_about`).
 #[cfg(target_os = "macos")]
 const ABOUT_ID: &str = "about";
+/// The About window's icon on macOS, the bundle's own (Task-A07-23).
+#[cfg(target_os = "macos")]
+const ABOUT_ICON: &[u8] = include_bytes!("../icons/128x128@2x.png");
+/// The About window's last line on macOS: the licence, the same in every language.
+#[cfg(target_os = "macos")]
+const LICENCE: &str = "Open source · MIT License";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
@@ -1376,6 +1382,9 @@ struct MenuTexts {
     check_updates: MenuItem<Wry>,
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
     update_known: Mutex<bool>,
+    /// The About window's line on what Allomos does, in the interface's language (Task-A07-23).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    about_tagline: Mutex<String>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -1517,6 +1526,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         move_tasks_in,
         check_updates,
         update_known: Mutex::new(false),
+        about_tagline: Mutex::new("Switch agents. Switch teammates. Keep the project.".into()),
         recent,
         state: Mutex::new(Recent::default()),
     });
@@ -1549,67 +1559,115 @@ fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
     PredefinedMenuItem::about(app, None, Some(metadata))
 }
 
-/// The system's About window with the name, the version, and the website as a centred link.
+/// The system's About window: the Allomos icon, the name, the version once, then a short line
+/// on what Allomos does (in the interface's language), the website as a link, and the licence
+/// (Task-A07-23). The icon is given explicitly, so a development build shows it too rather
+/// than the generic folder.
 #[cfg(target_os = "macos")]
 fn show_about(app: &AppHandle) {
     use objc2::rc::Retained;
     use objc2::runtime::AnyObject;
     use objc2::{AnyThread, MainThreadMarker};
     use objc2_app_kit::{
-        NSAboutPanelOptionApplicationName, NSAboutPanelOptionApplicationVersion,
-        NSAboutPanelOptionCredits, NSApplication, NSFont, NSFontAttributeName, NSLinkAttributeName,
-        NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignment,
+        NSAboutPanelOptionApplicationIcon, NSAboutPanelOptionApplicationName,
+        NSAboutPanelOptionApplicationVersion, NSAboutPanelOptionCredits, NSAboutPanelOptionVersion,
+        NSApplication, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName,
+        NSImage, NSLinkAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName,
+        NSTextAlignment,
     };
-    use objc2_foundation::{NSAttributedString, NSDictionary, NSString, NSURL};
+    use objc2_foundation::{
+        NSAttributedString, NSData, NSDictionary, NSMutableAttributedString, NSString, NSURL,
+    };
 
     // Menu events arrive on the main thread; anywhere else the window is not shown.
     let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
-    let Some(url) = NSURL::URLWithString(&NSString::from_str(WEBSITE)) else {
-        return;
-    };
     let info = app.package_info();
+    let tagline = app
+        .state::<MenuTexts>()
+        .about_tagline
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+
     let style = NSMutableParagraphStyle::new();
     style.setAlignment(NSTextAlignment::Center);
-    let font = NSFont::systemFontOfSize(NSFont::smallSystemFontSize());
-    let attributes: Retained<NSDictionary<NSString, AnyObject>> = unsafe {
-        NSDictionary::from_retained_objects(
-            &[
-                NSLinkAttributeName,
+    style.setParagraphSpacing(6.0);
+    // One centred paragraph of `text`, in a system font of `size` and `color`, a link to `url`.
+    let paragraph = |text: &str,
+                     size: f64,
+                     color: Retained<NSColor>,
+                     url: Option<Retained<NSURL>>|
+     -> Retained<NSAttributedString> {
+        let mut keys = unsafe {
+            vec![
                 NSParagraphStyleAttributeName,
                 NSFontAttributeName,
-            ],
-            &[
-                Retained::into_super(Retained::into_super(url)),
-                Retained::into_super(Retained::into_super(Retained::into_super(style))),
-                Retained::into_super(Retained::into_super(font)),
-            ],
-        )
+                NSForegroundColorAttributeName,
+            ]
+        };
+        let mut values: Vec<Retained<AnyObject>> = vec![
+            style.clone().into(),
+            NSFont::systemFontOfSize(size).into(),
+            color.into(),
+        ];
+        if let Some(url) = url {
+            keys.push(unsafe { NSLinkAttributeName });
+            values.push(url.into());
+        }
+        let attributes = NSDictionary::from_retained_objects(&keys, &values);
+        unsafe {
+            NSAttributedString::initWithString_attributes(
+                NSAttributedString::alloc(),
+                &NSString::from_str(text),
+                Some(&attributes),
+            )
+        }
     };
-    let credits = unsafe {
-        NSAttributedString::initWithString_attributes(
-            NSAttributedString::alloc(),
-            &NSString::from_str(WEBSITE_LABEL),
-            Some(&attributes),
-        )
+    let credits = NSMutableAttributedString::new();
+    credits.appendAttributedString(&paragraph(
+        &format!("{tagline}\n"),
+        NSFont::systemFontSize(),
+        NSColor::secondaryLabelColor(),
+        None,
+    ));
+    if let Some(url) = NSURL::URLWithString(&NSString::from_str(WEBSITE)) {
+        credits.appendAttributedString(&paragraph(
+            &format!("{WEBSITE_LABEL}\n"),
+            NSFont::smallSystemFontSize(),
+            NSColor::linkColor(),
+            Some(url),
+        ));
+    }
+    credits.appendAttributedString(&paragraph(
+        LICENCE,
+        NSFont::smallSystemFontSize() - 1.0,
+        NSColor::tertiaryLabelColor(),
+        None,
+    ));
+
+    let mut keys = unsafe {
+        vec![
+            NSAboutPanelOptionApplicationName,
+            NSAboutPanelOptionApplicationVersion,
+            // Empty: the window shows "Version 0.1.12", not "Version 0.1.12 (0.1.12)".
+            NSAboutPanelOptionVersion,
+            NSAboutPanelOptionCredits,
+        ]
     };
-    let options: Retained<NSDictionary<NSString, AnyObject>> = unsafe {
-        NSDictionary::from_retained_objects(
-            &[
-                NSAboutPanelOptionApplicationName,
-                NSAboutPanelOptionApplicationVersion,
-                NSAboutPanelOptionCredits,
-            ],
-            &[
-                Retained::into_super(Retained::into_super(NSString::from_str(&info.name))),
-                Retained::into_super(Retained::into_super(NSString::from_str(
-                    &info.version.to_string(),
-                ))),
-                Retained::into_super(Retained::into_super(credits)),
-            ],
-        )
-    };
+    let mut values: Vec<Retained<AnyObject>> = vec![
+        NSString::from_str(&info.name).into(),
+        NSString::from_str(&info.version.to_string()).into(),
+        NSString::from_str("").into(),
+        credits.into(),
+    ];
+    let icon = NSData::with_bytes(ABOUT_ICON);
+    if let Some(image) = NSImage::initWithData(NSImage::alloc(), &icon) {
+        keys.push(unsafe { NSAboutPanelOptionApplicationIcon });
+        values.push(image.into());
+    }
+    let options = NSDictionary::from_retained_objects(&keys, &values);
     let ns_app = NSApplication::sharedApplication(mtm);
     unsafe { ns_app.orderFrontStandardAboutPanelWithOptions(&options) };
     ns_app.activate();
@@ -1626,6 +1684,7 @@ struct MenuWords {
     no_recent: String,
     connect: String,
     move_tasks_in: String,
+    about_tagline: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1637,6 +1696,10 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
+    *texts
+        .about_tagline
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = words.about_tagline;
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
