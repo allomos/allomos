@@ -441,6 +441,8 @@ export function App({ messenger }: { messenger: Messenger }) {
         connect: t("menu.connect"),
         moveTasksIn: t("menu.move_cards"),
         aboutTagline: t("menu.about_tagline"),
+        aboutOpenWebsite: t("menu.about_open_website"),
+        aboutOk: t("menu.about_ok"),
       })
       .catch(() => undefined);
   }, [messenger, t]);

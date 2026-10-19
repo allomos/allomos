@@ -206,6 +206,8 @@
   "problem.cannot_set_state": "这里不能把任务 {id} 设为 {state}：只有代理认领任务（`alm claim`）时它才会变为进行中，也没有办法把任务退回 backlog。",
   "menu.connect": "连接 AI 智能体…",
   "menu.about_tagline": "换智能体，换队友，项目不断线。",
+  "menu.about_open_website": "打开 www.allomos.com",
+  "menu.about_ok": "好",
   "menu.check_updates": "检查更新…",
   "menu.download_update": "下载「换肩」{latest}…",
   "connect.title": "连接 AI 智能体",

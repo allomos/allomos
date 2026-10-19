@@ -195,8 +195,11 @@ export interface MenuTexts {
   noRecent: string;
   connect: string;
   moveTasksIn: string;
-  /** The About window's line on what Allomos does (macOS). */
+  /** The About window's line on what Allomos does (macOS and Windows). */
   aboutTagline: string;
+  /** The About window's buttons on Windows: open the website, and close it. */
+  aboutOpenWebsite: string;
+  aboutOk: string;
 }
 
 export const desktopMessenger: Messenger = {

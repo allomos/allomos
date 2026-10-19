@@ -22,7 +22,7 @@ use allomos_store::{
     project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 use tauri::menu::AboutMetadata;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Wry};
@@ -1362,14 +1362,15 @@ const CHECK_UPDATES_ID: &str = "check_updates";
 /// The website the About window links to, and the words it shows (Task-A07-22).
 const WEBSITE: &str = "https://www.allomos.com";
 const WEBSITE_LABEL: &str = "www.allomos.com";
-/// About Allomos on macOS, where the app shows the About window itself (`show_about`).
-#[cfg(target_os = "macos")]
+/// About Allomos on macOS and Windows, where the app shows the About window itself
+/// (`show_about`).
+#[cfg(any(target_os = "macos", windows))]
 const ABOUT_ID: &str = "about";
 /// The About window's icon on macOS, the bundle's own (Task-A07-23).
 #[cfg(target_os = "macos")]
 const ABOUT_ICON: &[u8] = include_bytes!("../icons/128x128@2x.png");
-/// The About window's last line on macOS: the licence, the same in every language.
-#[cfg(target_os = "macos")]
+/// The About window's last line on macOS and Windows: the licence, the same in every language.
+#[cfg(any(target_os = "macos", windows))]
 const LICENCE: &str = "Open source · MIT License";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 
@@ -1383,10 +1384,29 @@ struct MenuTexts {
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
     update_known: Mutex<bool>,
     /// The About window's line on what Allomos does, in the interface's language (Task-A07-23).
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
     about_tagline: Mutex<String>,
+    /// The About window's two buttons on Windows, in the interface's language (Task-A07-24).
+    #[cfg_attr(not(windows), allow(dead_code))]
+    about_buttons: Mutex<AboutButtons>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
+}
+
+/// The words on the About window's buttons on Windows: open the website, and close.
+#[cfg_attr(not(windows), allow(dead_code))]
+struct AboutButtons {
+    open_website: String,
+    ok: String,
+}
+
+impl Default for AboutButtons {
+    fn default() -> Self {
+        Self {
+            open_website: format!("Open {WEBSITE_LABEL}"),
+            ok: "OK".into(),
+        }
+    }
 }
 
 /// What the Open Recent submenu shows: the folders, newest first, and its two fixed texts.
@@ -1527,23 +1547,23 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         check_updates,
         update_known: Mutex::new(false),
         about_tagline: Mutex::new("Switch agents. Switch teammates. Keep the project.".into()),
+        about_buttons: Mutex::new(AboutButtons::default()),
         recent,
         state: Mutex::new(Recent::default()),
     });
     Ok(menu)
 }
 
-/// About Allomos, with the website. On macOS the item opens the system's About window itself
-/// (`show_about`), so the website is a link that opens in the default browser: the default
-/// item can only show plain text there. Windows and Linux keep the default item, with the
-/// website in its website field.
-#[cfg(target_os = "macos")]
+/// About Allomos, with the website. On macOS and Windows the item opens the About window itself
+/// (`show_about`), so the website opens in the default browser: the default item can only show
+/// it as plain text there. Linux keeps the default item, whose website field is a link.
+#[cfg(any(target_os = "macos", windows))]
 fn about_item(app: &AppHandle) -> tauri::Result<MenuItem<Wry>> {
     let name = &app.package_info().name;
     MenuItem::with_id(app, ABOUT_ID, format!("About {name}"), true, None::<&str>)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
     let info = app.package_info();
     let config = app.config();
@@ -1557,6 +1577,47 @@ fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
         ..Default::default()
     };
     PredefinedMenuItem::about(app, None, Some(metadata))
+}
+
+/// The About window on Windows (Task-A07-24): a message with the name, the version, the line on
+/// what Allomos does, the website and the licence. Windows's own About box cannot hold a link, so
+/// its first button opens the website in the default browser; the other closes it.
+#[cfg(windows)]
+fn show_about(app: &AppHandle) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+
+    let info = app.package_info();
+    let texts = app.state::<MenuTexts>();
+    let tagline = texts
+        .about_tagline
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let buttons = texts
+        .about_buttons
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let message = format!(
+        "{} {}\n\n{tagline}\n\n{WEBSITE_LABEL}\n{LICENCE}",
+        info.name, info.version
+    );
+    let mut dialog = app
+        .dialog()
+        .message(message)
+        .title(format!("About {}", info.name))
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            buttons.open_website.clone(),
+            buttons.ok.clone(),
+        ));
+    if let Some(window) = focused_window(app).and_then(|label| app.get_webview_window(&label)) {
+        dialog = dialog.parent(&window);
+    }
+    dialog.show(|open| {
+        if open {
+            let _ = opener().arg(WEBSITE).spawn();
+        }
+    });
 }
 
 /// The system's About window: the Allomos icon, the name, the version once, then a short line
@@ -1685,6 +1746,8 @@ struct MenuWords {
     connect: String,
     move_tasks_in: String,
     about_tagline: String,
+    about_open_website: String,
+    about_ok: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1700,6 +1763,13 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
         .about_tagline
         .lock()
         .unwrap_or_else(|e| e.into_inner()) = words.about_tagline;
+    *texts
+        .about_buttons
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = AboutButtons {
+        open_website: words.about_open_website,
+        ok: words.about_ok,
+    };
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -1748,7 +1818,7 @@ pub fn run() {
                     };
                 }
             };
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             if id == ABOUT_ID {
                 show_about(app);
                 return;

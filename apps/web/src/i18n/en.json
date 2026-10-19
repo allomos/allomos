@@ -206,6 +206,8 @@
   "problem.cannot_set_state": "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.",
   "menu.connect": "Connect with the Agents…",
   "menu.about_tagline": "Switch agents. Switch teammates. Keep the project.",
+  "menu.about_open_website": "Open www.allomos.com",
+  "menu.about_ok": "OK",
   "menu.check_updates": "Check for Updates…",
   "menu.download_update": "Download Allomos {latest}…",
   "connect.title": "Connect with the agents",
