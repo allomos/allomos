@@ -758,6 +758,25 @@ fn real_repo() -> (PathBuf, PathBuf) {
     (repo, remote)
 }
 
+/// The command line `c` as a person pasting it would run it: `sh -c` here, `cmd /C` on Windows.
+/// On Windows the line goes to `cmd` as it is (`raw_arg`): `args` would wrap it in quotes and
+/// escape its own quotes as `\"`, which `cmd` does not undo, so Git got `"C:\…"` with the quotes.
+fn shell(dir: &Path, c: &str) -> Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut cmd = Command::new("cmd");
+        cmd.current_dir(dir).arg("/C").raw_arg(c);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new("sh");
+        cmd.current_dir(dir).args(["-c", c]);
+        cmd
+    }
+}
+
 /// Run the Git commands `alm` printed (its `git_commands`) in `dir`, as an agent would.
 fn run_printed(dir: &Path, v: &Value) {
     let commands = v["git_commands"]
@@ -766,15 +785,7 @@ fn run_printed(dir: &Path, v: &Value) {
     assert!(!commands.is_empty(), "{v}");
     for c in commands {
         let c = c.as_str().unwrap();
-        let out = if cfg!(windows) {
-            Command::new("cmd")
-                .current_dir(dir)
-                .args(["/C", c])
-                .output()
-        } else {
-            Command::new("sh").current_dir(dir).args(["-c", c]).output()
-        }
-        .unwrap();
+        let out = shell(dir, c).output().unwrap();
         assert!(
             out.status.success(),
             "{c}: {}",
