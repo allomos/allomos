@@ -36,8 +36,10 @@ about the project's tasks.
   Markdown files tracked by Git. Change it only with `alm`, except the project notes and your
   own handoff file.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
-  task (what is running, pitfalls, where credentials live, never their values). Edited directly
-  and kept true while the project is built; `alm next` shows its Running and Pitfalls.
+  task (what is running, pitfalls, where the code and the taskbag are kept online, where
+  credentials live, never their values; no personal details such as email addresses or account
+  names, only placeholders). Edited directly and kept true while the project is built; `alm
+  next` shows its Running, Pitfalls and Repositories.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
 - **Task**: one observable outcome: what a person or agent can do when it is done. It has an
@@ -192,7 +194,7 @@ Work a task:
   counts as done. When all are done, `alm next` says so, and moves nothing: check, then
   `alm unblock <id>` (ready, or in progress when someone holds it).
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id> [--without-human-check \"<why, which run>\" --steps <file.md>]`: finished (see
+- `alm done <id> [--without-human-check \"<why>\" --steps <file.md>]`: finished (see
   `alm guide workflow`, step 7); it ends with the rule for checking the handoffs that name the
   task; follow it. The steps are Markdown for the person who checks it: the test folder, what to
   open, what to click, what they should see. On a task already done, it only records its human
@@ -341,8 +343,8 @@ const WORKFLOW: &str = "# How to work the tasks
 
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
-   first (`alm show <id>`), and the project notes' Running and Pitfalls, which `alm next` shows
-   (the whole file is the taskbag's `project-notes.md`).
+   first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
+   `alm next` shows (the whole file is the taskbag's `project-notes.md`).
    **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
    check the real state before trusting it: the worktree, branch and running processes it names
    (`git worktree list`, `git status -sb`, listening ports). What the previous session still
@@ -379,12 +381,12 @@ const WORKFLOW: &str = "# How to work the tasks
    heading), not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
-7. Finished: only once the task has the top label of the ladder (a person has checked it: the
-   human check), then `alm done <id>`. The one exception: in an automatic or loop run the
-   person set up to go on without them (a quiet run, step 8), you may finish a task
-   below the top label with
-   `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md>`; say so in
-   your handoff. Write the steps so a person can pick it up and test
+7. Finished: once the task has the top label of the ladder (a person has checked it: the
+   human check), `alm done <id>`. When the work is finished and only a person's hands-on check
+   is left, finish it below the top label, in quiet and normal mode alike (step 8):
+   `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
+   Do not leave such a task waiting: `alm wait` is only for a real question, an approval or an
+   outside effect (step 4). Write the steps so a person can pick it up and test
    it: the test folder, what to open, what to click, what they should see. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
    it, `alm checked <id>`. When a finished task needs more work on the same outcome (it failed
@@ -395,8 +397,9 @@ const WORKFLOW: &str = "# How to work the tasks
    another), ask the person to choose quiet or normal mode: show them what
    `alm guide run-modes` prints (in the task language), as it is, and do not start until they
    choose. Write the choice in your handoff (under Approvals in force: \"Run mode: quiet\" or
-   \"Run mode: normal\", who chose it and when) and follow it until the run ends. In normal mode
-   you work as usual: you stop and ask whenever you need the person. In quiet mode (a quiet run),
+   \"Run mode: normal\", who chose it and when) and follow it until the run ends. Both modes
+   finish a task the same way (step 7); they differ only in what you do when you need the
+   person during the run. In normal mode you stop and ask. In quiet mode (a quiet run),
    never stop to wait for the person. A routine choice: decide it,
    record it with `alm ai-decided <id> \"<what and why>\"`, and carry on. A real question for the
    person: park that task with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`
@@ -417,6 +420,11 @@ Rules:
   a hosted resource or a Git remote, learn a pitfall that would change what the next session
   does, or a credential moves; change lines in place, remove lines no longer true, and commit and
   push that file yourself.
+- Never write credentials or personal details (a person's or an account's email address, account
+  or user name, phone number, home address, local network address) into the project notes, a
+  handoff, a task, a document or the code: write a placeholder such as
+  `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Git history keeps
+  whatever was written, even after it is removed.
 - Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
@@ -446,6 +454,11 @@ follow it until the run ends.
 
 Before this run starts, please choose how I will work: **quiet mode** or **normal mode**.
 
+In both modes, a task whose work is finished and only waits for you to try it by hand ends the
+same way: it is marked done, to check, with the steps for checking it
+(`--without-human-check`). The modes differ only in what I do when I need you during the run:
+stop and ask, or park the question and go on.
+
 ## Quiet mode: I go on without you
 
 - **What I do:** I work the tasks one after another and never stop to ask you. I make routine
@@ -455,8 +468,7 @@ Before this run starts, please choose how I will work: **quiet mode** or **norma
   to, anything hard to undo, anything that changes the plan or another task, anything with a cost
   or an outside effect. Such a question parks its task as waiting (`alm wait`), and I go on with
   the next ready task without waiting for an answer.
-- **When you are interrupted:** not at all until the run is over. A task I finish without your
-  check is marked to check, with the steps for checking it (`--without-human-check`).
+- **When you are interrupted:** not at all until the run is over.
 - **How long it can run unattended:** until no ready task is left, or until my session's quota or
   context runs out. I keep my handoff up to date, so anyone can pick the work up.
 
@@ -478,13 +490,16 @@ When the run is over:
 ## Normal mode: I ask as usual
 
 - **What I do:** I work as usual. Routine choices I still make and record myself; whenever I
-  need you (a question only you can answer, an approval, a check by hand), I stop and ask.
+  need you (a question only you can answer, an approval, an outside effect), I stop and ask. A
+  task that only waits for your check by hand does not stop the run: it is marked done, to
+  check, as above.
 - **What I don't do:** I don't go past a question without your answer.
-- **When you are interrupted:** at each such question, approval or check.
+- **When you are interrupted:** at each such question or approval.
 - **How long it can run unattended:** only until the next question: the run pauses there until
   you answer.
 
-Please stay reachable while it runs: it pauses at each question until you answer.
+Please stay reachable while it runs: it pauses at each question until you answer. When it is
+over, check the finished tasks in `alm human` (To check), as described above.
 ";
 
 const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モードか
@@ -498,6 +513,10 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 
 この実行を始める前に、私の進め方を選んでください：**静かモード**か**通常モード**か。
 
+どちらのモードでも、作業が終わり、あなたが手で試す確認だけが残ったタスクは同じように終えます：
+確認の手順を付けて、完了・確認待ちにします（`--without-human-check`）。二つのモードの違いは、
+実行中にあなたが必要になったとき、止まって聞くか、質問を残して先へ進むかだけです。
+
 ## 静かモード：あなたを待たずに進めます
 
 - **すること：** タスクを一つずつ続けて進め、あなたに聞くために止まることはありません。決まりきった
@@ -506,8 +525,7 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 - **しないこと：** あなたが決めるべきことは決めません。利用者が目にして慣れていくもの、元に戻しにくい
   こと、計画や他のタスクを変えること、費用や外部への影響があること。そうした質問があれば、その
   タスクを待機中にして（`alm wait`）、答えを待たずに次の準備完了のタスクへ進みます。
-- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。あなたの確認なしに終えたタスクは、
-  確認の手順を付けて確認待ちとして残します（`--without-human-check`）。
+- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。
 - **無人で続けられる長さ：** 準備完了のタスクがなくなるまで、またはこのセッションの利用枠や
   コンテキストが尽きるまで。誰でも引き継げるよう、ハンドオフは常に最新にしておきます。
 
@@ -529,12 +547,14 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 ## 通常モード：いつもどおり聞きます
 
 - **すること：** いつもどおり進めます。決まりきった選択は私が決めて記録しますが、あなたが必要な
-  とき（あなたにしか答えられない質問、承認、手で試す確認）は止まって聞きます。
+  とき（あなたにしか答えられない質問、承認、外部への影響）は止まって聞きます。手で試す確認だけを
+  待つタスクでは実行は止まりません。上のとおり、完了・確認待ちにします。
 - **しないこと：** あなたの答えなしに質問の先へは進みません。
-- **あなたが呼ばれるとき：** そうした質問、承認、確認のたびに。
+- **あなたが呼ばれるとき：** そうした質問や承認のたびに。
 - **無人で続けられる長さ：** 次の質問まで。そこで実行は止まり、あなたの答えを待ちます。
 
-実行中は連絡がつくようにしておいてください。質問のたびに、答えるまで実行は止まります。
+実行中は連絡がつくようにしておいてください。質問のたびに、答えるまで実行は止まります。実行が
+終わったら、上で説明したとおり、`alm human`（To check）で終わったタスクを確認してください。
 ";
 
 const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
@@ -548,6 +568,10 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 
 这次运行开始之前，请选择我的工作方式：**安静模式**还是**普通模式**。
 
+两种模式下，工作已做完、只等你亲手检查的任务，都以同一种方式结束：标为已完成、待检查，并附上
+检查步骤（`--without-human-check`）。两种模式的区别只在于运行中需要你时，我是停下来问你，还是
+把问题搁置、接着往下做。
+
 ## 安静模式：我不等你，继续往下做
 
 - **我会做的：** 一个接一个地处理任务，从不停下来问你。常规的选择（名称、文件布局、有明显默认值的
@@ -555,8 +579,7 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 - **我不会做的：** 不替你决定该由你决定的事：用户会看到并习惯的东西、难以撤销的事、会改变计划或
   其他任务的事、有费用或对外有影响的事。遇到这类问题，我把那个任务设为等待中（`alm wait`），
   不等回答，接着做下一个就绪的任务。
-- **什么时候打扰你：** 运行结束之前一次也不会。没有经过你检查就完成的任务，会标为待检查，并附上
-  检查步骤（`--without-human-check`）。
+- **什么时候打扰你：** 运行结束之前一次也不会。
 - **能无人值守运行多久：** 直到没有就绪的任务，或者我这个会话的额度或上下文用完为止。我会让交接
   一直保持最新，谁都可以接着做。
 
@@ -575,12 +598,14 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 ## 普通模式：照常提问
 
 - **我会做的：** 照常工作。常规的选择仍由我决定并记录；每当需要你（只有你能回答的问题、批准、
-  亲手检查）时，我会停下来问你。
+  对外有影响的事）时，我会停下来问你。只等你亲手检查的任务不会让运行停下：像上面说的那样，标为
+  已完成、待检查。
 - **我不会做的：** 没有你的回答，不会越过问题继续做。
-- **什么时候打扰你：** 每遇到这样的问题、批准或检查时。
+- **什么时候打扰你：** 每遇到这样的问题或批准时。
 - **能无人值守运行多久：** 只到下一个问题为止：运行会停在那里，直到你回答。
 
-运行期间请保持能联系到你：每遇到一个问题，运行都会停下，直到你回答。
+运行期间请保持能联系到你：每遇到一个问题，运行都会停下，直到你回答。运行结束后，像上面说的那样，
+在 `alm human`（To check）里检查已完成的任务。
 ";
 
 /// `alm guide run-modes` in `language` (a task language such as `ja` or `zh-CN`), or `None` when
@@ -750,9 +775,11 @@ pub fn agent_files(language: &str) -> Option<&'static str> {
 ///
 /// 1: the four phases (clarify once, plan, build, finish), `/goal` with a condition judged from the
 /// conversation alone, and continuing from `alm next` (Task-A03-25-01).
-pub const GOAL_PROMPT_VERSION: u32 = 1;
+/// 2: every finished task, the goal task too, ends done and to check
+/// (`--without-human-check`) in either run mode, not waiting (Task-A03-31).
+pub const GOAL_PROMPT_VERSION: u32 = 2;
 
-const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v1)
+const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v2)
 
 For the agent: this is the goal prompt. A person has described an app they want (their words
 come with this prompt). You plan it into areas, iterations and tasks, make the tasks ready
@@ -789,7 +816,7 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`. Its description (`alm describe <id> --from <file.md>`) holds the spec: what the app
    does and for whom, and the acceptance criteria the finished app must meet, each one a thing a
-   person can try. End it with this line: \"Goal run (goal prompt v1): the person approved this
+   person can try. End it with this line: \"Goal run (goal prompt v2): the person approved this
    plan in advance by submitting the goal on <date>; the agent makes the areas, iterations and
    ready tasks. Outside effects still wait for the approver.\" The title's `Goal:` marks the goal
    task for every later session: keep it.
@@ -812,10 +839,10 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
 
 Iteration by iteration, one task at a time: `alm next`, then `alm claim <id> --as <your session
 name> --branch <the branch you are on>` (run the Git commands it prints), do the work and commit
-it, `alm label <id> \"<label>\"` as each step is proven, and finish it as the run mode says:
-- quiet mode: `alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`,
-  the steps telling the person how to try it;
-- normal mode: at the top label, once the person has checked it: `alm done <id>`.
+it, `alm label <id> \"<label>\"` as each step is proven, and finish it the same way in either
+run mode: once the work is finished and only the person's check by hand is left,
+`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`, the steps telling the
+person how to try it (at the top label, once the person has checked it: `alm done <id>`).
 
 When `alm next` says all of a task's blockers are done, check it, then `alm unblock <id>`. A task
 with an outside effect: `alm wait <id> --on \"<what the approver must do>\"`, then go on with the
@@ -826,8 +853,10 @@ handoff (`alm handoff`) after every task, and follow `alm handoff-rules`.
 ## 4. Finish
 
 When the last iteration's acceptance check is done: `alm unblock` the goal task, check the whole
-app against the spec's acceptance criteria, and leave the goal task waiting for the person's human
-check: `alm wait <id> --on \"Try the app: <how>\"`. If the goal turns out to be impossible, the
+app against the spec's acceptance criteria, and finish the goal task the same way, done and to
+check by the person:
+`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`, the steps
+telling the person how to try the whole app. If the goal turns out to be impossible, the
 goal task waits on the person instead, with the reason. Then print `alm list --json` and stop.
 
 ## Keep going until it is finished
@@ -844,7 +873,7 @@ true, and print `alm list --json` to show it. Stop earlier only at the quota gat
 handoff written; given this prompt again, you continue from `alm next`.
 ";
 
-const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v1)
+const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v2)
 
 给智能体：这是目标提示。有人描述了他们想要的应用（他们的原话随这段提示一起给出）。你把它规划成
 领域、迭代和任务，自己把任务设为就绪，然后一个迭代接一个迭代地把它做出来，每一步都用 `alm`
@@ -876,7 +905,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。它的描述（`alm describe <id> --from <file.md>`）写规格：应用做什么、为谁做，以及完成的
    应用必须满足的验收标准，每一条都是一个人能亲手试的事。最后加上这一行：
-   “Goal run (goal prompt v1)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
+   “Goal run (goal prompt v2)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
    就绪的任务由智能体来建。对外有影响的事仍然等批准人处理。”标题里的 `Goal:` 让之后的每个会话都能认出目标任务：保留它。
 2. **领域**，按应用的组成部分划分（例如它的界面、数据、服务器）：`alm add area \"<name>\"`。
 3. **迭代**，作为一份发布路线图，每个迭代结束时都有一个对方能试用的版本：
@@ -894,10 +923,9 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 
 一个迭代接一个迭代，一次一个任务：`alm next`，然后 `alm claim <id> --as <your session name>
 --branch <the branch you are on>`（运行它打印的 Git 命令），做完工作并提交，每证明一步就
-`alm label <id> \"<label>\"`，再按运行模式完成它：
-- 安静模式：`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`，
-  步骤告诉那个人怎么试用；
-- 普通模式：达到最高标签、那个人检查过之后：`alm done <id>`。
+`alm label <id> \"<label>\"`，两种运行模式下都用同一种方式完成它：工作做完、只差那个人亲手检查时，
+`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`，步骤告诉那个人怎么试用
+（达到最高标签、那个人检查过之后：`alm done <id>`）。
 
 当 `alm next` 说某个任务的阻塞任务都已完成时，检查一下，然后 `alm unblock <id>`。对外有影响的任务：
 `alm wait <id> --on \"<what the approver must do>\"`，然后接着做下一个就绪的任务。需要先做另一个任务
@@ -906,8 +934,9 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 
 ## 4. 收尾
 
-最后一个迭代的验收检查完成后：对目标任务运行 `alm unblock`，对照规格的验收标准检查整个应用，然后让
-目标任务等待那个人的人工检查：`alm wait <id> --on \"Try the app: <how>\"`。如果发现目标做不到，目标
+最后一个迭代的验收检查完成后：对目标任务运行 `alm unblock`，对照规格的验收标准检查整个应用，然后用同一种
+方式完成目标任务，标为已完成、待那个人检查：
+`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`，步骤告诉那个人怎么试用整个应用。如果发现目标做不到，目标
 任务改为等待那个人，并写明原因。然后打印 `alm list --json`，停下。
 
 ## 一直做到完成
@@ -923,7 +952,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 只有到了额度关口才提前停下，并写好交接；再次收到这段提示时，从 `alm next` 继续。
 ";
 
-const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v1)
+const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v2)
 
 エージェントへ：これはゴールのプロンプトです。ある人が、欲しいアプリを説明しました（その人の言葉は
 このプロンプトと一緒に渡されます）。あなたはそれをエリア、イテレーション、タスクに計画し、タスクを
@@ -959,7 +988,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。その説明（`alm describe <id> --from <file.md>`）に仕様を書きます。アプリが何をし、
    誰のためのものか、そして完成したアプリが満たすべき受け入れ基準。基準はどれも、人が試せることに
-   します。最後にこの一行を書きます：「Goal run (goal prompt v1)：この人は <date> にゴールを出して、
+   します。最後にこの一行を書きます：「Goal run (goal prompt v2)：この人は <date> にゴールを出して、
    この計画を前もって承認しました。エリア、イテレーション、準備完了のタスクはエージェントが作ります。
    外部への影響があることは、引き続き承認者を待ちます。」タイトルの `Goal:` は、あとのすべての
    セッションにゴールのタスクを示す印です。消さずに残します。
@@ -981,10 +1010,10 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
 
 イテレーションごとに、一度に一つのタスク：`alm next`、続けて `alm claim <id> --as <your session
 name> --branch <the branch you are on>`（表示される Git コマンドを実行します）、作業をしてコミット
-し、一歩ずつ確かめるたびに `alm label <id> \"<label>\"`、そして実行モードのとおりに終えます：
-- 静かモード：`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`。
-  手順にはその人が試すしかたを書きます。
-- 通常モード：一番上のラベルで、その人が確認したあとに `alm done <id>`。
+し、一歩ずつ確かめるたびに `alm label <id> \"<label>\"`、そしてどちらの実行モードでも同じように
+終えます：作業が終わり、その人が手で試す確認だけが残ったら
+`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`。手順にはその人が試すしかたを
+書きます（一番上のラベルで、その人が確認したあとなら `alm done <id>`）。
 
 `alm next` があるタスクのブロック元がすべて完了したと言ったら、確かめてから `alm unblock <id>`。
 外部への影響があるタスク：`alm wait <id> --on \"<what the approver must do>\"`、そして次の準備完了の
@@ -995,8 +1024,9 @@ name> --branch <the branch you are on>`（表示される Git コマンドを実
 ## 4. 仕上げる
 
 最後のイテレーションの受け入れ確認が終わったら：ゴールのタスクを `alm unblock` し、仕様の受け入れ
-基準に照らしてアプリ全体を確かめ、ゴールのタスクをその人の確認待ちにします：
-`alm wait <id> --on \"Try the app: <how>\"`。ゴールが無理だと分かったら、代わりにゴールのタスクを
+基準に照らしてアプリ全体を確かめ、ゴールのタスクも同じように、完了・その人の確認待ちにして終えます：
+`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`。手順には
+アプリ全体を試すしかたを書きます。ゴールが無理だと分かったら、代わりにゴールのタスクを
 理由を付けてその人の待ちにします。それから `alm list --json` を表示して止まります。
 
 ## 終わるまで続ける
@@ -1380,7 +1410,7 @@ mod tests {
                 "`alm add area \"<the app's name>\"`",
                 "--title \"Goal: <the app, in one line>\"",
                 "`alm describe <id> --from <file.md>`",
-                "Goal run (goal prompt v1)",
+                "Goal run (goal prompt v2)",
                 "`alm add area \"<name>\"`",
                 "`alm add iteration \"<name>\" --release v0.1`",
                 "`alm plan <id> <iteration>`",
@@ -1391,7 +1421,8 @@ mod tests {
                 "`alm next`",
                 "--branch <the branch you are on>",
                 "`alm label <id> \"<label>\"`",
-                "`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`",
+                "`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`",
+                "`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`",
                 "`alm done <id>`",
                 "`alm unblock <id>`",
                 "`alm wait <id> --on \"<what the approver must do>\"`",
@@ -1399,7 +1430,6 @@ mod tests {
                 "`alm handoff`",
                 "`alm handoff-rules`",
                 // Finish.
-                "`alm wait <id> --on \"Try the app: <how>\"`",
                 // Keep going: `/goal`, its condition, and continuing.
                 "`/goal`",
                 "Claude Code",
@@ -1432,7 +1462,8 @@ mod tests {
             "each ending in a version the person can try",
             "dates empty unless known",
             "is that release's acceptance check",
-            "waiting for the person's human check",
+            "finish the goal task the same way, done and to check by the person",
+            "the same way in either run mode",
             "which can be judged from the conversation alone",
             "Without `/goal`, the same holds: keep going",
         ] {

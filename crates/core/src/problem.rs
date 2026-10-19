@@ -104,10 +104,10 @@ problems! {
     BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: it will never be done, and it does not count as done. Is {id} still blocked?";
     /// `alm done --without-human-check` with no text, or the field empty in `task.json`
     /// (Task-A03-15; renamed from `without_owner_missing` in Task-A03-18).
-    WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check, and in which run.";
+    WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check.";
     /// A warning: `alm done --without-human-check` without the steps for the person who checks it
     /// (Task-A03-18). `alm` asks for them and shows how to write them; it does not refuse.
-    HumanCheckStepsMissing { id } => "human_check_steps_missing", "No human check steps for {id}: a person must be able to pick it up and test it. Write them in Markdown (the test folder, what to open, what to click, what they should see) to a file, then run `alm done {id} --without-human-check \"<why, which run>\" --steps <file.md>`.";
+    HumanCheckStepsMissing { id } => "human_check_steps_missing", "No human check steps for {id}: a person must be able to pick it up and test it. Write them in Markdown (the test folder, what to open, what to click, what they should see) to a file, then run `alm done {id} --without-human-check \"<why>\" --steps <file.md>`.";
     /// `--steps` names an empty file (Task-A03-18).
     HumanCheckStepsEmpty => "human_check_steps_empty", "The human check steps are empty. Write what a person opens, clicks and should see, or leave out --steps.";
     /// `alm checked` on a task that is not done (Task-A03-18).

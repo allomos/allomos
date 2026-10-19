@@ -7,7 +7,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 ## Always-on boundaries
 
 - **No external effect without the approver's exact approval**, recorded in the task's description: creating or changing hosted resources (Supabase projects, databases, hosting, DNS), applying SQL to a real target, deployments, secrets, sending email, creating GitHub repositories, adding or changing a remote, and anything touching other people's data. Approving a card authorizes only its local work.
-- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live).
+- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live). Personal details (email addresses, account names, phone numbers, local network addresses) are kept out the same way: write a placeholder and how to look it up.
 - **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
 - **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v15)
+## Tasks: Allomos (v17)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -68,14 +68,16 @@ the project notes (below) and your own handoff file.
   advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
   iterations and make your own tasks ready. Anything with an outside effect still waits for the
   approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
-- Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
-  In an automatic or loop run the person set up to go on without them (quiet mode), you
-  may finish below it with `alm done <id> --without-human-check "<why, which run>"
-  --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
-  In such a run (a quiet run), never stop to wait for the person: decide a routine choice
-  yourself (below); park a real question with `alm wait <id> --on "<the question>"` (it shows in
-  `alm human`, To answer) and go on with the next ready task; do not use `alm confirm` (it would
-  wait until it times out).
+- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
+  When the work is finished and only a person's hands-on check is left, in quiet and normal
+  mode alike, finish it below the top label with `alm done <id> --without-human-check "<why>"
+  --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
+  `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
+  a real question, an approval or an outside effect.
+  In an automatic or loop run the person set up to go on without them (a quiet run), never
+  stop to wait for the person: decide a routine choice yourself (below); park a real question
+  with `alm wait <id> --on "<the question>"` (it shows in `alm human`, To answer) and go on
+  with the next ready task; do not use `alm confirm` (it would wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
@@ -119,6 +121,11 @@ file aside), you edit it directly, and you keep it true while you work: update i
 or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
 that would change what the next session does, or a credential moves. Change lines in place and
 remove lines that are no longer true; then commit and push that file with Git yourself.
+Personal details are kept out like credentials: never write a person's or an account's email
+address, account or user name, phone number, home address or local network address into the
+project notes, a handoff, a task, a document or the code. Write a placeholder such as
+`<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
+Git history keeps whatever was written, even after it is removed.
 
 `alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
 `git commit`, `git push`), naming only that change's files: run them, and leave other changes as
@@ -136,6 +143,11 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 
 This project's taskbag is not inside this folder: it is at `../allomos-taskbag/.allomos/taskbag`. Run every `alm` command with
 `--taskbag "../allomos-taskbag/.allomos/taskbag"` (or set `ALLOMOS_TASKBAG` to that path).
+
+Where this project is kept online (the project notes' `## Repositories`). Working from a copy
+without the taskbag beside it, in the cloud for example, clone what is missing from here:
+- Code: https://github.com/allomos/allomos (public)
+- Taskbag: https://github.com/allomos/allomos-taskbag (private; clone it to `../allomos-taskbag` beside the code)
 
 ## Handoff — write it continuously
 
