@@ -199,6 +199,8 @@ export interface MenuTexts {
   noRecent: string;
   connect: string;
   moveTasksIn: string;
+  /** The About window's line on what Allomos does (macOS). */
+  aboutTagline: string;
 }
 
 export const desktopMessenger: Messenger = {

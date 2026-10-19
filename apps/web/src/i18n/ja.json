@@ -206,6 +206,7 @@
   "problem.cannot_make_ready": "タスク {id} は {state} です。誰も持っていない backlog、waiting、blocked のタスクだけを ready にできます。",
   "problem.cannot_set_state": "ここではタスク {id} を {state} にできません。タスクが進行中になるのはエージェントが取ったとき（`alm claim`）だけで、backlog に戻す操作はありません。",
   "menu.connect": "AI エージェントとつなぐ…",
+  "menu.about_tagline": "エージェントを替えても、チームメイトに渡しても、プロジェクトは途切れない。",
   "menu.check_updates": "アップデートを確認…",
   "menu.download_update": "「肩代」{latest} をダウンロード…",
   "menu.restart_update": "再起動して「肩代」{latest} にアップデート",

@@ -37,8 +37,9 @@ about the project's tasks.
   own handoff file.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
   task (what is running, pitfalls, where the code and the taskbag are kept online, where
-  credentials live, never their values). Edited directly and kept true while the project is
-  built; `alm next` shows its Running, Pitfalls and Repositories.
+  credentials live, never their values; no personal details such as email addresses or account
+  names, only placeholders). Edited directly and kept true while the project is built; `alm
+  next` shows its Running, Pitfalls and Repositories.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
 - **Task**: one observable outcome: what a person or agent can do when it is done. It has an
@@ -131,8 +132,13 @@ Read this before you add a task, so it fits this project.
    task shares that task's base; otherwise its base is the branch you are on. alm prints which
    and why; `--base <name>` chooses another. When you hold a task on another base, alm says so:
    decide which is right, and change it with `alm base <id> <branch>` if needed.
-7. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
-   (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
+7. **State.** A new task starts in backlog, in no iteration. `alm add task` then prints the next
+   steps (Task-A03-33): plan it in the iteration that fits (`alm plan <id> <iteration>`; usually
+   the current one, where related tasks are planned), then check it for anything that is the
+   person's to decide (what users will see and get used to, anything hard to undo, anything that
+   changes the plan or another task, anything with a cost or an outside effect). Nothing: make it
+   ready (`alm ready <id>`). Something: leave it in backlog, name each open question in the
+   description's Notes, and tell the person.
 8. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
    outcome of a done or dropped task is not a new task: reopen that one
    (`alm reopen <id> --note \"<why>\"`).
@@ -419,6 +425,11 @@ Rules:
   a hosted resource or a Git remote, learn a pitfall that would change what the next session
   does, or a credential moves; change lines in place, remove lines no longer true, and commit and
   push that file yourself.
+- Never write credentials or personal details (a person's or an account's email address, account
+  or user name, phone number, home address, local network address) into the project notes, a
+  handoff, a task, a document or the code: write a placeholder such as
+  `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Git history keeps
+  whatever was written, even after it is removed.
 - Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
@@ -1098,6 +1109,60 @@ want below. Build it by following the goal prompt that comes next.",
     format!("## {heading}\n\n{intro}\n\n{mode}\n\n{said}\n\n{words}\n\n{prompt}")
 }
 
+/// What `alm add task` prints after its Git commands (Task-A03-33), in the task language
+/// (`en`, `zh-CN`, `ja`; English otherwise): plan the new task in an iteration, from
+/// `iterations` (one line each, as `alm list` heads them), then make it ready unless something
+/// in it is the person's to decide. alm tells; the agent decides.
+pub fn added_task_steps(language: &str, id: &str, iterations: &[String]) -> String {
+    let listed: String = iterations
+        .iter()
+        .flat_map(|i| ["     ", i.as_str(), "\n"])
+        .collect();
+    match language {
+        "zh-CN" => {
+            let list = if iterations.is_empty() {
+                "   还没有迭代：先用 `alm add iteration` 添加一个。\n".to_string()
+            } else {
+                listed
+            };
+            format!(
+                "接下来（给添加它的智能体）：
+1. 把它计划进一个迭代：`alm plan {id} <迭代>`。选合适的那个（通常是当前迭代，相关任务计划在那里）：
+{list}2. 检查任务里有没有该由人决定的事：用户会看到并习惯的东西、难以撤销的事、改变计划或其他任务的事、有花费或对外影响的事。没有：把它设为就绪，`alm ready {id}`。有：留在待办，在描述的备注里写明每个待定问题，并告诉那个人。
+"
+            )
+        }
+        "ja" => {
+            let list = if iterations.is_empty() {
+                "   イテレーションがまだありません：先に `alm add iteration` で追加します。\n"
+                    .to_string()
+            } else {
+                listed
+            };
+            format!(
+                "次に（追加したエージェントへ）：
+1. イテレーションに計画します：`alm plan {id} <イテレーション>`。合うものを選びます（ふつうは関連するタスクが計画されている、今のイテレーション）：
+{list}2. 人が決めるべきことがタスクにないか確かめます：ユーザーが目にして慣れていくもの、元に戻しにくいこと、計画やほかのタスクを変えること、費用や外への影響があること。なければ準備完了にします：`alm ready {id}`。あれば backlog のまま残し、説明の備考に未決の問いを一つずつ書いて、その人に伝えます。
+"
+            )
+        }
+        _ => {
+            let list = if iterations.is_empty() {
+                "   There is no iteration yet: add one first with `alm add iteration`.\n"
+                    .to_string()
+            } else {
+                listed
+            };
+            format!(
+                "Next, for the agent who added it:
+1. Plan it in an iteration: `alm plan {id} <iteration>`. Pick the one that fits (usually the current one, where related tasks are planned):
+{list}2. Check the task for anything that is the person's to decide: what users will see and get used to, anything hard to undo, anything that changes the plan or another task, anything with a cost or an outside effect. Nothing: make it ready, `alm ready {id}`. Something: leave it in backlog, name each open question in the description's Notes, and tell the person.
+"
+            )
+        }
+    }
+}
+
 /// A topic of [`LOCALIZED_TOPICS`] in `language`, or `None` when the topic is not one of them or
 /// is not written in that language (the agent then translates the English text faithfully).
 pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
@@ -1183,7 +1248,7 @@ mod tests {
         assert!(
             guide(Some("tasks"))
                 .unwrap()
-                .contains("Do not make it ready yourself")
+                .contains("Nothing: make it\n   ready (`alm ready <id>`)")
         );
         assert!(guide(Some("tasks")).unwrap().contains("alm task-language"));
         assert!(crate::agent_section().contains("run `alm task-language`"));

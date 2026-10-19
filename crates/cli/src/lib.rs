@@ -20,7 +20,7 @@ use allomos_store::{
     agent_section, agent_section_for, agent_setup_request, default_root, events, find_taskbag,
     guide, id_from_name, init_with_labels, load, localized, pick_ui_language, picked_folder,
     plain_path, post_confirm, project_folder_of, read_answer, read_text, requests_dir,
-    saved_ui_language, task_language, taskbag_of, versions, was_seen, with_written_files,
+    saved_ui_language, task_language, taskbag_of, tidy, versions, was_seen, with_written_files,
     withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
@@ -667,6 +667,8 @@ impl Command {
 struct Done {
     fields: Value,
     text: String,
+    /// Printed after the Git commands: what to do next (Task-A03-33).
+    after: String,
     warnings: Vec<Problem>,
     issues: Vec<Issue>,
 }
@@ -676,6 +678,7 @@ impl Done {
         Done {
             fields,
             text,
+            after: String::new(),
             warnings: Vec::new(),
             issues: Vec::new(),
         }
@@ -1004,6 +1007,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         }
     }
     done.text.push_str(&text);
+    if !done.after.is_empty() {
+        let after = std::mem::take(&mut done.after);
+        done.text.push('\n');
+        done.text.push_str(&after);
+    }
 }
 
 fn error_line(command: Option<&str>, problem: &Problem) -> String {
@@ -1035,7 +1043,17 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
     };
     match &cli.taskbag {
         Some(path) => {
-            let path = cwd.join(path);
+            // Without `.` and `..`, so every path alm prints is tidy (Task-A03-32); as given
+            // when tidying it would miss the taskbag (a symbolic link followed by `..`).
+            let given = cwd.join(path);
+            let tidy = tidy(&given);
+            let path = if tidy.join("project.json").is_file()
+                || default_root(&tidy).join("project.json").is_file()
+            {
+                tidy
+            } else {
+                given
+            };
             if path.join("project.json").is_file() {
                 Ok(path)
             } else if default_root(&path).join("project.json").is_file() {
@@ -1246,12 +1264,12 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
         return format!(
             "Project notes: this taskbag has no {} yet ({}).\n",
             n.file,
-            n.path.display()
+            plain_path(&n.path).display()
         );
     }
     let mut text = format!(
         "Project notes ({}, last changed {}):\n",
-        n.path.display(),
+        plain_path(&n.path).display(),
         n.changed.as_deref().unwrap_or("unknown")
     );
     for (name, section) in [("Running", &n.running), ("Pitfalls", &n.pitfalls)] {
@@ -1298,7 +1316,7 @@ fn notes_reminder(n: &handoff::ProjectNotes) -> String {
     format!(
         "If what is running or a pitfall changed, update `{}` too ({when}): {}\n",
         n.file,
-        n.path.display()
+        plain_path(&n.path).display()
     )
 }
 
@@ -1969,10 +1987,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     if let Some(c) = &added.base {
                         text.push_str(&format!("  base branch: {}\n", c.english()));
                     }
+                    // What to do next, in the task language: plan it, then make it ready
+                    // unless something is the person's to decide (Task-A03-33).
+                    let system: Vec<String> = sys_locale::get_locales().collect();
+                    let (language, iterations) = match taskbag_of(&root, load(&root)) {
+                        Ok((bag, _)) => (
+                            task_language(&bag.project, &system).language,
+                            bag.iterations.iter().map(iteration_heading).collect(),
+                        ),
+                        Err(_) => ("en".to_string(), Vec::new()),
+                    };
+                    let steps = allomos_store::added_task_steps(&language, &task.id, &iterations);
                     let mut done = Done::new(
-                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base }),
+                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base, "next_steps": steps }),
                         text,
                     );
+                    done.after = steps;
                     done.warnings = added.warnings;
                     (done, added.issues)
                 }

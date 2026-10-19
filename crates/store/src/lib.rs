@@ -51,8 +51,8 @@ pub use convert::{
 };
 pub use events::Actor;
 pub use guide::{
-    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files, goal,
-    goal_request_in, guide, localized, run_modes,
+    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
+    agent_files, goal, goal_request_in, guide, localized, run_modes,
 };
 pub use settings::{
     TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language,
@@ -322,6 +322,11 @@ file aside), you edit it directly, and you keep it true while you work: update i
 or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
 that would change what the next session does, or a credential moves. Change lines in place and
 remove lines that are no longer true; then commit and push that file with Git yourself.
+Personal details are kept out like credentials: never write a person's or an account's email
+address, account or user name, phone number, home address or local network address into the
+project notes, a handoff, a task, a document or the code. Write a placeholder such as
+`<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
+Git history keeps whatever was written, even after it is removed.
 
 `alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
 `git commit`, `git push`), naming only that change's files: run them, and leave other changes as
@@ -419,7 +424,7 @@ This project's taskbag is not inside this folder: it is at `{at}`. Run every `al
 }
 
 /// `path` without `.` and `..` parts, worked out from the text alone (the disk is not asked).
-fn tidy(path: &Path) -> PathBuf {
+pub fn tidy(path: &Path) -> PathBuf {
     let mut clean = PathBuf::new();
     for part in path.components() {
         match part {

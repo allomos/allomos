@@ -71,7 +71,8 @@ The address only: never a token or a personal detail. None yet.
 
 ## Where credentials live
 
-Never their values. None yet.
+Never their values, and no personal details (email addresses, account names): write a
+placeholder such as `<ACCOUNT_EMAIL>` and how to look it up. None yet.
 
 ## Agents set up
 
@@ -102,7 +103,9 @@ pub struct ProjectNotes {
 
 /// The taskbag's project notes, as far as they can be read.
 pub fn project_notes(root: &Path) -> ProjectNotes {
-    let path = root.join(NOTES_FILE);
+    // Without `.` and `..` (Task-A03-32): a relative `--taskbag` used from a worktree would
+    // otherwise print as `.../worktree/../../../../taskbag/...`.
+    let path = crate::tidy(root).join(NOTES_FILE);
     let text = crate::read_text(&path).ok().map(|t| crate::lf(&t));
     let changed = fs::metadata(&path)
         .and_then(|m| m.modified())

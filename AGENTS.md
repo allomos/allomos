@@ -7,7 +7,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 ## Always-on boundaries
 
 - **No external effect without the approver's exact approval**, recorded in the task's description: creating or changing hosted resources (Supabase projects, databases, hosting, DNS), applying SQL to a real target, deployments, secrets, sending email, creating GitHub repositories, adding or changing a remote, and anything touching other people's data. Approving a card authorizes only its local work.
-- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live).
+- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live). Personal details (email addresses, account names, phone numbers, local network addresses) are kept out the same way: write a placeholder and how to look it up.
 - **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
 - **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
 - **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v16)
+## Tasks: Allomos (v17)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -121,6 +121,11 @@ file aside), you edit it directly, and you keep it true while you work: update i
 or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
 that would change what the next session does, or a credential moves. Change lines in place and
 remove lines that are no longer true; then commit and push that file with Git yourself.
+Personal details are kept out like credentials: never write a person's or an account's email
+address, account or user name, phone number, home address or local network address into the
+project notes, a handoff, a task, a document or the code. Write a placeholder such as
+`<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
+Git history keeps whatever was written, even after it is removed.
 
 `alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
 `git commit`, `git push`), naming only that change's files: run them, and leave other changes as
