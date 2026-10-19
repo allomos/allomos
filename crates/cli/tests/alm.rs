@@ -2229,6 +2229,59 @@ fn project_notes_path_is_tidy_from_a_worktree() {
     }
 }
 
+/// After `alm add task`, alm tells the agent what to do next (Task-A03-33): plan it in an
+/// iteration, from the ones listed, then make it ready unless something is the person's to
+/// decide; after the Git commands, in the task language. alm itself plans and readies nothing.
+#[test]
+fn add_task_tells_the_next_steps() {
+    let dir = tmp("add-next-steps");
+    ok(&dir, &["init"]);
+    ok(&dir, &["add", "area", "A01", "Core"]);
+
+    // No iteration yet: said, with how to add one.
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "One"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    let after = text.split("Commit only these files").nth(1).unwrap_or("");
+    assert!(
+        after.contains("Next, for the agent who added it:"),
+        "{text}"
+    );
+    assert!(after.contains("`alm plan A01-01 <iteration>`"), "{text}");
+    assert!(after.contains("There is no iteration yet"), "{text}");
+    assert!(
+        after.contains("Nothing: make it ready, `alm ready A01-01`"),
+        "{text}"
+    );
+    assert!(
+        after.contains("name each open question in the description's Notes"),
+        "{text}"
+    );
+
+    // The iterations listed; in JSON too; the task stays in backlog with no iteration.
+    ok(
+        &dir,
+        &["add", "iteration", "I01", "First steps", "--release", "0.1"],
+    );
+    let v = ok(&dir, &["add", "task", "--area", "A01", "--title", "Two"]);
+    let steps = v["next_steps"].as_str().unwrap();
+    assert!(steps.contains("     I01  First steps  (0.1)\n"), "{steps}");
+    assert!(steps.contains("`alm ready A01-02`"), "{steps}");
+    assert_eq!(v["task"]["state"], "backlog");
+    assert_eq!(v["task"]["iteration"], Value::Null);
+
+    // In the task language.
+    ok(&dir, &["task-language", "zh-CN"]);
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Three"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("接下来（给添加它的智能体）"), "{text}");
+    assert!(text.contains("`alm plan A01-03 <迭代>`"), "{text}");
+    ok(&dir, &["task-language", "ja"]);
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Four"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("次に（追加したエージェントへ）"), "{text}");
+}
+
 /// Every file under `dir`, with its contents, to show that nothing changed.
 fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut out: Vec<(PathBuf, Vec<u8>)> = walk(dir)

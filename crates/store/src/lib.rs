@@ -51,8 +51,8 @@ pub use convert::{
 };
 pub use events::Actor;
 pub use guide::{
-    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files, goal,
-    goal_request_in, guide, localized, run_modes,
+    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
+    agent_files, goal, goal_request_in, guide, localized, run_modes,
 };
 pub use settings::{
     TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language,

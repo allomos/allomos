@@ -667,6 +667,8 @@ impl Command {
 struct Done {
     fields: Value,
     text: String,
+    /// Printed after the Git commands: what to do next (Task-A03-33).
+    after: String,
     warnings: Vec<Problem>,
     issues: Vec<Issue>,
 }
@@ -676,6 +678,7 @@ impl Done {
         Done {
             fields,
             text,
+            after: String::new(),
             warnings: Vec::new(),
             issues: Vec::new(),
         }
@@ -1004,6 +1007,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         }
     }
     done.text.push_str(&text);
+    if !done.after.is_empty() {
+        let after = std::mem::take(&mut done.after);
+        done.text.push('\n');
+        done.text.push_str(&after);
+    }
 }
 
 fn error_line(command: Option<&str>, problem: &Problem) -> String {
@@ -1979,10 +1987,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     if let Some(c) = &added.base {
                         text.push_str(&format!("  base branch: {}\n", c.english()));
                     }
+                    // What to do next, in the task language: plan it, then make it ready
+                    // unless something is the person's to decide (Task-A03-33).
+                    let system: Vec<String> = sys_locale::get_locales().collect();
+                    let (language, iterations) = match taskbag_of(&root, load(&root)) {
+                        Ok((bag, _)) => (
+                            task_language(&bag.project, &system).language,
+                            bag.iterations.iter().map(iteration_heading).collect(),
+                        ),
+                        Err(_) => ("en".to_string(), Vec::new()),
+                    };
+                    let steps = allomos_store::added_task_steps(&language, &task.id, &iterations);
                     let mut done = Done::new(
-                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base }),
+                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base, "next_steps": steps }),
                         text,
                     );
+                    done.after = steps;
                     done.warnings = added.warnings;
                     (done, added.issues)
                 }
