@@ -16,7 +16,7 @@ import { movingTasks, updateNotice } from "./versionFlow";
 import { foundGroups } from "./agentPickerFlow";
 import { notSetUp, setupNotice } from "./agentSetupFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
-import { UPDATE_LOOK_MS, updateNote } from "./updateFlow";
+import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor, localTime } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
@@ -895,6 +895,8 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [asked, setAsked] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
   useEffect(() => {
     let live = true;
     const look = (ask: boolean) =>
@@ -909,18 +911,28 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
     void look(false);
     const timer = window.setInterval(() => void look(false), UPDATE_LOOK_MS);
     const stopMenu = messenger.onCheckUpdatesMenu(() => void look(true));
+    // The installer was downloaded and checked: ask again, so the menu offers Restart to Update.
+    const stopReady = messenger.onUpdateReady(() => void look(false));
+    const stopFailed = messenger.onUpdateFailed((problem) => onErrorRef.current(problem));
     return () => {
       live = false;
       window.clearInterval(timer);
-      void stopMenu.then((f) => f()).catch(() => undefined);
+      for (const stop of [stopMenu, stopReady, stopFailed]) void stop.then((f) => f()).catch(() => undefined);
     };
   }, [messenger]);
-  // The menu item: Check for Updates…, or Download Allomos <version>… once one is known.
-  const available = status?.available ?? null;
+  // The menu item: Check for Updates…, Download Allomos <version>… once one is known, or
+  // Restart to Update to Allomos <version> once its installer is downloaded and checked.
+  const item = updateMenuItem(status);
+  const itemLatest = item.action === "check" ? null : item.latest;
   useEffect(() => {
-    const text = available ? t("menu.download_update", { latest: available }) : t("menu.check_updates");
-    void messenger.setUpdateItem(text, Boolean(available)).catch(() => undefined);
-  }, [messenger, t, available]);
+    const text =
+      item.action === "restart"
+        ? t("menu.restart_update", { latest: itemLatest ?? "" })
+        : item.action === "download"
+          ? t("menu.download_update", { latest: itemLatest ?? "" })
+          : t("menu.check_updates");
+    void messenger.setUpdateItem(text, item.action).catch(() => undefined);
+  }, [messenger, t, item.action, itemLatest]);
   const note = updateNote(status, asked, hidden);
   if (!note) return null;
   const close = () => {

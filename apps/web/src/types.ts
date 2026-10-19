@@ -359,4 +359,6 @@ export interface UpdateStatus {
   available: string | null;
   /** GitHub was asked now and did not answer. */
   failed: boolean;
+  /** `available`'s installer is downloaded and its hash matched (Task-A07-17). */
+  ready: string | null;
 }

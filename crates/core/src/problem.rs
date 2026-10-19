@@ -157,6 +157,9 @@ problems! {
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
+    /// **Restart to Update** could not install the new version (Task-A07-17); this one keeps
+    /// running. `detail` is the system's own text, or why the download was refused.
+    UpdateFailed { detail } => "update_failed", "Allomos could not install the update: {detail}. You still have the version you had.";
     /// The chosen AI agent is no longer on this computer (Task-A05-02).
     AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
     /// `alm confirm`: the person chose Cancel in the app (Task-A05-02).

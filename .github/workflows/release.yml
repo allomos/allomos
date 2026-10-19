@@ -2,6 +2,8 @@
 # the unsigned installers and alm to that version's GitHub release (Task-A07-11). The installers
 # are the only .exe; alm alone is packed as alm-only_<v>_… (.tar.gz, .zip) so nobody takes it for
 # the installer (Task-A07-18).
+# Each installer gets a hash file beside it, <installer>.sha256, as `shasum -a 256` writes it: the
+# app downloads the installer and installs it only if its SHA-256 matches (Task-A07-17).
 # The tag must match the app's version: tag v0.2.0 needs "version": "0.2.0" in tauri.conf.json
 # and Cargo.toml. The Mac script apps/desktop/scripts/build-windows.sh stays as a backup.
 name: Release
@@ -49,6 +51,8 @@ jobs:
           - macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.pkg, or Allomos_${TAG#v}_aarch64.dmg
           - Windows: Allomos_${TAG#v}_x64-setup.exe
 
+          Each installer has a .sha256 file beside it with its SHA-256 hash; Allomos checks it before updating itself.
+
           The alm-only files hold the alm command alone, for computers without the app: alm-only_${TAG#v}_macos_arm64.tar.gz and alm-only_${TAG#v}_windows_x64.zip. Unpack, then run alm from a terminal.
 
           How to install: https://allomos.github.io/allomos/start/getting-started/"
@@ -76,7 +80,11 @@ jobs:
         run: |
           v=${{ needs.release.outputs.version }}
           tar -czf "alm-only_${v}_macos_arm64.tar.gz" -C target/release alm
-          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg target/release/bundle/pkg/*.pkg "alm-only_${v}_macos_arm64.tar.gz"
+          for f in target/release/bundle/dmg/*.dmg target/release/bundle/pkg/*.pkg; do
+            (cd "$(dirname "$f")" && shasum -a 256 "$(basename "$f")" > "$(basename "$f").sha256")
+          done
+          gh release upload "$TAG" --clobber target/release/bundle/dmg/*.dmg target/release/bundle/dmg/*.dmg.sha256 \
+            target/release/bundle/pkg/*.pkg target/release/bundle/pkg/*.pkg.sha256 "alm-only_${v}_macos_arm64.tar.gz"
 
   windows:
     needs: release
@@ -104,4 +112,7 @@ jobs:
         run: |
           v=${{ needs.release.outputs.version }}
           pwsh -NoProfile -Command "Compress-Archive -Path target/release/alm.exe -DestinationPath alm-only_${v}_windows_x64.zip -Force"
-          gh release upload "$TAG" --clobber target/release/bundle/nsis/*-setup.exe "alm-only_${v}_windows_x64.zip"
+          for f in target/release/bundle/nsis/*-setup.exe; do
+            (cd "$(dirname "$f")" && sha256sum "$(basename "$f")" > "$(basename "$f").sha256")
+          done
+          gh release upload "$TAG" --clobber target/release/bundle/nsis/*-setup.exe target/release/bundle/nsis/*-setup.exe.sha256 "alm-only_${v}_windows_x64.zip"

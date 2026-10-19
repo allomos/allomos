@@ -2,10 +2,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { updateNote } from "../src/updateFlow.ts";
+import { updateMenuItem, updateNote } from "../src/updateFlow.ts";
 import type { UpdateStatus } from "../src/types.ts";
 
-const status = (s: Partial<UpdateStatus>): UpdateStatus => ({ current: "0.1.5", latest: "0.1.5", newer: null, available: null, failed: false, ...s });
+const status = (s: Partial<UpdateStatus>): UpdateStatus => ({ current: "0.1.5", latest: "0.1.5", newer: null, available: null, failed: false, ready: null, ...s });
 
 test("nothing is shown before the first answer", () => {
   assert.equal(updateNote(null, false, null), null);
@@ -33,4 +33,13 @@ test("Check for Updates… always answers", () => {
   assert.deepEqual(updateNote(status({}), true, null), { kind: "current", current: "0.1.5" });
   assert.deepEqual(updateNote(status({ failed: true, latest: null }), true, null), { kind: "failed" });
   assert.equal(updateNote(status({ newer: "0.1.6" }), true, "0.1.6")?.kind, "offer");
+});
+
+test("the menu item checks, then downloads, then restarts to update (Task-A07-17)", () => {
+  assert.deepEqual(updateMenuItem(null), { action: "check" });
+  assert.deepEqual(updateMenuItem(status({})), { action: "check" });
+  assert.deepEqual(updateMenuItem(status({ available: "0.1.6" })), { action: "download", latest: "0.1.6" });
+  assert.deepEqual(updateMenuItem(status({ available: "0.1.6", ready: "0.1.6" })), { action: "restart", latest: "0.1.6" });
+  // A download of an older find does not offer a restart to a newer one.
+  assert.deepEqual(updateMenuItem(status({ available: "0.1.7", ready: "0.1.6" })), { action: "download", latest: "0.1.7" });
 });
