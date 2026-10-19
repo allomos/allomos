@@ -20,9 +20,8 @@ pub enum Kind {
 }
 
 /// One field's change. `from` is left out when the field was empty (or the item new), `to` when
-/// it was emptied.
+/// it was emptied. Fields it does not know are ignored, as for [`Event`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Change {
     pub field: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -32,8 +31,12 @@ pub struct Change {
 }
 
 /// One change to one item, as stored in `events/<name>.json`.
+///
+/// Fields this Allomos does not know are ignored rather than refused (Task-A01-55, approver
+/// 2026-10-19): events are written only by `alm` and the app, never by hand, so an unknown field
+/// means a newer Allomos added it, and refusing it would only drop that change from the history.
+/// The other files of the taskbag still refuse unknown fields, so mistyped names are caught.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Event {
     /// When, in UTC: `2026-10-13T14:02:05Z`.
     pub at: String,
@@ -294,6 +297,27 @@ mod tests {
         .unwrap();
         assert_eq!((old.agent.as_deref(), old.tool.as_deref()), (None, None));
         assert!(serde_json::to_value(&old).unwrap().get("agent").is_none());
+    }
+
+    #[test]
+    fn an_event_reads_with_fields_it_does_not_know() {
+        let text = r#"{"at":"2026-10-19T14:00:00Z","by":"s","via":"alm","command":"label",
+            "kind":"task","id":"A01-01","later":{"x":1},
+            "changes":[{"field":"label","to":"implemented","note":"?"}]}"#;
+        let e = crate::parse_event("events/e.json", text).unwrap();
+        assert_eq!(e.command, "label");
+        assert_eq!(e.changes[0].to.as_ref().unwrap(), "implemented");
+        // A required field missing is still a problem, naming the field.
+        let err = crate::parse_event(
+            "events/e.json",
+            r#"{"at":"2026-10-19T14:00:00Z","command":"label","kind":"task","changes":[]}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err.field.as_deref(), Some("via"));
+        assert_eq!(err.problem, crate::Problem::FieldMissing);
+        // So is a wrong kind of value, or text that is not JSON.
+        assert!(crate::parse_event("events/e.json", r#"{"at":1}"#).is_err());
+        assert!(crate::parse_event("events/e.json", "not json").is_err());
     }
 
     fn env<'a>(vars: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {

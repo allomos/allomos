@@ -3763,3 +3763,29 @@ fn claim_waits_until_card_files_are_moved_in() {
     ok(&repo, &["card", "A01-01"]);
     ok(&repo, &["--as", "a", "claim", "A01-02"]);
 }
+
+/// Approver, 2026-10-19 (Task-A01-55): a history record with fields this Allomos does not know
+/// (written by a newer one) is read, not reported and dropped; other files stay strict.
+#[test]
+fn history_records_with_unknown_fields_still_show() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    fs::write(
+        bag.join("events/2099-01-01-000000-000-zzzzzz.json"),
+        r#"{"at":"2099-01-01T00:00:00Z","by":"newer","via":"alm","command":"label","kind":"task",
+"id":"A01-01","from_a_newer_allomos":true,"changes":[{"field":"label","to":"implemented","extra":1}]}"#,
+    )
+    .unwrap();
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+    let v = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+    assert!(v.to_string().contains("newer"), "{v}");
+    // A task file with an unknown field is still refused.
+    let task = bag.join("tasks/A01-02/task.json");
+    let mut t: Value = serde_json::from_str(&fs::read_to_string(&task).unwrap()).unwrap();
+    t["colour"] = json!("red");
+    fs::write(&task, t.to_string()).unwrap();
+    let v = ok(&repo, &["list"]);
+    assert!(v["issues"].to_string().contains("field_unknown"), "{v}");
+}
