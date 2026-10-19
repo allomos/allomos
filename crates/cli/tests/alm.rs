@@ -2217,9 +2217,18 @@ fn project_notes_path_is_tidy_from_a_worktree() {
     let worktree = base.join("code/.claude/worktrees/one");
     fs::create_dir_all(&worktree).unwrap();
     let rel = "./../../../../bag/.allomos/taskbag";
-    let want = fs::canonicalize(&bag)
-        .unwrap()
-        .join(".allomos/taskbag/project-notes.md");
+    // The worktree as alm sees it from its working folder: resolved (`/private/var` on macOS),
+    // but on Windows as given, since `canonicalize` there adds `\\?\` and expands short names
+    // (`RUNNER~1`), which alm rightly does not print.
+    let bag_seen = if cfg!(windows) {
+        bag.clone()
+    } else {
+        fs::canonicalize(&bag).unwrap()
+    };
+    let want = bag_seen
+        .join(".allomos")
+        .join("taskbag")
+        .join("project-notes.md");
     let v = ok(&worktree, &["--taskbag", rel, "next"]);
     assert_eq!(v["project_notes"]["path"], want.display().to_string());
     for args in [
