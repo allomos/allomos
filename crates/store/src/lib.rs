@@ -257,6 +257,10 @@ the project notes (below) and your own handoff file.
   sessions do not see it. Every task has a base branch, by its real name: it starts from it and
   merges back into it; the claim records your working branch and prints the base to start from
   and merge into, with the Git commands as the example.
+- Always work a task in a worktree of its own (a separate working copy on the task's own
+  branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
+  prints), never in the main checkout: the main checkout stays on the base branch. Merge from
+  the main checkout; once merged, remove your worktree and the merged branch.
 - Report progress: `alm label <id> \"<label>\"`.
 - Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;

@@ -64,7 +64,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 19: a checked task whose work changed goes back to To check (`alm recheck`, the agent decides);
 /// an approval through `alm confirm` shows its evidence and task and covers only the plan shown
 /// (Task-A03-37).
-pub const SECTION_VERSION: u32 = 19;
+/// 20: always work a task in a worktree of its own; the main checkout stays on the base branch
+/// (Task-A03-38).
+pub const SECTION_VERSION: u32 = 20;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

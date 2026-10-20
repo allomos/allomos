@@ -2147,7 +2147,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v19)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v20)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2157,7 +2157,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v19)", "## Tasks: Allomos (v18)")
+            brief.replace("## Tasks: Allomos (v20)", "## Tasks: Allomos (v19)")
         ),
     )
     .unwrap();
@@ -3733,10 +3733,11 @@ fn tasks_record_their_base_branch_and_claims_say_where_to_merge() {
         json!([
             "git switch storage-v2",
             "git pull --ff-only",
-            "git switch -c claude/a01-01"
+            "git worktree add <folder> -b claude/a01-01 storage-v2"
         ])
     );
     assert_eq!(v["branch_commands"]["merge"][2], "git merge claude/a01-01");
+    assert_eq!(v["branch_commands"]["merge"][4], "git worktree remove <folder>");
     assert_eq!(v["branch_facts"], json!([]));
     // task.json has no new field: the branches are in the claim's event.
     let file = task_file(&repo, "A01-01");

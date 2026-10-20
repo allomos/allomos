@@ -29,7 +29,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 ## Working procedure
 
 1. **The unit of work is one observable outcome**, written as one card: a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Its full detail (outcome, details, rules, approvals, and evidence under an **Evidence** heading) lives in the task's description, written with `alm describe`; older tasks also keep a card file beside the task in the taskbag (`tasks/<id>/card.md`, opened by the description's `Card:` link). There are no card files in this repository. How to write one: `alm guide tasks`; terms and labels: `alm guide terms`; claiming and branches: `alm guide workflow`.
-2. **A session works in the current checkout by default**, holding **one** card. A worktree is created only when a task needs its own checkout, for example when several sessions work at once: each then has its own git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from the task's base branch, which `alm claim` names. Claim before you work, as `alm guide workflow` says.
+2. **Every task is worked in a worktree of its own** (approver, 2026-10-20; replaces A00-28's current-checkout default), holding **one** card: a git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from the task's base branch, which `alm claim` names. The main checkout stays on the base branch: merge there, then remove the worktree and the merged branch. Claim before you work, as `alm guide workflow` says.
 3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. The description holds detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the approver's open questions.
 4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → human verified (Done: the human check, called *owner verified* until the taskbag is migrated to `allomos/4`). Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v19)
+## Tasks: Allomos (v20)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -55,6 +55,10 @@ the project notes (below) and your own handoff file.
   sessions do not see it. Every task has a base branch, by its real name: it starts from it and
   merges back into it; the claim records your working branch and prints the base to start from
   and merge into, with the Git commands as the example.
+- Always work a task in a worktree of its own (a separate working copy on the task's own
+  branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
+  prints), never in the main checkout: the main checkout stays on the base branch. Merge from
+  the main checkout; once merged, remove your worktree and the merged branch.
 - Report progress: `alm label <id> "<label>"`.
 - Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
