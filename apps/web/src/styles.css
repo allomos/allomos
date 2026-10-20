@@ -186,7 +186,9 @@ button.link:hover { text-decoration: underline; }
 
 /* The welcome page: the road show's opening slide (Task-A05-03). The deck's display face (Big
    Shoulders Display) is a web font; the app draws its first page without the network, so it uses
-   the closest condensed face on the computer. Chinese and Japanese use their heavy system faces. */
+   the closest condensed face on the computer. Chinese and Japanese use their heavy system faces.
+   Sizes follow the window's height as well as its width (the vh terms), so the card and the two
+   buttons under it fit the usual window without scrolling (Task-A05-11). */
 :root {
   --display: "Big Shoulders Display", "Avenir Next Condensed", "Bahnschrift Condensed", "Arial Narrow",
     "Roboto Condensed", sans-serif;
@@ -196,29 +198,29 @@ button.link:hover { text-decoration: underline; }
 .welcome {
   width: min(1120px, 100%); margin: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 14px; box-shadow: 0 1px 2px rgb(18 34 58 / 0.06), 0 8px 28px rgb(18 34 58 / 0.07);
-  padding: clamp(22px, 4.2vw, 56px);
+  padding: clamp(22px, min(4.2vw, 5vh), 56px);
 }
 .welcome-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: clamp(20px, 3vw, 48px); align-items: center;
 }
 .welcome-grid > * { min-width: 0; }
-.welcome-text { display: grid; gap: 16px; }
+.welcome-text { display: grid; gap: clamp(10px, 2.2vh, 16px); }
 .welcome p { margin: 0; }
 .welcome .eyebrow {
   font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink);
 }
 .welcome h1 {
   margin: 0; font-family: var(--display); font-weight: 800; font-stretch: condensed;
-  font-size: clamp(38px, 5vw, 66px); line-height: .95; letter-spacing: .005em;
+  font-size: clamp(32px, min(5vw, 7vh), 66px); line-height: .95; letter-spacing: .005em;
   text-transform: uppercase; text-wrap: balance;
 }
 .welcome h1 em { font-style: normal; color: var(--accent); }
 :root:lang(zh-CN) .welcome h1, :root:lang(ja) .welcome h1 {
-  font-weight: 900; line-height: 1.18; letter-spacing: .01em; font-size: clamp(32px, 4.4vw, 58px);
+  font-weight: 900; line-height: 1.18; letter-spacing: .01em; font-size: clamp(28px, min(4.4vw, 6.2vh), 58px);
 }
 :root:lang(zh-CN) .welcome .eyebrow, :root:lang(ja) .welcome .eyebrow { font-family: var(--font); letter-spacing: .08em; font-size: 13px; }
-.welcome .lede { font-size: clamp(15px, 1.6vw, 19px); color: var(--muted); max-width: 60ch; }
+.welcome .lede { font-size: clamp(15px, min(1.6vw, 2.4vh), 19px); color: var(--muted); max-width: 60ch; }
 .welcome-start { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 8px; }
 .welcome .start { font-size: 15px; padding: 11px 28px; border-radius: 999px; }
 .welcome-start .muted { font-size: 13px; }
