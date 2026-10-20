@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
+import { WhoForm } from "./WhoForm";
 import { Markdown } from "./Markdown";
 import { LatestHandoff } from "./Handoffs";
 import { localTime } from "./handoffFlow";
@@ -347,36 +348,16 @@ export function TaskPane({
 
   /** The editor in place of a field's value: the name asked once first, then the control, Save and Cancel. */
   const nameForm = (): ReactNode => (
-      <div className="editor">
-        <p className="small">{t("edit.name_explain")}</p>
-        <input
-          type="text"
-          value={name}
-          placeholder={t("edit.name_placeholder")}
-          aria-label={t("edit.name_placeholder")}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void saveName();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              cancel();
-            }
-          }}
-          disabled={busy}
-          autoFocus
-        />
-        <div className="editor-buttons">
-          <button type="button" className="primary" onClick={() => void saveName()} disabled={busy || !name.trim()}>
-            {t("edit.name_save")}
-          </button>
-          <button type="button" onClick={cancel} disabled={busy}>
-            {t("edit.cancel")}
-          </button>
-        </div>
-        {error && <p className="banner error small">{error}</p>}
-      </div>
+    <WhoForm
+      name={name}
+      onName={setName}
+      explain="edit.name_explain"
+      label="who.label_task"
+      busy={busy}
+      error={error}
+      onSave={() => void saveName()}
+      onCancel={cancel}
+    />
   );
   const editor = (field: EditField): ReactNode =>
     !ownerName ? (

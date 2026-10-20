@@ -4,6 +4,7 @@
 
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
+import { WhoForm } from "./WhoForm";
 import { canAdd, pickArea, refreshItem, refreshTask, startItem, startTask, toNewIteration, toNewTask, type BaseChoice, type Creating, type ItemDraft, type TaskDraft } from "./createFlow";
 import { isProblem, type Area, type Iteration, type NewIteration, type NewTask, type NextIds } from "./types";
 
@@ -104,20 +105,19 @@ export function CreateForm({
 
   if (!ownerName) {
     return (
-      <form className="create-form editor" aria-label={title} onSubmit={(e) => e.preventDefault()} onKeyDown={(e) => keys(e, () => void saveName())}>
+      <div className="create-form editor" aria-label={title}>
         <h3>{title}</h3>
-        <p className="small">{t("create.name_explain")}</p>
-        <input type="text" value={name} placeholder={t("edit.name_placeholder")} aria-label={t("edit.name_placeholder")} onChange={(e) => setName(e.target.value)} disabled={busy} autoFocus />
-        <div className="editor-buttons">
-          <button type="button" className="primary" onClick={() => void saveName()} disabled={busy || !name.trim()}>
-            {t("edit.name_save")}
-          </button>
-          <button type="button" onClick={onClose} disabled={busy}>
-            {t("edit.cancel")}
-          </button>
-        </div>
-        {error && <p className="banner error small">{error}</p>}
-      </form>
+        <WhoForm
+          name={name}
+          onName={setName}
+          explain="create.name_explain"
+          label="who.label"
+          busy={busy}
+          error={error}
+          onSave={() => void saveName()}
+          onCancel={onClose}
+        />
+      </div>
     );
   }
 

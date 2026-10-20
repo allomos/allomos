@@ -39,6 +39,7 @@ import {
 import { useFold } from "./useFold";
 import { parseSort, sortTasks, type Sort } from "./sortFlow";
 import { SortMenu } from "./SortMenu";
+import { WhoLine } from "./WhoForm";
 import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
@@ -1506,6 +1507,8 @@ function TaskbagView({
               </label>
               {groupBy === "iteration" && <SortMenu sort={sort} onChange={chooseSort} />}
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
+              {/* Task-A01-40: the saved name changes are recorded as, and where to change it. */}
+              <WhoLine name={ownerName} onSave={saveOwnerName} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
                 <button type="button" className="link small" onClick={() => foldAll(true)}>
