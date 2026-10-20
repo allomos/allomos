@@ -1940,7 +1940,7 @@ fn goal_follows_the_task_language() {
         assert_eq!(v["written_in_language"], true, "{v}");
         let text = v["guide"].as_str().unwrap();
         assert!(text.starts_with(words), "{language}: {text}");
-        assert!(text.contains("(goal prompt v2)"), "{language}");
+        assert!(text.contains("(goal prompt v3)"), "{language}");
         assert!(text.contains("## 4. "), "{language}");
         assert!(text.contains("`/goal`"), "{language}");
     }

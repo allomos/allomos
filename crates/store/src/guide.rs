@@ -782,9 +782,9 @@ pub fn agent_files(language: &str) -> Option<&'static str> {
 /// conversation alone, and continuing from `alm next` (Task-A03-25-01).
 /// 2: every finished task, the goal task too, ends done and to check
 /// (`--without-human-check`) in either run mode, not waiting (Task-A03-31).
-pub const GOAL_PROMPT_VERSION: u32 = 2;
+pub const GOAL_PROMPT_VERSION: u32 = 3;
 
-const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v2)
+const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v3)
 
 For the agent: this is the goal prompt. A person has described an app they want (their words
 come with this prompt). You plan it into areas, iterations and tasks, make the tasks ready
@@ -821,7 +821,7 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`. Its description (`alm describe <id> --from <file.md>`) holds the spec: what the app
    does and for whom, and the acceptance criteria the finished app must meet, each one a thing a
-   person can try. End it with this line: \"Goal run (goal prompt v2): the person approved this
+   person can try. End it with this line: \"Goal run (goal prompt v3): the person approved this
    plan in advance by submitting the goal on <date>; the agent makes the areas, iterations and
    ready tasks. Outside effects still wait for the approver.\" The title's `Goal:` marks the goal
    task for every later session: keep it.
@@ -848,6 +848,13 @@ it, `alm label <id> \"<label>\"` as each step is proven, and finish it the same 
 run mode: once the work is finished and only the person's check by hand is left,
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`, the steps telling the
 person how to try it (at the top label, once the person has checked it: `alm done <id>`).
+
+**Checking a release.** Prove each check with automated tests and command-line checks first: the
+project's test suite, `curl` against the running server, a headless test runner. Use the browser
+(clicking, or running scripts in the page) only when nothing else can prove the result, and never
+run page scripts on a local network address such as `192.168.x.x`: the browser asks the person to
+approve every script there, and the run would stall. When an acceptance check still needs the
+browser, write that in the task's steps for the person, finish the task as above, and go on.
 
 When `alm next` says all of a task's blockers are done, check it, then `alm unblock <id>`. A task
 with an outside effect: `alm wait <id> --on \"<what the approver must do>\"`, then go on with the
@@ -878,7 +885,7 @@ true, and print `alm list --json` to show it. Stop earlier only at the quota gat
 handoff written; given this prompt again, you continue from `alm next`.
 ";
 
-const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v2)
+const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v3)
 
 给智能体：这是目标提示。有人描述了他们想要的应用（他们的原话随这段提示一起给出）。你把它规划成
 领域、迭代和任务，自己把任务设为就绪，然后一个迭代接一个迭代地把它做出来，每一步都用 `alm`
@@ -910,7 +917,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。它的描述（`alm describe <id> --from <file.md>`）写规格：应用做什么、为谁做，以及完成的
    应用必须满足的验收标准，每一条都是一个人能亲手试的事。最后加上这一行：
-   “Goal run (goal prompt v2)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
+   “Goal run (goal prompt v3)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
    就绪的任务由智能体来建。对外有影响的事仍然等批准人处理。”标题里的 `Goal:` 让之后的每个会话都能认出目标任务：保留它。
 2. **领域**，按应用的组成部分划分（例如它的界面、数据、服务器）：`alm add area \"<name>\"`。
 3. **迭代**，作为一份发布路线图，每个迭代结束时都有一个对方能试用的版本：
@@ -931,6 +938,11 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 `alm label <id> \"<label>\"`，两种运行模式下都用同一种方式完成它：工作做完、只差那个人亲手检查时，
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`，步骤告诉那个人怎么试用
 （达到最高标签、那个人检查过之后：`alm done <id>`）。
+
+**检查一个版本。** 每项检查先用自动测试和命令行来证明：项目的测试套件、对运行中的服务器用 `curl`、
+无界面的测试运行器。只有别的办法都证明不了时才用浏览器（点击，或在页面里运行脚本），并且不要在
+`192.168.x.x` 这样的局域网地址上运行页面脚本：浏览器在那里每运行一段脚本都要那个人批准，运行会卡住。
+如果某个验收检查仍然需要浏览器，就把这一点写进这个任务给那个人的步骤里，照上面的方式完成任务，接着往下做。
 
 当 `alm next` 说某个任务的阻塞任务都已完成时，检查一下，然后 `alm unblock <id>`。对外有影响的任务：
 `alm wait <id> --on \"<what the approver must do>\"`，然后接着做下一个就绪的任务。需要先做另一个任务
@@ -957,7 +969,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 只有到了额度关口才提前停下，并写好交接；再次收到这段提示时，从 `alm next` 继续。
 ";
 
-const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v2)
+const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v3)
 
 エージェントへ：これはゴールのプロンプトです。ある人が、欲しいアプリを説明しました（その人の言葉は
 このプロンプトと一緒に渡されます）。あなたはそれをエリア、イテレーション、タスクに計画し、タスクを
@@ -993,7 +1005,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。その説明（`alm describe <id> --from <file.md>`）に仕様を書きます。アプリが何をし、
    誰のためのものか、そして完成したアプリが満たすべき受け入れ基準。基準はどれも、人が試せることに
-   します。最後にこの一行を書きます：「Goal run (goal prompt v2)：この人は <date> にゴールを出して、
+   します。最後にこの一行を書きます：「Goal run (goal prompt v3)：この人は <date> にゴールを出して、
    この計画を前もって承認しました。エリア、イテレーション、準備完了のタスクはエージェントが作ります。
    外部への影響があることは、引き続き承認者を待ちます。」タイトルの `Goal:` は、あとのすべての
    セッションにゴールのタスクを示す印です。消さずに残します。
@@ -1019,6 +1031,13 @@ name> --branch <the branch you are on>`（表示される Git コマンドを実
 終えます：作業が終わり、その人が手で試す確認だけが残ったら
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`。手順にはその人が試すしかたを
 書きます（一番上のラベルで、その人が確認したあとなら `alm done <id>`）。
+
+**リリースを確かめる。** どの確認も、まず自動テストとコマンドラインで証明します：プロジェクトの
+テスト、動いているサーバーへの `curl`、画面を出さないテストランナー。ブラウザ（クリックや、ページでの
+スクリプトの実行）は、ほかに証明する方法がないときだけ使います。`192.168.x.x` のようなローカル
+ネットワークのアドレスでは、ページのスクリプトを実行しません。そこではスクリプトごとにブラウザがその人の
+承認を求め、実行が止まってしまうからです。それでもブラウザが要る受け入れ確認は、そのタスクのその人向けの
+手順にそう書き、上のとおりタスクを終えて先へ進みます。
 
 `alm next` があるタスクのブロック元がすべて完了したと言ったら、確かめてから `alm unblock <id>`。
 外部への影響があるタスク：`alm wait <id> --on \"<what the approver must do>\"`、そして次の準備完了の
@@ -1469,7 +1488,7 @@ mod tests {
                 "`alm add area \"<the app's name>\"`",
                 "--title \"Goal: <the app, in one line>\"",
                 "`alm describe <id> --from <file.md>`",
-                "Goal run (goal prompt v2)",
+                "Goal run (goal prompt v3)",
                 "`alm add area \"<name>\"`",
                 "`alm add iteration \"<name>\" --release v0.1`",
                 "`alm plan <id> <iteration>`",
@@ -1652,5 +1671,46 @@ mod tests {
                 .contains("# Run modes: quiet or normal")
         );
         assert_eq!(guide(Some("run-modes")).as_deref(), run_modes("en"));
+    }
+
+    /// Release checks in a goal run prefer tests and the command line, avoid page scripts on a
+    /// local network address, and put a browser-only check in the person's steps (Task-A03-36).
+    #[test]
+    fn goal_prompt_checks_releases_without_browser_prompts() {
+        for (language, words) in [
+            (
+                "en",
+                [
+                    "automated tests and command-line checks first",
+                    "never\nrun page scripts on a local network address",
+                    "write that in the task's steps for the person",
+                ],
+            ),
+            (
+                "zh-CN",
+                [
+                    "先用自动测试和命令行来证明",
+                    "不要在\n`192.168.x.x` 这样的局域网地址上运行页面脚本",
+                    "写进这个任务给那个人的步骤里",
+                ],
+            ),
+            (
+                "ja",
+                [
+                    "まず自動テストとコマンドラインで証明します",
+                    "ページのスクリプトを実行しません",
+                    "手順にそう書き",
+                ],
+            ),
+        ] {
+            let prompt = goal(language).unwrap();
+            for w in words {
+                assert!(prompt.contains(w), "{language}: {w}");
+            }
+            // Before the build loop's unblocking rules, inside phase 3.
+            let check = prompt.find(words[0]).unwrap();
+            assert!(check > prompt.find("## 3.").unwrap(), "{language}");
+            assert!(check < prompt.find("## 4.").unwrap(), "{language}");
+        }
     }
 }

@@ -229,6 +229,8 @@ export function BuildAppDialog({
                 </details>
               )}
               <p className="banner update">{t("build.auto_mode")}</p>
+              {/* Browser checks on a local network address can still ask for clicks (Task-A03-36). */}
+              <p className="banner update">{t("build.browser_checks")}</p>
             </>
           ) : (
             <div className="manual">
