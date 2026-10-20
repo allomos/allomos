@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>二十九分钟，做出一个英中日输入法 · 换肩 Allomos 博客</title>
+<meta name="description" content="第二次实验：只给一段描述，让 Claude 借着换肩的任务管理做一个 macOS 输入法，英文、中文、日文候选并排出现。我去遛狗、洗碗，回来时三个版本已经做完。">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/blog/tatakikun-in-29-minutes/">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/blog/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/blog/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="二十九分钟，做出一个英中日输入法 · 换肩 Allomos 博客">
+<meta property="og:description" content="第二次实验：只给一段描述，让 Claude 借着换肩的任务管理做一个 macOS 输入法，英文、中文、日文候选并排出现。我去遛狗、洗碗，回来时三个版本已经做完。">
+<meta property="og:url" content="https://www.allomos.com/zh/blog/tatakikun-in-29-minutes/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap narrow">
+  <header>
+    <a class="brand" href="/zh/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a class="sec" href="/zh/products/">产品</a>
+      <a class="sec" href="/zh/blog/" aria-current="true">博客</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/blog/" lang="en">EN</a><a href="/zh/blog/tatakikun-in-29-minutes/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/blog/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <article class="post">
+    <p class="kicker k1"><a href="/zh/blog/">博客</a> · Allomos 换肩 · 实验记录</p>
+    <h1>二十九分钟，做出一个英中日输入法</h1>
+    <p class="meta"><time datetime="2026-10-21">2026-10-21</time> · <a href="https://x.com/wang3an">@wang3an</a> · <a href="https://x.com/wang3an/status/2112522252344602628">X 上的原帖 ↗</a></p>
+    <p class="lead">第二次实验。这次的需求是一个输入法：用英文字母打字，英文、中文、日文的候选并排出现。我把一段话交给换肩（Allomos）和 Claude，然后去遛狗、洗碗。回来的时候，三个版本已经做完。</p>
+    <figure><img src="/zh/blog/tatakikun-in-29-minutes/img/cover.jpg" width="1600" height="1171" loading="lazy" alt="二十九分钟，做出一个英中日输入法"></figure>
+    <p class="note">根据 @wang3an 2026 年 10 月 20 日的串贴与 tatakikun 仓库的任务包整理 · 时间均为日本时间</p>
+    <ul class="stats"><li><strong>29 分钟</strong>从建好任务包（21:44）到目标完成（22:13）</li><li><strong>3 个版本</strong>v0.1、v0.2、v0.3，各有一个验收任务</li><li><strong>13 个任务</strong>分属 4 个领域，全部记在任务包里</li><li><strong>6.34 美元</strong>这一个会话的花费，Opus 5.5 Medium，用掉 5 小时额度的 8%</li></ul>
+<h2>需求：一段话</h2>
+<p class="when"><strong>21:32　串贴第 1 条</strong></p>
+<blockquote>我要继续试验，利用 Allomos 的创建 app 的功能，自动生成这样一个输入法。</blockquote>
+<p>上一次（<a href="/zh/blog/tosstoss-in-23-minutes/">二十三分钟，做出一个投桃</a>）做的是网页应用。这次换一个我自己从来没想过怎么做的东西：输入法。给 Claude 的全部需求就是下面这一段，最后加了一句“产品的英文名叫做 Tatakikun”。</p>
+<blockquote>一个输入法，当我输入的英文字符组成的是英文单词的时候，就会输入英文单词。当我输入的英文字符组成的是中文的时候就会形成中文候选词。当我输入的英文字符组成的可能是日文的时候，就出现日文的平假名，片假名，汉字候选词。当都有可能的时候，这些候选就都出现。并且，输入的英文字符原始字符串始终都会作为候选项出现。这些候选词的所处的位置，你帮我决定。候选词的布局方式是横向的。可以向下展开，出现更多（包括不完全匹配的），展开之后的内容可以向下滚动。</blockquote>
+<h2>按下开始</h2>
+<p class="when"><strong>21:48　串贴第 2 条</strong></p>
+<blockquote>新建。</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/01.jpg" width="1600" height="1171" loading="lazy" alt="换肩首页的“构建新应用…”：选一个空文件夹，写下想要什么样的应用。"><figcaption>换肩首页的“构建新应用…”：选一个空文件夹，写下想要什么样的应用。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/02.jpg" width="1600" height="1171" loading="lazy" alt="选智能体（Claude 应用）和工作方式：安静模式，不等人，常规的事自己决定，问题留到之后再问。"><figcaption>选智能体（Claude 应用）和工作方式：安静模式，不等人，常规的事自己决定，问题留到之后再问。</figcaption></figure>
+<p class="when"><strong>21:49　串贴第 3 条</strong></p>
+<blockquote>开始了，有点忐忑。</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/03.jpg" width="1600" height="1170" loading="lazy" alt="换肩在空文件夹里建好任务包，打开 Claude 应用并填好请求，然后等智能体响应。"><figcaption>换肩在空文件夹里建好任务包，打开 Claude 应用并填好请求，然后等智能体响应。</figcaption></figure>
+<p>从这里开始，人要做的只有一件事：在 Claude 里按一次回车。21:48 Claude 把计划提交进 Git：4 个领域（Tatakikun、转换引擎、词库、输入法界面）、3 个迭代、13 个任务。</p>
+<h2>遛狗的时候</h2>
+<p class="when"><strong>21:52 – 21:53　串贴第 4、5 条</strong></p>
+<blockquote>順調ですか？ / “正在生成词库”？有点高深的感觉，是什么意思呢？？？</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/04.jpg" width="1100" height="567" loading="lazy" alt="换肩的进度框：“A03-01 生成词库（0 / 12）”。"><figcaption>换肩的进度框：“A03-01 生成词库（0 / 12）”。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/05.jpg" width="1600" height="825" loading="lazy" alt="Claude 这边：计划已提交，第一个任务是写词库生成器。"><figcaption>Claude 这边：计划已提交，第一个任务是写词库生成器。</figcaption></figure>
+<p>“生成词库”的意思是：输入法要知道 <code>nihao</code> 对应“你好”、<code>toukyou</code> 对应“東京”。Claude 没有去网上找词典，而是从 macOS 自带的 ICU 数据里把中文拼音和日文读音导出来，做成两份词库；系统转换漏掉的常见读音（私→わたし、日本→にほん）再手工补上。</p>
+<p class="when"><strong>21:55　串贴第 6 条</strong></p>
+<blockquote>从来没想过这种 app 应该怎么做。算了，我去遛狗吧。说不定遛完了，就写好了呢。</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/06.jpg" width="1093" height="561" loading="lazy" alt="出门前：转换引擎三个任务（A02-01/02/03）一起做，1 / 12。"><figcaption>出门前：转换引擎三个任务（A02-01/02/03）一起做，1 / 12。</figcaption></figure>
+<p class="when"><strong>22:06 – 22:08　串贴第 7、8 条</strong></p>
+<blockquote>貌似遛狗太快了一点。因为晚上的时候狗狗不想在外面呆太久。但是已经可以看到它的测试图了。好期待！</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/07.jpg" width="720" height="1600" loading="lazy" alt="在手机上远程看 Claude 的会话：v0.1 的验收标准中能自动证明的全部通过（14 个测试加命令行输出），唯一要人动手的一步——在系统设置里添加输入法、在文本编辑里试用——写进给人的步骤。"><figcaption>在手机上远程看 Claude 的会话：v0.1 的验收标准中能自动证明的全部通过（14 个测试加命令行输出），唯一要人动手的一步——在系统设置里添加输入法、在文本编辑里试用——写进给人的步骤。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/08.jpg" width="1600" height="393" loading="lazy" alt="Claude 自己画的测试图：键入 ai，展开后的候选，中、日、英、平假名、片假名都有，后面几行灰色的是不完全匹配。"><figcaption>Claude 自己画的测试图：键入 ai，展开后的候选，中、日、英、平假名、片假名都有，后面几行灰色的是不完全匹配。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/09.jpg" width="1600" height="393" loading="lazy" alt="同一份候选的深色模式，已滚动到下面几行。"><figcaption>同一份候选的深色模式，已滚动到下面几行。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/10.jpg" width="1484" height="108" loading="lazy" alt="键入 zhongg：还没打完的拼音也给出“中国”，原始字母串 zhongg 始终在最后一个位置。"><figcaption>键入 zhongg：还没打完的拼音也给出“中国”，原始字母串 zhongg 始终在最后一个位置。</figcaption></figure>
+<h2>洗碗的时候</h2>
+<p class="when"><strong>22:09　串贴第 9 条</strong></p>
+<blockquote>也许我洗完碗，它就做好了！</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/11.jpg" width="720" height="1600" loading="lazy" alt="v0.2 的展开面板做好，19 个测试通过；每按一个键约 9 毫秒，启动时加载词库约 0.6 秒。接着开始 v0.3：多音字和学习。"><figcaption>v0.2 的展开面板做好，19 个测试通过；每按一个键约 9 毫秒，启动时加载词库约 0.6 秒。接着开始 v0.3：多音字和学习。</figcaption></figure>
+<p>按提交时间看，这二十几分钟是这样过去的：21:53 词库，21:57 转换引擎，22:01 输入法应用本身，22:02 v0.1 验收；22:06 不完全匹配和可展开的候选面板，22:07 v0.2 验收；22:10 多音字和“记住你选过的词”，22:13 v0.3 验收，目标完成。</p>
+<p class="when"><strong>22:27　串贴第 10 条</strong></p>
+<blockquote>把碗放进洗碗机，清理一下灶台，回来一看，做完了！怀着激动的心情截图记录。三个迭代完成了。</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/12.jpg" width="1093" height="561" loading="lazy" alt="换肩的进度框：“Tatakikun v0.3 完成：英中日混合候选输入法，21 个测试通过，等你安装试用”。"><figcaption>换肩的进度框：“Tatakikun v0.3 完成：英中日混合候选输入法，21 个测试通过，等你安装试用”。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/13.jpg" width="1600" height="1385" loading="lazy" alt="任务包：v0.1 6/6、v0.2 3/3、v0.3 3/3 全部完成，每个任务都挂着“待人工检查”，有的还挂着“待审阅 AI 决定”。"><figcaption>任务包：v0.1 6/6、v0.2 3/3、v0.3 3/3 全部完成，每个任务都挂着“待人工检查”，有的还挂着“待审阅 AI 决定”。</figcaption></figure>
+<h2>值不值六美元</h2>
+<p class="when"><strong>22:31　串贴第 11 条</strong></p>
+<blockquote>Claude 说价值 6 美元。到底值不值呢？待会儿就知道了。</blockquote>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/14.jpg" width="1093" height="705" loading="lazy" alt="Claude 的收尾说明：从零开始构建（包括生成词库）约 78 秒；你要做的两条命令；已知的不足；13 个任务全部完成，issues 为空。"><figcaption>Claude 的收尾说明：从零开始构建（包括生成词库）约 78 秒；你要做的两条命令；已知的不足；13 个任务全部完成，issues 为空。</figcaption></figure>
+<figure><img src="/zh/blog/tatakikun-in-29-minutes/img/15.jpg" width="747" height="1600" loading="lazy" alt="这个会话的用量：6.34 美元，活跃 29 分 44 秒，新增 1389 行。"><figcaption>这个会话的用量：6.34 美元，活跃 29 分 44 秒，新增 1389 行。</figcaption></figure>
+<p>Claude 没有替我改系统的输入法设置。安装和在系统里启用要人自己来：运行 <code>scripts/build.sh</code> 和 <code>scripts/install.sh</code>，再到 系统设置 → 键盘 → 文字输入 → 输入法 里添加 Tatakikun。这是任务包规则里写明的：会改到系统设置的事，由人来做。</p>
+<p class="when"><strong>22:49　串贴第 12 条</strong></p>
+<blockquote>它 可 以 工 作 ！</blockquote>
+<figure><video src="/zh/blog/tatakikun-in-29-minutes/img/typing.mp4" controls muted playsinline preload="metadata" width="998" height="914"></video><figcaption>装好之后第一次在真实的应用里打字。</figcaption></figure>
+<h2>任务包里留下了什么</h2>
+<p>和上一次一样，做完之后打开 tatakikun 仓库，alm 能完整说出这个输入法是怎么做出来的：</p>
+<ul><li>A03-01　从本机数据生成中文拼音词库和日文读音词库（21:53）</li><li>A02-01　键入拼音得到中文候选，包括整句（如 woaini→我爱你）（21:57）</li><li>A02-02　键入罗马字得到平假名、片假名和日文汉字候选（21:57）</li><li>A02-03　英文单词识别，各语言候选合并排序，原始字母串始终在候选里（21:57）</li><li>A04-01　在任何应用里用 Tatakikun 输入：横向候选条、数字选择、空格/回车上屏（22:01）</li><li>A01-02　v0.1 验收：从头到尾试用最小输入法（22:02）</li><li>A02-04　不完全匹配的候选：拼音/假名前缀匹配、英文补全和拼写建议（22:06）</li><li>A04-02　候选条向下展开显示更多候选，并能滚动（22:06）</li><li>A01-03　v0.2 验收：展开和不完全匹配（22:07）</li><li>A03-02　常见多音字词能用正确读音打出来（如 yinhang→银行）（22:11）</li><li>A02-05　记住用户选过的候选，下次排得更前（22:11）</li><li>A01-04　v0.3 验收：多音字和学习（22:13）</li><li>A01-01　Goal：Tatakikun——英中日混合候选的 macOS 输入法（22:13，等人试用）</li></ul>
+<p>Claude 替我做的决定也都记下来了，等人回头审。几条有代表性的：</p>
+<ul><li>候选条自己画（NSPanel），不用系统的 IMKCandidates：系统的候选窗很难做成“横向一条，向下展开再滚动”。</li><li>排序：各语言用同一种“代价”比较；第一行保证每种语言的最佳候选都在，原始字母串一定在第一行。</li><li>罗马字不支持 l 开头的小假名（la、lu…），只用 x 开头，免得 hello 这样的英文词被转成假名。</li><li>学习：只在本机记录“输入字母 + 选中的候选”，选得越多排得越前，删掉一个文件就能清除。</li><li>不替人安装和启用输入法，因为那会改系统的输入源设置；提供脚本和步骤，由人来运行。</li></ul>
+<h2>不尽人意的地方，和之后</h2>
+<p class="when"><strong>23:01　串贴第 13 条</strong></p>
+<blockquote>还有一些不尽人意的地方，是和输入法的特性相关的。但是作成这样我已经很满意了。产品操作方面可以通过改 bug 的方式来解决。比如不能输入全角的标点符号。常用词库的话，就不知道怎么做了。可能也是有办法的吧。</blockquote>
+<p>这两点后来都成了任务包里的新任务，同一个晚上就做完了：A04-03 让标点和空格按前文自动用全角或半角（中文、日文后面用全角）；A03-04 到 A03-06 把词库换成开源数据做的语言包——中文用 pinyin-data 和 phrase-pinyin-data，日文用 Mozc 的开源词典，英文用 SCOWL 的常用程度分级——安装时可以勾选要装哪几种语言。还加了只打辅音的缩写（nh→你好）和“连续打同一种语言时优先这种语言”。</p>
+<p>Tatakikun 以 MIT 协议开源在 <a href="https://github.com/allomos/tatakikun">github.com/allomos/tatakikun</a>，已经发布到 v0.5.1，可以下载安装包试用。介绍见<a href="/zh/products/tatakikun/">产品页</a>。</p>
+<h2>一些感想</h2>
+<p>这次让我意外的不是速度，而是题目本身：输入法是我自己完全不知道该从哪里下手的东西。Claude 先把它拆成词库、转换引擎、输入法界面三块，每一块都有可以自动证明的验收标准；只有“装进系统里亲手打字”这一步留给人。</p>
+<p>我做的事情只有：写一段话、按一次回车、遛狗、洗碗、装上试用。做了什么、为什么这样做、哪里还没验过，都在任务包里，第二天接着改的时候，不需要回去翻对话。</p>
+    <hr>
+    <p class="note">另一篇：</p><ul><li><a href="/zh/blog/tatakikun-in-29-minutes/">二十九分钟，做出一个英中日输入法</a></li><li><a href="/zh/blog/tosstoss-in-23-minutes/">二十三分钟，做出一个投桃</a></li></ul>
+  </article>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>

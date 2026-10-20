@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tatakikun · 换肩 Allomos</title>
+<meta name="description" content="macOS 输入法：用英文字母键入，英文、中文和日文候选并排出现。">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/products/tatakikun/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/products/tatakikun/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/products/tatakikun/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Tatakikun · 换肩 Allomos">
+<meta property="og:description" content="macOS 输入法：用英文字母键入，英文、中文和日文候选并排出现。">
+<meta property="og:url" content="https://www.allomos.com/zh/products/tatakikun/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/zh/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a class="sec" href="/zh/products/" aria-current="true">产品</a>
+      <a class="sec" href="/zh/blog/">博客</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/products/tatakikun/" lang="en">EN</a><a href="/zh/products/tatakikun/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/products/tatakikun/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero product-hero">
+    <img class="picon big" src="/images/products/tatakikun-icon.svg" alt="">
+    <h1>Tatakikun</h1>
+    <p>Tatakikun 把你用英文字母键入的内容同时当作英文单词、汉语拼音和日文罗马字来理解，英文、中文、平假名、片假名和日文汉字候选并排显示在一条横向候选条里。键入的原始字母串始终是候选之一。</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/allomos/tatakikun/releases/latest">下载安装器</a>
+      <a class="btn secondary" href="https://github.com/allomos/tatakikun">GitHub 上的源码</a>
+    </div>
+    <div class="tags">平台: macOS &nbsp;·&nbsp; 许可证: MIT</div>
+  </div>
+  <div class="shots"><figure><img src="/images/products/tatakikun-bar.png" width="1070" height="108" loading="lazy" alt="键入 “ai” 时的候选条：各语言的候选在同一条上。"><figcaption>键入 “ai” 时的候选条：各语言的候选在同一条上。</figcaption></figure><figure><img src="/images/products/tatakikun-expanded.png" width="1400" height="344" loading="lazy" alt="展开后显示更多行，可以滚动；不完全匹配的显示为灰色。"><figcaption>展开后显示更多行，可以滚动；不完全匹配的显示为灰色。</figcaption></figure></div>
+  <section><div class="cards"><div class="card"><h3>三种语言，一条候选条</h3><p>键入 <code>ai</code>，爱、愛、あい、アイ、ai 一起出现；每种匹配到的语言的最佳候选都保证在候选条里。</p></div><div class="card"><h3>向下展开，可以滚动</h3><p>按 ↓ 或 Tab 展开成多行，包括不完全匹配的候选：<code>zhongg</code> → 中国，<code>compu</code> → computer。</p></div><div class="card"><h3>会学习</h3><p>选过的候选下次排得更前。学到的内容只存在这台 Mac 上的一个文件里，删掉即可清除。</p></div><div class="card"><h3>标点跟着语言走</h3><p>中文、日文后面用全角标点，英文后面用半角。</p></div><div class="card"><h3>首字母缩写</h3><p>只打辅音也能出词：<code>nh</code> → 你好，<code>wtx</code> → わたし。</p></div><div class="card"><h3>语言包</h3><p>安装时勾选中文、日文、英文语言包，词库来自开源数据（pinyin-data、Mozc、SCOWL）。</p></div></div></section>
+  <section>
+    <h2>安装</h2>
+    <p class="lead">打开安装器，在“自定”页勾选要装的语言包；然后添加一次：系统设置 → 键盘 → 文字输入 → 输入法 → 编辑… → + → 简体中文 → Tatakikun。安装包没有 Apple 开发者签名，第一次打开会被拦下：到 系统设置 → 隐私与安全性，点<strong>仍要打开</strong>。</p>
+  </section>
+  <section>
+    <h2>读它是怎么做出来的</h2>
+    <p class="lead"><a href="/zh/blog/tatakikun-in-29-minutes/">二十九分钟，做出一个英中日输入法</a> — 第二次实验：只给一段描述，让 Claude 借着换肩的任务管理做一个 macOS 输入法，英文、中文、日文候选并排出现。我去遛狗、洗碗，回来时三个版本已经做完。</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>

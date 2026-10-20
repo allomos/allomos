@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>二十三分钟，做出一个投桃 · 换肩 Allomos 博客</title>
+<meta name="description" content="写一段话描述想要的应用，在换肩里点“开始”，再在 Claude 里按一次回车。Claude 自己拆成两个版本、九个任务，一个接一个做完；午夜过后，我用手机把一张截图发到了电脑上。">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/blog/tosstoss-in-23-minutes/">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/blog/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/blog/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="二十三分钟，做出一个投桃 · 换肩 Allomos 博客">
+<meta property="og:description" content="写一段话描述想要的应用，在换肩里点“开始”，再在 Claude 里按一次回车。Claude 自己拆成两个版本、九个任务，一个接一个做完；午夜过后，我用手机把一张截图发到了电脑上。">
+<meta property="og:url" content="https://www.allomos.com/zh/blog/tosstoss-in-23-minutes/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap narrow">
+  <header>
+    <a class="brand" href="/zh/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a class="sec" href="/zh/products/">产品</a>
+      <a class="sec" href="/zh/blog/" aria-current="true">博客</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/blog/" lang="en">EN</a><a href="/zh/blog/tosstoss-in-23-minutes/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/blog/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <article class="post">
+    <p class="kicker k1"><a href="/zh/blog/">博客</a> · Allomos 换肩 · 实验记录</p>
+    <h1>二十三分钟，做出一个投桃</h1>
+    <p class="meta"><time datetime="2026-10-18">2026-10-18</time> · <a href="https://x.com/wang3an">@wang3an</a> · <a href="https://x.com/wang3an/status/2111492105298457070">X 上的原帖 ↗</a></p>
+    <p class="lead">我写下一段话描述想要的应用，在换肩（Allomos）里点“开始”，再在 Claude 里按一次回车。Claude 自己拆成两个版本、九个任务，一个接一个做完。午夜过后，我用手机把一张截图发到了电脑上。</p>
+    <figure><img src="/zh/blog/tosstoss-in-23-minutes/img/cover.jpg" width="1200" height="480" loading="lazy" alt="二十三分钟，做出一个投桃"></figure>
+    <p class="note">根据 @wang3an 2026 年 10 月 16 日到 18 日的串贴与 tosstoss 项目的任务包整理 · 时间均为日本时间</p>
+    
+<ul class="stats">
+<li><strong>23 分钟</strong>从建好任务包到 v0.2 交付</li>
+<li><strong>2 个版本</strong>v0.1、v0.2，各有一个验收任务</li>
+<li><strong>9 个任务</strong>分属 4 个领域，全部记在任务包里</li>
+<li><strong>24 次提交</strong>代码与任务记录一起进 Git，打了两个版本标签</li>
+</ul>
+<h2>起点：一个小目的</h2>
+<p class="when">10/16 08:32　串贴第 1 条</p>
+<blockquote>我要利用 Allomos 做实验，达到一个小目的：Claude 和 Allomos 可以配合起来，自动开发出一个有实用价值的 WebApp。</blockquote>
+<p>换肩（Allomos）原本是一个任务包工具。项目的任务、进度和交接记录放在仓库的 .allomos/taskbag/ 里，AI 智能体用 alm 命令领取任务、标进度、写交接，人在桌面应用里看着。下图是换肩自己的开发项目：Tracking 领域 42 个任务完成了 34 个，每一行都标着“Not human-checked”，等人来亲手验过。</p>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/01.jpg" width="1200" height="787" loading="lazy" alt="换肩管理自己的开发：任务有领域、迭代、负责的会话，也区分“本地验证过”和“人检查过”。"><figcaption>换肩管理自己的开发：任务有领域、迭代、负责的会话，也区分“本地验证过”和“人检查过”。</figcaption></figure>
+<p>这次要试的是另一件事：只给一段描述，看智能体能不能借着这套任务管理，从空文件夹把一个能用的应用做出来，并且每一步都留下记录。</p>
+<h2>第一步：先让换肩学会“做一个新应用”</h2>
+<p class="when">08:34　串贴第 2 条</p>
+<blockquote>第一步是完善 Allomos，让它支持自动开发软件的功能……我要直接告诉 Claude 我上面的目的，让它帮我想一想应该怎么做。</blockquote>
+<p class="when">09:53　串贴第 3 条</p>
+<blockquote>保险起见不用默认的 Opus 5.5 Medium，改用 Extra 来考察。</blockquote>
+<p>给 Claude 的请求很直白：在换肩里加一个按钮，用户描述想要的应用，换肩把预定的提示词连同描述填进绑定的智能体。整个过程类似 /goal，区别在于从拆任务到最后完成，每一步都要用换肩的任务状态记录和流转。</p>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/02.png" width="784" height="483" loading="lazy" alt="考察阶段换成了更高的推理档位，Claude 先去读换肩已有的相关任务（A03-01、A03-03、A05-06）。"><figcaption>考察阶段换成了更高的推理档位，Claude 先去读换肩已有的相关任务（A03-01、A03-03、A05-06）。</figcaption></figure>
+<p class="when">11:33　串贴第 4 条</p>
+<blockquote>考察完成，开始实现 Allomos 新功能本身。完成之后就可以试验自动做 app 了。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/03.png" width="784" height="678" loading="lazy" alt="考察的产出是四个任务（A03-25 及其三个子任务）和一张“你已定下的事项”清单。"><figcaption>考察的产出是四个任务（A03-25 及其三个子任务）和一张“你已定下的事项”清单。</figcaption></figure>
+<p>这张清单基本定下了后面实验的规矩：</p>
+<ul>
+<li>一个应用分多个迭代，领域由智能体自己划分。</li>
+<li>智能体可以自己把任务设为 ready，这是目标运行模式的例外；建仓库、账号、API key、付费、部署这类对外有影响的操作，仍要批准人点头。</li>
+<li>提示词由换肩填好，人只按一次回车。</li>
+<li>不设花费上限，也不设停止点；订阅额度剩 3% 时，智能体写好交接后停下。</li>
+</ul>
+<p>这些规则后来都写进了项目的 AGENTS.md，tosstoss 仓库里现在也有一份。</p>
+<p class="when">10/17 23:50　串贴第 5 条</p>
+<blockquote>实现这个新功能的过程中不断发现其他的改进点。现在终于可以开始测试这个功能了。</blockquote>
+<p>换肩改了一天半。首页多了“构建新应用…”，对话框里依次是：空文件夹、应用描述、用哪个智能体、智能体怎么工作。</p>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/04.jpg" width="1200" height="785" loading="lazy" alt="投桃的全部需求就是这一段话：同一局域网里打开网页的实例自动相互发现，勾选对方、选择或拖放文件、点发送，对方自动接收；可以“下线”；手机浏览器也要能用。"><figcaption>投桃的全部需求就是这一段话：同一局域网里打开网页的实例自动相互发现，勾选对方、选择或拖放文件、点发送，对方自动接收；可以“下线”；手机浏览器也要能用。</figcaption></figure>
+<h2>按下开始</h2>
+<p class="when">23:51　串贴第 6 条</p>
+<blockquote>默认是安静模式。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/05.jpg" width="1200" height="785" loading="lazy" alt="安静模式：不等人，常规的事自己决定，问题留到之后再问。下面的提示说得很清楚，换肩从不改智能体的权限，要无人看管地运行，得先打开智能体自己的自动模式。"><figcaption>安静模式：不等人，常规的事自己决定，问题留到之后再问。下面的提示说得很清楚，换肩从不改智能体的权限，要无人看管地运行，得先打开智能体自己的自动模式。</figcaption></figure>
+<p class="when">23:57　串贴第 7 条</p>
+<blockquote>自动交给 Opus 5.5 Medium 来做。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/06.jpg" width="1199" height="786" loading="lazy" alt="换肩在空文件夹里建好任务包，打开 Claude 应用，填好请求后等着。"><figcaption>换肩在空文件夹里建好任务包，打开 Claude 应用，填好请求后等着。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/07.jpg" width="1200" height="875" loading="lazy" alt="填好的提示词写明了收尾条件和汇报方式：每一步都跑 alm progress，好让人在换肩里看到进度。"><figcaption>填好的提示词写明了收尾条件和汇报方式：每一步都跑 alm progress，好让人在换肩里看到进度。</figcaption></figure>
+<p>提示词里有两句话很关键。一句给出停下的条件：做到 alm list --json 显示目标的每个任务都已完成、已放弃或在等人；没有 /goal 时也一样，一个任务接一个任务做下去。另一句把进度接回换肩：开始时 alm progress --title &quot;构建应用&quot;，之后每一步 --step … --done … --of …，结束时 --finished。</p>
+<h2>二十三分钟里发生了什么</h2>
+<p>下面的时间轴按 tosstoss 仓库的提交时间画，横轴是真实比例。23:51:32 换肩建好任务包，00:14:27 Claude 把 v0.2 标为通过、目标交回给人，中间是两个迭代、八个工作任务。</p>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/08.jpg" width="1200" height="400" loading="lazy" alt="每个点是一次任务完成的提交。一个任务大约两分钟，验收任务稍长，因为要在浏览器里实际收发文件。"><figcaption>每个点是一次任务完成的提交。一个任务大约两分钟，验收任务稍长，因为要在浏览器里实际收发文件。</figcaption></figure>
+<p class="when">23:58　串贴第 8 条</p>
+<blockquote>Opus 提问一次。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/09.jpg" width="1053" height="1200" loading="lazy" alt="第一个问题：文件夹还不是 Git 仓库，要不要 git init。右侧是 Claude 给自己列的七步计划。"><figcaption>第一个问题：文件夹还不是 Git 仓库，要不要 git init。右侧是 Claude 给自己列的七步计划。</figcaption></figure>
+<p>按任务包的规矩，安静模式下常规选择应由智能体自己决定并记下来。在本地建一个 Git 仓库是很容易撤回的事，这一问本来可以省掉。</p>
+<p class="when">00:03　串贴第 9 条</p>
+<blockquote>Opus 开始努力工作。Allomos（换肩）这边稳稳接住了，不过看起来界面上还是有些小 bug。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/10.jpg" width="669" height="1007" loading="lazy" alt="Claude 用两个不同的地址（localhost 和 127.0.0.1）各开一个标签页，让它们成为两台“设备”，测试互相发现。"><figcaption>Claude 用两个不同的地址（localhost 和 127.0.0.1）各开一个标签页，让它们成为两台“设备”，测试互相发现。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/11.jpg" width="1199" height="783" loading="lazy" alt="进度框还停在“A03-01 页面界面（1/8）”，背后的列表里 A03-01 已经完成。"><figcaption>进度框还停在“A03-01 页面界面（1/8）”，背后的列表里 A03-01 已经完成。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/12.jpg" width="1200" height="783" loading="lazy" alt="转到后台后，右下角叠了两条进度提示，旧的那条没有被新的替换。"><figcaption>转到后台后，右下角叠了两条进度提示，旧的那条没有被新的替换。</figcaption></figure>
+<p>换肩这一侧的要点是：任务包每次变化都会自动刷新，Claude 领取、完成任务时，列表里的状态、负责会话和“AI 已决定”标记都实时跟上。小问题集中在进度显示上：旧进度没被替换，还有一条“Codex 尚未为这个项目设置”的提醒，而这次根本没用 Codex。</p>
+<p class="when">00:05 – 00:06　串贴第 10、11 条</p>
+<blockquote>Opus 又提问两次。还有一次是 javascript 权限请求，手快点了允许，没截图。看来权限给得不够啊。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/13.png" width="675" height="630" loading="lazy" alt="局域网地址算私有网络，第一次操作要先放行这个站点。"><figcaption>局域网地址算私有网络，第一次操作要先放行这个站点。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/14.png" width="675" height="608" loading="lazy" alt="执行 JavaScript 还要逐次确认：这个站点不能整站授权。"><figcaption>执行 JavaScript 还要逐次确认：这个站点不能整站授权。</figcaption></figure>
+<p>串贴里问“怎么 Opus 又问一次”，答案就在第二张图的小字里：对这个局域网 IP，内置浏览器关掉了整站授权，每次在页面里执行脚本都要单独批准。这类请求来自浏览器的安全规则，换肩的安静模式管不到。要彻底无人值守，验收步骤得改成用自动化测试或命令行来验，少依赖在真实局域网地址上跑页面脚本。</p>
+<p class="when">00:12 – 00:15　串贴第 12、13 条</p>
+<blockquote>开始弹下载对话框了。难道要做好了？……弹了 N 个。看来是在做测试。好像中毒了一样。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/15.png" width="675" height="608" loading="lazy" alt="“桃子照片-很长的名字”：在测长文件名在手机窄屏上会不会撑破布局。"><figcaption>“桃子照片-很长的名字”：在测长文件名在手机窄屏上会不会撑破布局。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/16.jpg" width="1114" height="1004" loading="lazy" alt="测试.bin、a.txt、big.bin：中文文件名、小文件、大文件，自动接收真的在触发下载。"><figcaption>测试.bin、a.txt、big.bin：中文文件名、小文件、大文件，自动接收真的在触发下载。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/17.jpg" width="1199" height="971" loading="lazy" alt="同一时刻的任务包：v0.1 四个任务全部完成，v0.2 只剩验收任务 A01-03 在进行中，右下角“构建应用：A01-03 v0.2 验收检查（7/8）”。"><figcaption>同一时刻的任务包：v0.1 四个任务全部完成，v0.2 只剩验收任务 A01-03 在进行中，右下角“构建应用：A01-03 v0.2 验收检查（7/8）”。</figcaption></figure>
+<p>弹窗本身就是证据。需求里写着自动接收是默认且不可关闭的，Claude 在浏览器里验收时，每收到一个文件，系统就弹一次保存框。</p>
+<p class="when">00:18　串贴第 14 条</p>
+<blockquote>Opus 告诉我说完成了。所有的任务都记录在 Allomos 里面了。快得有点出乎意料。我得测试一下。</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/18.jpg" width="1199" height="964" loading="lazy" alt="收尾时的任务包：两个迭代全部完成。目标任务 A01-01 处于“等待中”，等的是人：在真实手机上照 A01-03 的步骤试一次。"><figcaption>收尾时的任务包：两个迭代全部完成。目标任务 A01-01 处于“等待中”，等的是人：在真实手机上照 A01-03 的步骤试一次。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/19.png" width="668" height="652" loading="lazy" alt="Claude 的收尾说明分三块：怎么试、测过什么、已知限制。最后一句：试过之后告诉它结果，有问题就作为 v0.3 的任务加进来。"><figcaption>Claude 的收尾说明分三块：怎么试、测过什么、已知限制。最后一句：试过之后告诉它结果，有问题就作为 v0.3 的任务加进来。</figcaption></figure>
+<h2>投桃本身</h2>
+<p class="when">00:21　串贴第 15 条</p>
+<blockquote>PC 版</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/20.jpg" width="1200" height="911" loading="lazy" alt="电脑上打开终端打印的局域网地址。设备名是自动起的“形容词 + 水果”：温柔的柠檬、机灵的猕猴桃、机灵的香蕉。"><figcaption>电脑上打开终端打印的局域网地址。设备名是自动起的“形容词 + 水果”：温柔的柠檬、机灵的猕猴桃、机灵的香蕉。</figcaption></figure>
+<p class="when">00:33 – 00:37　串贴第 16–18 条</p>
+<blockquote>手机版。粉嘟嘟的有点微妙。。。 / 发送试试 / 果然收到了！</blockquote>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/21.jpg" width="540" height="1200" loading="lazy" alt="手机上：“认真的橘子”，看得到另外 4 台设备。"><figcaption>手机上：“认真的橘子”，看得到另外 4 台设备。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/22.jpg" width="540" height="1200" loading="lazy" alt="勾选电脑“温柔的柠檬”，发两张截图，显示“已送达”。"><figcaption>勾选电脑“温柔的柠檬”，发两张截图，显示“已送达”。</figcaption></figure>
+<figure><img src="/zh/blog/tosstoss-in-23-minutes/img/23.jpg" width="1200" height="911" loading="lazy" alt="电脑这边什么都没点，浏览器下载面板里已经有了这两个文件。同名文件被系统自动加上了 ~2，没有互相覆盖。"><figcaption>电脑这边什么都没点，浏览器下载面板里已经有了这两个文件。同名文件被系统自动加上了 ~2，没有互相覆盖。</figcaption></figure>
+<p>这是整个实验里第一次真机测试：一部真手机，同一个 Wi-Fi。Claude 之前只能用 375px 宽的模拟窗口测手机，这一步正是它在目标任务上写明要人来做的事。</p>
+<h2>任务包里留下了什么</h2>
+<p>实验真正想验证的，是做完之后留下的东西。打开 tosstoss 仓库，alm 能完整说出这个应用是怎么做出来的。</p>
+<ul>
+<li><strong>人</strong>：写一段描述，选文件夹、智能体和运行模式，按一次回车。最后亲手试，决定通过还是加任务。</li>
+<li><strong>换肩 Allomos</strong>：建任务包，写好 AGENTS.md 规则，把请求填进智能体，刷新显示进度和任务状态。</li>
+<li><strong>Claude</strong>：划领域、排迭代、建任务；alm claim、写代码、测试、alm done、alm progress，最后写交接。</li>
+</ul>
+<p>三方共用一份记录：.allomos/taskbag/，随代码一起提交进 Git</p>
+<ul>
+<li><strong>A02-01</strong>　启动服务器后打开网页的设备自动出现在彼此的在线列表中（23:56，待人工检查）</li>
+<li><strong>A03-01</strong>　看到在线设备，勾选对方，选择或拖放文件，发送和下线（23:58，待人工检查）</li>
+<li><strong>A04-01</strong>　接收方不做任何操作就自动收到文件，内容与原文件一致（00:00，待人工检查）</li>
+<li><strong>A01-02</strong>　v0.1 验收：两台设备从头到尾互传文件（00:04，待人工检查）</li>
+<li><strong>A04-02</strong>　双方都能看到传输进度，大文件也能稳定传完（00:08，待人工检查）</li>
+<li><strong>A03-02</strong>　手机浏览器上能舒适地完成勾选、选择文件、发送和接收（00:09，待人工检查）</li>
+<li><strong>A02-02</strong>　每台设备有易认的名字和图标，可以改名，刷新后保留（00:10，待人工检查）</li>
+<li><strong>A01-03</strong>　v0.2 验收：手机与电脑之间互传、进度、改名全部可用（00:14，待人工检查）</li>
+<li><strong>A01-01</strong>　Goal：投桃 Tosstoss（—，等人试用）</li>
+</ul>
+<h3>完成了，但不等于验过了</h3>
+<p>八个工作任务都是“已完成 · locally verified”，同时都挂着“待人工检查”。安静模式允许智能体不等人就把任务标为完成，代价是必须说明理由（“Goal run, quiet mode”），并给每个任务写好让人照着检查的步骤。alm human 现在列出 8 个待检查、1 个待回答。</p>
+<h3>12 条“AI 已决定”</h3>
+<p>Claude 自己拍板的事都留了记录，等人回头审。几条有代表性的：</p>
+<ul>
+<li><strong>架构</strong>：Node.js + ws，前端零依赖。浏览器做不了局域网广播，所以由运行 npm start 的电脑当会合点。</li>
+<li><strong>传输</strong>：经服务器中转，WebSocket 分块 256KB，不用 WebRTC，理由是局域网里够快，手机浏览器上更可靠。</li>
+<li><strong>流控</strong>：发送端最多领先最慢接收端 8MB，接收端每 1MB 回执一次，60 秒没有进展算失败。</li>
+<li><strong>手机</strong>：没做屏幕常亮，因为 Wake Lock 要 https，局域网的 http 页面用不了。</li>
+<li><strong>名字</strong>：默认“形容词 + 水果”，16×16 种组合，存在本机浏览器里。</li>
+</ul>
+<h3>交接与项目笔记</h3>
+<p>交接文件写明了运行模式（安静，由人在换肩里选的）、当前状态、代码结构，以及“如果人报告问题”该怎么办：每个问题在 v0.3 里加一个任务。项目笔记记下了下一个会话必须知道的坑，比如在同一个浏览器里测试时，要用 localhost、127.0.0.1 和局域网 IP 三个不同来源，让每个标签页拿到自己的名字。</p>
+<p><strong>数字</strong>：24 次提交，打了 v0.1、v0.2 两个标签；代码、样式和测试一共约 1500 行；npm test 8 项通过，其中一项把 200MB 文件同时发给两个接收端并核对 SHA-256；任务包里记了 97 条事件。</p>
+<h2>这次学到的</h2>
+<h3>可行</h3>
+<p>一段话的需求，加上一套写清楚的任务规则，Claude 在中档推理下 23 分钟交付了两个版本。最有用的不是速度，而是每一步都落在任务包里：拆成什么任务、谁在做、什么时候完成、凭什么算完成、替人做了哪些决定。人第二天打开换肩，就能接着审。</p>
+<h3>要修的</h3>
+<ul>
+<li><strong>换肩的进度显示</strong>：旧的进度提示不会被新的替换，后台会叠出好几条；进度框可能停在已经完成的任务上。“Codex 尚未设置”的提醒不该出现在只用 Claude 的项目里。</li>
+<li><strong>安静模式的边界</strong>：git init 这种本地、可撤回的事，按规则应由智能体决定并记录，不该停下来问。</li>
+<li><strong>浏览器权限</strong>：在局域网 IP 上执行页面脚本必须逐次批准，这是浏览器的规则，不是换肩能放开的。验收方法要么改用测试和命令行，要么在启动前就提醒人这几步会要人点。</li>
+</ul>
+<h3>人还要做的</h3>
+<p>真机试用已经做了，发送和接收都通过。剩下的是把它记回任务包：逐个 alm checked，审完 12 条决定后 alm reviewed，最后决定是接受目标，还是把“粉嘟嘟的有点微妙”这类意见作为 v0.3 的任务交回给 Claude。</p>
+<h2>一些感想</h2>
+<h3>真是快</h3>
+<p>串贴里我写了“快得有点出乎意料”，现在回头看还是这么觉得。23:51 换肩建好任务包，00:14 Claude 已经交出了 v0.2：服务器、页面、自动接收、传输进度、手机适配、设备改名，还附带测试和说明文档。我在旁边看着任务一个接一个变成“已完成”，偶尔点一下允许，二十几分钟，应用就做好了。</p>
+<h3>有换肩接着，我很放心</h3>
+<p>让我安心的是换肩的任务管理。每个任务什么时候被谁领取、凭什么算完成、Claude 替我做了哪些决定、哪里还没验过，全都记在任务包里，和代码一起提交进了 Git。这次很顺利，没有换智能体，也没有换人，一口气就做完了。但我知道，就算中途额度用完、会话断了，或者要换成 Codex、换成别人来做，都能从 alm next 和交接文件接着往下走。有它在后面接着，我就能放手让智能体自己跑。</p>
+<p>素材：@wang3an 的串贴（共 18 条，2026-10-16 08:32 至 10-18 00:37）以及 tosstoss 仓库的提交记录、alm list、alm human 与交接文件。截图均来自原帖。</p>
+    <hr>
+    <p class="note">另一篇：</p><ul><li><a href="/zh/blog/tatakikun-in-29-minutes/">二十九分钟，做出一个英中日输入法</a></li></ul>
+  </article>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
