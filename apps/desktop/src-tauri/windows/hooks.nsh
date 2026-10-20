@@ -1,4 +1,14 @@
-; Installer hooks for Windows (Task-A07-06). The installer puts alm.exe beside the app; these
+; Installer hooks for Windows (Task-A07-06).
+;
+; Uninstalling removes everything Allomos added (Task-A07-07), from Settings > Apps or by running
+; the same setup.exe again and choosing "Uninstall Allomos" (Tauri's installer offers it when this
+; version is installed; an older or newer one is uninstalled before installing). Tauri's own
+; uninstaller (installer.nsi) removes: the app (allomos-desktop.exe), alm.exe (an external binary), the
+; uninstaller and the app folder; the Start menu and desktop shortcuts; the entry in Settings >
+; Apps; and, only when the person ticks "Delete the application data" (unticked by default, so a
+; reinstall remembers recent folders), %APPDATA%\io.allomos (settings, quota reports) and
+; %LOCALAPPDATA%\io.allomos (the WebView2 cache). The hook below removes the PATH entry this
+; installer added. Project folders and taskbags are never touched. The installer puts alm.exe beside the app; these
 ; hooks add the app's folder to the person's own PATH, so `alm` works in every new terminal,
 ; and take it off again on uninstall. No administrator rights are needed.
 ;
