@@ -11,7 +11,7 @@ This page takes you from a first start to an AI agent working from your taskbag.
 
 Download the newest version from the [releases page](https://github.com/allomos/allomos/releases/latest):
 
-- **macOS** (Apple Silicon Macs: M1 or newer): `Allomos_<version>_aarch64.pkg`. Open it and follow the installer; it asks for your Mac password once, puts Allomos in Applications and installs the `alm` command too. (Or `Allomos_<version>_aarch64.dmg`: open it and drag Allomos into Applications; Allomos then offers **Install the alm command**.)
+- **macOS** (Apple Silicon Macs: M1 or newer): `Allomos_<version>_aarch64.pkg`. Open it and follow the installer; it asks for your Mac password once, puts Allomos in Applications and installs the `alm` command too. (Or `Allomos_<version>_aarch64.dmg`: open it and drag Allomos into Applications; Allomos then offers **Install the alm command**: click it once, and enter your Mac password. After that, updating Allomos updates `alm` too.)
 - **Windows**: `Allomos_<version>_x64-setup.exe`. Run it; it needs no administrator rights, and it installs the `alm` command too.
 
 Until version 1.0 these downloads are not signed, so the first time you open Allomos the system warns you:
