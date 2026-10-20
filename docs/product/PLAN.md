@@ -28,7 +28,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Interfaces for people and agents**, with desktop/mobile human use and browser/human CLI considered in the design. Shared structure and platform patterns are documented in [INTERFACES.md](./INTERFACES.md) (R60–R68; detailed design proposed).
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
 - **Import** the existing SSR migration board as the first real dataset.
-- **Generate project setup with an external AI agent:** a team leader supplies Allomos’s prompt and team context; Allomos reads/transforms the resulting project/task files ([feature contract](./AI-GENERATED-PROJECTS.md), R50–R51).
+- **Build a new app…:** a person describes the app they want; an agent plans it into areas, iterations and tasks with `alm` and builds it (Task A03-25). A separate generated-file import (R50–R55) was dropped 2026-10-20.
 - **Start a task in a chosen AI agent** (Claude Code, Codex) from the app, and **jump into** an already-started task's agent session ([D5](../decisions/0005-start-and-open-agent-sessions.md)).
 
 ## 3. Non-goals (for now)
@@ -90,7 +90,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 ### AI-generated project setup
 
-The leader gets an Allomos prompt, asks their chosen external agent to generate a project bundle, then opens/imports it in Allomos. Proposed flow: validate → preview → repair errors → accept locally → optionally publish after sign-in. The prompt/schema and adoption details are proposed in [AI-GENERATED-PROJECTS.md](./AI-GENERATED-PROJECTS.md). This path does not require the in-app agent runner or cloud access.
+**Dropped** (owner, 2026-10-20): **Build a new app…** is enough. An agent sets up a new project through `alm` from the goal prompt; there is no generated-file import. The old proposal is kept in [AI-GENERATED-PROJECTS.md](./AI-GENERATED-PROJECTS.md).
 
 ### Human and agent interfaces
 
@@ -174,7 +174,7 @@ flowchart TD
 | **Later** | **8** | **v0.8 — Start and open agents** | The owner **starts a task in Claude Code or Codex from Allomos and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
 | **Later** | **9** | **v0.9 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by a 9-digit code shown on the desktop (no email); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
 | **Later** | **10** | **v0.10 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
-| **Later** | **11** | **v0.11 — New projects in minutes** | A team leader **sets up a new project with any AI agent** | **Generation kit** (prompt, file schema, examples); desktop app validates, previews and adopts generated projects | R50–R55 |
+| ~~Later~~ | ~~11~~ | ~~v0.11 — New projects in minutes~~ | **Dropped** (owner, 2026-10-20): **Build a new app…** is enough | — | ~~R50–R55~~ |
 | **Later** | **12** | **v0.12 — Timeline and export** | The owner sees a **timeline** and can **share a Markdown report** | Desktop app: timeline (gantt) generated from events; Markdown export | R8 |
 | **Later** | **13** | **v0.13 — Cloud copy** | The owner **keeps a project in the cloud and works on it from two computers** | **Cloud service**, the first hosted server: sign-in, publish, clone, push and pull a project; **cloud web app** (the same web interface) | R42–R43, R92 (first paid features) |
 | **Later** | **14** | **v0.14 — Team** | A team **works on one project together online** | Cloud service: owner/admin invitations by email, roles, live updates, merging concurrent edits, atomic cloud claims | R12 (cloud), R20–R23 |
@@ -182,7 +182,7 @@ flowchart TD
 
 **When can an agent set up a project's taskbag?** (`alm init` = "set up Allomos here", like `git init`)
 - **From Iteration 1 (v0.1, macOS; Windows from Iteration 2).** An agent runs `alm init` in a repository; this creates an empty taskbag. It then adds areas and tasks one by one with `alm` commands. The desktop app can also create the folder.
-- **From Iteration 11 (v0.11).** An agent generates a **whole project at once** from Allomos's prompt, and Allomos validates and previews it before adopting it (R50–R55).
+- **Build a new app… (done, Task A03-25).** From a description, an agent plans the **whole project** into areas, iterations and tasks with `alm` and builds it. (A one-shot generated-file import, planned for v0.11, was dropped 2026-10-20.)
 
 **Taskbag place on disk (owner, 2026-10-04; renamed and made the only place 2026-10-06, [0013](../decisions/0013-product-name-fliphopper.md); renamed to `.allomos/taskbag/` 2026-10-10, [0015](../decisions/0015-product-name-allomos.md)):** `.allomos/taskbag/` at the root of the folder the user picks, like `.github/` or `.vscode/`, also when that folder is empty. `alm init` and the app both create it there (R72, R87).
 
