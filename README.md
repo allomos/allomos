@@ -103,7 +103,7 @@ Your data stays local unless you choose to share it.
 | Done | v0.1 macOS local tracker | switch |
 | Now | v0.2 macOS + Windows, editing | switch |
 | Next | v0.3 MCP for agents · v0.4 progress view · v0.5 burndown and forecast | switch · progress |
-| Later | v0.8 start and open agents · v0.9 phone at home · v0.10 phone anywhere · v0.11 AI-generated projects | switch · progress · skills |
+| Later | v0.8 start and open agents · v0.9 phone at home · v0.10 phone anywhere | switch · progress · skills |
 | Then | v0.13 cloud copy · v0.14 teams · v1.0 public release | switch |
 
 Allomos tracks its own development with Allomos.

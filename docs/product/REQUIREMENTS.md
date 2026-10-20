@@ -72,16 +72,18 @@ Local tracking works offline. AI-provider calls and other external integrations 
 
 ## AI-generated project setup
 
+**Dropped** (owner, 2026-10-20): **Build a new app…** (Task A03-25) is enough. An agent given the goal prompt plans the project into areas, iterations and tasks with `alm`, which refuses invalid input as it goes; no separate generated-file import is planned. R50–R55 are kept here as a record.
+
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by Allomos. | owner, 2026-10-01 | accepted |
-| R51 | Allomos can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | accepted |
-| R52 | Supply a versioned generation prompt and file schema shared with the validator, with examples and explicit handling of unknown data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
-| R53 | Validate generated bundles and show an adoption/change preview with actionable errors before changing active project data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
-| R54 | Generated output cannot invent verified progress or authoritative approvals; missing completion history stays unknown. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
-| R55 | Re-importing a generated bundle does not duplicate tasks or silently overwrite existing edits; show changes/conflicts. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
+| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by Allomos. | owner, 2026-10-01 | dropped |
+| R51 | Allomos can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | dropped |
+| R52 | Supply a versioned generation prompt and file schema shared with the validator, with examples and explicit handling of unknown data. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
+| R53 | Validate generated bundles and show an adoption/change preview with actionable errors before changing active project data. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
+| R54 | Generated output cannot invent verified progress or authoritative approvals; missing completion history stays unknown. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
+| R55 | Re-importing a generated bundle does not duplicate tasks or silently overwrite existing edits; show changes/conflicts. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
 
-Workflow, storage boundaries and proposed acceptance examples: [AI-generated project setup](./AI-GENERATED-PROJECTS.md). Local use follows R40–R43; cloud publication remains an explicit signed-in action. The final file schema is not yet selected.
+The dropped proposal: [AI-generated project setup](./AI-GENERATED-PROJECTS.md).
 
 ## Human and agent interfaces
 

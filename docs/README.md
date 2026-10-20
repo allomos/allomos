@@ -13,7 +13,7 @@
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
 | [product/REQUIREMENTS.md](./product/REQUIREMENTS.md) | Numbered requirements (R1…) cited by cards and tests | contract |
-| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Allomos project; proposed validation/adoption rules | contract |
+| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Allomos project; proposed validation/adoption rules; **dropped** 2026-10-20 (Build a new app… is enough) | record |
 | [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
 | [workflow/CODING_RULES.md](./workflow/CODING_RULES.md) | Rules for this repository's code: layout, versions, checks, how `alm` behaves, running and building the app. How agents work is told by `alm` and [AGENTS.md](../AGENTS.md) | contract |

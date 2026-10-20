@@ -1,5 +1,7 @@
 # AI-generated project setup
 
+> **Dropped** (owner, 2026-10-20): **Build a new app…** is enough. Nothing here is planned; this file is kept as a record of the proposal ([REQUIREMENTS § AI-generated project setup](./REQUIREMENTS.md#ai-generated-project-setup)).
+
 **In plain words:** a team leader copies a prompt from Allomos and gives it, with their goals, to any AI agent. The agent writes the project's areas and tasks as files. Allomos checks the files, shows what it will create, and turns them into a working project. The workflow is accepted (R50–R51); the exact file format and checks are proposed.
 
 Related interface contract: [INTERFACES.md](./INTERFACES.md). Its proposed shared command/validation layer covers generated-file adoption as well as graphical, CLI and MCP task edits.

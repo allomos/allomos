@@ -13,7 +13,7 @@ A **CLI** is a command-line interface used from a terminal by people, scripts an
 - **The desktop app provides the complete feature set; web and mobile apps are companions that connect to the running desktop app and view its projects, including progress and status** (R69–R71, accepted 2026-10-04). Operating systems, the mobile form, whether companions may edit, and release order are not selected.
 - Agents already require structured task updates through CLI and MCP (R11). MCP is a protocol through which compatible agent clients discover and call tools.
 - Local project tracking stores project/task information on the user's device without sign-in or an Allomos hosted service (R40–R43). Cloud projects require sign-in (R42). A client cannot silently publish local data to provide cross-device access.
-- The leader can use Allomos's prompt with an external agent to produce files that Allomos reads/transforms (R50–R51); see [AI-generated projects](./AI-GENERATED-PROJECTS.md).
+- A person sets up a new project by describing it to an agent through **Build a new app…**; the agent records it with `alm` (generated-file import, R50–R51, dropped 2026-10-20).
 
 The rules below were proposed on 2026-10-03 and accepted by the approver on 2026-10-20 as R63–R68. They do not choose storage, permissions details, a UI framework or an upstream product.
 
