@@ -545,7 +545,7 @@
   "problem.card_exists": "Task {id} already has a different card file, so it was not replaced.",
   "problem.card_empty": "The card file {path} is empty, so nothing was moved in.",
   "problem.card_not_reported": "No card file was reported for task {id}.",
-  "problem.claim_cards_outside": "{count} tasks keep their card files outside the taskbag ({tasks}), so no task can be claimed until they are moved in.",
+  "problem.claim_cards_outside": "{count} task(s) keep their card files outside the taskbag ({tasks}), so no task can be claimed until they are moved in.",
   "sort.label": "Sort the tasks in each iteration",
   "sort.summary": "{key}, {dir}",
   "sort.by": "Sort by",
