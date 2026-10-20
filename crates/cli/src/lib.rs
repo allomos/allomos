@@ -2386,8 +2386,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 });
                 blocked.push(task_json_in(&bag, t));
             }
-            // Card files (Task-A00-30): alm looks for none; it says what agents reported, or
-            // asks the agent to look.
+            // Card files (Task-A00-30): what the tasks' `Card:` links point to outside the
+            // taskbag and what agents reported; nothing when there are none (Task-A03-34).
             let outside = allomos_store::cards::outside(&root);
             let cards = next_cards_line(outside.len());
             text.push_str(&cards);
@@ -2409,7 +2409,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "handoff_rules": rules,
                     "project_notes": notes,
                     "cards_outside": outside,
-                    "cards": cards.trim_end(),
+                    "cards": if cards.is_empty() { Value::Null } else { json!(cards.trim_end()) },
                 }),
                 text,
             );
@@ -2917,13 +2917,14 @@ kept in the project folder. If you find others, report them with `alm cards foun
 }
 
 /// `alm next`'s line about card files (Task-A00-30): the ones still outside the taskbag (linked
-/// or reported), or, when none are, the request to look.
+/// or reported). None are: no line at all (Task-A03-34, approver 2026-10-20), so `alm next`
+/// prints only what is useful.
 fn next_cards_line(outside: usize) -> String {
     if outside > 0 {
         format!(
             "Card files: {outside} task(s) keep their card files in the project folder (`alm cards`): propose moving them in beside their tasks, following `alm guide move-cards`.\n"
         )
     } else {
-        "Card files: if tasks link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and propose moving them in (`alm guide move-cards`).\n".to_string()
+        String::new()
     }
 }

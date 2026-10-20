@@ -3546,9 +3546,11 @@ fn card_files_are_reported_and_moved_in_beside_their_tasks() {
     fs::create_dir_all(repo.join("docs/tasks")).unwrap();
     fs::write(repo.join("docs/tasks/A01-01.md"), "# A01-01\n\nCard.\n").unwrap();
     fs::write(repo.join("docs/tasks/A01-02.md"), "# A01-02\n\nCard.\n").unwrap();
-    // Nothing reported yet: alm asks the agent to look.
+    // Nothing linked or reported yet: no Card files line at all (Task-A03-34).
     let v = ok(&repo, &["next"]);
-    assert!(v["cards"].as_str().unwrap().contains("alm cards found"));
+    assert_eq!(v["cards"], Value::Null);
+    let text = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(!text.contains("Card files"), "{text}");
     assert_eq!(ok(&repo, &["cards"])["cards_outside"], json!([]));
 
     refused(&repo, &["cards", "found", "A01-01"], 2, "bad_usage");
