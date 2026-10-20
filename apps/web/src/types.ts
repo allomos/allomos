@@ -77,8 +77,8 @@ export type Edit =
   | { field: "next_dependency"; text: string | null }
   | { field: "handoff_note"; text: string | null }
   | { field: "iteration"; iteration: string | null }
-  | { field: "title"; title: string }
-  | { field: "description"; text: string }
+  | { field: "title"; title: string; expected_version?: string | null }
+  | { field: "description"; text: string; expected_version?: string | null }
   | { field: "checked" }
   | { field: "reopen"; note: string };
 
@@ -189,6 +189,8 @@ export interface Opened {
   last_changed?: Record<string, string>;
   /** Card files agents reported as still in the project folder (Task-A00-30). */
   cards_outside?: CardOutside[];
+  /** Each task's version, by task ID (Task-A01-57): sent back when a title or description is saved. */
+  versions?: Record<string, string>;
 }
 
 /**

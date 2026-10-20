@@ -231,7 +231,9 @@ Plan:
 - `alm base <id> <branch>`: change the branch a task starts from and merges into.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
-  description). Same holder rule as `alm label`; each is recorded in `alm history`.
+  description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
+  `--expected-version <v>` (the `version` `alm show` printed) to save only if nobody changed the
+  task since you read it; otherwise nothing is saved and alm shows the task as it is now.
 - `alm cards`: the card files still outside the taskbag: where a task's `Card:` link points
   outside its folder, and what agents reported (the app shows them as \"N tasks keep their card
   files in the project folder\"). `alm cards found

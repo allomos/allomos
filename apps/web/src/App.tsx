@@ -1640,6 +1640,7 @@ function TaskbagView({
             {selected && (
               <TaskPane
                 task={selected}
+                version={opened.versions?.[selected.id] ?? null}
                 tasks={box.tasks}
                 area={box.areas.find((a) => a.id === selected.area)}
                 iteration={iterations.find((i) => i.id === selected.iteration)}

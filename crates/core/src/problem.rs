@@ -151,6 +151,9 @@ problems! {
     TaskNotFound { id } => "task_not_found", "There is no task \"{id}\".";
     HolderMissing => "holder_missing", "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
+    /// A title or description was saved from an out-of-date copy of the task (Task-A01-57):
+    /// someone changed it after it was read, so nothing was written. `version` is its version now.
+    TaskChanged { id, version } => "task_changed", "Task {id} changed after you read it, so your change was not saved. Read it again (its version is now {version}), then save.";
     TaskClosed { id, state } => "task_closed", "Task {id} is {state}, so it cannot be changed this way.";
     /// A warning: the task was taken over from another holder.
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";

@@ -285,7 +285,13 @@ enum Command {
     /// Mark an unheld backlog, waiting or blocked task ready (for example, the approver approved it).
     Ready { id: String },
     /// Give a task a new title.
-    Title { id: String, title: String },
+    Title {
+        id: String,
+        title: String,
+        /// The version you read (`alm show`): if the task changed since, nothing is saved.
+        #[arg(long, value_name = "VERSION")]
+        expected_version: Option<String>,
+    },
     /// Give a task a new description (its description.md): `--text "<markdown>"`, or `--from` a
     /// Markdown file. An empty text (`--text ""`) removes it.
     Describe {
@@ -301,6 +307,9 @@ enum Command {
         /// A Markdown file with the new description.
         #[arg(long, value_name = "FILE")]
         from: Option<PathBuf>,
+        /// The version you read (`alm show`): if the task changed since, nothing is saved.
+        #[arg(long, value_name = "VERSION")]
+        expected_version: Option<String>,
     },
     /// Set the task's handoff note (what the next one needs); no text clears it.
     Note { id: String, text: Option<String> },
@@ -797,14 +806,36 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
             EXIT_OK
         }
         Err(problem) => {
+            // A save from an out-of-date copy (Task-A01-57): the task as it is now goes with
+            // the refusal, so the agent can compare and decide without another read.
+            let current = match &problem {
+                Problem::TaskChanged { id, .. } => locate(&cli, cwd)
+                    .ok()
+                    .and_then(|root| load(&root).taskbag)
+                    .and_then(|bag| ops::find_task(&bag, id).ok()),
+                _ => None,
+            };
             if cli.json {
-                stdout.push_str(&error_line(Some(command), &problem));
+                let mut line: Value = serde_json::from_str(&error_line(Some(command), &problem))
+                    .expect("error lines are JSON");
+                if let Some(task) = &current {
+                    line["current"] = task_json(task);
+                }
+                stdout.push_str(&format!("{line}\n"));
             } else {
                 stderr.push_str(&format!(
                     "error [{}]: {}\n",
                     problem.code(),
                     problem.english()
                 ));
+                if let Some(task) = &current {
+                    stderr.push_str(&format!("Now:\n  title: {}\n", task.title));
+                    if task.description.is_empty() {
+                        stderr.push_str("  description: (none)\n");
+                    } else {
+                        stderr.push_str(&format!("  description:\n{}", indent(&task.description)));
+                    }
+                }
             }
             exit_code(&problem)
         }
@@ -1185,7 +1216,10 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
 const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and run the Git commands it prints right away: until your claim is pushed, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
-    serde_json::to_value(t).expect("tasks serialize")
+    let mut v = serde_json::to_value(t).expect("tasks serialize");
+    // The version an agent passes back with `--expected-version` (Task-A01-57).
+    v["version"] = json!(ops::task_version(t));
+    v
 }
 
 /// A task for `--json` reading commands: with each blocker's current state when it is blocked.
@@ -2222,6 +2256,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("handoff note", task.handoff_note.as_deref()),
                 ("not human-checked", task.without_human_check.as_deref()),
             ];
+            // For `alm title` / `alm describe --expected-version` (Task-A01-57).
+            let version = ops::task_version(&task);
             for (name, value) in fields {
                 if let Some(v) = value {
                     text.push_str(&format!("{name}: {v}\n"));
@@ -2230,6 +2266,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(steps) = &task.human_check_steps {
                 text.push_str(&format!("human check steps:\n{}", indent(steps)));
             }
+            text.push_str(&format!("version: {version}\n"));
             let branches = allomos_store::branches(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
@@ -2569,8 +2606,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 done
             })
         }
-        Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
-        Command::Describe { id, text, from } => {
+        Command::Title {
+            id,
+            title,
+            expected_version,
+        } => change(cli, cwd, |bag| {
+            ops::check_version(bag, id, expected_version.as_deref())?;
+            ops::set_title(bag, id, me, title)
+        }),
+        Command::Describe {
+            id,
+            text,
+            from,
+            expected_version,
+        } => {
             // `--text` and `--from` exclude each other, and one of them is required.
             let text = match from {
                 Some(file) => {
@@ -2581,7 +2630,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => text.clone().unwrap_or_default(),
             };
-            change(cli, cwd, |bag| ops::set_description(bag, id, me, &text))
+            change(cli, cwd, |bag| {
+                ops::check_version(bag, id, expected_version.as_deref())?;
+                ops::set_description(bag, id, me, &text)
+            })
         }
         Command::Cards { what } => {
             let root = locate(cli, cwd)?;

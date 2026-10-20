@@ -564,3 +564,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .who-form label > span { font-size: 0.85em; color: var(--muted); }
 .who-line { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); }
 .who-line.editing label { display: inline-flex; align-items: center; gap: 6px; }
+
+/* A save refused because the task changed meanwhile (Task-A01-57): the newer text beside the person's own. */
+.task-pane .conflict { display: grid; gap: 6px; }
+.task-pane .conflict p { margin: 0; }
+.task-pane .conflict pre.newer { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; padding: 8px 10px; border-radius: 6px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }

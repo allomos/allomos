@@ -50,6 +50,9 @@ struct Opened {
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
     /// "N tasks keep their card files in the project folder" with **Update the taskbag…**.
     cards_outside: Vec<allomos_core::card::Outside>,
+    /// Each task's version, by task ID (Task-A01-57): the task pane sends back the version it
+    /// showed when it saves a title or description, so a newer change is never overwritten.
+    versions: std::collections::BTreeMap<String, String>,
 }
 
 /// The folder named on the command line: the first argument that is not an option.
@@ -115,8 +118,15 @@ fn open_taskbag(root: PathBuf) -> Opened {
         Some(bag) => allomos_store::cards::outside_of(&root, bag),
         None => Vec::new(),
     };
+    let versions = loaded
+        .taskbag
+        .iter()
+        .flat_map(|bag| &bag.tasks)
+        .map(|t| (t.id.clone(), allomos_core::ops::task_version(t)))
+        .collect();
     Opened {
         loaded,
+        versions,
         ai_decisions: allomos_store::ai_decisions(&root),
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
@@ -156,6 +166,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
+        versions: Default::default(),
         root,
         readme_added,
     })
@@ -893,6 +904,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
+        versions: Default::default(),
         root,
         readme_added: false,
     })

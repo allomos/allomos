@@ -94,9 +94,11 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
         },
         Edit::Title {
             title: "Do it well".into(),
+            expected_version: None,
         },
         Edit::Description {
             text: "A new *why*.".into(),
+            expected_version: None,
         },
         Edit::WaitingOn {
             text: "an answer".into(),
@@ -177,7 +179,15 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
     );
 
     // An empty description removes the file.
-    edit(&root, "A01-01", Edit::Description { text: "  ".into() }).unwrap();
+    edit(
+        &root,
+        "A01-01",
+        Edit::Description {
+            text: "  ".into(),
+            expected_version: None,
+        },
+    )
+    .unwrap();
     assert!(!root.join("tasks/A01-01/description.md").exists());
     fs::remove_dir_all(dir).unwrap();
 }
@@ -198,6 +208,7 @@ fn a_refused_edit_changes_no_file() {
             "A01-02",
             Edit::Description {
                 text: "mine now".into(),
+                expected_version: None,
             },
         ),
         (
@@ -206,7 +217,13 @@ fn a_refused_edit_changes_no_file() {
                 label: "not on the ladder".into(),
             },
         ),
-        ("A01-01", Edit::Title { title: " ".into() }),
+        (
+            "A01-01",
+            Edit::Title {
+                title: " ".into(),
+                expected_version: None,
+            },
+        ),
         (
             "A01-01",
             Edit::Iteration {
@@ -257,6 +274,7 @@ fn a_refused_edit_changes_no_file() {
             "A09-09",
             Edit::Title {
                 title: "Nope".into(),
+                expected_version: None,
             },
         ),
     ];
@@ -292,7 +310,15 @@ fn the_app_waits_for_the_lock_then_takes_it() {
 
     // A short wait gives up with `taskbag_busy` and changes nothing.
     let busy = change_task(&root, APP, Duration::from_millis(50), |bag| {
-        ops::edit(bag, "A01-01", APP.by, &Edit::Title { title: "x".into() })
+        ops::edit(
+            bag,
+            "A01-01",
+            APP.by,
+            &Edit::Title {
+                title: "x".into(),
+                expected_version: None,
+            },
+        )
     });
     assert!(matches!(busy, Err(Problem::TaskbagBusy { .. })));
     assert_eq!(snapshot(&root), before);
@@ -308,6 +334,7 @@ fn the_app_waits_for_the_lock_then_takes_it() {
         "A01-01",
         Edit::Title {
             title: "After the wait".into(),
+            expected_version: None,
         },
     )
     .unwrap();
@@ -332,10 +359,74 @@ fn an_older_taskbag_is_not_changed() {
         .unwrap();
         let before = snapshot(&root);
         assert!(matches!(
-            edit(&root, "A01-01", Edit::Title { title: "x".into() }),
+            edit(
+                &root,
+                "A01-01",
+                Edit::Title {
+                    title: "x".into(),
+                    expected_version: None
+                }
+            ),
             Err(Problem::TaskbagToMoveIn { .. })
         ));
         assert_eq!(snapshot(&root), before);
         fs::remove_dir_all(dir).unwrap();
     }
+}
+
+/// Two writers on the real files (Task-A01-57): both read A01-01; the agent saves its
+/// description; the person's save, from the version read before, is refused and changes no file;
+/// read again, it goes through.
+#[test]
+fn a_stale_save_writes_nothing() {
+    let (_dir, root) = taskbag("stale");
+    let read = ops::task_version(&load(&root).taskbag.unwrap().tasks[0].clone());
+    edit(
+        &root,
+        "A01-01",
+        Edit::Description {
+            text: "The agent's text".into(),
+            expected_version: Some(read.clone()),
+        },
+    )
+    .unwrap();
+    let before = snapshot(&root);
+    let now = ops::task_version(
+        &load(&root)
+            .taskbag
+            .unwrap()
+            .tasks
+            .into_iter()
+            .find(|t| t.id == "A01-01")
+            .unwrap(),
+    );
+    assert_eq!(
+        edit(
+            &root,
+            "A01-01",
+            Edit::Description {
+                text: "The person's text".into(),
+                expected_version: Some(read),
+            },
+        )
+        .unwrap_err(),
+        Problem::TaskChanged {
+            id: "A01-01".into(),
+            version: now.clone()
+        }
+    );
+    assert_eq!(snapshot(&root), before, "a refused save writes nothing");
+    edit(
+        &root,
+        "A01-01",
+        Edit::Description {
+            text: "The person's text".into(),
+            expected_version: Some(now),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join("tasks/A01-01/description.md")).unwrap(),
+        "The person's text\n"
+    );
 }

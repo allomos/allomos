@@ -29,6 +29,7 @@ import {
   toggleBlocker,
   type Draft,
   type EditField,
+  changedVersion,
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
@@ -50,6 +51,7 @@ export function TaskPane({
   ownerName,
   onSaveName,
   onEdit,
+  version,
   onReview,
   nextIterationId,
   onNewIteration,
@@ -77,6 +79,9 @@ export function TaskPane({
   onSaveName: (name: string) => Promise<void>;
   /** Makes one change. Rejects with the Problem that refused it; then nothing changed. */
   onEdit: (edit: Edit) => Promise<void>;
+  /** The task's version now (Task-A01-57); a title or description is saved against the version
+   * shown when the change began. */
+  version: string | null;
   /** Marks the task's AI decisions reviewed. Rejects with the Problem that refused it. */
   onReview: () => Promise<void>;
   /** The ID "New…" will give, when known (the next free one). */
@@ -94,6 +99,10 @@ export function TaskPane({
   // The Checked or Reviewed button asked for the person's name first (asked once, like a change).
   const [asking, setAsking] = useState<"checked" | "reviewed" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Task-A01-57: the task's version when the change began, and, when a save was refused because
+  // the task changed since, the version it has now.
+  const [startVersion, setStartVersion] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<string | null>(null);
   // Reopen… (Task-A01-50): the reason being written; null while the form is closed.
   const [reason, setReason] = useState<string | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
@@ -103,6 +112,7 @@ export function TaskPane({
     setAsking(null);
     setReason(null);
     setError(null);
+    setConflict(null);
   }, [task.id]);
 
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
@@ -110,10 +120,13 @@ export function TaskPane({
     setReason(null);
     setEditing(field);
     setDraft(startDraft(task, field));
+    setStartVersion(version);
+    setConflict(null);
     setCreated(EMPTY_NEW_ITERATION);
     setError(null);
   };
   const cancel = () => {
+    setConflict(null);
     setEditing(null);
     setAsking(null);
     setReason(null);
@@ -156,16 +169,23 @@ export function TaskPane({
     }
   };
   const savable = (field: EditField) => (field === "iteration" ? iterationSavable(task, draft, created) : draftChanged(task, field, draft));
-  const save = async () => {
-    if (!editing || busy || !savable(editing)) return;
+  // `against`: the version this save is made from; "Keep mine" saves against the newer one.
+  const save = async (against: string | null = startVersion) => {
+    if (!editing || busy || (!savable(editing) && !conflict)) return;
     setBusy(true);
     try {
       if (editing === "iteration" && draft.value === NEW_ITERATION) await onNewIteration(toPaneIteration(created));
-      else await onEdit(toEdit(editing, draft));
+      else await onEdit(toEdit(editing, draft, against));
       setEditing(null);
       setError(null);
+      setConflict(null);
     } catch (e) {
-      say(e);
+      // Changed while the person was editing (Task-A01-57): nothing was saved; show both.
+      const now = changedVersion(e);
+      if (now) {
+        setConflict(now);
+        setError(null);
+      } else say(e);
     } finally {
       setBusy(false);
     }
@@ -376,6 +396,26 @@ export function TaskPane({
           </button>
         </div>
         {error && <p className="banner error small">{error}</p>}
+        {conflict && (field === "title" || field === "description") && (
+          <div className="conflict banner error" role="alert">
+            <strong>{t("edit.conflict_title")}</strong>
+            <p className="small">{t("edit.conflict_body")}</p>
+            <span className="small">{t("edit.conflict_newer", { field: fieldName(field) })}</span>
+            {version === conflict ? (
+              <pre className="newer">{field === "title" ? task.title : task.description.trimEnd() || t("pane.no_description")}</pre>
+            ) : (
+              <p className="muted small">{t("edit.conflict_loading")}</p>
+            )}
+            <div className="editor-buttons">
+              <button type="button" className="primary" onClick={() => void save(conflict)} disabled={busy}>
+                {t("edit.keep_mine")}
+              </button>
+              <button type="button" onClick={cancel} disabled={busy}>
+                {t("edit.keep_newer")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
 

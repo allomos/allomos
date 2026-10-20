@@ -2302,6 +2302,105 @@ fn add_task_tells_the_next_steps() {
     assert!(text.contains("次に（追加したエージェントへ）"), "{text}");
 }
 
+/// A save from an out-of-date copy is refused (Task-A01-57): `alm show` gives the version; a
+/// second writer that passes the old one with `--expected-version` changes nothing and gets the
+/// task as it is now; without the option, `describe` and `title` work as before.
+#[test]
+fn describe_and_title_refuse_an_out_of_date_version() {
+    let repo = filled();
+    let read = ok(&repo, &["show", "A01-01"])["task"]["version"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let text = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(text.contains(&format!("version: {read}\n")), "{text}");
+    // The first writer saves with the version it read.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "s/one",
+            "describe",
+            "A01-01",
+            "--text",
+            "First",
+            "--expected-version",
+            &read,
+        ],
+    );
+    let before = snapshot(&repo);
+    // The second writer still holds the old version: refused, nothing written.
+    let v = refused(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "describe",
+            "A01-01",
+            "--text",
+            "Second",
+            "--expected-version",
+            &read,
+        ],
+        1,
+        "task_changed",
+    );
+    assert_eq!(v["current"]["description"], "First\n");
+    let now = v["current"]["version"].as_str().unwrap().to_string();
+    assert_ne!(now, read);
+    refused(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "title",
+            "A01-01",
+            "New",
+            "--expected-version",
+            &read,
+        ],
+        1,
+        "task_changed",
+    );
+    assert_eq!(snapshot(&repo), before, "a refused save writes nothing");
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "describe",
+            "A01-01",
+            "--text",
+            "Second",
+            "--expected-version",
+            &read,
+        ],
+    );
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("error [task_changed]")
+            && err.contains("Now:\n  title:")
+            && err.contains("    First"),
+        "{err}"
+    );
+    // Read again, the save goes through; without a version, as before.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "describe",
+            "A01-01",
+            "--text",
+            "Second",
+            "--expected-version",
+            &now,
+        ],
+    );
+    ok(&repo, &["--as", "s/two", "title", "A01-01", "Newer"]);
+    assert_eq!(ok(&repo, &["show", "A01-01"])["task"]["title"], "Newer");
+}
+
 /// Every file under `dir`, with its contents, to show that nothing changed.
 fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut out: Vec<(PathBuf, Vec<u8>)> = walk(dir)
