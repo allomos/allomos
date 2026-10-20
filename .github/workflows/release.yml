@@ -51,11 +51,45 @@ jobs:
           - macOS (Apple Silicon): Allomos_${TAG#v}_aarch64.pkg, or Allomos_${TAG#v}_aarch64.dmg
           - Windows: Allomos_${TAG#v}_x64-setup.exe
 
+          On macOS, the .pkg also makes Terminal find alm. With the .dmg, drag Allomos to Applications, open it and click Install the alm command… once (it asks for your Mac password).
+
           Each installer has a .sha256 file beside it with its SHA-256 hash; Allomos checks it before updating itself.
 
           The alm-only files hold the alm command alone, for computers without the app: alm-only_${TAG#v}_macos_arm64.tar.gz and alm-only_${TAG#v}_windows_x64.zip. Unpack, then run alm from a terminal.
 
-          How to install: https://allomos.github.io/allomos/start/getting-started/"
+          How to install: https://allomos.github.io/allomos/start/getting-started/
+
+          <details><summary>简体中文</summary>
+
+          未签名的构建。大多数人需要的是安装器，它会安装 app 和 alm 命令：
+          - macOS（Apple 芯片）：Allomos_${TAG#v}_aarch64.pkg，或 Allomos_${TAG#v}_aarch64.dmg
+          - Windows：Allomos_${TAG#v}_x64-setup.exe
+
+          在 macOS 上，.pkg 会顺便让终端找到 alm。用 .dmg 的话，把 Allomos 拖进“应用程序”，打开它，点一次 **安装 alm 命令…**（会请你输入 Mac 密码）。
+
+          每个安装器旁边有一个 .sha256 文件，记着它的 SHA-256 哈希值；Allomos 自我更新前会核对它。
+
+          alm-only 文件里只有 alm 命令，给没装 app 的电脑用：alm-only_${TAG#v}_macos_arm64.tar.gz 和 alm-only_${TAG#v}_windows_x64.zip。解压后在终端里运行 alm。
+
+          安装步骤：https://allomos.github.io/allomos/zh-cn/start/getting-started/
+
+          </details>
+
+          <details><summary>日本語</summary>
+
+          署名なしのビルドです。ほとんどの方にはインストーラーをおすすめします。アプリと alm コマンドを入れます：
+          - macOS（Apple シリコン）：Allomos_${TAG#v}_aarch64.pkg、または Allomos_${TAG#v}_aarch64.dmg
+          - Windows：Allomos_${TAG#v}_x64-setup.exe
+
+          macOS では、.pkg はターミナルから alm を使えるようにもします。.dmg の場合は、「肩代」を「アプリケーション」にドラッグして開き、**alm コマンドをインストール…** を一度クリックします（Mac のパスワードをたずねられます）。
+
+          各インストーラーの横に、SHA-256 ハッシュを記した .sha256 ファイルがあります。「肩代」は自動更新の前にこれを確かめます。
+
+          alm-only のファイルには alm コマンドだけが入っています。アプリのないコンピューター向けです：alm-only_${TAG#v}_macos_arm64.tar.gz と alm-only_${TAG#v}_windows_x64.zip。展開して、ターミナルで alm を実行します。
+
+          インストール手順：https://allomos.github.io/allomos/ja/start/getting-started/
+
+          </details>"
 
   macos:
     needs: release

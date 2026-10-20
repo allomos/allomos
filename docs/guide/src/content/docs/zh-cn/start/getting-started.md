@@ -11,7 +11,7 @@ sidebar:
 
 从[发布页](https://github.com/allomos/allomos/releases/latest)下载最新版本：
 
-- **macOS**（Apple 芯片的 Mac：M1 或更新）：`Allomos_<版本>_aarch64.pkg`。打开它，按安装器的步骤操作；它会请你输入一次 Mac 密码，把 Allomos 放进“应用程序”，并一起安装 `alm` 命令。（也可以用 `Allomos_<版本>_aarch64.dmg`：打开它，把 Allomos 拖进“应用程序”；之后 Allomos 会提示 **安装 alm 命令**。）
+- **macOS**（Apple 芯片的 Mac：M1 或更新）：`Allomos_<版本>_aarch64.pkg`。打开它，按安装器的步骤操作；它会请你输入一次 Mac 密码，把 Allomos 放进“应用程序”，并一起安装 `alm` 命令。（也可以用 `Allomos_<版本>_aarch64.dmg`：打开它，把 Allomos 拖进“应用程序”；之后 Allomos 会提示 **安装 alm 命令**：点一次，输入 Mac 密码。以后更新 Allomos，`alm` 也会一起更新。）
 - **Windows**：`Allomos_<版本>_x64-setup.exe`。运行它即可；不需要管理员权限，它也会安装 `alm` 命令。
 
 在 1.0 版之前，这些下载还没有签名，所以第一次打开 Allomos 时系统会提醒你：
