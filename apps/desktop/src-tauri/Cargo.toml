@@ -22,3 +22,10 @@ serde_json.workspace = true
 sys-locale = "=0.3.2"
 tauri = { version = "~2.11", features = [] }
 tauri-plugin-dialog = "2"
+
+# The About window on macOS: its clickable website link (Task-A07-22), icon and colours (A07-23): the versions Tauri already
+# uses, pinned.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.4"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSAttributedString", "NSData", "NSDictionary", "NSString", "NSURL"] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSApplication", "NSAttributedString", "NSColor", "NSFont", "NSImage", "NSParagraphStyle", "NSResponder", "NSText"] }

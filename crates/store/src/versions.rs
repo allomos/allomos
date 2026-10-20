@@ -54,7 +54,12 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// them in (`alm guide move-cards`) (Task-A00-30).
 /// 15: the person can start that with **Update the taskbag…** in the app, one button for an older
 /// taskbag and for card files, whose request `alm move-in` prints (Task-A01-45).
-pub const SECTION_VERSION: u32 = 15;
+/// 16: a task whose work is finished and only waits for a person's hands-on check ends with
+/// `alm done --without-human-check` in quiet and normal mode alike; `alm wait` is only for a real
+/// question, an approval or an outside effect (Task-A03-31).
+/// 17: personal details (email addresses, account names and the like) are kept out of the project
+/// notes and every other file like credentials, written as placeholders (Task-A03-29).
+pub const SECTION_VERSION: u32 = 17;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

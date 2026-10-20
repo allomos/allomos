@@ -41,7 +41,7 @@ export interface Task {
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
-  /** Why the task was finished without the human check, and in which run (Task-A03-15, A03-18). */
+  /** Why the task was finished without the human check (Task-A03-15, A03-18, A03-31). */
   without_human_check: string | null;
   /** How a person checks it, in Markdown (Task-A03-18). */
   human_check_steps: string | null;
@@ -359,4 +359,6 @@ export interface UpdateStatus {
   available: string | null;
   /** GitHub was asked now and did not answer. */
   failed: boolean;
+  /** `available`'s installer is downloaded and its hash matched (Task-A07-17). */
+  ready: string | null;
 }

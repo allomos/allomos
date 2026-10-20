@@ -22,6 +22,8 @@ use allomos_store::{
     project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
 };
 use serde::Serialize;
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::AboutMetadata;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
@@ -1010,9 +1012,31 @@ fn open_download_page() -> Result<(), Problem> {
 /// Whether a newer Allomos is on GitHub (Task-A07-16). `asked` when the person chose
 /// **Check for Updates…**: GitHub is asked now, and a skipped version is offered again.
 /// Otherwise GitHub is asked only when the last answer is a day old.
+///
+/// When a newer version is known, its installer is downloaded and checked in the background
+/// (Task-A07-17); once it is ready every window hears `update:ready` and asks again.
 #[tauri::command]
-async fn update_status(asked: bool) -> update::UpdateStatus {
-    update::check(asked)
+async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
+    let status = update::check(asked);
+    if let (Some(version), None) = (&status.available, &status.ready) {
+        update::prepare_in_background(version.clone(), move || {
+            let _ = app.emit(UPDATE_READY_EVENT, ());
+        });
+    }
+    status
+}
+
+/// **Restart to Update to Allomos <version>** (Task-A07-17): run the checked installer and
+/// quit; the new version starts by itself. If the person cancels macOS's password prompt,
+/// nothing changes. A failure is told to every window, and this version keeps running.
+fn restart_to_update(app: AppHandle) {
+    tauri::async_runtime::spawn_blocking(move || match update::restart_to_update() {
+        Ok(update::Restart::Quit) => app.exit(0),
+        Ok(update::Restart::Cancelled) => {}
+        Err(detail) => {
+            let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+        }
+    });
 }
 
 /// "Skip this version" on the update notice.
@@ -1357,7 +1381,33 @@ const CONNECT_EVENT: &str = "menu:connect";
 const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
+/// The website the About window links to, and the words it shows (Task-A07-22).
+const WEBSITE: &str = "https://www.allomos.com";
+const WEBSITE_LABEL: &str = "www.allomos.com";
+/// About Allomos on macOS, where the app shows the About window itself (`show_about`).
+#[cfg(target_os = "macos")]
+const ABOUT_ID: &str = "about";
+/// The About window's icon on macOS, the bundle's own (Task-A07-23).
+#[cfg(target_os = "macos")]
+const ABOUT_ICON: &[u8] = include_bytes!("../icons/128x128@2x.png");
+/// The About window's last line on macOS: the licence, the same in every language.
+#[cfg(target_os = "macos")]
+const LICENCE: &str = "Open source · MIT License";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
+const UPDATE_READY_EVENT: &str = "update:ready";
+const UPDATE_FAILED_EVENT: &str = "update:failed";
+
+/// What the update menu item does when chosen (Task-A07-16, Task-A07-17).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum UpdateAction {
+    /// **Check for Updates…**: the window asks GitHub now.
+    #[default]
+    Check,
+    /// **Download Allomos <version>…**: open the download page.
+    Download,
+    /// **Restart to Update to Allomos <version>**: install the checked download.
+    Restart,
+}
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
@@ -1366,8 +1416,12 @@ struct MenuTexts {
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
-    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
-    update_known: Mutex<bool>,
+    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
+    /// **Restart to Update to Allomos <version>** (Task-A07-17).
+    update_action: Mutex<UpdateAction>,
+    /// The About window's line on what Allomos does, in the interface's language (Task-A07-23).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    about_tagline: Mutex<String>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -1483,14 +1537,21 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .into_iter()
         .filter_map(|item| item.as_submenu().cloned())
         .collect();
+    // The default About item, first in the app menu on macOS and in the Help menu elsewhere,
+    // is replaced by one that also gives the website (Task-A07-22).
+    let about = about_item(app)?;
     if cfg!(target_os = "macos") {
         if let Some(app_menu) = submenus.first() {
+            app_menu.remove_at(0)?;
+            app_menu.insert(&about, 0)?;
             app_menu.insert(&check_updates, 1)?;
         }
     } else if let Some(help) = submenus
         .iter()
         .find(|s| s.text().is_ok_and(|t| t == "Help"))
     {
+        help.remove_at(0)?;
+        help.insert(&about, 0)?;
         help.append(&check_updates)?;
     } else {
         menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
@@ -1501,11 +1562,152 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         connect: connect_item,
         move_tasks_in,
         check_updates,
-        update_known: Mutex::new(false),
+        update_action: Mutex::new(UpdateAction::Check),
+        about_tagline: Mutex::new("Switch agents. Switch teammates. Keep the project.".into()),
         recent,
         state: Mutex::new(Recent::default()),
     });
     Ok(menu)
+}
+
+/// About Allomos, with the website. On macOS the item opens the system's About window itself
+/// (`show_about`), so the website is a link that opens in the default browser: the default
+/// item can only show plain text there. Windows and Linux keep the default item, with the
+/// website in its website field.
+#[cfg(target_os = "macos")]
+fn about_item(app: &AppHandle) -> tauri::Result<MenuItem<Wry>> {
+    let name = &app.package_info().name;
+    MenuItem::with_id(app, ABOUT_ID, format!("About {name}"), true, None::<&str>)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
+    let info = app.package_info();
+    let config = app.config();
+    let metadata = AboutMetadata {
+        name: Some(info.name.clone()),
+        version: Some(info.version.to_string()),
+        copyright: config.bundle.copyright.clone(),
+        authors: config.bundle.publisher.clone().map(|p| vec![p]),
+        website: Some(WEBSITE.to_string()),
+        website_label: Some(WEBSITE_LABEL.to_string()),
+        ..Default::default()
+    };
+    PredefinedMenuItem::about(app, None, Some(metadata))
+}
+
+/// The system's About window: the Allomos icon, the name, the version once, then a short line
+/// on what Allomos does (in the interface's language), the website as a link, and the licence
+/// (Task-A07-23). The icon is given explicitly, so a development build shows it too rather
+/// than the generic folder.
+#[cfg(target_os = "macos")]
+fn show_about(app: &AppHandle) {
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2::{AnyThread, MainThreadMarker};
+    use objc2_app_kit::{
+        NSAboutPanelOptionApplicationIcon, NSAboutPanelOptionApplicationName,
+        NSAboutPanelOptionApplicationVersion, NSAboutPanelOptionCredits, NSAboutPanelOptionVersion,
+        NSApplication, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName,
+        NSImage, NSLinkAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName,
+        NSTextAlignment,
+    };
+    use objc2_foundation::{
+        NSAttributedString, NSData, NSDictionary, NSMutableAttributedString, NSString, NSURL,
+    };
+
+    // Menu events arrive on the main thread; anywhere else the window is not shown.
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    let info = app.package_info();
+    let tagline = app
+        .state::<MenuTexts>()
+        .about_tagline
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+
+    let style = NSMutableParagraphStyle::new();
+    style.setAlignment(NSTextAlignment::Center);
+    style.setParagraphSpacing(6.0);
+    // One centred paragraph of `text`, in a system font of `size` and `color`, a link to `url`.
+    let paragraph = |text: &str,
+                     size: f64,
+                     color: Retained<NSColor>,
+                     url: Option<Retained<NSURL>>|
+     -> Retained<NSAttributedString> {
+        let mut keys = unsafe {
+            vec![
+                NSParagraphStyleAttributeName,
+                NSFontAttributeName,
+                NSForegroundColorAttributeName,
+            ]
+        };
+        let mut values: Vec<Retained<AnyObject>> = vec![
+            style.clone().into(),
+            NSFont::systemFontOfSize(size).into(),
+            color.into(),
+        ];
+        if let Some(url) = url {
+            keys.push(unsafe { NSLinkAttributeName });
+            values.push(url.into());
+        }
+        let attributes = NSDictionary::from_retained_objects(&keys, &values);
+        unsafe {
+            NSAttributedString::initWithString_attributes(
+                NSAttributedString::alloc(),
+                &NSString::from_str(text),
+                Some(&attributes),
+            )
+        }
+    };
+    let credits = NSMutableAttributedString::new();
+    credits.appendAttributedString(&paragraph(
+        &format!("{tagline}\n"),
+        NSFont::systemFontSize(),
+        NSColor::secondaryLabelColor(),
+        None,
+    ));
+    if let Some(url) = NSURL::URLWithString(&NSString::from_str(WEBSITE)) {
+        credits.appendAttributedString(&paragraph(
+            &format!("{WEBSITE_LABEL}\n"),
+            NSFont::smallSystemFontSize(),
+            NSColor::linkColor(),
+            Some(url),
+        ));
+    }
+    credits.appendAttributedString(&paragraph(
+        LICENCE,
+        NSFont::smallSystemFontSize() - 1.0,
+        NSColor::tertiaryLabelColor(),
+        None,
+    ));
+
+    let mut keys = unsafe {
+        vec![
+            NSAboutPanelOptionApplicationName,
+            NSAboutPanelOptionApplicationVersion,
+            // Empty: the window shows "Version 0.1.12", not "Version 0.1.12 (0.1.12)".
+            NSAboutPanelOptionVersion,
+            NSAboutPanelOptionCredits,
+        ]
+    };
+    let mut values: Vec<Retained<AnyObject>> = vec![
+        NSString::from_str(&info.name).into(),
+        NSString::from_str(&info.version.to_string()).into(),
+        NSString::from_str("").into(),
+        credits.into(),
+    ];
+    let icon = NSData::with_bytes(ABOUT_ICON);
+    if let Some(image) = NSImage::initWithData(NSImage::alloc(), &icon) {
+        keys.push(unsafe { NSAboutPanelOptionApplicationIcon });
+        values.push(image.into());
+    }
+    let options = NSDictionary::from_retained_objects(&keys, &values);
+    let ns_app = NSApplication::sharedApplication(mtm);
+    unsafe { ns_app.orderFrontStandardAboutPanelWithOptions(&options) };
+    ns_app.activate();
 }
 
 /// The menu's words in the interface's language, as the interface sends them.
@@ -1519,6 +1721,7 @@ struct MenuWords {
     no_recent: String,
     connect: String,
     move_tasks_in: String,
+    about_tagline: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1530,19 +1733,32 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
+    *texts
+        .about_tagline
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = words.about_tagline;
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
     let _ = fill_recent(&app, &texts.recent, &recent);
 }
 
-/// The update item's words, as the window sends them: **Check for Updates…**, or **Download
-/// Allomos <version>…** once a newer version is known, which then opens the download page, as
-/// the Claude app's **Restart to Update** item does (approver, 2026-10-15).
+/// The update item's words and what it does, as the window sends them: **Check for Updates…**
+/// (`check`); **Download Allomos <version>…** once a newer version is known, which opens the
+/// download page (`download`, Task-A07-16); **Restart to Update to Allomos <version>** once its
+/// installer is downloaded and checked, as the Claude app has it (`restart`, Task-A07-17).
 #[tauri::command]
-fn set_update_item(texts: tauri::State<MenuTexts>, text: String, known: bool) {
+fn set_update_item(texts: tauri::State<MenuTexts>, text: String, action: String) {
     let _ = texts.check_updates.set_text(text);
-    *texts.update_known.lock().unwrap_or_else(|e| e.into_inner()) = known;
+    let action = match action.as_str() {
+        "download" => UpdateAction::Download,
+        "restart" => UpdateAction::Restart,
+        _ => UpdateAction::Check,
+    };
+    *texts
+        .update_action
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = action;
 }
 
 /// Show these folders, newest first, under File → Open Recent.
@@ -1578,6 +1794,11 @@ pub fn run() {
                     };
                 }
             };
+            #[cfg(target_os = "macos")]
+            if id == ABOUT_ID {
+                show_about(app);
+                return;
+            }
             if id == NEW_WINDOW_ID {
                 let _ = open_new_window(app);
             } else if id == CONNECT_ID {
@@ -1585,15 +1806,17 @@ pub fn run() {
             } else if id == MOVE_TASKS_IN_ID {
                 send(MOVE_TASKS_IN_EVENT, None);
             } else if id == CHECK_UPDATES_ID {
-                let known = *app
+                let action = *app
                     .state::<MenuTexts>()
-                    .update_known
+                    .update_action
                     .lock()
                     .unwrap_or_else(|e| e.into_inner());
-                if known {
-                    let _ = open_download_page();
-                } else {
-                    send(CHECK_UPDATES_EVENT, None);
+                match action {
+                    UpdateAction::Check => send(CHECK_UPDATES_EVENT, None),
+                    UpdateAction::Download => {
+                        let _ = open_download_page();
+                    }
+                    UpdateAction::Restart => restart_to_update(app.clone()),
                 }
             } else if id == CLEAR_RECENT_ID {
                 send(CLEAR_RECENT_EVENT, None);

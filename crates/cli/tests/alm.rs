@@ -758,6 +758,25 @@ fn real_repo() -> (PathBuf, PathBuf) {
     (repo, remote)
 }
 
+/// The command line `c` as a person pasting it would run it: `sh -c` here, `cmd /C` on Windows.
+/// On Windows the line goes to `cmd` as it is (`raw_arg`): `args` would wrap it in quotes and
+/// escape its own quotes as `\"`, which `cmd` does not undo, so Git got `"C:\…"` with the quotes.
+fn shell(dir: &Path, c: &str) -> Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut cmd = Command::new("cmd");
+        cmd.current_dir(dir).arg("/C").raw_arg(c);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new("sh");
+        cmd.current_dir(dir).args(["-c", c]);
+        cmd
+    }
+}
+
 /// Run the Git commands `alm` printed (its `git_commands`) in `dir`, as an agent would.
 fn run_printed(dir: &Path, v: &Value) {
     let commands = v["git_commands"]
@@ -766,15 +785,7 @@ fn run_printed(dir: &Path, v: &Value) {
     assert!(!commands.is_empty(), "{v}");
     for c in commands {
         let c = c.as_str().unwrap();
-        let out = if cfg!(windows) {
-            Command::new("cmd")
-                .current_dir(dir)
-                .args(["/C", c])
-                .output()
-        } else {
-            Command::new("sh").current_dir(dir).args(["-c", c]).output()
-        }
-        .unwrap();
+        let out = shell(dir, c).output().unwrap();
         assert!(
             out.status.success(),
             "{c}: {}",
@@ -1929,7 +1940,7 @@ fn goal_follows_the_task_language() {
         assert_eq!(v["written_in_language"], true, "{v}");
         let text = v["guide"].as_str().unwrap();
         assert!(text.starts_with(words), "{language}: {text}");
-        assert!(text.contains("(goal prompt v1)"), "{language}");
+        assert!(text.contains("(goal prompt v2)"), "{language}");
         assert!(text.contains("## 4. "), "{language}");
         assert!(text.contains("`/goal`"), "{language}");
     }
@@ -2065,17 +2076,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v15)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v17)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v14 section (before Update the taskbag… covered an older taskbag, Task-A01-45) is out of date too.
+    // A v16 section (before personal details were kept out like credentials, Task-A03-29) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v15)", "## Tasks: Allomos (v14)")
+            brief.replace("## Tasks: Allomos (v17)", "## Tasks: Allomos (v16)")
         ),
     )
     .unwrap();
@@ -2102,6 +2113,9 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
         "a credential moves",
         "Change lines in place",
         "commit and push that file with Git yourself",
+        "Personal details are kept out like credentials",
+        "email address, account or user name",
+        "Write a placeholder such as `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up",
         "every new piece of work (a new card, a new outcome) gets its own task",
         "`alm guide tasks`",
     ] {
@@ -2190,6 +2204,102 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
             .unwrap()
             .contains("update `project-notes.md` too (this taskbag has none yet)")
     );
+}
+
+/// The project notes' path is printed full and tidy (Task-A03-32): from a worktree with a
+/// relative `--taskbag`, no `.` or `..` is left in it.
+#[test]
+fn project_notes_path_is_tidy_from_a_worktree() {
+    let base = tmp("notes-path");
+    let bag = base.join("bag");
+    fs::create_dir_all(&bag).unwrap();
+    ok(&bag, &["init"]);
+    let worktree = base.join("code/.claude/worktrees/one");
+    fs::create_dir_all(&worktree).unwrap();
+    let rel = "./../../../../bag/.allomos/taskbag";
+    // The worktree as alm sees it from its working folder: resolved (`/private/var` on macOS),
+    // but on Windows as given, since `canonicalize` there adds `\\?\` and expands short names
+    // (`RUNNER~1`), which alm rightly does not print.
+    let bag_seen = if cfg!(windows) {
+        bag.clone()
+    } else {
+        fs::canonicalize(&bag).unwrap()
+    };
+    let want = bag_seen
+        .join(".allomos")
+        .join("taskbag")
+        .join("project-notes.md");
+    let v = ok(&worktree, &["--taskbag", rel, "next"]);
+    assert_eq!(v["project_notes"]["path"], want.display().to_string());
+    for args in [
+        vec!["--taskbag", rel, "next"],
+        vec!["--taskbag", rel, "handoff", "--as", "s/one"],
+    ] {
+        let out = alm(&worktree, &args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        let text = String::from_utf8(out.stdout).unwrap();
+        assert!(
+            text.contains(&want.display().to_string()),
+            "{args:?}: {text}"
+        );
+        assert!(
+            !text.contains("/../") && !text.contains("/./"),
+            "{args:?}: {text}"
+        );
+    }
+}
+
+/// After `alm add task`, alm tells the agent what to do next (Task-A03-33): plan it in an
+/// iteration, from the ones listed, then make it ready unless something is the person's to
+/// decide; after the Git commands, in the task language. alm itself plans and readies nothing.
+#[test]
+fn add_task_tells_the_next_steps() {
+    let dir = tmp("add-next-steps");
+    ok(&dir, &["init"]);
+    ok(&dir, &["add", "area", "A01", "Core"]);
+
+    // No iteration yet: said, with how to add one.
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "One"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    let after = text.split("Commit only these files").nth(1).unwrap_or("");
+    assert!(
+        after.contains("Next, for the agent who added it:"),
+        "{text}"
+    );
+    assert!(after.contains("`alm plan A01-01 <iteration>`"), "{text}");
+    assert!(after.contains("There is no iteration yet"), "{text}");
+    assert!(
+        after.contains("Nothing: make it ready, `alm ready A01-01`"),
+        "{text}"
+    );
+    assert!(
+        after.contains("name each open question in the description's Notes"),
+        "{text}"
+    );
+
+    // The iterations listed; in JSON too; the task stays in backlog with no iteration.
+    ok(
+        &dir,
+        &["add", "iteration", "I01", "First steps", "--release", "0.1"],
+    );
+    let v = ok(&dir, &["add", "task", "--area", "A01", "--title", "Two"]);
+    let steps = v["next_steps"].as_str().unwrap();
+    assert!(steps.contains("     I01  First steps  (0.1)\n"), "{steps}");
+    assert!(steps.contains("`alm ready A01-02`"), "{steps}");
+    assert_eq!(v["task"]["state"], "backlog");
+    assert_eq!(v["task"]["iteration"], Value::Null);
+
+    // In the task language.
+    ok(&dir, &["task-language", "zh-CN"]);
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Three"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("接下来（给添加它的智能体）"), "{text}");
+    assert!(text.contains("`alm plan A01-03 <迭代>`"), "{text}");
+    ok(&dir, &["task-language", "ja"]);
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Four"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("次に（追加したエージェントへ）"), "{text}");
 }
 
 /// Every file under `dir`, with its contents, to show that nothing changed.
