@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Allomos</title>
-<meta name="description" content="Switch AI agents and teammates without losing the project. A free local app for macOS and Windows; the project travels in a taskbag of plain files in your own repository.">
+<meta name="description" content="Switch AI agents and teammates without losing the project, and keep every task, step and handoff of your vibe coding on the record. A free local app for macOS and Windows.">
 <link rel="alternate" hreflang="en" href="https://www.allomos.com/">
 <link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/">
 <link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/">
 <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
-<meta property="og:title" content="Allomos — switch agents, switch teammates, keep the project">
-<meta property="og:description" content="When one AI agent or account runs out, another picks up where it stopped.">
+<meta property="og:title" content="Allomos — switch agents and teammates, keep the whole project on the record">
+<meta property="og:description" content="When one AI agent or account runs out, another picks up where it stopped, and every task and its history stay in your repository.">
 <meta property="og:url" content="https://www.allomos.com/">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -19,7 +19,7 @@
   <header>
     <a class="brand" href="/"><img src="/images/logo.svg" alt="">Allomos</a>
     <nav>
-      <a href="#what">What it does</a>
+      <a href="#what">Features</a>
       <a href="#pricing">Pricing</a>
       <a href="https://github.com/allomos/allomos">GitHub</a>
       <span class="lang"><a href="/" aria-current="page" lang="en">EN</a><a href="/zh/" lang="zh-CN">中文</a><a href="/ja/" lang="ja">日本語</a></span>
@@ -27,8 +27,8 @@
   </header>
 
   <div class="hero">
-    <h1>Switch agents. Switch teammates.<br>Keep the project.</h1>
-    <p>When one AI agent or account runs out, another picks up where it stopped. When you hand the work to a teammate, nothing stays behind in a chat. The project travels in its <strong>taskbag</strong>: plain files in your own repository.</p>
+    <h1>Switch agents and teammates.<br>Keep the whole project on the record.</h1>
+    <p>When one AI agent or account runs out, another picks up exactly where it stopped. Every task, its status and its handoff notes are written down in one place — your own repository — instead of scattered across chats.</p>
     <div class="btns">
       <a class="btn primary" href="https://github.com/allomos/allomos/releases">Download for macOS</a>
       <a class="btn secondary" href="https://github.com/allomos/allomos">View on GitHub</a>
@@ -42,8 +42,8 @@
   </div>
 
   <section id="problem">
-    <h2>Every switch loses the thread</h2>
-    <p class="lead">Vibe coding runs on many sessions: Claude Code, Codex, several accounts, several people. A quota can end a session without warning, and the next one starts cold. In one real multi-agent project:</p>
+    <h2>Vibe coding leaves its history in a hundred chats</h2>
+    <p class="lead">A project moves through many sessions: Claude Code, Codex, several accounts, several people. A quota can end a session without warning; the next one starts cold, and what was decided lives only in an old conversation. In one real multi-agent project:</p>
     <ul class="facts">
       <li><strong>185 KB</strong> of handoff notes that each new session re-read to resume;</li>
       <li><strong>6</strong> places where one task's status was copied by hand;</li>
@@ -53,17 +53,18 @@
   </section>
 
   <section id="what">
-    <h2>One main job, two that make it better</h2>
-    <div class="cards">
-      <div class="card"><div class="kicker k1">Switch</div><h3>Agents and teammates</h3><p>Shift the project between AI agents and people without losing anything. The same <code>alm</code> commands for every agent; handoff and resume in one step.</p></div>
-      <div class="card"><div class="kicker k2">AI skills</div><h3>Work better with agents</h3><p>Learn what each agent is good at, what to hand over at a switch, and a simple process: one task per outcome, proven steps, your approval before anything leaves your machine.</p></div>
-      <div class="card"><div class="kicker k3">Progress</div><h3>Where it stands, when it lands</h3><p>Progress by area, what waits on you, and a burndown with a forecast finish date from your real pace. <em>(planned)</em></p></div>
+    <h2>Four things Allomos does</h2>
+    <div class="cards four">
+      <div class="card"><div class="kicker k1">Switching</div><h3>Agents and teammates</h3><p>Hand the project from one AI agent or account to another, or to a teammate, and pick up exactly where it stopped. Nothing is lost at the switch.</p></div>
+      <div class="card"><div class="kicker k2">Task management</div><h3>The whole process, on the record</h3><p>Every task, its status, handoff notes and decisions are recorded in one place, not spread across chats — easy to review, and easy to maintain for years.</p></div>
+      <div class="card"><div class="kicker k3">AI skills <span class="badge">In development</span></div><h3>Get better with your agents</h3><p>Work with your agents in a way that improves over time: what each one does well, what to hand over, and a process that keeps you in control.</p></div>
+      <div class="card"><div class="kicker k1">Progress <span class="badge">In development</span></div><h3>Where it stands, when it lands</h3><p>Progress by area, what waits on you, and a forecast finish date drawn from your real pace.</p></div>
     </div>
   </section>
 
-  <section id="how">
-    <h2>Claude runs out, Codex picks up</h2>
-    <p class="lead">Tasks, proven steps and handoff notes live as readable files in <code>.allomos/taskbag/</code>, versioned by your own Git — not inside one agent's memory or one account.</p>
+  <section id="switch">
+    <h2>Switching: Claude runs out, Codex picks up</h2>
+    <p class="lead">Every agent uses the same <code>alm</code> commands. One step to hand over, one step to take over — between agents, between accounts, between people. The next session reads the task and its note, not a 185 KB history.</p>
 <pre><code># Claude Code · account 1 · quota nearly used
 alm label A01-03 "implemented"
 alm release A01-03 --note "form done; tests next"
@@ -72,6 +73,28 @@ alm release A01-03 --note "form done; tests next"
 alm next
 A01-03  Sign-in page  ready · note: tests next
 alm claim A01-03</code></pre>
+  </section>
+
+  <section id="tasks">
+    <h2>Task management: nothing hides in a chat</h2>
+    <p class="lead">Tasks live as readable files in <code>.allomos/taskbag/</code>, versioned by your own Git — not inside one agent's memory or one account. What the taskbag keeps:</p>
+    <ul class="points">
+      <li><strong>Every task and its state</strong> — ready, in progress, waiting, blocked, done — in one place, with one owner at a time.</li>
+      <li><strong>Proven steps</strong> — each task climbs a ladder (implemented → locally verified → deployed → checked by a person), so progress is shown, not claimed.</li>
+      <li><strong>Handoff notes and the AI's own decisions</strong> — what was done, what's next, and every routine choice the agent made, so you can review them later.</li>
+      <li><strong>A queue for you</strong> — what needs your check, your answer or your review, in one list.</li>
+    </ul>
+    <p class="lead">Months later, when you or a new teammate come back to the code, the reason behind each change is still there.</p>
+  </section>
+
+  <section id="skills">
+    <h2>AI skills <span class="badge">In development</span></h2>
+    <p class="lead">Working with agents is a skill, and it compounds. Allomos will help you learn what each agent is good at, what to pass on at a switch, and a simple way of working — one task per outcome, proven steps, your approval before anything leaves your machine — so every project goes better than the last.</p>
+  </section>
+
+  <section id="progress">
+    <h2>Progress <span class="badge">In development</span></h2>
+    <p class="lead">Where is the project, and when will it land? Progress by area, the tasks waiting on you, and a burndown with a forecast finish date based on how fast the work really moves.</p>
     <div class="figure">
       <img class="light-only" src="/images/glide-path-en-light.svg" width="612" alt="Burndown drawn as a glide path: 60 tasks left at week 0, 34 at week 6; a 50% chance of finishing by week 14 and an 85% chance by week 15.">
       <img class="dark-only" src="/images/glide-path-en-dark.svg" width="612" alt="">
