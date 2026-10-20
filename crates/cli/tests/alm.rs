@@ -1498,7 +1498,7 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
         assert_eq!(asked.title, "Move tasks into Allomos");
         assert!(asked.plan.contains("- 5 tasks"));
         assert_eq!(asked.from.as_deref(), Some("claude/test"));
-        allomos_store::answer_confirm(project, &asked.id, yes).unwrap();
+        allomos_store::answer_confirm(project, &asked.id, yes, None).unwrap();
     }
     let out = child.wait_with_output().unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -1510,6 +1510,69 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
     assert_eq!(left, [".gitignore"]);
     assert!(!taskbag.exists(), "asking never creates the taskbag");
     (out.status.code().unwrap(), v)
+}
+
+/// `alm confirm --task --evidence` (Task-A03-37): the popup carries the evidence and the task; a
+/// Go ahead counts only for the plan shown and is recorded in the task's history; a yes given for
+/// another version of the plan counts as no.
+#[test]
+fn a_go_ahead_counts_only_for_the_plan_shown_and_is_recorded() {
+    let repo = filled();
+    fs::write(repo.join("plan.md"), "- Rename the field\n").unwrap();
+    fs::write(repo.join("evidence.md"), "- 58 tests pass\n").unwrap();
+    let ask = |shown: Option<&str>| {
+        let child = Command::new(ALM)
+            .current_dir(&repo)
+            .args([
+                "--json",
+                "--as",
+                "claude/test",
+                "confirm",
+                "--title",
+                "Rename",
+            ])
+            .args(["--plan", "plan.md", "--evidence", "evidence.md"])
+            .args(["--task", "A01-01", "--timeout", "20"])
+            .env_remove("ALLOMOS_TASKBAG")
+            .env_remove("ALLOMOS_HOLDER")
+            .env("ALLOMOS_NO_LAUNCH", "1")
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let asked = (0..100)
+            .find_map(|_| {
+                std::thread::sleep(Duration::from_millis(100));
+                allomos_store::pending_confirms(&repo).pop()
+            })
+            .expect("the question appears");
+        assert_eq!(asked.evidence.as_deref(), Some("- 58 tests pass\n"));
+        assert_eq!(asked.task.as_deref(), Some("A01-01"));
+        let shown = shown.unwrap_or(&asked.fingerprint).to_string();
+        allomos_store::answer_confirm(&repo, &asked.id, true, Some(&shown)).unwrap();
+        let out = child.wait_with_output().unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (out.status.code().unwrap(), v, asked.fingerprint)
+    };
+    let (code, v, fingerprint) = ask(None);
+    assert_eq!((code, &v["answer"]), (0, &json!("yes")), "{v}");
+    assert_eq!(v["fingerprint"], json!(fingerprint));
+    let history = ok(&repo, &["history", "A01-01"]).to_string();
+    assert!(
+        history.contains(&format!("Rename (plan {fingerprint})")),
+        "{history}"
+    );
+    // Shown another version of the plan: not a Go ahead for this one.
+    let (code, v, _) = ask(Some("0123456789abcdef"));
+    assert_eq!((code, &v["error"]["code"]), (1, &json!("confirm_declined")));
+    // An unknown task is refused before the person is asked.
+    refused(
+        &repo,
+        &[
+            "confirm", "--title", "x", "--plan", "plan.md", "--task", "A09-09",
+        ],
+        1,
+        "task_not_found",
+    );
 }
 
 #[test]
@@ -2084,7 +2147,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v18)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v19)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2094,7 +2157,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v18)", "## Tasks: Allomos (v17)")
+            brief.replace("## Tasks: Allomos (v19)", "## Tasks: Allomos (v18)")
         ),
     )
     .unwrap();

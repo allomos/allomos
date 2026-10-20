@@ -54,7 +54,7 @@ export function ConfirmDialog({
     setBusy(true);
     setError(null);
     try {
-      await messenger.answerConfirm(project, request.id, yes);
+      await messenger.answerConfirm(project, request.id, yes, request.fingerprint);
       setRequest(null);
       if (!yes) onCancelled?.();
     } catch (e) {
@@ -71,9 +71,17 @@ export function ConfirmDialog({
         <p className="muted">
           {request.from ? t("confirm.from", { from: request.from }) : t("confirm.from_unknown")}
         </p>
+        {request.task && <p className="muted small">{t("confirm.for_task", { id: request.task })}</p>}
         <div className="dialog-body">
           <Markdown source={request.plan} onLink={() => undefined} />
+          {request.evidence && (
+            <>
+              <h3>{t("confirm.evidence")}</h3>
+              <Markdown source={request.evidence} onLink={() => undefined} />
+            </>
+          )}
         </div>
+        <p className="muted small">{t("confirm.scope")}</p>
         {error && <p className="banner error">{error}</p>}
         <div className="row">
           <button type="button" onClick={() => void answer(false)} disabled={busy}>

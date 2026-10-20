@@ -194,7 +194,8 @@ export interface Messenger {
   /** The person closed a finished (or silent) report: remove it. */
   dismissProgress(project: string, id: string): Promise<void>;
   /** The person's answer to one of them. Rejects with a Problem when it is no longer waiting. */
-  answerConfirm(project: string, id: string, yes: boolean): Promise<void>;
+  /** A Go ahead names the fingerprint of what the person was shown, so it counts only for that plan (Task-A03-37). */
+  answerConfirm(project: string, id: string, yes: boolean, fingerprint?: string): Promise<void>;
   /** The open-folder flow's state for the taskbag at `root` (records the project folder when it is beside `.allomos/`). */
   projectSetup(root: string): Promise<SetupState>;
   /** Records `folder` as the project folder of the taskbag at `root`. Rejects with a Problem. */
@@ -304,7 +305,8 @@ export const desktopMessenger: Messenger = {
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   progressReports: (project) => invoke<Progress[]>("progress_reports", { project }),
   dismissProgress: (project, id) => invoke<void>("dismiss_progress", { project, id }),
-  answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
+  answerConfirm: (project, id, yes, fingerprint) =>
+    invoke<void>("answer_confirm_request", { project, id, yes, fingerprint: fingerprint ?? null }),
   projectSetup: (root) => invoke<SetupState>("project_setup", { root }),
   setProjectFolder: (root, folder) => invoke<SetupState>("set_project_folder", { root, folder }),
   setConnectEnabled: (enabled) => invoke<void>("set_connect_enabled", { enabled }),

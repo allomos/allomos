@@ -16,12 +16,12 @@ use allomos_core::ops::{self, Outcome};
 use allomos_core::{FORMAT, Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
-    Actor, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions,
-    agent_section, agent_section_for, agent_setup_request, default_root, events, find_taskbag,
-    guide, id_from_name, init_with_labels, load, localized, pick_ui_language, picked_folder,
-    plain_path, post_confirm, project_folder_of, read_answer, read_text, requests_dir,
-    saved_ui_language, task_language, taskbag_of, tidy, versions, was_seen, with_written_files,
-    withdraw_confirm,
+    Actor, ConfirmExtra, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES,
+    add_agent_instructions, agent_section, agent_section_for, agent_setup_request, default_root,
+    events, find_taskbag, guide, id_from_name, init_with_labels, load, localized, pick_ui_language,
+    picked_folder, plain_path, post_confirm, project_folder_of, read_answer, read_text,
+    requests_dir, saved_ui_language, task_language, taskbag_of, tidy, versions, was_seen,
+    with_written_files, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -143,6 +143,14 @@ enum Command {
         /// How long to wait for the answer, in seconds.
         #[arg(long, default_value_t = 600, value_name = "SECONDS")]
         timeout: u64,
+        /// A Markdown file with the evidence, shown under the plan: what was checked and the
+        /// results.
+        #[arg(long, value_name = "FILE")]
+        evidence: Option<PathBuf>,
+        /// The task the approval is for: a Go ahead is recorded in its history, for exactly the
+        /// plan shown. If the plan changes afterwards, ask again.
+        #[arg(long, value_name = "ID")]
+        task: Option<String>,
     },
     /// Tell the person in the Allomos app what you are doing on a job it gave you: the app shows
     /// a progress popup. Start with --title and --step, report each step, and end with --finished.
@@ -199,6 +207,18 @@ enum Command {
     /// A person has checked a finished task: it gets the top label and leaves To check; the note
     /// and the steps stay in its history. Run it only when the person says so.
     Checked { id: String },
+    /// Send a finished task back to To check: its work changed after a person checked it, so
+    /// the check no longer covers it. You decide when; say what changed. A task at the top label
+    /// goes one step down.
+    Recheck {
+        id: String,
+        /// What changed since the person checked it, in one line. Shown under To check.
+        #[arg(long, value_name = "TEXT")]
+        reason: String,
+        /// A Markdown file with new steps for checking it (otherwise the earlier steps stay).
+        #[arg(long, value_name = "FILE")]
+        steps: Option<PathBuf>,
+    },
     /// Record a decision you made on your own in a task (a routine choice: a name, a file layout,
     /// a small detail with an obvious default): what you decided and why, in one line. It is kept
     /// in the task's history; `alm human` lists it under To review: AI decisions until a person
@@ -551,6 +571,7 @@ impl Command {
             | Command::Unblock { id }
             | Command::Done { id, .. }
             | Command::Checked { id }
+            | Command::Recheck { id, .. }
             | Command::AiDecided { id, .. }
             | Command::Reviewed { id }
             | Command::Release { id, .. }
@@ -586,6 +607,9 @@ impl Command {
 
     /// Whether the command writes to the taskbag.
     fn changes(&self) -> bool {
+        if let Command::Confirm { task, .. } = self {
+            return task.is_some();
+        }
         if let Command::Project { name, id } = self {
             return name.is_some() || id.is_some();
         }
@@ -652,6 +676,7 @@ impl Command {
             Command::Unblock { .. } => "unblock",
             Command::Done { .. } => "done",
             Command::Checked { .. } => "checked",
+            Command::Recheck { .. } => "recheck",
             Command::AiDecided { .. } => "ai-decided",
             Command::Reviewed { .. } => "reviewed",
             Command::Human { .. } => "human",
@@ -1300,13 +1325,34 @@ fn windows_app() -> Option<PathBuf> {
 }
 
 /// `alm confirm`: leave the question, wait for the person's answer in the app, then tidy up.
-fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Result<Done, Problem> {
+fn confirm(
+    cli: &Cli,
+    cwd: &Path,
+    title: &str,
+    plan: &Path,
+    timeout: u64,
+    evidence: Option<&Path>,
+    task: Option<&str>,
+) -> Result<Done, Problem> {
     let project = confirm_project(cli, cwd);
-    let path = cwd.join(plan);
-    let text = read_text(&path).map_err(|e| Problem::ReadFailed {
-        detail: format!("{}: {e}", path.display()),
-    })?;
-    if text.len() > MAX_PLAN_BYTES {
+    let read = |file: &Path| {
+        let path = cwd.join(file);
+        read_text(&path).map_err(|e| Problem::ReadFailed {
+            detail: format!("{}: {e}", path.display()),
+        })
+    };
+    let text = read(plan)?;
+    let evidence = evidence.map(read).transpose()?;
+    // The task must exist before the person is asked about it.
+    let root = match task {
+        Some(id) => {
+            let root = locate(cli, cwd)?;
+            allomos_core::ops::find_task(&taskbag_of(&root, load(&root))?.0, id)?;
+            Some(root)
+        }
+        None => None,
+    };
+    if text.len() + evidence.as_ref().map_or(0, String::len) > MAX_PLAN_BYTES {
         return Err(Problem::BadUsage {
             detail: format!(
                 "the plan is longer than {} KB; keep it to what the person must decide",
@@ -1314,13 +1360,21 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
             ),
         });
     }
-    let asked =
-        post_confirm(&project, title, &text, cli.holder.as_deref(), timeout).map_err(|e| {
-            Problem::WriteFailed {
-                path: requests_dir(&project).display().to_string(),
-                detail: e.to_string(),
-            }
-        })?;
+    let asked = post_confirm(
+        &project,
+        title,
+        &text,
+        cli.holder.as_deref(),
+        timeout,
+        ConfirmExtra {
+            evidence: evidence.as_deref(),
+            task,
+        },
+    )
+    .map_err(|e| Problem::WriteFailed {
+        path: requests_dir(&project).display().to_string(),
+        detail: e.to_string(),
+    })?;
     if !cli.json {
         eprintln!(
             "Waiting for the person to answer in the Allomos app (project {})…",
@@ -1330,7 +1384,7 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
     let start = std::time::Instant::now();
     let mut launched = false;
     let answer = loop {
-        if let Some(answer) = read_answer(&project, &asked.id) {
+        if let Some(answer) = read_answer(&project, &asked.id, &asked.fingerprint) {
             break Some(answer);
         }
         if start.elapsed() >= Duration::from_secs(timeout) {
@@ -1344,10 +1398,27 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
     };
     withdraw_confirm(&project, &asked.id);
     match answer {
-        Some(true) => Ok(Done::new(
-            json!({ "answer": "yes", "project": project }),
-            "The person chose Go ahead.\n".to_string(),
-        )),
+        Some(true) => {
+            let mut out = format!(
+                "The person chose Go ahead, for exactly this plan (fingerprint {}). If the plan changes, ask again.\n",
+                asked.fingerprint
+            );
+            if let (Some(root), Some(id)) = (&root, task) {
+                let task = allomos_store::record_approval(
+                    root,
+                    Actor::alm(cli.holder.as_deref()),
+                    lock_wait(),
+                    id,
+                    title,
+                    &asked.fingerprint,
+                )?;
+                out.push_str(&format!("Recorded in {}'s history.\n", task.id));
+            }
+            Ok(Done::new(
+                json!({ "answer": "yes", "project": project, "fingerprint": asked.fingerprint, "task": task }),
+                out,
+            ))
+        }
         Some(false) => Err(Problem::ConfirmDeclined),
         None => Err(Problem::ConfirmTimeout {
             seconds: timeout.to_string(),
@@ -1763,7 +1834,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             title,
             plan,
             timeout,
-        } => confirm(cli, cwd, title, plan, *timeout),
+            evidence,
+            task,
+        } => confirm(
+            cli,
+            cwd,
+            title,
+            plan,
+            *timeout,
+            evidence.as_deref(),
+            task.as_deref(),
+        ),
         Command::Progress {
             title,
             step,
@@ -2693,6 +2774,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             Ok(done)
         }
         Command::Checked { id } => change(cli, cwd, |bag| ops::checked(bag, id)),
+        Command::Recheck { id, reason, steps } => {
+            let steps = match steps {
+                Some(file) => {
+                    let path = cwd.join(file);
+                    Some(
+                        std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+                            detail: format!("{}: {e}", path.display()),
+                        })?,
+                    )
+                }
+                None => None,
+            };
+            change(cli, cwd, |bag| {
+                ops::recheck(bag, id, reason, steps.as_deref())
+            })
+        }
         Command::AiDecided { id, text } => {
             let root = locate(cli, cwd)?;
             let d = allomos_store::record_ai_decision(
