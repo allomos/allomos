@@ -1569,7 +1569,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         move_tasks_in,
         check_updates,
         update_action: Mutex::new(UpdateAction::Check),
-        about_tagline: Mutex::new("Switch agents. Switch teammates. Keep the project.".into()),
+        about_tagline: Mutex::new("Switch agents and teammates. Keep the whole project on the record.".into()),
         recent,
         state: Mutex::new(Recent::default()),
     });
