@@ -33,7 +33,7 @@ Allomos relies on these terms. Use them as defined here, in commands and when yo
 about the project's tasks.
 
 - **Taskbag**: the folder holding the project's tasks (`.allomos/taskbag/`): readable JSON and
-  Markdown files tracked by Git. Change it only with `alm`, except the project notes and your
+  Markdown files kept in your version control tool (Git, for example). Change it only with `alm`, except the project notes and your
   own handoff file.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
   task (what is running, pitfalls, where the code and the taskbag are kept online, where
@@ -126,8 +126,8 @@ Read this before you add a task, so it fits this project.
    description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
    goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
    checked, with numbers and logs, under an **Evidence** heading).
-6. **Branch.** Say which Git branch you are on: `--branch <name>` (`git branch --show-current`;
-   alm reads no Git). The new task gets a base branch, by its real name: the branch it starts
+6. **Branch.** Say which branch you are on: `--branch <name>` (as your version control tool
+   shows it; in Git: `git branch --show-current`; alm reads no version control). The new task gets a base branch, by its real name: the branch it starts
    from and merges back into. When the branch you are on is a task's working branch, the new
    task shares that task's base; otherwise its base is the branch you are on. alm prints which
    and why; `--base <name>` chooses another. When you hold a task on another base, alm says so:
@@ -150,8 +150,8 @@ make them ready yourself (`alm ready <id>`). Record that approval once, on the g
 title starts with `Goal:`). Anything with an outside effect still waits for the approver
 (`alm wait`).
 
-When the project shares its tasks through Git, run the Git commands `alm add task` prints, so
-others see the new task.
+When the project shares its tasks through a version control tool, save and share the files
+`alm add task` lists (it prints the Git commands as the example), so others see the new task.
 ";
 
 const COMMANDS: &str = "# alm commands
@@ -191,7 +191,7 @@ Work a task:
 - `alm claim <id> --branch <the branch you are on> [--working <name>]`: you hold it; state in
   progress. It records the working branch (`--working`, default the branch you are on), gives a
   task without a base the branch you are on, prints the base to start from and merge into with
-  the Git commands (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
+  the Git commands as the example (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
   you are not on the base. `--take` only when its holder has stopped.
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
@@ -263,7 +263,7 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
   show a task's latest one.
 - `alm handoffs --check [--task <id>]`: the rule for checking the handoffs yourself, one by one,
   and removing those whose tasks are all done or dropped.
-- `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (Git keeps it).
+- `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (the version history keeps it).
 - `alm handoff-template [--set <file.md>]`: show or replace the project's template.
 
 Ask the person:
@@ -342,10 +342,10 @@ until the person says Go ahead.
    `tasks/<id>/card.md`, points the description's `Card:` link to it (adding one at the top when
    there is none) and clears the report; it never replaces a different `card.md` (`card_exists`).
    A finished or dropped task can be changed whoever is named as its holder.
-5. Finish what the plan names: remove the originals from the project folder (`git rm`), change the
+5. Finish what the plan names: remove the originals from the project folder (in Git: `git rm`), change the
    documents that linked to a card's old place, and remove the cards folder once it is empty.
-   Commit the taskbag's changes (the Git commands `alm` printed) and the project's changes, each
-   in its own repository. Check: `alm cards` lists none, `alm list --json` reports no issues, and
+   Save and share the taskbag's changes (the files `alm` listed; it printed the Git commands as the
+   example) and the project's changes, each in its own repository. Check: `alm cards` lists none, `alm list --json` reports no issues, and
    every moved task's `Card:` link opens its `card.md`.
 6. Tell the person what moved, what did not and why, and the card files without a task.
 ";
@@ -357,22 +357,25 @@ const WORKFLOW: &str = "# How to work the tasks
    first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
    `alm next` shows (the whole file is the taskbag's `project-notes.md`).
    **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
-   check the real state before trusting it: the worktree, branch and running processes it names
-   (`git worktree list`, `git status -sb`, listening ports). What the previous session still
+   check the real state before trusting it: the working copy, branch and running processes it
+   names (as your version control tool shows them; in Git: `git worktree list`, `git status -sb`;
+   and listening ports). What the previous session still
    holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the
    question with `alm wait`). What the handoff lists as already done (its **Already done, do not
    repeat** line) is not done again: a change of agent, account or session keeps the approvals
    and what was done; it does not authorize repeating it.
-2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>
-   --branch <the branch you are on>` (`git branch --show-current`; alm reads no Git), and run
-   the Git commands it prints right away: until your claim is pushed, other sessions do not see
-   it and may take the task too. A task someone else holds is not yours to change.
+2. Hold one task at a time. Pull first (get the latest changes), then `alm claim <id> --as <your
+   session name> --branch <the branch you are on>` (as your version control tool shows it; in
+   Git: `git branch --show-current`; alm reads no version control), and save and share the claim
+   right away with your version control tool (it prints the Git commands as the example): until
+   your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
    **Branches.** Every task has a base branch, by its real name (`main`, `master`,
    `storage-v2`…): it starts from it and merges back into it; merging one base branch into
    another is a task of its own. The claim records your working branch, the one you work on
    (`--working <name>` when it is not the one you are on, for example a new branch for a
    worktree of its own),
-   prints which base to start from and merge into with the Git commands, and says so when you
+   prints which base to start from and merge into with the Git commands as the example, and says
+   so when you
    are not on the base. A task without a base gets the branch you are on. Work in the current
    checkout by default; make a worktree of its own only when the task needs one (for example
    when several sessions work at once). Once the task's branch is merged into its base, remove
@@ -428,14 +431,14 @@ Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
   Two exceptions: fill in your own handoff file, the one `alm handoff` names; and keep
   `project-notes.md` true. Update it when you start or stop a server or process, create or change
-  a hosted resource or a Git remote, learn a pitfall that would change what the next session
-  does, or a credential moves; change lines in place, remove lines no longer true, and commit and
-  push that file yourself.
+  a hosted resource or a remote repository, learn a pitfall that would change what the next
+  session does, or a credential moves; change lines in place, remove lines no longer true, and
+  save and share that file with your version control tool yourself.
 - Never write credentials or personal details (a person's or an account's email address, account
   or user name, phone number, home address, local network address) into the project notes, a
   handoff, a task, a document or the code: write a placeholder such as
-  `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Git history keeps
-  whatever was written, even after it is removed.
+  `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Version history
+  keeps whatever was written, even after it is removed.
 - Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
@@ -449,8 +452,9 @@ Rules:
   things), anything that changes the plan or another task, and anything with a cost or an outside
   effect goes to the approver first (`alm wait`). In a goal run (step 9) the plan was approved in
   advance; outside effects still go to the approver.
-- After every `alm` change, run the Git commands it prints: they name only that change's files.
-  Your other work is committed as usual.
+- After every `alm` change, save and share the files it lists with your version control tool (it
+  prints the Git commands as the example): only that change's files. Your other work is saved as
+  usual.
 ";
 
 const RUN_MODES_EN: &str = "# Run modes: quiet or normal
@@ -663,21 +667,21 @@ contradictions.
    `alm wait <id> --on \"<the question>\"` on the task you hold, and move everything else.
 4. **Record the agent as set up** in the taskbag's `project-notes.md`, under `## Agents set up`
    (add that section when it is missing): one line per agent, with its file and the date, for
-   example `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`. Then commit only those
-   files. In the project: AGENTS.md and the agent files you changed
-   (`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`).
+   example `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`. Then save only those
+   files in your version control tool. In the project: AGENTS.md and the agent files you changed
+   (in Git: `git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`).
    In the taskbag: `project-notes.md`
-   (`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
-   Leave every other change as it is. Push as the project's rules say; when they say nothing,
-   only when the person asks.
+   (in Git: `git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
+   Leave every other change as it is. Share (push) as the project's rules say; when they say
+   nothing, only when the person asks.
 5. **Tell the person** what moved, which files now point to AGENTS.md, and the contradictions
    waiting for their answer.
 
 From then on:
 - Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file.
 - After changing shared rules, tell the person which running sessions still use the old ones:
-  those holding tasks in progress (`alm list --state in_progress`) and the worktrees they work in
-  (`git worktree list`). A session reads the new rules when it starts again.
+  those holding tasks in progress (`alm list --state in_progress`) and the working copies they work
+  in (in Git: `git worktree list`). A session reads the new rules when it starts again.
 ";
 
 const AGENT_FILES_ZH_CN: &str = "# 智能体文件：一套共用规则，放在 AGENTS.md
@@ -706,18 +710,18 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
    在安静运行中，用 `alm wait <id> --on \"<the question>\"` 把问题挂在你持有的任务上，其余照常移动。
 4. **记录这个智能体已设置好**：在任务包的 `project-notes.md` 里 `## Agents set up` 一节下（没有就
    添加这一节），每个智能体一行，写明它的文件和日期，例如
-   `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。然后只提交这些文件。在项目里：
+   `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。然后用你的版本控制工具只保存这些文件。在项目里：
    AGENTS.md 和你改过的智能体文件
-   （`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
+   （用 Git 时：`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
    在任务包里：`project-notes.md`
-   （`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
-   其他改动保持原样。按项目规则推送；规则没说时，只在用户要求时推送。
+   （用 Git 时：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
+   其他改动保持原样。按项目规则共享（推送）；规则没说时，只在用户要求时共享。
 5. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，以及哪些矛盾在等他们回答。
 
 此后：
 - 共用规则只放在 AGENTS.md；不要把共用规则加到某个智能体自己的文件里。
 - 改了共用规则之后，告诉用户哪些正在运行的会话还在用旧规则：持有进行中任务的会话
-  （`alm list --state in_progress`）和它们工作的工作树（`git worktree list`）。会话重新开始时
+  （`alm list --state in_progress`）和它们工作的工作副本（用 Git 时：`git worktree list`）。会话重新开始时
   才会读到新规则。
 ";
 
@@ -755,11 +759,11 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
 4. **エージェントを設定済みとして記録します。** タスクバッグの `project-notes.md` の
    `## Agents set up` の節（なければ加えます）に、エージェントごとに一行、そのファイルと日付を
    書きます。たとえば `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。それから、
-   それらのファイルだけをコミットします。プロジェクトでは AGENTS.md と変えたエージェントのファイル
-   （`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
+   それらのファイルだけをバージョン管理ツールで保存します。プロジェクトでは AGENTS.md と変えたエージェントのファイル
+   （Git なら：`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
    タスクバッグでは `project-notes.md`
-   （`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
-   ほかの変更はそのままにします。プッシュはプロジェクトのルールに従い、ルールに何もなければ
+   （Git なら：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
+   ほかの変更はそのままにします。共有（プッシュ）はプロジェクトのルールに従い、ルールに何もなければ
    ユーザーに頼まれたときだけにします。
 5. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どの
    食い違いが答えを待っているか。
@@ -767,8 +771,8 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
 これから先：
 - 共通ルールは AGENTS.md にだけ置きます。共通ルールをあるエージェント自身のファイルに足しません。
 - 共通ルールを変えたら、まだ古いルールで動いているセッションをユーザーに伝えます：進行中の
-  タスクを持つセッション（`alm list --state in_progress`）と、それが作業しているワークツリー
-  （`git worktree list`）。セッションは次に始めるときに新しいルールを読みます。
+  タスクを持つセッション（`alm list --state in_progress`）と、それが作業している作業コピー
+  （Git なら：`git worktree list`）。セッションは次に始めるときに新しいルールを読みます。
 ";
 
 /// `alm guide agent-files` in `language`, or `None` when it is not written in that language.
@@ -801,7 +805,7 @@ Write tasks in the task language (`alm task-language`); IDs, commands and code s
 **Goal-run mode.** Submitting the goal approved the plan in advance (approver, 2026-10-16): in
 this run you add the areas and iterations and make your own tasks ready, without asking. Record
 that approval once, on the goal task (phase 2). Everything else in AGENTS.md still holds: anything
-with an outside effect (creating accounts or a Git remote, API keys, payment, deployment, sending
+with an outside effect (creating accounts or a remote repository, API keys, payment, deployment, sending
 anything) waits for the approver with `alm wait`, and you go on with other ready tasks. There is
 no spend cap: the quota is the limit (`alm handoff-rules`: near 3% left, write your handoff and
 stop; the same prompt continues later).
@@ -849,7 +853,7 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
 ## 3. Build
 
 Iteration by iteration, one task at a time: `alm next`, then `alm claim <id> --as <your session
-name> --branch <the branch you are on>` (run the Git commands it prints), do the work and commit
+name> --branch <the branch you are on>` (save and share the claim; it prints the Git commands as the example), do the work and save it
 it, `alm label <id> \"<label>\"` as each step is proven, and finish it the same way in either
 run mode: once the work is finished and only the person's check by hand is left,
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`, the steps telling the
@@ -900,7 +904,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 
 **目标运行模式。** 提交目标就是事先批准了计划（批准人，2026-10-16）：在这次运行中，你自己添加
 领域和迭代，自己把任务设为就绪，不用询问。把这项批准在目标任务上记录一次（阶段 2）。AGENTS.md 里
-的其他规则照旧：任何对外有影响的事（创建账号或 Git 远程仓库、API 密钥、付款、部署、发送任何东西）
+的其他规则照旧：任何对外有影响的事（创建账号或远程仓库、API 密钥、付款、部署、发送任何东西）
 都用 `alm wait` 等批准人处理，你接着做其他就绪的任务。没有花费上限：额度就是限制
 （`alm handoff-rules`：剩余接近 3% 时，写好交接并停下；之后用同一段提示继续）。
 
@@ -940,7 +944,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 ## 3. 构建
 
 一个迭代接一个迭代，一次一个任务：`alm next`，然后 `alm claim <id> --as <your session name>
---branch <the branch you are on>`（运行它打印的 Git 命令），做完工作并提交，每证明一步就
+--branch <the branch you are on>`（保存并共享认领；它以 Git 命令为例），做完工作并保存（提交），每证明一步就
 `alm label <id> \"<label>\"`，两种运行模式下都用同一种方式完成它：工作做完、只差那个人亲手检查时，
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`，步骤告诉那个人怎么试用
 （达到最高标签、那个人检查过之后：`alm done <id>`）。
@@ -986,7 +990,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
 **ゴール実行モード。** ゴールを出したことで、計画は前もって承認されています（承認者、2026-10-16）。
 この実行では、エリアとイテレーションを自分で加え、自分のタスクを聞かずに準備完了にします。その承認は
 ゴールのタスクに一度だけ記録します（段階 2）。AGENTS.md のほかのルールはそのままです。外部への影響が
-あること（アカウントや Git のリモートの作成、API キー、支払い、デプロイ、何かを送ること）は
+あること（アカウントやリモートリポジトリの作成、API キー、支払い、デプロイ、何かを送ること）は
 `alm wait` で承認者を待ち、ほかの準備完了のタスクを進めます。費用の上限はありません。上限は利用枠です
 （`alm handoff-rules`：残りが 3% 近くになったらハンドオフを書いて止まり、同じプロンプトであとで続けます）。
 
@@ -1032,7 +1036,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
 ## 3. 作る
 
 イテレーションごとに、一度に一つのタスク：`alm next`、続けて `alm claim <id> --as <your session
-name> --branch <the branch you are on>`（表示される Git コマンドを実行します）、作業をしてコミット
+name> --branch <the branch you are on>`（担当を保存して共有します。Git のコマンドが例として表示されます）、作業をして保存（コミット）
 し、一歩ずつ確かめるたびに `alm label <id> \"<label>\"`、そしてどちらの実行モードでも同じように
 終えます：作業が終わり、その人が手で試す確認だけが残ったら
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`。手順にはその人が試すしかたを
@@ -1365,17 +1369,17 @@ mod tests {
             flat(crate::agent_section()).contains("`--base` overrides it"),
             "brief"
         );
-        // Decision 0017: no `--commit` / `--push`; pull before claiming, push the claim at once,
-        // and run the Git commands each change prints.
+        // Decision 0017: no `--commit` / `--push`; get the latest changes before claiming, share
+        // the claim at once in the version control tool, with the Git commands as the example
+        // (Task-A01-60).
         for text in [guide(None).unwrap(), crate::agent_section()] {
             assert!(!text.contains("--push"), "{text}");
             assert!(!text.contains("--commit"), "{text}");
-            assert!(
-                text.contains("Pull first") || text.contains("pull first"),
-                "{text}"
-            );
-            assert!(text.contains("until your claim is pushed"), "{text}");
-            assert!(text.contains("Git commands"), "{text}");
+            let text = flat(text);
+            assert!(text.contains("latest changes"), "{text}");
+            assert!(text.contains("until your claim is shared"), "{text}");
+            assert!(text.contains("version control tool"), "{text}");
+            assert!(text.contains("Git commands as the example"), "{text}");
         }
     }
 
@@ -1426,7 +1430,7 @@ mod tests {
             "Contradictions are not yours to settle",
             "do not choose between them",
             "list each pair for the person",
-            "commit only those files",
+            "save only those files in your version control tool",
             "Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file",
         ] {
             assert!(en.contains(words), "{words}");

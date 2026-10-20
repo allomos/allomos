@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v17)
+## Tasks: Allomos (v18)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -48,11 +48,13 @@ the project notes (below) and your own handoff file.
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
   Pitfalls), or `alm list`.
-- Take a task: pull first, then `alm claim <id> --as <your session name> --branch <the branch
-  you are on>` (`git branch --show-current`), and run the Git commands it prints right away:
-  until your claim is pushed, other sessions do not see it. Every task has a base branch, by its
-  real name: it starts from it and merges back into it; the claim records your working branch
-  and prints the base to start from and merge into, with the Git commands.
+- Take a task: get the latest changes first, then `alm claim <id> --as <your session name>
+  --branch <the branch you are on>` (as your version control tool shows it; in Git:
+  `git branch --show-current`), and save and share the claim right away with your version
+  control tool (it prints the Git commands as the example): until your claim is shared, other
+  sessions do not see it. Every task has a base branch, by its real name: it starts from it and
+  merges back into it; the claim records your working branch and prints the base to start from
+  and merge into, with the Git commands as the example.
 - Report progress: `alm label <id> "<label>"`.
 - Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
@@ -112,24 +114,27 @@ Shared rules: every AI agent on this project follows one set of shared rules, in
   file does not point to AGENTS.md, run `alm guide agent-files` and do it once for yourself
   before other work.
 - After changing shared rules, tell the person which running sessions still use the old ones
-  (from the taskbag's holders, `alm list --state in_progress`, and `git worktree list`).
+  (from the taskbag's holders, `alm list --state in_progress`, and your version control tool's
+  working copies; in Git: `git worktree list`).
 
 Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
 task: what is running, pitfalls, where credentials live (never their values). Read it at the
 start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
 file aside), you edit it directly, and you keep it true while you work: update it when you start
-or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
-that would change what the next session does, or a credential moves. Change lines in place and
-remove lines that are no longer true; then commit and push that file with Git yourself.
+or stop a server or process, create or change a hosted resource or a remote repository, learn a
+pitfall that would change what the next session does, or a credential moves. Change lines in
+place and remove lines that are no longer true; then save and share that file with your version
+control tool yourself.
 Personal details are kept out like credentials: never write a person's or an account's email
 address, account or user name, phone number, home address or local network address into the
 project notes, a handoff, a task, a document or the code. Write a placeholder such as
 `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
-Git history keeps whatever was written, even after it is removed.
+version history keeps whatever was written, even after it is removed.
 
-`alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
-`git commit`, `git push`), naming only that change's files: run them, and leave other changes as
-they are.
+`alm` never runs your version control tool. After every change it lists the changed files for
+you to save and share with your version control tool, with the Git commands as the example
+(`git add`, `git commit`, `git push`), naming only that change's files: save and share those,
+and leave other changes as they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task

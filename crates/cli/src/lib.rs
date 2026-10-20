@@ -217,13 +217,15 @@ enum Command {
     /// Show a task's history: every recorded change, newest first, with who and when.
     History { id: String },
     /// Hold a task and start it. Say which branch you are on (--branch): alm records the task's
-    /// working branch and says which base to start from and merge into, with the Git commands.
+    /// working branch and says which base to start from and merge into, with the Git commands as the
+    /// example.
     Claim {
         id: String,
         /// Take the task over from its current holder.
         #[arg(long)]
         take: bool,
-        /// The branch you are on (`git branch --show-current`; alm reads no Git). A task without a
+        /// The branch you are on, as your version control tool shows it (in Git:
+        /// `git branch --show-current`; alm reads no version control). A task without a
         /// base gets it.
         #[arg(long, value_name = "NAME")]
         branch: Option<String>,
@@ -471,7 +473,8 @@ enum Add {
         title: String,
         #[arg(long)]
         description: Option<String>,
-        /// The branch you are on (`git branch --show-current`; alm reads no Git). When it is a
+        /// The branch you are on, as your version control tool shows it (in Git:
+        /// `git branch --show-current`; alm reads no version control). When it is a
         /// task's working branch, the new task gets that task's base; otherwise this branch.
         #[arg(long, value_name = "NAME")]
         branch: Option<String>,
@@ -1353,7 +1356,7 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and run the Git commands it prints right away: until your claim is pushed, other sessions do not see it.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
     let mut v = serde_json::to_value(t).expect("tasks serialize");
@@ -1466,7 +1469,7 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
     // (Task-A03-30). alm reads no remote; the agent fills the section from its own Git remotes.
     match n.repositories.as_deref() {
         None => text.push_str(&format!(
-            "Repositories: no such section. Add `## Repositories` to {} with where the code and this taskbag are kept online (each folder's Git remote, the address only), so an agent working from a copy elsewhere, in the cloud for example, finds both.\n",
+            "Repositories: no such section. Add `## Repositories` to {} with where the code and this taskbag are kept online (each folder's remote repository, the address only; in Git: its remote), so an agent working from a copy elsewhere, in the cloud for example, finds both.\n",
             n.file
         )),
         Some([]) => text.push_str("Repositories: none named.\n"),
@@ -2933,7 +2936,7 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
         .push_str(&format!("  base branch: {base} ({why})\n"));
     let Some(working) = at.branches.working.as_deref() else {
         steps.text.push_str(&format!(
-            "Start from {base} and merge back into {base}. Claim it again with --branch <the branch you are on> for the Git commands.\n"
+            "Start from {base} and merge back into {base}. Claim it again with --branch <the branch you are on> for the steps (with the Git commands as the example).\n"
         ));
         return steps;
     };
@@ -2973,7 +2976,7 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
             .push(format!("You are on {c}, not on {base}, the task's base."));
     }
     steps.text.push_str(&format!(
-        "Start from {base} and merge back into {base} (alm runs no Git; these are for you):\n"
+        "Start from {base} and merge back into {base} (alm runs no version control tool; for Git, these are the commands):\n"
     ));
     if steps.start.is_empty() {
         steps
@@ -2993,7 +2996,7 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
     }
     if steps.merge.is_empty() {
         steps.text.push_str(&format!(
-            "  You work on {base} itself: commit and push there; there is nothing to merge.\n"
+            "  You work on {base} itself: save and share your changes there (in Git: commit and push); there is nothing to merge.\n"
         ));
     } else {
         steps

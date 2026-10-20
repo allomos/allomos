@@ -181,7 +181,7 @@ This folder is an Allomos project. Its tasks, areas and progress are in
 - Open this folder in the Allomos app to see the tasks by area.
 - AI agents and people can also work the tasks from a terminal with the `alm` command
   (`alm list`, `alm next`, `alm claim <task>`).
-- The files are plain JSON and Markdown, so Git can track every change.
+- The files are plain JSON and Markdown, so a version control tool (Git, for example) can track every change.
 
 Allomos wrote this file because the folder was empty. You may edit or delete it.
 ";
@@ -194,7 +194,7 @@ const README_ZH_CN: &str = "# 换肩项目
 - 在「换肩」应用中打开此文件夹，即可按领域查看任务。
 - AI 智能体和人也可以在终端中用 `alm` 命令处理任务
   （`alm list`、`alm next`、`alm claim <任务>`）。
-- 这些文件是普通的 JSON 和 Markdown，Git 可以记录每一处更改。
+- 这些文件是普通的 JSON 和 Markdown，版本控制工具（例如 Git）可以记录每一处更改。
 
 此文件夹原本是空的，所以「换肩」写了这个文件。你可以修改或删除它。
 ";
@@ -207,7 +207,7 @@ const README_JA: &str = "# 肩代プロジェクト
 - 「肩代」アプリでこのフォルダーを開くと、タスクをエリアごとに見られます。
 - AI エージェントや人は、ターミナルの `alm` コマンドでもタスクを扱えます
   （`alm list`、`alm next`、`alm claim <タスク>`）。
-- ファイルはただの JSON と Markdown なので、Git ですべての変更を記録できます。
+- ファイルはただの JSON と Markdown なので、バージョン管理ツール（たとえば Git）ですべての変更を記録できます。
 
 このフォルダーが空だったので、「肩代」がこのファイルを書きました。編集や削除は自由です。
 ";
@@ -249,11 +249,13 @@ the project notes (below) and your own handoff file.
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
   Pitfalls), or `alm list`.
-- Take a task: pull first, then `alm claim <id> --as <your session name> --branch <the branch
-  you are on>` (`git branch --show-current`), and run the Git commands it prints right away:
-  until your claim is pushed, other sessions do not see it. Every task has a base branch, by its
-  real name: it starts from it and merges back into it; the claim records your working branch
-  and prints the base to start from and merge into, with the Git commands.
+- Take a task: get the latest changes first, then `alm claim <id> --as <your session name>
+  --branch <the branch you are on>` (as your version control tool shows it; in Git:
+  `git branch --show-current`), and save and share the claim right away with your version
+  control tool (it prints the Git commands as the example): until your claim is shared, other
+  sessions do not see it. Every task has a base branch, by its real name: it starts from it and
+  merges back into it; the claim records your working branch and prints the base to start from
+  and merge into, with the Git commands as the example.
 - Report progress: `alm label <id> \"<label>\"`.
 - Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
@@ -313,24 +315,27 @@ Shared rules: every AI agent on this project follows one set of shared rules, in
   file does not point to AGENTS.md, run `alm guide agent-files` and do it once for yourself
   before other work.
 - After changing shared rules, tell the person which running sessions still use the old ones
-  (from the taskbag's holders, `alm list --state in_progress`, and `git worktree list`).
+  (from the taskbag's holders, `alm list --state in_progress`, and your version control tool's
+  working copies; in Git: `git worktree list`).
 
 Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
 task: what is running, pitfalls, where credentials live (never their values). Read it at the
 start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
 file aside), you edit it directly, and you keep it true while you work: update it when you start
-or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
-that would change what the next session does, or a credential moves. Change lines in place and
-remove lines that are no longer true; then commit and push that file with Git yourself.
+or stop a server or process, create or change a hosted resource or a remote repository, learn a
+pitfall that would change what the next session does, or a credential moves. Change lines in
+place and remove lines that are no longer true; then save and share that file with your version
+control tool yourself.
 Personal details are kept out like credentials: never write a person's or an account's email
 address, account or user name, phone number, home address or local network address into the
 project notes, a handoff, a task, a document or the code. Write a placeholder such as
 `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
-Git history keeps whatever was written, even after it is removed.
+version history keeps whatever was written, even after it is removed.
 
-`alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
-`git commit`, `git push`), naming only that change's files: run them, and leave other changes as
-they are.
+`alm` never runs your version control tool. After every change it lists the changed files for
+you to save and share with your version control tool, with the Git commands as the example
+(`git add`, `git commit`, `git push`), naming only that change's files: save and share those,
+and leave other changes as they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
@@ -486,22 +491,22 @@ pub(crate) fn setup_steps_with(
     );
     let no_repo = match (language, git) {
         ("zh-CN", GitStep::Ask) => {
-            "如果项目文件夹不在 Git 仓库中，先问用户是否要建立一个（在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于 Git 的部分。"
+            "如果项目文件夹还没有纳入版本控制，先问用户是否要建立（用 Git 时：在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于版本控制的部分。"
         }
         ("zh-CN", GitStep::Create) => {
-            "如果项目文件夹不在 Git 仓库中，自己在项目文件夹中运行 `git init` 建立一个，不要停下来问：这是安静模式的运行，本地仓库很容易撤销。等目标任务建好后，在它上面记下来：`alm ai-decided <目标任务的 ID> \"项目文件夹没有 Git 仓库，运行了 git init\"`。"
+            "如果项目文件夹还没有纳入版本控制，自己建立（用 Git 时：自己在项目文件夹中运行 `git init`），不要停下来问：这是安静模式的运行，本地仓库很容易撤销。等目标任务建好后，在它上面记下来：`alm ai-decided <目标任务的 ID> \"项目文件夹没有纳入版本控制，建立了版本控制（git init）\"`。"
         }
         ("ja", GitStep::Ask) => {
-            "プロジェクトのフォルダーが Git リポジトリの中になければ、作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下の Git の部分はすべて飛ばします。"
+            "プロジェクトのフォルダーがまだバージョン管理されていなければ、始めるかどうか（Git なら、プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下のバージョン管理の部分はすべて飛ばします。"
         }
         ("ja", GitStep::Create) => {
-            "プロジェクトのフォルダーが Git リポジトリの中になければ、尋ねずに自分でプロジェクトのフォルダーで `git init` を実行して作ります。静かなモードの実行で、ローカルのリポジトリは簡単に元に戻せるからです。ゴールのタスクができたら、そのタスクに記録します：`alm ai-decided <ゴールのタスクの ID> \"プロジェクトのフォルダーに Git リポジトリがなかったので git init を実行した\"`。"
+            "プロジェクトのフォルダーがまだバージョン管理されていなければ、尋ねずに自分で始めます（Git なら、プロジェクトのフォルダーで `git init` を実行します）。静かなモードの実行で、ローカルのリポジトリは簡単に元に戻せるからです。ゴールのタスクができたら、そのタスクに記録します：`alm ai-decided <ゴールのタスクの ID> \"プロジェクトのフォルダーがバージョン管理されていなかったので始めた（git init）\"`。"
         }
         (_, GitStep::Ask) => {
-            "If the project folder is not in a Git repository, ask the person whether to set one up (`git init` in the project folder); if they say no, skip every Git part below."
+            "If the project folder is not under version control yet, ask the person whether to set it up (for Git: `git init` in the project folder); if they say no, skip every version control part below."
         }
         (_, GitStep::Create) => {
-            "If the project folder is not in a Git repository, set one up yourself (`git init` in the project folder) without stopping to ask: this run is quiet, and a local repository is easy to undo. Once the goal task exists, record it on that task: `alm ai-decided <goal task id> \"The project folder had no Git repository, so I ran git init\"`."
+            "If the project folder is not under version control yet, set it up yourself (for Git: `git init` in the project folder) without stopping to ask: this run is quiet, and a local repository is easy to undo. Once the goal task exists, record it on that task: `alm ai-decided <goal task id> \"The project folder was not under version control, so I set it up (git init)\"`."
         }
     };
     match language {
@@ -513,13 +518,13 @@ pub(crate) fn setup_steps_with(
 
 在项目文件夹中：
 
-1. Git：Allomos 自己从不运行 Git。{no_repo}在 Git 仓库中，先单独提交任务包和它的改动（包括记录的项目文件夹）：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要推送）。
+1. 版本控制：Allomos 自己从不运行版本控制工具。{no_repo}在版本控制下，先用你的版本控制工具单独保存任务包和它的改动（包括记录的项目文件夹），用 Git 时：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要共享（推送））。
 2. 打开 AGENTS.md（如果没有就新建）。
 3. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
 5. 共用规则放进 AGENTS.md，每个智能体做一次：运行 `alm --taskbag \"{taskbag}\" guide agent-files` 并照做，为你自己，也为项目里已有的每个智能体规则文件（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` 之类；这些只是例子）。共用规则移到 AGENTS.md；每个智能体自己的文件只保留指向 AGENTS.md 的一行和真正属于它自己的内容；互相矛盾的规则不要替用户选，列出来问用户；把每个智能体记在任务包 project-notes.md 的 `## Agents set up` 一节下。CLAUDE.md 要包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到任何智能体自己的文件里。
-6. 如果项目是 Git 仓库，只提交 AGENTS.md、CLAUDE.md 和你改过的其他智能体文件，作为一次提交：`git -C \"{project}\" add AGENTS.md CLAUDE.md <你改过的其他智能体文件> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <你改过的其他智能体文件>`；再在任务包里只提交项目笔记：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。其他改动保持原样；除非用户要求，不要推送。
-7. 告诉用户你改了什么，以及你做的提交。"
+6. 如果项目在版本控制下，用你的版本控制工具只保存 AGENTS.md、CLAUDE.md 和你改过的其他智能体文件，作为一次改动，用 Git 时：`git -C \"{project}\" add AGENTS.md CLAUDE.md <你改过的其他智能体文件> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <你改过的其他智能体文件>`；再在任务包里只保存项目笔记，用 Git 时：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。其他改动保持原样；除非用户要求，不要共享（推送）。
+7. 告诉用户你改了什么，以及你保存的改动（提交）。"
         ),
         "ja" => format!(
             "Allomos がこのプロジェクトのタスクバッグを用意しました。これからの AI エージェントにそれを伝えてください。
@@ -529,13 +534,13 @@ pub(crate) fn setup_steps_with(
 
 プロジェクトのフォルダーで：
 
-1. Git：Allomos 自身は Git を一切実行しません。{no_repo}リポジトリの中なら、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをコミットします：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、プッシュもしません）。
+1. バージョン管理：Allomos 自身はバージョン管理ツールを一切実行しません。{no_repo}バージョン管理されていれば、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをバージョン管理ツールで保存します。Git なら：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、共有（プッシュ）もしません）。
 2. AGENTS.md を開きます（なければ作成します）。
 3. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
 5. 共通ルールを AGENTS.md に置きます（エージェントごとに一度）：`alm --taskbag \"{taskbag}\" guide agent-files` を実行してそのとおりに行います。自分自身について、そしてプロジェクトにすでにあるすべてのエージェント用ルールファイル（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` など。これは例です）について。共通ルールは AGENTS.md に移し、各エージェント自身のファイルには AGENTS.md を指す行と本当にそのエージェントだけのことを残します。食い違うルールはどちらも選ばず、ユーザーに示して尋ねます。各エージェントをタスクバッグの project-notes.md の `## Agents set up` の節に記録します。CLAUDE.md には AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があるようにします（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節をどのエージェント自身のファイルにもコピーしないでください。
-6. プロジェクトが Git リポジトリなら、AGENTS.md、CLAUDE.md、変えたほかのエージェントのファイルだけを一つのコミットにします：`git -C \"{project}\" add AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル>`。続いてタスクバッグではプロジェクトノートだけをコミットします：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。ほかの変更はそのままにし、頼まれない限りプッシュしません。
-7. 何を変えたか、どんなコミットをしたかをユーザーに見せてください。"
+6. プロジェクトがバージョン管理されていれば、AGENTS.md、CLAUDE.md、変えたほかのエージェントのファイルだけを一つの変更としてバージョン管理ツールで保存します。Git なら：`git -C \"{project}\" add AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル>`。続いてタスクバッグではプロジェクトノートだけを保存します。Git なら：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。ほかの変更はそのままにし、頼まれない限り共有（プッシュ）しません。
+7. 何を変えたか、どんな変更を保存（コミット）したかをユーザーに見せてください。"
         ),
         _ => format!(
             "Allomos has set up this project's taskbag. Please now tell future AI agents about it.
@@ -545,10 +550,11 @@ Taskbag (Allomos's task files): {taskbag}
 
 In the project folder:
 
-1. Git: Allomos itself never runs Git. {no_repo} In a repository, first commit the taskbag on its own, with its changes so far (the \
-recorded project folder too): `git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` \
+1. Version control: Allomos itself never runs your version control tool. {no_repo} Under version control, first save the taskbag \
+on its own in your version control tool, with its changes so far (the recorded project folder too); \
+for Git: `git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` \
 (add `../../README-allomos.md` to the end of both commands when Allomos left that file beside \
-`.allomos/`; never other files, and do not push).
+`.allomos/`; never other files, and do not share (push) it).
 2. Open AGENTS.md (create it if it is missing).
 3. If AGENTS.md already has Allomos instructions (for example a section headed \
 \"{heading}\", or any other text about Allomos or `alm`), replace them with \
@@ -565,13 +571,13 @@ person, who decides; each agent is recorded under `## Agents set up` in the task
 project-notes.md. CLAUDE.md must have the line that imports AGENTS.md (a plain ASCII at sign \
 followed by AGENTS.md), so Claude Code reads AGENTS.md (create CLAUDE.md with just that line if it \
 is missing). Do not copy the section into any agent's own file.
-6. If the project is a Git repository, commit only AGENTS.md, CLAUDE.md and the other agent files \
-you changed, as one commit: `git -C \"{project}\" add AGENTS.md CLAUDE.md <other agent files you \
+6. If the project is under version control, save only AGENTS.md, CLAUDE.md and the other agent \
+files you changed, as one change in your version control tool; for Git: `git -C \"{project}\" add AGENTS.md CLAUDE.md <other agent files you \
 changed> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md \
-<other agent files you changed>`; then, in the taskbag, only the project notes: \
+<other agent files you changed>`; then, in the taskbag, only the project notes; for Git: \
 `git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- \
-project-notes.md`. Leave every other change as it is; do not push unless the person asks.
-7. Show the user what you changed and the commits you made."
+project-notes.md`. Leave every other change as it is; do not share (push) unless the person asks.
+7. Show the user what you changed and the changes (commits) you saved."
         ),
     }
 }

@@ -112,10 +112,10 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
 
 1. 先查看，不要改动。找出这个项目是否、以及在哪里记录任务、状态、负责人、标签、领域和下一步（例如任务看板、卡片文件、待办清单），以及 AGENTS.md / CLAUDE.md 中哪些规则描述了它们。也找出交接记录（例如 AGENT_HANDOFF.md、恢复或交接段落、会话笔记）以及何时写交接的规则（例如额度或上下文的百分比）。不要运行项目的脚本或钩子。如果没有找到任务，告诉用户，然后停止。
 2. 自己决定，并写进计划：保留项目自己的任务 ID（只去掉 `Task-` 这样的前缀和结尾的描述）；标签阶梯用项目自己的，按顺序；按文件中的用词对应 ready、waiting、done、dropped；还没有卡片的计划工作作为 backlog 任务加入，说明里写“还没有卡片”；任务标题用 `alm task-language` 给出的语言写（原文是别的语言就翻译，卡片链接保留原文）。
-3. 如果项目是 Git 仓库：记下当前分支（原分支）。先把前面 Allomos 步骤留下的未提交改动各自单独提交，不带其他文件：任务包（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`），然后是只含 Allomos 一节改动的 AGENTS.md 和 CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。如果你要改的其他文件（卡片和看板文件，或 AGENTS.md 中其他改动）有未提交的改动，先告诉用户请他们提交或另存，然后停止；不要把它们混进去。
+3. 如果项目在版本控制下（下面的命令以 Git 为例；用别的版本控制工具时，用它自己的命令做同样的事）：记下当前分支（原分支）。先把前面 Allomos 步骤留下的未提交改动各自单独提交，不带其他文件：任务包（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`），然后是只含 Allomos 一节改动的 AGENTS.md 和 CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。如果你要改的其他文件（卡片和看板文件，或 AGENTS.md 中其他改动）有未提交的改动，先告诉用户请他们提交或另存，然后停止；不要把它们混进去。
 4. 唯一的问题。把完整计划用 Markdown 写进项目之外的文件（例如系统的临时文件夹）：对应表、标签阶梯、你做的决定、AGENTS.md 中要替换的规则、要删除的旧状态（卡片里的状态表、生成的看板段落、会话登记表）、每个卡片文件搬到哪个任务旁边（任务包里的 `tasks/<id>/card.md`，原文件从项目文件夹删除）、要搬的交接记录和它们的去处、工作分支 `allomos/convert`，以及“完成后提交，并合并到 <原分支>；不推送”。然后运行 `alm confirm --title \"{title}\" --plan <文件>`，它会在应用中显示计划并等待回答。退出码 0 表示用户同意整个计划；其他退出码表示取消或没有回答：什么都不要改，然后停止，并告诉用户：没有任何改动；如果改主意了，可以在这里让你再给他看一次计划，或在 Allomos 中选择“文件 → 连接 AI 智能体…”重新开始。
 5. 从原分支新建分支 `allomos/convert` 并在上面工作。
-6. 只用 `alm` 写任务包，绝不手工编辑它的文件。任务包已经存在（由 Allomos 建立）：不要再建一个，也不要删除它；如果它已经有任务，只添加，不改动那些任务。标签阶梯与任务包的不同时，用 `alm labels \"<阶梯，用逗号分隔>\"` 设置。然后每个领域 `alm add area <id> \"<名称>\"`，每个任务 `alm add task <id> --area <id> --title \"<标题>\"`。然后把每个任务的卡片文件搬到它旁边：`alm card <id> --from <文件>` 把它写成任务包里的 `tasks/<id>/card.md`，并在描述里加上指向它的 `Card:` 链接。传给它的是项目之外的一份副本：去掉旧状态（第 10 步的状态表），并按 `alm guide move-cards` 改好卡片里的相对链接，让它们在 `tasks/<id>/` 里也能打开；卡片是大文件中的一节时，副本只含那一节。每条改动任务包的 `alm` 命令都会打印用来分享这次改动的 Git 命令；搬迁期间不要逐条运行它们，第 11 步一起提交。
+6. 只用 `alm` 写任务包，绝不手工编辑它的文件。任务包已经存在（由 Allomos 建立）：不要再建一个，也不要删除它；如果它已经有任务，只添加，不改动那些任务。标签阶梯与任务包的不同时，用 `alm labels \"<阶梯，用逗号分隔>\"` 设置。然后每个领域 `alm add area <id> \"<名称>\"`，每个任务 `alm add task <id> --area <id> --title \"<标题>\"`。然后把每个任务的卡片文件搬到它旁边：`alm card <id> --from <文件>` 把它写成任务包里的 `tasks/<id>/card.md`，并在描述里加上指向它的 `Card:` 链接。传给它的是项目之外的一份副本：去掉旧状态（第 10 步的状态表），并按 `alm guide move-cards` 改好卡片里的相对链接，让它们在 `tasks/<id>/` 里也能打开；卡片是大文件中的一节时，副本只含那一节。每条改动任务包的 `alm` 命令都会列出要用版本控制工具保存和共享的文件（以 Git 命令为例）；搬迁期间不要逐条运行它们，第 11 步一起提交。
 7. 照文件所写原样复制状态：`alm --as <负责人> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。只复制写明的内容：不明的状态、日期或负责人保持不明，并写进报告；绝不编造进度、验证或批准。`alm` 还记不下的值（完成日期、依赖、优先级、批准等）写进报告。然后搬交接记录：当前的每段交接（每个会话或卡片一段）原文写进一个交接文件：`alm --as <它的会话> handoff --tasks <id,id> --from <文件>`；全项目都要知道的内容（在运行的服务、陷阱、凭据存放的位置，绝不写凭据本身，也不写邮箱、账号名等个人信息，只写占位符）写进任务包的 project-notes.md（这个文件可以直接编辑）；项目写明的交接规则用 `alm handoff-rules --quota <n> --context <n> --write-when \"<何时>\"` 设置。旧的交接历史存档留在原处，在 project-notes.md 里链接它。
 8. 写一份简短报告 `docs/allomos-conversion.md`：每个卡片文件和它对应的任务 ID，没有遗漏或重复；每个无法复制的值，注明文件和行；运行 `alm list --json`，确认没有 issues。
 9. 切换说明：在 AGENTS.md 中，用 Allomos 的一节（`alm brief` 的输出，见最后一行）替换关于状态存放位置、如何认领和释放、会话登记表、重新生成看板、交接写在哪里和何时写的规则；其他规则一字不改。确保 CLAUDE.md 包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md）。
@@ -134,10 +134,10 @@ fn convert_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) ->
 
 1. まず見るだけで、何も変えません。このプロジェクトがタスク、状況、担当者、ラベル、エリア、次の一歩を記録しているか、どこに記録しているか（タスクボード、カードのファイル、TODO リストなど）、AGENTS.md / CLAUDE.md のどのルールがそれを説明しているかを調べます。引き継ぎの記録（AGENT_HANDOFF.md、再開や引き継ぎの節、セッションのメモなど）と、いつ引き継ぎを書くかのルール（使用量やコンテキストの割合など）も探します。プロジェクトのスクリプトやフックは実行しません。タスクが見つからなければ、そう伝えて終わります。
 2. 自分で決めて計画に書きます：プロジェクト自身のタスク ID を残す（`Task-` のような接頭辞と末尾の説明だけを外す）、ラベルの段階はプロジェクト自身のものを順に使う、ファイルの言葉を ready、waiting、done、dropped に対応させる、まだカードのない予定の作業は backlog のタスクにして説明に「まだカードなし」と書く、タスクの題名は `alm task-language` の言語で書く（原文が別の言語なら訳し、原文はカードへのリンクで残す）。
-3. プロジェクトが Git リポジトリなら、今のブランチ（元のブランチ）を控えます。まず、前の「肩代」の手順が残したコミットされていない変更を、それぞれ単独でコミットします（ほかのファイルは入れません）：タスクバッグ（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`）、次に Allomos の節の変更だけを含む AGENTS.md と CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。変えるほかのファイル（カードやボードのファイル、AGENTS.md のほかの変更）にコミットされていない変更があれば、コミットするか退避するようユーザーに伝えて終わります。混ぜないでください。
+3. プロジェクトがバージョン管理されていれば（以下のコマンドは Git の例です。ほかのバージョン管理ツールなら、そのツールのコマンドで同じことをします）、今のブランチ（元のブランチ）を控えます。まず、前の「肩代」の手順が残したコミットされていない変更を、それぞれ単独でコミットします（ほかのファイルは入れません）：タスクバッグ（`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`）、次に Allomos の節の変更だけを含む AGENTS.md と CLAUDE.md（`git -C \"{project}\" add AGENTS.md CLAUDE.md && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md`）。変えるほかのファイル（カードやボードのファイル、AGENTS.md のほかの変更）にコミットされていない変更があれば、コミットするか退避するようユーザーに伝えて終わります。混ぜないでください。
 4. ただ一つの質問。計画全体を Markdown でプロジェクトの外のファイル（たとえばシステムの一時フォルダー）に書きます：対応表、ラベルの段階、自分で決めたこと、AGENTS.md で置き換えるルール、消す古い状況（カードの状況表、生成されるボードの節、セッション一覧）、カードのファイルごとの行き先（タスクバッグの `tasks/<id>/card.md`。元のファイルはプロジェクトのフォルダーから消す）、移す引き継ぎとその行き先、作業ブランチ `allomos/convert`、そして「最後にコミットし、<元のブランチ> にマージする。プッシュはしない」。続いて `alm confirm --title \"{title}\" --plan <ファイル>` を実行すると、アプリに計画が表示され、答えを待ちます。終了コード 0 は計画全体への同意です。それ以外はキャンセルか無回答です：何も変えずに終わり、ユーザーに伝えます：何も変わっていないこと、考えが変わったらここでもう一度計画を見せるよう頼めること、または Allomos の「ファイル → AI エージェントとつなぐ…」からやり直せること。
 5. 元のブランチから `allomos/convert` を作り、そこで作業します。
-6. タスクバッグは `alm` だけで書き、ファイルを手で編集しません。タスクバッグはすでにあります（Allomos が作りました）：新しく作ったり削除したりしないでください。すでにタスクがあれば追加だけにし、それらは変えません。ラベルの段階がタスクバッグと違えば `alm labels \"<段階、カンマ区切り>\"` で設定します。続いてエリアごとに `alm add area <id> \"<名前>\"`、タスクごとに `alm add task <id> --area <id> --title \"<題名>\"`。続いて、タスクごとのカードのファイルをそのタスクの隣に移します：`alm card <id> --from <ファイル>` がタスクバッグの `tasks/<id>/card.md` として書き、説明にそこへの `Card:` リンクを付けます。渡すのはプロジェクトの外に作った写しです：古い状況（手順 10 の状況表）を除き、カードの中の相対リンクを `alm guide move-cards` のとおり `tasks/<id>/` から開けるように直します。カードが大きなファイルの一節なら、写しはその節だけにします。タスクバッグを変える `alm` コマンドは、その変更を共有する Git コマンドを毎回表示します。移行の間はそれを一つずつ実行せず、手順 11 でまとめてコミットします。
+6. タスクバッグは `alm` だけで書き、ファイルを手で編集しません。タスクバッグはすでにあります（Allomos が作りました）：新しく作ったり削除したりしないでください。すでにタスクがあれば追加だけにし、それらは変えません。ラベルの段階がタスクバッグと違えば `alm labels \"<段階、カンマ区切り>\"` で設定します。続いてエリアごとに `alm add area <id> \"<名前>\"`、タスクごとに `alm add task <id> --area <id> --title \"<題名>\"`。続いて、タスクごとのカードのファイルをそのタスクの隣に移します：`alm card <id> --from <ファイル>` がタスクバッグの `tasks/<id>/card.md` として書き、説明にそこへの `Card:` リンクを付けます。渡すのはプロジェクトの外に作った写しです：古い状況（手順 10 の状況表）を除き、カードの中の相対リンクを `alm guide move-cards` のとおり `tasks/<id>/` から開けるように直します。カードが大きなファイルの一節なら、写しはその節だけにします。タスクバッグを変える `alm` コマンドは、バージョン管理ツールで保存して共有するファイルを、Git のコマンドを例にして毎回表示します。移行の間はそれを一つずつ実行せず、手順 11 でまとめてコミットします。
 7. 状況はファイルに書かれているとおりに写します：`alm --as <担当者> claim <id>`、`label`、`wait --on`、`needs`、`ready`、`done`、`drop`。書かれていることだけを写し、わからない状況・日付・担当者はわからないままにしてレポートに書きます。進捗、検証、承認を作り出してはいけません。`alm` がまだ記録できない値（完了日、依存関係、優先度、承認など）はレポートに書きます。続いて引き継ぎを移します：今の引き継ぎ（セッションかカードごとに一つ）を、言葉を変えずに引き継ぎファイルにします：`alm --as <そのセッション> handoff --tasks <id,id> --from <ファイル>`。プロジェクト全体で知っておくこと（動いているサーバー、落とし穴、資格情報の置き場所。値そのものは書かず、メールアドレスやアカウント名などの個人情報も書かずにプレースホルダーにする）はタスクバッグの project-notes.md に書きます（このファイルは直接編集してかまいません）。プロジェクトが定めている引き継ぎのルールは `alm handoff-rules --quota <n> --context <n> --write-when \"<いつ>\"` で設定します。古い引き継ぎの履歴はその場に残し、project-notes.md からリンクします。
 8. 短いレポート `docs/allomos-conversion.md` を書きます：カードのファイルごとに対応するタスク ID（抜けも重複もないこと）、写せなかった値とそのファイルと行。`alm list --json` を実行し、issues がないことを確かめます。
 9. 説明を切り替えます。AGENTS.md で、状況の置き場所、担当の取り方と手放し方、セッション一覧、ボードの再生成、引き継ぎの置き場所と書くタイミングについてのルールを、Allomos の節（`alm brief` の出力。最後の行を参照）で置き換えます。ほかのルールは一字も変えません。CLAUDE.md に AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があることを確かめます。
@@ -165,7 +165,9 @@ project's scripts or hooks. If you find no tasks, tell the person and stop.
 files' words to ready, waiting, done and dropped; add planned work that has no card yet as a \
 backlog task saying \"no card yet\"; write task titles in the language `alm task-language` gives \
 (translate a card's title when it is in another language; the card link keeps the original).
-3. If the project is a Git repository, note the current branch (the original branch). First \
+3. If the project is under version control (the commands below are for Git; with another \
+version control tool, do the same with its own commands), note the current branch (the original \
+branch). First \
 commit what the earlier Allomos steps left uncommitted, each as its own commit and nothing else: \
 the taskbag (`git -C \"{taskbag}\" add . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`), \
 then AGENTS.md and CLAUDE.md when their only changes are Allomos's section (`git -C \"{project}\" add \
@@ -195,8 +197,8 @@ card file in beside it: `alm card <id> --from <file>` writes it as the taskbag's
 `tasks/<id>/card.md` and gives the description a `Card:` link to it. Pass a copy made outside \
 the project, without the old status (step 10's status tables) and with the card's relative links \
 fixed to work from `tasks/<id>/`, as `alm guide move-cards` says; when a card is a section of a \
-bigger file, the copy holds that section only. Every `alm` command that changes the taskbag prints the Git \
-commands that share that change; during the move do not run them one by one: step 11 commits \
+bigger file, the copy holds that section only. Every `alm` command that changes the taskbag lists the files to \
+save and share in your version control tool, with the Git commands as the example; during the move do not run them one by one: step 11 commits \
 everything together.
 7. Copy status exactly as the files say it: `alm --as <holder> claim <id>`, `label`, `wait --on`, \
 `needs`, `ready`, `done`, `drop`. Copy only what is written: an unknown state, date or holder \
@@ -274,8 +276,8 @@ pub fn agent_move_in_request_in(
 - `tasks/<id>/task.json` 和 `description.md`：每个任务用相同的 ID、标题和领域加入（`alm add task`），描述用 `alm describe <id> --from <旧的 description.md>`，迭代用 `alm plan`；然后是状态、标签、负责人、等待内容、下一个依赖和交接备注（`alm claim`、`label`、`wait`、`needs`、`ready`、`done`、`drop`、`note`）。已完成任务的 `finished_without_owner` 说明改为 `alm done <id> --without-human-check \"<原样的说明>\"`，除非它的标签是阶梯的最高一级（那就是已经有人检查过）。
 - `handoffs/`（allomos/2 起）：每份交接原文不改，用 `alm --as <它的作者> handoff --tasks <它的任务> --from <文件>`。
 - `project-notes.md`：内容写进新任务包的 `project-notes.md`（这个文件可以直接编辑）。
-- `events/`（allomos/3 起）：历史记录。`alm` 只记录它自己做的改动，所以旧事件不复制，它们留在 Git 历史里。在报告和 `project-notes.md` 里写明仍包含旧任务包的最后一次提交（在提交任何东西之前运行 `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
-对下面步骤的改动：第 3 步不要单独提交新任务包：在 Git 里它取代旧任务包，所以在第 11 步和搬迁一起提交。第 6 步：保留每个任务自己的描述；旧描述的 `Card:` 链接指向项目文件夹里的卡片文件时，把那个卡片文件也这样搬到任务旁边（`alm card <id> --from <文件>`），旧任务文件夹里的 `card.md` 也一样；这些任务的其他卡片文件（`alm guide move-cards` 第 1 步，例如以任务 ID 命名、却没有描述链接到的文件）也这样搬入，没有对应任务的卡片文件列给用户看，绝不搬。第 9 步要替换的是 AGENTS.md / CLAUDE.md 里旧的 Allomos 一节。第 10 步要删除的旧状态就是旧文件夹 {old}，别的都不删：把它写进计划，用户同意后，只有当 Git 历史里有它（以前提交过）时才删除；否则保留它，并在报告里说明。"
+- `events/`（allomos/3 起）：历史记录。`alm` 只记录它自己做的改动，所以旧事件不复制，它们留在版本历史里（例如 Git 历史）。在报告和 `project-notes.md` 里写明仍包含旧任务包的最后一次提交（在提交任何东西之前运行 `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
+对下面步骤的改动：第 3 步不要单独提交新任务包：在版本控制里它取代旧任务包，所以在第 11 步和搬迁一起提交。第 6 步：保留每个任务自己的描述；旧描述的 `Card:` 链接指向项目文件夹里的卡片文件时，把那个卡片文件也这样搬到任务旁边（`alm card <id> --from <文件>`），旧任务文件夹里的 `card.md` 也一样；这些任务的其他卡片文件（`alm guide move-cards` 第 1 步，例如以任务 ID 命名、却没有描述链接到的文件）也这样搬入，没有对应任务的卡片文件列给用户看，绝不搬。第 9 步要替换的是 AGENTS.md / CLAUDE.md 里旧的 Allomos 一节。第 10 步要删除的旧状态就是旧文件夹 {old}，别的都不删：把它写进计划，用户同意后，只有当版本历史里有它（以前提交过）时才删除；否则保留它，并在报告里说明。"
             ),
         ),
         "ja" => (
@@ -296,8 +298,8 @@ pub fn agent_move_in_request_in(
 - `tasks/<id>/task.json` と `description.md`：タスクごとに同じ ID、題名、エリアで追加し（`alm add task`）、説明は `alm describe <id> --from <古い description.md>`、イテレーションは `alm plan` で。続いて状態、ラベル、担当者、待っている内容、次の依存、引き継ぎメモ（`alm claim`、`label`、`wait`、`needs`、`ready`、`done`、`drop`、`note`）。終わったタスクの `finished_without_owner` のメモは `alm done <id> --without-human-check \"<同じメモ>\"` にします。ただしラベルが最上位の段なら（人が確認済み）そうしません。
 - `handoffs/`（allomos/2 から）：引き継ぎごとに、文を変えずに `alm --as <書いた人> handoff --tasks <そのタスク> --from <ファイル>`。
 - `project-notes.md`：中身を新しいタスクバッグの `project-notes.md` に書きます（このファイルは直接編集してかまいません）。
-- `events/`（allomos/3 から）：履歴。`alm` は自分の変更しか履歴に残さないので、古いイベントは写しません。Git の履歴に残ります。古いタスクバッグを含む最後のコミットを、レポートと `project-notes.md` に書きます（何かをコミットする前に `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
-下の手順の変更点：手順 3 では新しいタスクバッグを単独でコミットしません。Git では古いものを置き換えるので、手順 11 で移行と一緒にコミットします。手順 6 ではタスク自身の説明を残します。古い説明の `Card:` リンクがプロジェクトのフォルダーにあるカードのファイルを指していれば、そのカードのファイルも同じようにタスクの隣に移します（`alm card <id> --from <ファイル>`）。古いタスクのフォルダーにある `card.md` も同じです。これらのタスクのほかのカードのファイル（`alm guide move-cards` の手順 1。たとえばタスクの ID の名前なのにどの説明からもリンクされていないもの）も同じように移し、タスクのないカードのファイルはユーザーに一覧で見せ、決して移しません。手順 9 で置き換えるのは AGENTS.md / CLAUDE.md の古い Allomos の節です。手順 10 で消す古い状況は古いフォルダー {old} だけです：計画に書き、同意のあとで、Git の履歴にある（以前コミットされた）ときだけ消します。そうでなければ残し、レポートにそう書きます。"
+- `events/`（allomos/3 から）：履歴。`alm` は自分の変更しか履歴に残さないので、古いイベントは写しません。バージョン管理の履歴（たとえば Git の履歴）に残ります。古いタスクバッグを含む最後のコミットを、レポートと `project-notes.md` に書きます（何かをコミットする前に `git -C \"{taskbag}\" log -1 --format=%H -- .`）。
+下の手順の変更点：手順 3 では新しいタスクバッグを単独でコミットしません。バージョン管理では古いものを置き換えるので、手順 11 で移行と一緒にコミットします。手順 6 ではタスク自身の説明を残します。古い説明の `Card:` リンクがプロジェクトのフォルダーにあるカードのファイルを指していれば、そのカードのファイルも同じようにタスクの隣に移します（`alm card <id> --from <ファイル>`）。古いタスクのフォルダーにある `card.md` も同じです。これらのタスクのほかのカードのファイル（`alm guide move-cards` の手順 1。たとえばタスクの ID の名前なのにどの説明からもリンクされていないもの）も同じように移し、タスクのないカードのファイルはユーザーに一覧で見せ、決して移しません。手順 9 で置き換えるのは AGENTS.md / CLAUDE.md の古い Allomos の節です。手順 10 で消す古い状況は古いフォルダー {old} だけです：計画に書き、同意のあとで、バージョン管理の履歴にある（以前コミットされた）ときだけ消します。そうでなければ残し、レポートにそう書きます。"
             ),
         ),
         _ => (
@@ -320,8 +322,8 @@ pub fn agent_move_in_request_in(
 - `tasks/<id>/task.json` and `description.md`: each task with the same ID, title and area (`alm add task`), its description with `alm describe <id> --from <the old description.md>`, its iteration with `alm plan`; then its state, label, holder, waiting-on, next dependency and handoff note (`alm claim`, `label`, `wait`, `needs`, `ready`, `done`, `drop`, `note`). A done task's `finished_without_owner` note becomes `alm done <id> --without-human-check \"<the same note>\"`, unless its label is the ladder's top step (then a person has checked it).
 - `handoffs/` (allomos/2 and later): each handoff, its text unchanged, with `alm --as <its writer> handoff --tasks <its tasks> --from <file>`.
 - `project-notes.md`: its content goes into the new taskbag's `project-notes.md` (you may edit that file directly).
-- `events/` (allomos/3): the history. `alm` records history only for its own changes, so the old events are not copied; they stay in Git history. Name, in the report and in `project-notes.md`, the last commit that holds the old taskbag (`git -C \"{taskbag}\" log -1 --format=%H -- .`, before anything is committed).
-Changes to the steps below: in step 3, do not commit the new taskbag on its own: in Git it replaces the old one, so it is committed with the move in step 11. In step 6, keep each task's own description; when the old description's `Card:` link points to a card file in the project folder, move that card file in beside the task the same way (`alm card <id> --from <file>`), and so a `card.md` in the old task folder; other card files of these tasks (`alm guide move-cards`, step 1: for example ones named after a task ID that no description links to) move in the same way, and card files without a task are listed for the person, never moved. In step 9, what you replace is Allomos's old section in AGENTS.md / CLAUDE.md. In step 10, the old status to remove is the old folder {old}, and nothing else: name it in the plan, and after Go ahead remove it only when Git history holds it (it was committed before); otherwise keep it and say so in the report."
+- `events/` (allomos/3): the history. `alm` records history only for its own changes, so the old events are not copied; they stay in the version history (Git history, for example). Name, in the report and in `project-notes.md`, the last commit that holds the old taskbag (`git -C \"{taskbag}\" log -1 --format=%H -- .`, before anything is committed).
+Changes to the steps below: in step 3, do not commit the new taskbag on its own: under version control it replaces the old one, so it is committed with the move in step 11. In step 6, keep each task's own description; when the old description's `Card:` link points to a card file in the project folder, move that card file in beside the task the same way (`alm card <id> --from <file>`), and so a `card.md` in the old task folder; other card files of these tasks (`alm guide move-cards`, step 1: for example ones named after a task ID that no description links to) move in the same way, and card files without a task are listed for the person, never moved. In step 9, what you replace is Allomos's old section in AGENTS.md / CLAUDE.md. In step 10, the old status to remove is the old folder {old}, and nothing else: name it in the plan, and after Go ahead remove it only when the version history holds it (it was committed before); otherwise keep it and say so in the report."
             ),
         ),
     };
@@ -560,7 +562,7 @@ mod tests {
         let en = agent_move_in_request_in("en", &project, &taskbag, &m);
         assert!(en.starts_with("Please move the tasks of a taskbag written by an older Allomos"));
         assert!(en.contains("Allomos renamed the old taskbag (format allomos/1"));
-        assert!(en.contains("remove it only when Git history holds it"));
+        assert!(en.contains("remove it only when the version history holds it"));
     }
 
     #[test]
@@ -606,25 +608,22 @@ mod tests {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(DEFAULT_DIR);
         let asks = [
-            ("en", "ask the person whether to set one up"),
-            ("zh-CN", "先问用户是否要建立一个"),
+            ("en", "ask the person whether to set it up"),
+            ("zh-CN", "先问用户是否要建立（用 Git 时"),
             (
                 "ja",
-                "作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます",
+                "始めるかどうか（Git なら、プロジェクトのフォルダーで `git init`）をユーザーに尋ねます",
             ),
         ];
         let creates = [
             (
                 "en",
-                "set one up yourself (`git init` in the project folder) without stopping to ask",
+                "set it up yourself (for Git: `git init` in the project folder) without stopping to ask",
             ),
-            (
-                "zh-CN",
-                "自己在项目文件夹中运行 `git init` 建立一个，不要停下来问",
-            ),
+            ("zh-CN", "自己在项目文件夹中运行 `git init`），不要停下来问"),
             (
                 "ja",
-                "尋ねずに自分でプロジェクトのフォルダーで `git init` を実行して作ります",
+                "尋ねずに自分で始めます（Git なら、プロジェクトのフォルダーで `git init` を実行します）",
             ),
         ];
         for ((language, ask), (_, create)) in asks.iter().zip(creates.iter()) {

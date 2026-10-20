@@ -297,9 +297,9 @@ fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
         "{rule}"
     );
     assert!(
-        rule.contains("Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>`")
+        rule.contains("Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>`")
     );
-    assert!(rule.contains("until your claim is pushed"), "{rule}");
+    assert!(rule.contains("until your claim is shared"), "{rule}");
     assert!(!rule.contains("--push"), "{rule}");
     assert!(v["handoff_rules"]["quota_gate"].is_number());
 
@@ -2084,7 +2084,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v17)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v18)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2094,7 +2094,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v17)", "## Tasks: Allomos (v16)")
+            brief.replace("## Tasks: Allomos (v18)", "## Tasks: Allomos (v17)")
         ),
     )
     .unwrap();
@@ -2116,11 +2116,11 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
         "Read it at the start",
         "you edit it directly",
         "start or stop a server or process",
-        "hosted resource or a Git remote",
+        "hosted resource or a remote repository",
         "learn a pitfall",
         "a credential moves",
         "Change lines in place",
-        "commit and push that file with Git yourself",
+        "save and share that file with your version control tool yourself",
         "Personal details are kept out like credentials",
         "email address, account or user name",
         "Write a placeholder such as `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up",

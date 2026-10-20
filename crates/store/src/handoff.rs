@@ -46,7 +46,7 @@ pub const DEFAULT_TEMPLATE: &str = "# Handoff
 /// 2026-10-16): the rules for the one taking over, not only for the one writing. `alm` checks
 /// nothing itself; the agent does ("alm tells; the agent checks").
 pub const TAKING_OVER: &str = "Taking over from a handoff:
-1. Check the real state before trusting the handoff: the worktree, branch and running processes it names (`git worktree list`, `git status -sb`, listening ports). What the previous session still holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the question with `alm wait`).
+1. Check the real state before trusting the handoff: the working copy, branch and running processes it names (as your version control tool shows them; in Git: `git worktree list`, `git status -sb`; and listening ports). What the previous session still holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the question with `alm wait`).
 2. What the handoff lists as already done is not done again. A change of agent, account or session keeps the approvals and what was done; it does not authorize repeating it.
 ";
 
