@@ -41,7 +41,6 @@ The single list of open questions and approvals. Remove a row when it is answere
 ## Roadmap — not yet carded
 
 Iterations 1–15 (v0.1–v1.0) in [PLAN § 9](./product/PLAN.md#9-roadmap--releases), by area in the taskbag (`alm list`). These include:
-- the desktop hub (W04);
 - companion viewing (W10, R69–R71);
 - AI-generated project setup (W09, R50–R55);
 - shared commands and the human CLI (R60–R68).

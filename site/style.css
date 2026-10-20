@@ -51,3 +51,9 @@ nav { display: flex; align-items: center; }
 :lang(zh-CN) body, body:lang(zh-CN) { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
 :lang(ja) body, body:lang(ja) { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", sans-serif; }
 .hero h1 span { display: inline-block; }
+.cards.four { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.badge { display: inline-block; margin-left: 6px; white-space: nowrap; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--muted); border: 1px dashed var(--line); vertical-align: 1px; }
+h2 .badge { font-size: 13px; vertical-align: 4px; }
+ul.points { padding-left: 20px; max-width: 680px; } ul.points li { margin: 6px 0; }
+.card { position: relative; }
+.card .kicker .badge { position: absolute; top: 18px; right: 16px; margin: 0; font-size: 10.5px; padding: 0 6px; letter-spacing: 0; }
