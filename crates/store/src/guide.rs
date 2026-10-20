@@ -158,8 +158,11 @@ const COMMANDS: &str = "# alm commands
 
 Every command takes `--taskbag <path>` (or ALLOMOS_TASKBAG; default: the nearest
 `.allomos/taskbag/` above the current folder), `--as <name>` (or ALLOMOS_HOLDER), `--json`
-(one JSON object on standard output). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage,
-3 taskbag busy or not writable.
+(one JSON object on standard output) and `--request-id <id>` (a one-time number of your own
+for a change: run the same command again with the same number, after a crash for example, and
+alm returns the first result instead of doing it twice; the same number with a different command
+is refused). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not
+writable.
 
 `alm` never runs or reads Git. After a change it prints \"Commit and push this change:\" and the
 exact `git add`, `git commit` and `git push` commands naming only the files that change wrote

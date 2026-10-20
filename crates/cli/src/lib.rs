@@ -62,6 +62,11 @@ struct Cli {
     /// Print one JSON result on standard output, and nothing else.
     #[arg(long, global = true)]
     json: bool,
+    /// A one-time number of your own for this change (Task-A01-58). Run the same command again
+    /// with the same number (after a crash, say) and alm returns the first result instead of
+    /// doing it twice; the same number with a different command is refused.
+    #[arg(long, global = true, value_name = "ID")]
+    request_id: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -734,8 +739,59 @@ struct Reply {
 
 /// Run `alm` and collect what it would print. Help, version and usage errors without `--json` are
 /// printed by `clap`.
+/// The input a one-time number stands for (Task-A01-58): the command's words and who runs it,
+/// without the number itself or `--json` (how the result is printed is not the change).
+fn request_input(args: &[OsString], holder: Option<&str>) -> String {
+    let mut words = Vec::new();
+    let mut skip = false;
+    for a in args.iter().skip(1) {
+        let a = a.to_string_lossy();
+        if skip {
+            skip = false;
+        } else if a == "--request-id" {
+            skip = true;
+        } else if !(a.starts_with("--request-id=") || a == "--json") {
+            words.push(a.into_owned());
+        }
+    }
+    allomos_core::request::fingerprint(&format!("{}\n{}", holder.unwrap_or(""), words.join("\n")))
+}
+
+/// A change run again under a one-time number it already used (Task-A01-58): the first run's
+/// result, and nothing changed; or `request_reused` when the number went with another input.
+/// `None` when the number is new (or the command changes nothing).
+fn repeated(cli: &Cli, cwd: &Path, id: &str, input: &str) -> Option<Result<Done, Problem>> {
+    if !cli.command.changes() {
+        return None;
+    }
+    let root = locate(cli, cwd).ok()?;
+    let (events, _) = allomos_store::events::list(&root);
+    let first = allomos_core::request::made_under(&events, id);
+    let (_, was) = allomos_core::request::of(first.first()?)?;
+    if was != input {
+        return Some(Err(Problem::RequestReused { id: id.to_string() }));
+    }
+    let what: Vec<String> = first
+        .iter()
+        .map(|e| match &e.id {
+            Some(item) => format!("{} {item}", e.command),
+            None => e.command.clone(),
+        })
+        .collect();
+    let text = format!(
+        "Done already under the one-time number {id} ({}): {}. Nothing changed.\n",
+        first[0].at,
+        what.join(", ")
+    );
+    Some(Ok(Done::new(
+        json!({ "taskbag": root, "repeated": true, "request_id": id, "first": allomos_core::request::summary(&first) }),
+        text,
+    )))
+}
+
 fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     let wants_json = args.iter().any(|a| a == "--json");
+    let raw_args = args.clone();
     let mut stdout = String::new();
     let mut stderr = String::new();
     let cli = match Cli::try_parse_from(args) {
@@ -773,9 +829,30 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     // Before the change: which changes made in the app has no agent been told to share yet
     // (decision 0017, row 9)?
     let before = Before::look(&cli, cwd);
+    // A one-time number (Task-A01-58): a repeat returns the first result; a new number marks
+    // every event this change writes.
+    let request = cli
+        .request_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(|id| {
+            (
+                id.to_string(),
+                request_input(&raw_args, cli.holder.as_deref()),
+            )
+        });
     let (result, written) = with_written_files(|| {
         check_versions(&cli, cwd).and_then(|outdated| {
-            let mut done = execute(&cli, cwd)?;
+            if let Some((id, input)) = &request {
+                if let Some(first) = repeated(&cli, cwd, id, input) {
+                    return first;
+                }
+                allomos_store::events::set_request(Some((id, input)));
+            }
+            let done = execute(&cli, cwd);
+            allomos_store::events::set_request(None);
+            let mut done = done?;
             done.warnings.extend(outdated);
             Ok(done)
         })

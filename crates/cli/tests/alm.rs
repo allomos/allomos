@@ -2401,6 +2401,96 @@ fn describe_and_title_refuse_an_out_of_date_version() {
     assert_eq!(ok(&repo, &["show", "A01-01"])["task"]["title"], "Newer");
 }
 
+/// A one-time number makes a repeated command safe (Task-A01-58): the same command with the
+/// same `--request-id` returns the first result and changes nothing; the same number with a
+/// different command is refused; without a number, commands work as before.
+#[test]
+fn a_repeated_command_with_the_same_number_runs_once() {
+    let repo = filled();
+    let add = [
+        "--as",
+        "s/one",
+        "--request-id",
+        "n-1",
+        "add",
+        "task",
+        "--area",
+        "A01",
+        "--title",
+        "Sign-in page",
+        "--branch",
+        "main",
+    ];
+    let first = ok(&repo, &add);
+    let id = first["task"]["id"].as_str().unwrap().to_string();
+    let before = snapshot(&repo);
+    // The crash: the agent runs it again. Nothing new; the first result comes back.
+    let again = ok(&repo, &add);
+    assert_eq!(again["repeated"], true);
+    assert_eq!(again["first"][0]["id"], id.as_str());
+    assert_eq!(again["first"][0]["command"], "add task");
+    assert_eq!(snapshot(&repo), before, "a repeat writes nothing");
+    let text = String::from_utf8(alm(&repo, &add).stdout).unwrap();
+    assert!(
+        text.contains("Done already under the one-time number n-1")
+            && text.contains(&format!("add task {id}")),
+        "{text}"
+    );
+    // --json or not is the same input.
+    let plain: Vec<&str> = add.to_vec();
+    assert_eq!(alm(&repo, &plain).status.code(), Some(0));
+    assert_eq!(snapshot(&repo), before);
+    // The same number for something else: refused, nothing done.
+    refused(
+        &repo,
+        &[
+            "--as",
+            "s/one",
+            "--request-id",
+            "n-1",
+            "note",
+            "A01-01",
+            "Different",
+        ],
+        1,
+        "request_reused",
+    );
+    assert_eq!(snapshot(&repo), before);
+    // A note under a new number, repeated: one note event.
+    let note = [
+        "--as",
+        "s/one",
+        "--request-id",
+        "n-2",
+        "note",
+        &id,
+        "Read the spec",
+    ];
+    ok(&repo, &note);
+    let after_note = snapshot(&repo);
+    assert_eq!(ok(&repo, &note)["repeated"], true);
+    assert_eq!(snapshot(&repo), after_note);
+    // Without a number, the same command adds a second task, as always.
+    let plain_add = [
+        "--as",
+        "s/one",
+        "add",
+        "task",
+        "--area",
+        "A01",
+        "--title",
+        "Sign-in page",
+        "--branch",
+        "main",
+    ];
+    let second = ok(&repo, &plain_add);
+    assert_ne!(second["task"]["id"], id.as_str());
+    // The number is kept in the history only, and is not shown as a change of the task.
+    let h = ok(&repo, &["history", &id]);
+    let shown = h.to_string();
+    assert!(!shown.contains("request_id"), "{shown}");
+}
+
 /// Every file under `dir`, with its contents, to show that nothing changed.
 fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut out: Vec<(PathBuf, Vec<u8>)> = walk(dir)

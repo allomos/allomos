@@ -204,6 +204,7 @@
   "problem.task_not_found": "タスク「{id}」はありません。",
   "problem.holder_missing": "--as <name> または環境変数 ALLOMOS_HOLDER で、あなたが誰かを指定してください。",
   "problem.task_held": "タスク {id} の担当は {holder} です。",
+  "problem.request_reused": "使い捨ての番号 {id} はすでに別の変更に使われたため、何もしませんでした。新しい変更には新しい番号を使ってください。",
   "problem.task_changed": "タスク {id} は読んだあとに変更されたため、あなたの変更は保存されませんでした。読み直してから（今の版は {version}）保存してください。",
   "problem.task_closed": "タスク {id} は {state} のため、この方法では変更できません。",
   "problem.took_over": "タスク {id} を {previous} から引き継ぎました。",

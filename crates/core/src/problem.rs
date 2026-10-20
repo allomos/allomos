@@ -151,6 +151,9 @@ problems! {
     TaskNotFound { id } => "task_not_found", "There is no task \"{id}\".";
     HolderMissing => "holder_missing", "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
+    /// The one-time number of a change (`--request-id`, Task-A01-58) was used before for a
+    /// different change, so nothing was done.
+    RequestReused { id } => "request_reused", "The one-time number {id} was already used for a different change, so nothing was done. Use a new number for a new change.";
     /// A title or description was saved from an out-of-date copy of the task (Task-A01-57):
     /// someone changed it after it was read, so nothing was written. `version` is its version now.
     TaskChanged { id, version } => "task_changed", "Task {id} changed after you read it, so your change was not saved. Read it again (its version is now {version}), then save.";

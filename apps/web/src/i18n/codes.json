@@ -162,6 +162,9 @@
   "request_not_found": [
     "id"
   ],
+  "request_reused": [
+    "id"
+  ],
   "startup_not_a_folder": [
     "path"
   ],

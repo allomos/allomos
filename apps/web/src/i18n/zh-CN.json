@@ -204,6 +204,7 @@
   "problem.task_not_found": "没有任务“{id}”。",
   "problem.holder_missing": "请用 --as <name> 或环境变量 ALLOMOS_HOLDER 说明你是谁。",
   "problem.task_held": "任务 {id} 由 {holder} 担当。",
+  "problem.request_reused": "一次性编号 {id} 已经用于另一项改动，所以什么也没做。新的改动请用新的编号。",
   "problem.task_changed": "你读取任务 {id} 之后，它被改动过，所以你的改动没有保存。请重新读取（它现在的版本是 {version}），再保存。",
   "problem.task_closed": "任务 {id} 的状态是 {state}，不能这样修改。",
   "problem.took_over": "已从 {previous} 接手任务 {id}。",

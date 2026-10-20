@@ -430,3 +430,41 @@ fn a_stale_save_writes_nothing() {
         "The person's text\n"
     );
 }
+
+/// Every event written while a one-time number is set carries it, and none after (Task-A01-58);
+/// a task's history leaves it out.
+#[test]
+fn events_written_under_a_number_carry_it() {
+    let (_dir, root) = taskbag("request");
+    events::set_request(Some(("n-1", "abc")));
+    let marked = edit(
+        &root,
+        "A01-01",
+        Edit::Label {
+            label: "implemented".into(),
+        },
+    );
+    events::set_request(None);
+    marked.unwrap();
+    edit(
+        &root,
+        "A01-01",
+        Edit::HandoffNote {
+            text: Some("Next".into()),
+        },
+    )
+    .unwrap();
+    let (all, _) = events::list(&root);
+    let under = allomos_core::request::made_under(&all, "n-1");
+    assert_eq!(under.len(), 1);
+    assert_eq!(under[0].command, "label");
+    assert_eq!(allomos_core::request::of(under[0]), Some(("n-1", "abc")));
+    assert_eq!(allomos_core::request::of(all.last().unwrap()), None);
+    let shown = events::history(&root, "A01-01");
+    assert!(
+        shown
+            .events
+            .iter()
+            .all(|e| e.changes.iter().all(|c| c.field != "request_id"))
+    );
+}

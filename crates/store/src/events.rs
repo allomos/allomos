@@ -115,12 +115,33 @@ pub(crate) fn new_file(root: &Path) -> String {
     }
 }
 
+/// The one-time number the change being made now runs under (Task-A01-58): set by `alm` for one
+/// command (`--request-id`), so every event that command writes carries it.
+static REQUEST: std::sync::Mutex<Option<allomos_core::event::Change>> = std::sync::Mutex::new(None);
+
+/// Mark every event written from now on with the one-time number `id` and the input
+/// fingerprint `input` ([`allomos_core::request`]); `None` stops marking.
+pub fn set_request(request: Option<(&str, &str)>) {
+    let change = request.map(|(id, input)| allomos_core::request::change(id, input));
+    *REQUEST.lock().unwrap_or_else(|e| e.into_inner()) = change;
+}
+
 /// Write one event. Returns its file, so a change that then fails can take it back.
 /// Callers hold the taskbag's lock.
 pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     let dir = root.join(EVENTS_DIR);
     fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
     let path = root.join(new_file(root));
+    let marked;
+    let event = match REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        Some(change) => {
+            let mut e = event.clone();
+            e.changes.push(change.clone());
+            marked = e;
+            &marked
+        }
+        None => event,
+    };
     write_atomic(&path, &json_text(event))?;
     Ok(path)
 }
@@ -267,6 +288,12 @@ pub fn history(root: &Path, id: &str) -> History {
     let mut events: Vec<Event> = all
         .into_iter()
         .filter(|e| e.kind == Kind::Task && e.id.as_deref() == Some(id))
+        .map(|mut e| {
+            // A one-time number (Task-A01-58) is not a change to the task: not shown.
+            e.changes
+                .retain(|c| c.field != allomos_core::request::FIELD);
+            e
+        })
         .collect();
     events.reverse();
     History {
