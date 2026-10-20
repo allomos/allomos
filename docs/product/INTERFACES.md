@@ -1,6 +1,6 @@
 # Human and AI-agent interfaces
 
-**In plain words:** people and AI agents both use Allomos, so every way in follows the same rules: the desktop app, the web and mobile companions, the command line (CLI) and the agent tool protocol (MCP). Each change goes through one shared set of operations that checks permissions and records history. The **desktop app is the hub** with all features; web and mobile companions connect to it to view progress and status ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). Everything below marked *proposed* still needs the owner's review.
+**In plain words:** people and AI agents both use Allomos, so every way in follows the same rules: the desktop app, the web and mobile companions, the command line (CLI) and the agent tool protocol (MCP). Each change goes through one shared set of operations that checks permissions and records history. The **desktop app is the hub** with all features; web and mobile companions connect to it to view progress and status ([0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). The approver accepted the design rules (R63–R68) on 2026-10-20; names, parameters and schemas marked *not final* are still chosen card by card.
 
 A **contract** for interface scope, with proposed design rules to review before implementation. Created 2026-10-03 from the owner's request; evidence and source links live in [the interface investigation](../research/interface-patterns.md). Requirement IDs: [R60–R68](./REQUIREMENTS.md#human-and-agent-interfaces).
 
@@ -15,7 +15,7 @@ A **CLI** is a command-line interface used from a terminal by people, scripts an
 - Local project tracking stores project/task information on the user's device without sign-in or an Allomos hosted service (R40–R43). Cloud projects require sign-in (R42). A client cannot silently publish local data to provide cross-device access.
 - The leader can use Allomos's prompt with an external agent to produce files that Allomos reads/transforms (R50–R51); see [AI-generated projects](./AI-GENERATED-PROJECTS.md).
 
-All rules below are **proposed**, except where they restate these accepted requirements or existing owner-approval boundaries. They do not choose storage, permissions details, a UI framework or an upstream product.
+The rules below were proposed on 2026-10-03 and accepted by the approver on 2026-10-20 as R63–R68. They do not choose storage, permissions details, a UI framework or an upstream product.
 
 ## Shared structure
 
