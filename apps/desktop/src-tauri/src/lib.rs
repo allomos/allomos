@@ -16,10 +16,11 @@ use std::sync::Mutex;
 use allomos_core::{Loaded, Problem};
 use allomos_store::progress::{Job, with_progress_in};
 use allomos_store::{
-    AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
-    add_readme_if_empty, agent_connect_request_in, agent_setup, agent_setup_request_in,
-    answer_confirm, id_from_name, init, inspect, load, pending_confirms, picked_folder,
-    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
+    AgentSetup, ConfirmRequest, GitStep, Inspection, LinkTarget, SetupState,
+    add_agent_instructions, add_readme_if_empty, agent_connect_request_with, agent_setup,
+    agent_setup_request_in, answer_confirm, id_from_name, init, inspect, load, pending_confirms,
+    picked_folder, project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp,
+    versions,
 };
 use serde::Serialize;
 #[cfg(not(target_os = "macos"))]
@@ -654,17 +655,19 @@ fn connect_plan(
     project: &Path,
     taskbag: &Path,
 ) -> Vec<(String, String)> {
-    connect_plan_with(agents, language, project, taskbag, true)
+    connect_plan_with(agents, language, project, taskbag, true, GitStep::Ask)
 }
 
 /// [`connect_plan`]; `progress`: the first agent's request asks it to report its progress to the
-/// app (Task-A05-08), unless a larger job's request does (Build a new app…).
+/// app (Task-A05-08), unless a larger job's request does (Build a new app…); `git`: whether the
+/// first agent asks before `git init` or, in a quiet goal run, runs it itself (Task-A03-35).
 fn connect_plan_with(
     agents: &[String],
     language: &str,
     project: &Path,
     taskbag: &Path,
     progress: bool,
+    git: GitStep,
 ) -> Vec<(String, String)> {
     let job = |job: Job, request: String| {
         if progress {
@@ -697,7 +700,7 @@ fn connect_plan_with(
             } else if i == 0 {
                 job(
                     Job::Connect,
-                    agent_connect_request_in(language, project, taskbag),
+                    agent_connect_request_with(language, project, taskbag, git),
                 )
             } else {
                 agent_setup_request_in(language, project, taskbag)
@@ -778,7 +781,10 @@ fn build_app_plan(
     description: &str,
     quiet: bool,
 ) -> String {
-    let connect = connect_plan_with(&[agent.to_string()], language, project, taskbag, false)
+    // A quiet run creates the Git repository itself, without stopping to ask (Task-A03-35,
+    // approver 2026-10-19); a normal run asks, as connecting does.
+    let git = if quiet { GitStep::Create } else { GitStep::Ask };
+    let connect = connect_plan_with(&[agent.to_string()], language, project, taskbag, false, git)
         .remove(0)
         .1;
     let goal = allomos_store::goal_request_in(language, description, quiet);
@@ -1902,6 +1908,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allomos_store::agent_connect_request_in;
 
     fn args(list: &[&str]) -> Vec<OsString> {
         std::iter::once("allomos")
@@ -2144,9 +2151,21 @@ mod tests {
             for quiet in [true, false] {
                 let auto =
                     build_app_plan("claude_app", language, &dir, &taskbag, description, quiet);
-                // One request: the wizard's connect request first, then the goal request.
-                let connect = agent_connect_request_in(language, &dir, &taskbag);
+                // One request: the wizard's connect request first, then the goal request. A quiet
+                // run creates the Git repository itself; a normal run asks (Task-A03-35).
+                let git = if quiet { GitStep::Create } else { GitStep::Ask };
+                let connect = agent_connect_request_with(language, &dir, &taskbag, git);
                 assert!(auto.starts_with(connect.trim_end()), "{language}");
+                assert_eq!(
+                    connect.contains("alm ai-decided <"),
+                    quiet,
+                    "{language}: only a quiet run records git init as an AI decision"
+                );
+                assert_eq!(
+                    connect == agent_connect_request_in(language, &dir, &taskbag),
+                    !quiet,
+                    "{language}: a normal run asks, as connecting does"
+                );
                 let goal = allomos_store::goal_request_in(language, description, quiet);
                 assert!(auto.contains(goal.trim_end()), "{language}");
                 // One progress request, for the whole job (Task-A05-08).

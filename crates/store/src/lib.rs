@@ -46,8 +46,8 @@ pub use confirm::{
 };
 pub use convert::{
     CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, MOVE_IN_REQUEST_VERSION,
-    agent_connect_request_in, agent_convert_request_in, agent_move_in_request_in,
-    agent_move_tasks_in_request_in,
+    agent_connect_request_in, agent_connect_request_with, agent_convert_request_in,
+    agent_move_in_request_in, agent_move_tasks_in_request_in,
 };
 pub use events::Actor;
 pub use guide::{
@@ -459,11 +459,51 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 /// The setup request's text without its last line (where Allomos's section comes from), so the
 /// connect request can carry it as its first part.
 pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
+    setup_steps_with(language, project_path, taskbag_path, GitStep::Ask)
+}
+
+/// What the agent does when the project folder is not in a Git repository yet (Task-A03-35).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitStep {
+    /// Ask the person first (decision 0017): connecting a project, and normal goal runs.
+    Ask,
+    /// Run `git init` itself and record it as an AI decision: a quiet goal run (approver,
+    /// 2026-10-19), where a local repository is a routine choice, easy to undo.
+    Create,
+}
+
+/// [`setup_steps_in`] with the Git step chosen.
+pub(crate) fn setup_steps_with(
+    language: &str,
+    project_path: &Path,
+    taskbag_path: &Path,
+    git: GitStep,
+) -> String {
     let (project, taskbag, heading) = (
         shown(project_path),
         shown(taskbag_path),
         AGENT_SECTION_HEADING,
     );
+    let no_repo = match (language, git) {
+        ("zh-CN", GitStep::Ask) => {
+            "如果项目文件夹不在 Git 仓库中，先问用户是否要建立一个（在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于 Git 的部分。"
+        }
+        ("zh-CN", GitStep::Create) => {
+            "如果项目文件夹不在 Git 仓库中，自己在项目文件夹中运行 `git init` 建立一个，不要停下来问：这是安静模式的运行，本地仓库很容易撤销。等目标任务建好后，在它上面记下来：`alm ai-decided <目标任务的 ID> \"项目文件夹没有 Git 仓库，运行了 git init\"`。"
+        }
+        ("ja", GitStep::Ask) => {
+            "プロジェクトのフォルダーが Git リポジトリの中になければ、作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下の Git の部分はすべて飛ばします。"
+        }
+        ("ja", GitStep::Create) => {
+            "プロジェクトのフォルダーが Git リポジトリの中になければ、尋ねずに自分でプロジェクトのフォルダーで `git init` を実行して作ります。静かなモードの実行で、ローカルのリポジトリは簡単に元に戻せるからです。ゴールのタスクができたら、そのタスクに記録します：`alm ai-decided <ゴールのタスクの ID> \"プロジェクトのフォルダーに Git リポジトリがなかったので git init を実行した\"`。"
+        }
+        (_, GitStep::Ask) => {
+            "If the project folder is not in a Git repository, ask the person whether to set one up (`git init` in the project folder); if they say no, skip every Git part below."
+        }
+        (_, GitStep::Create) => {
+            "If the project folder is not in a Git repository, set one up yourself (`git init` in the project folder) without stopping to ask: this run is quiet, and a local repository is easy to undo. Once the goal task exists, record it on that task: `alm ai-decided <goal task id> \"The project folder had no Git repository, so I ran git init\"`."
+        }
+    };
     match language {
         "zh-CN" => format!(
             "Allomos 已为这个项目建立了任务包。现在请把它告诉以后的 AI 智能体。
@@ -473,7 +513,7 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 
 在项目文件夹中：
 
-1. Git：Allomos 自己从不运行 Git。如果项目文件夹不在 Git 仓库中，先问用户是否要建立一个（在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于 Git 的部分。在 Git 仓库中，先单独提交任务包和它的改动（包括记录的项目文件夹）：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要推送）。
+1. Git：Allomos 自己从不运行 Git。{no_repo}在 Git 仓库中，先单独提交任务包和它的改动（包括记录的项目文件夹）：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要推送）。
 2. 打开 AGENTS.md（如果没有就新建）。
 3. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
@@ -489,7 +529,7 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 
 プロジェクトのフォルダーで：
 
-1. Git：Allomos 自身は Git を一切実行しません。プロジェクトのフォルダーが Git リポジトリの中になければ、作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下の Git の部分はすべて飛ばします。リポジトリの中なら、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをコミットします：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、プッシュもしません）。
+1. Git：Allomos 自身は Git を一切実行しません。{no_repo}リポジトリの中なら、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをコミットします：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、プッシュもしません）。
 2. AGENTS.md を開きます（なければ作成します）。
 3. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
@@ -505,9 +545,7 @@ Taskbag (Allomos's task files): {taskbag}
 
 In the project folder:
 
-1. Git: Allomos itself never runs Git. If the project folder is not in a Git repository, ask \
-the person whether to set one up (`git init` in the project folder); if they say no, skip every Git \
-part below. In a repository, first commit the taskbag on its own, with its changes so far (the \
+1. Git: Allomos itself never runs Git. {no_repo} In a repository, first commit the taskbag on its own, with its changes so far (the \
 recorded project folder too): `git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` \
 (add `../../README-allomos.md` to the end of both commands when Allomos left that file beside \
 `.allomos/`; never other files, and do not push).

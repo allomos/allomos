@@ -11,7 +11,7 @@ use std::path::Path;
 use allomos_core::FORMAT;
 
 use crate::versions::MoveIn;
-use crate::{section_source, setup_steps_in, shown};
+use crate::{section_source, shown};
 
 /// Changes when the conversion request's steps change, so a report can say which it followed.
 /// 2: the agent finds the tasks itself and asks with `alm confirm` before changing anything.
@@ -359,8 +359,19 @@ pub fn agent_connect_request_in(
     project_path: &Path,
     taskbag_path: &Path,
 ) -> String {
+    agent_connect_request_with(language, project_path, taskbag_path, crate::GitStep::Ask)
+}
+
+/// [`agent_connect_request_in`] with the Git step chosen: a quiet goal run creates the
+/// repository itself instead of asking (Task-A03-35).
+pub fn agent_connect_request_with(
+    language: &str,
+    project_path: &Path,
+    taskbag_path: &Path,
+    git: crate::GitStep,
+) -> String {
     let version = CONNECT_REQUEST_VERSION;
-    let setup = setup_steps_in(language, project_path, taskbag_path);
+    let setup = crate::setup_steps_with(language, project_path, taskbag_path, git);
     let convert = convert_steps_in(language, project_path, taskbag_path);
     let source = section_source(language, taskbag_path);
     let (intro, one, two) = match language {
@@ -586,5 +597,57 @@ mod tests {
             agent_connect_request_in("en", &project, &taskbag)
                 .contains("File → Connect with the Agents…")
         );
+    }
+
+    /// A quiet goal run creates the Git repository itself and records it as an AI decision;
+    /// connecting (and a normal run) still asks first (Task-A03-35, approver 2026-10-19).
+    #[test]
+    fn quiet_goal_run_creates_the_git_repository_itself() {
+        let project = PathBuf::from("/work/bakery");
+        let taskbag = project.join(DEFAULT_DIR);
+        let asks = [
+            ("en", "ask the person whether to set one up"),
+            ("zh-CN", "先问用户是否要建立一个"),
+            (
+                "ja",
+                "作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます",
+            ),
+        ];
+        let creates = [
+            (
+                "en",
+                "set one up yourself (`git init` in the project folder) without stopping to ask",
+            ),
+            (
+                "zh-CN",
+                "自己在项目文件夹中运行 `git init` 建立一个，不要停下来问",
+            ),
+            (
+                "ja",
+                "尋ねずに自分でプロジェクトのフォルダーで `git init` を実行して作ります",
+            ),
+        ];
+        for ((language, ask), (_, create)) in asks.iter().zip(creates.iter()) {
+            let normal = agent_connect_request_in(language, &project, &taskbag);
+            let quiet =
+                agent_connect_request_with(language, &project, &taskbag, crate::GitStep::Create);
+            assert!(
+                normal.contains(ask) && !normal.contains(create),
+                "{language}"
+            );
+            assert!(quiet.contains(create) && !quiet.contains(ask), "{language}");
+            assert!(quiet.contains("alm ai-decided <"), "{language}");
+            assert!(!normal.contains("alm ai-decided"), "{language}");
+            // Everything else is the same request: commit the taskbag, never push.
+            assert!(
+                quiet.contains("commit -m \"Add Allomos taskbag\""),
+                "{language}"
+            );
+            assert!(!quiet.contains("--push"), "{language}");
+            assert_eq!(
+                agent_connect_request_with(language, &project, &taskbag, crate::GitStep::Ask),
+                normal
+            );
+        }
     }
 }
