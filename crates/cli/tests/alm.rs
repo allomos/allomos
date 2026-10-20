@@ -2147,7 +2147,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v19)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v20)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2157,7 +2157,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v19)", "## Tasks: Allomos (v18)")
+            brief.replace("## Tasks: Allomos (v20)", "## Tasks: Allomos (v19)")
         ),
     )
     .unwrap();
@@ -4084,4 +4084,60 @@ fn card_links_outside_the_taskbag_are_listed_without_a_report() {
     assert_eq!(v["cards_outside"].as_array().unwrap().len(), 1);
     assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
     fs::remove_dir_all(repo).unwrap();
+}
+
+/// `alm quota` (Task-A03-02): an agent reports its quota; it is kept on this computer beside the
+/// app's settings, one report per agent, account and window, the newest first; no taskbag needed
+/// and nothing to share.
+#[test]
+fn quota_reports_are_kept_on_this_computer() {
+    let dir = tmp("quota");
+    let settings = dir.join("settings");
+    let run = |args: &[&str]| {
+        let out = Command::new(ALM)
+            .current_dir(&dir)
+            .arg("--json")
+            .args(args)
+            .env_remove("ALLOMOS_TASKBAG")
+            .env("ALLOMOS_SETTINGS_DIR", &settings)
+            .output()
+            .unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (out.status.code().unwrap(), v)
+    };
+    let (code, v) = run(&["quota"]);
+    assert_eq!((code, &v["reports"]), (0, &json!([])));
+    let (code, _) = run(&[
+        "quota",
+        "--agent",
+        "claude-code",
+        "--left",
+        "52",
+        "--resets",
+        "2026-10-20T17:00",
+    ]);
+    assert_eq!(code, 0);
+    run(&[
+        "quota",
+        "--agent",
+        "codex",
+        "--account",
+        "work",
+        "--left",
+        "3",
+    ]);
+    let (_, v) = run(&["quota", "--agent", "claude-code", "--left", "40"]);
+    let reports = v["reports"].as_array().unwrap();
+    assert_eq!(reports.len(), 2, "{v}");
+    assert_eq!(reports[0]["agent"], "claude-code");
+    assert_eq!(reports[0]["left"], 40);
+    assert_eq!(reports[0]["window"], "5h");
+    assert_eq!(reports[0]["resets"], Value::Null);
+    assert_eq!(reports[1]["account"], "work");
+    assert!(v.get("changed_files").is_none(), "{v}");
+    assert!(settings.join("quota.json").is_file());
+    let (code, v) = run(&[
+        "quota", "--agent", "codex", "--left", "5", "--window", "day",
+    ]);
+    assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
 }

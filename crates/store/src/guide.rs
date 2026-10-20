@@ -280,6 +280,13 @@ Ask the person:
   `alm progress --step …` at each step and `alm progress --finished \"<what happened>\"` at the
   end: on a job the person gave you from the Allomos app, the app shows your progress in a popup.
   `alm` only passes it on.
+- `alm quota --agent <id> --left <percent> [--resets <when>] [--window 5h|week] [--account <name>]`:
+  how much of your account's quota is left, from the figure you read at the handoff gate's quota
+  check (Claude Code: `get_usage`). The app shows it beside the agent: the agent that reported
+  last comes first, coloured by the share left. `--account` only when you can tell one, never an
+  email address or user name; `--resets` is local time (`2026-10-20T17:00`). Kept on this
+  computer beside the app's settings, not in the taskbag: nothing to save or share. `alm quota`
+  alone lists the reports.
 
 About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:

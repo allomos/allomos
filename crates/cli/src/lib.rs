@@ -105,6 +105,28 @@ enum Command {
     Delete(Delete),
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
+    /// Report how much of your account's quota is left, at the handoff gate's quota check, from
+    /// the figure you just read (for example Claude Code's get_usage). The Allomos app shows it
+    /// beside the agent. Kept on this computer, not in the taskbag: nothing to save or share.
+    /// Without --agent, it lists the reports.
+    Quota {
+        /// Your agent's id: claude-code, codex, or another agent's.
+        #[arg(long, requires = "left")]
+        agent: Option<String>,
+        /// A name for the account, only when you can tell one; never an email address or user
+        /// name.
+        #[arg(long, requires = "agent")]
+        account: Option<String>,
+        /// The share left, 0 to 100.
+        #[arg(long, value_name = "PERCENT", requires = "agent")]
+        left: Option<u8>,
+        /// When this window resets, local time (2026-10-20T17:00).
+        #[arg(long, value_name = "WHEN", requires = "agent")]
+        resets: Option<String>,
+        /// Which limit the figure is for: 5h (the handoff gate's) or week.
+        #[arg(long, default_value = "5h", requires = "agent")]
+        window: String,
+    },
     /// Print the details the brief points to: terms, what a project may customize, commands,
     /// how to work the tasks, the run modes to show the person before an automatic or loop run,
     /// the one-time procedure that puts every agent's shared rules in AGENTS.md, and the goal
@@ -590,6 +612,7 @@ impl Command {
             | Command::Project { .. }
             | Command::TaskLanguage { .. }
             | Command::Brief
+            | Command::Quota { .. }
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::Progress { .. }
@@ -642,6 +665,7 @@ impl Command {
                 | Command::Confirm { .. }
                 | Command::Progress { .. }
                 | Command::Brief
+                | Command::Quota { .. }
                 | Command::Guide { .. }
                 | Command::Handoffs { .. }
                 | Command::MoveIn { .. }
@@ -656,6 +680,7 @@ impl Command {
             Command::Labels { .. } => "labels",
             Command::TaskLanguage { .. } => "task-language",
             Command::Brief => "brief",
+            Command::Quota { .. } => "quota",
             Command::Guide { .. } => "guide",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
@@ -962,6 +987,7 @@ fn pack_history(cli: &Cli, cwd: &Path, done: &mut Done) {
         cli.command,
         Command::Init { .. }
             | Command::Brief
+            | Command::Quota { .. }
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::MoveIn { .. }
@@ -1005,6 +1031,7 @@ fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
         cli.command,
         Command::Init { .. }
             | Command::Brief
+            | Command::Quota { .. }
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::MoveIn { .. }
@@ -1575,7 +1602,7 @@ fn rules_line(r: &allomos_core::AppliedRules) -> String {
         .map(|n| format!(" (override for {n})"))
         .unwrap_or_default();
     format!(
-        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}.\n",
+        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}. Each time you check your quota for this gate, report the figure you read: `alm quota --agent <your agent's id> --left <percent> [--resets <when>]` (the Allomos app shows it).\n",
         r.quota_gate, r.context_gate, r.write_when
     )
 }
@@ -1881,6 +1908,55 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 json!({ "progress": p, "project": project }),
                 text,
             ))
+        }
+        Command::Quota {
+            agent,
+            account,
+            left,
+            resets,
+            window,
+        } => {
+            let reports = match (agent, left) {
+                (Some(agent), Some(left)) => {
+                    let report = allomos_store::new_quota_report(
+                        agent,
+                        account.as_deref(),
+                        window,
+                        *left,
+                        resets.as_deref(),
+                    )?;
+                    allomos_store::save_quota(report).map_err(|e| Problem::WriteFailed {
+                        path: "quota.json".to_string(),
+                        detail: e.to_string(),
+                    })?
+                }
+                _ => allomos_store::quota_reports(),
+            };
+            let mut text = String::new();
+            if agent.is_some() {
+                text.push_str("Reported. Kept on this computer only: nothing to save or share.\n");
+            }
+            for r in &reports {
+                text.push_str(&format!(
+                    "{}{}  {}  {}% left{}  (reported {})\n",
+                    r.agent,
+                    r.account
+                        .as_deref()
+                        .map(|a| format!(" ({a})"))
+                        .unwrap_or_default(),
+                    r.window,
+                    r.left,
+                    r.resets
+                        .as_deref()
+                        .map(|t| format!(", resets {t}"))
+                        .unwrap_or_default(),
+                    r.at
+                ));
+            }
+            if reports.is_empty() {
+                text.push_str("No quota reported on this computer yet.\n");
+            }
+            Ok(Done::new(json!({ "reports": reports }), text))
         }
         Command::Brief => {
             // With a taskbag, the section names it when it is outside the project folder.

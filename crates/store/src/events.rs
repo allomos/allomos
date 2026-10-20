@@ -61,6 +61,11 @@ impl<'a> Actor<'a> {
 /// Now, in UTC: the event's `at` (`2026-10-13T14:02:05Z`) and the start of its file name
 /// (`2026-10-13-140205-123`, with milliseconds, so files sort in the order they were written).
 /// Tests may fix the time with `ALLOMOS_NOW` (`2026-10-13T14:02:05Z` or `2026-10-13T14:02Z`).
+/// Now, in UTC (`2026-10-13T14:02:05Z`); `ALLOMOS_NOW` fixes it in tests.
+pub fn now_utc() -> String {
+    now().0
+}
+
 fn now() -> (String, String) {
     let since = SystemTime::now()
         .duration_since(UNIX_EPOCH)

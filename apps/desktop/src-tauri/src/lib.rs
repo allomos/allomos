@@ -1195,6 +1195,13 @@ fn dismiss_progress(project: PathBuf, id: String) {
     allomos_store::progress::dismiss(&project, &id)
 }
 
+/// How much quota each agent account has left, as the agents reported it with `alm quota`,
+/// newest first (Task-A03-02). Kept on this computer, not in a taskbag.
+#[tauri::command]
+fn quota_reports() -> Vec<allomos_store::QuotaReport> {
+    allomos_store::quota_reports()
+}
+
 /// Questions an agent is asking about `project` with `alm confirm`, oldest first. Listing them
 /// marks them seen, so `alm` knows this window shows them.
 #[tauri::command]
@@ -1851,6 +1858,7 @@ pub fn run() {
             agents_set_up,
             write_agent_files,
             agent_status,
+            quota_reports,
             confirm_requests,
             answer_confirm_request,
             progress_reports,

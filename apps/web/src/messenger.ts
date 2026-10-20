@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 /** What the About window shows of the app itself (Task-A07-28). */
 export interface AboutInfo {
@@ -187,6 +187,8 @@ export interface Messenger {
   dismissAlmOffer(mismatch: string): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
+  /** Each agent account's quota as the agents reported it (`alm quota`), newest first (Task-A03-02). */
+  quotaReports(): Promise<QuotaReport[]>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
   /** What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08). */
@@ -259,6 +261,7 @@ export const desktopMessenger: Messenger = {
   agentsSetUp: (taskbag) => invoke<string[]>("agents_set_up", { taskbag }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
+  quotaReports: () => invoke<QuotaReport[]>("quota_reports"),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),

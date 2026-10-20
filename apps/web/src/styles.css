@@ -97,6 +97,22 @@ button.link:hover { text-decoration: underline; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 8px; }
 .card h2, .card p { margin: 0; }
 .agent-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 0.9em; }
+/* One chip per agent (Task-A03-02): the current agent's quota, coloured by the share left; the
+   others dimmed; a stale figure grey and dashed. Hovering (or focusing) a chip shows the popup. */
+.agent-chip { position: relative; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; color: var(--ink); background: var(--surface); cursor: default; }
+.agent-chip.dimmed { opacity: 0.55; }
+.agent-chip.quota-green { color: var(--ok); background: var(--ok-bg); border-color: var(--ok); }
+.agent-chip.quota-amber { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+.agent-chip.quota-red { color: var(--err); background: var(--err-bg); border-color: var(--err); }
+.agent-chip.stale { color: var(--muted); border-style: dashed; }
+.quota-popup { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 280px; max-width: min(420px, 90vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); white-space: normal; }
+.agent-chip:hover .quota-popup, .agent-chip:focus-within .quota-popup, .agent-chip:focus .quota-popup { display: block; }
+.quota-popup ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.quota-popup li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.quota-popup li.stale { color: var(--muted); }
+.quota-popup .quota-green { color: var(--ok); }
+.quota-popup .quota-amber { color: var(--warn); }
+.quota-popup .quota-red { color: var(--err); }
 /* Link buttons sit at the top of a column elsewhere; in a line of text they sit in the middle. */
 .agent-line button.link, .agents .row button.link { align-self: center; font-size: inherit; line-height: inherit; }
 .agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

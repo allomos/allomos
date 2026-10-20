@@ -370,3 +370,19 @@ export interface UpdateStatus {
   /** `available`'s installer is downloaded and its hash matched (Task-A07-17). */
   ready: string | null;
 }
+
+/** How much of an agent account's quota is left, as the agent reported it (`alm quota`, Task-A03-02). */
+export interface QuotaReport {
+  /** `claude-code`, `codex`, or another agent's id. */
+  agent: string;
+  /** A name for the account, only when the agent could tell one. */
+  account?: string | null;
+  /** `5h` or `week`. */
+  window: string;
+  /** Share left, 0–100. */
+  left: number;
+  /** When the window resets, local time (`2026-10-20T17:00`). */
+  resets?: string | null;
+  /** When it was reported, UTC. */
+  at: string;
+}
