@@ -114,6 +114,7 @@
   "task.handoff_note": "handoff note: {note}",
   "task.iteration": "iteration {iteration}",
   "pane.label_aria": "Details of task {id}",
+  "pane.resize": "Drag to change the pane's width (arrow keys too; double-click for the default)",
   "pane.close": "Close",
   "pane.title": "Title",
   "pane.area": "Area",

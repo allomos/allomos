@@ -114,6 +114,7 @@
   "task.handoff_note": "交接说明：{note}",
   "task.iteration": "迭代 {iteration}",
   "pane.label_aria": "任务 {id} 的详情",
+  "pane.resize": "拖动以调整面板宽度（也可以用方向键；双击恢复默认宽度）",
   "pane.close": "关闭",
   "pane.title": "标题",
   "pane.area": "领域",

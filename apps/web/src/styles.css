@@ -302,7 +302,12 @@ button.link:hover { text-decoration: underline; }
    and the pane scroll separately, so the list's scroll bar stays at the list's right edge (owner,
    2026-10-09) and opening the pane keeps the list where it was. */
 .list-layout { flex: 1 1 0; min-height: 240px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 14px; }
-.list-layout.with-pane { grid-template-columns: minmax(0, 1fr) minmax(300px, 40%); }
+.list-layout.with-pane { grid-template-columns: minmax(0, 1fr) 14px minmax(300px, 40%); column-gap: 0; }
+/* Task-A01-56: a width the person dragged, still kept between 300px and what leaves the list 320px. */
+.list-layout.with-pane.sized { grid-template-columns: minmax(0, 1fr) 14px clamp(300px, var(--pane-width), calc(100% - 334px)); }
+.pane-resizer { align-self: stretch; cursor: col-resize; touch-action: none; position: relative; outline: none; }
+.pane-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 6px; width: 2px; border-radius: 1px; background: transparent; transition: background 0.15s; }
+.pane-resizer:hover::after, .pane-resizer:focus-visible::after, .pane-resizer:active::after { background: var(--accent); }
 .list-layout > .areas { min-height: 0; overflow: auto; align-content: start; grid-auto-rows: max-content; scrollbar-gutter: stable; }
 .task-pane {
   align-self: start; max-height: 100%; overflow: auto;
@@ -354,7 +359,8 @@ button.link:hover { text-decoration: underline; }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
 .pane-review .ai-decisions { padding-left: 20px; }
 @media (max-width: 720px) {
-  .list-layout.with-pane { grid-template-columns: minmax(0, 1fr); }
+  .list-layout.with-pane, .list-layout.with-pane.sized { grid-template-columns: minmax(0, 1fr); }
+  .pane-resizer { display: none; }
   .task-pane { position: fixed; inset: 64px 12px 12px; max-height: none; z-index: 5; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }
   .top { flex-wrap: wrap; }
   .task { grid-template-columns: minmax(0, 1fr) auto; }

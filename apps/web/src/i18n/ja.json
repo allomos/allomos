@@ -114,6 +114,7 @@
   "task.handoff_note": "引き継ぎメモ：{note}",
   "task.iteration": "イテレーション {iteration}",
   "pane.label_aria": "タスク {id} の詳細",
+  "pane.resize": "ドラッグでパネルの幅を変えます（矢印キーでも。ダブルクリックで既定の幅に戻ります）",
   "pane.close": "閉じる",
   "pane.title": "タイトル",
   "pane.area": "エリア",
