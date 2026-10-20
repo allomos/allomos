@@ -43,6 +43,8 @@ Today `alm` commits and pushes the task list by itself (`--commit`, `--push`), a
 | 14 | Migration prompt (A01-32) | no `--commit` / `--push`; commit only when asked | **When `alm migrate --finish` succeeds, the agent commits** the taskbag's files. **Commit only; no push.** |
 | 15 | "Migrate the taskbag…" in the app | commit those files; push only if asked | As 14. |
 
+**Amended 2026-10-20 (approver, task `A01-60`): general wording.** Allomos no longer assumes Git in what it says. After a change `alm` prints "Save this change in your version control tool and share it. Changed files:", the files, then "For Git:" with the same commands as before; `alm claim` asks to share the claim before the work starts, in the same general words. `--json` keeps `changed_files`, `git_commands` and `git_instruction`. `alm` and the app still never run or read Git.
+
 ## Alternatives considered
 
 | Option | Why not |

@@ -1099,30 +1099,39 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             "Agent: {}",
             cli.holder.as_deref().unwrap_or("<your session name>")
         );
+        // In general words, with the Git commands as the example (Task-A01-60, approver
+        // 2026-10-20): Allomos does not assume Git.
         let (instruction, commands) = if files.is_empty() {
             (
-                "Nothing changed, so there is nothing to commit.".to_string(),
+                "Nothing changed, so there is nothing to save.".to_string(),
                 Vec::new(),
             )
         } else if matches!(cli.command, Command::Claim { .. }) {
             (
-                "Commit and push this change now, before you start the work. Until it is pushed, other sessions do not see your claim and may take this task too:".to_string(),
+                "Save this change in your version control tool and share it now, before you start the work. Until it is shared, other sessions do not see your claim and may take this task too. Changed files:".to_string(),
                 git_commands(&root, &files, &subject, &who, true),
             )
         } else {
             (
-                "Commit and push this change:".to_string(),
+                "Save this change in your version control tool and share it. Changed files:"
+                    .to_string(),
                 git_commands(&root, &files, &subject, &who, true),
             )
         };
         text.push('\n');
         text.push_str(&instruction);
         text.push('\n');
+        if !commands.is_empty() {
+            for f in &files {
+                text.push_str(&format!("  {f}\n"));
+            }
+            text.push_str("For Git:\n");
+        }
         for c in &commands {
             text.push_str(&format!("  {c}\n"));
         }
         if !commands.is_empty() {
-            text.push_str("Commit only these files; leave other changes as they are.\n");
+            text.push_str("Save only these files; leave other changes as they are.\n");
         }
         done.fields["changed_files"] = json!(files);
         done.fields["git_commands"] = json!(commands);
@@ -1150,9 +1159,13 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
                 true,
             );
             text.push_str(&format!(
-                "\n{} change(s) made in the Allomos app by {by} are not shared yet. Commit them as the person's, in their own commit (if someone already committed them, Git finds nothing to commit; that is fine):\n",
+                "\n{} change(s) made in the Allomos app by {by} are not shared yet. Save and share them in your version control tool as the person's, on their own (if someone already did, there is nothing to save; that is fine). Changed files:\n",
                 app.count
             ));
+            for f in &rest {
+                text.push_str(&format!("  {f}\n"));
+            }
+            text.push_str("For Git:\n");
             for c in &commands {
                 text.push_str(&format!("  {c}\n"));
             }

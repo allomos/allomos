@@ -164,12 +164,13 @@ alm returns the first result instead of doing it twice; the same number with a d
 is refused). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not
 writable.
 
-`alm` never runs or reads Git. After a change it prints \"Commit and push this change:\" and the
-exact `git add`, `git commit` and `git push` commands naming only the files that change wrote
-(`--json`: `changed_files` and `git_commands`); run them yourself and leave other changes as they
-are. `alm claim` asks you to push at once, before you start the work. Changes the person made in
-the Allomos app and not shared yet come with their own commands, to commit as the person's.
-`alm init` prints none: commit the new taskbag yourself.
+`alm` never runs or reads your version control tool. After a change it prints \"Save this change
+in your version control tool and share it\", the files that change wrote, and, \"For Git:\", the
+exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files` and
+`git_commands`); save and share them yourself and leave other changes as they are. `alm claim`
+asks you to share at once, before you start the work. Changes the person made in the Allomos app
+and not shared yet come with their own files and commands, to save as the person's. `alm init`
+prints none: save the new taskbag yourself.
 
 See:
 - `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its

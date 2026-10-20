@@ -149,7 +149,7 @@ fn init_refuses_twice_and_needs_no_git() {
     assert_eq!(project["name"], "deep");
     let text = String::from_utf8(alm(&tmp("init-text"), &["init"]).stdout).unwrap();
     assert!(
-        !text.contains("Commit and push") && !text.contains("Commit only these files"),
+        !text.contains("Save this change") && !text.contains("Save only these files"),
         "{text}"
     );
 }
@@ -813,7 +813,10 @@ fn printed_git_commands_share_only_that_change() {
         "alm: add area A01\nAgent: <your session name>"
     );
     let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "T"]);
-    assert_eq!(v["git_instruction"], "Commit and push this change:");
+    assert_eq!(
+        v["git_instruction"],
+        "Save this change in your version control tool and share it. Changed files:"
+    );
     run_printed(&repo, &v);
     assert_eq!(
         git(&repo, &["log", "-1", "--format=%s"]),
@@ -839,7 +842,7 @@ fn printed_git_commands_share_only_that_change() {
     // The claim says to push at once, before the work starts (row 2).
     assert_eq!(
         v["git_instruction"],
-        "Commit and push this change now, before you start the work. Until it is pushed, other sessions do not see your claim and may take this task too:"
+        "Save this change in your version control tool and share it now, before you start the work. Until it is shared, other sessions do not see your claim and may take this task too. Changed files:"
     );
     let commands: Vec<&str> = v["git_commands"]
         .as_array()
@@ -903,7 +906,7 @@ fn printed_git_commands_share_only_that_change() {
     assert_eq!(v["git_commands"], json!([]), "{v}");
     assert_eq!(
         v["git_instruction"],
-        "Nothing changed, so there is nothing to commit."
+        "Nothing changed, so there is nothing to save."
     );
     // For people: the same commands, then the rule.
     let out = alm(
@@ -912,7 +915,9 @@ fn printed_git_commands_share_only_that_change() {
     );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(
-        text.contains("\nCommit and push this change:\n  git -C "),
+        text.contains(
+            "\nSave this change in your version control tool and share it. Changed files:\n  "
+        ) && text.contains("\nFor Git:\n  git -C "),
         "{text}"
     );
     assert!(
@@ -920,7 +925,7 @@ fn printed_git_commands_share_only_that_change() {
         "{text}"
     );
     assert!(
-        text.ends_with("Commit only these files; leave other changes as they are.\n"),
+        text.ends_with("Save only these files; leave other changes as they are.\n"),
         "{text}"
     );
 }
@@ -1274,7 +1279,10 @@ fn describe_and_note_change_a_task_like_the_app() {
     let out = alm(&repo, &["--as", "a", "note", "A01-01", "Back soon."]);
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success(), "{text}");
-    assert!(text.contains("Commit and push this change:"), "{text}");
+    assert!(
+        text.contains("Save this change in your version control tool and share it. Changed files:"),
+        "{text}"
+    );
     assert!(text.contains(task_json), "{text}");
     assert!(!text.contains("description.md"), "{text}");
 }
@@ -2262,7 +2270,7 @@ fn add_task_tells_the_next_steps() {
     let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "One"]);
     assert_eq!(out.status.code(), Some(0));
     let text = String::from_utf8(out.stdout).unwrap();
-    let after = text.split("Commit only these files").nth(1).unwrap_or("");
+    let after = text.split("Save only these files").nth(1).unwrap_or("");
     assert!(
         after.contains("Next, for the agent who added it:"),
         "{text}"
@@ -3447,7 +3455,9 @@ fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
     let v = ok(&repo, &["handoffs", "--check", "--task", "A01-01"]);
     // The done's text: the task, the rule, then the Git commands for the done itself.
     let rule = text.split_once('\n').unwrap().1;
-    let rule = &rule[..rule.find("\nCommit and push this change:").unwrap()];
+    let rule = &rule[..rule
+        .find("\nSave this change in your version control tool")
+        .unwrap()];
     assert_eq!(v["instruction"], json!(rule));
 
     // The agent removes a handoff by the name alm handoffs lists; then it is gone.
