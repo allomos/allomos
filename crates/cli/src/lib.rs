@@ -854,6 +854,7 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
             allomos_store::events::set_request(None);
             let mut done = done?;
             done.warnings.extend(outdated);
+            pack_history(&cli, cwd, &mut done);
             Ok(done)
         })
     });
@@ -922,6 +923,46 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
         stdout,
         stderr,
     }
+}
+
+/// After a command that worked, from the 28th of a month (Task-A01-59, approver 2026-10-20: alm
+/// packs by itself): pack the history of whole earlier months into one file each. What was
+/// packed is said, and the Git commands that share the change include the packed and removed
+/// files. A taskbag busy with another writer is left for the next command.
+fn pack_history(cli: &Cli, cwd: &Path, done: &mut Done) {
+    if matches!(
+        cli.command,
+        Command::Init { .. }
+            | Command::Brief
+            | Command::Guide { .. }
+            | Command::Confirm { .. }
+            | Command::MoveIn { .. }
+    ) {
+        return;
+    }
+    let Ok(root) = locate(cli, cwd) else {
+        return;
+    };
+    let Ok(lock) = Lock::acquire(&root, Duration::ZERO) else {
+        return;
+    };
+    let packed = lock.pack_history().unwrap_or_default();
+    drop(lock);
+    if packed.is_empty() {
+        return;
+    }
+    let mut text = String::new();
+    for p in &packed {
+        text.push_str(&format!(
+            "Packed the history of {} into {} ({} changes; {} single files removed).\n",
+            p.month, p.file, p.changes, p.removed
+        ));
+    }
+    done.text.push_str(&text);
+    if done.fields["taskbag"].is_null() {
+        done.fields["taskbag"] = json!(root);
+    }
+    done.fields["packed"] = json!(packed);
 }
 
 /// Before a command: is the taskbag in the format this Allomos reads, and is Allomos's section in
@@ -1022,7 +1063,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
     let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) else {
         return;
     };
-    let changes = cli.command.changes() && !matches!(cli.command, Command::Init { .. });
+    // A command that packed old history (Task-A01-59) shares that too, even when it only reads.
+    let packed = done.fields["packed"]
+        .as_array()
+        .is_some_and(|p| !p.is_empty());
+    let changes = (cli.command.changes() || packed) && !matches!(cli.command, Command::Init { .. });
     let mut text = String::new();
     let mut files: Vec<String> = written
         .iter()
@@ -1044,6 +1089,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         let subject = match cli.command.target().map(String::from).or(made) {
             Some(id) => format!("alm: {command} {id}"),
             None => format!("alm: {command}"),
+        };
+        let subject = if packed && !cli.command.changes() {
+            "alm: pack history".to_string()
+        } else {
+            subject
         };
         let who = format!(
             "Agent: {}",

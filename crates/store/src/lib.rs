@@ -1271,6 +1271,12 @@ pub struct Lock {
 }
 
 impl Lock {
+    /// Pack the history of whole earlier months from the 28th of a month (Task-A01-59):
+    /// [`events::pack`].
+    pub fn pack_history(&self) -> Result<Vec<events::Packed>, Problem> {
+        events::pack(&self.root)
+    }
+
     /// Take the lock, waiting up to `wait` for another writer to finish.
     pub fn acquire(root: &Path, wait: Duration) -> Result<Lock, Problem> {
         if !root.join(PROJECT_FILE).is_file() {

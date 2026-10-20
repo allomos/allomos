@@ -2491,6 +2491,70 @@ fn a_repeated_command_with_the_same_number_runs_once() {
     assert!(!shown.contains("request_id"), "{shown}");
 }
 
+/// `alm` at a given time (`ALLOMOS_NOW`), for the packing of old history (Task-A01-59).
+fn alm_at(dir: &Path, now: &str, args: &[&str]) -> Output {
+    Command::new(ALM)
+        .current_dir(dir)
+        .args(args)
+        .env_remove("ALLOMOS_TASKBAG")
+        .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_LOCK_WAIT_MS")
+        .env("ALLOMOS_NOW", now)
+        .output()
+        .unwrap()
+}
+
+/// From the 28th, any command packs the history of earlier months (Task-A01-59): it says so and
+/// prints the Git commands for the packed file and the removed single files; the history reads
+/// the same afterwards.
+#[test]
+fn any_command_packs_earlier_months_from_the_28th() {
+    let dir = tmp("pack");
+    let sept = "2026-09-10T09:00:00Z";
+    for args in [
+        vec!["init"],
+        vec!["add", "area", "A01", "Core"],
+        vec![
+            "add", "task", "--area", "A01", "--title", "One", "--branch", "main",
+        ],
+        vec!["--as", "s/one", "note", "A01-01", "Next"],
+    ] {
+        assert_eq!(alm_at(&dir, sept, &args).status.code(), Some(0), "{args:?}");
+    }
+    let history = |now: &str| -> Value {
+        let out = alm_at(&dir, now, &["--json", "history", "A01-01"]);
+        let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+        v["events"].clone()
+    };
+    let before = history("2026-10-27T09:00:00Z");
+    assert!(
+        !dir.join(".allomos/taskbag/events/2026-09.events").exists(),
+        "not before the 28th"
+    );
+
+    // October 28th: a reading command packs September and says how to share it.
+    let out = alm_at(&dir, "2026-10-28T09:00:00Z", &["list"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Packed the history of 2026-09 into events/2026-09.events"),
+        "{text}"
+    );
+    assert!(text.contains("alm: pack history"), "{text}");
+    assert!(text.contains("events/2026-09.events"), "{text}");
+    assert!(
+        text.contains("events/2026-09-10-"),
+        "the removed files are shared too: {text}"
+    );
+    assert!(dir.join(".allomos/taskbag/events/2026-09.events").exists());
+    assert_eq!(history("2026-10-28T09:00:00Z"), before);
+
+    // Nothing more to pack: nothing said, nothing to share.
+    let out = alm_at(&dir, "2026-10-29T09:00:00Z", &["--json", "list"]);
+    let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+    assert_eq!(v["packed"], Value::Null);
+}
+
 /// Every file under `dir`, with its contents, to show that nothing changed.
 fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut out: Vec<(PathBuf, Vec<u8>)> = walk(dir)
