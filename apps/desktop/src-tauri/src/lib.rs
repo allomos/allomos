@@ -1204,8 +1204,13 @@ fn confirm_requests(project: PathBuf) -> Vec<ConfirmRequest> {
 
 /// The person's answer to question `id`: go ahead (`yes`) or cancel.
 #[tauri::command]
-fn answer_confirm_request(project: PathBuf, id: String, yes: bool) -> Result<(), Problem> {
-    answer_confirm(&project, &id, yes)
+fn answer_confirm_request(
+    project: PathBuf,
+    id: String,
+    yes: bool,
+    fingerprint: Option<String>,
+) -> Result<(), Problem> {
+    answer_confirm(&project, &id, yes, fingerprint.as_deref())
 }
 
 /// Do the AI agents know about this project? What the window's agent line shows (Task-A03-04).

@@ -290,6 +290,12 @@ export interface ConfirmRequest {
   /** Seconds since 1970. */
   asked: number;
   until: number;
+  /** What shows the plan is sound, in Markdown, shown under it (`--evidence`, Task-A03-37). */
+  evidence?: string | null;
+  /** The task the approval is for (`--task`). */
+  task?: string | null;
+  /** A fingerprint of exactly what is shown: a Go ahead counts only for it. */
+  fingerprint?: string;
 }
 
 /** What an AI agent reports about a job the app gave it (`alm progress`, Task-A05-08). */

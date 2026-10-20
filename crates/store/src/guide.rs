@@ -211,6 +211,10 @@ Work a task:
 - `alm checked <id>`: a person has checked the finished task: it gets the top label and leaves
   To check; the note and steps stay in its history. Run it only when the person says so.
   It does not review the task's AI decisions.
+- `alm recheck <id> --reason \"<what changed>\" [--steps <file.md>]`: the work of a checked task
+  changed afterwards, so the person's check no longer covers it: the task goes back to To check
+  with your reason (and new steps, or the earlier ones), one label below the top. You decide
+  when; `alm` does not look at the work.
 - `alm ai-decided <id> \"<what and why>\"`: record a routine choice you made on your own in the
   task, in one line, for example `alm ai-decided A01-37 \"Names: alm describe, alm note — match
   alm title\"`. Any task, any state; the task's files do not change, the history keeps it.
@@ -267,8 +271,11 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
 - `alm handoff-template [--set <file.md>]`: show or replace the project's template.
 
 Ask the person:
-- `alm confirm --title \"<heading>\" --plan <file.md>`: shows your plan in the Allomos app and
-  waits; exit 0 means go ahead, anything else means change nothing.
+- `alm confirm --title \"<heading>\" --plan <file.md> [--evidence <file.md>] [--task <id>]`:
+  shows your plan in the Allomos app, with its evidence (what you checked and the results) under
+  it, and waits; exit 0 means go ahead, anything else means change nothing. A Go ahead covers
+  only what was shown (its fingerprint is printed); with `--task` it is recorded in that task's
+  history. If the plan changes afterwards, ask again.
 - `alm progress --title \"<job>\" --step \"<what now>\" [--done <n> --of <total>]`, then
   `alm progress --step …` at each step and `alm progress --finished \"<what happened>\"` at the
   end: on a job the person gave you from the Allomos app, the app shows your progress in a popup.
@@ -443,8 +450,10 @@ Rules:
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
-- Before a change the person must agree to, show your plan with `alm confirm` and change nothing
-  unless it exits 0 (in a quiet run, park it with `alm wait` instead: step 8).
+- Before a change the person must agree to, show your plan with `alm confirm` (with the evidence,
+  `--evidence`, and the task, `--task`) and change nothing unless it exits 0 (in a quiet run, park
+  it with `alm wait` instead: step 8). A Go ahead covers only the plan shown: if it changes, ask
+  again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with

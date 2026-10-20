@@ -61,7 +61,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// notes and every other file like credentials, written as placeholders (Task-A03-29).
 /// 18: the section asks the agent to save and share with "your version control tool", naming
 /// Git only as the example (Task-A01-60).
-pub const SECTION_VERSION: u32 = 18;
+/// 19: a checked task whose work changed goes back to To check (`alm recheck`, the agent decides);
+/// an approval through `alm confirm` shows its evidence and task and covers only the plan shown
+/// (Task-A03-37).
+pub const SECTION_VERSION: u32 = 19;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

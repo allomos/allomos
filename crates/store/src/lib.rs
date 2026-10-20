@@ -41,8 +41,9 @@ pub use agent_setup::{
     AGENTS_SET_UP_REQUEST_VERSION, agent_update_taskbag_request_in, agents_set_up_request_in,
 };
 pub use confirm::{
-    ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
-    read_answer, requests_dir, was_seen, withdraw_confirm,
+    ConfirmRequest, Extra as ConfirmExtra, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm,
+    pending_confirms, post_confirm, read_answer, requests_dir, shown_fingerprint, was_seen,
+    withdraw_confirm,
 };
 pub use convert::{
     CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, MOVE_IN_REQUEST_VERSION,
@@ -282,7 +283,11 @@ the project notes (below) and your own handoff file.
   with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`, To answer) and go on
   with the next ready task; do not use `alm confirm` (it would wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
-  says they checked one: `alm checked <id>`.
+  says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
+  it back to To check with `alm recheck <id> --reason \"<what changed>\"`.
+- Approvals: when you ask the person to approve a plan with `alm confirm`, show the evidence
+  (`--evidence <file.md>`) and name the task (`--task <id>`). A Go ahead covers only the plan
+  shown; if the plan changes afterwards, ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each one with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it
@@ -1990,6 +1995,35 @@ pub fn record_ai_decision(
         pending,
         issues,
     })
+}
+
+/// The field of the event that records a Go ahead in a task's history (Task-A03-37).
+pub const APPROVAL_FIELD: &str = "approval";
+
+/// Record in task `id`'s history that the person chose Go ahead on a plan shown through
+/// `alm confirm --task` (Task-A03-37): one `approved` event whose `approval` change holds the
+/// popup's title and the fingerprint of exactly what was shown, under the lock. The task's files
+/// do not change. A changed plan is a new question, so this counts only for that fingerprint.
+pub fn record_approval(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    title: &str,
+    fingerprint: &str,
+) -> Result<Task, Problem> {
+    let (lock, bag, _) = lock_for_change(root, wait)?;
+    let task = ops::find_task(&bag, id)?;
+    let change = allomos_core::event::Change {
+        field: APPROVAL_FIELD.to_string(),
+        from: None,
+        to: Some(serde_json::Value::String(format!(
+            "{title} (plan {fingerprint})"
+        ))),
+    };
+    let event = actor.event("approved", Kind::Task, Some(&task.id), vec![change]);
+    lock.record(&event, |_| Ok(()))?;
+    Ok(task)
 }
 
 /// Mark task `id`'s AI decisions reviewed (`alm reviewed`, the app's Reviewed button,

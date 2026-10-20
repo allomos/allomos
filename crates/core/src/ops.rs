@@ -781,6 +781,46 @@ pub fn checked(taskbag: &Taskbag, id: &str) -> Result<Outcome, Problem> {
     Ok(Outcome::plain(task))
 }
 
+/// Send a finished task back to "To check" (Task-A03-37): its work changed after a person checked
+/// it, so the earlier check no longer covers it. The AI agent decides when (approver,
+/// 2026-10-20); `alm` does not look at the work. `reason` says what changed and is shown where the
+/// task waits for its check; `steps` replace the steps for checking it (without them, the earlier
+/// steps stay, or the warning `human_check_steps_missing` asks for them). A task at the top label
+/// goes one step down, since the person's check no longer covers it. Only a done task can be sent
+/// back; the holder rule does not apply, as for `checked`.
+pub fn recheck(
+    taskbag: &Taskbag,
+    id: &str,
+    reason: &str,
+    steps: Option<&str>,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    if task.state != State::Done {
+        return Err(Problem::NotDone {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    let note = non_empty(Some(reason)).ok_or(Problem::WithoutHumanCheckMissing)?;
+    let mut warnings = Vec::new();
+    match steps.map(str::trim) {
+        Some("") => return Err(Problem::HumanCheckStepsEmpty),
+        Some(steps) => task.human_check_steps = Some(format!("{steps}\n")),
+        None if task.human_check_steps.is_none() => {
+            warnings.push(Problem::HumanCheckStepsMissing {
+                id: task.id.clone(),
+            })
+        }
+        None => {}
+    }
+    let ladder = &taskbag.project.labels;
+    if ladder.len() > 1 && task.label.as_ref() == ladder.last() {
+        task.label = Some(ladder[ladder.len() - 2].clone());
+    }
+    task.without_human_check = Some(note);
+    Ok(Outcome::warned(task, warnings))
+}
+
 /// Let go of the task. A task `in_progress` goes back to `ready`. The handoff note is
 /// replaced by `note`, or removed when there is none, so it always describes the latest
 /// release.
@@ -1876,6 +1916,37 @@ mod tests {
         assert_eq!(o.task.label.as_deref(), Some("human verified"));
         let e: Edit = serde_json::from_str(r#"{"field":"checked"}"#).unwrap();
         assert_eq!(e, Edit::Checked);
+        // Its work changed after the check: the agent sends it back to To check (Task-A03-37).
+        put!(s, o.task);
+        let back = recheck(&s, "A01-01", " The save button moved ", None).unwrap();
+        assert_eq!(
+            back.task.without_human_check.as_deref(),
+            Some("The save button moved")
+        );
+        assert_eq!(back.task.label.as_deref(), Some("deployed and verified"));
+        assert!(back.task.to_check());
+        assert!(matches!(
+            back.warnings[..],
+            [Problem::HumanCheckStepsMissing { .. }]
+        ));
+        let with = recheck(&s, "A01-01", "moved", Some("1. Click Save.\n")).unwrap();
+        assert!(with.warnings.is_empty());
+        assert_eq!(
+            with.task.human_check_steps.as_deref(),
+            Some("1. Click Save.\n")
+        );
+        assert!(matches!(
+            recheck(&s, "A01-01", " ", None),
+            Err(Problem::WithoutHumanCheckMissing)
+        ));
+        assert!(matches!(
+            recheck(&s, "A01-01", "x", Some(" ")),
+            Err(Problem::HumanCheckStepsEmpty)
+        ));
+        assert!(matches!(
+            recheck(&s, "A01-02", "x", None),
+            Err(Problem::NotDone { .. })
+        ));
     }
 
     #[test]
