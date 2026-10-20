@@ -67,7 +67,7 @@ Rust puts everything it builds in `target/`, one per checkout (the main checkout
 - **One `target/` per checkout.** Do not set a shared `CARGO_TARGET_DIR`: parallel sessions would wait on each other's builds and keep rebuilding over each other's changes.
 - **No routine `cargo clean`.** It throws away work that the next build must redo. Run it only in your own worktree, and only when builds behave strangely after a Rust or Tauri upgrade, or when the disk is short of space.
 - **Remove a worktree when its card is merged.** This deletes its `target/` with it. `alm guide workflow` says when (step 2, Branches).
-- Build in the checkout you work in: the main checkout by default, or your card's worktree when the task has one (`alm claim` says which branch it starts from and merges into).
+- Build in your card's worktree: every task is worked in a worktree of its own, and the main checkout stays on the base branch (`alm claim` says which branch it starts from and merges into).
 
 ## How `alm` behaves
 

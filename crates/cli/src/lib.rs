@@ -3122,11 +3122,13 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
     match working {
         Some(w) if w != base => {
             let wq = quoted(w);
+            // Always in a worktree of its own (Task-A03-38): the main checkout stays on the
+            // base, so the merge runs there and the worktree is removed afterwards.
             if current != Some(w) {
                 steps.start = vec![
                     format!("git switch {b}"),
                     "git pull --ff-only".to_string(),
-                    format!("git switch -c {wq}"),
+                    format!("git worktree add <folder> -b {wq} {b}"),
                 ];
             }
             steps.merge = vec![
@@ -3134,6 +3136,8 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
                 "git pull --ff-only".to_string(),
                 format!("git merge {wq}"),
                 "git push".to_string(),
+                "git worktree remove <folder>".to_string(),
+                format!("git branch -d {wq}"),
             ];
         }
         _ => {
@@ -3141,6 +3145,9 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
                 steps.start.push(format!("git switch {b}"));
             }
             steps.start.push("git pull --ff-only".to_string());
+            steps.facts.push(format!(
+                "Your working branch is {base}, the task's base. Work every task in a worktree of its own, on a branch of its own: claim again with --working <new branch>."
+            ));
         }
     }
     if let Some(c) = current.filter(|c| *c != base) {
@@ -3160,11 +3167,10 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
         for c in &steps.start {
             steps.text.push_str(&format!("    {c}\n"));
         }
-        if let Some(w) = working.filter(|w| *w != base) {
-            steps.text.push_str(&format!(
-                "    (or in a worktree of its own: git worktree add <folder> -b {} {b})\n",
-                quoted(w)
-            ));
+        if working.is_some_and(|w| w != base) {
+            steps.text.push_str(
+                "    (run these in the main checkout, which stays on the base; then work in <folder>)\n",
+            );
         }
     }
     if steps.merge.is_empty() {
@@ -3174,7 +3180,7 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
     } else {
         steps
             .text
-            .push_str("  When the task is done, merge it into its base:\n");
+            .push_str("  When the task is done, merge it into its base, in the main checkout:\n");
         for c in &steps.merge {
             steps.text.push_str(&format!("    {c}\n"));
         }

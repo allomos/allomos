@@ -390,10 +390,13 @@ const WORKFLOW: &str = "# How to work the tasks
    worktree of its own),
    prints which base to start from and merge into with the Git commands as the example, and says
    so when you
-   are not on the base. A task without a base gets the branch you are on. Work in the current
-   checkout by default; make a worktree of its own only when the task needs one (for example
-   when several sessions work at once). Once the task's branch is merged into its base, remove
-   your own worktree and the merged branch; never another session's.
+   are not on the base. A task without a base gets the branch you are on.
+   **Always work a task in a worktree of its own** (a separate working copy on the task's own
+   branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which `alm claim`
+   prints), never in the main checkout: the main checkout stays on the base branch, so no
+   session leaves it on a task's branch and several sessions can work at once. Merge from the
+   main checkout, where the base is checked out. Once the task's branch is merged into its
+   base, remove your own worktree and the merged branch; never another session's.
 3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
    with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
