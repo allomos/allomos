@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tatakikun · 肩代 Allomos</title>
+<meta name="description" content="macOS 用入力メソッド：英字で入力すると、英語・中国語・日本語の候補が並んで出ます。">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/products/tatakikun/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/products/tatakikun/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/products/tatakikun/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Tatakikun · 肩代 Allomos">
+<meta property="og:description" content="macOS 用入力メソッド：英字で入力すると、英語・中国語・日本語の候補が並んで出ます。">
+<meta property="og:url" content="https://www.allomos.com/ja/products/tatakikun/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/ja/"><img src="/images/logo.svg" alt="">肩代 Allomos</a>
+    <nav>
+      <a class="sec" href="/ja/products/" aria-current="true">製品</a>
+      <a class="sec" href="/ja/blog/">ブログ</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/products/tatakikun/" lang="en">EN</a><a href="/zh/products/tatakikun/" lang="zh-CN">中文</a><a href="/ja/products/tatakikun/" aria-current="page" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero product-hero">
+    <img class="picon big" src="/images/products/tatakikun-icon.svg" alt="">
+    <h1>Tatakikun</h1>
+    <p>Tatakikun は、英字で入力した文字列を英単語・中国語のピンイン・日本語のローマ字として同時に解釈し、英語・中国語・ひらがな・カタカナ・漢字の候補を 1 本の横長の候補バーに並べます。入力したままの英字列も、常に候補のひとつです。</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/allomos/tatakikun/releases/latest">インストーラをダウンロード</a>
+      <a class="btn secondary" href="https://github.com/allomos/tatakikun">GitHub のソース</a>
+    </div>
+    <div class="tags">対応: macOS &nbsp;·&nbsp; ライセンス: MIT</div>
+  </div>
+  <div class="shots"><figure><img src="/images/products/tatakikun-bar.png" width="1070" height="108" loading="lazy" alt="「ai」と入力したときの候補バー。"><figcaption>「ai」と入力したときの候補バー。</figcaption></figure><figure><img src="/images/products/tatakikun-expanded.png" width="1400" height="344" loading="lazy" alt="展開すると複数行になり、スクロールできます。部分一致は灰色。"><figcaption>展開すると複数行になり、スクロールできます。部分一致は灰色。</figcaption></figure></div>
+  <section><div class="cards"><div class="card"><h3>3 言語を 1 本のバーに</h3><p><code>ai</code> と打てば 爱・愛・あい・アイ・ai がいっしょに出ます。一致した言語の最良候補は必ずバーに残ります。</p></div><div class="card"><h3>下に広げてスクロール</h3><p>↓ か Tab で複数行に展開。部分一致の候補も出ます：<code>zhongg</code> → 中国、<code>compu</code> → computer。</p></div><div class="card"><h3>学習します</h3><p>選んだ候補は次から上位に。学習内容はこの Mac の 1 ファイルだけに保存され、消せばリセットされます。</p></div><div class="card"><h3>言語に合う句読点</h3><p>中国語・日本語のあとは全角、英語のあとは半角になります。</p></div><div class="card"><h3>子音だけの省略入力</h3><p>子音だけでも候補が出ます：<code>nh</code> → 你好、<code>wtx</code> → わたし。</p></div><div class="card"><h3>言語パック</h3><p>インストール時に中国語・日本語・英語のパックを選べます。辞書はオープンデータ（pinyin-data、Mozc、SCOWL）から作ります。</p></div></div></section>
+  <section>
+    <h2>インストール</h2>
+    <p class="lead">インストーラを開き、使う言語パックにチェックを入れます。そのあと一度だけ追加します：システム設定 → キーボード → テキスト入力 → 入力ソース → 編集… → + → 中国語（簡体字）→ Tatakikun。Apple の Developer ID 署名がないため、初回は システム設定 → プライバシーとセキュリティ で<strong>このまま開く</strong>をクリックしてください。</p>
+  </section>
+  <section>
+    <h2>作られた経緯を読む</h2>
+    <p class="lead"><a href="/zh/blog/tatakikun-in-29-minutes/">29 分で英中日の入力メソッドができるまで</a> (中国語) — 2 回目の実験：一段落の説明だけで、Claude が Allomos のタスク管理を使って、英語・中国語・日本語の候補を並べて出す macOS 入力メソッドを作りました。犬の散歩と皿洗いから戻ると、3 つのバージョンができていました。</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT ライセンス</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tosstoss · Allomos</title>
+<meta name="description" content="Send files between devices from the browser: open the page, tick the other device, send. Phones too.">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/products/tosstoss/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/products/tosstoss/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/products/tosstoss/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Tosstoss · Allomos">
+<meta property="og:description" content="Send files between devices from the browser: open the page, tick the other device, send. Phones too.">
+<meta property="og:url" content="https://www.allomos.com/products/tosstoss/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/"><img src="/images/logo.svg" alt="">Allomos</a>
+    <nav>
+      <a class="sec" href="/products/" aria-current="true">Products</a>
+      <a class="sec" href="/blog/">Blog</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/products/tosstoss/" aria-current="page" lang="en">EN</a><a href="/zh/products/tosstoss/" lang="zh-CN">中文</a><a href="/ja/products/tosstoss/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero product-hero">
+    <img class="picon big" src="/images/products/tosstoss-icon.svg" alt="">
+    <h1>Tosstoss</h1>
+    <p>Tosstoss sends files between devices straight from the browser. Every device that opens the page shows up for the others; tick one, choose or drop files, press send, and the other side receives them on its own. It works on phones too.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://tosstoss.allomos.com/">Open Tosstoss</a>
+      <a class="btn secondary" href="https://github.com/allomos/tosstoss-public">Source on GitHub</a>
+    </div>
+    <div class="tags">Platform: Web · any browser &nbsp;·&nbsp; Licence: MIT</div>
+  </div>
+  <div class="shots"><figure><img src="/images/products/tosstoss-pc.jpg" width="540" height="1200" loading="lazy" alt="On a computer: the devices online, each with its own name."><figcaption>On a computer: the devices online, each with its own name.</figcaption></figure><figure><img src="/images/products/tosstoss-phone.png" width="668" height="652" loading="lazy" alt="On a phone: tick the computer, send two screenshots, “delivered”."><figcaption>On a phone: tick the computer, send two screenshots, “delivered”.</figcaption></figure></div>
+  <section><div class="cards"><div class="card"><h3>Nothing to install</h3><p>Open the page on your computer and your phone. Devices on the same network find each other, each with a friendly name like “gentle lemon”.</p></div><div class="card"><h3>Received on its own</h3><p>Files arrive and download without anyone clicking. Both sides see the progress, and large files make it through.</p></div><div class="card"><h3>Direct when it can</h3><p>Devices try a direct WebRTC connection first; if that fails, the server relays the file without storing it.</p></div><div class="card"><h3>Rooms and the square</h3><p>Share a room link or QR code to send between networks, or meet in the open square; or go offline whenever you like.</p></div><div class="card"><h3>Run your own</h3><p>Run it on your own computer for your home network with <code>npm start</code>, or deploy it to Cloudflare Workers.</p></div></div></section>
+  <section>
+    <h2>Use it</h2>
+    <p class="lead">Open <a href="https://tosstoss.allomos.com/">tosstoss.allomos.com</a> on two devices on the same Wi-Fi. To run it on your own network, install Node.js 18 or newer and run <code>npm install</code> and <code>npm start</code> in the source folder; open the address it prints.</p>
+  </section>
+  <section>
+    <h2>Read how it was built</h2>
+    <p class="lead"><a href="/zh/blog/tosstoss-in-23-minutes/">Tosstoss in twenty-three minutes</a> (in Chinese) — One paragraph describing the app, one click on Start in Allomos, one Enter in Claude. Claude split it into two versions and nine tasks and built them one after another; after midnight I sent a screenshot from my phone to my computer with it.</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT licence</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
