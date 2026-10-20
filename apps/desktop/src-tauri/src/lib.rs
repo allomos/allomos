@@ -23,7 +23,7 @@ use allomos_store::{
     versions,
 };
 use serde::Serialize;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 use tauri::menu::AboutMetadata;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Wry};
@@ -1299,12 +1299,17 @@ fn window_showing(
 }
 
 /// The label of the window in front, else the first one.
+/// The About window is not a project window: menu commands skip it (Task-A07-28).
 fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
-    windows
-        .iter()
+    let projects = || {
+        windows
+            .iter()
+            .filter(|(label, _)| label.as_str() != ABOUT_WINDOW)
+    };
+    projects()
         .find(|(_, w)| w.is_focused().unwrap_or(false))
-        .or_else(|| windows.iter().next())
+        .or_else(|| projects().next())
         .map(|(label, _)| label.clone())
 }
 
@@ -1401,16 +1406,14 @@ const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
 /// The website the About window links to, and the words it shows (Task-A07-22).
 const WEBSITE: &str = "https://www.allomos.com";
+#[cfg(not(any(target_os = "macos", windows)))]
 const WEBSITE_LABEL: &str = "www.allomos.com";
-/// About Allomos on macOS, where the app shows the About window itself (`show_about`).
-#[cfg(target_os = "macos")]
+/// About Allomos on macOS and Windows: the menu item, and the label of the app's own About
+/// window it opens (Task-A07-28).
+#[cfg(any(target_os = "macos", windows))]
 const ABOUT_ID: &str = "about";
-/// The About window's icon on macOS, the bundle's own (Task-A07-23).
-#[cfg(target_os = "macos")]
-const ABOUT_ICON: &[u8] = include_bytes!("../icons/128x128@2x.png");
-/// The About window's last line on macOS: the licence, the same in every language.
-#[cfg(target_os = "macos")]
-const LICENCE: &str = "Open source · MIT License";
+/// The About window's label: not a project window, so menu commands never go to it.
+const ABOUT_WINDOW: &str = "about";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
 const UPDATE_READY_EVENT: &str = "update:ready";
 const UPDATE_FAILED_EVENT: &str = "update:failed";
@@ -1437,9 +1440,6 @@ struct MenuTexts {
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
     /// **Restart to Update to Allomos <version>** (Task-A07-17).
     update_action: Mutex<UpdateAction>,
-    /// The About window's line on what Allomos does, in the interface's language (Task-A07-23).
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
-    about_tagline: Mutex<String>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -1581,24 +1581,22 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         move_tasks_in,
         check_updates,
         update_action: Mutex::new(UpdateAction::Check),
-        about_tagline: Mutex::new("Switch agents and teammates. Keep the whole project on the record.".into()),
         recent,
         state: Mutex::new(Recent::default()),
     });
     Ok(menu)
 }
 
-/// About Allomos, with the website. On macOS the item opens the system's About window itself
-/// (`show_about`), so the website is a link that opens in the default browser: the default
-/// item can only show plain text there. Windows and Linux keep the default item, with the
-/// website in its website field.
-#[cfg(target_os = "macos")]
+/// About Allomos. On macOS and Windows the item opens the app's own About window
+/// ([`open_about_window`], Task-A07-28): the same on both, in the interface's language, with the
+/// website as a real link. Linux, not shipped (decision 0011), keeps the default item.
+#[cfg(any(target_os = "macos", windows))]
 fn about_item(app: &AppHandle) -> tauri::Result<MenuItem<Wry>> {
     let name = &app.package_info().name;
     MenuItem::with_id(app, ABOUT_ID, format!("About {name}"), true, None::<&str>)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
     let info = app.package_info();
     let config = app.config();
@@ -1614,118 +1612,66 @@ fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
     PredefinedMenuItem::about(app, None, Some(metadata))
 }
 
-/// The system's About window: the Allomos icon, the name, the version once, then a short line
-/// on what Allomos does (in the interface's language), the website as a link, and the licence
-/// (Task-A07-23). The icon is given explicitly, so a development build shows it too rather
-/// than the generic folder.
-#[cfg(target_os = "macos")]
-fn show_about(app: &AppHandle) {
-    use objc2::rc::Retained;
-    use objc2::runtime::AnyObject;
-    use objc2::{AnyThread, MainThreadMarker};
-    use objc2_app_kit::{
-        NSAboutPanelOptionApplicationIcon, NSAboutPanelOptionApplicationName,
-        NSAboutPanelOptionApplicationVersion, NSAboutPanelOptionCredits, NSAboutPanelOptionVersion,
-        NSApplication, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName,
-        NSImage, NSLinkAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName,
-        NSTextAlignment,
-    };
-    use objc2_foundation::{
-        NSAttributedString, NSData, NSDictionary, NSMutableAttributedString, NSString, NSURL,
-    };
+/// The app's own About window (Task-A07-28): a small window showing the web interface's About
+/// page (`index.html?about`): the icon, name, version, slogan, the website link and the licence.
+/// One at a time: choosing About again brings it forward.
+#[cfg(any(target_os = "macos", windows))]
+fn open_about_window(app: &AppHandle) -> tauri::Result<()> {
+    if let Some(window) = app.get_webview_window(ABOUT_WINDOW) {
+        let _ = window.unminimize();
+        window.show()?;
+        return window.set_focus();
+    }
+    let name = &app.package_info().name;
+    tauri::WebviewWindowBuilder::new(
+        app,
+        ABOUT_WINDOW,
+        tauri::WebviewUrl::App("index.html?about".into()),
+    )
+    .title(format!("About {name}"))
+    .inner_size(360.0, 400.0)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .center()
+    .build()
+    .map(drop)
+}
 
-    // Menu events arrive on the main thread; anywhere else the window is not shown.
-    let Some(mtm) = MainThreadMarker::new() else {
-        return;
-    };
+/// What the About window shows of the app itself: its name and version (Task-A07-28).
+#[derive(Serialize)]
+struct AboutInfo {
+    name: String,
+    version: String,
+}
+
+#[tauri::command]
+fn about_info(app: AppHandle) -> AboutInfo {
     let info = app.package_info();
-    let tagline = app
-        .state::<MenuTexts>()
-        .about_tagline
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
-
-    let style = NSMutableParagraphStyle::new();
-    style.setAlignment(NSTextAlignment::Center);
-    style.setParagraphSpacing(6.0);
-    // One centred paragraph of `text`, in a system font of `size` and `color`, a link to `url`.
-    let paragraph = |text: &str,
-                     size: f64,
-                     color: Retained<NSColor>,
-                     url: Option<Retained<NSURL>>|
-     -> Retained<NSAttributedString> {
-        let mut keys = unsafe {
-            vec![
-                NSParagraphStyleAttributeName,
-                NSFontAttributeName,
-                NSForegroundColorAttributeName,
-            ]
-        };
-        let mut values: Vec<Retained<AnyObject>> = vec![
-            style.clone().into(),
-            NSFont::systemFontOfSize(size).into(),
-            color.into(),
-        ];
-        if let Some(url) = url {
-            keys.push(unsafe { NSLinkAttributeName });
-            values.push(url.into());
-        }
-        let attributes = NSDictionary::from_retained_objects(&keys, &values);
-        unsafe {
-            NSAttributedString::initWithString_attributes(
-                NSAttributedString::alloc(),
-                &NSString::from_str(text),
-                Some(&attributes),
-            )
-        }
-    };
-    let credits = NSMutableAttributedString::new();
-    credits.appendAttributedString(&paragraph(
-        &format!("{tagline}\n"),
-        NSFont::systemFontSize(),
-        NSColor::secondaryLabelColor(),
-        None,
-    ));
-    if let Some(url) = NSURL::URLWithString(&NSString::from_str(WEBSITE)) {
-        credits.appendAttributedString(&paragraph(
-            &format!("{WEBSITE_LABEL}\n"),
-            NSFont::smallSystemFontSize(),
-            NSColor::linkColor(),
-            Some(url),
-        ));
+    AboutInfo {
+        name: info.name.clone(),
+        version: info.version.to_string(),
     }
-    credits.appendAttributedString(&paragraph(
-        LICENCE,
-        NSFont::smallSystemFontSize() - 1.0,
-        NSColor::tertiaryLabelColor(),
-        None,
-    ));
+}
 
-    let mut keys = unsafe {
-        vec![
-            NSAboutPanelOptionApplicationName,
-            NSAboutPanelOptionApplicationVersion,
-            // Empty: the window shows "Version 0.1.12", not "Version 0.1.12 (0.1.12)".
-            NSAboutPanelOptionVersion,
-            NSAboutPanelOptionCredits,
-        ]
-    };
-    let mut values: Vec<Retained<AnyObject>> = vec![
-        NSString::from_str(&info.name).into(),
-        NSString::from_str(&info.version.to_string()).into(),
-        NSString::from_str("").into(),
-        credits.into(),
-    ];
-    let icon = NSData::with_bytes(ABOUT_ICON);
-    if let Some(image) = NSImage::initWithData(NSImage::alloc(), &icon) {
-        keys.push(unsafe { NSAboutPanelOptionApplicationIcon });
-        values.push(image.into());
-    }
-    let options = NSDictionary::from_retained_objects(&keys, &values);
-    let ns_app = NSApplication::sharedApplication(mtm);
-    unsafe { ns_app.orderFrontStandardAboutPanelWithOptions(&options) };
-    ns_app.activate();
+/// The About window's link: the website in the default browser. A fixed address: the window
+/// cannot ask to open any other.
+#[tauri::command]
+fn open_website() -> Result<(), Problem> {
+    opener()
+        .arg(WEBSITE)
+        .spawn()
+        .map(drop)
+        .map_err(|e| Problem::OpenFailed {
+            path: WEBSITE.to_string(),
+            detail: e.to_string(),
+        })
+}
+
+/// Close the calling window (the About window's Escape key).
+#[tauri::command]
+fn close_window(window: tauri::WebviewWindow) {
+    let _ = window.close();
 }
 
 /// The menu's words in the interface's language, as the interface sends them.
@@ -1739,7 +1685,6 @@ struct MenuWords {
     no_recent: String,
     connect: String,
     move_tasks_in: String,
-    about_tagline: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1751,10 +1696,6 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
-    *texts
-        .about_tagline
-        .lock()
-        .unwrap_or_else(|e| e.into_inner()) = words.about_tagline;
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -1812,9 +1753,9 @@ pub fn run() {
                     };
                 }
             };
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             if id == ABOUT_ID {
-                show_about(app);
+                let _ = open_about_window(app);
                 return;
             }
             if id == NEW_WINDOW_ID {
@@ -1850,6 +1791,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             startup_folder,
+            about_info,
+            open_website,
+            close_window,
             new_window,
             set_window_project,
             show_project_elsewhere,

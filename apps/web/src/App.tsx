@@ -443,7 +443,6 @@ export function App({ messenger }: { messenger: Messenger }) {
         noRecent: t("menu.no_recent"),
         connect: t("menu.connect"),
         moveTasksIn: t("menu.move_cards"),
-        aboutTagline: t("menu.about_tagline"),
       })
       .catch(() => undefined);
   }, [messenger, t]);

@@ -10,6 +10,12 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
+/** What the About window shows of the app itself (Task-A07-28). */
+export interface AboutInfo {
+  name: string;
+  version: string;
+}
+
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
   startupFolder(): Promise<string | null>;
@@ -154,6 +160,12 @@ export interface Messenger {
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
+  /** The About window (Task-A07-28): the app's name and version. */
+  aboutInfo(): Promise<AboutInfo>;
+  /** The About window's link: www.allomos.com in the default browser. */
+  openWebsite(): Promise<void>;
+  /** Close the calling window (the About window's Escape key). */
+  closeWindow(): Promise<void>;
   /** Whether a newer Allomos is on GitHub (Task-A07-16); `asked` from Check for Updates…. */
   updateStatus(asked: boolean): Promise<UpdateStatus>;
   /** "Skip this version" on the update notice. */
@@ -199,8 +211,6 @@ export interface MenuTexts {
   noRecent: string;
   connect: string;
   moveTasksIn: string;
-  /** The About window's line on what Allomos does (macOS). */
-  aboutTagline: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -251,6 +261,9 @@ export const desktopMessenger: Messenger = {
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
+  aboutInfo: () => invoke<AboutInfo>("about_info"),
+  openWebsite: () => invoke<void>("open_website"),
+  closeWindow: () => invoke<void>("close_window"),
   updateStatus: (asked) => invoke<UpdateStatus>("update_status", { asked }),
   skipUpdate: (version) => invoke<void>("skip_update", { version }),
   setUpdateItem: (text, action) => invoke<void>("set_update_item", { text, action }),

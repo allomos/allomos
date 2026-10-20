@@ -569,3 +569,19 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .task-pane .conflict { display: grid; gap: 6px; }
 .task-pane .conflict p { margin: 0; }
 .task-pane .conflict pre.newer { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; padding: 8px 10px; border-radius: 6px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+
+/* The app's own About window (Task-A07-28): centred, nothing to scroll. */
+.about-window { box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; background: var(--bg); color: var(--ink); }
+.about-window .about-icon { width: 96px; height: 96px; margin-bottom: 8px; }
+.about-window .about-icon .jade { fill: #2a9d8f; }
+.about-window .about-icon .terracotta { fill: #e76f51; }
+.about-window .about-icon .spark { fill: #e9c46a; }
+.about-window .about-icon .ring { fill: none; stroke-width: 66; }
+.about-window .about-icon .ring.jade { stroke: #2a9d8f; }
+.about-window .about-icon .ring.terracotta { stroke: #e76f51; }
+.about-window h1 { margin: 0; font-size: 22px; }
+.about-window p { margin: 0; }
+.about-window .about-version { color: var(--muted); font-size: 13px; }
+.about-window .about-tagline { margin: 10px 0 4px; max-width: 280px; line-height: 1.4; }
+.about-window .about-website { font-size: 14px; align-self: center; }
+.about-window .about-licence { margin-top: 12px; color: var(--muted); }
