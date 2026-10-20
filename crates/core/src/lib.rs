@@ -11,6 +11,7 @@ pub mod event;
 mod model;
 pub mod ops;
 mod problem;
+pub mod request;
 mod validate;
 
 pub use model::{

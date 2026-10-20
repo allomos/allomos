@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode, RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
@@ -14,7 +14,7 @@ import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { outdatedFiles, updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
-import { UPDATE_LOOK_MS, updateNote } from "./updateFlow";
+import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor, localTime } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
@@ -37,6 +37,9 @@ import {
 import { useFold } from "./useFold";
 import { parseSort, sortTasks, type Sort } from "./sortFlow";
 import { SortMenu } from "./SortMenu";
+import { PaneResizer } from "./PaneResizer";
+import { PANE_WIDTH_KEY, parsePaneWidth } from "./paneWidthFlow";
+import { WhoLine } from "./WhoForm";
 import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
@@ -827,6 +830,8 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [asked, setAsked] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
   useEffect(() => {
     let live = true;
     const look = (ask: boolean) =>
@@ -841,18 +846,28 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
     void look(false);
     const timer = window.setInterval(() => void look(false), UPDATE_LOOK_MS);
     const stopMenu = messenger.onCheckUpdatesMenu(() => void look(true));
+    // The installer was downloaded and checked: ask again, so the menu offers Restart to Update.
+    const stopReady = messenger.onUpdateReady(() => void look(false));
+    const stopFailed = messenger.onUpdateFailed((problem) => onErrorRef.current(problem));
     return () => {
       live = false;
       window.clearInterval(timer);
-      void stopMenu.then((f) => f()).catch(() => undefined);
+      for (const stop of [stopMenu, stopReady, stopFailed]) void stop.then((f) => f()).catch(() => undefined);
     };
   }, [messenger]);
-  // The menu item: Check for Updates…, or Download Allomos <version>… once one is known.
-  const available = status?.available ?? null;
+  // The menu item: Check for Updates…, Download Allomos <version>… once one is known, or
+  // Restart to Update to Allomos <version> once its installer is downloaded and checked.
+  const item = updateMenuItem(status);
+  const itemLatest = item.action === "check" ? null : item.latest;
   useEffect(() => {
-    const text = available ? t("menu.download_update", { latest: available }) : t("menu.check_updates");
-    void messenger.setUpdateItem(text, Boolean(available)).catch(() => undefined);
-  }, [messenger, t, available]);
+    const text =
+      item.action === "restart"
+        ? t("menu.restart_update", { latest: itemLatest ?? "" })
+        : item.action === "download"
+          ? t("menu.download_update", { latest: itemLatest ?? "" })
+          : t("menu.check_updates");
+    void messenger.setUpdateItem(text, item.action).catch(() => undefined);
+  }, [messenger, t, item.action, itemLatest]);
   const note = updateNote(status, asked, hidden);
   if (!note) return null;
   const close = () => {
@@ -1274,6 +1289,15 @@ function TaskbagView({
     if (selectedId) document.getElementById(`task-${selectedId}`)?.scrollIntoView({ block: "nearest" });
   }, [selectedId, groupBy]);
 
+  // The task pane's width (Task-A01-56): null is the default; a dragged width is kept in storage.
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const [paneWidth, setPaneWidth] = useState<number | null>(() => {
+    try {
+      return parsePaneWidth(localStorage.getItem(PANE_WIDTH_KEY));
+    } catch {
+      return null;
+    }
+  });
   // The person's name for the task pane's changes (Task-A01-18): asked once, kept in the app's settings.
   const [ownerName, setOwnerName] = useState<string | null>(null);
   useEffect(() => {
@@ -1426,6 +1450,8 @@ function TaskbagView({
               </label>
               {groupBy === "iteration" && <SortMenu sort={sort} onChange={chooseSort} />}
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
+              {/* Task-A01-40: the saved name changes are recorded as, and where to change it. */}
+              <WhoLine name={ownerName} onSave={saveOwnerName} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
                 <button type="button" className="link small" onClick={() => foldAll(true)}>
@@ -1438,7 +1464,11 @@ function TaskbagView({
             </div>
           )}
           {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
-          <div className={selected ? "list-layout with-pane" : "list-layout"}>
+          <div
+            ref={layoutRef}
+            className={selected ? (paneWidth !== null ? "list-layout with-pane sized" : "list-layout with-pane") : "list-layout"}
+            style={paneWidth !== null ? ({ "--pane-width": `${paneWidth}px` } as CSSProperties) : undefined}
+          >
             {groupBy === "handoffs" ? (
               <HandoffsView
                 handoffs={handoffs}
@@ -1537,9 +1567,12 @@ function TaskbagView({
               )}
             </div>
             )}
+            {/* Task-A01-56: drag the pane's inner edge to change its width; it is kept for next time. */}
+            {selected && <PaneResizer layout={layoutRef} width={paneWidth} onWidth={setPaneWidth} />}
             {selected && (
               <TaskPane
                 task={selected}
+                version={opened.versions?.[selected.id] ?? null}
                 tasks={box.tasks}
                 area={box.areas.find((a) => a.id === selected.area)}
                 iteration={iterations.find((i) => i.id === selected.iteration)}

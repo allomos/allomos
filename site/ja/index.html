@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>肩代 Allomos</title>
+<meta name="description" content="AI エージェントやチームメイトに替わっても、プロジェクトは途切れない。バイブコーディングのタスク、段階、引き継ぎはすべて記録に残ります。macOS と Windows の無料ローカルアプリ。">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="肩代 Allomos：エージェントもチームメイトも替えられる、プロジェクトはすべて記録に残る">
+<meta property="og:description" content="ある AI エージェントやアカウントの使用量が尽きたら、別のエージェントが止まったところから続けます。タスクとその経緯は、あなたのリポジトリに残ります。">
+<meta property="og:url" content="https://www.allomos.com/ja/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/ja/"><img src="/images/logo.svg" alt="">肩代 Allomos</a>
+    <nav>
+      <a href="#what">機能</a>
+      <a href="#pricing">料金</a>
+      <a href="https://github.com/allomos/allomos">GitHub</a>
+      <span class="lang"><a href="/" lang="en">EN</a><a href="/zh/" lang="zh-CN">中文</a><a href="/ja/" aria-current="page" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1><span>エージェントも</span><span>チームメイトも</span><span>替えられる。</span><br><span>プロジェクトは</span><span>すべて記録に。</span></h1>
+    <p>ある AI エージェントやアカウントの使用量が尽きたら、別のエージェントが止まったところから続けます。タスク、その状態、引き継ぎメモは、チャットに散らばらず一か所に——あなた自身のリポジトリに——書き残されます。</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/allomos/allomos/releases">macOS 版をダウンロード</a>
+      <a class="btn secondary" href="https://github.com/allomos/allomos">GitHub で見る</a>
+    </div>
+    <div class="tags">ローカルアプリ・無料 &nbsp;·&nbsp; macOS · Windows &nbsp;·&nbsp; Claude Code · Codex &nbsp;·&nbsp; クラウド・任意</div>
+  </div>
+
+  <div class="figure">
+    <img class="light-only" src="/images/hop-ja-light.svg" width="560" alt="使用量が尽きると、タスクは Claude Code（アカウント 1）から Codex（アカウント 2）へ、引き継ぎでチームメイトへ移ります。三者ともリポジトリにある同じタスクバッグを読み書きします。">
+    <img class="dark-only" src="/images/hop-ja-dark.svg" width="560" alt="">
+  </div>
+
+  <section id="problem">
+    <h2>バイブコーディングの経緯は、無数のチャットに散らばる</h2>
+    <p class="lead">一つのプロジェクトはたくさんのセッションを通ります。Claude Code、Codex、いくつものアカウント、何人もの人。使用量の上限で予告なくセッションが終わり、次はゼロから始まります。決めたことは古い会話の中にしか残りません。実際のマルチエージェントのプロジェクトでは：</p>
+    <ul class="facts">
+      <li>新しいセッションが再開のたびに読み直す <strong>185 KB</strong> の引き継ぎメモ</li>
+      <li>一つのタスクの状況を手で写していた場所が <strong>6</strong> か所</li>
+      <li>同時にタスクを取り合う <strong>3</strong> つのセッション、決着はマージの衝突</li>
+      <li>「いつ終わるのか」に答えられた人は <strong>0</strong> 人</li>
+    </ul>
+  </section>
+
+  <section id="what">
+    <h2>肩代がする四つのこと</h2>
+    <div class="cards four">
+      <div class="card"><div class="kicker k1">切り替え</div><h3>エージェントとチームメイト</h3><p>AI エージェントやアカウントから別のものへ、あるいはチームメイトへ。止まったところからそのまま続けられ、切り替えで何も失いません。</p></div>
+      <div class="card"><div class="kicker k2">タスク管理</div><h3>すべての過程を記録に</h3><p>タスク、その状態、引き継ぎメモ、決めたことを、チャットに散らさず一か所に記録。人の目で確かめやすく、開発中も何年先の保守も楽になります。</p></div>
+      <div class="card"><div class="kicker k3">AI スキル <span class="badge">開発中</span></div><h3>エージェントと、だんだん上手に</h3><p>使うほどうまくなるエージェントとの協力のしかた：それぞれの得意なこと、切り替えで渡すもの、主導権を手放さない進め方。</p></div>
+      <div class="card"><div class="kicker k1">進捗管理 <span class="badge">開発中</span></div><h3>どこまで進み、いつ着くか</h3><p>エリアごとの進捗、あなたを待っていること、実際のペースから見込む完了日。</p></div>
+    </div>
+  </section>
+
+  <section id="switch">
+    <h2>切り替え：Claude が尽きたら、Codex が続ける</h2>
+    <p class="lead">どのエージェントも同じ <code>alm</code> コマンドを使います。渡すのも引き取るのも一歩——エージェント間でも、アカウント間でも、人の間でも。次のセッションが読むのはタスクとその引き継ぎメモで、185 KB の履歴ではありません。</p>
+<pre><code># Claude Code · アカウント 1 · 使用量がもうすぐ尽きる
+alm label A01-03 "implemented"
+alm release A01-03 --note "form done; tests next"
+
+# Codex · アカウント 2 · 1 分後
+alm next
+A01-03  Sign-in page  ready · note: tests next
+alm claim A01-03</code></pre>
+  </section>
+
+  <section id="tasks">
+    <h2>タスク管理：チャットに隠れるものはない</h2>
+    <p class="lead">タスクは <code>.allomos/taskbag/</code> にある読めるファイルで、あなた自身の Git でバージョン管理されます。一つのエージェントの記憶や一つのアカウントには閉じ込められません。タスクバッグに残るもの：</p>
+    <ul class="points">
+      <li><strong>すべてのタスクとその状態</strong>——準備済み、進行中、待ち、ブロック、完了——を一か所に。担当は常に一人（または一つのエージェント）。</li>
+      <li><strong>確かめた段階</strong>——各タスクははしごを上ります（実装済み → ローカルで確認 → デプロイ済み → 人が確認）。進捗は主張ではなく証拠で示します。</li>
+      <li><strong>引き継ぎメモと AI 自身の判断</strong>——何をしたか、次は何か、エージェントが下した日常の判断のすべて。あとから見直せます。</li>
+      <li><strong>あなた宛ての一覧</strong>——あなたの確認、回答、レビューを待つものを一つのリストに。</li>
+    </ul>
+    <p class="lead">何か月後かにあなたや新しいチームメイトがコードに戻ってきても、変更ごとの理由がそこに残っています。</p>
+  </section>
+
+  <section id="skills">
+    <h2>AI スキル <span class="badge">開発中</span></h2>
+    <p class="lead">エージェントとの協力は技術で、積み重なっていきます。肩代は、エージェントごとの得意なこと、切り替えで渡すべきこと、そしてシンプルな進め方——一つの成果に一つのタスク、段階ごとの確認、何かがあなたのマシンを出る前のあなたの承認——を身につける手助けをし、プロジェクトのたびに前よりうまく進むようにします。</p>
+  </section>
+
+  <section id="progress">
+    <h2>進捗管理 <span class="badge">開発中</span></h2>
+    <p class="lead">プロジェクトはどこまで進み、いつ着くのか。エリアごとの進捗、あなたを待っているタスク、そして実際の作業の速さから完了日を見込むバーンダウン。</p>
+    <div class="figure">
+      <img class="light-only" src="/images/glide-path-ja-light.svg" width="612" alt="バーンダウンを着陸の進入経路として描いた図：第 0 週に残り 60 タスク、第 6 週に残り 34。第 14 週までに終わる見込みは 50%、第 15 週までなら 85%。">
+      <img class="dark-only" src="/images/glide-path-ja-dark.svg" width="612" alt="">
+    </div>
+    <p class="note" style="text-align:center">これから作る予測機能のイメージで、実際のデータではありません。</p>
+  </section>
+
+  <section id="pricing">
+    <h2>手元では無料、払うのはクラウドだけ</h2>
+    <div class="cards">
+      <div class="card"><div class="kicker k1">ローカルアプリ</div><h3>無料</h3><p>アカウント不要、カード不要、試用期限なし。タスクはあなたのマシンとリポジトリに残ります。</p></div>
+      <div class="card"><div class="kicker k2">クラウド</div><h3>任意</h3><p>チーム向けのリアルタイム共有、メールでの招待、役割。料金は後日発表します。</p></div>
+    </div>
+  </section>
+
+  <section id="status">
+    <h2>開発の初期段階です</h2>
+    <p class="lead">v0.1（macOS のローカルなタスク管理）は公開済みで、v0.2（macOS と Windows、アプリでの編集）を進めています。<a href="https://github.com/allomos/allomos">GitHub</a> で動きを追ったり、試したりできます。</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT ライセンス</span>
+    <span><a href="https://github.com/allomos/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>

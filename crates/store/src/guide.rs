@@ -33,11 +33,13 @@ Allomos relies on these terms. Use them as defined here, in commands and when yo
 about the project's tasks.
 
 - **Taskbag**: the folder holding the project's tasks (`.allomos/taskbag/`): readable JSON and
-  Markdown files tracked by Git. Change it only with `alm`, except the project notes and your
+  Markdown files kept in your version control tool (Git, for example). Change it only with `alm`, except the project notes and your
   own handoff file.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
-  task (what is running, pitfalls, where credentials live, never their values). Edited directly
-  and kept true while the project is built; `alm next` shows its Running and Pitfalls.
+  task (what is running, pitfalls, where the code and the taskbag are kept online, where
+  credentials live, never their values; no personal details such as email addresses or account
+  names, only placeholders). Edited directly and kept true while the project is built; `alm
+  next` shows its Running, Pitfalls and Repositories.
 - **Project folder**: the folder with the project's code and its AGENTS.md / CLAUDE.md. Usually
   the folder holding `.allomos/`; `project_folder` in the taskbag's project.json records it.
 - **Task**: one observable outcome: what a person or agent can do when it is done. It has an
@@ -124,14 +126,19 @@ Read this before you add a task, so it fits this project.
    description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
    goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
    checked, with numbers and logs, under an **Evidence** heading).
-6. **Branch.** Say which Git branch you are on: `--branch <name>` (`git branch --show-current`;
-   alm reads no Git). The new task gets a base branch, by its real name: the branch it starts
+6. **Branch.** Say which branch you are on: `--branch <name>` (as your version control tool
+   shows it; in Git: `git branch --show-current`; alm reads no version control). The new task gets a base branch, by its real name: the branch it starts
    from and merges back into. When the branch you are on is a task's working branch, the new
    task shares that task's base; otherwise its base is the branch you are on. alm prints which
    and why; `--base <name>` chooses another. When you hold a task on another base, alm says so:
    decide which is right, and change it with `alm base <id> <branch>` if needed.
-7. **State.** A new task starts in backlog. Do not make it ready yourself: the person approves it
-   (`alm ready <id>`). Plan it in an iteration (`alm plan <id> <iteration>`) only when asked.
+7. **State.** A new task starts in backlog, in no iteration. `alm add task` then prints the next
+   steps (Task-A03-33): plan it in the iteration that fits (`alm plan <id> <iteration>`; usually
+   the current one, where related tasks are planned), then check it for anything that is the
+   person's to decide (what users will see and get used to, anything hard to undo, anything that
+   changes the plan or another task, anything with a cost or an outside effect). Nothing: make it
+   ready (`alm ready <id>`). Something: leave it in backlog, name each open question in the
+   description's Notes, and tell the person.
 8. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
    outcome of a done or dropped task is not a new task: reopen that one
    (`alm reopen <id> --note \"<why>\"`).
@@ -143,23 +150,27 @@ make them ready yourself (`alm ready <id>`). Record that approval once, on the g
 title starts with `Goal:`). Anything with an outside effect still waits for the approver
 (`alm wait`).
 
-When the project shares its tasks through Git, run the Git commands `alm add task` prints, so
-others see the new task.
+When the project shares its tasks through a version control tool, save and share the files
+`alm add task` lists (it prints the Git commands as the example), so others see the new task.
 ";
 
 const COMMANDS: &str = "# alm commands
 
 Every command takes `--taskbag <path>` (or ALLOMOS_TASKBAG; default: the nearest
 `.allomos/taskbag/` above the current folder), `--as <name>` (or ALLOMOS_HOLDER), `--json`
-(one JSON object on standard output). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage,
-3 taskbag busy or not writable.
+(one JSON object on standard output) and `--request-id <id>` (a one-time number of your own
+for a change: run the same command again with the same number, after a crash for example, and
+alm returns the first result instead of doing it twice; the same number with a different command
+is refused). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not
+writable.
 
-`alm` never runs or reads Git. After a change it prints \"Commit and push this change:\" and the
-exact `git add`, `git commit` and `git push` commands naming only the files that change wrote
-(`--json`: `changed_files` and `git_commands`); run them yourself and leave other changes as they
-are. `alm claim` asks you to push at once, before you start the work. Changes the person made in
-the Allomos app and not shared yet come with their own commands, to commit as the person's.
-`alm init` prints none: commit the new taskbag yourself.
+`alm` never runs or reads your version control tool. After a change it prints \"Save this change
+in your version control tool and share it\", the files that change wrote, and, \"For Git:\", the
+exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files` and
+`git_commands`); save and share them yourself and leave other changes as they are. `alm claim`
+asks you to share at once, before you start the work. Changes the person made in the Allomos app
+and not shared yet come with their own files and commands, to save as the person's. `alm init`
+prints none: save the new taskbag yourself.
 
 See:
 - `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
@@ -180,7 +191,7 @@ Work a task:
 - `alm claim <id> --branch <the branch you are on> [--working <name>]`: you hold it; state in
   progress. It records the working branch (`--working`, default the branch you are on), gives a
   task without a base the branch you are on, prints the base to start from and merge into with
-  the Git commands (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
+  the Git commands as the example (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
   you are not on the base. `--take` only when its holder has stopped. While card files are kept
   outside the taskbag it refuses (`claim_cards_outside`): move them in first (`alm guide
   move-cards`).
@@ -194,7 +205,7 @@ Work a task:
   counts as done. When all are done, `alm next` says so, and moves nothing: check, then
   `alm unblock <id>` (ready, or in progress when someone holds it).
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id> [--without-human-check \"<why, which run>\" --steps <file.md>]`: finished (see
+- `alm done <id> [--without-human-check \"<why>\" --steps <file.md>]`: finished (see
   `alm guide workflow`, step 7); it ends with the rule for checking the handoffs that name the
   task; follow it. The steps are Markdown for the person who checks it: the test folder, what to
   open, what to click, what they should see. On a task already done, it only records its human
@@ -202,6 +213,10 @@ Work a task:
 - `alm checked <id>`: a person has checked the finished task: it gets the top label and leaves
   To check; the note and steps stay in its history. Run it only when the person says so.
   It does not review the task's AI decisions.
+- `alm recheck <id> --reason \"<what changed>\" [--steps <file.md>]`: the work of a checked task
+  changed afterwards, so the person's check no longer covers it: the task goes back to To check
+  with your reason (and new steps, or the earlier ones), one label below the top. You decide
+  when; `alm` does not look at the work.
 - `alm ai-decided <id> \"<what and why>\"`: record a routine choice you made on your own in the
   task, in one line, for example `alm ai-decided A01-37 \"Names: alm describe, alm note — match
   alm title\"`. Any task, any state; the task's files do not change, the history keeps it.
@@ -226,7 +241,9 @@ Plan:
 - `alm base <id> <branch>`: change the branch a task starts from and merges into.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
-  description). Same holder rule as `alm label`; each is recorded in `alm history`.
+  description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
+  `--expected-version <v>` (the `version` `alm show` printed) to save only if nobody changed the
+  task since you read it; otherwise nothing is saved and alm shows the task as it is now.
 - `alm cards`: the card files still outside the taskbag: where a task's `Card:` link points
   outside its folder, and what agents reported (the app shows them as \"N tasks keep their card
   files in the project folder\"). `alm cards found
@@ -252,16 +269,26 @@ Handoffs (the note a session leaves so whoever continues does not start blind):
   show a task's latest one.
 - `alm handoffs --check [--task <id>]`: the rule for checking the handoffs yourself, one by one,
   and removing those whose tasks are all done or dropped.
-- `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (Git keeps it).
+- `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (the version history keeps it).
 - `alm handoff-template [--set <file.md>]`: show or replace the project's template.
 
 Ask the person:
-- `alm confirm --title \"<heading>\" --plan <file.md>`: shows your plan in the Allomos app and
-  waits; exit 0 means go ahead, anything else means change nothing.
+- `alm confirm --title \"<heading>\" --plan <file.md> [--evidence <file.md>] [--task <id>]`:
+  shows your plan in the Allomos app, with its evidence (what you checked and the results) under
+  it, and waits; exit 0 means go ahead, anything else means change nothing. A Go ahead covers
+  only what was shown (its fingerprint is printed); with `--task` it is recorded in that task's
+  history. If the plan changes afterwards, ask again.
 - `alm progress --title \"<job>\" --step \"<what now>\" [--done <n> --of <total>]`, then
   `alm progress --step …` at each step and `alm progress --finished \"<what happened>\"` at the
   end: on a job the person gave you from the Allomos app, the app shows your progress in a popup.
   `alm` only passes it on.
+- `alm quota --agent <id> --left <percent> [--resets <when>] [--window 5h|week] [--account <name>]`:
+  how much of your account's quota is left, from the figure you read at the handoff gate's quota
+  check (Claude Code: `get_usage`). The app shows it beside the agent: the agent that reported
+  last comes first, coloured by the share left. `--account` only when you can tell one, never an
+  email address or user name; `--resets` is local time (`2026-10-20T17:00`). Kept on this
+  computer beside the app's settings, not in the taskbag: nothing to save or share. `alm quota`
+  alone lists the reports.
 
 About Allomos:
 - `alm brief`: the section for AGENTS.md. `alm guide [terms|customize|tasks|commands|workflow]`:
@@ -331,10 +358,10 @@ until the person says Go ahead.
    `tasks/<id>/card.md`, points the description's `Card:` link to it (adding one at the top when
    there is none) and clears the report; it never replaces a different `card.md` (`card_exists`).
    A finished or dropped task can be changed whoever is named as its holder.
-5. Finish what the plan names: remove the originals from the project folder (`git rm`), change the
+5. Finish what the plan names: remove the originals from the project folder (in Git: `git rm`), change the
    documents that linked to a card's old place, and remove the cards folder once it is empty.
-   Commit the taskbag's changes (the Git commands `alm` printed) and the project's changes, each
-   in its own repository. Check: `alm cards` lists none, `alm list --json` reports no issues, and
+   Save and share the taskbag's changes (the files `alm` listed; it printed the Git commands as the
+   example) and the project's changes, each in its own repository. Check: `alm cards` lists none, `alm list --json` reports no issues, and
    every moved task's `Card:` link opens its `card.md`.
 6. Tell the person what moved, what did not and why, and the card files without a task.
 ";
@@ -343,29 +370,35 @@ const WORKFLOW: &str = "# How to work the tasks
 
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
    otherwise one from the earliest iteration whose next dependency is met. Read its handoff
-   first (`alm show <id>`), and the project notes' Running and Pitfalls, which `alm next` shows
-   (the whole file is the taskbag's `project-notes.md`).
+   first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
+   `alm next` shows (the whole file is the taskbag's `project-notes.md`).
    **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
-   check the real state before trusting it: the worktree, branch and running processes it names
-   (`git worktree list`, `git status -sb`, listening ports). What the previous session still
+   check the real state before trusting it: the working copy, branch and running processes it
+   names (as your version control tool shows them; in Git: `git worktree list`, `git status -sb`;
+   and listening ports). What the previous session still
    holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the
    question with `alm wait`). What the handoff lists as already done (its **Already done, do not
    repeat** line) is not done again: a change of agent, account or session keeps the approvals
    and what was done; it does not authorize repeating it.
-2. Hold one task at a time. Pull first, then `alm claim <id> --as <your session name>
-   --branch <the branch you are on>` (`git branch --show-current`; alm reads no Git), and run
-   the Git commands it prints right away: until your claim is pushed, other sessions do not see
-   it and may take the task too. A task someone else holds is not yours to change.
+2. Hold one task at a time. Pull first (get the latest changes), then `alm claim <id> --as <your
+   session name> --branch <the branch you are on>` (as your version control tool shows it; in
+   Git: `git branch --show-current`; alm reads no version control), and save and share the claim
+   right away with your version control tool (it prints the Git commands as the example): until
+   your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
    **Branches.** Every task has a base branch, by its real name (`main`, `master`,
    `storage-v2`…): it starts from it and merges back into it; merging one base branch into
    another is a task of its own. The claim records your working branch, the one you work on
    (`--working <name>` when it is not the one you are on, for example a new branch for a
    worktree of its own),
-   prints which base to start from and merge into with the Git commands, and says so when you
-   are not on the base. A task without a base gets the branch you are on. Work in the current
-   checkout by default; make a worktree of its own only when the task needs one (for example
-   when several sessions work at once). Once the task's branch is merged into its base, remove
-   your own worktree and the merged branch; never another session's.
+   prints which base to start from and merge into with the Git commands as the example, and says
+   so when you
+   are not on the base. A task without a base gets the branch you are on.
+   **Always work a task in a worktree of its own** (a separate working copy on the task's own
+   branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which `alm claim`
+   prints), never in the main checkout: the main checkout stays on the base branch, so no
+   session leaves it on a task's branch and several sessions can work at once. Merge from the
+   main checkout, where the base is checked out. Once the task's branch is merged into its
+   base, remove your own worktree and the merged branch; never another session's.
 3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
    with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
@@ -381,12 +414,12 @@ const WORKFLOW: &str = "# How to work the tasks
    heading), not in the handoff.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
-7. Finished: only once the task has the top label of the ladder (a person has checked it: the
-   human check), then `alm done <id>`. The one exception: in an automatic or loop run the
-   person set up to go on without them (a quiet run, step 8), you may finish a task
-   below the top label with
-   `alm done <id> --without-human-check \"<why, which run>\" --steps <file.md>`; say so in
-   your handoff. Write the steps so a person can pick it up and test
+7. Finished: once the task has the top label of the ladder (a person has checked it: the
+   human check), `alm done <id>`. When the work is finished and only a person's hands-on check
+   is left, finish it below the top label, in quiet and normal mode alike (step 8):
+   `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
+   Do not leave such a task waiting: `alm wait` is only for a real question, an approval or an
+   outside effect (step 4). Write the steps so a person can pick it up and test
    it: the test folder, what to open, what to click, what they should see. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
    it, `alm checked <id>`. When a finished task needs more work on the same outcome (it failed
@@ -397,8 +430,9 @@ const WORKFLOW: &str = "# How to work the tasks
    another), ask the person to choose quiet or normal mode: show them what
    `alm guide run-modes` prints (in the task language), as it is, and do not start until they
    choose. Write the choice in your handoff (under Approvals in force: \"Run mode: quiet\" or
-   \"Run mode: normal\", who chose it and when) and follow it until the run ends. In normal mode
-   you work as usual: you stop and ask whenever you need the person. In quiet mode (a quiet run),
+   \"Run mode: normal\", who chose it and when) and follow it until the run ends. Both modes
+   finish a task the same way (step 7); they differ only in what you do when you need the
+   person during the run. In normal mode you stop and ask. In quiet mode (a quiet run),
    never stop to wait for the person. A routine choice: decide it,
    record it with `alm ai-decided <id> \"<what and why>\"`, and carry on. A real question for the
    person: park that task with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`
@@ -416,15 +450,22 @@ Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
   Two exceptions: fill in your own handoff file, the one `alm handoff` names; and keep
   `project-notes.md` true. Update it when you start or stop a server or process, create or change
-  a hosted resource or a Git remote, learn a pitfall that would change what the next session
-  does, or a credential moves; change lines in place, remove lines no longer true, and commit and
-  push that file yourself.
+  a hosted resource or a remote repository, learn a pitfall that would change what the next
+  session does, or a credential moves; change lines in place, remove lines no longer true, and
+  save and share that file with your version control tool yourself.
+- Never write credentials or personal details (a person's or an account's email address, account
+  or user name, phone number, home address, local network address) into the project notes, a
+  handoff, a task, a document or the code: write a placeholder such as
+  `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Version history
+  keeps whatever was written, even after it is removed.
 - Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
-- Before a change the person must agree to, show your plan with `alm confirm` and change nothing
-  unless it exits 0 (in a quiet run, park it with `alm wait` instead: step 8).
+- Before a change the person must agree to, show your plan with `alm confirm` (with the evidence,
+  `--evidence`, and the task, `--task`) and change nothing unless it exits 0 (in a quiet run, park
+  it with `alm wait` instead: step 8). A Go ahead covers only the plan shown: if it changes, ask
+  again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
@@ -432,8 +473,9 @@ Rules:
   things), anything that changes the plan or another task, and anything with a cost or an outside
   effect goes to the approver first (`alm wait`). In a goal run (step 9) the plan was approved in
   advance; outside effects still go to the approver.
-- After every `alm` change, run the Git commands it prints: they name only that change's files.
-  Your other work is committed as usual.
+- After every `alm` change, save and share the files it lists with your version control tool (it
+  prints the Git commands as the example): only that change's files. Your other work is saved as
+  usual.
 ";
 
 const RUN_MODES_EN: &str = "# Run modes: quiet or normal
@@ -448,6 +490,11 @@ follow it until the run ends.
 
 Before this run starts, please choose how I will work: **quiet mode** or **normal mode**.
 
+In both modes, a task whose work is finished and only waits for you to try it by hand ends the
+same way: it is marked done, to check, with the steps for checking it
+(`--without-human-check`). The modes differ only in what I do when I need you during the run:
+stop and ask, or park the question and go on.
+
 ## Quiet mode: I go on without you
 
 - **What I do:** I work the tasks one after another and never stop to ask you. I make routine
@@ -457,8 +504,7 @@ Before this run starts, please choose how I will work: **quiet mode** or **norma
   to, anything hard to undo, anything that changes the plan or another task, anything with a cost
   or an outside effect. Such a question parks its task as waiting (`alm wait`), and I go on with
   the next ready task without waiting for an answer.
-- **When you are interrupted:** not at all until the run is over. A task I finish without your
-  check is marked to check, with the steps for checking it (`--without-human-check`).
+- **When you are interrupted:** not at all until the run is over.
 - **How long it can run unattended:** until no ready task is left, or until my session's quota or
   context runs out. I keep my handoff up to date, so anyone can pick the work up.
 
@@ -480,13 +526,16 @@ When the run is over:
 ## Normal mode: I ask as usual
 
 - **What I do:** I work as usual. Routine choices I still make and record myself; whenever I
-  need you (a question only you can answer, an approval, a check by hand), I stop and ask.
+  need you (a question only you can answer, an approval, an outside effect), I stop and ask. A
+  task that only waits for your check by hand does not stop the run: it is marked done, to
+  check, as above.
 - **What I don't do:** I don't go past a question without your answer.
-- **When you are interrupted:** at each such question, approval or check.
+- **When you are interrupted:** at each such question or approval.
 - **How long it can run unattended:** only until the next question: the run pauses there until
   you answer.
 
-Please stay reachable while it runs: it pauses at each question until you answer.
+Please stay reachable while it runs: it pauses at each question until you answer. When it is
+over, check the finished tasks in `alm human` (To check), as described above.
 ";
 
 const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モードか
@@ -500,6 +549,10 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 
 この実行を始める前に、私の進め方を選んでください：**静かモード**か**通常モード**か。
 
+どちらのモードでも、作業が終わり、あなたが手で試す確認だけが残ったタスクは同じように終えます：
+確認の手順を付けて、完了・確認待ちにします（`--without-human-check`）。二つのモードの違いは、
+実行中にあなたが必要になったとき、止まって聞くか、質問を残して先へ進むかだけです。
+
 ## 静かモード：あなたを待たずに進めます
 
 - **すること：** タスクを一つずつ続けて進め、あなたに聞くために止まることはありません。決まりきった
@@ -508,8 +561,7 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 - **しないこと：** あなたが決めるべきことは決めません。利用者が目にして慣れていくもの、元に戻しにくい
   こと、計画や他のタスクを変えること、費用や外部への影響があること。そうした質問があれば、その
   タスクを待機中にして（`alm wait`）、答えを待たずに次の準備完了のタスクへ進みます。
-- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。あなたの確認なしに終えたタスクは、
-  確認の手順を付けて確認待ちとして残します（`--without-human-check`）。
+- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。
 - **無人で続けられる長さ：** 準備完了のタスクがなくなるまで、またはこのセッションの利用枠や
   コンテキストが尽きるまで。誰でも引き継げるよう、ハンドオフは常に最新にしておきます。
 
@@ -531,12 +583,14 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 ## 通常モード：いつもどおり聞きます
 
 - **すること：** いつもどおり進めます。決まりきった選択は私が決めて記録しますが、あなたが必要な
-  とき（あなたにしか答えられない質問、承認、手で試す確認）は止まって聞きます。
+  とき（あなたにしか答えられない質問、承認、外部への影響）は止まって聞きます。手で試す確認だけを
+  待つタスクでは実行は止まりません。上のとおり、完了・確認待ちにします。
 - **しないこと：** あなたの答えなしに質問の先へは進みません。
-- **あなたが呼ばれるとき：** そうした質問、承認、確認のたびに。
+- **あなたが呼ばれるとき：** そうした質問や承認のたびに。
 - **無人で続けられる長さ：** 次の質問まで。そこで実行は止まり、あなたの答えを待ちます。
 
-実行中は連絡がつくようにしておいてください。質問のたびに、答えるまで実行は止まります。
+実行中は連絡がつくようにしておいてください。質問のたびに、答えるまで実行は止まります。実行が
+終わったら、上で説明したとおり、`alm human`（To check）で終わったタスクを確認してください。
 ";
 
 const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
@@ -550,6 +604,10 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 
 这次运行开始之前，请选择我的工作方式：**安静模式**还是**普通模式**。
 
+两种模式下，工作已做完、只等你亲手检查的任务，都以同一种方式结束：标为已完成、待检查，并附上
+检查步骤（`--without-human-check`）。两种模式的区别只在于运行中需要你时，我是停下来问你，还是
+把问题搁置、接着往下做。
+
 ## 安静模式：我不等你，继续往下做
 
 - **我会做的：** 一个接一个地处理任务，从不停下来问你。常规的选择（名称、文件布局、有明显默认值的
@@ -557,8 +615,7 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 - **我不会做的：** 不替你决定该由你决定的事：用户会看到并习惯的东西、难以撤销的事、会改变计划或
   其他任务的事、有费用或对外有影响的事。遇到这类问题，我把那个任务设为等待中（`alm wait`），
   不等回答，接着做下一个就绪的任务。
-- **什么时候打扰你：** 运行结束之前一次也不会。没有经过你检查就完成的任务，会标为待检查，并附上
-  检查步骤（`--without-human-check`）。
+- **什么时候打扰你：** 运行结束之前一次也不会。
 - **能无人值守运行多久：** 直到没有就绪的任务，或者我这个会话的额度或上下文用完为止。我会让交接
   一直保持最新，谁都可以接着做。
 
@@ -577,12 +634,14 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 ## 普通模式：照常提问
 
 - **我会做的：** 照常工作。常规的选择仍由我决定并记录；每当需要你（只有你能回答的问题、批准、
-  亲手检查）时，我会停下来问你。
+  对外有影响的事）时，我会停下来问你。只等你亲手检查的任务不会让运行停下：像上面说的那样，标为
+  已完成、待检查。
 - **我不会做的：** 没有你的回答，不会越过问题继续做。
-- **什么时候打扰你：** 每遇到这样的问题、批准或检查时。
+- **什么时候打扰你：** 每遇到这样的问题或批准时。
 - **能无人值守运行多久：** 只到下一个问题为止：运行会停在那里，直到你回答。
 
-运行期间请保持能联系到你：每遇到一个问题，运行都会停下，直到你回答。
+运行期间请保持能联系到你：每遇到一个问题，运行都会停下，直到你回答。运行结束后，像上面说的那样，
+在 `alm human`（To check）里检查已完成的任务。
 ";
 
 /// `alm guide run-modes` in `language` (a task language such as `ja` or `zh-CN`), or `None` when
@@ -629,21 +688,21 @@ contradictions.
    `alm wait <id> --on \"<the question>\"` on the task you hold, and move everything else.
 4. **Record the agent as set up** in the taskbag's `project-notes.md`, under `## Agents set up`
    (add that section when it is missing): one line per agent, with its file and the date, for
-   example `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`. Then commit only those
-   files. In the project: AGENTS.md and the agent files you changed
-   (`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`).
+   example `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`. Then save only those
+   files in your version control tool. In the project: AGENTS.md and the agent files you changed
+   (in Git: `git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`).
    In the taskbag: `project-notes.md`
-   (`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
-   Leave every other change as it is. Push as the project's rules say; when they say nothing,
-   only when the person asks.
+   (in Git: `git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
+   Leave every other change as it is. Share (push) as the project's rules say; when they say
+   nothing, only when the person asks.
 5. **Tell the person** what moved, which files now point to AGENTS.md, and the contradictions
    waiting for their answer.
 
 From then on:
 - Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file.
 - After changing shared rules, tell the person which running sessions still use the old ones:
-  those holding tasks in progress (`alm list --state in_progress`) and the worktrees they work in
-  (`git worktree list`). A session reads the new rules when it starts again.
+  those holding tasks in progress (`alm list --state in_progress`) and the working copies they work
+  in (in Git: `git worktree list`). A session reads the new rules when it starts again.
 ";
 
 const AGENT_FILES_ZH_CN: &str = "# 智能体文件：一套共用规则，放在 AGENTS.md
@@ -672,18 +731,18 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
    在安静运行中，用 `alm wait <id> --on \"<the question>\"` 把问题挂在你持有的任务上，其余照常移动。
 4. **记录这个智能体已设置好**：在任务包的 `project-notes.md` 里 `## Agents set up` 一节下（没有就
    添加这一节），每个智能体一行，写明它的文件和日期，例如
-   `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。然后只提交这些文件。在项目里：
+   `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。然后用你的版本控制工具只保存这些文件。在项目里：
    AGENTS.md 和你改过的智能体文件
-   （`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
+   （用 Git 时：`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
    在任务包里：`project-notes.md`
-   （`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
-   其他改动保持原样。按项目规则推送；规则没说时，只在用户要求时推送。
+   （用 Git 时：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
+   其他改动保持原样。按项目规则共享（推送）；规则没说时，只在用户要求时共享。
 5. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，以及哪些矛盾在等他们回答。
 
 此后：
 - 共用规则只放在 AGENTS.md；不要把共用规则加到某个智能体自己的文件里。
 - 改了共用规则之后，告诉用户哪些正在运行的会话还在用旧规则：持有进行中任务的会话
-  （`alm list --state in_progress`）和它们工作的工作树（`git worktree list`）。会话重新开始时
+  （`alm list --state in_progress`）和它们工作的工作副本（用 Git 时：`git worktree list`）。会话重新开始时
   才会读到新规则。
 ";
 
@@ -721,11 +780,11 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
 4. **エージェントを設定済みとして記録します。** タスクバッグの `project-notes.md` の
    `## Agents set up` の節（なければ加えます）に、エージェントごとに一行、そのファイルと日付を
    書きます。たとえば `- Claude Code: CLAUDE.md (imports AGENTS.md), 2026-10-16`。それから、
-   それらのファイルだけをコミットします。プロジェクトでは AGENTS.md と変えたエージェントのファイル
-   （`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
+   それらのファイルだけをバージョン管理ツールで保存します。プロジェクトでは AGENTS.md と変えたエージェントのファイル
+   （Git なら：`git add <those files> && git commit -m \"Shared agent rules in AGENTS.md\" -- <those files>`）。
    タスクバッグでは `project-notes.md`
-   （`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
-   ほかの変更はそのままにします。プッシュはプロジェクトのルールに従い、ルールに何もなければ
+   （Git なら：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
+   ほかの変更はそのままにします。共有（プッシュ）はプロジェクトのルールに従い、ルールに何もなければ
    ユーザーに頼まれたときだけにします。
 5. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どの
    食い違いが答えを待っているか。
@@ -733,8 +792,8 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
 これから先：
 - 共通ルールは AGENTS.md にだけ置きます。共通ルールをあるエージェント自身のファイルに足しません。
 - 共通ルールを変えたら、まだ古いルールで動いているセッションをユーザーに伝えます：進行中の
-  タスクを持つセッション（`alm list --state in_progress`）と、それが作業しているワークツリー
-  （`git worktree list`）。セッションは次に始めるときに新しいルールを読みます。
+  タスクを持つセッション（`alm list --state in_progress`）と、それが作業している作業コピー
+  （Git なら：`git worktree list`）。セッションは次に始めるときに新しいルールを読みます。
 ";
 
 /// `alm guide agent-files` in `language`, or `None` when it is not written in that language.
@@ -752,9 +811,11 @@ pub fn agent_files(language: &str) -> Option<&'static str> {
 ///
 /// 1: the four phases (clarify once, plan, build, finish), `/goal` with a condition judged from the
 /// conversation alone, and continuing from `alm next` (Task-A03-25-01).
-pub const GOAL_PROMPT_VERSION: u32 = 1;
+/// 2: every finished task, the goal task too, ends done and to check
+/// (`--without-human-check`) in either run mode, not waiting (Task-A03-31).
+pub const GOAL_PROMPT_VERSION: u32 = 3;
 
-const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v1)
+const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v3)
 
 For the agent: this is the goal prompt. A person has described an app they want (their words
 come with this prompt). You plan it into areas, iterations and tasks, make the tasks ready
@@ -765,7 +826,7 @@ Write tasks in the task language (`alm task-language`); IDs, commands and code s
 **Goal-run mode.** Submitting the goal approved the plan in advance (approver, 2026-10-16): in
 this run you add the areas and iterations and make your own tasks ready, without asking. Record
 that approval once, on the goal task (phase 2). Everything else in AGENTS.md still holds: anything
-with an outside effect (creating accounts or a Git remote, API keys, payment, deployment, sending
+with an outside effect (creating accounts or a remote repository, API keys, payment, deployment, sending
 anything) waits for the approver with `alm wait`, and you go on with other ready tasks. There is
 no spend cap: the quota is the limit (`alm handoff-rules`: near 3% left, write your handoff and
 stop; the same prompt continues later).
@@ -791,7 +852,7 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`. Its description (`alm describe <id> --from <file.md>`) holds the spec: what the app
    does and for whom, and the acceptance criteria the finished app must meet, each one a thing a
-   person can try. End it with this line: \"Goal run (goal prompt v1): the person approved this
+   person can try. End it with this line: \"Goal run (goal prompt v3): the person approved this
    plan in advance by submitting the goal on <date>; the agent makes the areas, iterations and
    ready tasks. Outside effects still wait for the approver.\" The title's `Goal:` marks the goal
    task for every later session: keep it.
@@ -813,11 +874,18 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
 ## 3. Build
 
 Iteration by iteration, one task at a time: `alm next`, then `alm claim <id> --as <your session
-name> --branch <the branch you are on>` (run the Git commands it prints), do the work and commit
-it, `alm label <id> \"<label>\"` as each step is proven, and finish it as the run mode says:
-- quiet mode: `alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`,
-  the steps telling the person how to try it;
-- normal mode: at the top label, once the person has checked it: `alm done <id>`.
+name> --branch <the branch you are on>` (save and share the claim; it prints the Git commands as the example), do the work and save it
+it, `alm label <id> \"<label>\"` as each step is proven, and finish it the same way in either
+run mode: once the work is finished and only the person's check by hand is left,
+`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`, the steps telling the
+person how to try it (at the top label, once the person has checked it: `alm done <id>`).
+
+**Checking a release.** Prove each check with automated tests and command-line checks first: the
+project's test suite, `curl` against the running server, a headless test runner. Use the browser
+(clicking, or running scripts in the page) only when nothing else can prove the result, and never
+run page scripts on a local network address such as `192.168.x.x`: the browser asks the person to
+approve every script there, and the run would stall. When an acceptance check still needs the
+browser, write that in the task's steps for the person, finish the task as above, and go on.
 
 When `alm next` says all of a task's blockers are done, check it, then `alm unblock <id>`. A task
 with an outside effect: `alm wait <id> --on \"<what the approver must do>\"`, then go on with the
@@ -828,8 +896,10 @@ handoff (`alm handoff`) after every task, and follow `alm handoff-rules`.
 ## 4. Finish
 
 When the last iteration's acceptance check is done: `alm unblock` the goal task, check the whole
-app against the spec's acceptance criteria, and leave the goal task waiting for the person's human
-check: `alm wait <id> --on \"Try the app: <how>\"`. If the goal turns out to be impossible, the
+app against the spec's acceptance criteria, and finish the goal task the same way, done and to
+check by the person:
+`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`, the steps
+telling the person how to try the whole app. If the goal turns out to be impossible, the
 goal task waits on the person instead, with the reason. Then print `alm list --json` and stop.
 
 ## Keep going until it is finished
@@ -846,7 +916,7 @@ true, and print `alm list --json` to show it. Stop earlier only at the quota gat
 handoff written; given this prompt again, you continue from `alm next`.
 ";
 
-const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v1)
+const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v3)
 
 给智能体：这是目标提示。有人描述了他们想要的应用（他们的原话随这段提示一起给出）。你把它规划成
 领域、迭代和任务，自己把任务设为就绪，然后一个迭代接一个迭代地把它做出来，每一步都用 `alm`
@@ -855,7 +925,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 
 **目标运行模式。** 提交目标就是事先批准了计划（批准人，2026-10-16）：在这次运行中，你自己添加
 领域和迭代，自己把任务设为就绪，不用询问。把这项批准在目标任务上记录一次（阶段 2）。AGENTS.md 里
-的其他规则照旧：任何对外有影响的事（创建账号或 Git 远程仓库、API 密钥、付款、部署、发送任何东西）
+的其他规则照旧：任何对外有影响的事（创建账号或远程仓库、API 密钥、付款、部署、发送任何东西）
 都用 `alm wait` 等批准人处理，你接着做其他就绪的任务。没有花费上限：额度就是限制
 （`alm handoff-rules`：剩余接近 3% 时，写好交接并停下；之后用同一段提示继续）。
 
@@ -878,7 +948,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。它的描述（`alm describe <id> --from <file.md>`）写规格：应用做什么、为谁做，以及完成的
    应用必须满足的验收标准，每一条都是一个人能亲手试的事。最后加上这一行：
-   “Goal run (goal prompt v1)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
+   “Goal run (goal prompt v3)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
    就绪的任务由智能体来建。对外有影响的事仍然等批准人处理。”标题里的 `Goal:` 让之后的每个会话都能认出目标任务：保留它。
 2. **领域**，按应用的组成部分划分（例如它的界面、数据、服务器）：`alm add area \"<name>\"`。
 3. **迭代**，作为一份发布路线图，每个迭代结束时都有一个对方能试用的版本：
@@ -895,11 +965,15 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 ## 3. 构建
 
 一个迭代接一个迭代，一次一个任务：`alm next`，然后 `alm claim <id> --as <your session name>
---branch <the branch you are on>`（运行它打印的 Git 命令），做完工作并提交，每证明一步就
-`alm label <id> \"<label>\"`，再按运行模式完成它：
-- 安静模式：`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`，
-  步骤告诉那个人怎么试用；
-- 普通模式：达到最高标签、那个人检查过之后：`alm done <id>`。
+--branch <the branch you are on>`（保存并共享认领；它以 Git 命令为例），做完工作并保存（提交），每证明一步就
+`alm label <id> \"<label>\"`，两种运行模式下都用同一种方式完成它：工作做完、只差那个人亲手检查时，
+`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`，步骤告诉那个人怎么试用
+（达到最高标签、那个人检查过之后：`alm done <id>`）。
+
+**检查一个版本。** 每项检查先用自动测试和命令行来证明：项目的测试套件、对运行中的服务器用 `curl`、
+无界面的测试运行器。只有别的办法都证明不了时才用浏览器（点击，或在页面里运行脚本），并且不要在
+`192.168.x.x` 这样的局域网地址上运行页面脚本：浏览器在那里每运行一段脚本都要那个人批准，运行会卡住。
+如果某个验收检查仍然需要浏览器，就把这一点写进这个任务给那个人的步骤里，照上面的方式完成任务，接着往下做。
 
 当 `alm next` 说某个任务的阻塞任务都已完成时，检查一下，然后 `alm unblock <id>`。对外有影响的任务：
 `alm wait <id> --on \"<what the approver must do>\"`，然后接着做下一个就绪的任务。需要先做另一个任务
@@ -908,8 +982,9 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 
 ## 4. 收尾
 
-最后一个迭代的验收检查完成后：对目标任务运行 `alm unblock`，对照规格的验收标准检查整个应用，然后让
-目标任务等待那个人的人工检查：`alm wait <id> --on \"Try the app: <how>\"`。如果发现目标做不到，目标
+最后一个迭代的验收检查完成后：对目标任务运行 `alm unblock`，对照规格的验收标准检查整个应用，然后用同一种
+方式完成目标任务，标为已完成、待那个人检查：
+`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`，步骤告诉那个人怎么试用整个应用。如果发现目标做不到，目标
 任务改为等待那个人，并写明原因。然后打印 `alm list --json`，停下。
 
 ## 一直做到完成
@@ -925,7 +1000,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 只有到了额度关口才提前停下，并写好交接；再次收到这段提示时，从 `alm next` 继续。
 ";
 
-const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v1)
+const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v3)
 
 エージェントへ：これはゴールのプロンプトです。ある人が、欲しいアプリを説明しました（その人の言葉は
 このプロンプトと一緒に渡されます）。あなたはそれをエリア、イテレーション、タスクに計画し、タスクを
@@ -936,7 +1011,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
 **ゴール実行モード。** ゴールを出したことで、計画は前もって承認されています（承認者、2026-10-16）。
 この実行では、エリアとイテレーションを自分で加え、自分のタスクを聞かずに準備完了にします。その承認は
 ゴールのタスクに一度だけ記録します（段階 2）。AGENTS.md のほかのルールはそのままです。外部への影響が
-あること（アカウントや Git のリモートの作成、API キー、支払い、デプロイ、何かを送ること）は
+あること（アカウントやリモートリポジトリの作成、API キー、支払い、デプロイ、何かを送ること）は
 `alm wait` で承認者を待ち、ほかの準備完了のタスクを進めます。費用の上限はありません。上限は利用枠です
 （`alm handoff-rules`：残りが 3% 近くになったらハンドオフを書いて止まり、同じプロンプトであとで続けます）。
 
@@ -961,7 +1036,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。その説明（`alm describe <id> --from <file.md>`）に仕様を書きます。アプリが何をし、
    誰のためのものか、そして完成したアプリが満たすべき受け入れ基準。基準はどれも、人が試せることに
-   します。最後にこの一行を書きます：「Goal run (goal prompt v1)：この人は <date> にゴールを出して、
+   します。最後にこの一行を書きます：「Goal run (goal prompt v3)：この人は <date> にゴールを出して、
    この計画を前もって承認しました。エリア、イテレーション、準備完了のタスクはエージェントが作ります。
    外部への影響があることは、引き続き承認者を待ちます。」タイトルの `Goal:` は、あとのすべての
    セッションにゴールのタスクを示す印です。消さずに残します。
@@ -982,11 +1057,18 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
 ## 3. 作る
 
 イテレーションごとに、一度に一つのタスク：`alm next`、続けて `alm claim <id> --as <your session
-name> --branch <the branch you are on>`（表示される Git コマンドを実行します）、作業をしてコミット
-し、一歩ずつ確かめるたびに `alm label <id> \"<label>\"`、そして実行モードのとおりに終えます：
-- 静かモード：`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`。
-  手順にはその人が試すしかたを書きます。
-- 通常モード：一番上のラベルで、その人が確認したあとに `alm done <id>`。
+name> --branch <the branch you are on>`（担当を保存して共有します。Git のコマンドが例として表示されます）、作業をして保存（コミット）
+し、一歩ずつ確かめるたびに `alm label <id> \"<label>\"`、そしてどちらの実行モードでも同じように
+終えます：作業が終わり、その人が手で試す確認だけが残ったら
+`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`。手順にはその人が試すしかたを
+書きます（一番上のラベルで、その人が確認したあとなら `alm done <id>`）。
+
+**リリースを確かめる。** どの確認も、まず自動テストとコマンドラインで証明します：プロジェクトの
+テスト、動いているサーバーへの `curl`、画面を出さないテストランナー。ブラウザ（クリックや、ページでの
+スクリプトの実行）は、ほかに証明する方法がないときだけ使います。`192.168.x.x` のようなローカル
+ネットワークのアドレスでは、ページのスクリプトを実行しません。そこではスクリプトごとにブラウザがその人の
+承認を求め、実行が止まってしまうからです。それでもブラウザが要る受け入れ確認は、そのタスクのその人向けの
+手順にそう書き、上のとおりタスクを終えて先へ進みます。
 
 `alm next` があるタスクのブロック元がすべて完了したと言ったら、確かめてから `alm unblock <id>`。
 外部への影響があるタスク：`alm wait <id> --on \"<what the approver must do>\"`、そして次の準備完了の
@@ -997,8 +1079,9 @@ name> --branch <the branch you are on>`（表示される Git コマンドを実
 ## 4. 仕上げる
 
 最後のイテレーションの受け入れ確認が終わったら：ゴールのタスクを `alm unblock` し、仕様の受け入れ
-基準に照らしてアプリ全体を確かめ、ゴールのタスクをその人の確認待ちにします：
-`alm wait <id> --on \"Try the app: <how>\"`。ゴールが無理だと分かったら、代わりにゴールのタスクを
+基準に照らしてアプリ全体を確かめ、ゴールのタスクも同じように、完了・その人の確認待ちにして終えます：
+`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`。手順には
+アプリ全体を試すしかたを書きます。ゴールが無理だと分かったら、代わりにゴールのタスクを
 理由を付けてその人の待ちにします。それから `alm list --json` を表示して止まります。
 
 ## 終わるまで続ける
@@ -1074,6 +1157,60 @@ want below. Build it by following the goal prompt that comes next.",
         ),
     };
     format!("## {heading}\n\n{intro}\n\n{mode}\n\n{said}\n\n{words}\n\n{prompt}")
+}
+
+/// What `alm add task` prints after its Git commands (Task-A03-33), in the task language
+/// (`en`, `zh-CN`, `ja`; English otherwise): plan the new task in an iteration, from
+/// `iterations` (one line each, as `alm list` heads them), then make it ready unless something
+/// in it is the person's to decide. alm tells; the agent decides.
+pub fn added_task_steps(language: &str, id: &str, iterations: &[String]) -> String {
+    let listed: String = iterations
+        .iter()
+        .flat_map(|i| ["     ", i.as_str(), "\n"])
+        .collect();
+    match language {
+        "zh-CN" => {
+            let list = if iterations.is_empty() {
+                "   还没有迭代：先用 `alm add iteration` 添加一个。\n".to_string()
+            } else {
+                listed
+            };
+            format!(
+                "接下来（给添加它的智能体）：
+1. 把它计划进一个迭代：`alm plan {id} <迭代>`。选合适的那个（通常是当前迭代，相关任务计划在那里）：
+{list}2. 检查任务里有没有该由人决定的事：用户会看到并习惯的东西、难以撤销的事、改变计划或其他任务的事、有花费或对外影响的事。没有：把它设为就绪，`alm ready {id}`。有：留在待办，在描述的备注里写明每个待定问题，并告诉那个人。
+"
+            )
+        }
+        "ja" => {
+            let list = if iterations.is_empty() {
+                "   イテレーションがまだありません：先に `alm add iteration` で追加します。\n"
+                    .to_string()
+            } else {
+                listed
+            };
+            format!(
+                "次に（追加したエージェントへ）：
+1. イテレーションに計画します：`alm plan {id} <イテレーション>`。合うものを選びます（ふつうは関連するタスクが計画されている、今のイテレーション）：
+{list}2. 人が決めるべきことがタスクにないか確かめます：ユーザーが目にして慣れていくもの、元に戻しにくいこと、計画やほかのタスクを変えること、費用や外への影響があること。なければ準備完了にします：`alm ready {id}`。あれば backlog のまま残し、説明の備考に未決の問いを一つずつ書いて、その人に伝えます。
+"
+            )
+        }
+        _ => {
+            let list = if iterations.is_empty() {
+                "   There is no iteration yet: add one first with `alm add iteration`.\n"
+                    .to_string()
+            } else {
+                listed
+            };
+            format!(
+                "Next, for the agent who added it:
+1. Plan it in an iteration: `alm plan {id} <iteration>`. Pick the one that fits (usually the current one, where related tasks are planned):
+{list}2. Check the task for anything that is the person's to decide: what users will see and get used to, anything hard to undo, anything that changes the plan or another task, anything with a cost or an outside effect. Nothing: make it ready, `alm ready {id}`. Something: leave it in backlog, name each open question in the description's Notes, and tell the person.
+"
+            )
+        }
+    }
 }
 
 /// A topic of [`LOCALIZED_TOPICS`] in `language`, or `None` when the topic is not one of them or
@@ -1161,7 +1298,7 @@ mod tests {
         assert!(
             guide(Some("tasks"))
                 .unwrap()
-                .contains("Do not make it ready yourself")
+                .contains("Nothing: make it\n   ready (`alm ready <id>`)")
         );
         assert!(guide(Some("tasks")).unwrap().contains("alm task-language"));
         assert!(crate::agent_section().contains("run `alm task-language`"));
@@ -1253,17 +1390,17 @@ mod tests {
             flat(crate::agent_section()).contains("`--base` overrides it"),
             "brief"
         );
-        // Decision 0017: no `--commit` / `--push`; pull before claiming, push the claim at once,
-        // and run the Git commands each change prints.
+        // Decision 0017: no `--commit` / `--push`; get the latest changes before claiming, share
+        // the claim at once in the version control tool, with the Git commands as the example
+        // (Task-A01-60).
         for text in [guide(None).unwrap(), crate::agent_section()] {
             assert!(!text.contains("--push"), "{text}");
             assert!(!text.contains("--commit"), "{text}");
-            assert!(
-                text.contains("Pull first") || text.contains("pull first"),
-                "{text}"
-            );
-            assert!(text.contains("until your claim is pushed"), "{text}");
-            assert!(text.contains("Git commands"), "{text}");
+            let text = flat(text);
+            assert!(text.contains("latest changes"), "{text}");
+            assert!(text.contains("until your claim is shared"), "{text}");
+            assert!(text.contains("version control tool"), "{text}");
+            assert!(text.contains("Git commands as the example"), "{text}");
         }
     }
 
@@ -1314,7 +1451,7 @@ mod tests {
             "Contradictions are not yours to settle",
             "do not choose between them",
             "list each pair for the person",
-            "commit only those files",
+            "save only those files in your version control tool",
             "Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file",
         ] {
             assert!(en.contains(words), "{words}");
@@ -1382,7 +1519,7 @@ mod tests {
                 "`alm add area \"<the app's name>\"`",
                 "--title \"Goal: <the app, in one line>\"",
                 "`alm describe <id> --from <file.md>`",
-                "Goal run (goal prompt v1)",
+                "Goal run (goal prompt v3)",
                 "`alm add area \"<name>\"`",
                 "`alm add iteration \"<name>\" --release v0.1`",
                 "`alm plan <id> <iteration>`",
@@ -1393,7 +1530,8 @@ mod tests {
                 "`alm next`",
                 "--branch <the branch you are on>",
                 "`alm label <id> \"<label>\"`",
-                "`alm done <id> --without-human-check \"Goal run, quiet mode\" --steps <file.md>`",
+                "`alm done <id> --without-human-check \"Goal run\" --steps <file.md>`",
+                "`alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`",
                 "`alm done <id>`",
                 "`alm unblock <id>`",
                 "`alm wait <id> --on \"<what the approver must do>\"`",
@@ -1401,7 +1539,6 @@ mod tests {
                 "`alm handoff`",
                 "`alm handoff-rules`",
                 // Finish.
-                "`alm wait <id> --on \"Try the app: <how>\"`",
                 // Keep going: `/goal`, its condition, and continuing.
                 "`/goal`",
                 "Claude Code",
@@ -1434,7 +1571,8 @@ mod tests {
             "each ending in a version the person can try",
             "dates empty unless known",
             "is that release's acceptance check",
-            "waiting for the person's human check",
+            "finish the goal task the same way, done and to check by the person",
+            "the same way in either run mode",
             "which can be judged from the conversation alone",
             "Without `/goal`, the same holds: keep going",
         ] {
@@ -1564,5 +1702,46 @@ mod tests {
                 .contains("# Run modes: quiet or normal")
         );
         assert_eq!(guide(Some("run-modes")).as_deref(), run_modes("en"));
+    }
+
+    /// Release checks in a goal run prefer tests and the command line, avoid page scripts on a
+    /// local network address, and put a browser-only check in the person's steps (Task-A03-36).
+    #[test]
+    fn goal_prompt_checks_releases_without_browser_prompts() {
+        for (language, words) in [
+            (
+                "en",
+                [
+                    "automated tests and command-line checks first",
+                    "never\nrun page scripts on a local network address",
+                    "write that in the task's steps for the person",
+                ],
+            ),
+            (
+                "zh-CN",
+                [
+                    "先用自动测试和命令行来证明",
+                    "不要在\n`192.168.x.x` 这样的局域网地址上运行页面脚本",
+                    "写进这个任务给那个人的步骤里",
+                ],
+            ),
+            (
+                "ja",
+                [
+                    "まず自動テストとコマンドラインで証明します",
+                    "ページのスクリプトを実行しません",
+                    "手順にそう書き",
+                ],
+            ),
+        ] {
+            let prompt = goal(language).unwrap();
+            for w in words {
+                assert!(prompt.contains(w), "{language}: {w}");
+            }
+            // Before the build loop's unblocking rules, inside phase 3.
+            let check = prompt.find(words[0]).unwrap();
+            assert!(check > prompt.find("## 3.").unwrap(), "{language}");
+            assert!(check < prompt.find("## 4.").unwrap(), "{language}");
+        }
     }
 }

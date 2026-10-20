@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
-  site: 'https://mypals-ml.github.io',
+  site: 'https://allomos.github.io',
   base: '/allomos',
   integrations: [
     starlight({
@@ -21,7 +21,7 @@ export default defineConfig({
         ja: { label: '日本語', lang: 'ja' },
       },
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/mypals-ml/allomos' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/allomos/allomos' },
       ],
       sidebar: [
         {

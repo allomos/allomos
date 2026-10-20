@@ -9,6 +9,13 @@ When you build software with AI agents such as Claude Code and Codex, the work i
 
 Allomos fixes this by keeping the project's state in one place that every agent and every person reads: the **taskbag**.
 
+## What it does
+
+- **Switching.** Hand the project from one AI agent or account to another, or to a teammate, and pick up exactly where it stopped.
+- **Task management.** The whole vibe-coding process is on the record: every task and its status in one place, not scattered across chats. That makes the work easy to review by hand and easy to maintain, while you build and for years after.
+- **AI skills** *(in development)*. Work with your agents in a way that gets better over time.
+- **Progress management** *(in development)*. See where the project stands and when it will land.
+
 ## The taskbag
 
 A taskbag is a folder, `.allomos/taskbag/`, inside your project. It holds plain text files:

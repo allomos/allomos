@@ -63,8 +63,10 @@ export function draftChanged(task: Task, field: EditField, draft: Draft): boolea
   return draft.value.trim() !== start.value.trim();
 }
 
-/** The change Rust is asked for. Empty text clears a field that may be empty. */
-export function toEdit(field: EditField, draft: Draft): Edit {
+/** The change Rust is asked for. Empty text clears a field that may be empty. A title or
+ * description carries the version of the task the person started from (Task-A01-57), so Rust
+ * refuses it if the task changed since. */
+export function toEdit(field: EditField, draft: Draft, version: string | null = null): Edit {
   const text = draft.value.trim();
   switch (field) {
     case "state":
@@ -85,9 +87,9 @@ export function toEdit(field: EditField, draft: Draft): Edit {
     case "iteration":
       return { field, iteration: text || null };
     case "title":
-      return { field, title: text };
+      return { field, title: text, expected_version: version };
     case "description":
-      return { field, text: draft.value };
+      return { field, text: draft.value, expected_version: version };
   }
 }
 
@@ -143,4 +145,12 @@ export function iterationSavable(task: Task, draft: Draft, created: NewIteration
 export function toPaneIteration(created: NewIterationDraft): NewIteration {
   const orNull = (text: string) => text.trim() || null;
   return { id: null, name: created.name.trim(), release: null, start: orNull(created.start), end: orNull(created.end) };
+}
+
+/** A save refused because the task changed after the person started editing (Task-A01-57):
+ * the task's version now, or null for any other refusal. */
+export function changedVersion(e: unknown): string | null {
+  if (typeof e !== "object" || e === null) return null;
+  const p = e as { code?: unknown; params?: Record<string, unknown> };
+  return p.code === "task_changed" && typeof p.params?.version === "string" ? p.params.version : null;
 }

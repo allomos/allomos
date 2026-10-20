@@ -154,7 +154,7 @@ fn init_refuses_twice_and_needs_no_git() {
     assert_eq!(project["name"], "deep");
     let text = String::from_utf8(alm(&tmp("init-text"), &["init"]).stdout).unwrap();
     assert!(
-        !text.contains("Commit and push") && !text.contains("Commit only these files"),
+        !text.contains("Save this change") && !text.contains("Save only these files"),
         "{text}"
     );
 }
@@ -302,9 +302,9 @@ fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
         "{rule}"
     );
     assert!(
-        rule.contains("Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>`")
+        rule.contains("Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>`")
     );
-    assert!(rule.contains("until your claim is pushed"), "{rule}");
+    assert!(rule.contains("until your claim is shared"), "{rule}");
     assert!(!rule.contains("--push"), "{rule}");
     assert!(v["handoff_rules"]["quota_gate"].is_number());
 
@@ -763,6 +763,25 @@ fn real_repo() -> (PathBuf, PathBuf) {
     (repo, remote)
 }
 
+/// The command line `c` as a person pasting it would run it: `sh -c` here, `cmd /C` on Windows.
+/// On Windows the line goes to `cmd` as it is (`raw_arg`): `args` would wrap it in quotes and
+/// escape its own quotes as `\"`, which `cmd` does not undo, so Git got `"C:\…"` with the quotes.
+fn shell(dir: &Path, c: &str) -> Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut cmd = Command::new("cmd");
+        cmd.current_dir(dir).arg("/C").raw_arg(c);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new("sh");
+        cmd.current_dir(dir).args(["-c", c]);
+        cmd
+    }
+}
+
 /// Run the Git commands `alm` printed (its `git_commands`) in `dir`, as an agent would.
 fn run_printed(dir: &Path, v: &Value) {
     let commands = v["git_commands"]
@@ -771,15 +790,7 @@ fn run_printed(dir: &Path, v: &Value) {
     assert!(!commands.is_empty(), "{v}");
     for c in commands {
         let c = c.as_str().unwrap();
-        let out = if cfg!(windows) {
-            Command::new("cmd")
-                .current_dir(dir)
-                .args(["/C", c])
-                .output()
-        } else {
-            Command::new("sh").current_dir(dir).args(["-c", c]).output()
-        }
-        .unwrap();
+        let out = shell(dir, c).output().unwrap();
         assert!(
             out.status.success(),
             "{c}: {}",
@@ -807,7 +818,10 @@ fn printed_git_commands_share_only_that_change() {
         "alm: add area A01\nAgent: <your session name>"
     );
     let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "T"]);
-    assert_eq!(v["git_instruction"], "Commit and push this change:");
+    assert_eq!(
+        v["git_instruction"],
+        "Save this change in your version control tool and share it. Changed files:"
+    );
     run_printed(&repo, &v);
     assert_eq!(
         git(&repo, &["log", "-1", "--format=%s"]),
@@ -833,7 +847,7 @@ fn printed_git_commands_share_only_that_change() {
     // The claim says to push at once, before the work starts (row 2).
     assert_eq!(
         v["git_instruction"],
-        "Commit and push this change now, before you start the work. Until it is pushed, other sessions do not see your claim and may take this task too:"
+        "Save this change in your version control tool and share it now, before you start the work. Until it is shared, other sessions do not see your claim and may take this task too. Changed files:"
     );
     let commands: Vec<&str> = v["git_commands"]
         .as_array()
@@ -897,7 +911,7 @@ fn printed_git_commands_share_only_that_change() {
     assert_eq!(v["git_commands"], json!([]), "{v}");
     assert_eq!(
         v["git_instruction"],
-        "Nothing changed, so there is nothing to commit."
+        "Nothing changed, so there is nothing to save."
     );
     // For people: the same commands, then the rule.
     let out = alm(
@@ -906,7 +920,9 @@ fn printed_git_commands_share_only_that_change() {
     );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(
-        text.contains("\nCommit and push this change:\n  git -C "),
+        text.contains(
+            "\nSave this change in your version control tool and share it. Changed files:\n  "
+        ) && text.contains("\nFor Git:\n  git -C "),
         "{text}"
     );
     assert!(
@@ -914,7 +930,7 @@ fn printed_git_commands_share_only_that_change() {
         "{text}"
     );
     assert!(
-        text.ends_with("Commit only these files; leave other changes as they are.\n"),
+        text.ends_with("Save only these files; leave other changes as they are.\n"),
         "{text}"
     );
 }
@@ -1268,7 +1284,10 @@ fn describe_and_note_change_a_task_like_the_app() {
     let out = alm(&repo, &["--as", "a", "note", "A01-01", "Back soon."]);
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success(), "{text}");
-    assert!(text.contains("Commit and push this change:"), "{text}");
+    assert!(
+        text.contains("Save this change in your version control tool and share it. Changed files:"),
+        "{text}"
+    );
     assert!(text.contains(task_json), "{text}");
     assert!(!text.contains("description.md"), "{text}");
 }
@@ -1484,7 +1503,7 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
         assert_eq!(asked.title, "Move tasks into Allomos");
         assert!(asked.plan.contains("- 5 tasks"));
         assert_eq!(asked.from.as_deref(), Some("claude/test"));
-        allomos_store::answer_confirm(project, &asked.id, yes).unwrap();
+        allomos_store::answer_confirm(project, &asked.id, yes, None).unwrap();
     }
     let out = child.wait_with_output().unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -1496,6 +1515,69 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
     assert_eq!(left, [".gitignore"]);
     assert!(!taskbag.exists(), "asking never creates the taskbag");
     (out.status.code().unwrap(), v)
+}
+
+/// `alm confirm --task --evidence` (Task-A03-37): the popup carries the evidence and the task; a
+/// Go ahead counts only for the plan shown and is recorded in the task's history; a yes given for
+/// another version of the plan counts as no.
+#[test]
+fn a_go_ahead_counts_only_for_the_plan_shown_and_is_recorded() {
+    let repo = filled();
+    fs::write(repo.join("plan.md"), "- Rename the field\n").unwrap();
+    fs::write(repo.join("evidence.md"), "- 58 tests pass\n").unwrap();
+    let ask = |shown: Option<&str>| {
+        let child = Command::new(ALM)
+            .current_dir(&repo)
+            .args([
+                "--json",
+                "--as",
+                "claude/test",
+                "confirm",
+                "--title",
+                "Rename",
+            ])
+            .args(["--plan", "plan.md", "--evidence", "evidence.md"])
+            .args(["--task", "A01-01", "--timeout", "20"])
+            .env_remove("ALLOMOS_TASKBAG")
+            .env_remove("ALLOMOS_HOLDER")
+            .env("ALLOMOS_NO_LAUNCH", "1")
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let asked = (0..100)
+            .find_map(|_| {
+                std::thread::sleep(Duration::from_millis(100));
+                allomos_store::pending_confirms(&repo).pop()
+            })
+            .expect("the question appears");
+        assert_eq!(asked.evidence.as_deref(), Some("- 58 tests pass\n"));
+        assert_eq!(asked.task.as_deref(), Some("A01-01"));
+        let shown = shown.unwrap_or(&asked.fingerprint).to_string();
+        allomos_store::answer_confirm(&repo, &asked.id, true, Some(&shown)).unwrap();
+        let out = child.wait_with_output().unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (out.status.code().unwrap(), v, asked.fingerprint)
+    };
+    let (code, v, fingerprint) = ask(None);
+    assert_eq!((code, &v["answer"]), (0, &json!("yes")), "{v}");
+    assert_eq!(v["fingerprint"], json!(fingerprint));
+    let history = ok(&repo, &["history", "A01-01"]).to_string();
+    assert!(
+        history.contains(&format!("Rename (plan {fingerprint})")),
+        "{history}"
+    );
+    // Shown another version of the plan: not a Go ahead for this one.
+    let (code, v, _) = ask(Some("0123456789abcdef"));
+    assert_eq!((code, &v["error"]["code"]), (1, &json!("confirm_declined")));
+    // An unknown task is refused before the person is asked.
+    refused(
+        &repo,
+        &[
+            "confirm", "--title", "x", "--plan", "plan.md", "--task", "A09-09",
+        ],
+        1,
+        "task_not_found",
+    );
 }
 
 #[test]
@@ -1934,7 +2016,7 @@ fn goal_follows_the_task_language() {
         assert_eq!(v["written_in_language"], true, "{v}");
         let text = v["guide"].as_str().unwrap();
         assert!(text.starts_with(words), "{language}: {text}");
-        assert!(text.contains("(goal prompt v1)"), "{language}");
+        assert!(text.contains("(goal prompt v3)"), "{language}");
         assert!(text.contains("## 4. "), "{language}");
         assert!(text.contains("`/goal`"), "{language}");
     }
@@ -2070,17 +2152,17 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v15)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v21)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
 
-    // A v14 section (before Update the taskbag… covered an older taskbag, Task-A01-45) is out of date too.
+    // A v16 section (before personal details were kept out like credentials, Task-A03-29) is out of date too.
     fs::write(
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v15)", "## Tasks: Allomos (v14)")
+            brief.replace("## Tasks: Allomos (v21)", "## Tasks: Allomos (v20)")
         ),
     )
     .unwrap();
@@ -2102,11 +2184,14 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
         "Read it at the start",
         "you edit it directly",
         "start or stop a server or process",
-        "hosted resource or a Git remote",
+        "hosted resource or a remote repository",
         "learn a pitfall",
         "a credential moves",
         "Change lines in place",
-        "commit and push that file with Git yourself",
+        "save and share that file with your version control tool yourself",
+        "Personal details are kept out like credentials",
+        "email address, account or user name",
+        "Write a placeholder such as `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up",
         "every new piece of work (a new card, a new outcome) gets its own task",
         "`alm guide tasks`",
     ] {
@@ -2195,6 +2280,355 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
             .unwrap()
             .contains("update `project-notes.md` too (this taskbag has none yet)")
     );
+}
+
+/// The project notes' path is printed full and tidy (Task-A03-32): from a worktree with a
+/// relative `--taskbag`, no `.` or `..` is left in it.
+#[test]
+fn project_notes_path_is_tidy_from_a_worktree() {
+    let base = tmp("notes-path");
+    let bag = base.join("bag");
+    fs::create_dir_all(&bag).unwrap();
+    ok(&bag, &["init"]);
+    let worktree = base.join("code/.claude/worktrees/one");
+    fs::create_dir_all(&worktree).unwrap();
+    let rel = "./../../../../bag/.allomos/taskbag";
+    // The worktree as alm sees it from its working folder: resolved (`/private/var` on macOS),
+    // but on Windows as given, since `canonicalize` there adds `\\?\` and expands short names
+    // (`RUNNER~1`), which alm rightly does not print.
+    let bag_seen = if cfg!(windows) {
+        bag.clone()
+    } else {
+        fs::canonicalize(&bag).unwrap()
+    };
+    let want = bag_seen
+        .join(".allomos")
+        .join("taskbag")
+        .join("project-notes.md");
+    let v = ok(&worktree, &["--taskbag", rel, "next"]);
+    assert_eq!(v["project_notes"]["path"], want.display().to_string());
+    for args in [
+        vec!["--taskbag", rel, "next"],
+        vec!["--taskbag", rel, "handoff", "--as", "s/one"],
+    ] {
+        let out = alm(&worktree, &args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        let text = String::from_utf8(out.stdout).unwrap();
+        assert!(
+            text.contains(&want.display().to_string()),
+            "{args:?}: {text}"
+        );
+        assert!(
+            !text.contains("/../") && !text.contains("/./"),
+            "{args:?}: {text}"
+        );
+    }
+}
+
+/// After `alm add task`, alm tells the agent what to do next (Task-A03-33): plan it in an
+/// iteration, from the ones listed, then make it ready unless something is the person's to
+/// decide; after the Git commands, in the task language. alm itself plans and readies nothing.
+#[test]
+fn add_task_tells_the_next_steps() {
+    let dir = tmp("add-next-steps");
+    ok(&dir, &["init"]);
+    ok(&dir, &["add", "area", "A01", "Core"]);
+
+    // No iteration yet: said, with how to add one.
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "One"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    let after = text.split("Save only these files").nth(1).unwrap_or("");
+    assert!(
+        after.contains("Next, for the agent who added it:"),
+        "{text}"
+    );
+    assert!(after.contains("`alm plan A01-01 <iteration>`"), "{text}");
+    assert!(after.contains("There is no iteration yet"), "{text}");
+    assert!(
+        after.contains("Nothing: make it ready, `alm ready A01-01`"),
+        "{text}"
+    );
+    assert!(
+        after.contains("name each open question in the description's Notes"),
+        "{text}"
+    );
+
+    // The iterations listed; in JSON too; the task stays in backlog with no iteration.
+    ok(
+        &dir,
+        &["add", "iteration", "I01", "First steps", "--release", "0.1"],
+    );
+    let v = ok(&dir, &["add", "task", "--area", "A01", "--title", "Two"]);
+    let steps = v["next_steps"].as_str().unwrap();
+    assert!(steps.contains("     I01  First steps  (0.1)\n"), "{steps}");
+    assert!(steps.contains("`alm ready A01-02`"), "{steps}");
+    assert_eq!(v["task"]["state"], "backlog");
+    assert_eq!(v["task"]["iteration"], Value::Null);
+
+    // In the task language.
+    ok(&dir, &["task-language", "zh-CN"]);
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Three"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("接下来（给添加它的智能体）"), "{text}");
+    assert!(text.contains("`alm plan A01-03 <迭代>`"), "{text}");
+    ok(&dir, &["task-language", "ja"]);
+    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Four"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("次に（追加したエージェントへ）"), "{text}");
+}
+
+/// A save from an out-of-date copy is refused (Task-A01-57): `alm show` gives the version; a
+/// second writer that passes the old one with `--expected-version` changes nothing and gets the
+/// task as it is now; without the option, `describe` and `title` work as before.
+#[test]
+fn describe_and_title_refuse_an_out_of_date_version() {
+    let repo = filled();
+    let read = ok(&repo, &["show", "A01-01"])["task"]["version"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let text = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(text.contains(&format!("version: {read}\n")), "{text}");
+    // The first writer saves with the version it read.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "s/one",
+            "describe",
+            "A01-01",
+            "--text",
+            "First",
+            "--expected-version",
+            &read,
+        ],
+    );
+    let before = snapshot(&repo);
+    // The second writer still holds the old version: refused, nothing written.
+    let v = refused(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "describe",
+            "A01-01",
+            "--text",
+            "Second",
+            "--expected-version",
+            &read,
+        ],
+        1,
+        "task_changed",
+    );
+    assert_eq!(v["current"]["description"], "First\n");
+    let now = v["current"]["version"].as_str().unwrap().to_string();
+    assert_ne!(now, read);
+    refused(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "title",
+            "A01-01",
+            "New",
+            "--expected-version",
+            &read,
+        ],
+        1,
+        "task_changed",
+    );
+    assert_eq!(snapshot(&repo), before, "a refused save writes nothing");
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "describe",
+            "A01-01",
+            "--text",
+            "Second",
+            "--expected-version",
+            &read,
+        ],
+    );
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("error [task_changed]")
+            && err.contains("Now:\n  title:")
+            && err.contains("    First"),
+        "{err}"
+    );
+    // Read again, the save goes through; without a version, as before.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "s/two",
+            "describe",
+            "A01-01",
+            "--text",
+            "Second",
+            "--expected-version",
+            &now,
+        ],
+    );
+    ok(&repo, &["--as", "s/two", "title", "A01-01", "Newer"]);
+    assert_eq!(ok(&repo, &["show", "A01-01"])["task"]["title"], "Newer");
+}
+
+/// A one-time number makes a repeated command safe (Task-A01-58): the same command with the
+/// same `--request-id` returns the first result and changes nothing; the same number with a
+/// different command is refused; without a number, commands work as before.
+#[test]
+fn a_repeated_command_with_the_same_number_runs_once() {
+    let repo = filled();
+    let add = [
+        "--as",
+        "s/one",
+        "--request-id",
+        "n-1",
+        "add",
+        "task",
+        "--area",
+        "A01",
+        "--title",
+        "Sign-in page",
+        "--branch",
+        "main",
+    ];
+    let first = ok(&repo, &add);
+    let id = first["task"]["id"].as_str().unwrap().to_string();
+    let before = snapshot(&repo);
+    // The crash: the agent runs it again. Nothing new; the first result comes back.
+    let again = ok(&repo, &add);
+    assert_eq!(again["repeated"], true);
+    assert_eq!(again["first"][0]["id"], id.as_str());
+    assert_eq!(again["first"][0]["command"], "add task");
+    assert_eq!(snapshot(&repo), before, "a repeat writes nothing");
+    let text = String::from_utf8(alm(&repo, &add).stdout).unwrap();
+    assert!(
+        text.contains("Done already under the one-time number n-1")
+            && text.contains(&format!("add task {id}")),
+        "{text}"
+    );
+    // --json or not is the same input.
+    let plain: Vec<&str> = add.to_vec();
+    assert_eq!(alm(&repo, &plain).status.code(), Some(0));
+    assert_eq!(snapshot(&repo), before);
+    // The same number for something else: refused, nothing done.
+    refused(
+        &repo,
+        &[
+            "--as",
+            "s/one",
+            "--request-id",
+            "n-1",
+            "note",
+            "A01-01",
+            "Different",
+        ],
+        1,
+        "request_reused",
+    );
+    assert_eq!(snapshot(&repo), before);
+    // A note under a new number, repeated: one note event.
+    let note = [
+        "--as",
+        "s/one",
+        "--request-id",
+        "n-2",
+        "note",
+        &id,
+        "Read the spec",
+    ];
+    ok(&repo, &note);
+    let after_note = snapshot(&repo);
+    assert_eq!(ok(&repo, &note)["repeated"], true);
+    assert_eq!(snapshot(&repo), after_note);
+    // Without a number, the same command adds a second task, as always.
+    let plain_add = [
+        "--as",
+        "s/one",
+        "add",
+        "task",
+        "--area",
+        "A01",
+        "--title",
+        "Sign-in page",
+        "--branch",
+        "main",
+    ];
+    let second = ok(&repo, &plain_add);
+    assert_ne!(second["task"]["id"], id.as_str());
+    // The number is kept in the history only, and is not shown as a change of the task.
+    let h = ok(&repo, &["history", &id]);
+    let shown = h.to_string();
+    assert!(!shown.contains("request_id"), "{shown}");
+}
+
+/// `alm` at a given time (`ALLOMOS_NOW`), for the packing of old history (Task-A01-59).
+fn alm_at(dir: &Path, now: &str, args: &[&str]) -> Output {
+    Command::new(ALM)
+        .current_dir(dir)
+        .args(args)
+        .env_remove("ALLOMOS_TASKBAG")
+        .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_LOCK_WAIT_MS")
+        .env("ALLOMOS_NOW", now)
+        .output()
+        .unwrap()
+}
+
+/// From the 28th, any command packs the history of earlier months (Task-A01-59): it says so and
+/// prints the Git commands for the packed file and the removed single files; the history reads
+/// the same afterwards.
+#[test]
+fn any_command_packs_earlier_months_from_the_28th() {
+    let dir = tmp("pack");
+    let sept = "2026-09-10T09:00:00Z";
+    for args in [
+        vec!["init"],
+        vec!["add", "area", "A01", "Core"],
+        vec![
+            "add", "task", "--area", "A01", "--title", "One", "--branch", "main",
+        ],
+        vec!["--as", "s/one", "note", "A01-01", "Next"],
+    ] {
+        assert_eq!(alm_at(&dir, sept, &args).status.code(), Some(0), "{args:?}");
+    }
+    let history = |now: &str| -> Value {
+        let out = alm_at(&dir, now, &["--json", "history", "A01-01"]);
+        let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+        v["events"].clone()
+    };
+    let before = history("2026-10-27T09:00:00Z");
+    assert!(
+        !dir.join(".allomos/taskbag/events/2026-09.events").exists(),
+        "not before the 28th"
+    );
+
+    // October 28th: a reading command packs September and says how to share it.
+    let out = alm_at(&dir, "2026-10-28T09:00:00Z", &["list"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Packed the history of 2026-09 into events/2026-09.events"),
+        "{text}"
+    );
+    assert!(text.contains("alm: pack history"), "{text}");
+    assert!(text.contains("events/2026-09.events"), "{text}");
+    assert!(
+        text.contains("events/2026-09-10-"),
+        "the removed files are shared too: {text}"
+    );
+    assert!(dir.join(".allomos/taskbag/events/2026-09.events").exists());
+    assert_eq!(history("2026-10-28T09:00:00Z"), before);
+
+    // Nothing more to pack: nothing said, nothing to share.
+    let out = alm_at(&dir, "2026-10-29T09:00:00Z", &["--json", "list"]);
+    let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+    assert_eq!(v["packed"], Value::Null);
 }
 
 /// Every file under `dir`, with its contents, to show that nothing changed.
@@ -3089,7 +3523,9 @@ fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
     let v = ok(&repo, &["handoffs", "--check", "--task", "A01-01"]);
     // The done's text: the task, the rule, then the Git commands for the done itself.
     let rule = text.split_once('\n').unwrap().1;
-    let rule = &rule[..rule.find("\nCommit and push this change:").unwrap()];
+    let rule = &rule[..rule
+        .find("\nSave this change in your version control tool")
+        .unwrap()];
     assert_eq!(v["instruction"], json!(rule));
 
     // The agent removes a handoff by the name alm handoffs lists; then it is gone.
@@ -3302,10 +3738,14 @@ fn tasks_record_their_base_branch_and_claims_say_where_to_merge() {
         json!([
             "git switch storage-v2",
             "git pull --ff-only",
-            "git switch -c claude/a01-01"
+            "git worktree add <folder> -b claude/a01-01 storage-v2"
         ])
     );
     assert_eq!(v["branch_commands"]["merge"][2], "git merge claude/a01-01");
+    assert_eq!(
+        v["branch_commands"]["merge"][4],
+        "git worktree remove <folder>"
+    );
     assert_eq!(v["branch_facts"], json!([]));
     // task.json has no new field: the branches are in the claim's event.
     let file = task_file(&repo, "A01-01");
@@ -3441,9 +3881,11 @@ fn card_files_are_reported_and_moved_in_beside_their_tasks() {
     fs::create_dir_all(repo.join("docs/tasks")).unwrap();
     fs::write(repo.join("docs/tasks/A01-01.md"), "# A01-01\n\nCard.\n").unwrap();
     fs::write(repo.join("docs/tasks/A01-02.md"), "# A01-02\n\nCard.\n").unwrap();
-    // Nothing reported yet: alm asks the agent to look.
+    // Nothing linked or reported yet: no Card files line at all (Task-A03-34).
     let v = ok(&repo, &["next"]);
-    assert!(v["cards"].as_str().unwrap().contains("alm cards found"));
+    assert_eq!(v["cards"], Value::Null);
+    let text = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(!text.contains("Card files"), "{text}");
     assert_eq!(ok(&repo, &["cards"])["cards_outside"], json!([]));
     // A01-01 is finished by an old session (before the card files were reported: `alm claim`
     // refuses while some are outside the taskbag, Task-A03-27).
@@ -3788,4 +4230,60 @@ fn history_records_with_unknown_fields_still_show() {
     fs::write(&task, t.to_string()).unwrap();
     let v = ok(&repo, &["list"]);
     assert!(v["issues"].to_string().contains("field_unknown"), "{v}");
+}
+
+/// `alm quota` (Task-A03-02): an agent reports its quota; it is kept on this computer beside the
+/// app's settings, one report per agent, account and window, the newest first; no taskbag needed
+/// and nothing to share.
+#[test]
+fn quota_reports_are_kept_on_this_computer() {
+    let dir = tmp("quota");
+    let settings = dir.join("settings");
+    let run = |args: &[&str]| {
+        let out = Command::new(ALM)
+            .current_dir(&dir)
+            .arg("--json")
+            .args(args)
+            .env_remove("ALLOMOS_TASKBAG")
+            .env("ALLOMOS_SETTINGS_DIR", &settings)
+            .output()
+            .unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (out.status.code().unwrap(), v)
+    };
+    let (code, v) = run(&["quota"]);
+    assert_eq!((code, &v["reports"]), (0, &json!([])));
+    let (code, _) = run(&[
+        "quota",
+        "--agent",
+        "claude-code",
+        "--left",
+        "52",
+        "--resets",
+        "2026-10-20T17:00",
+    ]);
+    assert_eq!(code, 0);
+    run(&[
+        "quota",
+        "--agent",
+        "codex",
+        "--account",
+        "work",
+        "--left",
+        "3",
+    ]);
+    let (_, v) = run(&["quota", "--agent", "claude-code", "--left", "40"]);
+    let reports = v["reports"].as_array().unwrap();
+    assert_eq!(reports.len(), 2, "{v}");
+    assert_eq!(reports[0]["agent"], "claude-code");
+    assert_eq!(reports[0]["left"], 40);
+    assert_eq!(reports[0]["window"], "5h");
+    assert_eq!(reports[0]["resets"], Value::Null);
+    assert_eq!(reports[1]["account"], "work");
+    assert!(v.get("changed_files").is_none(), "{v}");
+    assert!(settings.join("quota.json").is_file());
+    let (code, v) = run(&[
+        "quota", "--agent", "codex", "--left", "5", "--window", "day",
+    ]);
+    assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
 }

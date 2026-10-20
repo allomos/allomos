@@ -104,10 +104,10 @@ problems! {
     BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: it will never be done, and it does not count as done. Is {id} still blocked?";
     /// `alm done --without-human-check` with no text, or the field empty in `task.json`
     /// (Task-A03-15; renamed from `without_owner_missing` in Task-A03-18).
-    WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check, and in which run.";
+    WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check.";
     /// A warning: `alm done --without-human-check` without the steps for the person who checks it
     /// (Task-A03-18). `alm` asks for them and shows how to write them; it does not refuse.
-    HumanCheckStepsMissing { id } => "human_check_steps_missing", "No human check steps for {id}: a person must be able to pick it up and test it. Write them in Markdown (the test folder, what to open, what to click, what they should see) to a file, then run `alm done {id} --without-human-check \"<why, which run>\" --steps <file.md>`.";
+    HumanCheckStepsMissing { id } => "human_check_steps_missing", "No human check steps for {id}: a person must be able to pick it up and test it. Write them in Markdown (the test folder, what to open, what to click, what they should see) to a file, then run `alm done {id} --without-human-check \"<why>\" --steps <file.md>`.";
     /// `--steps` names an empty file (Task-A03-18).
     HumanCheckStepsEmpty => "human_check_steps_empty", "The human check steps are empty. Write what a person opens, clicks and should see, or leave out --steps.";
     /// `alm checked` on a task that is not done (Task-A03-18).
@@ -121,10 +121,10 @@ problems! {
     /// `alm reviewed` (or the app's Reviewed button) on a task with no AI decisions to review (Task-A03-19).
     NothingToReview { id } => "nothing_to_review", "Task {id} has no AI decisions waiting for review.";
     /// A branch name that is not one: empty, with a space, or starting with `-` (Task-A03-22).
-    BranchInvalid { name } => "branch_invalid", "\"{name}\" is not a branch name. Give the branch's real name, as Git shows it (for example main).";
+    BranchInvalid { name } => "branch_invalid", "\"{name}\" is not a branch name. Give the branch's real name, as your version control tool shows it (in Git: `git branch --show-current`, for example main).";
     /// A warning: `alm add task` or `alm claim` was not told which branch the agent is on, so the
     /// task's branches were not recorded (Task-A03-22). alm reads no Git.
-    BranchMissing { id } => "branch_missing", "alm was not told which branch you are on, so task {id}'s branches were not recorded. Pass --branch <name>: read it with `git branch --show-current` (alm reads no Git).";
+    BranchMissing { id } => "branch_missing", "alm was not told which branch you are on, so task {id}'s branches were not recorded. Pass --branch <name>, as your version control tool shows it (in Git: `git branch --show-current`; alm reads none).";
     /// A warning: the session adding a task holds another task on a different base (Task-A03-22).
     BaseDiffers { held, held_base, base } => "base_differs", "You hold {held}, which starts from and merges into {held_base}, but the new task got the base {base}. Decide which is right: keep it, or change the new task's base with `alm base <its id> {held_base}`.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
@@ -151,12 +151,21 @@ problems! {
     TaskNotFound { id } => "task_not_found", "There is no task \"{id}\".";
     HolderMissing => "holder_missing", "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
+    /// The one-time number of a change (`--request-id`, Task-A01-58) was used before for a
+    /// different change, so nothing was done.
+    RequestReused { id } => "request_reused", "The one-time number {id} was already used for a different change, so nothing was done. Use a new number for a new change.";
+    /// A title or description was saved from an out-of-date copy of the task (Task-A01-57):
+    /// someone changed it after it was read, so nothing was written. `version` is its version now.
+    TaskChanged { id, version } => "task_changed", "Task {id} changed after you read it, so your change was not saved. Read it again (its version is now {version}), then save.";
     TaskClosed { id, state } => "task_closed", "Task {id} is {state}, so it cannot be changed this way.";
     /// A warning: the task was taken over from another holder.
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
+    /// **Restart to Update** could not install the new version (Task-A07-17); this one keeps
+    /// running. `detail` is the system's own text, or why the download was refused.
+    UpdateFailed { detail } => "update_failed", "Allomos could not install the update: {detail}. You still have the version you had.";
     /// The chosen AI agent is no longer on this computer (Task-A05-02).
     AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
     /// `alm confirm`: the person chose Cancel in the app (Task-A05-02).

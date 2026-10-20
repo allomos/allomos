@@ -166,8 +166,15 @@
   "request_not_found": [
     "id"
   ],
+  "request_reused": [
+    "id"
+  ],
   "startup_not_a_folder": [
     "path"
+  ],
+  "task_changed": [
+    "id",
+    "version"
   ],
   "task_closed": [
     "id",
@@ -213,6 +220,9 @@
   ],
   "unknown_iteration": [
     "iteration"
+  ],
+  "update_failed": [
+    "detail"
   ],
   "waiting_on_missing": [],
   "without_human_check_missing": [],

@@ -16,12 +16,12 @@ use allomos_core::ops::{self, Outcome};
 use allomos_core::{FORMAT, Issue, Iteration, Problem, Project, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::{
-    Actor, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES, add_agent_instructions,
-    agent_section, agent_section_for, agent_setup_request, default_root, events, find_taskbag,
-    guide, id_from_name, init_with_labels, load, localized, pick_ui_language, picked_folder,
-    plain_path, post_confirm, project_folder_of, read_answer, read_text, requests_dir,
-    saved_ui_language, task_language, taskbag_of, versions, was_seen, with_written_files,
-    withdraw_confirm,
+    Actor, ConfirmExtra, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES,
+    add_agent_instructions, agent_section, agent_section_for, agent_setup_request, default_root,
+    events, find_taskbag, guide, id_from_name, init_with_labels, load, localized, pick_ui_language,
+    picked_folder, plain_path, post_confirm, project_folder_of, read_answer, read_text,
+    requests_dir, saved_ui_language, task_language, taskbag_of, tidy, versions, was_seen,
+    with_written_files, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -62,6 +62,11 @@ struct Cli {
     /// Print one JSON result on standard output, and nothing else.
     #[arg(long, global = true)]
     json: bool,
+    /// A one-time number of your own for this change (Task-A01-58). Run the same command again
+    /// with the same number (after a crash, say) and alm returns the first result instead of
+    /// doing it twice; the same number with a different command is refused.
+    #[arg(long, global = true, value_name = "ID")]
+    request_id: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -100,6 +105,28 @@ enum Command {
     Delete(Delete),
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
+    /// Report how much of your account's quota is left, at the handoff gate's quota check, from
+    /// the figure you just read (for example Claude Code's get_usage). The Allomos app shows it
+    /// beside the agent. Kept on this computer, not in the taskbag: nothing to save or share.
+    /// Without --agent, it lists the reports.
+    Quota {
+        /// Your agent's id: claude-code, codex, or another agent's.
+        #[arg(long, requires = "left")]
+        agent: Option<String>,
+        /// A name for the account, only when you can tell one; never an email address or user
+        /// name.
+        #[arg(long, requires = "agent")]
+        account: Option<String>,
+        /// The share left, 0 to 100.
+        #[arg(long, value_name = "PERCENT", requires = "agent")]
+        left: Option<u8>,
+        /// When this window resets, local time (2026-10-20T17:00).
+        #[arg(long, value_name = "WHEN", requires = "agent")]
+        resets: Option<String>,
+        /// Which limit the figure is for: 5h (the handoff gate's) or week.
+        #[arg(long, default_value = "5h", requires = "agent")]
+        window: String,
+    },
     /// Print the details the brief points to: terms, what a project may customize, commands,
     /// how to work the tasks, the run modes to show the person before an automatic or loop run,
     /// the one-time procedure that puts every agent's shared rules in AGENTS.md, and the goal
@@ -138,6 +165,14 @@ enum Command {
         /// How long to wait for the answer, in seconds.
         #[arg(long, default_value_t = 600, value_name = "SECONDS")]
         timeout: u64,
+        /// A Markdown file with the evidence, shown under the plan: what was checked and the
+        /// results.
+        #[arg(long, value_name = "FILE")]
+        evidence: Option<PathBuf>,
+        /// The task the approval is for: a Go ahead is recorded in its history, for exactly the
+        /// plan shown. If the plan changes afterwards, ask again.
+        #[arg(long, value_name = "ID")]
+        task: Option<String>,
     },
     /// Tell the person in the Allomos app what you are doing on a job it gave you: the app shows
     /// a progress popup. Start with --title and --step, report each step, and end with --finished.
@@ -194,6 +229,18 @@ enum Command {
     /// A person has checked a finished task: it gets the top label and leaves To check; the note
     /// and the steps stay in its history. Run it only when the person says so.
     Checked { id: String },
+    /// Send a finished task back to To check: its work changed after a person checked it, so
+    /// the check no longer covers it. You decide when; say what changed. A task at the top label
+    /// goes one step down.
+    Recheck {
+        id: String,
+        /// What changed since the person checked it, in one line. Shown under To check.
+        #[arg(long, value_name = "TEXT")]
+        reason: String,
+        /// A Markdown file with new steps for checking it (otherwise the earlier steps stay).
+        #[arg(long, value_name = "FILE")]
+        steps: Option<PathBuf>,
+    },
     /// Record a decision you made on your own in a task (a routine choice: a name, a file layout,
     /// a small detail with an obvious default): what you decided and why, in one line. It is kept
     /// in the task's history; `alm human` lists it under To review: AI decisions until a person
@@ -212,13 +259,15 @@ enum Command {
     /// Show a task's history: every recorded change, newest first, with who and when.
     History { id: String },
     /// Hold a task and start it. Say which branch you are on (--branch): alm records the task's
-    /// working branch and says which base to start from and merge into, with the Git commands.
+    /// working branch and says which base to start from and merge into, with the Git commands as the
+    /// example.
     Claim {
         id: String,
         /// Take the task over from its current holder.
         #[arg(long)]
         take: bool,
-        /// The branch you are on (`git branch --show-current`; alm reads no Git). A task without a
+        /// The branch you are on, as your version control tool shows it (in Git:
+        /// `git branch --show-current`; alm reads no version control). A task without a
         /// base gets it.
         #[arg(long, value_name = "NAME")]
         branch: Option<String>,
@@ -255,13 +304,12 @@ enum Command {
     /// Move a blocked task on (ready, or in progress when someone holds it). `alm` does not check
     /// its blockers: you do.
     Unblock { id: String },
-    /// Finish a task. Finish it at the top label (a person has checked it); in an automatic or
-    /// loop run, a task may be finished below it with --without-human-check and --steps. On a task
-    /// already done, only its human check is recorded again.
+    /// Finish a task. Finish it at the top label (a person has checked it); when only a person's
+    /// hands-on check is left, in any run mode, finish it below it with --without-human-check and
+    /// --steps. On a task already done, only its human check is recorded again.
     Done {
         id: String,
-        /// Why the task is finished without the human check, and in which run (an automatic or
-        /// loop run). Recorded in the task's file; `alm human` lists it under To check.
+        /// Why the task is finished without the human check. Recorded in the task's file; `alm human` lists it under To check.
         /// `--without-owner` is its old name.
         #[arg(long, value_name = "TEXT", alias = "without-owner")]
         without_human_check: Option<String>,
@@ -286,7 +334,13 @@ enum Command {
     /// Mark an unheld backlog, waiting or blocked task ready (for example, the approver approved it).
     Ready { id: String },
     /// Give a task a new title.
-    Title { id: String, title: String },
+    Title {
+        id: String,
+        title: String,
+        /// The version you read (`alm show`): if the task changed since, nothing is saved.
+        #[arg(long, value_name = "VERSION")]
+        expected_version: Option<String>,
+    },
     /// Give a task a new description (its description.md): `--text "<markdown>"`, or `--from` a
     /// Markdown file. An empty text (`--text ""`) removes it.
     Describe {
@@ -302,6 +356,9 @@ enum Command {
         /// A Markdown file with the new description.
         #[arg(long, value_name = "FILE")]
         from: Option<PathBuf>,
+        /// The version you read (`alm show`): if the task changed since, nothing is saved.
+        #[arg(long, value_name = "VERSION")]
+        expected_version: Option<String>,
     },
     /// Set the task's handoff note (what the next one needs); no text clears it.
     Note { id: String, text: Option<String> },
@@ -458,7 +515,8 @@ enum Add {
         title: String,
         #[arg(long)]
         description: Option<String>,
-        /// The branch you are on (`git branch --show-current`; alm reads no Git). When it is a
+        /// The branch you are on, as your version control tool shows it (in Git:
+        /// `git branch --show-current`; alm reads no version control). When it is a
         /// task's working branch, the new task gets that task's base; otherwise this branch.
         #[arg(long, value_name = "NAME")]
         branch: Option<String>,
@@ -535,6 +593,7 @@ impl Command {
             | Command::Unblock { id }
             | Command::Done { id, .. }
             | Command::Checked { id }
+            | Command::Recheck { id, .. }
             | Command::AiDecided { id, .. }
             | Command::Reviewed { id }
             | Command::Release { id, .. }
@@ -553,6 +612,7 @@ impl Command {
             | Command::Project { .. }
             | Command::TaskLanguage { .. }
             | Command::Brief
+            | Command::Quota { .. }
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::Progress { .. }
@@ -570,6 +630,9 @@ impl Command {
 
     /// Whether the command writes to the taskbag.
     fn changes(&self) -> bool {
+        if let Command::Confirm { task, .. } = self {
+            return task.is_some();
+        }
         if let Command::Project { name, id } = self {
             return name.is_some() || id.is_some();
         }
@@ -602,6 +665,7 @@ impl Command {
                 | Command::Confirm { .. }
                 | Command::Progress { .. }
                 | Command::Brief
+                | Command::Quota { .. }
                 | Command::Guide { .. }
                 | Command::Handoffs { .. }
                 | Command::MoveIn { .. }
@@ -616,6 +680,7 @@ impl Command {
             Command::Labels { .. } => "labels",
             Command::TaskLanguage { .. } => "task-language",
             Command::Brief => "brief",
+            Command::Quota { .. } => "quota",
             Command::Guide { .. } => "guide",
             Command::Add(Add::Area { .. }) => "add area",
             Command::Add(Add::Iteration { .. }) => "add iteration",
@@ -636,6 +701,7 @@ impl Command {
             Command::Unblock { .. } => "unblock",
             Command::Done { .. } => "done",
             Command::Checked { .. } => "checked",
+            Command::Recheck { .. } => "recheck",
             Command::AiDecided { .. } => "ai-decided",
             Command::Reviewed { .. } => "reviewed",
             Command::Human { .. } => "human",
@@ -668,6 +734,8 @@ impl Command {
 struct Done {
     fields: Value,
     text: String,
+    /// Printed after the Git commands: what to do next (Task-A03-33).
+    after: String,
     warnings: Vec<Problem>,
     issues: Vec<Issue>,
 }
@@ -677,6 +745,7 @@ impl Done {
         Done {
             fields,
             text,
+            after: String::new(),
             warnings: Vec::new(),
             issues: Vec::new(),
         }
@@ -723,8 +792,59 @@ struct Reply {
 
 /// Run `alm` and collect what it would print. Help, version and usage errors without `--json` are
 /// printed by `clap`.
+/// The input a one-time number stands for (Task-A01-58): the command's words and who runs it,
+/// without the number itself or `--json` (how the result is printed is not the change).
+fn request_input(args: &[OsString], holder: Option<&str>) -> String {
+    let mut words = Vec::new();
+    let mut skip = false;
+    for a in args.iter().skip(1) {
+        let a = a.to_string_lossy();
+        if skip {
+            skip = false;
+        } else if a == "--request-id" {
+            skip = true;
+        } else if !(a.starts_with("--request-id=") || a == "--json") {
+            words.push(a.into_owned());
+        }
+    }
+    allomos_core::request::fingerprint(&format!("{}\n{}", holder.unwrap_or(""), words.join("\n")))
+}
+
+/// A change run again under a one-time number it already used (Task-A01-58): the first run's
+/// result, and nothing changed; or `request_reused` when the number went with another input.
+/// `None` when the number is new (or the command changes nothing).
+fn repeated(cli: &Cli, cwd: &Path, id: &str, input: &str) -> Option<Result<Done, Problem>> {
+    if !cli.command.changes() {
+        return None;
+    }
+    let root = locate(cli, cwd).ok()?;
+    let (events, _) = allomos_store::events::list(&root);
+    let first = allomos_core::request::made_under(&events, id);
+    let (_, was) = allomos_core::request::of(first.first()?)?;
+    if was != input {
+        return Some(Err(Problem::RequestReused { id: id.to_string() }));
+    }
+    let what: Vec<String> = first
+        .iter()
+        .map(|e| match &e.id {
+            Some(item) => format!("{} {item}", e.command),
+            None => e.command.clone(),
+        })
+        .collect();
+    let text = format!(
+        "Done already under the one-time number {id} ({}): {}. Nothing changed.\n",
+        first[0].at,
+        what.join(", ")
+    );
+    Some(Ok(Done::new(
+        json!({ "taskbag": root, "repeated": true, "request_id": id, "first": allomos_core::request::summary(&first) }),
+        text,
+    )))
+}
+
 fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     let wants_json = args.iter().any(|a| a == "--json");
+    let raw_args = args.clone();
     let mut stdout = String::new();
     let mut stderr = String::new();
     let cli = match Cli::try_parse_from(args) {
@@ -762,10 +882,32 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     // Before the change: which changes made in the app has no agent been told to share yet
     // (decision 0017, row 9)?
     let before = Before::look(&cli, cwd);
+    // A one-time number (Task-A01-58): a repeat returns the first result; a new number marks
+    // every event this change writes.
+    let request = cli
+        .request_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(|id| {
+            (
+                id.to_string(),
+                request_input(&raw_args, cli.holder.as_deref()),
+            )
+        });
     let (result, written) = with_written_files(|| {
         check_versions(&cli, cwd).and_then(|outdated| {
-            let mut done = execute(&cli, cwd)?;
+            if let Some((id, input)) = &request {
+                if let Some(first) = repeated(&cli, cwd, id, input) {
+                    return first;
+                }
+                allomos_store::events::set_request(Some((id, input)));
+            }
+            let done = execute(&cli, cwd);
+            allomos_store::events::set_request(None);
+            let mut done = done?;
             done.warnings.extend(outdated);
+            pack_history(&cli, cwd, &mut done);
             Ok(done)
         })
     });
@@ -795,14 +937,36 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
             EXIT_OK
         }
         Err(problem) => {
+            // A save from an out-of-date copy (Task-A01-57): the task as it is now goes with
+            // the refusal, so the agent can compare and decide without another read.
+            let current = match &problem {
+                Problem::TaskChanged { id, .. } => locate(&cli, cwd)
+                    .ok()
+                    .and_then(|root| load(&root).taskbag)
+                    .and_then(|bag| ops::find_task(&bag, id).ok()),
+                _ => None,
+            };
             if cli.json {
-                stdout.push_str(&error_line(Some(command), &problem));
+                let mut line: Value = serde_json::from_str(&error_line(Some(command), &problem))
+                    .expect("error lines are JSON");
+                if let Some(task) = &current {
+                    line["current"] = task_json(task);
+                }
+                stdout.push_str(&format!("{line}\n"));
             } else {
                 stderr.push_str(&format!(
                     "error [{}]: {}\n",
                     problem.code(),
                     problem.english()
                 ));
+                if let Some(task) = &current {
+                    stderr.push_str(&format!("Now:\n  title: {}\n", task.title));
+                    if task.description.is_empty() {
+                        stderr.push_str("  description: (none)\n");
+                    } else {
+                        stderr.push_str(&format!("  description:\n{}", indent(&task.description)));
+                    }
+                }
             }
             exit_code(&problem)
         }
@@ -812,6 +976,47 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
         stdout,
         stderr,
     }
+}
+
+/// After a command that worked, from the 28th of a month (Task-A01-59, approver 2026-10-20: alm
+/// packs by itself): pack the history of whole earlier months into one file each. What was
+/// packed is said, and the Git commands that share the change include the packed and removed
+/// files. A taskbag busy with another writer is left for the next command.
+fn pack_history(cli: &Cli, cwd: &Path, done: &mut Done) {
+    if matches!(
+        cli.command,
+        Command::Init { .. }
+            | Command::Brief
+            | Command::Quota { .. }
+            | Command::Guide { .. }
+            | Command::Confirm { .. }
+            | Command::MoveIn { .. }
+    ) {
+        return;
+    }
+    let Ok(root) = locate(cli, cwd) else {
+        return;
+    };
+    let Ok(lock) = Lock::acquire(&root, Duration::ZERO) else {
+        return;
+    };
+    let packed = lock.pack_history().unwrap_or_default();
+    drop(lock);
+    if packed.is_empty() {
+        return;
+    }
+    let mut text = String::new();
+    for p in &packed {
+        text.push_str(&format!(
+            "Packed the history of {} into {} ({} changes; {} single files removed).\n",
+            p.month, p.file, p.changes, p.removed
+        ));
+    }
+    done.text.push_str(&text);
+    if done.fields["taskbag"].is_null() {
+        done.fields["taskbag"] = json!(root);
+    }
+    done.fields["packed"] = json!(packed);
 }
 
 /// Before a command: is the taskbag in the format this Allomos reads, and is Allomos's section in
@@ -826,6 +1031,7 @@ fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
         cli.command,
         Command::Init { .. }
             | Command::Brief
+            | Command::Quota { .. }
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::MoveIn { .. }
@@ -912,7 +1118,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
     let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) else {
         return;
     };
-    let changes = cli.command.changes() && !matches!(cli.command, Command::Init { .. });
+    // A command that packed old history (Task-A01-59) shares that too, even when it only reads.
+    let packed = done.fields["packed"]
+        .as_array()
+        .is_some_and(|p| !p.is_empty());
+    let changes = (cli.command.changes() || packed) && !matches!(cli.command, Command::Init { .. });
     let mut text = String::new();
     let mut files: Vec<String> = written
         .iter()
@@ -935,34 +1145,48 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             Some(id) => format!("alm: {command} {id}"),
             None => format!("alm: {command}"),
         };
+        let subject = if packed && !cli.command.changes() {
+            "alm: pack history".to_string()
+        } else {
+            subject
+        };
         let who = format!(
             "Agent: {}",
             cli.holder.as_deref().unwrap_or("<your session name>")
         );
+        // In general words, with the Git commands as the example (Task-A01-60, approver
+        // 2026-10-20): Allomos does not assume Git.
         let (instruction, commands) = if files.is_empty() {
             (
-                "Nothing changed, so there is nothing to commit.".to_string(),
+                "Nothing changed, so there is nothing to save.".to_string(),
                 Vec::new(),
             )
         } else if matches!(cli.command, Command::Claim { .. }) {
             (
-                "Commit and push this change now, before you start the work. Until it is pushed, other sessions do not see your claim and may take this task too:".to_string(),
+                "Save this change in your version control tool and share it now, before you start the work. Until it is shared, other sessions do not see your claim and may take this task too. Changed files:".to_string(),
                 git_commands(&root, &files, &subject, &who, true),
             )
         } else {
             (
-                "Commit and push this change:".to_string(),
+                "Save this change in your version control tool and share it. Changed files:"
+                    .to_string(),
                 git_commands(&root, &files, &subject, &who, true),
             )
         };
         text.push('\n');
         text.push_str(&instruction);
         text.push('\n');
+        if !commands.is_empty() {
+            for f in &files {
+                text.push_str(&format!("  {f}\n"));
+            }
+            text.push_str("For Git:\n");
+        }
         for c in &commands {
             text.push_str(&format!("  {c}\n"));
         }
         if !commands.is_empty() {
-            text.push_str("Commit only these files; leave other changes as they are.\n");
+            text.push_str("Save only these files; leave other changes as they are.\n");
         }
         done.fields["changed_files"] = json!(files);
         done.fields["git_commands"] = json!(commands);
@@ -990,9 +1214,13 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
                 true,
             );
             text.push_str(&format!(
-                "\n{} change(s) made in the Allomos app by {by} are not shared yet. Commit them as the person's, in their own commit (if someone already committed them, Git finds nothing to commit; that is fine):\n",
+                "\n{} change(s) made in the Allomos app by {by} are not shared yet. Save and share them in your version control tool as the person's, on their own (if someone already did, there is nothing to save; that is fine). Changed files:\n",
                 app.count
             ));
+            for f in &rest {
+                text.push_str(&format!("  {f}\n"));
+            }
+            text.push_str("For Git:\n");
             for c in &commands {
                 text.push_str(&format!("  {c}\n"));
             }
@@ -1005,6 +1233,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         }
     }
     done.text.push_str(&text);
+    if !done.after.is_empty() {
+        let after = std::mem::take(&mut done.after);
+        done.text.push('\n');
+        done.text.push_str(&after);
+    }
 }
 
 fn error_line(command: Option<&str>, problem: &Problem) -> String {
@@ -1036,7 +1269,17 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
     };
     match &cli.taskbag {
         Some(path) => {
-            let path = cwd.join(path);
+            // Without `.` and `..`, so every path alm prints is tidy (Task-A03-32); as given
+            // when tidying it would miss the taskbag (a symbolic link followed by `..`).
+            let given = cwd.join(path);
+            let tidy = tidy(&given);
+            let path = if tidy.join("project.json").is_file()
+                || default_root(&tidy).join("project.json").is_file()
+            {
+                tidy
+            } else {
+                given
+            };
             if path.join("project.json").is_file() {
                 Ok(path)
             } else if default_root(&path).join("project.json").is_file() {
@@ -1109,13 +1352,34 @@ fn windows_app() -> Option<PathBuf> {
 }
 
 /// `alm confirm`: leave the question, wait for the person's answer in the app, then tidy up.
-fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Result<Done, Problem> {
+fn confirm(
+    cli: &Cli,
+    cwd: &Path,
+    title: &str,
+    plan: &Path,
+    timeout: u64,
+    evidence: Option<&Path>,
+    task: Option<&str>,
+) -> Result<Done, Problem> {
     let project = confirm_project(cli, cwd);
-    let path = cwd.join(plan);
-    let text = read_text(&path).map_err(|e| Problem::ReadFailed {
-        detail: format!("{}: {e}", path.display()),
-    })?;
-    if text.len() > MAX_PLAN_BYTES {
+    let read = |file: &Path| {
+        let path = cwd.join(file);
+        read_text(&path).map_err(|e| Problem::ReadFailed {
+            detail: format!("{}: {e}", path.display()),
+        })
+    };
+    let text = read(plan)?;
+    let evidence = evidence.map(read).transpose()?;
+    // The task must exist before the person is asked about it.
+    let root = match task {
+        Some(id) => {
+            let root = locate(cli, cwd)?;
+            allomos_core::ops::find_task(&taskbag_of(&root, load(&root))?.0, id)?;
+            Some(root)
+        }
+        None => None,
+    };
+    if text.len() + evidence.as_ref().map_or(0, String::len) > MAX_PLAN_BYTES {
         return Err(Problem::BadUsage {
             detail: format!(
                 "the plan is longer than {} KB; keep it to what the person must decide",
@@ -1123,13 +1387,21 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
             ),
         });
     }
-    let asked =
-        post_confirm(&project, title, &text, cli.holder.as_deref(), timeout).map_err(|e| {
-            Problem::WriteFailed {
-                path: requests_dir(&project).display().to_string(),
-                detail: e.to_string(),
-            }
-        })?;
+    let asked = post_confirm(
+        &project,
+        title,
+        &text,
+        cli.holder.as_deref(),
+        timeout,
+        ConfirmExtra {
+            evidence: evidence.as_deref(),
+            task,
+        },
+    )
+    .map_err(|e| Problem::WriteFailed {
+        path: requests_dir(&project).display().to_string(),
+        detail: e.to_string(),
+    })?;
     if !cli.json {
         eprintln!(
             "Waiting for the person to answer in the Allomos app (project {})…",
@@ -1139,7 +1411,7 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
     let start = std::time::Instant::now();
     let mut launched = false;
     let answer = loop {
-        if let Some(answer) = read_answer(&project, &asked.id) {
+        if let Some(answer) = read_answer(&project, &asked.id, &asked.fingerprint) {
             break Some(answer);
         }
         if start.elapsed() >= Duration::from_secs(timeout) {
@@ -1153,10 +1425,27 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
     };
     withdraw_confirm(&project, &asked.id);
     match answer {
-        Some(true) => Ok(Done::new(
-            json!({ "answer": "yes", "project": project }),
-            "The person chose Go ahead.\n".to_string(),
-        )),
+        Some(true) => {
+            let mut out = format!(
+                "The person chose Go ahead, for exactly this plan (fingerprint {}). If the plan changes, ask again.\n",
+                asked.fingerprint
+            );
+            if let (Some(root), Some(id)) = (&root, task) {
+                let task = allomos_store::record_approval(
+                    root,
+                    Actor::alm(cli.holder.as_deref()),
+                    lock_wait(),
+                    id,
+                    title,
+                    &asked.fingerprint,
+                )?;
+                out.push_str(&format!("Recorded in {}'s history.\n", task.id));
+            }
+            Ok(Done::new(
+                json!({ "answer": "yes", "project": project, "fingerprint": asked.fingerprint, "task": task }),
+                out,
+            ))
+        }
         Some(false) => Err(Problem::ConfirmDeclined),
         None => Err(Problem::ConfirmTimeout {
             seconds: timeout.to_string(),
@@ -1165,10 +1454,13 @@ fn confirm(cli: &Cli, cwd: &Path, title: &str, plan: &Path, timeout: u64) -> Res
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Pull first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and run the Git commands it prints right away: until your claim is pushed, other sessions do not see it.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
-    serde_json::to_value(t).expect("tasks serialize")
+    let mut v = serde_json::to_value(t).expect("tasks serialize");
+    // The version an agent passes back with `--expected-version` (Task-A01-57).
+    v["version"] = json!(ops::task_version(t));
+    v
 }
 
 /// A task for `--json` reading commands: with each blocker's current state when it is blocked.
@@ -1247,12 +1539,12 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
         return format!(
             "Project notes: this taskbag has no {} yet ({}).\n",
             n.file,
-            n.path.display()
+            plain_path(&n.path).display()
         );
     }
     let mut text = format!(
         "Project notes ({}, last changed {}):\n",
-        n.path.display(),
+        plain_path(&n.path).display(),
         n.changed.as_deref().unwrap_or("unknown")
     );
     for (name, section) in [("Running", &n.running), ("Pitfalls", &n.pitfalls)] {
@@ -1271,6 +1563,21 @@ fn notes_lines(n: &handoff::ProjectNotes) -> String {
             }
         }
     }
+    // Where the code and the taskbag are kept online, for an agent working from a copy elsewhere
+    // (Task-A03-30). alm reads no remote; the agent fills the section from its own Git remotes.
+    match n.repositories.as_deref() {
+        None => text.push_str(&format!(
+            "Repositories: no such section. Add `## Repositories` to {} with where the code and this taskbag are kept online (each folder's remote repository, the address only; in Git: its remote), so an agent working from a copy elsewhere, in the cloud for example, finds both.\n",
+            n.file
+        )),
+        Some([]) => text.push_str("Repositories: none named.\n"),
+        Some(items) => {
+            text.push_str("Repositories:\n");
+            for item in items {
+                text.push_str(&format!("  - {item}\n"));
+            }
+        }
+    }
     text
 }
 
@@ -1284,7 +1591,7 @@ fn notes_reminder(n: &handoff::ProjectNotes) -> String {
     format!(
         "If what is running or a pitfall changed, update `{}` too ({when}): {}\n",
         n.file,
-        n.path.display()
+        plain_path(&n.path).display()
     )
 }
 
@@ -1295,7 +1602,7 @@ fn rules_line(r: &allomos_core::AppliedRules) -> String {
         .map(|n| format!(" (override for {n})"))
         .unwrap_or_default();
     format!(
-        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}.\n",
+        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}. Each time you check your quota for this gate, report the figure you read: `alm quota --agent <your agent's id> --left <percent> [--resets <when>]` (the Allomos app shows it).\n",
         r.quota_gate, r.context_gate, r.write_when
     )
 }
@@ -1554,7 +1861,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             title,
             plan,
             timeout,
-        } => confirm(cli, cwd, title, plan, *timeout),
+            evidence,
+            task,
+        } => confirm(
+            cli,
+            cwd,
+            title,
+            plan,
+            *timeout,
+            evidence.as_deref(),
+            task.as_deref(),
+        ),
         Command::Progress {
             title,
             step,
@@ -1591,6 +1908,55 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 json!({ "progress": p, "project": project }),
                 text,
             ))
+        }
+        Command::Quota {
+            agent,
+            account,
+            left,
+            resets,
+            window,
+        } => {
+            let reports = match (agent, left) {
+                (Some(agent), Some(left)) => {
+                    let report = allomos_store::new_quota_report(
+                        agent,
+                        account.as_deref(),
+                        window,
+                        *left,
+                        resets.as_deref(),
+                    )?;
+                    allomos_store::save_quota(report).map_err(|e| Problem::WriteFailed {
+                        path: "quota.json".to_string(),
+                        detail: e.to_string(),
+                    })?
+                }
+                _ => allomos_store::quota_reports(),
+            };
+            let mut text = String::new();
+            if agent.is_some() {
+                text.push_str("Reported. Kept on this computer only: nothing to save or share.\n");
+            }
+            for r in &reports {
+                text.push_str(&format!(
+                    "{}{}  {}  {}% left{}  (reported {})\n",
+                    r.agent,
+                    r.account
+                        .as_deref()
+                        .map(|a| format!(" ({a})"))
+                        .unwrap_or_default(),
+                    r.window,
+                    r.left,
+                    r.resets
+                        .as_deref()
+                        .map(|t| format!(", resets {t}"))
+                        .unwrap_or_default(),
+                    r.at
+                ));
+            }
+            if reports.is_empty() {
+                text.push_str("No quota reported on this computer yet.\n");
+            }
+            Ok(Done::new(json!({ "reports": reports }), text))
         }
         Command::Brief => {
             // With a taskbag, the section names it when it is outside the project folder.
@@ -1955,10 +2321,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     if let Some(c) = &added.base {
                         text.push_str(&format!("  base branch: {}\n", c.english()));
                     }
+                    // What to do next, in the task language: plan it, then make it ready
+                    // unless something is the person's to decide (Task-A03-33).
+                    let system: Vec<String> = sys_locale::get_locales().collect();
+                    let (language, iterations) = match taskbag_of(&root, load(&root)) {
+                        Ok((bag, _)) => (
+                            task_language(&bag.project, &system).language,
+                            bag.iterations.iter().map(iteration_heading).collect(),
+                        ),
+                        Err(_) => ("en".to_string(), Vec::new()),
+                    };
+                    let steps = allomos_store::added_task_steps(&language, &task.id, &iterations);
                     let mut done = Done::new(
-                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base }),
+                        json!({ "taskbag": root, "task": task_json(&task), "base": added.base, "next_steps": steps }),
                         text,
                     );
+                    done.after = steps;
                     done.warnings = added.warnings;
                     (done, added.issues)
                 }
@@ -2178,6 +2556,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("handoff note", task.handoff_note.as_deref()),
                 ("not human-checked", task.without_human_check.as_deref()),
             ];
+            // For `alm title` / `alm describe --expected-version` (Task-A01-57).
+            let version = ops::task_version(&task);
             for (name, value) in fields {
                 if let Some(v) = value {
                     text.push_str(&format!("{name}: {v}\n"));
@@ -2186,6 +2566,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(steps) = &task.human_check_steps {
                 text.push_str(&format!("human check steps:\n{}", indent(steps)));
             }
+            text.push_str(&format!("version: {version}\n"));
             let branches = allomos_store::branches(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
@@ -2342,8 +2723,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 });
                 blocked.push(task_json_in(&bag, t));
             }
-            // Card files (Task-A00-30): alm looks for none; it says what agents reported, or
-            // asks the agent to look.
+            // Card files (Task-A00-30): what the tasks' `Card:` links point to outside the
+            // taskbag and what agents reported; nothing when there are none (Task-A03-34).
             let outside = allomos_store::cards::outside(&root);
             let cards = next_cards_line(outside.len());
             text.push_str(&cards);
@@ -2365,7 +2746,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "handoff_rules": rules,
                     "project_notes": notes,
                     "cards_outside": outside,
-                    "cards": cards.trim_end(),
+                    "cards": if cards.is_empty() { Value::Null } else { json!(cards.trim_end()) },
                 }),
                 text,
             );
@@ -2479,6 +2860,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             Ok(done)
         }
         Command::Checked { id } => change(cli, cwd, |bag| ops::checked(bag, id)),
+        Command::Recheck { id, reason, steps } => {
+            let steps = match steps {
+                Some(file) => {
+                    let path = cwd.join(file);
+                    Some(
+                        std::fs::read_to_string(&path).map_err(|e| Problem::ReadFailed {
+                            detail: format!("{}: {e}", path.display()),
+                        })?,
+                    )
+                }
+                None => None,
+            };
+            change(cli, cwd, |bag| {
+                ops::recheck(bag, id, reason, steps.as_deref())
+            })
+        }
         Command::AiDecided { id, text } => {
             let root = locate(cli, cwd)?;
             let d = allomos_store::record_ai_decision(
@@ -2535,8 +2932,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 done
             })
         }
-        Command::Title { id, title } => change(cli, cwd, |bag| ops::set_title(bag, id, me, title)),
-        Command::Describe { id, text, from } => {
+        Command::Title {
+            id,
+            title,
+            expected_version,
+        } => change(cli, cwd, |bag| {
+            ops::check_version(bag, id, expected_version.as_deref())?;
+            ops::set_title(bag, id, me, title)
+        }),
+        Command::Describe {
+            id,
+            text,
+            from,
+            expected_version,
+        } => {
             // `--text` and `--from` exclude each other, and one of them is required.
             let text = match from {
                 Some(file) => {
@@ -2547,7 +2956,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => text.clone().unwrap_or_default(),
             };
-            change(cli, cwd, |bag| ops::set_description(bag, id, me, &text))
+            change(cli, cwd, |bag| {
+                ops::check_version(bag, id, expected_version.as_deref())?;
+                ops::set_description(bag, id, me, &text)
+            })
         }
         Command::Cards { what } => {
             let root = locate(cli, cwd)?;
@@ -2707,7 +3119,7 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
         .push_str(&format!("  base branch: {base} ({why})\n"));
     let Some(working) = at.branches.working.as_deref() else {
         steps.text.push_str(&format!(
-            "Start from {base} and merge back into {base}. Claim it again with --branch <the branch you are on> for the Git commands.\n"
+            "Start from {base} and merge back into {base}. Claim it again with --branch <the branch you are on> for the steps (with the Git commands as the example).\n"
         ));
         return steps;
     };
@@ -2720,11 +3132,13 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
     match working {
         Some(w) if w != base => {
             let wq = quoted(w);
+            // Always in a worktree of its own (Task-A03-38): the main checkout stays on the
+            // base, so the merge runs there and the worktree is removed afterwards.
             if current != Some(w) {
                 steps.start = vec![
                     format!("git switch {b}"),
                     "git pull --ff-only".to_string(),
-                    format!("git switch -c {wq}"),
+                    format!("git worktree add <folder> -b {wq} {b}"),
                 ];
             }
             steps.merge = vec![
@@ -2732,6 +3146,8 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
                 "git pull --ff-only".to_string(),
                 format!("git merge {wq}"),
                 "git push".to_string(),
+                "git worktree remove <folder>".to_string(),
+                format!("git branch -d {wq}"),
             ];
         }
         _ => {
@@ -2739,6 +3155,9 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
                 steps.start.push(format!("git switch {b}"));
             }
             steps.start.push("git pull --ff-only".to_string());
+            steps.facts.push(format!(
+                "Your working branch is {base}, the task's base. Work every task in a worktree of its own, on a branch of its own: claim again with --working <new branch>."
+            ));
         }
     }
     if let Some(c) = current.filter(|c| *c != base) {
@@ -2747,7 +3166,7 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
             .push(format!("You are on {c}, not on {base}, the task's base."));
     }
     steps.text.push_str(&format!(
-        "Start from {base} and merge back into {base} (alm runs no Git; these are for you):\n"
+        "Start from {base} and merge back into {base} (alm runs no version control tool; for Git, these are the commands):\n"
     ));
     if steps.start.is_empty() {
         steps
@@ -2758,21 +3177,20 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
         for c in &steps.start {
             steps.text.push_str(&format!("    {c}\n"));
         }
-        if let Some(w) = working.filter(|w| *w != base) {
-            steps.text.push_str(&format!(
-                "    (or in a worktree of its own: git worktree add <folder> -b {} {b})\n",
-                quoted(w)
-            ));
+        if working.is_some_and(|w| w != base) {
+            steps.text.push_str(
+                "    (run these in the main checkout, which stays on the base; then work in <folder>)\n",
+            );
         }
     }
     if steps.merge.is_empty() {
         steps.text.push_str(&format!(
-            "  You work on {base} itself: commit and push there; there is nothing to merge.\n"
+            "  You work on {base} itself: save and share your changes there (in Git: commit and push); there is nothing to merge.\n"
         ));
     } else {
         steps
             .text
-            .push_str("  When the task is done, merge it into its base:\n");
+            .push_str("  When the task is done, merge it into its base, in the main checkout:\n");
         for c in &steps.merge {
             steps.text.push_str(&format!("    {c}\n"));
         }
@@ -2883,13 +3301,14 @@ kept in the project folder. If you find others, report them with `alm cards foun
 }
 
 /// `alm next`'s line about card files (Task-A00-30): the ones still outside the taskbag (linked
-/// or reported), or, when none are, the request to look.
+/// or reported). None are: no line at all (Task-A03-34, approver 2026-10-20), so `alm next`
+/// prints only what is useful.
 fn next_cards_line(outside: usize) -> String {
     if outside > 0 {
         format!(
             "Card files: {outside} task(s) keep their card files in the project folder (`alm cards`): propose moving them in beside their tasks, following `alm guide move-cards`.\n"
         )
     } else {
-        "Card files: if tasks link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and propose moving them in (`alm guide move-cards`).\n".to_string()
+        String::new()
     }
 }

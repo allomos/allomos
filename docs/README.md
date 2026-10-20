@@ -8,12 +8,12 @@
 |---|---|---|
 | [TASK_BOARD.md](./TASK_BOARD.md) | Now and what waits on the owner. Card status lives in the taskbag (`../allomos-taskbag/.allomos/taskbag/`, read with `alm list` or the app). | status |
 | taskbag `handoffs/` and `project-notes.md` (in `../allomos-taskbag/.allomos/taskbag/`, outside this repository) | Each session's handoff (`alm handoffs`), and what every session must know: running, pitfalls, where credentials live, current truth. Replaced `AGENT_HANDOFF.md` on 2026-10-12 | handoff |
-| [guide/](./guide/) | The user guide in English, Chinese and Japanese, built with Astro Starlight; published at https://mypals-ml.github.io/allomos/ once approved (`A07-10`) | user guide |
+| [guide/](./guide/) | The user guide in English, Chinese and Japanese, built with Astro Starlight; published at https://allomos.github.io/allomos/ once approved (`A07-10`) | user guide |
 | taskbag `tasks/<id>/description.md` (outside this repository) | Each task's full detail: outcome, details, rules, approvals, and evidence under an **Evidence** heading (`alm show <id>`, written with `alm describe`). Replaced the card files in `docs/tasks/` on 2026-10-16 (`A00-30`); those card files now sit beside their tasks as `tasks/<id>/card.md`, linked from the description (2026-10-17) | tasks |
 | **product/** | | |
 | [product/PLAN.md](./product/PLAN.md) | Problem, goals, data model, views, burndown, architecture, milestones | plan |
 | [product/REQUIREMENTS.md](./product/REQUIREMENTS.md) | Numbered requirements (R1…) cited by cards and tests | contract |
-| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Allomos project; proposed validation/adoption rules | contract |
+| [product/AI-GENERATED-PROJECTS.md](./product/AI-GENERATED-PROJECTS.md) | Leader → supplied prompt → external agent → generated files → Allomos project; proposed validation/adoption rules; **dropped** 2026-10-20 (Build a new app… is enough) | record |
 | [product/INTERFACES.md](./product/INTERFACES.md) | Human desktop/mobile scope, browser/CLI consideration and proposed shared task operations for GUI, agents and imports | contract |
 | **workflow/** | | |
 | [workflow/CODING_RULES.md](./workflow/CODING_RULES.md) | Rules for this repository's code: layout, versions, checks, how `alm` behaves, running and building the app. How agents work is told by `alm` and [AGENTS.md](../AGENTS.md) | contract |

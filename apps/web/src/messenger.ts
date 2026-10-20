@@ -8,7 +8,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, LastAgent, IterationChange, NewIteration, NewTask, NextIds, Opened, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+
+/** What the About window shows of the app itself (Task-A07-28). */
+export interface AboutInfo {
+  name: string;
+  version: string;
+}
 
 export interface Messenger {
   /** A folder given when Allomos was started, if any. Rejects with a Problem when the given path is not a folder. */
@@ -156,14 +162,24 @@ export interface Messenger {
   writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
+  /** The About window (Task-A07-28): the app's name and version. */
+  aboutInfo(): Promise<AboutInfo>;
+  /** The About window's link: www.allomos.com in the default browser. */
+  openWebsite(): Promise<void>;
+  /** Close the calling window (the About window's Escape key). */
+  closeWindow(): Promise<void>;
   /** Whether a newer Allomos is on GitHub (Task-A07-16); `asked` from Check for Updates…. */
   updateStatus(asked: boolean): Promise<UpdateStatus>;
   /** "Skip this version" on the update notice. */
   skipUpdate(version: string): Promise<void>;
   /** Calls `handler` when Check for Updates… is chosen. */
   onCheckUpdatesMenu(handler: () => void): Promise<() => void>;
-  /** The update menu item's words; `known` makes it open the download page. */
-  setUpdateItem(text: string, known: boolean): Promise<void>;
+  /** The update menu item's words and what it does when chosen. */
+  setUpdateItem(text: string, action: "check" | "download" | "restart"): Promise<void>;
+  /** Calls `handler` when a newer version's installer is downloaded and checked (Task-A07-17). */
+  onUpdateReady(handler: () => void): Promise<() => void>;
+  /** Calls `handler` when Restart to Update could not install the new version. */
+  onUpdateFailed(handler: (problem: Problem) => void): Promise<() => void>;
   /** Whether to offer **Install the alm command** (Task-A07-12). */
   almCommandStatus(): Promise<AlmStatus>;
   /** Links the app's own `alm` into Terminal's path, asking for the Mac password. Rejects with a Problem. */
@@ -173,6 +189,8 @@ export interface Messenger {
   dismissAlmOffer(mismatch: string): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
+  /** Each agent account's quota as the agents reported it (`alm quota`), newest first (Task-A03-02). */
+  quotaReports(): Promise<QuotaReport[]>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
   /** What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08). */
@@ -180,7 +198,8 @@ export interface Messenger {
   /** The person closed a finished (or silent) report: remove it. */
   dismissProgress(project: string, id: string): Promise<void>;
   /** The person's answer to one of them. Rejects with a Problem when it is no longer waiting. */
-  answerConfirm(project: string, id: string, yes: boolean): Promise<void>;
+  /** A Go ahead names the fingerprint of what the person was shown, so it counts only for that plan (Task-A03-37). */
+  answerConfirm(project: string, id: string, yes: boolean, fingerprint?: string): Promise<void>;
   /** The open-folder flow's state for the taskbag at `root` (records the project folder when it is beside `.allomos/`). */
   projectSetup(root: string): Promise<SetupState>;
   /** Records `folder` as the project folder of the taskbag at `root`. Rejects with a Problem. */
@@ -244,12 +263,18 @@ export const desktopMessenger: Messenger = {
   agentsSetUp: (taskbag) => invoke<string[]>("agents_set_up", { taskbag }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
+  quotaReports: () => invoke<QuotaReport[]>("quota_reports"),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),
+  aboutInfo: () => invoke<AboutInfo>("about_info"),
+  openWebsite: () => invoke<void>("open_website"),
+  closeWindow: () => invoke<void>("close_window"),
   updateStatus: (asked) => invoke<UpdateStatus>("update_status", { asked }),
   skipUpdate: (version) => invoke<void>("skip_update", { version }),
-  setUpdateItem: (text, known) => invoke<void>("set_update_item", { text, known }),
+  setUpdateItem: (text, action) => invoke<void>("set_update_item", { text, action }),
+  onUpdateReady: (handler) => getCurrentWebviewWindow().listen("update:ready", () => handler()),
+  onUpdateFailed: (handler) => getCurrentWebviewWindow().listen<Problem>("update:failed", (e) => handler(e.payload)),
   onCheckUpdatesMenu: (handler) => getCurrentWebviewWindow().listen("menu:check_updates", () => handler()),
   almCommandStatus: () => invoke<AlmStatus>("alm_command_status"),
   installAlmCommand: () => invoke<AlmInstalled>("install_alm_command"),
@@ -285,7 +310,8 @@ export const desktopMessenger: Messenger = {
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   progressReports: (project) => invoke<Progress[]>("progress_reports", { project }),
   dismissProgress: (project, id) => invoke<void>("dismiss_progress", { project, id }),
-  answerConfirm: (project, id, yes) => invoke<void>("answer_confirm_request", { project, id, yes }),
+  answerConfirm: (project, id, yes, fingerprint) =>
+    invoke<void>("answer_confirm_request", { project, id, yes, fingerprint: fingerprint ?? null }),
   projectSetup: (root) => invoke<SetupState>("project_setup", { root }),
   setProjectFolder: (root, folder) => invoke<SetupState>("set_project_folder", { root, folder }),
   setConnectEnabled: (enabled) => invoke<void>("set_connect_enabled", { enabled }),

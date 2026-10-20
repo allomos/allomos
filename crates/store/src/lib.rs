@@ -33,23 +33,29 @@ pub mod events;
 mod guide;
 pub mod handoff;
 pub mod progress;
+mod quota;
 mod settings;
 mod setup;
 mod update_taskbag;
 pub mod versions;
 pub use confirm::{
-    ConfirmRequest, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm, pending_confirms, post_confirm,
-    read_answer, requests_dir, was_seen, withdraw_confirm,
+    ConfirmRequest, Extra as ConfirmExtra, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm,
+    pending_confirms, post_confirm, read_answer, requests_dir, shown_fingerprint, was_seen,
+    withdraw_confirm,
 };
 pub use convert::{
     CONNECT_REQUEST_VERSION, CONVERT_REQUEST_VERSION, MOVE_IN_REQUEST_VERSION,
-    agent_connect_request_in, agent_convert_request_in, agent_move_in_request_in,
-    agent_move_tasks_in_request_in,
+    agent_connect_request_in, agent_connect_request_with, agent_convert_request_in,
+    agent_move_in_request_in, agent_move_tasks_in_request_in,
 };
 pub use events::Actor;
 pub use guide::{
-    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files, goal,
-    goal_request_in, guide, localized, run_modes,
+    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
+    agent_files, goal, goal_request_in, guide, localized, run_modes,
+};
+pub use quota::{
+    QuotaReport, WINDOWS as QUOTA_WINDOWS, new_report as new_quota_report, quota_reports,
+    save_quota,
 };
 pub use settings::{
     TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, pick_ui_language,
@@ -179,7 +185,7 @@ This folder is an Allomos project. Its tasks, areas and progress are in
 - Open this folder in the Allomos app to see the tasks by area.
 - AI agents and people can also work the tasks from a terminal with the `alm` command
   (`alm list`, `alm next`, `alm claim <task>`).
-- The files are plain JSON and Markdown, so Git can track every change.
+- The files are plain JSON and Markdown, so a version control tool (Git, for example) can track every change.
 
 Allomos wrote this file because the folder was empty. You may edit or delete it.
 ";
@@ -192,7 +198,7 @@ const README_ZH_CN: &str = "# 换肩项目
 - 在「换肩」应用中打开此文件夹，即可按领域查看任务。
 - AI 智能体和人也可以在终端中用 `alm` 命令处理任务
   （`alm list`、`alm next`、`alm claim <任务>`）。
-- 这些文件是普通的 JSON 和 Markdown，Git 可以记录每一处更改。
+- 这些文件是普通的 JSON 和 Markdown，版本控制工具（例如 Git）可以记录每一处更改。
 
 此文件夹原本是空的，所以「换肩」写了这个文件。你可以修改或删除它。
 ";
@@ -205,7 +211,7 @@ const README_JA: &str = "# 肩代プロジェクト
 - 「肩代」アプリでこのフォルダーを開くと、タスクをエリアごとに見られます。
 - AI エージェントや人は、ターミナルの `alm` コマンドでもタスクを扱えます
   （`alm list`、`alm next`、`alm claim <タスク>`）。
-- ファイルはただの JSON と Markdown なので、Git ですべての変更を記録できます。
+- ファイルはただの JSON と Markdown なので、バージョン管理ツール（たとえば Git）ですべての変更を記録できます。
 
 このフォルダーが空だったので、「肩代」がこのファイルを書きました。編集や削除は自由です。
 ";
@@ -247,11 +253,17 @@ the project notes (below) and your own handoff file.
 - Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
   rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
   Pitfalls), or `alm list`.
-- Take a task: pull first, then `alm claim <id> --as <your session name> --branch <the branch
-  you are on>` (`git branch --show-current`), and run the Git commands it prints right away:
-  until your claim is pushed, other sessions do not see it. Every task has a base branch, by its
-  real name: it starts from it and merges back into it; the claim records your working branch
-  and prints the base to start from and merge into, with the Git commands.
+- Take a task: get the latest changes first, then `alm claim <id> --as <your session name>
+  --branch <the branch you are on>` (as your version control tool shows it; in Git:
+  `git branch --show-current`), and save and share the claim right away with your version
+  control tool (it prints the Git commands as the example): until your claim is shared, other
+  sessions do not see it. Every task has a base branch, by its real name: it starts from it and
+  merges back into it; the claim records your working branch and prints the base to start from
+  and merge into, with the Git commands as the example.
+- Always work a task in a worktree of its own (a separate working copy on the task's own
+  branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
+  prints), never in the main checkout: the main checkout stays on the base branch. Merge from
+  the main checkout; once merged, remove your worktree and the merged branch.
 - Report progress: `alm label <id> \"<label>\"`.
 - Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
   another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
@@ -267,16 +279,22 @@ the project notes (below) and your own handoff file.
   advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
   iterations and make your own tasks ready. Anything with an outside effect still waits for the
   approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
-- Finished: only at the top label (a person has checked it: the human check): `alm done <id>`.
-  In an automatic or loop run the person set up to go on without them (quiet mode), you
-  may finish below it with `alm done <id> --without-human-check \"<why, which run>\"
-  --steps <file.md>` (the steps tell a person how to check it); say so in your handoff.
-  In such a run (a quiet run), never stop to wait for the person: decide a routine choice
-  yourself (below); park a real question with `alm wait <id> --on \"<the question>\"` (it shows in
-  `alm human`, To answer) and go on with the next ready task; do not use `alm confirm` (it would
-  wait until it times out).
+- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
+  When the work is finished and only a person's hands-on check is left, in quiet and normal
+  mode alike, finish it below the top label with `alm done <id> --without-human-check \"<why>\"
+  --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
+  `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
+  a real question, an approval or an outside effect.
+  In an automatic or loop run the person set up to go on without them (a quiet run), never
+  stop to wait for the person: decide a routine choice yourself (below); park a real question
+  with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`, To answer) and go on
+  with the next ready task; do not use `alm confirm` (it would wait until it times out).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
-  says they checked one: `alm checked <id>`.
+  says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
+  it back to To check with `alm recheck <id> --reason \"<what changed>\"`.
+- Approvals: when you ask the person to approve a plan with `alm confirm`, show the evidence
+  (`--evidence <file.md>`) and name the task (`--task <id>`). A Go ahead covers only the plan
+  shown; if the plan changes afterwards, ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each one with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it
@@ -300,6 +318,10 @@ the project notes (below) and your own handoff file.
 - Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
   `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
   Whoever continues reads it with `alm next` or `alm show <id>`.
+- Quota: each time you check your quota for the handoff gate, report the figure you just read
+  with `alm quota --agent <your agent's id, e.g. claude-code or codex> --left <percent>
+  [--resets <local date and time>] [--account <name, only if you can tell one; never an email>]`;
+  the Allomos app shows it beside the agent. It stays on this computer: nothing to share.
 
 Shared rules: every AI agent on this project follows one set of shared rules, in AGENTS.md.
 - Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file (such as
@@ -309,19 +331,27 @@ Shared rules: every AI agent on this project follows one set of shared rules, in
   file does not point to AGENTS.md, run `alm guide agent-files` and do it once for yourself
   before other work.
 - After changing shared rules, tell the person which running sessions still use the old ones
-  (from the taskbag's holders, `alm list --state in_progress`, and `git worktree list`).
+  (from the taskbag's holders, `alm list --state in_progress`, and your version control tool's
+  working copies; in Git: `git worktree list`).
 
 Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
 task: what is running, pitfalls, where credentials live (never their values). Read it at the
 start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
 file aside), you edit it directly, and you keep it true while you work: update it when you start
-or stop a server or process, create or change a hosted resource or a Git remote, learn a pitfall
-that would change what the next session does, or a credential moves. Change lines in place and
-remove lines that are no longer true; then commit and push that file with Git yourself.
+or stop a server or process, create or change a hosted resource or a remote repository, learn a
+pitfall that would change what the next session does, or a credential moves. Change lines in
+place and remove lines that are no longer true; then save and share that file with your version
+control tool yourself.
+Personal details are kept out like credentials: never write a person's or an account's email
+address, account or user name, phone number, home address or local network address into the
+project notes, a handoff, a task, a document or the code. Write a placeholder such as
+`<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
+version history keeps whatever was written, even after it is removed.
 
-`alm` never runs Git. After every change it prints the Git commands that share it (`git add`,
-`git commit`, `git push`), naming only that change's files: run them, and leave other changes as
-they are.
+`alm` never runs your version control tool. After every change it lists the changed files for
+you to save and share with your version control tool, with the Git commands as the example
+(`git add`, `git commit`, `git push`), naming only that change's files: save and share those,
+and leave other changes as they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
@@ -361,8 +391,41 @@ pub(crate) fn section_source(language: &str, taskbag: &Path) -> String {
 }
 
 /// [`agent_section`], plus where the taskbag is when it is not inside `project` (written relative
-/// to `project`, so the file works on every computer that has both folders side by side).
+/// to `project`, so the file works on every computer that has both folders side by side), plus
+/// where the code and the taskbag are kept online when the project notes say (Task-A03-30).
 pub fn agent_section_for(project: &Path, taskbag: &Path) -> String {
+    format!(
+        "{}{}",
+        taskbag_place(project, taskbag),
+        repositories_lines(
+            &handoff::project_notes(taskbag)
+                .repositories
+                .unwrap_or_default()
+        )
+    )
+}
+
+/// The lines naming where the code and the taskbag are kept online (the project notes'
+/// `## Repositories` items, as written), for a copy without its taskbag beside it, as an agent in
+/// the cloud has (Task-A03-30). Empty when the notes name none.
+pub fn repositories_lines(items: &[String]) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    let mut list = String::new();
+    for item in items {
+        list.push_str(&format!("- {item}\n"));
+    }
+    format!(
+        "
+Where this project is kept online (the project notes' `## Repositories`). Working from a copy
+without the taskbag beside it, in the cloud for example, clone what is missing from here:
+{list}"
+    )
+}
+
+/// [`agent_section`], plus where the taskbag is when it is not inside `project`.
+fn taskbag_place(project: &Path, taskbag: &Path) -> String {
     let section = agent_section();
     // Tidy `.` and `..` first: `/work/app/../tasks` is not inside `/work/app`.
     let (project, taskbag) = (&tidy(project), &tidy(taskbag));
@@ -382,7 +445,7 @@ This project's taskbag is not inside this folder: it is at `{at}`. Run every `al
 }
 
 /// `path` without `.` and `..` parts, worked out from the text alone (the disk is not asked).
-fn tidy(path: &Path) -> PathBuf {
+pub fn tidy(path: &Path) -> PathBuf {
     let mut clean = PathBuf::new();
     for part in path.components() {
         match part {
@@ -417,11 +480,51 @@ pub fn agent_setup_request_in(language: &str, project_path: &Path, taskbag_path:
 /// The setup request's text without its last line (where Allomos's section comes from), so the
 /// connect request can carry it as its first part.
 pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: &Path) -> String {
+    setup_steps_with(language, project_path, taskbag_path, GitStep::Ask)
+}
+
+/// What the agent does when the project folder is not in a Git repository yet (Task-A03-35).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitStep {
+    /// Ask the person first (decision 0017): connecting a project, and normal goal runs.
+    Ask,
+    /// Run `git init` itself and record it as an AI decision: a quiet goal run (approver,
+    /// 2026-10-19), where a local repository is a routine choice, easy to undo.
+    Create,
+}
+
+/// [`setup_steps_in`] with the Git step chosen.
+pub(crate) fn setup_steps_with(
+    language: &str,
+    project_path: &Path,
+    taskbag_path: &Path,
+    git: GitStep,
+) -> String {
     let (project, taskbag, heading) = (
         shown(project_path),
         shown(taskbag_path),
         AGENT_SECTION_HEADING,
     );
+    let no_repo = match (language, git) {
+        ("zh-CN", GitStep::Ask) => {
+            "如果项目文件夹还没有纳入版本控制，先问用户是否要建立（用 Git 时：在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于版本控制的部分。"
+        }
+        ("zh-CN", GitStep::Create) => {
+            "如果项目文件夹还没有纳入版本控制，自己建立（用 Git 时：自己在项目文件夹中运行 `git init`），不要停下来问：这是安静模式的运行，本地仓库很容易撤销。等目标任务建好后，在它上面记下来：`alm ai-decided <目标任务的 ID> \"项目文件夹没有纳入版本控制，建立了版本控制（git init）\"`。"
+        }
+        ("ja", GitStep::Ask) => {
+            "プロジェクトのフォルダーがまだバージョン管理されていなければ、始めるかどうか（Git なら、プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下のバージョン管理の部分はすべて飛ばします。"
+        }
+        ("ja", GitStep::Create) => {
+            "プロジェクトのフォルダーがまだバージョン管理されていなければ、尋ねずに自分で始めます（Git なら、プロジェクトのフォルダーで `git init` を実行します）。静かなモードの実行で、ローカルのリポジトリは簡単に元に戻せるからです。ゴールのタスクができたら、そのタスクに記録します：`alm ai-decided <ゴールのタスクの ID> \"プロジェクトのフォルダーがバージョン管理されていなかったので始めた（git init）\"`。"
+        }
+        (_, GitStep::Ask) => {
+            "If the project folder is not under version control yet, ask the person whether to set it up (for Git: `git init` in the project folder); if they say no, skip every version control part below."
+        }
+        (_, GitStep::Create) => {
+            "If the project folder is not under version control yet, set it up yourself (for Git: `git init` in the project folder) without stopping to ask: this run is quiet, and a local repository is easy to undo. Once the goal task exists, record it on that task: `alm ai-decided <goal task id> \"The project folder was not under version control, so I set it up (git init)\"`."
+        }
+    };
     match language {
         "zh-CN" => format!(
             "Allomos 已为这个项目建立了任务包。现在请把它告诉以后的 AI 智能体。
@@ -431,13 +534,13 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 
 在项目文件夹中：
 
-1. Git：Allomos 自己从不运行 Git。如果项目文件夹不在 Git 仓库中，先问用户是否要建立一个（在项目文件夹中运行 `git init`）；用户不同意，就跳过下面所有关于 Git 的部分。在 Git 仓库中，先单独提交任务包和它的改动（包括记录的项目文件夹）：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要推送）。
+1. 版本控制：Allomos 自己从不运行版本控制工具。{no_repo}在版本控制下，先用你的版本控制工具单独保存任务包和它的改动（包括记录的项目文件夹），用 Git 时：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（如果 Allomos 在 `.allomos/` 旁边留下了 README-allomos.md，在两条命令末尾都加上 `../../README-allomos.md`；不要带上其他文件，也不要共享（推送））。
 2. 打开 AGENTS.md（如果没有就新建）。
 3. 如果 AGENTS.md 已经有关于 Allomos 的说明（例如标题为“{heading}”的一节，或其他关于 Allomos 或 `alm` 的文字），用 Allomos 的一节（见最后一行）替换它们；否则添加这一节。
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
 5. 共用规则放进 AGENTS.md，每个智能体做一次：运行 `alm --taskbag \"{taskbag}\" guide agent-files` 并照做，为你自己，也为项目里已有的每个智能体规则文件（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` 之类；这些只是例子）。共用规则移到 AGENTS.md；每个智能体自己的文件只保留指向 AGENTS.md 的一行和真正属于它自己的内容；互相矛盾的规则不要替用户选，列出来问用户；把每个智能体记在任务包 project-notes.md 的 `## Agents set up` 一节下。CLAUDE.md 要包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到任何智能体自己的文件里。
-6. 如果项目是 Git 仓库，只提交 AGENTS.md、CLAUDE.md 和你改过的其他智能体文件，作为一次提交：`git -C \"{project}\" add AGENTS.md CLAUDE.md <你改过的其他智能体文件> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <你改过的其他智能体文件>`；再在任务包里只提交项目笔记：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。其他改动保持原样；除非用户要求，不要推送。
-7. 告诉用户你改了什么，以及你做的提交。"
+6. 如果项目在版本控制下，用你的版本控制工具只保存 AGENTS.md、CLAUDE.md 和你改过的其他智能体文件，作为一次改动，用 Git 时：`git -C \"{project}\" add AGENTS.md CLAUDE.md <你改过的其他智能体文件> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <你改过的其他智能体文件>`；再在任务包里只保存项目笔记，用 Git 时：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。其他改动保持原样；除非用户要求，不要共享（推送）。
+7. 告诉用户你改了什么，以及你保存的改动（提交）。"
         ),
         "ja" => format!(
             "Allomos がこのプロジェクトのタスクバッグを用意しました。これからの AI エージェントにそれを伝えてください。
@@ -447,13 +550,13 @@ pub(crate) fn setup_steps_in(language: &str, project_path: &Path, taskbag_path: 
 
 プロジェクトのフォルダーで：
 
-1. Git：Allomos 自身は Git を一切実行しません。プロジェクトのフォルダーが Git リポジトリの中になければ、作るかどうか（プロジェクトのフォルダーで `git init`）をユーザーに尋ねます。断られたら、以下の Git の部分はすべて飛ばします。リポジトリの中なら、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをコミットします：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、プッシュもしません）。
+1. バージョン管理：Allomos 自身はバージョン管理ツールを一切実行しません。{no_repo}バージョン管理されていれば、まずタスクバッグ（記録されたプロジェクトのフォルダーを含む）だけをバージョン管理ツールで保存します。Git なら：`git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .`（Allomos が `.allomos/` の隣に README-allomos.md を残していれば、両方のコマンドの最後に `../../README-allomos.md` を加えます。ほかのファイルは入れず、共有（プッシュ）もしません）。
 2. AGENTS.md を開きます（なければ作成します）。
 3. AGENTS.md にすでに Allomos の説明（たとえば「{heading}」という見出しの節や、Allomos または `alm` についてのほかの文）があれば、Allomos の節（最後の行を参照）で置き換えます。なければその節を追加します。
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
 5. 共通ルールを AGENTS.md に置きます（エージェントごとに一度）：`alm --taskbag \"{taskbag}\" guide agent-files` を実行してそのとおりに行います。自分自身について、そしてプロジェクトにすでにあるすべてのエージェント用ルールファイル（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` など。これは例です）について。共通ルールは AGENTS.md に移し、各エージェント自身のファイルには AGENTS.md を指す行と本当にそのエージェントだけのことを残します。食い違うルールはどちらも選ばず、ユーザーに示して尋ねます。各エージェントをタスクバッグの project-notes.md の `## Agents set up` の節に記録します。CLAUDE.md には AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があるようにします（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節をどのエージェント自身のファイルにもコピーしないでください。
-6. プロジェクトが Git リポジトリなら、AGENTS.md、CLAUDE.md、変えたほかのエージェントのファイルだけを一つのコミットにします：`git -C \"{project}\" add AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル>`。続いてタスクバッグではプロジェクトノートだけをコミットします：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。ほかの変更はそのままにし、頼まれない限りプッシュしません。
-7. 何を変えたか、どんなコミットをしたかをユーザーに見せてください。"
+6. プロジェクトがバージョン管理されていれば、AGENTS.md、CLAUDE.md、変えたほかのエージェントのファイルだけを一つの変更としてバージョン管理ツールで保存します。Git なら：`git -C \"{project}\" add AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル>`。続いてタスクバッグではプロジェクトノートだけを保存します。Git なら：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。ほかの変更はそのままにし、頼まれない限り共有（プッシュ）しません。
+7. 何を変えたか、どんな変更を保存（コミット）したかをユーザーに見せてください。"
         ),
         _ => format!(
             "Allomos has set up this project's taskbag. Please now tell future AI agents about it.
@@ -463,12 +566,11 @@ Taskbag (Allomos's task files): {taskbag}
 
 In the project folder:
 
-1. Git: Allomos itself never runs Git. If the project folder is not in a Git repository, ask \
-the person whether to set one up (`git init` in the project folder); if they say no, skip every Git \
-part below. In a repository, first commit the taskbag on its own, with its changes so far (the \
-recorded project folder too): `git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` \
+1. Version control: Allomos itself never runs your version control tool. {no_repo} Under version control, first save the taskbag \
+on its own in your version control tool, with its changes so far (the recorded project folder too); \
+for Git: `git -C \"{taskbag}\" add -- . && git -C \"{taskbag}\" commit -m \"Add Allomos taskbag\" -- .` \
 (add `../../README-allomos.md` to the end of both commands when Allomos left that file beside \
-`.allomos/`; never other files, and do not push).
+`.allomos/`; never other files, and do not share (push) it).
 2. Open AGENTS.md (create it if it is missing).
 3. If AGENTS.md already has Allomos instructions (for example a section headed \
 \"{heading}\", or any other text about Allomos or `alm`), replace them with \
@@ -485,13 +587,13 @@ person, who decides; each agent is recorded under `## Agents set up` in the task
 project-notes.md. CLAUDE.md must have the line that imports AGENTS.md (a plain ASCII at sign \
 followed by AGENTS.md), so Claude Code reads AGENTS.md (create CLAUDE.md with just that line if it \
 is missing). Do not copy the section into any agent's own file.
-6. If the project is a Git repository, commit only AGENTS.md, CLAUDE.md and the other agent files \
-you changed, as one commit: `git -C \"{project}\" add AGENTS.md CLAUDE.md <other agent files you \
+6. If the project is under version control, save only AGENTS.md, CLAUDE.md and the other agent \
+files you changed, as one change in your version control tool; for Git: `git -C \"{project}\" add AGENTS.md CLAUDE.md <other agent files you \
 changed> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md \
-<other agent files you changed>`; then, in the taskbag, only the project notes: \
+<other agent files you changed>`; then, in the taskbag, only the project notes; for Git: \
 `git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- \
-project-notes.md`. Leave every other change as it is; do not push unless the person asks.
-7. Show the user what you changed and the commits you made."
+project-notes.md`. Leave every other change as it is; do not share (push) unless the person asks.
+7. Show the user what you changed and the changes (commits) you saved."
         ),
     }
 }
@@ -1191,6 +1293,12 @@ pub struct Lock {
 }
 
 impl Lock {
+    /// Pack the history of whole earlier months from the 28th of a month (Task-A01-59):
+    /// [`events::pack`].
+    pub fn pack_history(&self) -> Result<Vec<events::Packed>, Problem> {
+        events::pack(&self.root)
+    }
+
     /// Take the lock, waiting up to `wait` for another writer to finish.
     pub fn acquire(root: &Path, wait: Duration) -> Result<Lock, Problem> {
         if !root.join(PROJECT_FILE).is_file() {
@@ -1900,6 +2008,35 @@ pub fn record_ai_decision(
     })
 }
 
+/// The field of the event that records a Go ahead in a task's history (Task-A03-37).
+pub const APPROVAL_FIELD: &str = "approval";
+
+/// Record in task `id`'s history that the person chose Go ahead on a plan shown through
+/// `alm confirm --task` (Task-A03-37): one `approved` event whose `approval` change holds the
+/// popup's title and the fingerprint of exactly what was shown, under the lock. The task's files
+/// do not change. A changed plan is a new question, so this counts only for that fingerprint.
+pub fn record_approval(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    title: &str,
+    fingerprint: &str,
+) -> Result<Task, Problem> {
+    let (lock, bag, _) = lock_for_change(root, wait)?;
+    let task = ops::find_task(&bag, id)?;
+    let change = allomos_core::event::Change {
+        field: APPROVAL_FIELD.to_string(),
+        from: None,
+        to: Some(serde_json::Value::String(format!(
+            "{title} (plan {fingerprint})"
+        ))),
+    };
+    let event = actor.event("approved", Kind::Task, Some(&task.id), vec![change]);
+    lock.record(&event, |_| Ok(()))?;
+    Ok(task)
+}
+
 /// Mark task `id`'s AI decisions reviewed (`alm reviewed`, the app's Reviewed button,
 /// Task-A03-19): one `reviewed` event listing each, under the lock. Refused with
 /// `nothing_to_review` when it has none. Overturning one is done by changing the task as usual.
@@ -1983,6 +2120,32 @@ mod tests {
             agent_section_for(&project, &project.join("./.allomos/taskbag")),
             agent_section()
         );
+    }
+
+    #[test]
+    fn the_section_names_the_repositories_the_project_notes_list() {
+        let base = tmp("brief-repos");
+        let (project, taskbag) = (base.join("app"), base.join("tasks/.allomos/taskbag"));
+        fs::create_dir_all(&project).unwrap();
+        init(&taskbag, "p", "P").unwrap();
+        // None listed yet: the section as before.
+        let plain = agent_section_for(&project, &taskbag);
+        assert!(!plain.contains("kept online"), "{plain}");
+        fs::write(
+            taskbag.join(handoff::NOTES_FILE),
+            "## Repositories\n\n- Code: https://github.com/o/app\n- Taskbag: https://github.com/o/app-tasks\n",
+        )
+        .unwrap();
+        let section = agent_section_for(&project, &taskbag);
+        assert!(section.starts_with(&plain), "{section}");
+        assert!(
+            section.ends_with(
+                "- Code: https://github.com/o/app\n- Taskbag: https://github.com/o/app-tasks\n"
+            ),
+            "{section}"
+        );
+        assert!(section.contains("in the cloud for example"), "{section}");
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]

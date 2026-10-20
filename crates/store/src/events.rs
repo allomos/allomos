@@ -69,6 +69,11 @@ impl<'a> Actor<'a> {
 /// Now, in UTC: the event's `at` (`2026-10-13T14:02:05Z`) and the start of its file name
 /// (`2026-10-13-140205-123`, with milliseconds, so files sort in the order they were written).
 /// Tests may fix the time with `ALLOMOS_NOW` (`2026-10-13T14:02:05Z` or `2026-10-13T14:02Z`).
+/// Now, in UTC (`2026-10-13T14:02:05Z`); `ALLOMOS_NOW` fixes it in tests.
+pub fn now_utc() -> String {
+    now().0
+}
+
 fn now() -> (String, String) {
     let since = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -123,12 +128,33 @@ pub(crate) fn new_file(root: &Path) -> String {
     }
 }
 
+/// The one-time number the change being made now runs under (Task-A01-58): set by `alm` for one
+/// command (`--request-id`), so every event that command writes carries it.
+static REQUEST: std::sync::Mutex<Option<allomos_core::event::Change>> = std::sync::Mutex::new(None);
+
+/// Mark every event written from now on with the one-time number `id` and the input
+/// fingerprint `input` ([`allomos_core::request`]); `None` stops marking.
+pub fn set_request(request: Option<(&str, &str)>) {
+    let change = request.map(|(id, input)| allomos_core::request::change(id, input));
+    *REQUEST.lock().unwrap_or_else(|e| e.into_inner()) = change;
+}
+
 /// Write one event. Returns its file, so a change that then fails can take it back.
 /// Callers hold the taskbag's lock.
 pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     let dir = root.join(EVENTS_DIR);
     fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
     let path = root.join(new_file(root));
+    let marked;
+    let event = match REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        Some(change) => {
+            let mut e = event.clone();
+            e.changes.push(change.clone());
+            marked = e;
+            &marked
+        }
+        None => event,
+    };
     write_atomic(&path, &json_text(event))?;
     Ok(path)
 }
@@ -139,19 +165,186 @@ pub fn list(root: &Path) -> (Vec<Event>, Vec<Issue>) {
     (events.into_iter().map(|(_, e)| e).collect(), issues)
 }
 
-/// [`list`], with each event's file relative to the taskbag (`events/<name>.json`).
+/// The ending of a month's packed history (Task-A01-59): `events/2026-09.events`. Not `.json`,
+/// so an older Allomos, which reads only `.json` files there, skips it without an error.
+pub const PACK_EXT: &str = "events";
+
+/// One line of a packed month: an event and the name of the single file it came from.
+#[derive(Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PackLine {
+    file: String,
+    event: Event,
+}
+
+/// The events in a month's packed file, each with its original file (`events/<name>.json`), and
+/// the lines that could not be read.
+fn read_pack(path: &Path, issues: &mut Vec<Issue>) -> Vec<(String, Event)> {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let file = format!("{EVENTS_DIR}/{name}");
+    let text = match crate::read_text(path) {
+        Ok(t) => t,
+        Err(e) => {
+            issues.push(Issue::new(
+                &file,
+                None,
+                Problem::ReadFailed {
+                    detail: e.to_string(),
+                },
+            ));
+            return Vec::new();
+        }
+    };
+    let mut out = Vec::new();
+    for (n, line) in text
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| !l.trim().is_empty())
+    {
+        match serde_json::from_str::<PackLine>(line) {
+            Ok(p) => out.push((format!("{EVENTS_DIR}/{}", p.file), p.event)),
+            Err(e) => issues.push(Issue::new(
+                &format!("{file}:{}", n + 1),
+                None,
+                Problem::NotJson {
+                    detail: e.to_string(),
+                },
+            )),
+        }
+    }
+    out
+}
+
+/// What [`pack`] did for one month.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Packed {
+    /// `2026-09`.
+    pub month: String,
+    /// `events/2026-09.events`, relative to the taskbag.
+    pub file: String,
+    /// How many changes the month's file now holds.
+    pub changes: usize,
+    /// How many single files were packed into it (and removed).
+    pub removed: usize,
+}
+
+/// Pack the history of whole earlier months (Task-A01-59, approver 2026-10-20): from the 28th of
+/// a month (UTC), every earlier month whose changes are still single files gets one file,
+/// `events/<yyyy-mm>.events`, and those single files are removed. The file lists the month's
+/// changes in file-name order, one per line, so the same changes give the same file on every
+/// computer. A month already packed takes in any single files that arrived since. A single file
+/// that cannot be read stays where it is (and is still reported). Callers hold the lock.
+pub(crate) fn pack(root: &Path) -> Result<Vec<Packed>, Problem> {
+    let today = now().0;
+    let (this_month, day) = (&today[..7], today[8..10].parse::<u32>().unwrap_or(1));
+    if day < 28 {
+        return Ok(Vec::new());
+    }
+    let dir = root.join(EVENTS_DIR);
+    // Single files of earlier months, by month.
+    let mut months: std::collections::BTreeMap<String, Vec<PathBuf>> = Default::default();
+    for path in sorted_entries(&dir) {
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") || name.len() < 8 {
+            continue;
+        }
+        let month = &name[..7];
+        let looks_dated =
+            month.as_bytes()[4] == b'-' && month.chars().filter(char::is_ascii_digit).count() == 6;
+        if looks_dated && month < this_month {
+            months.entry(month.to_string()).or_default().push(path);
+        }
+    }
+    let mut done = Vec::new();
+    for (month, singles) in months {
+        let pack_path = dir.join(format!("{month}.{PACK_EXT}"));
+        let mut ignored = Vec::new();
+        let mut events: std::collections::BTreeMap<String, Event> =
+            read_pack(&pack_path, &mut ignored)
+                .into_iter()
+                .map(|(f, e)| {
+                    (
+                        f.trim_start_matches(&format!("{EVENTS_DIR}/")).to_string(),
+                        e,
+                    )
+                })
+                .collect();
+        let mut taken = Vec::new();
+        for path in singles {
+            let name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
+            let file = format!("{EVENTS_DIR}/{name}");
+            let Ok(Ok(event)) = crate::read_text(&path).map(|t| parse_event(&file, &t)) else {
+                continue;
+            };
+            events.insert(name, event);
+            taken.push(path);
+        }
+        if taken.is_empty() {
+            continue;
+        }
+        let mut text = String::new();
+        for (file, event) in &events {
+            let line = PackLine {
+                file: file.clone(),
+                event: event.clone(),
+            };
+            text.push_str(&serde_json::to_string(&line).expect("events serialize"));
+            text.push('\n');
+        }
+        write_atomic(&pack_path, &text)?;
+        for path in &taken {
+            fs::remove_file(path).map_err(|e| write_failed(path, e))?;
+            crate::note_written(path);
+        }
+        done.push(Packed {
+            file: format!("{EVENTS_DIR}/{month}.{PACK_EXT}"),
+            month,
+            changes: events.len(),
+            removed: taken.len(),
+        });
+    }
+    Ok(done)
+}
+
+/// [`list`], with each event's file relative to the taskbag (`events/<name>.json`). Packed months
+/// (Task-A01-59) are read too, each event under the name of the single file it came from, so
+/// every reader sees the same history as before packing.
 pub fn list_with_files(root: &Path) -> (Vec<(String, Event)>, Vec<Issue>) {
     let mut events = Vec::new();
     let mut issues = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
     for path in sorted_entries(&root.join(EVENTS_DIR)) {
+        if path.extension().and_then(|e| e.to_str()) == Some(PACK_EXT) {
+            for (file, e) in read_pack(&path, &mut issues) {
+                if seen.insert(file.clone()) {
+                    events.push((file, e));
+                }
+            }
+            continue;
+        }
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
             continue;
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         let file = format!("{EVENTS_DIR}/{name}");
+        if seen.contains(&file) {
+            // Packed already; the single file is a copy (for example, merged in afterwards).
+            continue;
+        }
         match crate::read_text(&path) {
             Ok(text) => match parse_event(&file, &text) {
-                Ok(e) => events.push((file, e)),
+                Ok(e) => {
+                    seen.insert(file.clone());
+                    events.push((file, e));
+                }
                 Err(i) => issues.push(i),
             },
             Err(e) => issues.push(Issue::new(
@@ -303,6 +496,12 @@ pub fn history(root: &Path, id: &str) -> History {
     let mut events: Vec<Event> = all
         .into_iter()
         .filter(|e| e.kind == Kind::Task && e.id.as_deref() == Some(id))
+        .map(|mut e| {
+            // A one-time number (Task-A01-58) is not a change to the task: not shown.
+            e.changes
+                .retain(|c| c.field != allomos_core::request::FIELD);
+            e
+        })
         .collect();
     events.reverse();
     History {

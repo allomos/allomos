@@ -24,7 +24,7 @@ A folder **with** `.allomos` opens directly, and the app walks the same checks i
 
 ### The first screen
 
-- With nothing open (the first start, or the last folder is gone), the window shows the road show's opening slide: the slogan "Switch agents. Switch teammates. *Keep the project.*", its short explanation and the drawing of a task shifting between agents and a teammate around the taskbag, and one button, **Start**, with the hint "Select a folder where you want to keep your tasks". **Start** opens the wizard at step 1. The top bar has no folder button on this page.
+- With nothing open (the first start, or the last folder is gone), the window shows the slogan "Switch agents and teammates. *Keep the whole project on the record.*" (the website's, since A07-26/A07-27), its short explanation and the drawing of a task shifting between agents and a teammate around the taskbag, and one button, **Start**, with the hint "Select a folder where you want to keep your tasks". **Start** opens the wizard at step 1. The top bar has no folder button on this page.
 
 ### The setup wizard
 
@@ -45,7 +45,7 @@ The page has no setup cards of its own (owner, 2026-10-12): when something is mi
 - If `project.json` records a project folder, use it. Otherwise, if `AGENTS.md` or `CLAUDE.md` is in the Allomos folder (beside `.allomos/`), that folder is the project folder: record it.
 - Still no project folder: the wizard opens at **step 3**. (Until 2026-10-12 a card on the page asked "Which folder holds this project?".)
 - A project folder, but an agent is not told about Allomos or the taskbag has no tasks: the wizard opens at **step 4**. With the agents told and no tasks, step 4 shows **Update the taskbag**: the AI is asked to look for tasks the project already keeps (a task board, card files, a to-do list) and move them in after the person's Go ahead (approver, 2026-10-19, Task-A03-27).
-- Before showing step 3 or 4 this way, the wizard keeps the taskbag in Git and commits it (as step 2's **Next** does), and that page says what it did.
+- Recording the project folder this way only writes `project.json`; Allomos does not commit it ([0017](../decisions/0017-agents-run-git-not-alm.md), row 7). The agent connected in step 4 commits it with the taskbag. (Until 2026-10-14 the wizard committed it before showing step 3 or 4.)
 - **Connect** keeps the taskbag open. **Not now** (step 4) goes back to the **start page** when no agent has ever been told about Allomos (neither `AGENTS.md` nor `CLAUDE.md` mentions it), like **Cancel**; when one has, it keeps the taskbag open (owner, 2026-10-12). With the taskbag open, the wizard does not open by itself again until the folder is opened again (opening the same folder again counts). **Cancel** goes back to the start page.
 - **Recorded as** a path relative to the Allomos folder (`"."` when they are the same, `"../app"` for a sibling), so moving or cloning both folders together keeps it working; an absolute path only when no relative one exists (another disk).
 

@@ -13,6 +13,7 @@ import {
   startDraft,
   stateChoices,
   toEdit,
+  changedVersion,
   toPaneIteration,
   toggleBlocker,
 } from "../src/editFlow.ts";
@@ -76,8 +77,19 @@ test("each field becomes the change Rust reads", () => {
   assert.deepEqual(toEdit("next_dependency", d(" ")), { field: "next_dependency", text: null });
   assert.deepEqual(toEdit("handoff_note", d("Read it")), { field: "handoff_note", text: "Read it" });
   assert.deepEqual(toEdit("iteration", d("")), { field: "iteration", iteration: null });
-  assert.deepEqual(toEdit("title", d(" New ")), { field: "title", title: "New" });
-  assert.deepEqual(toEdit("description", d("Text\n")), { field: "description", text: "Text\n" });
+  assert.deepEqual(toEdit("title", d(" New ")), { field: "title", title: "New", expected_version: null });
+  assert.deepEqual(toEdit("description", d("Text\n")), { field: "description", text: "Text\n", expected_version: null });
+});
+
+test("a title or description carries the version it started from; a refusal names the version now (Task-A01-57)", () => {
+  const d = (value: string) => ({ value, waitingOn: "", who: "", blockedBy: [] });
+  assert.deepEqual(toEdit("title", d("New"), "0123456789abcdef"), { field: "title", title: "New", expected_version: "0123456789abcdef" });
+  assert.deepEqual(toEdit("description", d("Text"), "0123456789abcdef"), { field: "description", text: "Text", expected_version: "0123456789abcdef" });
+  // Other fields carry no version.
+  assert.deepEqual(toEdit("label", d("implemented"), "0123456789abcdef"), { field: "label", label: "implemented" });
+  assert.equal(changedVersion({ code: "task_changed", params: { id: "A01-01", version: "fedcba9876543210" } }), "fedcba9876543210");
+  assert.equal(changedVersion({ code: "task_held", params: { id: "A01-01", holder: "x" } }), null);
+  assert.equal(changedVersion("boom"), null);
 });
 
 test("blocked is a state the app sets, with the tasks that must finish first (decision 0016)", () => {

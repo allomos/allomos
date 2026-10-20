@@ -97,6 +97,22 @@ button.link:hover { text-decoration: underline; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 8px; }
 .card h2, .card p { margin: 0; }
 .agent-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 0.9em; }
+/* One chip per agent (Task-A03-02): the current agent's quota, coloured by the share left; the
+   others dimmed; a stale figure grey and dashed. Hovering (or focusing) a chip shows the popup. */
+.agent-chip { position: relative; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; color: var(--ink); background: var(--surface); cursor: default; }
+.agent-chip.dimmed { opacity: 0.55; }
+.agent-chip.quota-green { color: var(--ok); background: var(--ok-bg); border-color: var(--ok); }
+.agent-chip.quota-amber { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+.agent-chip.quota-red { color: var(--err); background: var(--err-bg); border-color: var(--err); }
+.agent-chip.stale { color: var(--muted); border-style: dashed; }
+.quota-popup { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 280px; max-width: min(420px, 90vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); white-space: normal; }
+.agent-chip:hover .quota-popup, .agent-chip:focus-within .quota-popup, .agent-chip:focus .quota-popup { display: block; }
+.quota-popup ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.quota-popup li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.quota-popup li.stale { color: var(--muted); }
+.quota-popup .quota-green { color: var(--ok); }
+.quota-popup .quota-amber { color: var(--warn); }
+.quota-popup .quota-red { color: var(--err); }
 /* Link buttons sit at the top of a column elsewhere; in a line of text they sit in the middle. */
 .agent-line button.link, .agents .row button.link { align-self: center; font-size: inherit; line-height: inherit; }
 .agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -302,7 +318,12 @@ button.link:hover { text-decoration: underline; }
    and the pane scroll separately, so the list's scroll bar stays at the list's right edge (owner,
    2026-10-09) and opening the pane keeps the list where it was. */
 .list-layout { flex: 1 1 0; min-height: 240px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 14px; }
-.list-layout.with-pane { grid-template-columns: minmax(0, 1fr) minmax(300px, 40%); }
+.list-layout.with-pane { grid-template-columns: minmax(0, 1fr) 14px minmax(300px, 40%); column-gap: 0; }
+/* Task-A01-56: a width the person dragged, still kept between 300px and what leaves the list 320px. */
+.list-layout.with-pane.sized { grid-template-columns: minmax(0, 1fr) 14px clamp(300px, var(--pane-width), calc(100% - 334px)); }
+.pane-resizer { align-self: stretch; cursor: col-resize; touch-action: none; position: relative; outline: none; }
+.pane-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 6px; width: 2px; border-radius: 1px; background: transparent; transition: background 0.15s; }
+.pane-resizer:hover::after, .pane-resizer:focus-visible::after, .pane-resizer:active::after { background: var(--accent); }
 .list-layout > .areas { min-height: 0; overflow: auto; align-content: start; grid-auto-rows: max-content; scrollbar-gutter: stable; }
 .task-pane {
   align-self: start; max-height: 100%; overflow: auto;
@@ -349,12 +370,13 @@ button.link:hover { text-decoration: underline; }
 .badge.to-check { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--warn-bg); color: var(--warn); border: 1px dashed var(--warn); }
 .pane-check { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
 .pane-check .muted { flex-basis: 100%; }
-/* Task-A03-19: "AI decided" and the decisions to review. */
+/* Task-A03-19: "AI decisions to review" and the decisions to review. */
 .badge.ai-decided { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); border: 1px dashed var(--ok); }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
 .pane-review .ai-decisions { padding-left: 20px; }
 @media (max-width: 720px) {
-  .list-layout.with-pane { grid-template-columns: minmax(0, 1fr); }
+  .list-layout.with-pane, .list-layout.with-pane.sized { grid-template-columns: minmax(0, 1fr); }
+  .pane-resizer { display: none; }
   .task-pane { position: fixed; inset: 64px 12px 12px; max-height: none; z-index: 5; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }
   .top { flex-wrap: wrap; }
   .task { grid-template-columns: minmax(0, 1fr) auto; }
@@ -516,7 +538,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 /* Build a new app… (Task-A03-25-02): under the start page's card, right of Open recent…, and its
    dialog. */
 .welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
-.build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
+.build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; min-height: 7.5em; }
+.build-app .banner code { overflow-wrap: anywhere; }
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
 .build-app .run-modes summary { cursor: pointer; }
@@ -548,3 +571,33 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .progress-finished { display: flex; gap: 8px; margin: 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--line); overflow-wrap: anywhere; }
 .progress-finished > span:first-child { color: var(--ok); font-weight: 600; }
 .progress-bar { width: 100%; height: 8px; accent-color: var(--accent); }
+
+/* The one-time "who are you" step (Task-A01-40): a box of its own, apart from the field being changed. */
+.who-form { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg); }
+.who-form h4 { margin: 0; font-size: 0.95em; }
+.who-form p { margin: 0; }
+.who-form label { display: grid; gap: 2px; }
+.who-form label > span { font-size: 0.85em; color: var(--muted); }
+.who-line { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); }
+.who-line.editing label { display: inline-flex; align-items: center; gap: 6px; }
+
+/* A save refused because the task changed meanwhile (Task-A01-57): the newer text beside the person's own. */
+.task-pane .conflict { display: grid; gap: 6px; }
+.task-pane .conflict p { margin: 0; }
+.task-pane .conflict pre.newer { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; padding: 8px 10px; border-radius: 6px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+
+/* The app's own About window (Task-A07-28): centred, nothing to scroll. */
+.about-window { box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; background: var(--bg); color: var(--ink); }
+.about-window .about-icon { width: 96px; height: 96px; margin-bottom: 8px; }
+.about-window .about-icon .jade { fill: #2a9d8f; }
+.about-window .about-icon .terracotta { fill: #e76f51; }
+.about-window .about-icon .spark { fill: #e9c46a; }
+.about-window .about-icon .ring { fill: none; stroke-width: 66; }
+.about-window .about-icon .ring.jade { stroke: #2a9d8f; }
+.about-window .about-icon .ring.terracotta { stroke: #e76f51; }
+.about-window h1 { margin: 0; font-size: 22px; }
+.about-window p { margin: 0; }
+.about-window .about-version { color: var(--muted); font-size: 13px; }
+.about-window .about-tagline { margin: 10px 0 4px; max-width: 280px; line-height: 1.4; }
+.about-window .about-website { font-size: 14px; align-self: center; }
+.about-window .about-licence { margin-top: 12px; color: var(--muted); }

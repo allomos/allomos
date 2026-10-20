@@ -260,7 +260,7 @@ pub struct Task {
     /// A short note left on release for whoever picks the task up next.
     #[serde(default)]
     pub handoff_note: Option<String>,
-    /// Why the task was finished without the human check, and in which run: set by
+    /// Why the task was finished without the human check: set by
     /// `alm done --without-human-check` (Task-A03-15, renamed in Task-A03-18). While a done task
     /// has it, the task waits for a person to check it ("To check", `alm human`). Marking it
     /// checked (`alm checked`, or the top label on a done task) clears it; its history keeps it.

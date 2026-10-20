@@ -41,7 +41,7 @@ export interface Task {
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
-  /** Why the task was finished without the human check, and in which run (Task-A03-15, A03-18). */
+  /** Why the task was finished without the human check (Task-A03-15, A03-18, A03-31). */
   without_human_check: string | null;
   /** How a person checks it, in Markdown (Task-A03-18). */
   human_check_steps: string | null;
@@ -77,8 +77,8 @@ export type Edit =
   | { field: "next_dependency"; text: string | null }
   | { field: "handoff_note"; text: string | null }
   | { field: "iteration"; iteration: string | null }
-  | { field: "title"; title: string }
-  | { field: "description"; text: string }
+  | { field: "title"; title: string; expected_version?: string | null }
+  | { field: "description"; text: string; expected_version?: string | null }
   | { field: "checked" }
   | { field: "reopen"; note: string };
 
@@ -189,6 +189,8 @@ export interface Opened {
   last_changed?: Record<string, string>;
   /** Card files agents reported as still in the project folder (Task-A00-30). */
   cards_outside?: CardOutside[];
+  /** Each task's version, by task ID (Task-A01-57): sent back when a title or description is saved. */
+  versions?: Record<string, string>;
 }
 
 /**
@@ -298,6 +300,12 @@ export interface ConfirmRequest {
   /** Seconds since 1970. */
   asked: number;
   until: number;
+  /** What shows the plan is sound, in Markdown, shown under it (`--evidence`, Task-A03-37). */
+  evidence?: string | null;
+  /** The task the approval is for (`--task`). */
+  task?: string | null;
+  /** A fingerprint of exactly what is shown: a Go ahead counts only for it. */
+  fingerprint?: string;
 }
 
 /** What an AI agent reports about a job the app gave it (`alm progress`, Task-A05-08). */
@@ -369,4 +377,22 @@ export interface UpdateStatus {
   available: string | null;
   /** GitHub was asked now and did not answer. */
   failed: boolean;
+  /** `available`'s installer is downloaded and its hash matched (Task-A07-17). */
+  ready: string | null;
+}
+
+/** How much of an agent account's quota is left, as the agent reported it (`alm quota`, Task-A03-02). */
+export interface QuotaReport {
+  /** `claude-code`, `codex`, or another agent's id. */
+  agent: string;
+  /** A name for the account, only when the agent could tell one. */
+  account?: string | null;
+  /** `5h` or `week`. */
+  window: string;
+  /** Share left, 0–100. */
+  left: number;
+  /** When the window resets, local time (`2026-10-20T17:00`). */
+  resets?: string | null;
+  /** When it was reported, UTC. */
+  at: string;
 }

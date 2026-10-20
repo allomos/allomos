@@ -72,16 +72,18 @@ Local tracking works offline. AI-provider calls and other external integrations 
 
 ## AI-generated project setup
 
+**Dropped** (owner, 2026-10-20): **Build a new app…** (Task A03-25) is enough. An agent given the goal prompt plans the project into areas, iterations and tasks with `alm`, which refuses invalid input as it goes; no separate generated-file import is planned. R50–R55 are kept here as a record.
+
 | ID | Requirement | Source | Status |
 |---|---|---|---|
-| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by Allomos. | owner, 2026-10-01 | accepted |
-| R51 | Allomos can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | accepted |
-| R52 | Supply a versioned generation prompt and file schema shared with the validator, with examples and explicit handling of unknown data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
-| R53 | Validate generated bundles and show an adoption/change preview with actionable errors before changing active project data. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
-| R54 | Generated output cannot invent verified progress or authoritative approvals; missing completion history stays unknown. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
-| R55 | Re-importing a generated bundle does not duplicate tasks or silently overwrite existing edits; show changes/conflicts. | [feature contract](./AI-GENERATED-PROJECTS.md) | proposed |
+| R50 | A team leader can ask an AI agent to generate project/task data and files using a prompt supplied by Allomos. | owner, 2026-10-01 | dropped |
+| R51 | Allomos can read or transform that generated output into a usable project for its lists, charts and task workflow. | owner, 2026-10-01 | dropped |
+| R52 | Supply a versioned generation prompt and file schema shared with the validator, with examples and explicit handling of unknown data. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
+| R53 | Validate generated bundles and show an adoption/change preview with actionable errors before changing active project data. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
+| R54 | Generated output cannot invent verified progress or authoritative approvals; missing completion history stays unknown. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
+| R55 | Re-importing a generated bundle does not duplicate tasks or silently overwrite existing edits; show changes/conflicts. | [feature contract](./AI-GENERATED-PROJECTS.md) | dropped |
 
-Workflow, storage boundaries and proposed acceptance examples: [AI-generated project setup](./AI-GENERATED-PROJECTS.md). Local use follows R40–R43; cloud publication remains an explicit signed-in action. The final file schema is not yet selected.
+The dropped proposal: [AI-generated project setup](./AI-GENERATED-PROJECTS.md).
 
 ## Human and agent interfaces
 
@@ -90,12 +92,12 @@ Workflow, storage boundaries and proposed acceptance examples: [AI-generated pro
 | R60 | The app is well structured to provide interfaces for both people and AI agents. | owner, 2026-10-03 | accepted |
 | R61 | Human UI supports desktop and mobile use. Packaging is set by R69–R71; desktop systems by R81; release order remains undecided. | owner, 2026-10-03; updated 2026-10-04 | accepted |
 | R62 | Investigate and consider browser and human CLI interfaces alongside desktop/mobile; agent CLI/MCP remains required by R11. | owner, 2026-10-03 | accepted |
-| R63 | Graphical clients, CLI, MCP and imports use shared task commands/queries with consistent validation, permissions and event recording. | [interface contract](./INTERFACES.md) | proposed |
-| R64 | Agent interfaces expose discoverable capabilities, versioned structured inputs/results, bounded task context and actionable errors. | [interface contract](./INTERFACES.md) | proposed |
-| R65 | Mutations support stale-revision detection and safe retries; interrupted long operations can be resumed without duplicate effects. | [interface contract](./INTERFACES.md) | proposed |
-| R66 | Human review shows evidence and exact decision scope; responsible person, executing agent, verification and session state remain distinguishable. | [interface contract](./INTERFACES.md) | proposed |
-| R67 | Graphical interfaces adapt to screen size and input method, with accessible text/controls and alternatives to drag-only actions. | [interface contract](./INTERFACES.md) | proposed |
-| R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md) | proposed |
+| R63 | Graphical clients, CLI, MCP and imports use shared task commands/queries with consistent validation, permissions and event recording. The desktop app and `alm` call the same shared code (`allomos-core`, `allomos-store`); agents go through `alm` (approver, 2026-10-20). | [interface contract](./INTERFACES.md); approver, 2026-10-20 | accepted |
+| R64 | Agent interfaces expose discoverable capabilities, versioned structured inputs/results, bounded task context and actionable errors. | [interface contract](./INTERFACES.md); approver, 2026-10-20 | accepted |
+| R65 | Mutations support stale-revision detection and safe retries; interrupted long operations can be resumed without duplicate effects. | [interface contract](./INTERFACES.md); approver, 2026-10-20 | accepted |
+| R66 | Human review shows evidence and exact decision scope; responsible person, executing agent, verification and session state remain distinguishable. | [interface contract](./INTERFACES.md); approver, 2026-10-20 | accepted |
+| R67 | Graphical interfaces adapt to screen size and input method, with accessible text/controls and alternatives to drag-only actions. | [interface contract](./INTERFACES.md); approver, 2026-10-20 | accepted |
+| R68 | Clients show where local data lives, explain unavailable cross-device capabilities and support explicit transfer rather than automatic publication. | [interface contract](./INTERFACES.md); approver, 2026-10-20 | accepted |
 | R69 | The **desktop application provides the complete feature set** and is the hub for local projects, agents and companions. | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R70 | **Web and mobile apps are companions** that connect to a running desktop application. The mobile companion is a **phone-friendly web page** served by the desktop app (decided 2026-10-04). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |
 | R71 | Companions can **view** the desktop app's projects, including **progress and status** (task states, area progress, charts and burndown, waiting-on). | owner, 2026-10-04; [0009](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | accepted |

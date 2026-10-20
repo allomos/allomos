@@ -35,6 +35,32 @@ pub struct ConfirmRequest {
     /// When the asker stops waiting. A question past this is no longer shown, so a popup never
     /// outlives an agent whose command was stopped.
     pub until: u64,
+    /// What shows the plan is sound (checks run, results), in Markdown, shown under the plan
+    /// (`--evidence`, Task-A03-37).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<String>,
+    /// The task the approval is for (`--task`): a Go ahead is recorded in its history.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+    /// A fingerprint of exactly what the person is shown (title, plan and evidence): a Go ahead
+    /// counts only for it (Task-A03-37).
+    #[serde(default)]
+    pub fingerprint: String,
+}
+
+/// The fingerprint of what a question shows: its title, plan and evidence.
+pub fn shown_fingerprint(title: &str, plan: &str, evidence: Option<&str>) -> String {
+    allomos_core::request::fingerprint(&format!(
+        "{title}\u{0}{plan}\u{0}{}",
+        evidence.unwrap_or("")
+    ))
+}
+
+/// What the asker adds to a question besides its title and plan.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Extra<'a> {
+    pub evidence: Option<&'a str>,
+    pub task: Option<&'a str>,
 }
 
 pub fn requests_dir(project: &Path) -> PathBuf {
@@ -86,6 +112,7 @@ pub fn post_confirm(
     plan: &str,
     from: Option<&str>,
     wait_secs: u64,
+    extra: Extra,
 ) -> io::Result<ConfirmRequest> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let dir = requests_dir(project);
@@ -102,6 +129,9 @@ pub fn post_confirm(
         from: from.map(String::from),
         asked: now(),
         until: now().saturating_add(wait_secs),
+        evidence: extra.evidence.map(String::from),
+        task: extra.task.map(String::from),
+        fingerprint: shown_fingerprint(title, plan, extra.evidence),
     };
     let text = serde_json::to_string_pretty(&request).map_err(io::Error::other)?;
     write_whole(&dir.join(format!("{}.json", request.id)), &text)?;
@@ -135,26 +165,45 @@ pub fn pending_confirms(project: &Path) -> Vec<ConfirmRequest> {
     found
 }
 
-/// Record the person's answer to question `id` in `project`.
-pub fn answer_confirm(project: &Path, id: &str, yes: bool) -> Result<(), Problem> {
+/// Record the person's answer to question `id` in `project`. A Go ahead names the fingerprint of
+/// what the person was shown (`shown`; without it, the question's own), so it counts only for
+/// that plan (Task-A03-37).
+pub fn answer_confirm(
+    project: &Path,
+    id: &str,
+    yes: bool,
+    shown: Option<&str>,
+) -> Result<(), Problem> {
     let dir = requests_dir(project);
-    if !valid_id(id) || !dir.join(format!("{id}.json")).is_file() {
-        return Err(Problem::RequestNotFound { id: id.to_string() });
-    }
+    let request = valid_id(id)
+        .then(|| fs::read_to_string(dir.join(format!("{id}.json"))).ok())
+        .flatten()
+        .and_then(|text| serde_json::from_str::<ConfirmRequest>(&text).ok())
+        .ok_or_else(|| Problem::RequestNotFound { id: id.to_string() })?;
     let path = dir.join(format!("{id}.answer"));
-    write_whole(&path, if yes { "yes" } else { "no" }).map_err(|e| Problem::WriteFailed {
+    let text = if yes {
+        format!("yes {}", shown.unwrap_or(&request.fingerprint))
+    } else {
+        "no".to_string()
+    };
+    write_whole(&path, &text).map_err(|e| Problem::WriteFailed {
         path: path.display().to_string(),
         detail: e.to_string(),
     })
 }
 
-/// The person's answer to question `id`, once there is one.
-pub fn read_answer(project: &Path, id: &str) -> Option<bool> {
+/// The person's answer to question `id`, once there is one. A Go ahead given for something other
+/// than `fingerprint` (the plan changed after the person saw it) counts as no: they were not
+/// shown it (Task-A03-37). A bare `yes` comes from an Allomos before that and counts.
+pub fn read_answer(project: &Path, id: &str, fingerprint: &str) -> Option<bool> {
     let text = fs::read_to_string(requests_dir(project).join(format!("{id}.answer"))).ok()?;
-    match text.trim() {
-        "yes" => Some(true),
-        "no" => Some(false),
-        _ => None,
+    match text.trim().split_once(' ') {
+        Some(("yes", shown)) => Some(shown == fingerprint),
+        _ => match text.trim() {
+            "yes" => Some(true),
+            "no" => Some(false),
+            _ => None,
+        },
     }
 }
 
@@ -197,10 +246,11 @@ mod tests {
             "- 3 areas\n- 5 tasks",
             Some("claude"),
             60,
+            Extra::default(),
         )
         .unwrap();
         // A question whose asker stopped waiting is not shown.
-        let gone = post_confirm(&dir, "Old", "-", None, 0).unwrap();
+        let gone = post_confirm(&dir, "Old", "-", None, 0, Extra::default()).unwrap();
         let mut old = gone.clone();
         old.until = 1;
         fs::write(
@@ -214,13 +264,16 @@ mod tests {
                 .contains("\n*\n")
         );
         assert!(!was_seen(&dir, &asked.id));
-        assert_eq!(read_answer(&dir, &asked.id), None);
+        assert_eq!(read_answer(&dir, &asked.id, &asked.fingerprint), None);
 
         // The app lists it (and marks it seen), then the person answers.
         assert_eq!(pending_confirms(&dir), [asked.clone()]);
         assert!(was_seen(&dir, &asked.id));
-        answer_confirm(&dir, &asked.id, false).unwrap();
-        assert_eq!(read_answer(&dir, &asked.id), Some(false));
+        answer_confirm(&dir, &asked.id, false, None).unwrap();
+        assert_eq!(
+            read_answer(&dir, &asked.id, &asked.fingerprint),
+            Some(false)
+        );
         // An answered question is no longer pending.
         assert!(pending_confirms(&dir).is_empty());
 
@@ -230,12 +283,51 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A Go ahead counts only for what the person was shown (Task-A03-37).
+    #[test]
+    fn a_go_ahead_counts_only_for_the_plan_shown() {
+        let dir = tmp("scope");
+        let extra = Extra {
+            evidence: Some("- 58 tests pass"),
+            task: Some("A03-37"),
+        };
+        let asked = post_confirm(&dir, "Move tasks", "- 5 tasks", None, 60, extra).unwrap();
+        assert_eq!(asked.evidence.as_deref(), Some("- 58 tests pass"));
+        assert_eq!(asked.task.as_deref(), Some("A03-37"));
+        assert_eq!(
+            asked.fingerprint,
+            shown_fingerprint("Move tasks", "- 5 tasks", Some("- 58 tests pass"))
+        );
+        assert_ne!(
+            asked.fingerprint,
+            shown_fingerprint("Move tasks", "- 6 tasks", Some("- 58 tests pass"))
+        );
+        assert_eq!(pending_confirms(&dir), [asked.clone()]);
+        // Shown the question as it is: yes.
+        answer_confirm(&dir, &asked.id, true, Some(&asked.fingerprint)).unwrap();
+        assert_eq!(read_answer(&dir, &asked.id, &asked.fingerprint), Some(true));
+        // A yes given for another version of the plan counts as no.
+        answer_confirm(&dir, &asked.id, true, Some("0123456789abcdef")).unwrap();
+        assert_eq!(
+            read_answer(&dir, &asked.id, &asked.fingerprint),
+            Some(false)
+        );
+        // An older app's bare yes still counts.
+        fs::write(
+            requests_dir(&dir).join(format!("{}.answer", asked.id)),
+            "yes",
+        )
+        .unwrap();
+        assert_eq!(read_answer(&dir, &asked.id, &asked.fingerprint), Some(true));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn unknown_or_odd_ids_are_refused() {
         let dir = tmp("ids");
         for id in ["1-2-3", "../project", "", "a"] {
             assert_eq!(
-                answer_confirm(&dir, id, true),
+                answer_confirm(&dir, id, true, None),
                 Err(Problem::RequestNotFound { id: id.into() })
             );
         }

@@ -781,6 +781,46 @@ pub fn checked(taskbag: &Taskbag, id: &str) -> Result<Outcome, Problem> {
     Ok(Outcome::plain(task))
 }
 
+/// Send a finished task back to "To check" (Task-A03-37): its work changed after a person checked
+/// it, so the earlier check no longer covers it. The AI agent decides when (approver,
+/// 2026-10-20); `alm` does not look at the work. `reason` says what changed and is shown where the
+/// task waits for its check; `steps` replace the steps for checking it (without them, the earlier
+/// steps stay, or the warning `human_check_steps_missing` asks for them). A task at the top label
+/// goes one step down, since the person's check no longer covers it. Only a done task can be sent
+/// back; the holder rule does not apply, as for `checked`.
+pub fn recheck(
+    taskbag: &Taskbag,
+    id: &str,
+    reason: &str,
+    steps: Option<&str>,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    if task.state != State::Done {
+        return Err(Problem::NotDone {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    let note = non_empty(Some(reason)).ok_or(Problem::WithoutHumanCheckMissing)?;
+    let mut warnings = Vec::new();
+    match steps.map(str::trim) {
+        Some("") => return Err(Problem::HumanCheckStepsEmpty),
+        Some(steps) => task.human_check_steps = Some(format!("{steps}\n")),
+        None if task.human_check_steps.is_none() => {
+            warnings.push(Problem::HumanCheckStepsMissing {
+                id: task.id.clone(),
+            })
+        }
+        None => {}
+    }
+    let ladder = &taskbag.project.labels;
+    if ladder.len() > 1 && task.label.as_ref() == ladder.last() {
+        task.label = Some(ladder[ladder.len() - 2].clone());
+    }
+    task.without_human_check = Some(note);
+    Ok(Outcome::warned(task, warnings))
+}
+
 /// Let go of the task. A task `in_progress` goes back to `ready`. The handoff note is
 /// replaced by `note`, or removed when there is none, so it always describes the latest
 /// release.
@@ -843,6 +883,43 @@ pub fn set_handoff_note(
     Ok(Outcome::plain(task))
 }
 
+/// The version of a task as it is now (Task-A01-57): a short fingerprint of everything saved in
+/// its `task.json` and `description.md`. It changes with every change to the task, so a writer
+/// that read version `v` can tell whether the task changed since.
+pub fn task_version(task: &crate::model::Task) -> String {
+    // FNV-1a, 64 bits: the same on every computer and Rust version.
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let json = serde_json::to_string(task).unwrap_or_default();
+    for b in json
+        .bytes()
+        .chain(std::iter::once(0))
+        .chain(task.description.bytes())
+    {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
+/// Refuse a change made from an out-of-date copy (Task-A01-57): when the writer says which
+/// version it read (`expected`) and the task has changed since, nothing is written. Without a
+/// version, nothing is checked, so existing agent prompts keep working.
+pub fn check_version(taskbag: &Taskbag, id: &str, expected: Option<&str>) -> Result<(), Problem> {
+    let Some(expected) = expected.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(());
+    };
+    let task = find_task(taskbag, id)?;
+    let version = task_version(&task);
+    if version == expected {
+        Ok(())
+    } else {
+        Err(Problem::TaskChanged {
+            id: task.id,
+            version,
+        })
+    }
+}
+
 /// Give the task a new description, the text of its `description.md` (the app's task pane,
 /// Task-A01-18). Same holder rule as other changes; allowed in any state. Empty text removes it.
 pub fn set_description(
@@ -901,11 +978,16 @@ pub enum Edit {
         #[serde(default)]
         iteration: Option<String>,
     },
+    /// `expected_version`: the version the app showed (Task-A01-57); a newer task refuses it.
     Title {
         title: String,
+        #[serde(default)]
+        expected_version: Option<String>,
     },
     Description {
         text: String,
+        #[serde(default)]
+        expected_version: Option<String>,
     },
     /// A person checked the finished task: like `alm checked` (Task-A03-18).
     Checked,
@@ -964,8 +1046,18 @@ pub fn edit(
         Edit::Iteration { iteration } => {
             plan(taskbag, id, iteration.as_deref()).map(|o| (o, "plan"))
         }
-        Edit::Title { title } => set_title(taskbag, id, me, title).map(|o| (o, "title")),
-        Edit::Description { text } => {
+        Edit::Title {
+            title,
+            expected_version,
+        } => {
+            check_version(taskbag, id, expected_version.as_deref())?;
+            set_title(taskbag, id, me, title).map(|o| (o, "title"))
+        }
+        Edit::Description {
+            text,
+            expected_version,
+        } => {
+            check_version(taskbag, id, expected_version.as_deref())?;
             set_description(taskbag, id, me, text).map(|o| (o, "describe"))
         }
         Edit::Checked => checked(taskbag, id).map(|o| (o, "checked")),
@@ -1393,6 +1485,64 @@ mod tests {
         assert_eq!(next_area_id(&s), "T0011");
     }
 
+    /// Two writers read the same task; the first saves; the second, still holding the old
+    /// version, is refused and nothing it sent is kept (Task-A01-57).
+    #[test]
+    fn a_save_from_an_out_of_date_copy_is_refused() {
+        let mut s = bag();
+        let id = s.tasks[0].id.clone();
+        let read = task_version(&s.tasks[0]);
+        // The same task gives the same version; the version is short and stable.
+        assert_eq!(read, task_version(&s.tasks[0].clone()));
+        assert_eq!(read.len(), 16);
+        // The first writer (an agent's `alm describe`) saves.
+        let first = edit(
+            &s,
+            &id,
+            None,
+            &Edit::Description {
+                text: "The agent's text".into(),
+                expected_version: Some(read.clone()),
+            },
+        )
+        .unwrap()
+        .0;
+        s.tasks[0] = first.task.clone();
+        let now = task_version(&s.tasks[0]);
+        assert_ne!(now, read);
+        // The second writer (the person in the app) still holds the old version: refused.
+        let stale = Edit::Description {
+            text: "The person's text".into(),
+            expected_version: Some(read.clone()),
+        };
+        assert_eq!(
+            edit(&s, &id, None, &stale),
+            Err(Problem::TaskChanged {
+                id: id.clone(),
+                version: now.clone()
+            })
+        );
+        let stale_title = Edit::Title {
+            title: "A new title".into(),
+            expected_version: Some(read),
+        };
+        assert!(matches!(
+            edit(&s, &id, None, &stale_title),
+            Err(Problem::TaskChanged { .. })
+        ));
+        // With the current version, or with none (existing prompts), the save goes through.
+        let fresh = Edit::Description {
+            text: "The person's text".into(),
+            expected_version: Some(now),
+        };
+        assert_eq!(
+            edit(&s, &id, None, &fresh).unwrap().0.task.description,
+            "The person's text\n"
+        );
+        assert!(check_version(&s, &id, None).is_ok());
+        assert!(check_version(&s, &id, Some("  ")).is_ok());
+    }
+
     #[test]
     fn the_task_language_is_ui_or_a_language_code() {
         let s = bag();
@@ -1766,6 +1916,37 @@ mod tests {
         assert_eq!(o.task.label.as_deref(), Some("human verified"));
         let e: Edit = serde_json::from_str(r#"{"field":"checked"}"#).unwrap();
         assert_eq!(e, Edit::Checked);
+        // Its work changed after the check: the agent sends it back to To check (Task-A03-37).
+        put!(s, o.task);
+        let back = recheck(&s, "A01-01", " The save button moved ", None).unwrap();
+        assert_eq!(
+            back.task.without_human_check.as_deref(),
+            Some("The save button moved")
+        );
+        assert_eq!(back.task.label.as_deref(), Some("deployed and verified"));
+        assert!(back.task.to_check());
+        assert!(matches!(
+            back.warnings[..],
+            [Problem::HumanCheckStepsMissing { .. }]
+        ));
+        let with = recheck(&s, "A01-01", "moved", Some("1. Click Save.\n")).unwrap();
+        assert!(with.warnings.is_empty());
+        assert_eq!(
+            with.task.human_check_steps.as_deref(),
+            Some("1. Click Save.\n")
+        );
+        assert!(matches!(
+            recheck(&s, "A01-01", " ", None),
+            Err(Problem::WithoutHumanCheckMissing)
+        ));
+        assert!(matches!(
+            recheck(&s, "A01-01", "x", Some(" ")),
+            Err(Problem::HumanCheckStepsEmpty)
+        ));
+        assert!(matches!(
+            recheck(&s, "A01-02", "x", None),
+            Err(Problem::NotDone { .. })
+        ));
     }
 
     #[test]
@@ -2057,7 +2238,13 @@ mod tests {
             );
         }
         same(
-            ed(&s, Edit::Title { title: " ".into() }),
+            ed(
+                &s,
+                Edit::Title {
+                    title: " ".into(),
+                    expected_version: None,
+                },
+            ),
             set_title(&s, "A01-01", me, " "),
             "title",
         );
@@ -2073,11 +2260,19 @@ mod tests {
             &s,
             Edit::Description {
                 text: "New\n\n".into(),
+                expected_version: None,
             },
         )
         .unwrap();
         assert_eq!((o.task.description.as_str(), c), ("New\n", "describe"));
-        let (o, _) = ed(&s, Edit::Description { text: " ".into() }).unwrap();
+        let (o, _) = ed(
+            &s,
+            Edit::Description {
+                text: " ".into(),
+                expected_version: None,
+            },
+        )
+        .unwrap();
         assert_eq!(o.task.description, "");
 
         // A task an agent holds: the app's person is refused by the holder rule, like `alm`;
@@ -2098,8 +2293,14 @@ mod tests {
             },
             Edit::NextDependency { text: None },
             Edit::HandoffNote { text: None },
-            Edit::Title { title: "t".into() },
-            Edit::Description { text: "d".into() },
+            Edit::Title {
+                title: "t".into(),
+                expected_version: None,
+            },
+            Edit::Description {
+                text: "d".into(),
+                expected_version: None,
+            },
         ] {
             assert_eq!(ed(&s, e).map(|(o, _)| o), held.clone());
         }

@@ -5,6 +5,7 @@
 
 import { useState, type KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
+import { WhoForm } from "./WhoForm";
 import { canSaveGroup, startGroupEdit, type Editing, type GroupDraft } from "./groupEditFlow";
 import { isProblem, type Area, type Iteration } from "./types";
 
@@ -67,20 +68,19 @@ export function GroupEditForm({
 
   if (!ownerName) {
     return (
-      <form className="create-form editor" aria-label={title} onSubmit={(e) => e.preventDefault()} onKeyDown={(e) => keys(e, () => name.trim() && void run("save", () => onSaveName(name.trim())))}>
+      <div className="create-form editor" aria-label={title}>
         <h3>{title}</h3>
-        <p className="small">{t("edit.name_explain")}</p>
-        <input type="text" value={name} placeholder={t("edit.name_placeholder")} aria-label={t("edit.name_placeholder")} onChange={(e) => setName(e.target.value)} disabled={!!busy} autoFocus />
-        <div className="editor-buttons">
-          <button type="button" className="primary" onClick={() => void run("save", () => onSaveName(name.trim()))} disabled={!!busy || !name.trim()}>
-            {t("edit.name_save")}
-          </button>
-          <button type="button" onClick={onClose} disabled={!!busy}>
-            {t("edit.cancel")}
-          </button>
-        </div>
-        {error && <p className="banner error small">{error}</p>}
-      </form>
+        <WhoForm
+          name={name}
+          onName={setName}
+          explain="edit.name_explain"
+          label="who.label"
+          busy={!!busy}
+          error={error}
+          onSave={() => void run("save", () => onSaveName(name.trim()))}
+          onCancel={onClose}
+        />
+      </div>
     );
   }
 

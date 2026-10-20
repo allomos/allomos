@@ -16,12 +16,15 @@ use std::sync::Mutex;
 use allomos_core::{Loaded, Problem};
 use allomos_store::progress::{Job, with_progress_in};
 use allomos_store::{
-    AgentSetup, ConfirmRequest, Inspection, LinkTarget, SetupState, add_agent_instructions,
-    add_readme_if_empty, agent_connect_request_in, agent_setup, agent_setup_request_in,
-    answer_confirm, id_from_name, init, inspect, load, pending_confirms, picked_folder,
-    project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp, versions,
+    AgentSetup, ConfirmRequest, GitStep, Inspection, LinkTarget, SetupState,
+    add_agent_instructions, add_readme_if_empty, agent_connect_request_with, agent_setup,
+    agent_setup_request_in, answer_confirm, id_from_name, init, inspect, load, pending_confirms,
+    picked_folder, project_folder_of, record_project_folder, resolve_task_link, setup_state, stamp,
+    versions,
 };
 use serde::Serialize;
+#[cfg(not(any(target_os = "macos", windows)))]
+use tauri::menu::AboutMetadata;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
@@ -47,6 +50,9 @@ struct Opened {
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
     /// "N tasks keep their card files in the project folder" with **Update the taskbag…**.
     cards_outside: Vec<allomos_core::card::Outside>,
+    /// Each task's version, by task ID (Task-A01-57): the task pane sends back the version it
+    /// showed when it saves a title or description, so a newer change is never overwritten.
+    versions: std::collections::BTreeMap<String, String>,
 }
 
 /// The folder named on the command line: the first argument that is not an option.
@@ -112,8 +118,15 @@ fn open_taskbag(root: PathBuf) -> Opened {
         Some(bag) => allomos_store::cards::outside_of(&root, bag),
         None => Vec::new(),
     };
+    let versions = loaded
+        .taskbag
+        .iter()
+        .flat_map(|bag| &bag.tasks)
+        .map(|t| (t.id.clone(), allomos_core::ops::task_version(t)))
+        .collect();
     Opened {
         loaded,
+        versions,
         ai_decisions: allomos_store::ai_decisions(&root),
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
@@ -153,6 +166,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
+        versions: Default::default(),
         root,
         readme_added,
     })
@@ -652,17 +666,19 @@ fn connect_plan(
     project: &Path,
     taskbag: &Path,
 ) -> Vec<(String, String)> {
-    connect_plan_with(agents, language, project, taskbag, true)
+    connect_plan_with(agents, language, project, taskbag, true, GitStep::Ask)
 }
 
 /// [`connect_plan`]; `progress`: the first agent's request asks it to report its progress to the
-/// app (Task-A05-08), unless a larger job's request does (Build a new app…).
+/// app (Task-A05-08), unless a larger job's request does (Build a new app…); `git`: whether the
+/// first agent asks before `git init` or, in a quiet goal run, runs it itself (Task-A03-35).
 fn connect_plan_with(
     agents: &[String],
     language: &str,
     project: &Path,
     taskbag: &Path,
     progress: bool,
+    git: GitStep,
 ) -> Vec<(String, String)> {
     let job = |job: Job, request: String| {
         if progress {
@@ -695,7 +711,7 @@ fn connect_plan_with(
             } else if i == 0 {
                 job(
                     Job::Connect,
-                    agent_connect_request_in(language, project, taskbag),
+                    agent_connect_request_with(language, project, taskbag, git),
                 )
             } else {
                 agent_setup_request_in(language, project, taskbag)
@@ -776,7 +792,10 @@ fn build_app_plan(
     description: &str,
     quiet: bool,
 ) -> String {
-    let connect = connect_plan_with(&[agent.to_string()], language, project, taskbag, false)
+    // A quiet run creates the Git repository itself, without stopping to ask (Task-A03-35,
+    // approver 2026-10-19); a normal run asks, as connecting does.
+    let git = if quiet { GitStep::Create } else { GitStep::Ask };
+    let connect = connect_plan_with(&[agent.to_string()], language, project, taskbag, false, git)
         .remove(0)
         .1;
     let goal = allomos_store::goal_request_in(language, description, quiet);
@@ -885,6 +904,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
+        versions: Default::default(),
         root,
         readme_added: false,
     })
@@ -992,7 +1012,7 @@ fn write_handoff(
 
 /// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
 /// while it is private). A fixed address: the window cannot ask to open any other.
-const DOWNLOAD_URL: &str = "https://github.com/mypals-ml/allomos/releases";
+const DOWNLOAD_URL: &str = "https://github.com/allomos/allomos/releases";
 
 /// Open the download page in the web browser, for a taskbag that needs a newer Allomos.
 #[tauri::command]
@@ -1010,9 +1030,31 @@ fn open_download_page() -> Result<(), Problem> {
 /// Whether a newer Allomos is on GitHub (Task-A07-16). `asked` when the person chose
 /// **Check for Updates…**: GitHub is asked now, and a skipped version is offered again.
 /// Otherwise GitHub is asked only when the last answer is a day old.
+///
+/// When a newer version is known, its installer is downloaded and checked in the background
+/// (Task-A07-17); once it is ready every window hears `update:ready` and asks again.
 #[tauri::command]
-async fn update_status(asked: bool) -> update::UpdateStatus {
-    update::check(asked)
+async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
+    let status = update::check(asked);
+    if let (Some(version), None) = (&status.available, &status.ready) {
+        update::prepare_in_background(version.clone(), move || {
+            let _ = app.emit(UPDATE_READY_EVENT, ());
+        });
+    }
+    status
+}
+
+/// **Restart to Update to Allomos <version>** (Task-A07-17): run the checked installer and
+/// quit; the new version starts by itself. If the person cancels macOS's password prompt,
+/// nothing changes. A failure is told to every window, and this version keeps running.
+fn restart_to_update(app: AppHandle) {
+    tauri::async_runtime::spawn_blocking(move || match update::restart_to_update() {
+        Ok(update::Restart::Quit) => app.exit(0),
+        Ok(update::Restart::Cancelled) => {}
+        Err(detail) => {
+            let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+        }
+    });
 }
 
 /// "Skip this version" on the update notice.
@@ -1157,6 +1199,13 @@ fn dismiss_progress(project: PathBuf, id: String) {
     allomos_store::progress::dismiss(&project, &id)
 }
 
+/// How much quota each agent account has left, as the agents reported it with `alm quota`,
+/// newest first (Task-A03-02). Kept on this computer, not in a taskbag.
+#[tauri::command]
+fn quota_reports() -> Vec<allomos_store::QuotaReport> {
+    allomos_store::quota_reports()
+}
+
 /// Questions an agent is asking about `project` with `alm confirm`, oldest first. Listing them
 /// marks them seen, so `alm` knows this window shows them.
 #[tauri::command]
@@ -1166,8 +1215,13 @@ fn confirm_requests(project: PathBuf) -> Vec<ConfirmRequest> {
 
 /// The person's answer to question `id`: go ahead (`yes`) or cancel.
 #[tauri::command]
-fn answer_confirm_request(project: PathBuf, id: String, yes: bool) -> Result<(), Problem> {
-    answer_confirm(&project, &id, yes)
+fn answer_confirm_request(
+    project: PathBuf,
+    id: String,
+    yes: bool,
+    fingerprint: Option<String>,
+) -> Result<(), Problem> {
+    answer_confirm(&project, &id, yes, fingerprint.as_deref())
 }
 
 /// Do the AI agents know about this project? What the window's agent line shows (Task-A03-04).
@@ -1261,12 +1315,17 @@ fn window_showing(
 }
 
 /// The label of the window in front, else the first one.
+/// The About window is not a project window: menu commands skip it (Task-A07-28).
 fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
-    windows
-        .iter()
+    let projects = || {
+        windows
+            .iter()
+            .filter(|(label, _)| label.as_str() != ABOUT_WINDOW)
+    };
+    projects()
         .find(|(_, w)| w.is_focused().unwrap_or(false))
-        .or_else(|| windows.iter().next())
+        .or_else(|| projects().next())
         .map(|(label, _)| label.clone())
 }
 
@@ -1361,7 +1420,31 @@ const CONNECT_EVENT: &str = "menu:connect";
 const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 const CHECK_UPDATES_ID: &str = "check_updates";
+/// The website the About window links to, and the words it shows (Task-A07-22).
+const WEBSITE: &str = "https://www.allomos.com";
+#[cfg(not(any(target_os = "macos", windows)))]
+const WEBSITE_LABEL: &str = "www.allomos.com";
+/// About Allomos on macOS and Windows: the menu item, and the label of the app's own About
+/// window it opens (Task-A07-28).
+#[cfg(any(target_os = "macos", windows))]
+const ABOUT_ID: &str = "about";
+/// The About window's label: not a project window, so menu commands never go to it.
+const ABOUT_WINDOW: &str = "about";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
+const UPDATE_READY_EVENT: &str = "update:ready";
+const UPDATE_FAILED_EVENT: &str = "update:failed";
+
+/// What the update menu item does when chosen (Task-A07-16, Task-A07-17).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum UpdateAction {
+    /// **Check for Updates…**: the window asks GitHub now.
+    #[default]
+    Check,
+    /// **Download Allomos <version>…**: open the download page.
+    Download,
+    /// **Restart to Update to Allomos <version>**: install the checked download.
+    Restart,
+}
 
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
@@ -1370,8 +1453,9 @@ struct MenuTexts {
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
-    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16).
-    update_known: Mutex<bool>,
+    /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
+    /// **Restart to Update to Allomos <version>** (Task-A07-17).
+    update_action: Mutex<UpdateAction>,
     recent: Submenu<Wry>,
     state: Mutex<Recent>,
 }
@@ -1487,14 +1571,21 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .into_iter()
         .filter_map(|item| item.as_submenu().cloned())
         .collect();
+    // The default About item, first in the app menu on macOS and in the Help menu elsewhere,
+    // is replaced by one that also gives the website (Task-A07-22).
+    let about = about_item(app)?;
     if cfg!(target_os = "macos") {
         if let Some(app_menu) = submenus.first() {
+            app_menu.remove_at(0)?;
+            app_menu.insert(&about, 0)?;
             app_menu.insert(&check_updates, 1)?;
         }
     } else if let Some(help) = submenus
         .iter()
         .find(|s| s.text().is_ok_and(|t| t == "Help"))
     {
+        help.remove_at(0)?;
+        help.insert(&about, 0)?;
         help.append(&check_updates)?;
     } else {
         menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
@@ -1505,11 +1596,98 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         connect: connect_item,
         move_tasks_in,
         check_updates,
-        update_known: Mutex::new(false),
+        update_action: Mutex::new(UpdateAction::Check),
         recent,
         state: Mutex::new(Recent::default()),
     });
     Ok(menu)
+}
+
+/// About Allomos. On macOS and Windows the item opens the app's own About window
+/// ([`open_about_window`], Task-A07-28): the same on both, in the interface's language, with the
+/// website as a real link. Linux, not shipped (decision 0011), keeps the default item.
+#[cfg(any(target_os = "macos", windows))]
+fn about_item(app: &AppHandle) -> tauri::Result<MenuItem<Wry>> {
+    let name = &app.package_info().name;
+    MenuItem::with_id(app, ABOUT_ID, format!("About {name}"), true, None::<&str>)
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn about_item(app: &AppHandle) -> tauri::Result<PredefinedMenuItem<Wry>> {
+    let info = app.package_info();
+    let config = app.config();
+    let metadata = AboutMetadata {
+        name: Some(info.name.clone()),
+        version: Some(info.version.to_string()),
+        copyright: config.bundle.copyright.clone(),
+        authors: config.bundle.publisher.clone().map(|p| vec![p]),
+        website: Some(WEBSITE.to_string()),
+        website_label: Some(WEBSITE_LABEL.to_string()),
+        ..Default::default()
+    };
+    PredefinedMenuItem::about(app, None, Some(metadata))
+}
+
+/// The app's own About window (Task-A07-28): a small window showing the web interface's About
+/// page (`index.html?about`): the icon, name, version, slogan, the website link and the licence.
+/// One at a time: choosing About again brings it forward.
+#[cfg(any(target_os = "macos", windows))]
+fn open_about_window(app: &AppHandle) -> tauri::Result<()> {
+    if let Some(window) = app.get_webview_window(ABOUT_WINDOW) {
+        let _ = window.unminimize();
+        window.show()?;
+        return window.set_focus();
+    }
+    let name = &app.package_info().name;
+    tauri::WebviewWindowBuilder::new(
+        app,
+        ABOUT_WINDOW,
+        tauri::WebviewUrl::App("index.html?about".into()),
+    )
+    .title(format!("About {name}"))
+    .inner_size(360.0, 400.0)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .center()
+    .build()
+    .map(drop)
+}
+
+/// What the About window shows of the app itself: its name and version (Task-A07-28).
+#[derive(Serialize)]
+struct AboutInfo {
+    name: String,
+    version: String,
+}
+
+#[tauri::command]
+fn about_info(app: AppHandle) -> AboutInfo {
+    let info = app.package_info();
+    AboutInfo {
+        name: info.name.clone(),
+        version: info.version.to_string(),
+    }
+}
+
+/// The About window's link: the website in the default browser. A fixed address: the window
+/// cannot ask to open any other.
+#[tauri::command]
+fn open_website() -> Result<(), Problem> {
+    opener()
+        .arg(WEBSITE)
+        .spawn()
+        .map(drop)
+        .map_err(|e| Problem::OpenFailed {
+            path: WEBSITE.to_string(),
+            detail: e.to_string(),
+        })
+}
+
+/// Close the calling window (the About window's Escape key).
+#[tauri::command]
+fn close_window(window: tauri::WebviewWindow) {
+    let _ = window.close();
 }
 
 /// The menu's words in the interface's language, as the interface sends them.
@@ -1540,13 +1718,22 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = fill_recent(&app, &texts.recent, &recent);
 }
 
-/// The update item's words, as the window sends them: **Check for Updates…**, or **Download
-/// Allomos <version>…** once a newer version is known, which then opens the download page, as
-/// the Claude app's **Restart to Update** item does (approver, 2026-10-15).
+/// The update item's words and what it does, as the window sends them: **Check for Updates…**
+/// (`check`); **Download Allomos <version>…** once a newer version is known, which opens the
+/// download page (`download`, Task-A07-16); **Restart to Update to Allomos <version>** once its
+/// installer is downloaded and checked, as the Claude app has it (`restart`, Task-A07-17).
 #[tauri::command]
-fn set_update_item(texts: tauri::State<MenuTexts>, text: String, known: bool) {
+fn set_update_item(texts: tauri::State<MenuTexts>, text: String, action: String) {
     let _ = texts.check_updates.set_text(text);
-    *texts.update_known.lock().unwrap_or_else(|e| e.into_inner()) = known;
+    let action = match action.as_str() {
+        "download" => UpdateAction::Download,
+        "restart" => UpdateAction::Restart,
+        _ => UpdateAction::Check,
+    };
+    *texts
+        .update_action
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = action;
 }
 
 /// Show these folders, newest first, under File → Open Recent.
@@ -1582,6 +1769,11 @@ pub fn run() {
                     };
                 }
             };
+            #[cfg(any(target_os = "macos", windows))]
+            if id == ABOUT_ID {
+                let _ = open_about_window(app);
+                return;
+            }
             if id == NEW_WINDOW_ID {
                 let _ = open_new_window(app);
             } else if id == CONNECT_ID {
@@ -1589,15 +1781,17 @@ pub fn run() {
             } else if id == MOVE_TASKS_IN_ID {
                 send(MOVE_TASKS_IN_EVENT, None);
             } else if id == CHECK_UPDATES_ID {
-                let known = *app
+                let action = *app
                     .state::<MenuTexts>()
-                    .update_known
+                    .update_action
                     .lock()
                     .unwrap_or_else(|e| e.into_inner());
-                if known {
-                    let _ = open_download_page();
-                } else {
-                    send(CHECK_UPDATES_EVENT, None);
+                match action {
+                    UpdateAction::Check => send(CHECK_UPDATES_EVENT, None),
+                    UpdateAction::Download => {
+                        let _ = open_download_page();
+                    }
+                    UpdateAction::Restart => restart_to_update(app.clone()),
                 }
             } else if id == CLEAR_RECENT_ID {
                 send(CLEAR_RECENT_EVENT, None);
@@ -1613,6 +1807,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             startup_folder,
+            about_info,
+            open_website,
+            close_window,
             new_window,
             set_window_project,
             show_project_elsewhere,
@@ -1666,6 +1863,7 @@ pub fn run() {
             last_agent,
             write_agent_files,
             agent_status,
+            quota_reports,
             confirm_requests,
             answer_confirm_request,
             progress_reports,
@@ -1684,6 +1882,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allomos_store::agent_connect_request_in;
 
     fn args(list: &[&str]) -> Vec<OsString> {
         std::iter::once("allomos")
@@ -1920,9 +2119,21 @@ mod tests {
             for quiet in [true, false] {
                 let auto =
                     build_app_plan("claude_app", language, &dir, &taskbag, description, quiet);
-                // One request: the wizard's connect request first, then the goal request.
-                let connect = agent_connect_request_in(language, &dir, &taskbag);
+                // One request: the wizard's connect request first, then the goal request. A quiet
+                // run creates the Git repository itself; a normal run asks (Task-A03-35).
+                let git = if quiet { GitStep::Create } else { GitStep::Ask };
+                let connect = agent_connect_request_with(language, &dir, &taskbag, git);
                 assert!(auto.starts_with(connect.trim_end()), "{language}");
+                assert_eq!(
+                    connect.contains("alm ai-decided <"),
+                    quiet,
+                    "{language}: only a quiet run records git init as an AI decision"
+                );
+                assert_eq!(
+                    connect == agent_connect_request_in(language, &dir, &taskbag),
+                    !quiet,
+                    "{language}: a normal run asks, as connecting does"
+                );
                 let goal = allomos_store::goal_request_in(language, description, quiet);
                 assert!(auto.contains(goal.trim_end()), "{language}");
                 // One progress request, for the whole job (Task-A05-08).

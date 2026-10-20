@@ -43,6 +43,8 @@ Today `alm` commits and pushes the task list by itself (`--commit`, `--push`), a
 | 14 | Migration prompt (A01-32) | no `--commit` / `--push`; commit only when asked | **When `alm migrate --finish` succeeds, the agent commits** the taskbag's files. **Commit only; no push.** |
 | 15 | "Migrate the taskbag…" in the app | commit those files; push only if asked | As 14. |
 
+**Amended 2026-10-20 (approver, task `A01-60`): general wording.** Allomos no longer assumes Git in what it says. After a change `alm` prints "Save this change in your version control tool and share it. Changed files:", the files, then "For Git:" with the same commands as before; `alm claim` asks to share the claim before the work starts, in the same general words. `--json` keeps `changed_files`, `git_commands` and `git_instruction`. `alm` and the app still never run or read Git.
+
 ## Alternatives considered
 
 | Option | Why not |
@@ -57,6 +59,7 @@ Today `alm` commits and pushes the task list by itself (`--commit`, `--push`), a
 - **Every existing AGENTS.md section** that says `--push` must be renewed (the section's version goes up, so `alm` and the app ask for it), including this repository's.
 - **Tests** that check commits made by `alm` and the wizard are replaced by tests of the printed files and commands (exactly the command's files, nothing else; claim's wording; no commands for `init`).
 - **The wizard** no longer needs Git to finish; a folder outside Git works until the agent sets it up.
+- **Exception: a quiet goal run** (approver, 2026-10-19, task `A03-35`). In **Build a new app…** with quiet mode, the agent runs `git init` itself when the folder is not a repository, and records it as an AI decision on the goal task, instead of asking (row 6). Connecting a project and normal goal runs still ask first.
 - **The "last used by" line** depends on the change history instead of Git.
 - **Errors** `commit_failed` / `push_failed` / `git_init_failed` / `git_missing` disappear from `alm` and the wizard.
 

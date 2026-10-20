@@ -54,7 +54,21 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// them in (`alm guide move-cards`) (Task-A00-30).
 /// 15: the person can start that with **Update the taskbag…** in the app, one button for an older
 /// taskbag and for card files, whose request `alm move-in` prints (Task-A01-45).
-pub const SECTION_VERSION: u32 = 15;
+/// 16: a task whose work is finished and only waits for a person's hands-on check ends with
+/// `alm done --without-human-check` in quiet and normal mode alike; `alm wait` is only for a real
+/// question, an approval or an outside effect (Task-A03-31).
+/// 17: personal details (email addresses, account names and the like) are kept out of the project
+/// notes and every other file like credentials, written as placeholders (Task-A03-29).
+/// 18: the section asks the agent to save and share with "your version control tool", naming
+/// Git only as the example (Task-A01-60).
+/// 19: a checked task whose work changed goes back to To check (`alm recheck`, the agent decides);
+/// an approval through `alm confirm` shows its evidence and task and covers only the plan shown
+/// (Task-A03-37).
+/// 20: always work a task in a worktree of its own; the main checkout stays on the base branch
+/// (Task-A03-38).
+/// 21: at the handoff gate's quota check, the agent reports the figure with `alm quota`; the app
+/// shows it (Task-A03-02).
+pub const SECTION_VERSION: u32 = 21;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -465,7 +479,7 @@ const EN: Phrases = Phrases {
     taskbag: "Taskbag (Allomos's task files)",
     section: "In the project folder, replace Allomos's section in {files} (headed \"{heading}…\", or any other text about Allomos or `alm`) with the output of `{alm} brief`, exactly as it is. Keep the rest of each file as it is.",
     report: "Show the user what you changed and the commits you made.",
-    commit: "If the project is a Git repository, commit only these changes: the taskbag's files and {files}. Leave every other change as it is; do not push unless the person asks.",
+    commit: "If the project is under version control, save only these changes in your version control tool (in Git: commit them): the taskbag's files and {files}. Leave every other change as it is; do not share (push) unless the person asks.",
 };
 
 const ZH_CN: Phrases = Phrases {
@@ -474,7 +488,7 @@ const ZH_CN: Phrases = Phrases {
     taskbag: "任务包（Allomos 的任务文件）",
     section: "在项目文件夹中，把 {files} 里 Allomos 的一节（标题以“{heading}”开头，或其他关于 Allomos 或 `alm` 的说明）替换为 `{alm} brief` 的输出，原样（英文）使用。文件的其他内容保持不变。",
     report: "告诉用户你改了什么，以及你做的提交。",
-    commit: "如果项目是 Git 仓库，只提交这些改动：任务包的文件和 {files}。其他改动保持原样；除非用户要求，不要推送。",
+    commit: "如果项目在版本控制下，用你的版本控制工具只保存这些改动（用 Git 时：提交）：任务包的文件和 {files}。其他改动保持原样；除非用户要求，不要共享（推送）。",
 };
 
 const JA: Phrases = Phrases {
@@ -483,7 +497,7 @@ const JA: Phrases = Phrases {
     taskbag: "タスクバッグ（Allomos のタスクファイル）",
     section: "プロジェクトのフォルダーで、{files} の Allomos の節（見出しが「{heading}」で始まるもの、または Allomos や `alm` についてのほかの説明）を `{alm} brief` の出力で置き換え、そのまま（英語のまま）使います。ファイルのほかの部分は変えません。",
     report: "何を変えたか、どんなコミットをしたかをユーザーに見せてください。",
-    commit: "プロジェクトが Git リポジトリなら、これらの変更だけをコミットします：タスクバッグのファイルと {files}。ほかの変更はそのままにし、頼まれない限りプッシュしません。",
+    commit: "プロジェクトがバージョン管理されていれば、これらの変更だけをバージョン管理ツールで保存します（Git ならコミット）：タスクバッグのファイルと {files}。ほかの変更はそのままにし、頼まれない限り共有（プッシュ）しません。",
 };
 
 fn phrases(language: &str) -> &'static Phrases {
