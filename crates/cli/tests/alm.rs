@@ -817,7 +817,10 @@ fn printed_git_commands_share_only_that_change() {
         git(&repo, &["log", "-1", "--format=%s%n%b"]),
         "alm: add area A01\nAgent: <your session name>"
     );
-    let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "T"]);
+    let v = ok(
+        &repo,
+        &["add", "task", "A01-01", "--area", "A01", "--title", "T"],
+    );
     assert_eq!(
         v["git_instruction"],
         "Save this change in your version control tool and share it. Changed files:"
@@ -959,7 +962,7 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
         &["init"][..],
         &["add", "area", "A01", "Tracking"],
         &[
-            "add", "task", "--area", "A01", "--title", "T", "--branch", "main",
+            "add", "task", "A01-01", "--area", "A01", "--title", "T", "--branch", "main",
         ],
         &["--as", "a", "claim", "A01-01", "--branch", "main"],
         &["--as", "a", "label", "A01-01", "human verified"],
@@ -1665,13 +1668,27 @@ fn add_task_without_an_id_takes_the_next_in_its_area() {
             "A customer orders a cake",
         ],
     );
-    assert_eq!(v["task"]["id"], "A01-03");
+    // A word ID in its area, never the next number (Task-A01-54).
+    let id = v["task"]["id"].as_str().unwrap().to_string();
+    assert!(
+        id.starts_with("A01-") && !allomos_core::ids::numbered(&id),
+        "{id}"
+    );
     assert_eq!(v["task"]["state"], "backlog");
     let v = ok(
         &repo,
         &["add", "task", "--area", "A02", "--title", "Charts"],
     );
-    assert_eq!(v["task"]["id"], "A02-02");
+    assert!(v["task"]["id"].as_str().unwrap().starts_with("A02-"));
+    // `alm list` shows the numbered tasks first, then the new ones in the order they were made.
+    let list = ok(&repo, &["list", "--area", "A01"]);
+    let ids: Vec<&str> = list["areas"][0]["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids.last(), Some(&id.as_str()), "{list}");
     refused(
         &repo,
         &["add", "task", "--area", "A09", "--title", "x"],
@@ -2332,10 +2349,15 @@ fn project_notes_path_is_tidy_from_a_worktree() {
 fn add_task_tells_the_next_steps() {
     let dir = tmp("add-next-steps");
     ok(&dir, &["init"]);
+    // English, whatever language this computer's Allomos app shows.
+    ok(&dir, &["task-language", "en"]);
     ok(&dir, &["add", "area", "A01", "Core"]);
 
     // No iteration yet: said, with how to add one.
-    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "One"]);
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-01", "--area", "A01", "--title", "One"],
+    );
     assert_eq!(out.status.code(), Some(0));
     let text = String::from_utf8(out.stdout).unwrap();
     let after = text.split("Save only these files").nth(1).unwrap_or("");
@@ -2359,7 +2381,10 @@ fn add_task_tells_the_next_steps() {
         &dir,
         &["add", "iteration", "I01", "First steps", "--release", "0.1"],
     );
-    let v = ok(&dir, &["add", "task", "--area", "A01", "--title", "Two"]);
+    let v = ok(
+        &dir,
+        &["add", "task", "A01-02", "--area", "A01", "--title", "Two"],
+    );
     let steps = v["next_steps"].as_str().unwrap();
     assert!(steps.contains("     I01  First steps  (0.1)\n"), "{steps}");
     assert!(steps.contains("`alm ready A01-02`"), "{steps}");
@@ -2368,12 +2393,18 @@ fn add_task_tells_the_next_steps() {
 
     // In the task language.
     ok(&dir, &["task-language", "zh-CN"]);
-    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Three"]);
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Three"],
+    );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("接下来（给添加它的智能体）"), "{text}");
     assert!(text.contains("`alm plan A01-03 <迭代>`"), "{text}");
     ok(&dir, &["task-language", "ja"]);
-    let out = alm(&dir, &["add", "task", "--area", "A01", "--title", "Four"]);
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-04", "--area", "A01", "--title", "Four"],
+    );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("次に（追加したエージェントへ）"), "{text}");
 }
@@ -2591,7 +2622,7 @@ fn any_command_packs_earlier_months_from_the_28th() {
         vec!["init"],
         vec!["add", "area", "A01", "Core"],
         vec![
-            "add", "task", "--area", "A01", "--title", "One", "--branch", "main",
+            "add", "task", "A01-01", "--area", "A01", "--title", "One", "--branch", "main",
         ],
         vec!["--as", "s/one", "note", "A01-01", "Next"],
     ] {
@@ -4286,4 +4317,41 @@ fn quota_reports_are_kept_on_this_computer() {
         "quota", "--agent", "codex", "--left", "5", "--window", "day",
     ]);
     assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
+}
+
+/// Task-A01-54: two branches each add a task to the same area without pulling; the merge has no
+/// conflict in the taskbag, both tasks are there with different word IDs, and the numbered task
+/// made before keeps its ID.
+#[test]
+fn tasks_added_on_two_branches_merge_without_a_clash() {
+    let (repo, _) = real_repo();
+    ok(&repo, &["init"]);
+    ok(&repo, &["add", "area", "A01", "Tracking"]);
+    ok(
+        &repo,
+        &["add", "task", "A01-53", "--area", "A01", "--title", "Old"],
+    );
+    git(&repo, &["add", "--", ".allomos"]);
+    git(&repo, &["commit", "--quiet", "-m", "taskbag"]);
+    let mut made = Vec::new();
+    for (branch, title) in [("one", "From one"), ("two", "From two")] {
+        git(&repo, &["switch", "--quiet", "-c", branch, "main"]);
+        let v = ok(&repo, &["add", "task", "--area", "A01", "--title", title]);
+        made.push(v["task"]["id"].as_str().unwrap().to_string());
+        git(&repo, &["add", "--", ".allomos"]);
+        git(&repo, &["commit", "--quiet", "-m", title]);
+    }
+    assert_ne!(made[0], made[1]);
+    git(&repo, &["merge", "--quiet", "--no-edit", "one"]);
+    let v = ok(&repo, &["list", "--area", "A01"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+    let ids: Vec<&str> = v["areas"][0]["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids.len(), 3, "{v}");
+    assert_eq!(ids[0], "A01-53");
+    assert!(ids.contains(&made[0].as_str()) && ids.contains(&made[1].as_str()));
 }

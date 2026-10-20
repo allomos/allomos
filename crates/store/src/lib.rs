@@ -909,7 +909,13 @@ pub fn load(root: &Path) -> Loaded {
     areas.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
     let mut iterations: Vec<Iteration> = iterations.into_iter().map(|(_, i)| i).collect();
     iterations.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
-    let tasks = tasks.into_iter().map(|(_, t)| t).collect();
+    let mut tasks: Vec<Task> = tasks.into_iter().map(|(_, t)| t).collect();
+    // Numbered IDs first as before, then word IDs in the order they were made (Task-A01-54). The
+    // history is read only when there is a word ID.
+    if tasks.iter().any(|t| !allomos_core::ids::numbered(&t.id)) {
+        let made = created(root);
+        tasks.sort_by(|a, b| allomos_core::ids::compare(&a.id, &b.id, &made));
+    }
     Loaded {
         taskbag: Some(Taskbag {
             project,
@@ -1900,6 +1906,22 @@ pub fn last_changed(root: &Path) -> std::collections::BTreeMap<String, String> {
         };
         let at = out.entry(id).or_default();
         if e.at > *at {
+            *at = e.at;
+        }
+    }
+    out
+}
+
+/// When each task was made, by task ID (Task-A01-54): the oldest `at` among its events, in UTC.
+/// Lists order word IDs by it. A task with no recorded change is left out.
+pub fn created(root: &Path) -> std::collections::BTreeMap<String, String> {
+    let mut out: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    for e in events::list(root).0 {
+        let (Kind::Task, Some(id)) = (e.kind, e.id) else {
+            continue;
+        };
+        let at = out.entry(id).or_insert_with(|| e.at.clone());
+        if e.at < *at {
             *at = e.at;
         }
     }

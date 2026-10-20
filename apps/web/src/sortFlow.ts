@@ -31,11 +31,26 @@ export function parseSort(text: string | null): Sort {
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
+/** An older, numbered ID (`A01-53`, `A01-03-01`): only digits after the area (crates/core/src/ids.rs). */
+export function numbered(id: string): boolean {
+  return /^[^-]+-[\d-]+$/.test(id);
+}
+
 /** `tasks` in `sort`'s order, as a new list. `changed` holds each task's last change (UTC,
  * `2026-10-13T14:02:05Z`, so text order is time order); a task with none counts as oldest. Ties
- * fall back to the ID, ascending, so the order never jumps between reloads. */
+ * fall back to the ID order, ascending, so the order never jumps between reloads.
+ *
+ * The ID order is the taskbag's own order, as `tasks` come (Task-A01-54): numbered IDs
+ * (`A01-53`) by number, then word IDs (`A01-tiger042`) in the order they were made, which
+ * Allomos works out from the history. Sorting word IDs alphabetically would scatter new tasks. */
 export function sortTasks(tasks: Task[], sort: Sort, changed: Record<string, string> = {}): Task[] {
-  const byId = (a: Task, b: Task) => collator.compare(a.id, b.id);
+  const at = new Map(tasks.map((t, i) => [t.id, i]));
+  const byId = (a: Task, b: Task) => {
+    const [x, y] = [numbered(a.id), numbered(b.id)];
+    if (x && y) return collator.compare(a.id, b.id);
+    if (x !== y) return x ? -1 : 1;
+    return (at.get(a.id) ?? 0) - (at.get(b.id) ?? 0);
+  };
   const primary = (a: Task, b: Task): number => {
     if (sort.key === "name") return collator.compare(a.title, b.title);
     if (sort.key === "changed") {

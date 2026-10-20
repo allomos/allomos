@@ -114,24 +114,18 @@ pub fn new_area(taskbag: &Taskbag, id: &str, name: &str) -> Result<Area, Problem
     })
 }
 
-/// The next free task ID in `area`, following the project's own pattern `<area>-<number>`:
-/// one more than the highest number used, as wide as the widest one (at least two digits).
-/// Child tasks (`A01-03-01`) and other IDs do not count. Refused when the area does not exist.
+/// A new task ID in `area` (Task-A01-54): `<area>-<word><000-999>`, for example `A01-tiger042`,
+/// drawn at random so tasks added on different branches do not clash ([`crate::ids`]); drawn
+/// again if the ID is already in this taskbag. Refused when the area does not exist.
 pub fn next_task_id(taskbag: &Taskbag, area: &str) -> Result<String, Problem> {
     if !taskbag.areas.iter().any(|a| a.id == area) {
         return Err(Problem::UnknownArea {
             area: area.to_string(),
         });
     }
-    let prefix = format!("{area}-");
-    let (highest, width) = taskbag
-        .tasks
-        .iter()
-        .filter_map(|t| t.id.strip_prefix(&prefix))
-        .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
-        .filter_map(|n| n.parse::<u64>().ok().map(|v| (v, n.len())))
-        .fold((0, 2), |(h, w), (v, len)| (h.max(v), w.max(len)));
-    Ok(format!("{prefix}{:0width$}", highest + 1))
+    Ok(crate::ids::new_task_id(area, |id| {
+        taskbag.tasks.iter().any(|t| t.id == id)
+    }))
 }
 
 /// The next free ID after `ids` (in their order), following the project's own pattern
@@ -1441,18 +1435,17 @@ mod tests {
     }
 
     #[test]
-    fn the_next_task_id_follows_the_area_pattern() {
-        let mut s = bag();
-        // bag() has A01-01, A01-02 and A02-01.
-        assert_eq!(next_task_id(&s, "A01").unwrap(), "A01-03");
-        assert_eq!(next_task_id(&s, "A02").unwrap(), "A02-02");
-        // Children and other IDs do not count; a wider number keeps its width.
-        for id in ["A01-02-07", "A01-x", "A02-009"] {
-            let area = &id[..3];
-            s.tasks.push(new_task(&s, id, area, "t", None).unwrap());
+    fn a_new_task_id_is_a_word_and_a_number_in_its_area() {
+        let s = bag();
+        // bag() has A01-01, A01-02 and A02-01: numbered IDs stay; new ones are words (A01-54).
+        for area in ["A01", "A02"] {
+            let id = next_task_id(&s, area).unwrap();
+            assert!(id.starts_with(&format!("{area}-")), "{id}");
+            assert!(!crate::ids::numbered(&id), "{id}");
+            assert!(find_task(&s, &id).is_err(), "{id}");
+            // It can be added as any ID can.
+            assert!(new_task(&s, &id, area, "t", None).is_ok());
         }
-        assert_eq!(next_task_id(&s, "A01").unwrap(), "A01-03");
-        assert_eq!(next_task_id(&s, "A02").unwrap(), "A02-010");
         assert_eq!(
             next_task_id(&s, "A09"),
             Err(Problem::UnknownArea { area: "A09".into() })

@@ -8,6 +8,7 @@ pub mod branch;
 pub mod card;
 pub mod decision;
 pub mod event;
+pub mod ids;
 mod model;
 pub mod ops;
 mod problem;

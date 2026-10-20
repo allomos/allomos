@@ -96,7 +96,7 @@ mod tests {
             &tb,
             crate::Actor::APP,
             std::time::Duration::from_secs(1),
-            &serde_json::from_str(r#"{"area":"A1","title":"Bake"}"#).unwrap(),
+            &serde_json::from_str(r#"{"id":"A1-01","area":"A1","title":"Bake"}"#).unwrap(),
         )
         .unwrap();
         let r = agent_update_taskbag_request_in("en", &p, &tb);

@@ -1678,7 +1678,7 @@ fn human(
             });
         }
     }
-    let mut tasks: Vec<&Task> = bag
+    let tasks: Vec<&Task> = bag
         .tasks
         .iter()
         .filter(|t| {
@@ -1686,7 +1686,6 @@ fn human(
                 && iteration.is_none_or(|i| t.iteration.as_deref() == Some(i))
         })
         .collect();
-    tasks.sort_by(|a, b| a.id.cmp(&b.id));
     let to_check: Vec<&Task> = tasks.iter().copied().filter(|t| t.to_check()).collect();
     let to_answer: Vec<&Task> = tasks
         .iter()
@@ -2455,8 +2454,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     && (!*mine || t.holder.as_deref() == me)
                     && (!*without_human_check || t.to_check())
             };
-            let mut tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
-            tasks.sort_by(|a, b| a.id.cmp(&b.id));
+            // In the taskbag's order: numbered IDs, then word IDs as they were made (A01-54).
+            let tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
             let mut text = String::new();
             let mut group = |heading: String, members: &[&&Task]| {
                 if members.is_empty() {

@@ -14,6 +14,12 @@ test("by ID, ascending, is the taskbag's own order; numbers count as numbers", (
   assert.deepEqual(ids(sortTasks(tasks, { key: "id", dir: "desc" })), ["A02-01", "A01-10", "A01-03", "A01-2"]);
 });
 
+test("word IDs come after numbered ones, in the taskbag's order (when they were made), not A to Z (A01-54)", () => {
+  const mixed = [task("A01-10", "x"), task("A01-tiger042", "y"), task("A01-2", "z"), task("A01-apple007", "w")];
+  assert.deepEqual(ids(sortTasks(mixed, DEFAULT_SORT)), ["A01-2", "A01-10", "A01-tiger042", "A01-apple007"]);
+  assert.deepEqual(ids(sortTasks(mixed, { key: "id", dir: "desc" })), ["A01-apple007", "A01-tiger042", "A01-10", "A01-2"]);
+});
+
 test("by name ignores case, A to Z and Z to A", () => {
   assert.deepEqual(ids(sortTasks(tasks, { key: "name", dir: "asc" })), ["A01-2", "A01-03", "A01-10", "A02-01"]);
   assert.deepEqual(ids(sortTasks(tasks, { key: "name", dir: "desc" })), ["A02-01", "A01-10", "A01-03", "A01-2"]);

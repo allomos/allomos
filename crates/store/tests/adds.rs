@@ -112,16 +112,19 @@ fn each_new_item_writes_one_event_and_a_planned_task_two() {
     );
 
     // A task without an iteration: one event, in backlog.
+    // Without an ID it gets a word ID in its area (Task-A01-54).
     let t = add_task(&root, APP, WAIT, &task(None, "A01", None))
         .unwrap()
         .item;
-    assert_eq!(
-        (t.id.as_str(), t.state, t.iteration.clone()),
-        ("A01-01", State::Backlog, None)
+    assert!(
+        t.id.starts_with("A01-") && !allomos_core::ids::numbered(&t.id),
+        "{}",
+        t.id
     );
+    assert_eq!((t.state, t.iteration.clone()), (State::Backlog, None));
     assert_eq!(
         events_since(&root, start + 2),
-        [ev("add task", "task", "A01-01")]
+        [ev("add task", "task", &t.id)]
     );
 
     // With an iteration: added, then planned, under one lock: two events, as typing both.

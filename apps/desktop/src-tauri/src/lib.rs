@@ -2471,11 +2471,16 @@ mod tests {
         );
         let ids = next_ids(root.clone()).unwrap();
         assert_eq!(ids.iteration, "I08");
-        assert_eq!(ids.tasks.get("A01").map(String::as_str), Some("A01-01"));
+        // A word ID in the area (Task-A01-54).
+        let suggested = ids.tasks.get("A01").unwrap();
+        assert!(
+            suggested.starts_with("A01-") && !allomos_core::ids::numbered(suggested),
+            "{suggested}"
+        );
 
         // New task in an iteration group, as `messenger.addTask` sends it: added, then planned.
         let task: allomos_store::NewTask = serde_json::from_value(serde_json::json!({
-            "id": "", "area": "A01", "title": "Plan the week", "description": "Why.", "iteration": "I07"
+            "id": "A01-01", "area": "A01", "title": "Plan the week", "description": "Why.", "iteration": "I07"
         }))
         .unwrap();
         let t = add_task_as(&root, Some("Will"), task).unwrap();

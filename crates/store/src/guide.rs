@@ -107,9 +107,11 @@ Read this before you add a task, so it fits this project.
    how an existing task is written. Follow what you see.
 2. **Area.** Use an area that exists. Add a new one (`alm add area <id> \"<name>\"`) only when the
    person asks for it or agrees to it, or in a goal run (below).
-3. **ID.** Leave it out: `alm add task --area <area> --title \"…\"` takes the next free number in
-   the area (A01-04 after A01-03). Give an ID only to follow a pattern the project already uses,
-   for example a child task `A01-03-01` under `A01-03`.
+3. **ID.** Leave it out: `alm add task --area <area> --title \"…\"` gives the task a new ID in the
+   area: a random short word and three digits, for example `A01-tiger042`, so tasks added on
+   other branches never get the same one. Older numbered IDs (`A01-53`) stay as they are. Give
+   an ID only to follow a pattern the project already uses, for example a child task
+   `A01-03-01` under `A01-03`.
 4. **Title.** One observable outcome: what a person can do or see when it is done (\"A customer
    orders a cake for a pick-up day\"), not a technical step (\"add an orders table\").
 5. **Description** (`--description`, Markdown), in three short parts:
@@ -236,8 +238,8 @@ Plan:
 - `alm delete area <id>`, `alm delete iteration <id>`: refused while any task is in it, done and
   dropped ones too (plan them elsewhere first).
 - `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]
-  --branch <the branch you are on> [--base <name>]`: without an ID, the next free one in the
-  area; the base branch as `alm guide tasks` says. Read `alm guide tasks` first.
+  --branch <the branch you are on> [--base <name>]`: without an ID, a new word ID in the
+  area (`A01-tiger042`); the base branch as `alm guide tasks` says. Read `alm guide tasks` first.
 - `alm base <id> <branch>`: change the branch a task starts from and merges into.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
