@@ -37,6 +37,7 @@ import {
 import { useFold } from "./useFold";
 import { parseSort, sortTasks, type Sort } from "./sortFlow";
 import { SortMenu } from "./SortMenu";
+import { BrandMark } from "./BrandMark";
 import { PaneResizer } from "./PaneResizer";
 import { PANE_WIDTH_KEY, parsePaneRatio } from "./paneWidthFlow";
 import { WhoLine } from "./WhoForm";
@@ -467,15 +468,8 @@ export function App({ messenger }: { messenger: Messenger }) {
     <div className="app">
       <header className="top">
         <div className="brand" aria-label={t("brand.name")}>
-          {/* The Allomos mark (owner's choice: layout Y2, colours D4): a ring where a ball was, a solid ball where it
-              arrived, a spark for the jump. Same drawing as the app icon's small form. */}
-          <svg viewBox="100 100 824 824" aria-hidden="true">
-            <circle className="ring jade" cx="265" cy="512" r="105" />
-            <circle className="jade" cx="759" cy="512" r="138" />
-            <circle className="ring terracotta" cx="512" cy="265" r="105" />
-            <circle className="terracotta" cx="512" cy="759" r="138" />
-            <path className="spark" d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" />
-          </svg>
+          {/* The Allomos mark; it plays the waiting animation once when the window opens. */}
+          <BrandMark />
           {/* The product's name in the interface's language: Allomos, 换肩, 肩代. */}
           <span>{t("brand.name")}</span>
         </div>

@@ -3,6 +3,7 @@
 // and the licence. Its words follow the interface's language. Escape closes it.
 
 import { useEffect, useState } from "react";
+import { BrandMark } from "./BrandMark";
 import { useI18n } from "./i18n";
 import type { AboutInfo, Messenger } from "./messenger";
 
@@ -22,14 +23,9 @@ export function AboutWindow({ messenger }: { messenger: Pick<Messenger, "aboutIn
   }, [t]);
   return (
     <main className="about-window">
-      {/* The Allomos mark, as in the top bar and the app icon. */}
-      <svg className="about-icon brand-mark" viewBox="100 100 824 824" aria-hidden="true">
-        <circle className="ring jade" cx="265" cy="512" r="105" />
-        <circle className="jade" cx="759" cy="512" r="138" />
-        <circle className="ring terracotta" cx="512" cy="265" r="105" />
-        <circle className="terracotta" cx="512" cy="759" r="138" />
-        <path className="spark" d="M512 392 L552 472 L632 512 L552 552 L512 632 L472 552 L392 512 L472 472 Z" />
-      </svg>
+      {/* The Allomos mark, as in the top bar and the app icon; it plays the waiting animation once
+          when the window opens (Task-A07-apex359). */}
+      <BrandMark className="about-icon brand-mark" />
       <h1>{t("brand.name")}</h1>
       {info && <p className="about-version">{t("about.version", { version: info.version })}</p>}
       <p className="about-tagline">{t("about.tagline")}</p>

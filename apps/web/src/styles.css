@@ -187,6 +187,48 @@ button.link:hover { text-decoration: underline; }
   .icon-loader .il-jade { transform: translate(480px, 0); }
   .icon-loader .il-terra { transform: translate(0, 480px); }
 }
+/* The mark's opening round (Task-A07-apex359): the waiting animation above, once, in the still
+   mark's own shapes (BrandMark.tsx). The balls are drawn where they land and start 494 px back on
+   their rings; the round ends on the finished mark, held, with no fade, so the still mark that
+   follows is the same picture. 8 s, like one round of the loader. */
+.mark-intro .mi-ring-jade { transform-origin: 265px 512px; animation: mi-ring-jade 8s 1 both; }
+.mark-intro .mi-ring-terra { transform-origin: 512px 265px; animation: mi-ring-terra 8s 1 both; }
+.mark-intro .mi-jade { transform-origin: 759px 512px; animation: mi-jade 8s 1 both; }
+.mark-intro .mi-terra { transform-origin: 512px 759px; animation: mi-terra 8s 1 both; }
+.mark-intro .mi-spark { transform-origin: 512px 512px; animation: mi-spark 8s 1 both; }
+@keyframes mi-ring-jade {
+  0%, 10% { transform: scale(0.5); opacity: 0; animation-timing-function: ease-out; }
+  17.5%, 100% { transform: scale(1); opacity: 1; }
+}
+@keyframes mi-ring-terra {
+  0%, 20% { transform: scale(0.5); opacity: 0; animation-timing-function: ease-out; }
+  27.5%, 100% { transform: scale(1); opacity: 1; }
+}
+@keyframes mi-jade {
+  0%, 30% { transform: translate(-494px, 0) scale(0.6); opacity: 0; animation-timing-function: ease-out; }
+  42.5% { transform: translate(-494px, 0) scale(1); opacity: 1; }
+  62.5% { transform: translate(-494px, 0) scale(1); opacity: 1; animation-timing-function: ease-in; }
+  67.2% { transform: translate(-247px, 0) scale(0.5); animation-timing-function: ease-out; }
+  72.1% { transform: translate(0, 0) scale(1.12, 0.9); }
+  74.1%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes mi-terra {
+  0%, 45% { transform: translate(0, -494px) scale(0.6); opacity: 0; animation-timing-function: ease-out; }
+  57.5% { transform: translate(0, -494px) scale(1); opacity: 1; }
+  75.2% { transform: translate(0, -494px) scale(1); opacity: 1; animation-timing-function: ease-in; }
+  80% { transform: translate(0, -247px) scale(0.5); animation-timing-function: ease-out; }
+  84.8% { transform: translate(0, 0) scale(0.9, 1.12); }
+  86.8%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes mi-spark {
+  0%, 57.5% { transform: rotate(0deg) scale(1); opacity: 1; }
+  62.5%, 71.3%, 75.9%, 83.9% { transform: rotate(0deg) scale(0.7); opacity: 0.6; }
+  67.2%, 80% { transform: rotate(45deg) scale(1.3); opacity: 1; }
+  86.8%, 100% { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark-intro .mi-ring-jade, .mark-intro .mi-ring-terra, .mark-intro .mi-jade, .mark-intro .mi-terra, .mark-intro .mi-spark { animation: none; }
+}
 .agents .row { align-items: center; }
 
 /* The welcome page: the road show's opening slide (Task-A05-03). The deck's display face (Big
