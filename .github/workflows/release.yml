@@ -57,6 +57,8 @@ jobs:
 
           The alm-only files hold the alm command alone, for computers without the app: alm-only_${TAG#v}_macos_arm64.tar.gz and alm-only_${TAG#v}_windows_x64.zip. Unpack, then run alm from a terminal.
 
+          What is new in this version: https://allomos.github.io/allomos/release-notes/v$(echo "${TAG#v}" | tr . -)/
+
           How to install: https://allomos.github.io/allomos/start/getting-started/
 
           <details><summary>简体中文</summary>
@@ -70,6 +72,8 @@ jobs:
           每个安装器旁边有一个 .sha256 文件，记着它的 SHA-256 哈希值；Allomos 自我更新前会核对它。
 
           alm-only 文件里只有 alm 命令，给没装 app 的电脑用：alm-only_${TAG#v}_macos_arm64.tar.gz 和 alm-only_${TAG#v}_windows_x64.zip。解压后在终端里运行 alm。
+
+          这个版本的新内容：https://allomos.github.io/allomos/zh-cn/release-notes/v$(echo "${TAG#v}" | tr . -)/
 
           安装步骤：https://allomos.github.io/allomos/zh-cn/start/getting-started/
 
@@ -86,6 +90,8 @@ jobs:
           各インストーラーの横に、SHA-256 ハッシュを記した .sha256 ファイルがあります。「肩代」は自動更新の前にこれを確かめます。
 
           alm-only のファイルには alm コマンドだけが入っています。アプリのないコンピューター向けです：alm-only_${TAG#v}_macos_arm64.tar.gz と alm-only_${TAG#v}_windows_x64.zip。展開して、ターミナルで alm を実行します。
+
+          このバージョンの新しいこと：https://allomos.github.io/allomos/ja/release-notes/v$(echo "${TAG#v}" | tr . -)/
 
           インストール手順：https://allomos.github.io/allomos/ja/start/getting-started/
 

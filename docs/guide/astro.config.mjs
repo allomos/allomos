@@ -29,6 +29,11 @@ export default defineConfig({
           translations: { 'zh-CN': '从这里开始', ja: 'はじめに' },
           items: [{ autogenerate: { directory: 'start' } }],
         },
+        {
+          label: 'Release notes',
+          translations: { 'zh-CN': '发布说明', ja: 'リリースノート' },
+          items: [{ autogenerate: { directory: 'release-notes' } }],
+        },
       ],
     }),
   ],
