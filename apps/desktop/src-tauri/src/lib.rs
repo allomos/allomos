@@ -1344,8 +1344,36 @@ fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
     .title("Allomos")
     .inner_size(1100.0, 720.0)
     .min_inner_size(720.0, 480.0)
+    .visible(false)
     .build()
-    .map(drop)
+    .map(|window| fit_to_screen(&window))
+}
+
+/// A window's size for a screen whose usable area is `width` × `height` (logical pixels): about
+/// 80 % of the width and 85 % of the height, between the minimum window and 1280 × 900, never larger
+/// than the screen (Task-A05-gusto837).
+fn window_size(width: f64, height: f64) -> (f64, f64) {
+    (
+        (width * 0.8).clamp(720.0, 1280.0).min(width),
+        (height * 0.85).clamp(480.0, 900.0).min(height),
+    )
+}
+
+/// Size a hidden window to the screen it is on, centre it and show it. Without a screen to measure,
+/// it keeps the size it was built with.
+fn fit_to_screen(window: &tauri::WebviewWindow) {
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    if let Some(monitor) = monitor {
+        let area = monitor.work_area().size.to_logical::<f64>(monitor.scale_factor());
+        let (width, height) = window_size(area.width, area.height);
+        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        let _ = window.center();
+    }
+    let _ = window.show();
 }
 
 /// The top bar's **New window…** (Task-A01-27).
@@ -1757,6 +1785,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .manage(Windows::default())
+        // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                fit_to_screen(&window);
+            }
+            Ok(())
+        })
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             // Menu commands act on the window in front, not on every window (Task-A01-27).
@@ -1889,6 +1924,16 @@ mod tests {
             .chain(list.iter().copied())
             .map(OsString::from)
             .collect()
+    }
+
+    #[test]
+    fn window_size_follows_the_screen() {
+        // A 13-inch MacBook Air, a 1080p screen, a large screen, a small one.
+        assert_eq!(window_size(1440.0, 875.0), (1152.0, 743.75));
+        assert_eq!(window_size(1920.0, 1040.0), (1280.0, 884.0));
+        assert_eq!(window_size(2560.0, 1415.0), (1280.0, 900.0));
+        assert_eq!(window_size(800.0, 500.0), (720.0, 480.0));
+        assert_eq!(window_size(700.0, 450.0), (700.0, 450.0));
     }
 
     #[test]

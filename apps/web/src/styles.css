@@ -229,8 +229,14 @@ button.link:hover { text-decoration: underline; }
 .welcome-start .muted { font-size: 13px; }
 /* Open recent… under the start page's card, at its left edge, and its dialog (Task-A01-43). The card
    itself is unchanged; the wrapper takes its width and centring. */
-.welcome-wrap { width: min(1120px, 100%); margin: auto; display: grid; gap: 12px; justify-items: start; }
-.welcome-wrap > .welcome { width: 100%; margin: 0; }
+/* The card and the buttons under it fill the page's height, the card's content centred inside it,
+   so the margins around them stay even (Task-A05-gusto837); in a very tall window the block stops
+   growing and the auto margins centre it. */
+.welcome-wrap {
+  width: min(1120px, 100%); flex: 1 0 auto; max-height: 840px; margin: auto; display: grid;
+  grid-template-rows: 1fr auto; gap: 12px; justify-items: start;
+}
+.welcome-wrap > .welcome { width: 100%; margin: 0; display: grid; align-content: center; }
 .recent-dialog { grid-template-rows: auto minmax(0, 1fr); width: min(560px, 100%); }
 .recent-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .recent-dialog .close { border: none; background: none; font-size: 20px; line-height: 1; padding: 2px 6px; color: var(--muted); cursor: pointer; }
