@@ -12,6 +12,23 @@ export function agentName(id: string): string {
   return AGENT_NAMES[id] ?? id;
 }
 
+/**
+ * The agent's id from what a session reported, as alm folds it since Task-A03-39 (reports saved
+ * before that are folded here): the part before any `/`, and a word starting with `claude` is
+ * `claude-code`, one starting with `codex` is `codex`. A session that reported under its session
+ * name (`claude/a09-28-kanto-picker`) no longer gets a chip of its own.
+ */
+export function agentId(reported: string): string {
+  const word = (reported.trim().split("/")[0] ?? "").trim();
+  const lower = word.toLowerCase();
+  return lower.startsWith("claude") ? "claude-code" : lower.startsWith("codex") ? "codex" : word;
+}
+
+/** Every report under its folded agent id, newest first. */
+function folded(reports: QuotaReport[]): QuotaReport[] {
+  return reports.map((r) => ({ ...r, agent: agentId(r.agent) })).sort((a, b) => b.at.localeCompare(a.at));
+}
+
 /** Green at 20% or more, amber from 5% to under 20%, red under 5%. */
 export function tone(left: number): "green" | "amber" | "red" {
   return left >= 20 ? "green" : left >= 5 ? "amber" : "red";
@@ -43,7 +60,7 @@ export interface Chip {
 
 /** The chips, current first, then Claude Code and Codex, then other agents that reported. */
 export function chips(reports: QuotaReport[], setup: { codex: boolean; claude: boolean }): Chip[] {
-  const newest = [...reports].sort((a, b) => b.at.localeCompare(a.at));
+  const newest = folded(reports);
   const current = newest[0]?.agent ?? null;
   const told = (agent: string) => (agent === "claude-code" ? setup.claude : agent === "codex" ? setup.codex : null);
   const order = [current, "claude-code", "codex", ...newest.map((r) => r.agent)].filter(
@@ -63,7 +80,7 @@ export function chips(reports: QuotaReport[], setup: { codex: boolean; claude: b
 
 /** The popup's rows: every report, the current agent's first, then the newest first. */
 export function popupRows(reports: QuotaReport[]): QuotaReport[] {
-  const newest = [...reports].sort((a, b) => b.at.localeCompare(a.at));
+  const newest = folded(reports);
   const current = newest[0]?.agent;
   return [...newest.filter((r) => r.agent === current), ...newest.filter((r) => r.agent !== current)];
 }

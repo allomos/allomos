@@ -101,6 +101,9 @@ button.link:hover { text-decoration: underline; }
    others dimmed; a stale figure grey and dashed. Hovering (or focusing) a chip shows the popup. */
 .agent-chip { position: relative; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; color: var(--ink); background: var(--surface); cursor: default; }
 .agent-chip.dimmed { opacity: 0.55; }
+/* The dimming would fade the popup too (opacity covers the chip's children), so a dimmed chip is
+   shown in full while its popup is open (Task-A03-39). */
+.agent-chip.dimmed:hover, .agent-chip.dimmed:focus-within, .agent-chip.dimmed:focus { opacity: 1; }
 .agent-chip.quota-green { color: var(--ok); background: var(--ok-bg); border-color: var(--ok); }
 .agent-chip.quota-amber { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
 .agent-chip.quota-red { color: var(--err); background: var(--err-bg); border-color: var(--err); }

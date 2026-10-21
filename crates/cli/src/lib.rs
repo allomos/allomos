@@ -110,7 +110,8 @@ enum Command {
     /// beside the agent. Kept on this computer, not in the taskbag: nothing to save or share.
     /// Without --agent, it lists the reports.
     Quota {
-        /// Your agent's id: claude-code, codex, or another agent's.
+        /// Your agent's id: claude-code, codex, or another agent's (not your session name; a
+        /// word starting with claude or codex, or a session name claude/…, is read as that agent).
         #[arg(long, requires = "left")]
         agent: Option<String>,
         /// A name for the account, only when you can tell one; never an email address or user

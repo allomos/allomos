@@ -89,6 +89,23 @@ fn bad(detail: String) -> Problem {
     Problem::BadUsage { detail }
 }
 
+/// The agent's id from what a session reported. Sessions sometimes give their session name
+/// (`claude/a09-28-kanto-picker`) or a short form (`Claude`, `codex-cli`) instead of the id, which
+/// gave the app a chip per session (Task-A03-39): the part before any `/` is taken, and a word
+/// that starts with `claude` is Claude Code (`claude-code`), one that starts with `codex` is Codex
+/// (`codex`). Any other id is kept as given.
+pub fn agent_id(reported: &str) -> String {
+    let word = reported.trim().split('/').next().unwrap_or("").trim();
+    let lower = word.to_ascii_lowercase();
+    if lower.starts_with("claude") {
+        "claude-code".into()
+    } else if lower.starts_with("codex") {
+        "codex".into()
+    } else {
+        word.to_string()
+    }
+}
+
 /// The report an agent gives: refused when the input is invalid (an empty agent, an unknown
 /// window, a share over 100, a bad date). Nothing else is judged.
 pub fn new_report(
@@ -98,7 +115,7 @@ pub fn new_report(
     left: u8,
     resets: Option<&str>,
 ) -> Result<QuotaReport, Problem> {
-    let agent = agent.trim();
+    let agent = agent_id(agent);
     if agent.is_empty() || agent.chars().any(char::is_whitespace) {
         return Err(bad(format!(
             "--agent needs the agent's id, one word (for example claude-code or codex), not \"{agent}\""
@@ -119,7 +136,7 @@ pub fn new_report(
         )));
     }
     Ok(QuotaReport {
-        agent: agent.to_string(),
+        agent,
         account: account
             .map(str::trim)
             .filter(|a| !a.is_empty())
@@ -157,6 +174,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_session_name_or_short_form_is_folded_into_the_agent_id() {
+        for (given, id) in [
+            ("claude-code", "claude-code"),
+            ("claude/a09-28-kanto-picker", "claude-code"),
+            (" Claude ", "claude-code"),
+            ("codex", "codex"),
+            ("codex-cli/loop-2", "codex"),
+            ("gemini", "gemini"),
+            ("gemini/run-3", "gemini"),
+        ] {
+            assert_eq!(agent_id(given), id, "{given}");
+        }
+        assert_eq!(new_report("claude/a09-28", None, "5h", 86, None).unwrap().agent, "claude-code");
+        assert!(matches!(new_report("/x", None, "5h", 1, None), Err(Problem::BadUsage { .. })));
+    }
+
+    #[test]
     fn invalid_input_is_refused_and_nothing_else_judged() {
         let ok = new_report(
             "claude-code",
@@ -178,7 +212,7 @@ mod tests {
         );
         for (agent, window, left, resets) in [
             ("", "5h", 1, None),
-            ("claude code", "5h", 1, None),
+            ("some agent", "5h", 1, None),
             ("codex", "day", 1, None),
             ("codex", "5h", 101, None),
             ("codex", "5h", 1, Some("tomorrow")),

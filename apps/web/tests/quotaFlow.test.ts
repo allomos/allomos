@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chips, freshness, popupRows, tone } from "../src/quotaFlow.ts";
+import { agentId, chips, freshness, popupRows, tone } from "../src/quotaFlow.ts";
 import type { QuotaReport } from "../src/types.ts";
 
 const r = (agent: string, left: number, at: string, more: Partial<QuotaReport> = {}): QuotaReport => ({
@@ -64,4 +64,23 @@ test("no reports: the two known agents, none current; another agent that reporte
       ["Codex", false, false],
     ],
   );
+});
+
+test("a report under a session name or short form counts for its agent, not as another agent", () => {
+  assert.deepEqual(
+    ["claude-code", "claude/a09-28-kanto-picker", " Claude ", "codex-cli/loop-2", "gemini/run-3"].map(agentId),
+    ["claude-code", "claude-code", "claude-code", "codex", "gemini"],
+  );
+  const reports = [
+    r("codex", 40, "2026-10-20T10:00:00Z"),
+    r("claude/a09-28-kanto-picker", 86, "2026-10-20T10:30:00Z"),
+  ];
+  assert.deepEqual(
+    chips(reports, { codex: true, claude: true }).map((c) => [c.name, c.current, c.quota?.left ?? null]),
+    [
+      ["Claude Code", true, 86],
+      ["Codex", false, null],
+    ],
+  );
+  assert.deepEqual(popupRows(reports).map((x) => x.agent), ["claude-code", "codex"]);
 });
