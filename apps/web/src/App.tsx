@@ -38,7 +38,7 @@ import { useFold } from "./useFold";
 import { parseSort, sortTasks, type Sort } from "./sortFlow";
 import { SortMenu } from "./SortMenu";
 import { PaneResizer } from "./PaneResizer";
-import { PANE_WIDTH_KEY, parsePaneWidth } from "./paneWidthFlow";
+import { PANE_WIDTH_KEY, parsePaneRatio } from "./paneWidthFlow";
 import { WhoLine } from "./WhoForm";
 import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
@@ -1289,11 +1289,12 @@ function TaskbagView({
     if (selectedId) document.getElementById(`task-${selectedId}`)?.scrollIntoView({ block: "nearest" });
   }, [selectedId, groupBy]);
 
-  // The task pane's width (Task-A01-56): null is the default; a dragged width is kept in storage.
+  // The task pane's width (Task-A01-56): null is the default; a dragged width is kept in storage as
+  // the pane's share of the list-and-pane box (Task-A01-61).
   const layoutRef = useRef<HTMLDivElement | null>(null);
-  const [paneWidth, setPaneWidth] = useState<number | null>(() => {
+  const [paneRatio, setPaneRatio] = useState<number | null>(() => {
     try {
-      return parsePaneWidth(localStorage.getItem(PANE_WIDTH_KEY));
+      return parsePaneRatio(localStorage.getItem(PANE_WIDTH_KEY));
     } catch {
       return null;
     }
@@ -1466,8 +1467,8 @@ function TaskbagView({
           {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
           <div
             ref={layoutRef}
-            className={selected ? (paneWidth !== null ? "list-layout with-pane sized" : "list-layout with-pane") : "list-layout"}
-            style={paneWidth !== null ? ({ "--pane-width": `${paneWidth}px` } as CSSProperties) : undefined}
+            className={selected ? (paneRatio !== null ? "list-layout with-pane sized" : "list-layout with-pane") : "list-layout"}
+            style={paneRatio !== null ? ({ "--pane-width": `${paneRatio * 100}%` } as CSSProperties) : undefined}
           >
             {groupBy === "handoffs" ? (
               <HandoffsView
@@ -1568,7 +1569,7 @@ function TaskbagView({
             </div>
             )}
             {/* Task-A01-56: drag the pane's inner edge to change its width; it is kept for next time. */}
-            {selected && <PaneResizer layout={layoutRef} width={paneWidth} onWidth={setPaneWidth} />}
+            {selected && <PaneResizer layout={layoutRef} ratio={paneRatio} onRatio={setPaneRatio} />}
             {selected && (
               <TaskPane
                 task={selected}

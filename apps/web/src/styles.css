@@ -324,7 +324,8 @@ button.link:hover { text-decoration: underline; }
    2026-10-09) and opening the pane keeps the list where it was. */
 .list-layout { flex: 1 1 0; min-height: 240px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 14px; }
 .list-layout.with-pane { grid-template-columns: minmax(0, 1fr) 14px minmax(300px, 40%); column-gap: 0; }
-/* Task-A01-56: a width the person dragged, still kept between 300px and what leaves the list 320px. */
+/* Task-A01-56: a width the person dragged, kept as a share of this box (Task-A01-61, a percentage),
+   still kept between 300px and what leaves the list 320px. */
 .list-layout.with-pane.sized { grid-template-columns: minmax(0, 1fr) 14px clamp(300px, var(--pane-width), calc(100% - 334px)); }
 .pane-resizer { align-self: stretch; cursor: col-resize; touch-action: none; position: relative; outline: none; }
 .pane-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 6px; width: 2px; border-radius: 1px; background: transparent; transition: background 0.15s; }

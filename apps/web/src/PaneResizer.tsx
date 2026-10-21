@@ -1,38 +1,56 @@
 // The task pane's inner edge (Task-A01-56): drag it, or use the arrow keys when it has focus, to
 // make the pane wider or narrower; double-click it to go back to the default width. The width is
-// kept in the app's own storage, so it is the same the next time the pane opens and after a restart.
+// kept in the app's own storage as a share of the list-and-pane box (Task-A01-61), so it is the same
+// the next time the pane opens, after a restart, and in proportion when the window is resized.
 
 import { useRef, type RefObject } from "react";
 import { useI18n } from "./i18n";
-import { KEY_STEP, MIN_PANE, PANE_WIDTH_KEY, clampPane, dragWidth, maxPane } from "./paneWidthFlow";
+import {
+  KEY_STEP,
+  MIN_PANE,
+  PANE_WIDTH_KEY,
+  clampPane,
+  dragWidth,
+  formatPaneRatio,
+  maxPane,
+  paneRatio,
+  ratioWidth,
+} from "./paneWidthFlow";
 
 /** The column the edge sits in, between the list and the pane, in pixels. */
 export const EDGE = 14;
 
 export function PaneResizer({
   layout,
-  width,
-  onWidth,
+  ratio,
+  onRatio,
 }: {
   /** The list and pane's shared box, to measure against. */
   layout: RefObject<HTMLDivElement | null>;
-  /** The chosen width, or null for the default. */
-  width: number | null;
-  onWidth: (width: number | null) => void;
+  /** The chosen share of the box, or null for the default. */
+  ratio: number | null;
+  onRatio: (ratio: number | null) => void;
 }) {
   const { t } = useI18n();
   const dragging = useRef(false);
   const box = () => layout.current?.getBoundingClientRect() ?? null;
   // The pane's width now, measured when no width has been chosen yet.
   const current = () => {
-    if (width !== null) return width;
+    const r = box();
+    if (ratio !== null && r) return ratioWidth(ratio, r.width, EDGE);
     const pane = layout.current?.querySelector<HTMLElement>(".task-pane");
     return pane ? pane.getBoundingClientRect().width : MIN_PANE;
   };
-  const keep = (w: number | null) => {
+  // A width in pixels becomes the pane's share of the box, shown now and kept for next time.
+  const choose = (w: number, layoutWidth: number) => {
+    const share = paneRatio(w, layoutWidth);
+    onRatio(share);
+    return share;
+  };
+  const keep = (share: number | null) => {
     try {
-      if (w === null) localStorage.removeItem(PANE_WIDTH_KEY);
-      else localStorage.setItem(PANE_WIDTH_KEY, String(w));
+      if (share === null) localStorage.removeItem(PANE_WIDTH_KEY);
+      else localStorage.setItem(PANE_WIDTH_KEY, formatPaneRatio(share));
     } catch {
       /* storage unavailable: the width lasts until the window closes */
     }
@@ -59,7 +77,7 @@ export function PaneResizer({
         const r = box();
         if (!dragging.current || !r) return;
         // The pointer sits in the middle of the edge's column.
-        onWidth(dragWidth(e.clientX + EDGE / 2, r.right, r.width, EDGE));
+        choose(dragWidth(e.clientX + EDGE / 2, r.right, r.width, EDGE), r.width);
       }}
       onPointerUp={(e) => {
         if (!dragging.current) return;
@@ -67,13 +85,11 @@ export function PaneResizer({
         e.currentTarget.releasePointerCapture(e.pointerId);
         const r = box();
         if (r) {
-          const w = dragWidth(e.clientX + EDGE / 2, r.right, r.width, EDGE);
-          onWidth(w);
-          keep(w);
+          keep(choose(dragWidth(e.clientX + EDGE / 2, r.right, r.width, EDGE), r.width));
         }
       }}
       onDoubleClick={() => {
-        onWidth(null);
+        onRatio(null);
         keep(null);
       }}
       onKeyDown={(e) => {
@@ -90,8 +106,7 @@ export function PaneResizer({
                 : null;
         if (to === null) return;
         e.preventDefault();
-        onWidth(to);
-        keep(to);
+        keep(choose(to, r.width));
       }}
     />
   );
