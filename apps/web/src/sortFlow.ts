@@ -1,6 +1,7 @@
-// Sorting the tasks inside each iteration (Task-A01-52): by ID (the taskbag's own order), by name
-// or by last change, ascending or descending. Kept apart from React so it can be tested with Node
-// alone (`npm --prefix apps/web test`). Only type imports here: Node strips them.
+// Sorting the tasks inside each iteration and area (Task-A01-52, Task-A01-plum588): by ID (the
+// taskbag's own order), by name or by last change, ascending or descending. Kept apart from React
+// so it can be tested with Node alone (`npm --prefix apps/web test`). Only type imports here: Node
+// strips them.
 import type { Task } from "./types";
 
 export type SortKey = "id" | "name" | "changed";

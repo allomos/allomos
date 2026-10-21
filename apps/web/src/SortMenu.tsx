@@ -1,5 +1,6 @@
-// The Iterations tab's sort menu (Task-A01-52): a compact button saying the sort in use, which
-// opens a menu of what to sort by and which way. The order itself is decided in sortFlow.ts.
+// The task list's sort menu (Task-A01-52; in the By area tab too, Task-A01-plum588): a compact
+// button saying the sort in use, which opens a menu of what to sort by and which way. The order
+// itself is decided in sortFlow.ts.
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";

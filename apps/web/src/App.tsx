@@ -1147,7 +1147,8 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  // The Iterations tab's sort (Task-A01-52), remembered like the tab and the filter.
+  // The task list's sort (Task-A01-52), remembered like the tab and the filter; one choice for the
+  // Iterations and By area tabs (Task-A01-plum588).
   const [sort, setSort] = useState<Sort>(() => {
     try {
       return parseSort(localStorage.getItem(SORT_KEY));
@@ -1209,12 +1210,12 @@ function TaskbagView({
         id: area.id,
         name: area.name,
         empty: t("area.no_tasks"),
-        tasks: box.tasks.filter((task) => task.area === area.id),
+        tasks: inOrder(box.tasks.filter((task) => task.area === area.id)),
         newTask: { area: area.id, iteration: null },
         edit: { kind: "area", id: area.id },
       });
     }
-    const lost = box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area));
+    const lost = inOrder(box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area)));
     if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
   }
   // With a state filter, each group lists only the tasks in that state (its count stays whole)
@@ -1449,7 +1450,7 @@ function TaskbagView({
                   ))}
                 </select>
               </label>
-              {groupBy === "iteration" && <SortMenu sort={sort} onChange={chooseSort} />}
+              {groupBy !== "handoffs" && <SortMenu sort={sort} onChange={chooseSort} />}
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-40: the saved name changes are recorded as, and where to change it. */}
               <WhoLine name={ownerName} onSave={saveOwnerName} />

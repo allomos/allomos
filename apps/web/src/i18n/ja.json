@@ -590,7 +590,7 @@
   "problem.card_empty": "カードのファイル {path} は空なので、何も移しませんでした。",
   "problem.card_not_reported": "タスク {id} のカードのファイルは報告されていません。",
   "problem.claim_cards_outside": "{count} 件のタスクのカードのファイルがまだタスクバッグの外にあります（{tasks}）。移し入れるまで、どのタスクも始められません。",
-  "sort.label": "各イテレーションのタスクを並べ替え",
+  "sort.label": "各エリアやイテレーションのタスクを並べ替え",
   "sort.summary": "{key}・{dir}",
   "sort.by": "並べ替え",
   "sort.by_id": "ID",

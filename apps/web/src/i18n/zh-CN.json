@@ -590,7 +590,7 @@
   "problem.card_empty": "卡片文件 {path} 是空的，所以没有搬入任何东西。",
   "problem.card_not_reported": "没有人报告任务 {id} 的卡片文件。",
   "problem.claim_cards_outside": "有 {count} 个任务的卡片文件还在任务包外（{tasks}），把它们搬进来之前，不能开始任何任务。",
-  "sort.label": "对每个迭代中的任务排序",
+  "sort.label": "对每个领域或迭代中的任务排序",
   "sort.summary": "{key}，{dir}",
   "sort.by": "排序方式",
   "sort.by_id": "ID",
