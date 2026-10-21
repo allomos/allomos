@@ -1651,6 +1651,21 @@ fn brief_and_guide_tell_agents_about_allomos() {
     assert!(all["guide"].as_str().unwrap().contains("# Allomos terms"));
     let (code, v) = fj(&repo, &["guide", "nope"]);
     assert_eq!((code, &v["error"]["code"]), (2, &json!("bad_usage")));
+    // A topic in separate words, and the words after it (Task-A03-planet530).
+    let v = ok(&repo, &["guide", "github", "release", "minor"]);
+    assert_eq!(v["topic"], json!("github-release"));
+    assert_eq!(v["words"], json!(["minor"]));
+    let text = v["guide"].as_str().unwrap();
+    assert!(text.starts_with("Words after the topic, for you to read as this guide says: minor"));
+    assert!(text.contains("# GitHub release: publish a new release and install it"));
+    let v = ok(&repo, &["guide", "github-release", "--language", "ja"]);
+    assert_eq!(v["written_in_language"], json!(false));
+    assert!(
+        v["guide"]
+            .as_str()
+            .unwrap()
+            .starts_with("This text is not written in ja yet: follow")
+    );
 }
 
 #[test]
@@ -2169,7 +2184,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v21)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v22)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2179,7 +2194,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v21)", "## Tasks: Allomos (v20)")
+            brief.replace("## Tasks: Allomos (v22)", "## Tasks: Allomos (v21)")
         ),
     )
     .unwrap();

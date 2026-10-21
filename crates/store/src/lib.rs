@@ -51,7 +51,7 @@ pub use convert::{
 pub use events::Actor;
 pub use guide::{
     GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
-    agent_files, goal, goal_request_in, guide, localized, run_modes,
+    agent_files, github_release, goal, goal_request_in, guide, guide_topic, localized, run_modes,
 };
 pub use quota::{
     QuotaReport, WINDOWS as QUOTA_WINDOWS, new_report as new_quota_report, quota_reports,
@@ -279,6 +279,9 @@ the project notes (below) and your own handoff file.
   advance, recorded once on the goal task (its title starts with `Goal:`): you add the areas and
   iterations and make your own tasks ready. Anything with an outside effect still waits for the
   approver. No spend cap: the quota gate of `alm handoff-rules` is the limit.
+- A line in the conversation that starts with `alm ` followed by one of its commands (for example
+  `alm guide github release`) is a command: run it as written, and when it prints a guide, follow
+  that guide. The word alm inside a sentence is not one.
 - Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
   When the work is finished and only a person's hands-on check is left, in quiet and normal
   mode alike, finish it below the top label with `alm done <id> --without-human-check \"<why>\"
@@ -361,6 +364,7 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
 `alm guide agent-files` (one set of shared rules for every agent, done once per agent),
 `alm guide goal` (the goal prompt: build an app from a description, release by release),
+`alm guide github-release` (publish a GitHub release and install it, when the approver asks),
 `alm guide move-cards` (card files: moving them in beside their tasks).
 "
     )

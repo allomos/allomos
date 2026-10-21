@@ -6,9 +6,12 @@
 //! ([`run_modes`]), and `agent-files` (Task-A03-24), the one-time procedure that puts every
 //! agent's shared rules in AGENTS.md, which the person may read along ([`agent_files`]); and `goal`
 //! (Task-A03-25-01), the goal prompt Allomos types into an agent for the person ([`goal`]).
+//! `github-release` (Task-A03-planet530), which the agent follows when the approver writes
+//! `alm guide github release` in the conversation, is printed in the task language like those, but
+//! so far written only in English ([`github_release`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 9] = [
+pub const GUIDE_TOPICS: [&str; 10] = [
     "terms",
     "customize",
     "tasks",
@@ -17,11 +20,12 @@ pub const GUIDE_TOPICS: [&str; 9] = [
     "run-modes",
     "agent-files",
     "goal",
+    "github-release",
     "move-cards",
 ];
 
 /// The topics written in every language of [`RUN_MODES_LANGUAGES`], printed in the task language.
-pub const LOCALIZED_TOPICS: [&str; 3] = ["run-modes", "agent-files", "goal"];
+pub const LOCALIZED_TOPICS: [&str; 4] = ["run-modes", "agent-files", "goal", "github-release"];
 
 /// The languages `alm guide run-modes`, `alm guide agent-files` and `alm guide goal` are written in: those of the Allomos app (`en`, `ja`,
 /// `zh-CN`, as [`crate::pick_ui_language`] picks them).
@@ -303,6 +307,10 @@ About Allomos:
 - `alm guide goal [--language <code>]`: the goal prompt: given a person's description of an app,
   plan it into areas, iterations and ready tasks and build it release by release, recording every
   step with `alm`; same languages.
+- `alm guide github-release`: what to do when the approver writes `alm guide github release` in the
+  conversation: publish a new GitHub release with release notes, check it, and install it on this
+  computer, from the facts in the project notes' `## Releases` section. Words after the topic
+  (`minor`, `major`, `no install`) are the guide's, for you to read. English only so far.
 - `alm guide move-cards`: how to find card files kept outside the taskbag, report them, and
   move them in beside their tasks after the person's Go ahead.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
@@ -1215,6 +1223,161 @@ pub fn added_task_steps(language: &str, id: &str, iterations: &[String]) -> Stri
     }
 }
 
+/// `alm guide github-release` (Task-A03-planet530): the procedure an agent follows when the
+/// approver writes `alm guide github release` in the conversation: publish a new GitHub release
+/// with release notes, check it, and install it on this computer. The same text for every project:
+/// it names no repository, address or file; the project's facts come from the project notes'
+/// `## Releases` section.
+const GITHUB_RELEASE_EN: &str = "# GitHub release: publish a new release and install it on this computer
+
+The approver writes `alm guide github release` (or `alm guide github-release`) in the
+conversation; you ran it, and this is what to do. One outcome: **a new release on GitHub, with
+notes that say what changed, installed on this computer.** The command in the conversation is the
+approval for this release and for installing it here. Anything it does not cover (another version
+jump than its words say, publishing somewhere new) still goes to the approver.
+
+Words after the command, which you read from the approver's line (alm does not act on them):
+- `minor` or `major`: raise that part of the version instead of the patch.
+- `no install`: stop after step 6 (released and checked); do not download or install.
+Any other word: ask the approver what it means before you tag.
+
+This text names no repository, address or file: every fact of the project comes from the
+taskbag's `project-notes.md`, its `## Releases` section (step 0). Where the project's rules
+(AGENTS.md) say something else, they win.
+
+## 0. Read the project's release facts
+
+Read the `## Releases` section of the project notes. It is a table with these keys:
+
+| Key | What it says |
+|---|---|
+| `REMOTE` | the GitHub repository |
+| `BASE_BRANCH` | the branch releases are cut from |
+| `VERSION_FILES` | every file that holds the version, how it is written there, and what derives from it (a lockfile) |
+| `TAG_FORMAT` | how a tag is spelled |
+| `BUMP` | which part of the version goes up by default |
+| `RELEASE_WORKFLOW` | what builds and publishes on a tag push, how long it takes, how to run it again for an existing tag |
+| `NOTES_DIR` | where release-notes pages live, the file name pattern, and the shape of a page |
+| `NOTES_LANGUAGES` | every language a page must exist in |
+| `NOTES_INDEX` | the index pages that list releases and gain a line |
+| `NOTES_URL` | the published address of a release's page, per language |
+| `NOTES_PUBLISH` | what publishes the pages, how long it takes, and how to build them locally |
+| `GH_NOTES` | who writes the GitHub release's own notes, and whether they link to the pages |
+| `INSTALL_ASSET` | the asset to install on this computer, and its checksum file |
+| `INSTALL_COMMAND` | how it is installed, and whether a person must approve (a password, a dialog) |
+| `VERIFY_INSTALLED` | how to read the installed version afterwards |
+| `APPROVAL_RECORD` | where this release's approval and evidence are written |
+
+When the section is missing, or a key in it: derive what the repository settles (the last tag
+and its shape, the workflow under `.github/workflows` that runs on a tag, the files whose version
+equals the last tag's, the folder holding the last release's notes page, the assets of the last
+GitHub release for this computer), write the section into the project notes, and show it to the
+approver before tagging. Ask only for what nothing in the repository settles. Next time the
+section is the source.
+
+## 1. Preflight: stop on any failure and say which
+
+- You are on `BASE_BRANCH`, the working tree is clean, pulled, and nothing is ahead of the remote.
+- The last release (`gh release list --limit 1`) and the last tag agree.
+- No run of `RELEASE_WORKFLOW` is still going (`gh run list --workflow <file> --limit 1`).
+- There are commits since the last tag. None: say so and stop, there is nothing to release.
+- `gh auth status` passes, and so does every tool `INSTALL_COMMAND` needs.
+
+## 2. Collect what changed
+
+- `git log <last tag>..HEAD --no-merges` lists the commits; a version bump is not a change.
+- When a commit names a task, read it (`alm show <id>`), so the notes say what a person using the
+  product notices, not what the code did.
+- Sort the changes under **New**, **Fixed** and **Also** (or the headings the last release's page
+  uses): one bullet per outcome, a bold lead-in, plain words, present tense; no commit hashes and
+  no task IDs in the text. A change nobody using the product can notice (refactoring, tests, agent
+  rules) goes under Also in one line, or is left out; say in your handoff what you left out.
+- Write the notes in each of `NOTES_LANGUAGES`, translating meaning, not words; product and
+  command names stay as they are.
+
+## 3. Choose the version
+
+`BUMP` (or the command's `minor` / `major`) applied to the last tag's version. Say the version you
+chose before you write anything: until the tag exists, everything is easy to undo.
+
+## 4. Write the notes
+
+- One page per language in `NOTES_LANGUAGES`, in the same shape as the last release's page (front
+  matter, headings, the download line, the date).
+- A line for the new release at the top of every page in `NOTES_INDEX`.
+- Build the pages locally (`NOTES_PUBLISH` says how), so a broken page is found before it is
+  published.
+- When `GH_NOTES` links to the pages, every language's page exists before the tag: a missing page
+  is a dead link on the GitHub release.
+
+## 5. Bump, commit, tag
+
+- Change every file in `VERSION_FILES` to the new version; update what derives from them (a
+  lockfile) with the project's own tool, never by hand.
+- One commit holds the notes and the bump, in the project's commit style with the attribution line
+  its rules ask for. Push `BASE_BRANCH` and confirm it landed.
+- Tag in `TAG_FORMAT`, annotated (`git tag -a <tag> -m <tag>`), and push the tag. The tag push is
+  the outside effect; everything before it is local.
+
+## 6. Wait and check
+
+- Wait for the release run and for the notes' publish in the background
+  (`gh run watch <run id> --exit-status`); do not poll by hand.
+- A failed run: read its log, fix the cause on `BASE_BRANCH`, and run it again the way
+  `RELEASE_WORKFLOW` says (often `workflow_dispatch` with the tag). Never delete a tag or a release
+  and tag again; say what happened instead.
+- Check, and keep the evidence: `gh release view <tag>` lists every expected asset and checksum
+  file; the release's own notes point to the pages (`GH_NOTES`); `NOTES_URL` for the new version
+  answers 200 in every language, with the version in the page's title.
+
+## 7. Download and install
+
+- Download into a new, empty folder outside the project:
+  `gh release download <tag> --pattern <INSTALL_ASSET> --pattern <its checksum file>`.
+- Check the checksum first; a mismatch stops the install, and you report it.
+- Install with `INSTALL_COMMAND`. When it asks for a password or an approval in a dialog, open it
+  for the approver and say what to click; never type a password.
+- `VERIFY_INSTALLED`: the installed version equals the released one. Report what it shows.
+
+## 8. Record and report
+
+- Write the approval (the approver's command line, and when) and the evidence where
+  `APPROVAL_RECORD` says, and in your handoff.
+- Report in plain words first: the version, the notes' headings and how many items each has, the
+  links to the release and to the notes, and the version installed. Then the evidence: the run
+  IDs, the asset list, the checksum result. Last, what was not done or not checked.
+
+## What you never do here
+
+- Release from a working tree with changes, from another branch than `BASE_BRANCH`, or while a
+  release run is going.
+- Guess a value the repository does not settle: ask the approver.
+- Force-push, delete a tag or a release, or tag again.
+- Type a password or approve an installer's dialog.
+";
+
+/// `alm guide github-release` in `language`, or `None` when it is not written in that language
+/// (the agent then follows a faithful translation of the English text). Only English so far.
+pub fn github_release(language: &str) -> Option<&'static str> {
+    match written_in(language)? {
+        "en" => Some(GITHUB_RELEASE_EN),
+        _ => None,
+    }
+}
+
+/// The topic `words` name, joined by hyphens (`github release` is `github-release`), and the words
+/// after it, which the guide defines and the agent reads (`alm guide github release minor`). The
+/// longest run of leading words that names a topic wins; `None` when no leading words name one.
+pub fn guide_topic(words: &[String]) -> Option<(&'static str, Vec<String>)> {
+    (1..=words.len()).rev().find_map(|n| {
+        let name = words[..n].join("-").to_lowercase();
+        GUIDE_TOPICS
+            .iter()
+            .find(|t| **t == name)
+            .map(|t| (*t, words[n..].to_vec()))
+    })
+}
+
 /// A topic of [`LOCALIZED_TOPICS`] in `language`, or `None` when the topic is not one of them or
 /// is not written in that language (the agent then translates the English text faithfully).
 pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
@@ -1222,6 +1385,7 @@ pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
         "run-modes" => run_modes(language),
         "agent-files" => agent_files(language),
         "goal" => goal(language),
+        "github-release" => github_release(language),
         _ => None,
     }
 }
@@ -1252,6 +1416,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "run-modes" => Some(RUN_MODES_EN),
         "agent-files" => Some(AGENT_FILES_EN),
         "goal" => Some(GOAL_EN),
+        "github-release" => Some(GITHUB_RELEASE_EN),
         "move-cards" => Some(MOVE_CARDS),
         _ => None,
     };
@@ -1482,6 +1647,102 @@ mod tests {
         ] {
             assert!(brief.contains(&flat(words)), "{words}");
         }
+    }
+
+    /// `alm guide github-release` (Task-A03-planet530): one text for every project, naming no
+    /// repository, address or file; it reads the project's facts from the project notes, covers
+    /// every step, the words after the command, and what it never does. Written in English only.
+    #[test]
+    fn github_release_is_generic_and_complete() {
+        let text = guide(Some("github-release")).unwrap();
+        assert_eq!(github_release("en"), Some(GITHUB_RELEASE_EN));
+        assert_eq!(
+            localized("github-release", "en-GB"),
+            Some(GITHUB_RELEASE_EN)
+        );
+        assert_eq!(github_release("ja"), None);
+        assert_eq!(github_release("zh-CN"), None);
+        let low = text.to_lowercase();
+        for word in ["allomos", "github.io", "docs/guide"] {
+            assert!(!low.contains(word), "{word}");
+        }
+        for words in [
+            "`## Releases`",
+            "## 0. Read the project's release facts",
+            "## 1. Preflight",
+            "## 2. Collect what changed",
+            "## 3. Choose the version",
+            "## 4. Write the notes",
+            "## 5. Bump, commit, tag",
+            "## 6. Wait and check",
+            "## 7. Download and install",
+            "## 8. Record and report",
+            "`git log <last tag>..HEAD --no-merges`",
+            "`gh auth status`",
+            "`gh run watch <run id> --exit-status`",
+            "`minor` or `major`",
+            "`no install`",
+            "never type a password",
+            "Force-push, delete a tag or a release, or tag again.",
+        ] {
+            assert!(text.contains(words), "{words}");
+        }
+        for key in [
+            "REMOTE",
+            "BASE_BRANCH",
+            "VERSION_FILES",
+            "TAG_FORMAT",
+            "BUMP",
+            "RELEASE_WORKFLOW",
+            "NOTES_DIR",
+            "NOTES_LANGUAGES",
+            "NOTES_INDEX",
+            "NOTES_URL",
+            "NOTES_PUBLISH",
+            "GH_NOTES",
+            "INSTALL_ASSET",
+            "INSTALL_COMMAND",
+            "VERIFY_INSTALLED",
+            "APPROVAL_RECORD",
+        ] {
+            assert!(text.contains(&format!("| `{key}` |")), "{key}");
+        }
+        // The brief makes a line starting with `alm ` in the conversation a command to run.
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        let brief = flat(&crate::agent_section());
+        assert!(brief.contains(&flat(
+            "A line in the conversation that starts with `alm ` followed by one of its commands"
+        )));
+        assert!(brief.contains("when it prints a guide, follow that guide"));
+    }
+
+    /// A topic written as separate words is the same topic; the words after it are the guide's.
+    #[test]
+    fn a_topic_may_be_written_as_separate_words() {
+        let words = |s: &str| s.split(' ').map(String::from).collect::<Vec<_>>();
+        assert_eq!(
+            guide_topic(&words("github release")),
+            Some(("github-release", vec![]))
+        );
+        assert_eq!(
+            guide_topic(&words("github-release")),
+            Some(("github-release", vec![]))
+        );
+        assert_eq!(
+            guide_topic(&words("GitHub release minor")),
+            Some(("github-release", words("minor")))
+        );
+        assert_eq!(
+            guide_topic(&words("github release no install")),
+            Some(("github-release", words("no install")))
+        );
+        assert_eq!(
+            guide_topic(&words("run modes")),
+            Some(("run-modes", vec![]))
+        );
+        assert_eq!(guide_topic(&words("terms")), Some(("terms", vec![])));
+        assert_eq!(guide_topic(&words("github")), None);
+        assert_eq!(guide_topic(&words("nope release")), None);
     }
 
     /// `alm guide goal` (Task-A03-25-01): the versioned goal prompt, written in every language the

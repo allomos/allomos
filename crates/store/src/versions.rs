@@ -68,7 +68,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// (Task-A03-38).
 /// 21: at the handoff gate's quota check, the agent reports the figure with `alm quota`; the app
 /// shows it (Task-A03-02).
-pub const SECTION_VERSION: u32 = 21;
+/// 22: a line in the conversation starting with `alm ` and one of its commands is a command to run
+/// as written, and a guide it prints is followed; `alm guide github-release` (Task-A03-planet530).
+pub const SECTION_VERSION: u32 = 22;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

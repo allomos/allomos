@@ -18,10 +18,10 @@ use allomos_store::handoff;
 use allomos_store::{
     Actor, ConfirmExtra, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES,
     add_agent_instructions, agent_section, agent_section_for, agent_setup_request, default_root,
-    events, find_taskbag, guide, id_from_name, init_with_labels, load, localized, pick_ui_language,
-    picked_folder, plain_path, post_confirm, project_folder_of, read_answer, read_text,
-    requests_dir, saved_ui_language, task_language, taskbag_of, tidy, versions, was_seen,
-    with_written_files, withdraw_confirm,
+    events, find_taskbag, guide, guide_topic, id_from_name, init_with_labels, load, localized,
+    pick_ui_language, picked_folder, plain_path, post_confirm, project_folder_of, read_answer,
+    read_text, requests_dir, saved_ui_language, task_language, taskbag_of, tidy, versions,
+    was_seen, with_written_files, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -131,12 +131,14 @@ enum Command {
     /// Print the details the brief points to: terms, what a project may customize, commands,
     /// how to work the tasks, the run modes to show the person before an automatic or loop run,
     /// the one-time procedure that puts every agent's shared rules in AGENTS.md, and the goal
-    /// prompt that builds an app from a description. All topics (in English) when none is named.
+    /// prompt that builds an app from a description, and how to publish a GitHub release and install
+    /// it. All topics (in English) when none is named. A topic may be written as separate words
+    /// (`alm guide github release`); words after the topic are the guide's, for the agent to read.
     Guide {
-        #[arg(value_parser = GUIDE_TOPICS)]
-        topic: Option<String>,
-        /// For `run-modes`, `agent-files` and `goal`: the language to print it in (default: the task
-        /// language).
+        /// The topic, as one word or several (joined with `-`), then any words the guide defines.
+        words: Vec<String>,
+        /// For `run-modes`, `agent-files`, `goal` and `github-release`: the language to print it in
+        /// (default: the task language).
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
     },
@@ -2170,13 +2172,42 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 request,
             ))
         }
-        Command::Guide {
-            topic: Some(name),
-            language,
-        } if LOCALIZED_TOPICS.contains(&name.as_str()) => {
+        Command::Guide { words, language } => {
+            // A topic may be written as separate words (`alm guide github release`,
+            // Task-A03-planet530); words after it are the guide's, for the agent to read.
+            let (topic, rest) = if words.is_empty() {
+                (None, Vec::new())
+            } else {
+                match guide_topic(words) {
+                    Some((topic, rest)) => (Some(topic), rest),
+                    None => {
+                        return Err(Problem::BadUsage {
+                            detail: format!(
+                                "There is no guide topic \"{}\". The topics: {}.",
+                                words.join(" "),
+                                GUIDE_TOPICS.join(", ")
+                            ),
+                        });
+                    }
+                }
+            };
+            let after = if rest.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "Words after the topic, for you to read as this guide says: {}\n\n",
+                    rest.join(" ")
+                )
+            };
+            let Some(name) = topic.filter(|t| LOCALIZED_TOPICS.contains(t)) else {
+                let text = format!("{after}{}", guide(topic).unwrap_or_default());
+                return Ok(Done::new(
+                    json!({ "topic": topic, "words": rest, "guide": text }),
+                    text,
+                ));
+            };
             // The person reads it (or reads along): in the task language (Task-A03-21,
             // Task-A03-24). Without a taskbag here, the language the app would use.
-            let topic = Some(name.clone());
             let language = match language {
                 Some(code) => code.trim().to_string(),
                 None => {
@@ -2193,12 +2224,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             };
             let (text, written) = match localized(name, &language) {
                 Some(text) => (text.to_string(), true),
-                // The goal prompt is the agent's to follow, not to show (Task-A03-25-01).
-                None if name == "goal" => (
+                // The goal prompt and the release procedure are the agent's to follow, not to
+                // show (Task-A03-25-01, Task-A03-planet530).
+                None if name == "goal" || name == "github-release" => (
                     format!(
                         "This text is not written in {language} yet: follow a faithful translation \
-                         of it into {language}, keeping commands as they are, and write the tasks \
-                         in {language}.\n\n{}",
+                         of it into {language}, keeping commands as they are{}.\n\n{}",
+                        if name == "goal" {
+                            format!(", and write the tasks in {language}")
+                        } else {
+                            String::new()
+                        },
                         localized(name, "en").unwrap_or_default()
                     ),
                     false,
@@ -2212,14 +2248,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     false,
                 ),
             };
+            let text = format!("{after}{text}");
             Ok(Done::new(
-                json!({ "topic": topic, "language": language, "written_in_language": written, "guide": text }),
+                json!({ "topic": topic, "words": rest, "language": language, "written_in_language": written, "guide": text }),
                 text,
             ))
-        }
-        Command::Guide { topic, .. } => {
-            let text = guide(topic.as_deref()).unwrap_or_default();
-            Ok(Done::new(json!({ "topic": topic, "guide": text }), text))
         }
         Command::TaskLanguage { value: Some(value) } => {
             let root = locate(cli, cwd)?;
