@@ -12,8 +12,9 @@ export interface Sort {
 }
 
 export const SORT_KEYS: SortKey[] = ["id", "name", "changed"];
-/** The taskbag's own order: what the list showed before the menu existed. */
-export const DEFAULT_SORT: Sort = { key: "id", dir: "asc" };
+/** The sort when the person has not chosen one: the most recently changed tasks first
+ * (Task-A01-city762). Before, it was the taskbag's own order (ID, ascending). */
+export const DEFAULT_SORT: Sort = { key: "changed", dir: "desc" };
 
 /** A sort read back from storage; anything unreadable is the default. */
 export function parseSort(text: string | null): Sort {
