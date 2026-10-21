@@ -482,14 +482,9 @@ export function App({ messenger }: { messenger: Messenger }) {
         {opened?.loaded.taskbag && (
           <div className="where">
             <strong>{opened.loaded.taskbag.project.name}</strong>
-            <code title={opened.root}>{opened.root}</code>
-            {/* Whether the AI agents are told about this project, then Show in Finder at the right (owner, 2026-10-10). */}
-            <div className="where-row">
-              <AgentLine
-                messenger={messenger}
-                root={opened.root}
-                onTell={() => openWizard({ resume: { root: opened.root, at: 4 } })}
-              />
+            {/* The path, then Show in Finder right after it on the same line (Task-A01-bubble562). */}
+            <div className="where-path">
+              <code title={opened.root}>{opened.root}</code>
               <button
                 type="button"
                 className="link reveal"
@@ -497,6 +492,14 @@ export function App({ messenger }: { messenger: Messenger }) {
               >
                 {t(FILE_MANAGER_KEY)}
               </button>
+            </div>
+            {/* Whether the AI agents are told about this project (owner, 2026-10-10), on its own row. */}
+            <div className="where-row">
+              <AgentLine
+                messenger={messenger}
+                root={opened.root}
+                onTell={() => openWizard({ resume: { root: opened.root, at: 4 } })}
+              />
             </div>
           </div>
         )}

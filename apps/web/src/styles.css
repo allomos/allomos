@@ -69,11 +69,13 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .brand .ring { fill: none; stroke-width: 66; }
 .brand .ring.jade { stroke: #2a9d8f; }
 .brand .ring.terracotta { stroke: #e76f51; }
-/* As wide as its widest line (the path), so Show in Finder lines up with the path's right end. */
+/* The project name, the path with Show in Finder right after it (Task-A01-bubble562), then the
+   agents line. A long path is cut with an ellipsis; the button never shrinks out of view. */
 .where { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
-.where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.where-path { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.where-path .reveal { flex: none; white-space: nowrap; }
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-.where-row .reveal { margin-left: auto; }
 button.link { align-self: start; border: none; background: none; padding: 0; color: var(--accent); font-size: 0.85em; cursor: pointer; }
 button.link:hover { text-decoration: underline; }
 .top .language { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); }
