@@ -47,6 +47,16 @@ export function freshness(report: QuotaReport, now: Date): { state: "fresh" | "a
   return { state: minutes >= 10 ? "aged" : "fresh", minutes };
 }
 
+/**
+ * How old a report reads on the chip (Task-A03-flour054): minutes up to an hour, then whole hours
+ * up to a day, then whole days, so a report from yesterday no longer reads "630 min ago".
+ */
+export function ageText(minutes: number): { key: "agentline.age" | "agentline.age_hours" | "agentline.age_days"; n: number } {
+  if (minutes < 60) return { key: "agentline.age", n: minutes };
+  if (minutes < 24 * 60) return { key: "agentline.age_hours", n: Math.floor(minutes / 60) };
+  return { key: "agentline.age_days", n: Math.floor(minutes / (24 * 60)) };
+}
+
 export interface Chip {
   agent: string;
   name: string;

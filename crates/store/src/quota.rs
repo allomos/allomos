@@ -169,9 +169,159 @@ pub fn save_quota(report: QuotaReport) -> io::Result<Vec<QuotaReport>> {
     Ok(reports)
 }
 
+/// How old an agent's newest 5-hour report may be before a command that moves a task on asks for
+/// a new one (Task-A03-flour054, approver 2026-10-22), in minutes: the app's chip turns stale at
+/// the same age (`apps/web/src/quotaFlow.ts`).
+pub const ASK_AFTER_MINUTES: i64 = 30;
+
+/// The ask a command that moves a task on prints when the agent's quota report is missing or old.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct QuotaAsk {
+    /// The agent's id, from the session name (`claude/…` is `claude-code`); `None` without one.
+    pub agent: Option<String>,
+    /// How old the agent's newest 5-hour report is, in minutes; `None` when there is none.
+    pub minutes: Option<i64>,
+    /// The command to run, with the figure left for the agent to fill in.
+    pub command: String,
+}
+
+impl QuotaAsk {
+    /// The ask in plain words, with the command on a line of its own.
+    pub fn text(&self) -> String {
+        let who = match &self.agent {
+            Some(a) => format!("Your agent ({a})"),
+            None => "Your agent".to_string(),
+        };
+        let when = match self.minutes {
+            Some(m) => format!("last reported its quota {m} min ago"),
+            None => "has not reported its quota on this computer".to_string(),
+        };
+        format!(
+            "Quota: {who} {when}. Read your usage now (in Claude Code: get_usage) and report it, so the \
+             Allomos app shows a current figure; nothing to save or share:\n  {}\n",
+            self.command
+        )
+    }
+}
+
+/// Seconds since 1970 for a UTC time `YYYY-MM-DDTHH:MM:SSZ`, or `None` for another shape.
+fn utc_seconds(text: &str) -> Option<i64> {
+    let b = text.as_bytes();
+    if b.len() != 20 || b[19] != b'Z' || b[10] != b'T' {
+        return None;
+    }
+    let n = |r: std::ops::Range<usize>| text.get(r)?.parse::<i64>().ok();
+    let (y, m, d) = (n(0..4)?, n(5..7)?, n(8..10)?);
+    let (hh, mm, ss) = (n(11..13)?, n(14..16)?, n(17..19)?);
+    // Days from the civil date (Howard Hinnant's algorithm), the inverse of `civil_from_days`.
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(days * 86_400 + hh * 3600 + mm * 60 + ss)
+}
+
+/// What a command that moves a task on asks of the agent `holder` (its session name, as `--as`
+/// gives it), given every report and the time now (UTC): `None` when the agent's newest 5-hour
+/// report is younger than [`ASK_AFTER_MINUTES`], otherwise the ask. `alm` only tells; the
+/// command it asks after has already succeeded (AGENTS.md: "alm tells; the agent checks").
+pub fn quota_ask(holder: Option<&str>, reports: &[QuotaReport], now: &str) -> Option<QuotaAsk> {
+    let agent = holder.map(agent_id).filter(|a| !a.is_empty());
+    let newest = reports
+        .iter()
+        .filter(|r| r.window == "5h")
+        .filter(|r| agent.as_deref().is_none_or(|a| agent_id(&r.agent) == a))
+        .filter_map(|r| utc_seconds(&r.at))
+        .max();
+    let minutes = match (newest, utc_seconds(now)) {
+        (Some(at), Some(now)) => Some(((now - at) / 60).max(0)),
+        _ => None,
+    };
+    if minutes.is_some_and(|m| m < ASK_AFTER_MINUTES) {
+        return None;
+    }
+    let id = agent
+        .clone()
+        .unwrap_or_else(|| "<your agent's id>".to_string());
+    Some(QuotaAsk {
+        command: format!(
+            "alm quota --agent {id} --left <percent> [--resets <local date and time>]"
+        ),
+        agent,
+        minutes,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn report(agent: &str, window: &str, at: &str) -> QuotaReport {
+        QuotaReport {
+            agent: agent.into(),
+            account: None,
+            window: window.into(),
+            left: 50,
+            resets: None,
+            at: at.into(),
+        }
+    }
+
+    #[test]
+    fn a_missing_or_old_report_is_asked_for_and_a_recent_one_is_not() {
+        let now = "2026-10-21T16:00:00Z";
+        // Never reported: asked, with the agent's id from the session name.
+        let ask = quota_ask(Some("claude/a03-flour054"), &[], now).unwrap();
+        assert_eq!(ask.agent.as_deref(), Some("claude-code"));
+        assert_eq!(ask.minutes, None);
+        assert!(
+            ask.command
+                .starts_with("alm quota --agent claude-code --left <percent>")
+        );
+        assert!(
+            ask.text()
+                .contains("has not reported its quota on this computer")
+        );
+        // An old report, saved under a session name before Task-A03-39: still this agent's.
+        let old = [report("claude/i03-loop", "5h", "2026-10-21T05:23:45Z")];
+        let ask = quota_ask(Some("claude/x"), &old, now).unwrap();
+        assert_eq!(ask.minutes, Some(636));
+        assert!(ask.text().contains("last reported its quota 636 min ago"));
+        // Recent enough: nothing asked. 29 minutes is recent; 30 is not.
+        let recent = [report("claude-code", "5h", "2026-10-21T15:31:00Z")];
+        assert_eq!(quota_ask(Some("claude/x"), &recent, now), None);
+        let edge = [report("claude-code", "5h", "2026-10-21T15:30:00Z")];
+        assert_eq!(
+            quota_ask(Some("claude/x"), &edge, now).unwrap().minutes,
+            Some(30)
+        );
+        // Another agent's or another window's report does not count.
+        let others = [
+            report("codex", "5h", "2026-10-21T15:59:00Z"),
+            report("claude-code", "week", "2026-10-21T15:59:00Z"),
+        ];
+        assert_eq!(
+            quota_ask(Some("claude/x"), &others, now).unwrap().minutes,
+            None
+        );
+        assert_eq!(quota_ask(Some("codex/run"), &others, now), None);
+        // Without a session name: any agent's recent report will do; otherwise a placeholder.
+        assert_eq!(quota_ask(None, &others, now), None);
+        let ask = quota_ask(None, &[], now).unwrap();
+        assert_eq!(ask.agent, None);
+        assert!(ask.command.contains("--agent <your agent's id>"));
+    }
+
+    #[test]
+    fn utc_times_are_read_as_seconds() {
+        assert_eq!(utc_seconds("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(utc_seconds("2026-10-21T16:00:00Z"), Some(1_792_598_400));
+        assert_eq!(utc_seconds("2026-10-21T16:00"), None);
+        assert_eq!(utc_seconds("tomorrow"), None);
+    }
 
     #[test]
     fn a_session_name_or_short_form_is_folded_into_the_agent_id() {
@@ -186,8 +336,16 @@ mod tests {
         ] {
             assert_eq!(agent_id(given), id, "{given}");
         }
-        assert_eq!(new_report("claude/a09-28", None, "5h", 86, None).unwrap().agent, "claude-code");
-        assert!(matches!(new_report("/x", None, "5h", 1, None), Err(Problem::BadUsage { .. })));
+        assert_eq!(
+            new_report("claude/a09-28", None, "5h", 86, None)
+                .unwrap()
+                .agent,
+            "claude-code"
+        );
+        assert!(matches!(
+            new_report("/x", None, "5h", 1, None),
+            Err(Problem::BadUsage { .. })
+        ));
     }
 
     #[test]

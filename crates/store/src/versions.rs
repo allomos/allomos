@@ -70,7 +70,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// shows it (Task-A03-02).
 /// 22: a line in the conversation starting with `alm ` and one of its commands is a command to run
 /// as written, and a guide it prints is followed; `alm guide github-release` (Task-A03-planet530).
-pub const SECTION_VERSION: u32 = 22;
+/// 23: `alm claim`, `alm label`, `alm release`, `alm done` and `alm handoff` ask for a quota report
+/// when the agent's last one is missing or 30 minutes old; the agent reads its usage then and
+/// reports it (Task-A03-flour054).
+pub const SECTION_VERSION: u32 = 23;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

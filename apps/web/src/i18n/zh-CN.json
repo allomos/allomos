@@ -14,6 +14,8 @@
   "agentline.label": "AI 智能体：",
   "agentline.quota": "{name}：额度 {left}%",
   "agentline.age": "{minutes} 分钟前",
+  "agentline.age_hours": "{hours} 小时前",
+  "agentline.age_days": "{days} 天前",
   "agentline.popup_title": "剩余额度（智能体报告）",
   "agentline.popup_none": "这台电脑上还没有智能体报告额度。智能体在为交接检查额度时用 alm quota 报告。",
   "agentline.popup_left": "剩余 {left}%（{window}）",

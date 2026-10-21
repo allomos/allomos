@@ -26,11 +26,15 @@ fn tmp(name: &str) -> PathBuf {
     p
 }
 
-/// `alm` in `dir`, with no Allomos settings inherited from the test's own environment.
+/// `alm` in `dir`, with no Allomos settings inherited from the test's own environment. Its
+/// settings folder is an empty one of the test run's own, so the person's real settings and quota
+/// reports never change a result (Task-A03-flour054).
 fn alm(dir: &Path, args: &[&str]) -> Output {
+    let settings = std::env::temp_dir().join(format!("alm-test-settings-{}", std::process::id()));
     Command::new(ALM)
         .current_dir(dir)
         .args(args)
+        .env("ALLOMOS_SETTINGS_DIR", settings)
         .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
@@ -933,8 +937,74 @@ fn printed_git_commands_share_only_that_change() {
         "{text}"
     );
     assert!(
-        text.ends_with("Save only these files; leave other changes as they are.\n"),
+        text.contains("Save only these files; leave other changes as they are.\n"),
         "{text}"
+    );
+}
+
+/// A command that moves a task on asks for a quota report when the agent's is missing or 30
+/// minutes old (Task-A03-flour054); a fresh report silences it; other commands never ask.
+#[test]
+fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
+    let repo = filled();
+    let settings = tmp("quota-ask-settings");
+    let run = |args: &[&str], now: Option<&str>| {
+        let mut c = Command::new(ALM);
+        c.current_dir(&repo)
+            .args(args)
+            .env("ALLOMOS_SETTINGS_DIR", &settings)
+            .env_remove("ALLOMOS_TASKBAG")
+            .env_remove("ALLOMOS_HOLDER");
+        if let Some(now) = now {
+            c.env("ALLOMOS_NOW", now);
+        }
+        let out = c.output().unwrap();
+        assert_eq!(out.status.code(), Some(0), "{args:?}: {out:?}");
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let text = run(
+        &["--as", "claude/a03", "label", "A01-01", "implemented"],
+        None,
+    );
+    assert!(
+        text.contains(
+            "Quota: Your agent (claude-code) has not reported its quota on this computer."
+        ) && text.ends_with(
+            "\n  alm quota --agent claude-code --left <percent> [--resets <local date and time>]\n"
+        ),
+        "{text}"
+    );
+    run(
+        &["quota", "--agent", "claude-code", "--left", "80"],
+        Some("2026-10-21T10:00:00Z"),
+    );
+    let text = run(
+        &["--as", "claude/a03", "label", "A01-01", "locally verified"],
+        Some("2026-10-21T10:29:00Z"),
+    );
+    assert!(!text.contains("Quota:"), "{text}");
+    let v: Value = serde_json::from_str(&run(
+        &[
+            "--json",
+            "--as",
+            "claude/a03",
+            "label",
+            "A01-01",
+            "implemented",
+        ],
+        Some("2026-10-21T10:45:00Z"),
+    ))
+    .unwrap();
+    assert_eq!(v["quota_ask"]["agent"], json!("claude-code"));
+    assert_eq!(v["quota_ask"]["minutes"], json!(45));
+    // Reading commands never ask.
+    assert!(!run(&["list"], Some("2026-10-22T10:00:00Z")).contains("Quota:"));
+    assert!(
+        !run(
+            &["--as", "claude/a03", "show", "A01-01"],
+            Some("2026-10-22T10:00:00Z")
+        )
+        .contains("Quota:")
     );
 }
 
@@ -2184,7 +2254,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v22)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v23)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2194,7 +2264,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v22)", "## Tasks: Allomos (v21)")
+            brief.replace("## Tasks: Allomos (v23)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();

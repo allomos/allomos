@@ -14,6 +14,8 @@
   "agentline.label": "AI エージェント：",
   "agentline.quota": "{name}：残り {left}%",
   "agentline.age": "{minutes} 分前",
+  "agentline.age_hours": "{hours} 時間前",
+  "agentline.age_days": "{days} 日前",
   "agentline.popup_title": "残りの使用枠（エージェントの報告）",
   "agentline.popup_none": "このコンピューターではまだどのエージェントも使用枠を報告していません。エージェントは引き継ぎのために使用枠を確かめるとき、alm quota で報告します。",
   "agentline.popup_left": "残り {left}%（{window}）",

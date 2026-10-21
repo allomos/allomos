@@ -14,6 +14,8 @@
   "agentline.label": "AI agents:",
   "agentline.quota": "{name}: Quota {left}%",
   "agentline.age": "{minutes} min ago",
+  "agentline.age_hours": "{hours} h ago",
+  "agentline.age_days": "{days} d ago",
   "agentline.popup_title": "Quota left, as the agents reported it",
   "agentline.popup_none": "No agent has reported its quota on this computer yet. Agents report it with alm quota when they check their quota for the handoff.",
   "agentline.popup_left": "{left}% left ({window})",

@@ -19,9 +19,9 @@ use allomos_store::{
     Actor, ConfirmExtra, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES,
     add_agent_instructions, agent_section, agent_section_for, agent_setup_request, default_root,
     events, find_taskbag, guide, guide_topic, id_from_name, init_with_labels, load, localized,
-    pick_ui_language, picked_folder, plain_path, post_confirm, project_folder_of, read_answer,
-    read_text, requests_dir, saved_ui_language, task_language, taskbag_of, tidy, versions,
-    was_seen, with_written_files, withdraw_confirm,
+    pick_ui_language, picked_folder, plain_path, post_confirm, project_folder_of, quota_ask,
+    quota_reports, read_answer, read_text, requests_dir, saved_ui_language, task_language,
+    taskbag_of, tidy, versions, was_seen, with_written_files, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -917,6 +917,25 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     let code = match result {
         Ok(mut done) => {
             share(&cli, &before, &written, &mut done);
+            // A command that moves a task on asks for a fresh quota report when the agent's is
+            // missing or old (Task-A03-flour054): alm tells; the agent reads its usage.
+            let moves_on = matches!(
+                cli.command,
+                Command::Claim { .. }
+                    | Command::Label { .. }
+                    | Command::Release { .. }
+                    | Command::Done { .. }
+                    | Command::Handoff { .. }
+            );
+            if moves_on {
+                if let Some(ask) =
+                    quota_ask(cli.holder.as_deref(), &quota_reports(), &events::now_utc())
+                {
+                    done.text.push('\n');
+                    done.text.push_str(&ask.text());
+                    done.fields["quota_ask"] = json!(ask);
+                }
+            }
             if cli.json {
                 let mut out = json!({ "schema": SCHEMA, "ok": true, "command": command });
                 if let (Some(out), Some(fields)) = (out.as_object_mut(), done.fields.as_object()) {
@@ -1605,8 +1624,11 @@ fn rules_line(r: &allomos_core::AppliedRules) -> String {
         .map(|n| format!(" (override for {n})"))
         .unwrap_or_default();
     format!(
-        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}. Each time you check your quota for this gate, report the figure you read: `alm quota --agent <your agent's id> --left <percent> [--resets <when>]` (the Allomos app shows it).\n",
-        r.quota_gate, r.context_gate, r.write_when
+        "Handoff rules{whose}: with {}% of the 5-hour quota left, start nothing new, write your handoff (`alm handoff`) and stop; at {}% context used, finish the current step, write your handoff, commit, and give the person the exact prompt for a new session; also write it {}. Report your quota each time you read it: `alm quota --agent <your agent's id> --left <percent> [--resets <when>]` (the Allomos app shows it); `alm claim`, `alm label`, `alm release`, `alm done` and `alm handoff` ask for it when your last report is missing or {} minutes old or more.\n",
+        r.quota_gate,
+        r.context_gate,
+        r.write_when,
+        allomos_store::QUOTA_ASK_AFTER_MINUTES
     )
 }
 

@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { agentId, chips, freshness, popupRows, tone } from "../src/quotaFlow.ts";
+import { ageText, agentId, chips, freshness, popupRows, tone } from "../src/quotaFlow.ts";
 import type { QuotaReport } from "../src/types.ts";
 
 const r = (agent: string, left: number, at: string, more: Partial<QuotaReport> = {}): QuotaReport => ({
@@ -83,4 +83,14 @@ test("a report under a session name or short form counts for its agent, not as a
     ],
   );
   assert.deepEqual(popupRows(reports).map((x) => x.agent), ["claude-code", "codex"]);
+});
+
+test("an old report reads in hours or days, not hundreds of minutes (A03-flour054)", () => {
+  assert.deepEqual(ageText(25), { key: "agentline.age", n: 25 });
+  assert.deepEqual(ageText(59), { key: "agentline.age", n: 59 });
+  assert.deepEqual(ageText(60), { key: "agentline.age_hours", n: 1 });
+  assert.deepEqual(ageText(633), { key: "agentline.age_hours", n: 10 });
+  assert.deepEqual(ageText(24 * 60 - 1), { key: "agentline.age_hours", n: 23 });
+  assert.deepEqual(ageText(24 * 60), { key: "agentline.age_days", n: 1 });
+  assert.deepEqual(ageText(3 * 24 * 60 + 5), { key: "agentline.age_days", n: 3 });
 });

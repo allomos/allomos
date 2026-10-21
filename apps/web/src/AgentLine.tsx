@@ -1,4 +1,4 @@
-// "Do the AI agents know about this project?" (Task-A03-04): a short note beside Show in Finder.
+// "Do the AI agents know about this project?" (Task-A03-04): a short note under the taskbag's path.
 // Allomos works it out itself from the project's instruction files (AGENTS.md, CLAUDE.md);
 // agents write no flag. Since 2026-10-10 (owner) it no longer says who last used `alm` or holds
 // tasks: a holder copied from an old board read as an agent "working now". Allomos runs no Git
@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import { localTime } from "./handoffFlow";
 import type { Messenger } from "./messenger";
-import { agentName, chips, freshness, popupRows, tone } from "./quotaFlow";
+import { ageText, agentName, chips, freshness, popupRows, tone } from "./quotaFlow";
 import type { AgentStatus, QuotaReport } from "./types";
 
 /** How often the line checks again: the instruction files are outside the taskbag. */
@@ -59,6 +59,10 @@ export function AgentLine({
   const mark = (ok: boolean) => (ok ? "✓" : "✗");
   const list = chips(reports, status.setup);
   const anyCurrent = list.some((c) => c.current);
+  const age = (minutes: number) => {
+    const { key, n } = ageText(minutes);
+    return t(key, { minutes: n, hours: n, days: n });
+  };
 
   const popup = (
     <div className="quota-popup" role="tooltip">
@@ -107,7 +111,7 @@ export function AgentLine({
                 {c.quota
                   ? t("agentline.quota", { name: c.name, left: c.quota.left })
                   : `${c.name}${c.told === null ? "" : ` ${mark(c.told)}`}`}
-                {fresh && fresh.state !== "fresh" && ` · ${t("agentline.age", { minutes: fresh.minutes })}`}
+                {fresh && fresh.state !== "fresh" && ` · ${age(fresh.minutes)}`}
                 {popup}
               </span>
             );
