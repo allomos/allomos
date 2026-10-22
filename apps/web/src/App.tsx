@@ -18,6 +18,7 @@ import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
 import { latestFor, localTime } from "./handoffFlow";
 import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
+import { groupCount } from "./groupCountFlow";
 import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { DescriptionHit, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
@@ -1728,8 +1729,7 @@ function TaskGroup({
 }) {
   const { t } = useI18n();
   const all = counted ?? tasks;
-  const done = all.filter((t) => t.state === "done").length;
-  const pct = all.length ? Math.round((done / all.length) * 100) : 0;
+  const { done, total, pct } = groupCount(all.map((t) => t.state));
   return (
     <section className={collapsed ? "area collapsed" : "area"}>
       <header className="area-head">
@@ -1738,7 +1738,7 @@ function TaskGroup({
             {id && <span className="id">{id}</span>} {name}
           </button>
         </h2>
-        <span className="count">{t("area.count", { done, total: all.length })}</span>
+        <span className="count">{t("area.count", { done, total })}</span>
         {sub && <span className="sub">{sub}</span>}
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
