@@ -343,9 +343,10 @@ button.link:hover { text-decoration: underline; }
 .area-head .sub { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
 .area { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 /* The active iteration (Task-A01-root343): an accent edge and badge, so the current one is seen at
-   a glance; a closed one is greyed, with a grey badge, as finished work. */
+   a glance; a closed one has a grey badge, title and meter and a dashed edge, as finished work,
+   on the usual background (approver, 2026-10-22). */
 .area.active-iteration { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-.area.closed-iteration { background: var(--bg); border-style: dashed; }
+.area.closed-iteration { border-style: dashed; }
 .area.closed-iteration .area-head h2, .area.closed-iteration .area-head .count { color: var(--muted); }
 .area.closed-iteration .meter > div { background: var(--muted); }
 .area-head h2 .badge { margin-left: 8px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; }
