@@ -128,6 +128,9 @@ problems! {
     /// A warning: the session adding a task holds another task on a different base (Task-A03-22).
     BaseDiffers { held, held_base, base } => "base_differs", "You hold {held}, which starts from and merges into {held_base}, but the new task got the base {base}. Decide which is right: keep it, or change the new task's base with `alm base <its id> {held_base}`.";
     IterationNameMissing => "iteration_name_missing", "The iteration needs a name.";
+    IterationActiveAlready { id, active } => "iteration_active_already", "{active} is the active iteration; only one iteration is active at a time. Close it first (`alm change iteration {active} --state closed`, or `--state planned`), then make {id} active.";
+    SecondActiveIteration { id, active } => "second_active_iteration", "{id} is marked active, but {active} already is; only one iteration is active at a time. Set one of them to planned or closed with `alm change iteration <id> --state …`.";
+    InvalidIterationState { value } => "invalid_iteration_state", "\"{value}\" is not an iteration state. Use planned, active or closed.";
     DuplicateIterationId { id } => "duplicate_iteration_id", "Another iteration already uses the ID \"{id}\".";
     UnknownIteration { iteration } => "unknown_iteration", "The iteration \"{iteration}\" does not exist. Add it with `alm add iteration`, or use an existing iteration ID.";
     /// `alm delete area` while a task, even a done or dropped one, is in the area (owner, 2026-10-14; Task-A01-29).

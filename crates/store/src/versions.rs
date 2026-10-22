@@ -127,7 +127,7 @@ impl SectionState {
 /// is connected, while an older taskbag's tasks are still to be moved in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VersionCheck {
-    /// What this Allomos writes, for messages: `allomos/4`.
+    /// What this Allomos writes, for messages: `allomos/5`.
     pub format_current: String,
     pub section_current: u32,
     pub format: FormatState,

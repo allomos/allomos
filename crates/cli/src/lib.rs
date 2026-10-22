@@ -13,7 +13,9 @@ use std::time::Duration;
 use allomos_core::decision::Decision;
 use allomos_core::event::{self, Kind};
 use allomos_core::ops::{self, Outcome};
-use allomos_core::{FORMAT, Issue, Iteration, Problem, Project, State, Task, Taskbag};
+use allomos_core::{
+    FORMAT, Issue, Iteration, IterationState, Problem, Project, State, Task, Taskbag,
+};
 use allomos_store::handoff;
 use allomos_store::{
     Actor, ConfirmExtra, GUIDE_TOPICS, LOCALIZED_TOPICS, Lock, MAX_PLAN_BYTES,
@@ -97,7 +99,8 @@ enum Command {
     /// with every task that carries it (`alm rename label "<old>" "<new>"`).
     #[command(subcommand)]
     Rename(Rename),
-    /// Change an iteration: `alm change iteration <id> [--name] [--release] [--start] [--end]`.
+    /// Change an iteration: `alm change iteration <id> [--name] [--release] [--start] [--end]
+    /// [--state planned|active|closed]`.
     #[command(subcommand)]
     Change(ChangeWhat),
     /// Delete an area or an iteration; refused while any task is in it, done and dropped ones too.
@@ -526,6 +529,10 @@ enum Add {
         /// The base branch to use instead of the one --branch chooses.
         #[arg(long, value_name = "NAME")]
         base: Option<String>,
+        /// The iteration to plan it in. Default: the active iteration, if one is
+        /// (Task-A01-root343); otherwise none.
+        #[arg(long, value_name = "ID")]
+        iteration: Option<String>,
     },
 }
 
@@ -540,10 +547,14 @@ enum Rename {
 
 #[derive(Subcommand)]
 enum ChangeWhat {
-    /// Change an iteration's name, release or dates; its ID stays. What is not given stays as it
-    /// is; an empty release or date ("") clears it.
+    /// Change an iteration's name, release, dates or state; its ID stays. What is not given stays
+    /// as it is; an empty release or date ("") clears it. `--state`: planned, active or closed; at
+    /// most one iteration is active.
     Iteration {
         id: String,
+        /// planned, active or closed (Task-A01-root343).
+        #[arg(long, value_name = "STATE")]
+        state: Option<String>,
         #[arg(long)]
         name: Option<String>,
         /// The release it produces, for example v0.2.
@@ -1476,7 +1487,7 @@ fn confirm(
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the earliest iteration whose next dependency is met, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the active iteration whose next dependency is met (the list shows its tasks first); with none there, from the earliest iteration, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
     let mut v = serde_json::to_value(t).expect("tasks serialize");
@@ -1531,6 +1542,10 @@ fn iteration_heading(it: &Iteration) -> String {
     let extra: Vec<String> = it.release.iter().cloned().chain(dates).collect();
     if !extra.is_empty() {
         s.push_str(&format!("  ({})", extra.join(", ")));
+    }
+    // Its state, unless planned (Task-A01-root343).
+    if !it.state.is_planned() {
+        s.push_str(&format!("  [{}]", it.state.as_str()));
     }
     s
 }
@@ -2360,13 +2375,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     description,
                     branch,
                     base,
+                    iteration,
                 } => {
+                    // A new task goes into the active iteration unless another is named
+                    // (approver, 2026-10-22; Task-A01-root343).
+                    let active = taskbag_of(&root, load(&root))
+                        .ok()
+                        .and_then(|(bag, _)| ops::active_iteration(&bag).map(|i| i.id.clone()));
+                    let planned_in = iteration.clone().or(active.clone());
                     let new = allomos_store::NewTask {
                         id: id.clone(),
                         area: area.clone(),
                         title: title.clone(),
                         description: description.clone(),
-                        iteration: None,
+                        iteration: planned_in.clone(),
                         branch: branch.clone(),
                         base: base.clone(),
                     };
@@ -2386,7 +2408,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         ),
                         Err(_) => ("en".to_string(), Vec::new()),
                     };
-                    let steps = allomos_store::added_task_steps(&language, &task.id, &iterations);
+                    if let Some(i) = &task.iteration {
+                        let why = if iteration.is_some() {
+                            "as asked"
+                        } else {
+                            "the active iteration"
+                        };
+                        text.push_str(&format!("  iteration: {i} ({why})\n"));
+                    }
+                    let steps = allomos_store::added_task_steps(
+                        &language,
+                        &task.id,
+                        &iterations,
+                        task.iteration.as_deref(),
+                    );
                     let mut done = Done::new(
                         json!({ "taskbag": root, "task": task_json(&task), "base": added.base, "next_steps": steps }),
                         text,
@@ -2433,19 +2468,51 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             release,
             start,
             end,
+            state,
         }) => {
             let root = locate(cli, cwd)?;
+            let state = match state {
+                Some(s) => Some(
+                    IterationState::parse(s)
+                        .ok_or_else(|| Problem::InvalidIterationState { value: s.clone() })?,
+                ),
+                None => None,
+            };
             let change = ops::IterationChange {
                 name: name.clone(),
                 release: release.clone(),
                 start: start.clone(),
                 end: end.clone(),
+                state,
             };
             let changed =
                 allomos_store::change_iteration(&root, Actor::alm(me), lock_wait(), id, &change)?;
             let iteration = changed.item;
-            let text = format!("Changed iteration {}\n", iteration_heading(&iteration));
-            let mut done = Done::new(json!({ "taskbag": root, "iteration": iteration }), text);
+            let mut text = format!("Changed iteration {}\n", iteration_heading(&iteration));
+            // Closing an iteration with unfinished tasks moves none of them: alm lists them and
+            // asks (approver, 2026-10-22; Task-A01-root343).
+            let mut unfinished: Vec<Value> = Vec::new();
+            if state == Some(IterationState::Closed) {
+                if let Ok((bag, _)) = taskbag_of(&root, load(&root)) {
+                    let left = ops::unfinished_in(&bag, &iteration.id);
+                    if !left.is_empty() {
+                        text.push_str(&format!(
+                            "{} task(s) in {} are not finished; none was moved:\n",
+                            left.len(),
+                            iteration.id
+                        ));
+                        for t in &left {
+                            text.push_str(&format!("  {}\n", task_line(t)));
+                        }
+                        text.push_str("Decide for each: plan it in another iteration (`alm plan <id> <iteration>`), finish or drop it, or leave it here. Ask the person when it is theirs to decide.\n");
+                    }
+                    unfinished = left.into_iter().map(task_json).collect();
+                }
+            }
+            let mut done = Done::new(
+                json!({ "taskbag": root, "iteration": iteration, "unfinished": unfinished }),
+                text,
+            );
             done.issues = changed.issues;
             Ok(done)
         }
@@ -2708,6 +2775,25 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 CHOOSING_RULE.to_string()
             };
             let mut text = String::new();
+            // The active iteration all done: suggest the next step; alm changes no state
+            // (approver, 2026-10-22; Task-A01-root343).
+            let finished = ops::finished_active(&bag).map(|(done_it, next_it)| {
+                let words = match next_it {
+                    Some(n) => format!(
+                        "{} is all done (every task done or dropped). Close it and make {} active? `alm change iteration {} --state closed`, then `alm change iteration {} --state active` (ask the person first unless they set this up).",
+                        done_it.id, n.id, done_it.id, n.id
+                    ),
+                    None => format!(
+                        "{} is all done (every task done or dropped). Close it? `alm change iteration {} --state closed` (ask the person first unless they set this up); no planned iteration follows it.",
+                        done_it.id, done_it.id
+                    ),
+                };
+                (done_it.id.clone(), next_it.map(|n| n.id.clone()), words)
+            });
+            if let Some((_, _, words)) = &finished {
+                text.push_str(words);
+                text.push_str("\n\n");
+            }
             let mut listed = Vec::new();
             for t in &tasks {
                 let latest = handoff::latest_for(&root, &t.id);
@@ -2802,6 +2888,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "project_notes": notes,
                     "cards_outside": outside,
                     "cards": if cards.is_empty() { Value::Null } else { json!(cards.trim_end()) },
+                    "active_iteration": ops::active_iteration(&bag).map(|i| i.id.clone()),
+                    "finished_iteration": finished.as_ref().map(|(done_it, next_it, words)| json!({ "iteration": done_it, "next": next_it, "suggestion": words })),
                 }),
                 text,
             );

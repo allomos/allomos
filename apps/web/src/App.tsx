@@ -1072,6 +1072,8 @@ type Group = {
   newTask?: { area: string | null; iteration: string | null };
   /** The area or iteration this group is, for its Edit form (Task-A01-29); none for Unplanned and unknown areas. */
   edit?: Editing;
+  /** The active iteration, shown highlighted (Task-A01-root343). */
+  active?: boolean;
 };
 
 function TaskbagView({
@@ -1195,6 +1197,7 @@ function TaskbagView({
         tasks: inOrder(box.tasks.filter((task) => task.iteration === it.id)),
         newTask: { area: null, iteration: it.id },
         edit: { kind: "iteration", id: it.id },
+        active: it.state === "active",
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
@@ -1513,6 +1516,7 @@ function TaskbagView({
                   id={g.id}
                   name={g.name}
                   sub={g.sub}
+                  active={g.active}
                   empty={g.empty}
                   tasks={g.tasks}
                   counted={g.counted}
@@ -1628,6 +1632,8 @@ function TaskbagView({
 /** An iteration's release and dates, for the line under its name. */
 function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string {
   const parts: string[] = [];
+  // Its state, unless planned (Task-A01-root343).
+  if (it.state === "active" || it.state === "closed") parts.push(t(`iteration.state_${it.state}`));
   if (it.release) parts.push(t("iteration.release", { release: it.release }));
   if (it.start && it.end) parts.push(t("iteration.dates", { start: it.start, end: it.end }));
   else if (it.start) parts.push(t("iteration.from", { start: it.start }));
@@ -1677,6 +1683,7 @@ function TaskGroup({
   id,
   name,
   sub,
+  active,
   empty,
   tasks,
   counted,
@@ -1698,6 +1705,8 @@ function TaskGroup({
   id: string;
   name: string;
   sub?: string;
+  /** The active iteration: highlighted (Task-A01-root343). */
+  active?: boolean;
   empty: string;
   tasks: Task[];
   /** Every task of the group, for its count and progress, when `tasks` is filtered by state. */
@@ -1733,7 +1742,7 @@ function TaskGroup({
   const all = counted ?? tasks;
   const { done, total, pct } = groupCount(all.map((t) => t.state));
   return (
-    <section className={collapsed ? "area collapsed" : "area"}>
+    <section className={["area", collapsed ? "collapsed" : "", active ? "active-iteration" : ""].filter(Boolean).join(" ")}>
       <header className="area-head">
         <h2>
           <button type="button" className="fold" aria-expanded={!collapsed} onClick={onToggle}>

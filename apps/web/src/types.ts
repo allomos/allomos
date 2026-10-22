@@ -16,6 +16,9 @@ export interface Area {
 }
 
 /** When tasks are planned: a time-box that ends in a release (R89). */
+/** Where an iteration is (Task-A01-root343): planned (also when missing), active (at most one), closed. */
+export type IterationState = "planned" | "active" | "closed";
+
 export interface Iteration {
   id: string;
   name: string;
@@ -23,6 +26,7 @@ export interface Iteration {
   start?: string;
   end?: string;
   release?: string;
+  state?: IterationState;
 }
 
 export interface Task {
@@ -111,6 +115,7 @@ export interface IterationChange {
   release: string;
   start: string;
   end: string;
+  state: IterationState;
 }
 
 /** The IDs the New forms suggest, each the next free one, worked out in Rust (Task-A01-19). */

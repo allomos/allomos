@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/4";
+pub const FORMAT: &str = "allomos/5";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape. An older Allomos
 /// refuses a newer taskbag (Task-A01-25); this one reads only its own format. A taskbag in any
@@ -19,7 +19,10 @@ pub const FORMAT: &str = "allomos/4";
 /// (decision 0016, Task-A01-31); the human check: `finished_without_owner` becomes
 /// `without_human_check`, with optional `human_check_steps`, and the default top label is
 /// "human verified" (Task-A03-18).
-pub const FORMAT_VERSION: u32 = 4;
+/// 5: an iteration's `state`: planned (the default, not written), active or closed; at most one
+/// active (Task-A01-root343). Iteration files no longer refuse a field they do not know, so a later
+/// optional field there needs no new format.
+pub const FORMAT_VERSION: u32 = 5;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
 /// FlipHopper's `fliphopper/1`).
@@ -169,9 +172,10 @@ pub struct Area {
 }
 
 /// An iteration: *when* tasks are planned, a time-box that ends in a release (R89).
-/// Optional for a task; a task without one is unplanned.
+/// Optional for a task; a task without one is unplanned. Unknown fields are read past, not
+/// refused (approver, 2026-10-22; Task-A01-root343), so an optional field added later does not
+/// need a new format.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Iteration {
     pub id: String,
     pub name: String,
@@ -186,6 +190,45 @@ pub struct Iteration {
     /// The release this iteration produces, for example `v0.2`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release: Option<String>,
+    /// Planned, active or closed (Task-A01-root343); missing means planned.
+    #[serde(default, skip_serializing_if = "IterationState::is_planned")]
+    pub state: IterationState,
+}
+
+/// Where an iteration is (approver, 2026-10-22; Task-A01-root343): planned → active → closed. At
+/// most one iteration is active at a time. Only a person (in the app) or an agent (`alm change
+/// iteration <id> --state …`) sets it; nothing infers it from dates or progress.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IterationState {
+    #[default]
+    Planned,
+    Active,
+    Closed,
+}
+
+impl IterationState {
+    pub fn is_planned(&self) -> bool {
+        *self == IterationState::Planned
+    }
+
+    /// As files and commands write it: `planned`, `active`, `closed`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IterationState::Planned => "planned",
+            IterationState::Active => "active",
+            IterationState::Closed => "closed",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<IterationState> {
+        match text.trim() {
+            "planned" => Some(IterationState::Planned),
+            "active" => Some(IterationState::Active),
+            "closed" => Some(IterationState::Closed),
+            _ => None,
+        }
+    }
 }
 
 /// Where a task is in its life.

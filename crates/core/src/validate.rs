@@ -49,11 +49,22 @@ const CHOICE_FIELDS: &[(&str, &[&str])] = &[(
     ],
 )];
 
+/// An iteration's fixed-choice fields (Task-A01-root343): its `state` is not a task's.
+const ITERATION_CHOICE_FIELDS: &[(&str, &[&str])] = &[("state", &["planned", "active", "closed"])];
+
 fn parse<T: DeserializeOwned>(file: &str, text: &str) -> Result<T, Issue> {
+    parse_with(file, text, CHOICE_FIELDS)
+}
+
+fn parse_with<T: DeserializeOwned>(
+    file: &str,
+    text: &str,
+    choices: &[(&str, &[&str])],
+) -> Result<T, Issue> {
     // Check fixed-choice fields first, so the problem names the field (e.g. `state`)
     // rather than the bad value.
     if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(text) {
-        for (field, allowed) in CHOICE_FIELDS {
+        for (field, allowed) in choices {
             if let Some(value) = map.get(*field) {
                 let ok = value.as_str().is_some_and(|v| allowed.contains(&v));
                 if !ok {
@@ -241,7 +252,8 @@ pub fn valid_date(text: &str) -> bool {
 }
 
 pub fn parse_iteration(file: &str, text: &str) -> Result<Iteration, Vec<Issue>> {
-    let iteration: Iteration = parse(file, text).map_err(|i| vec![i])?;
+    let iteration: Iteration =
+        parse_with(file, text, ITERATION_CHOICE_FIELDS).map_err(|i| vec![i])?;
     let mut issues = Vec::new();
     check_id(file, "id", &iteration.id, &mut issues);
     if iteration.name.trim().is_empty() {
@@ -317,6 +329,7 @@ pub fn validate_taskbag(
         }
     }
     let mut iteration_ids = HashSet::new();
+    let mut active: Option<&str> = None;
     for (file, iteration) in iterations {
         if !iteration_ids.insert(iteration.id.as_str()) {
             issues.push(Issue::new(
@@ -326,6 +339,20 @@ pub fn validate_taskbag(
                     id: iteration.id.clone(),
                 },
             ));
+        }
+        // At most one active iteration (Task-A01-root343): a hand edit may leave two.
+        if iteration.state == crate::IterationState::Active {
+            match active {
+                Some(first) => issues.push(Issue::new(
+                    file,
+                    Some("state"),
+                    Problem::SecondActiveIteration {
+                        id: iteration.id.clone(),
+                        active: first.to_string(),
+                    },
+                )),
+                None => active = Some(iteration.id.as_str()),
+            }
         }
     }
     let mut task_ids = HashSet::new();
@@ -408,7 +435,7 @@ pub fn validate_taskbag(
 mod tests {
     use super::*;
 
-    const PROJECT: &str = r#"{"format":"allomos/4","id":"demo","name":"Demo"}"#;
+    const PROJECT: &str = r#"{"format":"allomos/5","id":"demo","name":"Demo"}"#;
 
     fn project() -> Project {
         parse_project("project.json", PROJECT).unwrap()
@@ -423,7 +450,7 @@ mod tests {
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/5","id":"d","name":"D","later":{"context":90}}"#,
+            r#"{"format":"allomos/6","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);
@@ -435,7 +462,7 @@ mod tests {
     fn handoff_gates_must_be_percentages() {
         let ok = parse_project(
             "project.json",
-            r#"{"format":"allomos/4","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
+            r#"{"format":"allomos/5","id":"d","name":"D","handoff":{"quota_gate":5,"overrides":{"codex":{"context_gate":80}}}}"#,
         )
         .unwrap();
         let rules = ok.handoff.unwrap();
@@ -449,7 +476,7 @@ mod tests {
         assert_eq!(rules.applied(Some("codexy")).context_gate, 90);
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/4","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
+            r#"{"format":"allomos/5","id":"d","name":"D","handoff":{"overrides":{"codex":{"quota_gate":150}}}}"#,
         )
         .unwrap_err();
         assert_eq!(err[0].problem.code(), "invalid_percent");
@@ -726,6 +753,29 @@ mod tests {
             "a".to_string(),
             parse_area("a", r#"{"id":"A1","name":"T"}"#).unwrap(),
         )];
+        // The state (Task-A01-root343): missing is planned; a field it does not know is read past.
+        let st = |text: &str| parse_iteration("i", text).map(|i| i.state);
+        assert_eq!(
+            st(r#"{"id":"I1","name":"One"}"#),
+            Ok(crate::IterationState::Planned)
+        );
+        assert_eq!(
+            st(r#"{"id":"I1","name":"One","state":"active"}"#),
+            Ok(crate::IterationState::Active)
+        );
+        assert_eq!(
+            st(r#"{"id":"I1","name":"One","state":"closed","later":1}"#),
+            Ok(crate::IterationState::Closed)
+        );
+        assert!(st(r#"{"id":"I1","name":"One","state":"doing"}"#).is_err());
+        assert_eq!(
+            serde_json::to_string(
+                &parse_iteration("i", r#"{"id":"I1","name":"One","state":"planned"}"#).unwrap()
+            )
+            .unwrap(),
+            r#"{"id":"I1","name":"One","order":0}"#
+        );
+
         let iterations = vec![
             (
                 "iterations/I1.json".to_string(),

@@ -1,4 +1,4 @@
-# Taskbag file format — `allomos/4`
+# Taskbag file format — `allomos/5`
 
 A **contract**: the files inside a taskbag. The Allomos app, the `alm` command and AI agents must all read and write exactly this. Code: `crates/core` (rules) and `crates/store` (reading and writing). Decided by [0007](../decisions/0007-git-like-project-sync.md) and [0010](../decisions/0010-project-data-folder.md).
 
@@ -56,7 +56,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 | Field | Required | Meaning |
 |---|---|---|
-| `format` | yes | `"allomos/4"` for this version (`"allomos/3"` before the `blocked` state, a task's `blocked_by` and `who`, A01-31, and the human check's `without_human_check` and `human_check_steps`, A03-18; `"allomos/2"` before events, A01-17, and a task's `finished_without_owner`, A03-15; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)), and so is a taskbag in any older `allomos/<n>` ([§ Format versions](#format-versions)). |
+| `format` | yes | `"allomos/5"` for this version (`"allomos/4"` before an iteration's `state`, A01-root343; `"allomos/3"` before the `blocked` state, a task's `blocked_by` and `who`, A01-31, and the human check's `without_human_check` and `human_check_steps`, A03-18; `"allomos/2"` before events, A01-17, and a task's `finished_without_owner`, A03-15; `"allomos/1"` before the handoff files, A03-06): `allomos/<n>`, where the number goes up whenever the taskbag changes shape ([§ Format versions](#format-versions)). Other values are refused, including FlipHopper's `"fliphopper/1"` and the earlier `"glidebox/1"`: a FlipHopper project is moved in by an AI agent like any other task system ([0015](../decisions/0015-product-name-allomos.md)), and so is a taskbag in any older `allomos/<n>` ([§ Format versions](#format-versions)). |
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `human verified` (`owner verified` before `allomos/4`; an existing ladder is renamed only when the person agrees, with `alm rename label`). The top step is the **human check**. Changed with `alm labels`. |
@@ -150,6 +150,9 @@ An **iteration** is *when* tasks are planned: a time-box that ends in a release 
 | `start` | no | First day, `YYYY-MM-DD`. |
 | `end` | no | Last day, `YYYY-MM-DD`. |
 | `release` | no | The release it produces, e.g. `v0.2`. |
+| `state` | no (`allomos/5`) | `planned` (the default, also when the field is missing; not written), `active` or `closed` (approver, 2026-10-22; task `A01-root343`). **At most one iteration is active**: `alm change iteration <id> --state active` (or the app's Edit form) is refused (`iteration_active_already`) while another is, and a second one written by hand is reported (`second_active_iteration`). Only a person or an agent sets it; nothing infers it from dates or progress. A new task goes into the active iteration (`alm add task`, unless `--iteration` names another); `alm next` lists the active iteration's tasks first and, once all of them are done or dropped, suggests closing it and making the next planned one active, changing nothing itself. Closing an iteration with unfinished tasks lists them and moves none. |
+
+Unknown fields in an iteration file are read past, not refused (since `allomos/5`), so a later optional field there needs no new format.
 
 ## `tasks/<id>/task.json`
 
@@ -212,8 +215,8 @@ Each problem names the **file** and, where it can, the **field**, with a plain e
 
 Added by task `A01-25`. Allomos reads `format` before anything else in `project.json`, because a newer taskbag may have fields this Allomos does not know.
 
-- **Newer** than this Allomos (`allomos/5` read by an Allomos that writes `allomos/4`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
-- **Older**, in **any** format below this Allomos's (today `allomos/1`, `/2` and `/3`): nothing is read or written, and no format is "too old" (owner, 2026-10-15, task `A01-45`). Every `alm` command except `init`, `brief`, `guide`, `confirm` and `move-in` stops with `taskbag_to_move_in` (exit code 1), which says the taskbag must be moved in from the app, or with the request `alm move-in` prints.
+- **Newer** than this Allomos (`allomos/6` read by an Allomos that writes `allomos/5`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
+- **Older**, in **any** format below this Allomos's (today `allomos/1` to `/4`; `allomos/4` taskbags are moved in once for the iteration state, approver 2026-10-22, task `A01-root343`): nothing is read or written, and no format is "too old" (owner, 2026-10-15, task `A01-45`). Every `alm` command except `init`, `brief`, `guide`, `confirm` and `move-in` stops with `taskbag_to_move_in` (exit code 1), which says the taskbag must be moved in from the app, or with the request `alm move-in` prints.
 - **Moving an older taskbag in** works like moving another task system in (`A05-02`): an AI agent does it, not code steps per version.
   1. The app offers **Move the tasks in…** (in the notice above the task list, and in the setup wizard's step 2). It **renames the old folder aside**, keeping the old format in its name, `.allomos/taskbag/` → `.allomos/taskbag-allomos-3/` (`-2`, `-3` … added when that name is taken), and **creates a new, empty taskbag** in its place with the old project's `id`, `name` and `project_folder`. Nothing inside the old folder is changed. If the new taskbag cannot be created, the old folder is renamed back.
   2. The Connect step then gives the chosen agent the **move-in request** (`agent_move_in_request_in`, versioned `MOVE_IN_REQUEST_VERSION`): the conversion request's steps, told that the tasks to move are the old folder's, with everything it holds: `project.json` (ladder, task language, handoff rules), areas, iterations, tasks with their descriptions and status, `handoffs/` and `project-notes.md`. The old `events/` (the history) are not copied, since `alm` records only its own changes: they stay in Git history, and the report and `project-notes.md` name the last commit that holds the old taskbag. An old top label "owner verified" becomes "human verified"; a done task's `finished_without_owner` becomes `without_human_check`.

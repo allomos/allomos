@@ -108,11 +108,18 @@
   "invalid_id": [
     "id"
   ],
+  "invalid_iteration_state": [
+    "value"
+  ],
   "invalid_language": [
     "value"
   ],
   "invalid_percent": [
     "value"
+  ],
+  "iteration_active_already": [
+    "id",
+    "active"
   ],
   "iteration_name_missing": [],
   "iteration_not_empty": [
@@ -168,6 +175,10 @@
   ],
   "request_reused": [
     "id"
+  ],
+  "second_active_iteration": [
+    "id",
+    "active"
   ],
   "startup_not_a_folder": [
     "path"

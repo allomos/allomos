@@ -3,18 +3,19 @@
 // `alm change iteration` and `alm delete`; nothing here refuses one (a delete of a group with tasks
 // is sent, and Rust's refusal is shown).
 
-import type { Area, Iteration, IterationChange } from "./types";
+import type { Area, Iteration, IterationChange, IterationState } from "./types";
 
 /** Which group's Edit form is open. */
 export type Editing = { kind: "area"; id: string } | { kind: "iteration"; id: string };
 
-/** What the person typed in the Edit form. An area uses only `name`. */
-export type GroupDraft = { name: string; release: string; start: string; end: string };
+/** What the person typed in the Edit form. An area uses only `name`; an iteration also its
+ * state (Task-A01-root343). */
+export type GroupDraft = { name: string; release: string; start: string; end: string; state: IterationState };
 
 /** The Edit form's start: the group as it is now. */
 export function startGroupEdit(item: Area | Iteration): GroupDraft {
   const it = item as Partial<Iteration>;
-  return { name: item.name, release: it.release ?? "", start: it.start ?? "", end: it.end ?? "" };
+  return { name: item.name, release: it.release ?? "", start: it.start ?? "", end: it.end ?? "", state: it.state ?? "planned" };
 }
 
 /** Whether Save is offered: there is a name, and something differs from the group as it is. */
@@ -22,10 +23,10 @@ export function canSaveGroup(kind: Editing["kind"], draft: GroupDraft, item: Are
   if (draft.name.trim() === "") return false;
   const now = startGroupEdit(item);
   if (kind === "area") return draft.name.trim() !== now.name;
-  return (["name", "release", "start", "end"] as const).some((k) => draft[k].trim() !== now[k]);
+  return (["name", "release", "start", "end", "state"] as const).some((k) => draft[k].trim() !== now[k]);
 }
 
 /** The iteration change Rust is asked for: every field, an empty release or date clearing it. */
 export function toIterationChange(draft: GroupDraft): IterationChange {
-  return { name: draft.name.trim(), release: draft.release.trim(), start: draft.start.trim(), end: draft.end.trim() };
+  return { name: draft.name.trim(), release: draft.release.trim(), start: draft.start.trim(), end: draft.end.trim(), state: draft.state };
 }

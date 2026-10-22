@@ -2797,7 +2797,7 @@ fn move_in_on_a_current_taskbag_asks_for_the_card_files() {
 /// `alm move-in` prints the request.
 #[test]
 fn every_older_taskbag_is_to_be_moved_in() {
-    for n in 1..=3 {
+    for n in 1..=4 {
         let repo = filled();
         fs::write(
             repo.join("AGENTS.md"),
@@ -2819,7 +2819,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
         ] {
             let v = refused(&repo, args, 1, "taskbag_to_move_in");
             assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
-            assert_eq!(v["error"]["params"]["current"], "allomos/4");
+            assert_eq!(v["error"]["params"]["current"], "allomos/5");
             let message = v["error"]["message"].as_str().unwrap();
             assert!(message.contains("Update the taskbag…"), "{message}");
             assert!(message.contains("`alm move-in`"), "{message}");
@@ -3816,7 +3816,7 @@ fn block_shows_blockers_and_next_only_tells() {
 #[test]
 fn a_newer_taskbag_is_refused_by_an_older_build() {
     let repo = filled();
-    set_format(&repo, "allomos/5");
+    set_format(&repo, "allomos/6");
     refused(&repo, &["list"], 4, "taskbag_newer");
 }
 
@@ -4439,4 +4439,129 @@ fn tasks_added_on_two_branches_merge_without_a_clash() {
     assert_eq!(ids.len(), 3, "{v}");
     assert_eq!(ids[0], "A01-53");
     assert!(ids.contains(&made[0].as_str()) && ids.contains(&made[1].as_str()));
+}
+
+/// Iterations have a state (approver, 2026-10-22; Task-A01-root343): planned → active → closed,
+/// at most one active, set only by a command. A new task goes into the active iteration; `alm
+/// next` lists its tasks first and says when it is all done; closing one lists the unfinished
+/// tasks and moves none.
+#[test]
+fn iterations_have_a_state_and_the_active_one_leads() {
+    let repo = filled();
+    ok(&repo, &["task-language", "en"]);
+    ok(&repo, &["add", "iteration", "I01", "One"]);
+    ok(&repo, &["add", "iteration", "I02", "Two"]);
+    let bag = repo.join(".allomos/taskbag");
+    let file = |id: &str| fs::read_to_string(bag.join(format!("iterations/{id}.json"))).unwrap();
+    // Planned is the default and is not written.
+    assert!(!file("I01").contains("state"), "{}", file("I01"));
+
+    // No active iteration: a new task goes into none, and the steps say how to set one.
+    let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "Loose"]);
+    assert_eq!(v["task"]["iteration"], Value::Null);
+    assert!(
+        v["next_steps"].as_str().unwrap().contains("--state active"),
+        "{v}"
+    );
+
+    // Make I01 active; a second active iteration is refused, a bad state too.
+    let v = ok(&repo, &["change", "iteration", "I01", "--state", "active"]);
+    assert_eq!(v["iteration"]["state"], "active");
+    assert!(
+        file("I01").contains("\"state\": \"active\""),
+        "{}",
+        file("I01")
+    );
+    let v = refused(
+        &repo,
+        &["change", "iteration", "I02", "--state", "active"],
+        1,
+        "iteration_active_already",
+    );
+    assert_eq!(v["error"]["params"]["active"], "I01");
+    refused(
+        &repo,
+        &["change", "iteration", "I02", "--state", "doing"],
+        1,
+        "invalid_iteration_state",
+    );
+
+    // A new task goes into the active iteration, unless another is named.
+    let v = ok(
+        &repo,
+        &["add", "task", "--area", "A01", "--title", "In one"],
+    );
+    let in_one = v["task"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["task"]["iteration"], "I01");
+    assert!(
+        v["next_steps"]
+            .as_str()
+            .unwrap()
+            .contains("It went into iteration I01"),
+        "{v}"
+    );
+    let v = ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "--area",
+            "A01",
+            "--title",
+            "In two",
+            "--iteration",
+            "I02",
+        ],
+    );
+    let in_two = v["task"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["task"]["iteration"], "I02");
+
+    // `alm next`: the active iteration's tasks first, whatever the order of iterations.
+    ok(&repo, &["change", "iteration", "I01", "--state", "planned"]);
+    ok(&repo, &["change", "iteration", "I02", "--state", "active"]);
+    ok(&repo, &["ready", &in_one]);
+    ok(&repo, &["ready", &in_two]);
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["tasks"][0]["id"], in_two.as_str(), "{v}");
+    assert_eq!(v["active_iteration"], "I02");
+    assert!(
+        v["instruction"]
+            .as_str()
+            .unwrap()
+            .contains("from the active iteration")
+    );
+    let listed = ok(&repo, &["list", "--by", "iteration"]);
+    assert!(
+        listed.to_string().contains("\"state\":\"active\""),
+        "{listed}"
+    );
+
+    // Closing I02 with an unfinished task lists it and moves nothing.
+    let v = ok(&repo, &["change", "iteration", "I02", "--state", "closed"]);
+    assert_eq!(v["unfinished"][0]["id"], in_two.as_str());
+    assert_eq!(ok(&repo, &["show", &in_two])["task"]["iteration"], "I02");
+    let out = alm(&repo, &["change", "iteration", "I02", "--state", "closed"]);
+    assert!(
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .contains("none was moved")
+    );
+
+    // The active iteration all done: `alm next` suggests closing it and the next planned one;
+    // it changes no state itself.
+    ok(&repo, &["change", "iteration", "I01", "--state", "active"]);
+    ok(&repo, &["add", "iteration", "I03", "Three"]);
+    ok(&repo, &["drop", &in_one]);
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["finished_iteration"]["iteration"], "I01", "{v}");
+    assert_eq!(v["finished_iteration"]["next"], "I03", "{v}");
+    assert_eq!(
+        ok(&repo, &["list", "--by", "iteration"])
+            .to_string()
+            .matches("\"state\":\"active\"")
+            .count(),
+        1
+    );
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]));
 }

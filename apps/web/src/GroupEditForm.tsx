@@ -7,7 +7,7 @@ import { useState, type KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
 import { WhoForm } from "./WhoForm";
 import { canSaveGroup, startGroupEdit, type Editing, type GroupDraft } from "./groupEditFlow";
-import { isProblem, type Area, type Iteration } from "./types";
+import { isProblem, type Area, type Iteration, type IterationState } from "./types";
 
 export function GroupEditForm({
   editing,
@@ -101,6 +101,17 @@ export function GroupEditForm({
           {field("release", t("create.release"), "text", { placeholder: "v0.3" })}
           {field("start", t("create.start"), "date")}
           {field("end", t("create.end"), "date")}
+          {/* Task-A01-root343: planned → active → closed; at most one active (Rust refuses a second). */}
+          <label>
+            <span>{t("iteration.state")}</span>
+            <select value={draft.state} onChange={(e) => setDraft((d) => ({ ...d, state: e.target.value as IterationState }))} disabled={!!busy}>
+              {(["planned", "active", "closed"] as const).map((s) => (
+                <option key={s} value={s}>
+                  {t(`iteration.state_${s}`)}
+                </option>
+              ))}
+            </select>
+          </label>
         </>
       )}
       <div className="editor-buttons">

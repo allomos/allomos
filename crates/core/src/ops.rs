@@ -6,7 +6,7 @@
 //! taskbag's lock (see `crates/store`).
 
 use crate::event::Change;
-use crate::model::{Area, Iteration, Project, State, Task, Taskbag};
+use crate::model::{Area, Iteration, IterationState, Project, State, Task, Taskbag};
 use crate::problem::Problem;
 use crate::validate::valid_date;
 use serde::Deserialize;
@@ -352,6 +352,7 @@ pub fn new_iteration(
         start: date(details.start)?,
         end: date(details.end)?,
         release: non_empty(details.release),
+        state: IterationState::Planned,
     })
 }
 
@@ -406,10 +407,15 @@ pub struct IterationChange {
     pub start: Option<String>,
     #[serde(default)]
     pub end: Option<String>,
+    /// `planned`, `active` or `closed` (Task-A01-root343).
+    #[serde(default)]
+    pub state: Option<IterationState>,
 }
 
 /// The iteration with `change` applied (`alm change iteration`, Task-A01-29). Its ID and order
-/// stay; dates are checked as `alm add iteration` checks them.
+/// stay; dates are checked as `alm add iteration` checks them. Making it active is refused while
+/// another iteration is active: at most one is (Task-A01-root343); the other is closed (or put
+/// back to planned) first, by whoever sets the states.
 pub fn change_iteration(
     taskbag: &Taskbag,
     id: &str,
@@ -428,7 +434,59 @@ pub fn change_iteration(
     if let Some(end) = &change.end {
         iteration.end = optional_date(Some(end))?;
     }
+    if let Some(state) = change.state {
+        if state == IterationState::Active {
+            if let Some(other) = active_iteration(taskbag).filter(|a| a.id != id) {
+                return Err(Problem::IterationActiveAlready {
+                    id: id.to_string(),
+                    active: other.id.clone(),
+                });
+            }
+        }
+        iteration.state = state;
+    }
     Ok(iteration)
+}
+
+/// The active iteration, if one is (Task-A01-root343). Should a hand edit leave more than one,
+/// the first in order; `validate` reports the rest.
+pub fn active_iteration(taskbag: &Taskbag) -> Option<&Iteration> {
+    taskbag
+        .iterations
+        .iter()
+        .find(|i| i.state == IterationState::Active)
+}
+
+/// The tasks planned in `iteration` that are not finished: neither done nor dropped. Listed when
+/// the iteration is closed, which moves none of them (approver, 2026-10-22).
+pub fn unfinished_in<'a>(taskbag: &'a Taskbag, iteration: &str) -> Vec<&'a Task> {
+    taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.iteration.as_deref() == Some(iteration))
+        .filter(|t| !matches!(t.state, State::Done | State::Dropped))
+        .collect()
+}
+
+/// When the active iteration holds tasks and all of them are done or dropped: it, and the next
+/// planned iteration in order, if any (Task-A01-root343). `alm next` suggests closing the one and
+/// making the other active; it changes neither.
+pub fn finished_active(taskbag: &Taskbag) -> Option<(&Iteration, Option<&Iteration>)> {
+    let active = active_iteration(taskbag)?;
+    let planned = taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.iteration.as_deref() == Some(active.id.as_str()))
+        .count();
+    if planned == 0 || !unfinished_in(taskbag, &active.id).is_empty() {
+        return None;
+    }
+    let next = taskbag
+        .iterations
+        .iter()
+        .filter(|i| i.state == IterationState::Planned && i.order > active.order)
+        .min_by_key(|i| i.order);
+    Some((active, next))
 }
 
 /// The area to delete (`alm delete area`, Task-A01-29). Refused while any task is in it, done
@@ -1141,7 +1199,8 @@ pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Proble
 
 /// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14). A
 /// `blocked` or `waiting` task is never among them: skipped by its state, not by its words:
-/// earliest iteration first (unplanned tasks last), then area order, then ID. With an
+/// the active iteration first (Task-A01-root343), then the earliest iteration (unplanned tasks
+/// last), then area order, then ID. With an
 /// iteration, only the tasks planned in it; an iteration that does not exist is refused.
 pub fn next<'a>(taskbag: &'a Taskbag, iteration: Option<&str>) -> Result<Vec<&'a Task>, Problem> {
     if let Some(i) = iteration {
@@ -1158,11 +1217,16 @@ pub fn next<'a>(taskbag: &'a Taskbag, iteration: Option<&str>) -> Result<Vec<&'a
             .position(|a| a.id == area)
             .unwrap_or(usize::MAX)
     };
+    // The active iteration first (Task-A01-root343), then the others in order, unplanned last.
+    let active = active_iteration(taskbag).map(|a| a.id.as_str());
     let iteration_rank = |t: &Task| {
+        if t.iteration.is_some() && t.iteration.as_deref() == active {
+            return 0;
+        }
         t.iteration
             .as_ref()
             .and_then(|i| taskbag.iterations.iter().position(|x| &x.id == i))
-            .unwrap_or(usize::MAX)
+            .map_or(usize::MAX, |p| p + 1)
     };
     let mut tasks: Vec<&Task> = taskbag
         .tasks
