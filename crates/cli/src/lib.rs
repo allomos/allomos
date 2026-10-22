@@ -1487,7 +1487,7 @@ fn confirm(
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the active iteration whose next dependency is met (the list shows its tasks first); with none there, from the earliest iteration, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the active iteration (the one marked active, or else the first planned one) whose next dependency is met (the list shows its tasks first); with none there, from the earliest iteration, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
 
 fn task_json(t: &Task) -> Value {
     let mut v = serde_json::to_value(t).expect("tasks serialize");
@@ -2600,6 +2600,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .collect::<Vec<_>>()
             };
             let fields = if by == "iteration" {
+                let active = ops::active_iteration(&bag).map(|i| i.id.clone());
                 let mut groups = Vec::new();
                 for it in &bag.iterations {
                     if iteration.as_ref().is_some_and(|x| x != &it.id) {
@@ -2609,8 +2610,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         .iter()
                         .filter(|t| t.iteration.as_ref() == Some(&it.id))
                         .collect();
-                    group(iteration_heading(it), &members);
+                    let is_active = active.as_ref() == Some(&it.id);
+                    let mut heading = iteration_heading(it);
+                    // The first planned iteration, active because none is marked (Task-A01-root343).
+                    if is_active && it.state.is_planned() {
+                        heading.push_str("  [active]");
+                    }
+                    group(heading, &members);
                     let mut g = json!(it);
+                    g["active"] = json!(is_active);
                     g["tasks"] = json!(tasks_json(&members));
                     groups.push(g);
                 }
@@ -2779,6 +2787,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             // (approver, 2026-10-22; Task-A01-root343).
             let finished = ops::finished_active(&bag).map(|(done_it, next_it)| {
                 let words = match next_it {
+                    // Active only because it is the first planned: closing it is enough, the next
+                    // planned one is then active the same way.
+                    Some(n) if done_it.state.is_planned() => format!(
+                        "{} is all done (every task done or dropped). Close it? `alm change iteration {} --state closed` (ask the person first unless they set this up); {}, the next planned iteration, is then active.",
+                        done_it.id, done_it.id, n.id
+                    ),
                     Some(n) => format!(
                         "{} is all done (every task done or dropped). Close it and make {} active? `alm change iteration {} --state closed`, then `alm change iteration {} --state active` (ask the person first unless they set this up).",
                         done_it.id, n.id, done_it.id, n.id

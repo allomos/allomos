@@ -1526,7 +1526,7 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
 
     let text = String::from_utf8(alm(&repo, &["list", "--by", "iteration"]).stdout).unwrap();
     assert!(
-        text.starts_with("I01  v0.1  (v0.1, until 2026-10-07)\n  A01-01  done"),
+        text.starts_with("I01  v0.1  (v0.1, until 2026-10-07)  [active]\n  A01-01  done"),
         "{text}"
     );
     assert!(
@@ -2461,7 +2461,8 @@ fn add_task_tells_the_next_steps() {
         "{text}"
     );
 
-    // The iterations listed; in JSON too; the task stays in backlog with no iteration.
+    // With an iteration, the first planned one is active (Task-A01-root343): the task goes into
+    // it, in backlog; in JSON too.
     ok(
         &dir,
         &["add", "iteration", "I01", "First steps", "--release", "0.1"],
@@ -2471,10 +2472,10 @@ fn add_task_tells_the_next_steps() {
         &["add", "task", "A01-02", "--area", "A01", "--title", "Two"],
     );
     let steps = v["next_steps"].as_str().unwrap();
-    assert!(steps.contains("     I01  First steps  (0.1)\n"), "{steps}");
+    assert!(steps.contains("It went into iteration I01"), "{steps}");
     assert!(steps.contains("`alm ready A01-02`"), "{steps}");
     assert_eq!(v["task"]["state"], "backlog");
-    assert_eq!(v["task"]["iteration"], Value::Null);
+    assert_eq!(v["task"]["iteration"], "I01");
 
     // In the task language.
     ok(&dir, &["task-language", "zh-CN"]);
@@ -4441,6 +4442,76 @@ fn tasks_added_on_two_branches_merge_without_a_clash() {
     assert!(ids.contains(&made[0].as_str()) && ids.contains(&made[1].as_str()));
 }
 
+/// With no iteration marked active, the first planned one is active (approver, 2026-10-22;
+/// Task-A01-root343): new tasks go into it, `alm list` and `alm next` say so, nothing is written,
+/// and marking another one active is not refused. With every iteration closed, none is active.
+#[test]
+fn the_first_planned_iteration_is_active_when_none_is_marked() {
+    let repo = filled();
+    ok(&repo, &["task-language", "en"]);
+    ok(&repo, &["add", "iteration", "I01", "One"]);
+    ok(&repo, &["add", "iteration", "I02", "Two"]);
+    ok(&repo, &["add", "iteration", "I03", "Three"]);
+    ok(&repo, &["change", "iteration", "I01", "--state", "closed"]);
+    let bag = repo.join(".allomos/taskbag");
+    let file = |id: &str| fs::read_to_string(bag.join(format!("iterations/{id}.json"))).unwrap();
+
+    // I01 is closed, so I02 is active: a new task goes into it, and nothing is written.
+    let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "First"]);
+    let first = v["task"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["task"]["iteration"], "I02");
+    assert!(!file("I02").contains("state"), "{}", file("I02"));
+    let listed = ok(&repo, &["list", "--by", "iteration"]);
+    let actives: Vec<&Value> = listed["iterations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|g| g["active"] == true)
+        .collect();
+    assert_eq!(actives.len(), 1, "{listed}");
+    assert_eq!(actives[0]["id"], "I02");
+    let out = alm(&repo, &["list", "--by", "iteration"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("I02  Two  [active]"), "{text}");
+    ok(&repo, &["ready", &first]);
+    assert_eq!(ok(&repo, &["next"])["active_iteration"], "I02");
+
+    // All done: closing it is enough, the next planned one is then active.
+    ok(&repo, &["drop", &first]);
+    let out = alm(&repo, &["next"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("I03, the next planned iteration, is then active"),
+        "{text}"
+    );
+    ok(&repo, &["change", "iteration", "I02", "--state", "closed"]);
+    assert_eq!(ok(&repo, &["next"])["active_iteration"], "I03");
+
+    // Marking another one active is not refused by the first planned one, and wins over it.
+    ok(&repo, &["add", "iteration", "I04", "Four"]);
+    ok(&repo, &["change", "iteration", "I04", "--state", "active"]);
+    let v = ok(
+        &repo,
+        &["add", "task", "--area", "A01", "--title", "Second"],
+    );
+    assert_eq!(v["task"]["iteration"], "I04");
+
+    // Every iteration closed: none is active, a new task goes into none.
+    for id in ["I03", "I04"] {
+        ok(&repo, &["change", "iteration", id, "--state", "closed"]);
+    }
+    let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "Loose"]);
+    assert_eq!(v["task"]["iteration"], Value::Null);
+    assert!(
+        v["next_steps"]
+            .as_str()
+            .unwrap()
+            .contains("none is planned either"),
+        "{v}"
+    );
+    assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
+}
+
 /// Iterations have a state (approver, 2026-10-22; Task-A01-root343): planned → active → closed,
 /// at most one active, set only by a command. A new task goes into the active iteration; `alm
 /// next` lists its tasks first and says when it is all done; closing one lists the unfinished
@@ -4456,13 +4527,11 @@ fn iterations_have_a_state_and_the_active_one_leads() {
     // Planned is the default and is not written.
     assert!(!file("I01").contains("state"), "{}", file("I01"));
 
-    // No active iteration: a new task goes into none, and the steps say how to set one.
+    // None marked active: the first planned one is (approver, 2026-10-22), so a new task goes
+    // into I01.
     let v = ok(&repo, &["add", "task", "--area", "A01", "--title", "Loose"]);
-    assert_eq!(v["task"]["iteration"], Value::Null);
-    assert!(
-        v["next_steps"].as_str().unwrap().contains("--state active"),
-        "{v}"
-    );
+    let loose = v["task"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["task"]["iteration"], "I01");
 
     // Make I01 active; a second active iteration is refused, a bad state too.
     let v = ok(&repo, &["change", "iteration", "I01", "--state", "active"]);
@@ -4552,6 +4621,7 @@ fn iterations_have_a_state_and_the_active_one_leads() {
     ok(&repo, &["change", "iteration", "I01", "--state", "active"]);
     ok(&repo, &["add", "iteration", "I03", "Three"]);
     ok(&repo, &["drop", &in_one]);
+    ok(&repo, &["drop", &loose]);
     let v = ok(&repo, &["next"]);
     assert_eq!(v["finished_iteration"]["iteration"], "I01", "{v}");
     assert_eq!(v["finished_iteration"]["next"], "I03", "{v}");

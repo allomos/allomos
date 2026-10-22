@@ -138,8 +138,9 @@ Read this before you add a task, so it fits this project.
    task shares that task's base; otherwise its base is the branch you are on. alm prints which
    and why; `--base <name>` chooses another. When you hold a task on another base, alm says so:
    decide which is right, and change it with `alm base <id> <branch>` if needed.
-7. **State.** A new task starts in backlog, in the active iteration (`--iteration <id>` names
-   another; with no active iteration, in none). `alm add task` then prints the next steps
+7. **State.** A new task starts in backlog, in the active iteration: the one marked active, or
+   else the first planned one (`--iteration <id>` names another; with no planned iteration
+   left, in none). `alm add task` then prints the next steps
    (Task-A03-33, A01-root343): plan it elsewhere if it belongs there (`alm plan <id>
    <iteration>`), or in one at all when no iteration is active, then check it for anything that
    is the person's to decide (what users will see and get used to, anything hard to undo, anything that
@@ -381,8 +382,8 @@ until the person says Go ahead.
 const WORKFLOW: &str = "# How to work the tasks
 
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
-   otherwise one from the active iteration (listed first), else the earliest iteration, whose
-   next dependency is met. Read its handoff
+   otherwise one from the active iteration (listed first: the one marked active, or else the
+   first planned one), else the earliest iteration, whose next dependency is met. Read its handoff
    first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
    `alm next` shows (the whole file is the taskbag's `project-notes.md`).
    **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
@@ -1201,7 +1202,7 @@ pub fn added_task_steps(
                     format!("1. 它已放进迭代 {i}。如果它属于别的迭代：`alm plan {id} <迭代>`。\n")
                 }
                 None => format!(
-                    "1. 没有进行中的迭代，所以它不在任何迭代里。把它计划进合适的迭代：`alm plan {id} <迭代>`（用 `alm change iteration <迭代> --state active` 设定进行中的迭代后，新任务会自动放进去）：\n{list}"
+                    "1. 没有进行中的迭代（也没有计划中的迭代），所以它不在任何迭代里。把它计划进合适的迭代：`alm plan {id} <迭代>`（有进行中的迭代时，新任务会自动放进去：标为进行中的那个，没有就是第一个计划中的迭代）：\n{list}"
                 ),
             };
             format!(
@@ -1222,7 +1223,7 @@ pub fn added_task_steps(
                     "1. イテレーション {i} に入れました。別のイテレーションのものなら：`alm plan {id} <イテレーション>`。\n"
                 ),
                 None => format!(
-                    "1. 進行中のイテレーションがないので、どのイテレーションにも入っていません。合うものに計画します：`alm plan {id} <イテレーション>`（`alm change iteration <イテレーション> --state active` で進行中のイテレーションを決めると、新しいタスクは自動でそこに入ります）：\n{list}"
+                    "1. 進行中のイテレーションがない（計画中のイテレーションもない）ので、どのイテレーションにも入っていません。合うものに計画します：`alm plan {id} <イテレーション>`（進行中のイテレーションがあれば、新しいタスクは自動でそこに入ります：進行中にしたもの、なければ最初の計画中のもの）：\n{list}"
                 ),
             };
             format!(
@@ -1243,7 +1244,7 @@ pub fn added_task_steps(
                     "1. It went into iteration {i}. If it belongs in another: `alm plan {id} <iteration>`.\n"
                 ),
                 None => format!(
-                    "1. No iteration is active, so it is in none. Plan it in the one that fits: `alm plan {id} <iteration>` (once an iteration is made active with `alm change iteration <iteration> --state active`, new tasks go into it):\n{list}"
+                    "1. No iteration is active (none is planned either), so it is in none. Plan it in the one that fits: `alm plan {id} <iteration>` (while one is active, new tasks go into it: the one marked active, or else the first planned one):\n{list}"
                 ),
             };
             format!(

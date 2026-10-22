@@ -182,6 +182,8 @@ export interface Issue {
 export interface Loaded {
   taskbag: { project: Project; areas: Area[]; iterations: Iteration[]; tasks: Task[] } | null;
   issues: Issue[];
+  /** The active iteration's ID: the one marked active, or else the first planned one (Task-A01-root343). */
+  active_iteration?: string | null;
 }
 
 export type Inspection =

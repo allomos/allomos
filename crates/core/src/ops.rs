@@ -436,7 +436,7 @@ pub fn change_iteration(
     }
     if let Some(state) = change.state {
         if state == IterationState::Active {
-            if let Some(other) = active_iteration(taskbag).filter(|a| a.id != id) {
+            if let Some(other) = marked_active(taskbag).filter(|a| a.id != id) {
                 return Err(Problem::IterationActiveAlready {
                     id: id.to_string(),
                     active: other.id.clone(),
@@ -448,13 +448,26 @@ pub fn change_iteration(
     Ok(iteration)
 }
 
-/// The active iteration, if one is (Task-A01-root343). Should a hand edit leave more than one,
-/// the first in order; `validate` reports the rest.
-pub fn active_iteration(taskbag: &Taskbag) -> Option<&Iteration> {
+/// The iteration marked active, if one is (Task-A01-root343). Should a hand edit leave more than
+/// one, the first in order; `validate` reports the rest.
+pub fn marked_active(taskbag: &Taskbag) -> Option<&Iteration> {
     taskbag
         .iterations
         .iter()
         .find(|i| i.state == IterationState::Active)
+}
+
+/// The active iteration: the one marked active, or else the first planned one in order
+/// (approver, 2026-10-22; Task-A01-root343). Nothing is written: closing it makes the next
+/// planned one active the same way.
+pub fn active_iteration(taskbag: &Taskbag) -> Option<&Iteration> {
+    marked_active(taskbag).or_else(|| {
+        taskbag
+            .iterations
+            .iter()
+            .filter(|i| i.state == IterationState::Planned)
+            .min_by_key(|i| i.order)
+    })
 }
 
 /// The tasks planned in `iteration` that are not finished: neither done nor dropped. Listed when

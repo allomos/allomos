@@ -33,6 +33,9 @@ impl Issue {
 pub struct Loaded {
     pub taskbag: Option<Taskbag>,
     pub issues: Vec<Issue>,
+    /// The active iteration's ID, as `ops::active_iteration` finds it, so the app shows the same
+    /// one `alm` uses (Task-A01-root343).
+    pub active_iteration: Option<String>,
 }
 
 /// Fields whose value must be one of a fixed list: (field, allowed values).

@@ -858,6 +858,7 @@ pub fn load(root: &Path) -> Loaded {
         return Loaded {
             taskbag: None,
             issues,
+            active_iteration: None,
         };
     };
 
@@ -924,14 +925,17 @@ pub fn load(root: &Path) -> Loaded {
         let made = created(root);
         tasks.sort_by(|a, b| allomos_core::ids::compare(&a.id, &b.id, &made));
     }
+    let taskbag = Taskbag {
+        project,
+        areas,
+        iterations,
+        tasks,
+    };
+    let active_iteration = allomos_core::ops::active_iteration(&taskbag).map(|i| i.id.clone());
     Loaded {
-        taskbag: Some(Taskbag {
-            project,
-            areas,
-            iterations,
-            tasks,
-        }),
+        taskbag: Some(taskbag),
         issues,
+        active_iteration,
     }
 }
 

@@ -1072,8 +1072,8 @@ type Group = {
   newTask?: { area: string | null; iteration: string | null };
   /** The area or iteration this group is, for its Edit form (Task-A01-29); none for Unplanned and unknown areas. */
   edit?: Editing;
-  /** The active iteration, shown highlighted (Task-A01-root343). */
-  active?: boolean;
+  /** The iteration's state when active or closed, shown as a badge in its own colour (Task-A01-root343). */
+  iterationState?: "active" | "closed";
 };
 
 function TaskbagView({
@@ -1098,7 +1098,7 @@ function TaskbagView({
   onRefresh: () => Promise<void>;
 }) {
   const { t, rich } = useI18n();
-  const { taskbag: box, issues } = opened.loaded;
+  const { taskbag: box, issues, active_iteration: activeIteration } = opened.loaded;
   const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_to_move_in") : issues;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
   const choose = (g: GroupBy) => {
@@ -1197,7 +1197,7 @@ function TaskbagView({
         tasks: inOrder(box.tasks.filter((task) => task.iteration === it.id)),
         newTask: { area: null, iteration: it.id },
         edit: { kind: "iteration", id: it.id },
-        active: it.state === "active",
+        iterationState: it.id === activeIteration ? "active" : it.state === "closed" ? "closed" : undefined,
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
@@ -1516,7 +1516,7 @@ function TaskbagView({
                   id={g.id}
                   name={g.name}
                   sub={g.sub}
-                  active={g.active}
+                  iterationState={g.iterationState}
                   empty={g.empty}
                   tasks={g.tasks}
                   counted={g.counted}
@@ -1632,8 +1632,6 @@ function TaskbagView({
 /** An iteration's release and dates, for the line under its name. */
 function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string {
   const parts: string[] = [];
-  // Its state, unless planned (Task-A01-root343).
-  if (it.state === "active" || it.state === "closed") parts.push(t(`iteration.state_${it.state}`));
   if (it.release) parts.push(t("iteration.release", { release: it.release }));
   if (it.start && it.end) parts.push(t("iteration.dates", { start: it.start, end: it.end }));
   else if (it.start) parts.push(t("iteration.from", { start: it.start }));
@@ -1683,7 +1681,7 @@ function TaskGroup({
   id,
   name,
   sub,
-  active,
+  iterationState,
   empty,
   tasks,
   counted,
@@ -1705,8 +1703,9 @@ function TaskGroup({
   id: string;
   name: string;
   sub?: string;
-  /** The active iteration: highlighted (Task-A01-root343). */
-  active?: boolean;
+  /** An active or closed iteration: a badge and colour of its own (Task-A01-root343). The active
+   * one is the one marked active, or else the first planned one, as alm finds it. */
+  iterationState?: "active" | "closed";
   empty: string;
   tasks: Task[];
   /** Every task of the group, for its count and progress, when `tasks` is filtered by state. */
@@ -1742,12 +1741,13 @@ function TaskGroup({
   const all = counted ?? tasks;
   const { done, total, pct } = groupCount(all.map((t) => t.state));
   return (
-    <section className={["area", collapsed ? "collapsed" : "", active ? "active-iteration" : ""].filter(Boolean).join(" ")}>
+    <section className={["area", collapsed ? "collapsed" : "", iterationState ? `${iterationState}-iteration` : ""].filter(Boolean).join(" ")}>
       <header className="area-head">
         <h2>
           <button type="button" className="fold" aria-expanded={!collapsed} onClick={onToggle}>
             {id && <span className="id">{id}</span>} {name}
           </button>
+          {iterationState && <span className={`badge iteration-${iterationState}`}>{t(`iteration.state_${iterationState}`)}</span>}
         </h2>
         <span className="count">{t("area.count", { done, total })}</span>
         {sub && <span className="sub">{sub}</span>}
