@@ -413,6 +413,16 @@ const WORKFLOW: &str = "# How to work the tasks
    session leaves it on a task's branch and several sessions can work at once. Merge from the
    main checkout, where the base is checked out. Once the task's branch is merged into its
    base, remove your own worktree and the merged branch; never another session's.
+   **Before you plan: the size of the files you will change** (Task-A03-tide388; `alm claim`
+   repeats it). A source file your plan changes that is over about 1000 lines (tests do not
+   count; the project notes may name another limit) needs a look: is the part you will change
+   tangled with unrelated things? If so, the plan includes a refactoring of only that part (for
+   example, moved into a module of its own), never the whole file, so files get smaller task by
+   task. By default it is done in the same task, as a commit of its own before the feature
+   commit, with the tests passing and the behaviour unchanged after it. When the refactoring is
+   bigger than the feature itself, or reaches files outside the task, add a task for it first
+   and link them with `alm block <this task> --by <new task>`. alm only reminds: it measures no
+   file and stops nothing.
 3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
    with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
@@ -1256,6 +1266,21 @@ pub fn added_task_steps(
     }
 }
 
+/// What `alm claim` prints after its Git commands (Task-A03-tide388, approver 2026-10-22), in the
+/// task language (`en`, `zh-CN`, `ja`; English otherwise): before planning the task, look at the
+/// size of the source files the plan will change, and put a refactoring of only the part to be
+/// changed into the plan when one is too big. alm reminds; it measures nothing and stops nothing.
+pub fn claimed_task_steps(language: &str) -> String {
+    match language {
+        "zh-CN" => "做计划之前（alm 提醒，你来检查）：看一下计划要改的源文件有多大。超过约 1000 行（测试文件不算；项目说明 `project-notes.md` 可以定别的行数）就看一看：要改的那部分是否和不相干的东西缠在一起。是的话，把重构写进这次的计划：只把本任务要改的那部分拆出来（例如移到自己的模块），不重构整个文件，文件随一个个任务逐步变小。默认在本任务里做：重构单独一个提交，放在功能提交之前，提交后测试通过、行为不变。重构比功能本身还大，或要动本任务范围外的文件时，先另开一个任务做重构，再用 `alm block <本任务> --by <新任务>` 连上。
+".to_string(),
+        "ja" => "計画を立てる前に（alm は知らせるだけ、確かめるのはあなた）：計画で変える元のファイルの大きさを見ます。約 1000 行を超えるもの（テストのファイルは数えません。`project-notes.md` で別の行数を決めてもかまいません）は一度見て、変える部分が関係のないものと絡み合っていないか判断します。絡み合っていれば、リファクタリングを今回の計画に入れます。このタスクで変える部分だけを切り出し（たとえば専用のモジュールへ移す）、ファイル全体は書き直しません。ファイルはタスクごとに少しずつ小さくなります。ふつうはこのタスクの中で行います：リファクタリングを機能のコミットより前の独立したコミットにし、その後もテストが通り、動きが変わらないこと。リファクタリングが機能そのものより大きいとき、またはこのタスクの範囲外のファイルに及ぶときは、先にリファクタリングのタスクを別に追加し、`alm block <このタスク> --by <新しいタスク>` でつなぎます。
+".to_string(),
+        _ => "Before you plan this task (alm reminds; you check): look at the size of the source files your plan will change. One over about 1000 lines (tests do not count; the project notes, `project-notes.md`, may name another limit) needs a look: is the part you will change tangled with unrelated things? If so, put a refactoring into this plan: only the part this task changes (for example, move it into a module of its own), never the whole file, so files get smaller task by task. By default it is done in this task, as a commit of its own before the feature commit, with the tests passing and the behaviour unchanged after it. When the refactoring is bigger than the feature itself, or reaches files outside this task, add a task for it first and link them with `alm block <this task> --by <new task>`.
+".to_string(),
+    }
+}
+
 /// `alm guide github-release` (Task-A03-planet530): the procedure an agent follows when the
 /// approver writes `alm guide github release` in the conversation: publish a new GitHub release
 /// with release notes, check it, and install it on this computer. The same text for every project:
@@ -1747,6 +1772,61 @@ mod tests {
             "A line in the conversation that starts with `alm ` followed by one of its commands"
         )));
         assert!(brief.contains("when it prints a guide, follow that guide"));
+    }
+
+    /// Task-A03-tide388: the size reminder, in every language the app speaks and in the workflow
+    /// guide; only a reminder.
+    #[test]
+    fn the_file_size_reminder_is_written_in_every_language_and_in_the_workflow() {
+        for (language, words) in [
+            (
+                "en",
+                [
+                    "1000 lines",
+                    "only the part this task changes",
+                    "a commit of its own before the feature commit",
+                    "`alm block <this task> --by <new task>`",
+                    "project-notes.md",
+                ],
+            ),
+            (
+                "zh-CN",
+                [
+                    "1000 行",
+                    "只把本任务要改的那部分拆出来",
+                    "放在功能提交之前",
+                    "`alm block <本任务> --by <新任务>`",
+                    "project-notes.md",
+                ],
+            ),
+            (
+                "ja",
+                [
+                    "1000 行",
+                    "このタスクで変える部分だけ",
+                    "機能のコミットより前",
+                    "`alm block <このタスク> --by <新しいタスク>`",
+                    "project-notes.md",
+                ],
+            ),
+        ] {
+            let text = claimed_task_steps(language);
+            for w in words {
+                assert!(text.contains(w), "{language}: {w}");
+            }
+        }
+        assert_eq!(claimed_task_steps("fr"), claimed_task_steps("en"));
+        let workflow = guide(Some("workflow")).unwrap();
+        for w in [
+            "**Before you plan: the size of the files you will change**",
+            "about 1000 lines",
+            "never the whole file",
+            "alm only reminds",
+        ] {
+            assert!(workflow.contains(w), "{w}");
+        }
+        // AGENTS.md's section is not changed (approver, 2026-10-22).
+        assert!(!crate::agent_section().contains("1000 lines"));
     }
 
     /// A topic written as separate words is the same topic; the words after it are the guide's.
