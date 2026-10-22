@@ -1,109 +1,166 @@
-# Moving Allomos's tasks into the new taskbag (2026-10-12)
+# Moving Allomos's tasks into the new taskbag (2026-10-22)
 
-*Since 2026-10-17 (`A00-30`) each card file lives in the taskbag beside its task, as `tasks/<id>/card.md`, and the description's link is `Card: [card.md](card.md)`; the card links below are history.*
+**What happened, in plain words:** Allomos 0.1.20 writes a newer taskbag format (`allomos/5`) and no longer reads the old one (`allomos/4`). The app set the old taskbag aside as `../allomos-taskbag/.allomos/taskbag-allomos-4` and made a new, empty taskbag in its place, `../allomos-taskbag/.allomos/taskbag`. Everything in the old one was copied into the new one with the `alm` command, keeping every ID and the order. No taskbag file was edited by hand except `project-notes.md`, which is meant to be edited directly. The approver approved the plan in the Allomos app (`alm confirm`, "Move tasks into Allomos", plan fingerprint `fbc6da29c3283c52`). The old folder was then deleted; its content is in the taskbag repository's Git history.
 
-**What happened, in plain words:** until today this project's tasks lived in a taskbag inside this repository (`.allomos/taskbag/`). They were copied, with their exact status, into the taskbag Allomos set up next to this repository, `../allomos-taskbag/.allomos/taskbag` (its own Git repository, branch `master`). The old in-repository taskbag was then removed, so status has one home again. Every task was written with the `alm` command; no taskbag file was edited by hand. The owner approved the plan in the Allomos app (`alm confirm`, "Move tasks into Allomos").
+The previous move (2026-10-12, from a taskbag inside this repository) is described in this file's Git history (`git log -- docs/allomos-conversion.md`).
 
 ## What was copied
 
-- **8 areas** (A00–A07, same names and order) and **15 iterations** (I01–I15, same names and releases).
-- **64 tasks**, one per card file below. Each task's state, label, holder, waiting-on, next dependency, iteration and handoff note were compared field by field with the old `task.json` after copying: **0 differences**.
-- **The label ladder:** drafted → implemented → locally verified → deployed and verified → owner verified (the new taskbag lacked "drafted"; set with `alm labels`).
-- **4 new backlog tasks** for planned work that has no card yet ([TASK_BOARD § Roadmap — not yet carded](./TASK_BOARD.md#roadmap--not-yet-carded)). Their description says "No card yet": `A01-22` Desktop hub (W04), `A01-23` Shared commands and the human CLI (R60–R68), `A04-02` Companion viewing (W10, R69–R71), `A05-04` AI-generated project setup (W09, R50–R55). They are unplanned (no iteration), because the board names none.
-- Each task's description links to its card: `Card: [docs/tasks/<file>](../../../../../allomos/docs/tasks/<file>)`.
-
-Nothing was dropped or duplicated: 64 card files, 64 copied tasks, 64 old tasks.
-
-## Card files and the tasks they became
-
-| Card file | Task | Status copied (state · label · holder) |
-|---|---|---|
-| task `A00-01` | `A00-01` | done · owner verified |
-| task `A00-02` | `A00-02` | done |
-| task `A00-03` | `A00-03` | done · owner verified |
-| task `A00-04` | `A00-04` | done · owner verified |
-| task `A00-05` | `A00-05` | done |
-| task `A00-06` | `A00-06` | done · owner verified |
-| task `A00-07` | `A00-07` | done · owner verified |
-| task `A00-08` | `A00-08` | done · owner verified |
-| task `A00-09` | `A00-09` | done · owner verified |
-| task `A00-10` | `A00-10` | done · owner verified |
-| task `A00-11` | `A00-11` | waiting · drafted |
-| task `A00-12` | `A00-12` | done · owner verified |
-| task `A00-13` | `A00-13` | done · owner verified |
-| task `A00-14` | `A00-14` | waiting · drafted |
-| task `A00-15` | `A00-15` | waiting · drafted |
-| task `A00-16` | `A00-16` | done |
-| task `A00-17` | `A00-17` | done · owner verified |
-| task `A00-18` | `A00-18` | done · owner verified |
-| task `A00-19` | `A00-19` | done · owner verified · claude/a00-19-republish |
-| task `A00-20` | `A00-20` | done · owner verified |
-| task `A00-21` | `A00-21` | done · owner verified · claude/a00-21-allomos |
-| task `A00-22` | `A00-22` | done · owner verified · claude/a00-22-leftover-names |
-| task `A00-23` | `A00-23` | waiting |
-| task `A00-24` | `A00-24` | in progress · deployed and verified · claude/a00-24-decks |
-| task `A01-01` | `A01-01` | done · owner verified |
-| task `A01-02` | `A01-02` | done · owner verified |
-| task `A01-03` | `A01-03` | done · owner verified |
-| task `A01-04` | `A01-04` | done · owner verified |
-| task `A01-05` | `A01-05` | done · owner verified |
-| task `A01-06` | `A01-06` | done · owner verified |
-| task `A01-07` | `A01-07` | done · owner verified |
-| task `A01-08` | `A01-08` | done · owner verified |
-| task `A01-09` | `A01-09` | done · owner verified |
-| task `A01-10` | `A01-10` | done · owner verified |
-| task `A01-11` | `A01-11` | done · owner verified |
-| task `A01-12` | `A01-12` | done · owner verified |
-| task `A01-13` | `A01-13` | done · owner verified |
-| task `A01-14` | `A01-14` | done · owner verified |
-| task `A01-15` | `A01-15` | done · owner verified · claude/a01-15-iterations |
-| task `A01-16` | `A01-16` | done · owner verified · claude/a01-16-task-pane |
-| task `A01-17` | `A01-17` | backlog |
-| task `A01-18` | `A01-18` | backlog |
-| task `A01-19` | `A01-19` | backlog |
-| task `A01-20` | `A01-20` | done · owner verified |
-| task `A01-21` | `A01-21` | done · owner verified · claude/a01-21-task-language |
-| task `A02-01` | `A02-01` | backlog |
-| task `A03-01` | `A03-01` | waiting · drafted |
-| task `A03-02` | `A03-02` | backlog |
-| task `A03-03` | `A03-03` | done · owner verified |
-| task `A03-04` | `A03-04` | done · owner verified |
-| task `A03-05` | `A03-05` | done · owner verified |
-| task `A03-06` | `A03-06` | backlog |
-| task `A03-07` | `A03-07` | ready |
-| task `A03-08` | `A03-08` | done · owner verified · claude/a03-08-step-commits |
-| task `A04-01` | `A04-01` | waiting · drafted |
-| task `A05-01` | `A05-01` | dropped |
-| task `A05-02` | `A05-02` | done · owner verified · claude/a05-02-convert-project |
-| task `A05-03` | `A05-03` | in progress · implemented · claude/a05-03-setup-wizard |
-| task `A07-01` | `A07-01` | done · owner verified |
-| task `A07-02` | `A07-02` | done · owner verified · claude/a07-02-script-run |
-| task `A07-03` | `A07-03` | backlog |
-| task `A07-04` | `A07-04` | backlog |
-| task `A07-05` | `A07-05` | done · owner verified · claude/a07-05-windows-agents |
-| task `A07-06` | `A07-06` | done · owner verified · claude/a07-06-installer-alm |
+- **Settings:** the label ladder drafted → implemented → locally verified → deployed and verified → human verified (the new taskbag lacked "drafted"; set with `alm labels`; the top step was already called "human verified"); task language `ui` (unchanged); handoff rules: context gate 70% and when to write (`alm handoff-rules`).
+- **8 areas** (A00–A07) and **15 iterations** (I01–I15): same IDs, names, order and releases.
+- **194 tasks**, same IDs, areas, iterations and descriptions. State, label, holder, next dependency, handoff note, waiting-on, the reason for finishing without the human check and the human check steps were compared field by field with the old `task.json` after copying: **0 differences** (titles compared against their translations).
+- **Titles:** the task language is zh-CN, so the 146 titles written in English were translated into Chinese; titles already in Chinese are unchanged. Descriptions and cards are not translated.
+- **115 card files**, each moved beside its own task with `alm card` (table below); every copy is byte for byte the same as the old `card.md`. Their relative links work as before, because a card sits at the same place inside the taskbag. 14 tasks had a `card.md` but no `Card:` line at the top of their description (in some the link appeared only further down): `alm card` added the line `Card: [card.md](card.md)` at the top (A01-25, A01-26, A01-27, A01-28, A01-29, A01-47, A03-02, A03-09, A03-11, A03-12, A03-20, A07-07, A07-16, A07-18); the rest of those descriptions is unchanged.
+- **No card files in this project folder** (`docs/tasks/` was removed in A00-30, and no file is named after a task ID; `crates/store/tests/fixtures/` holds test samples, not cards). So nothing was removed from this repository, and there are no card files without a task.
+- **12 handoffs**, each with its writer and tasks, the text unchanged (`alm handoff --from`; `alm` adds one blank line after the header).
+- **Project notes:** the old `project-notes.md` in full, plus a **Moved in** section; the pitfall about the old format was rewritten in place, because it is no longer true.
+- **AGENTS.md:** its Allomos section is already exactly what `alm brief` prints for the new taskbag, so it did not change. `CLAUDE.md` already imports `@AGENTS.md`.
+- **Checks:** `alm list --json` reports `issues: []` and `cards_outside: []`; `alm cards` lists none.
 
 ## Values that could not be copied
 
-| Value | Where | Why, and what to do |
+| Value | Where it was | What happened |
 |---|---|---|
-| Project ID `allomos` and name `Allomos` | `.allomos/taskbag/project.json` lines 3–4 (removed; see Git history) | The new taskbag was created as `allomos-taskbag` / "allomos-taskbag", and `alm` has no command to rename a project. Rename it in the Allomos app if wanted. |
-| Task language `en` (fixed) | `.allomos/taskbag/project.json` line 13 | The new taskbag keeps `ui` (follows the app's language; it gives `en` today), as the plan said. To fix it to English: `alm task-language en`. |
-| `project_folder` `.` | `.allomos/taskbag/project.json` line 12 | Not a task value; the new taskbag already names `../allomos`. |
-| Who changed each task and when | Git history of `.allomos/taskbag/` in this repository (the `alm: …` commits) | Taskbag history cannot be copied; it stays in this repository's history. The new taskbag's history starts at its commit `0d26e76`. |
+| Change history: 1692 event files | `taskbag-allomos-4/events/` | Not copied: `alm` records only its own changes. They stay in the taskbag repository's Git history; the last commit with the whole old taskbag is `868c0696710491eafd67ecdaf09784a2e0fc333a` (path `.allomos/taskbag/`). The new tasks' history starts with today's copy. |
+| Handoff written / updated times: 2026-10-15T13:16Z / 2026-10-15T14:56Z | `taskbag-allomos-4/handoffs/2026-10-15-1316-claude-loop-i02.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-15T14:58Z / 2026-10-16T09:57Z | `taskbag-allomos-4/handoffs/2026-10-15-1458-claude-loop-ready.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-16T01:14Z / 2026-10-16T01:14Z | `taskbag-allomos-4/handoffs/2026-10-16-0114-claude-a00-30-detail-in-taskbag.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-16T09:27Z / 2026-10-16T09:27Z | `taskbag-allomos-4/handoffs/2026-10-16-0927-claude-a00-30-cards-in.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-16T10:17Z / 2026-10-17T02:10Z | `taskbag-allomos-4/handoffs/2026-10-16-1017-claude-a01-51-auto-notice.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-18T08:36Z / 2026-10-20T03:45Z | `taskbag-allomos-4/handoffs/2026-10-18-0836-claude-website.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-19T10:25Z / 2026-10-19T10:25Z | `taskbag-allomos-4/handoffs/2026-10-19-1025-claude-i02-loop.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-20T10:31Z / 2026-10-20T12:00Z | `taskbag-allomos-4/handoffs/2026-10-20-1031-claude-i02-loop-2.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-20T16:57Z / 2026-10-20T16:57Z | `taskbag-allomos-4/handoffs/2026-10-20-1657-claude-a05-11-welcome-fit.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-21T07:18Z / 2026-10-22T10:45Z | `taskbag-allomos-4/handoffs/2026-10-21-0718-claude-i02-loop-2026-10-21.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-21T14:22Z / 2026-10-21T14:22Z | `taskbag-allomos-4/handoffs/2026-10-21-1422-claude-a05-gusto837-welcome-balance.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Handoff written / updated times: 2026-10-22T12:16Z / 2026-10-22T12:16Z | `taskbag-allomos-4/handoffs/2026-10-22-1216-claude-a07-apex359-faster.md`, lines 4–5 | `alm handoff` set both to the time of the copy (2026-10-22T13:42Z) and named the file `2026-10-22-1342-…`. |
+| Base branch of each task | (none: `allomos/4` did not record one) | Every task's base is `main`, this project's base branch (decided in the plan). |
+| Working branch of held tasks | (none recorded) | Left unknown: holders were copied with `alm claim` without a working branch. |
+| Quota gate for handoffs | `taskbag-allomos-4/project.json`, lines 14–17 (`handoff` has only `context_gate` and `write_when`) | Not set in the old file; the new taskbag shows `alm`'s default (3% of the 5-hour quota). |
+| Iteration dates | `taskbag-allomos-4/iterations/I01.json` … `I15.json` | None were recorded, so none were written. |
+| A03-tide388's latest changes | taskbag repository commit `905f155` ("alm: A03-tide388 evidence, AI decision, label, done to check", by `claude/a03-tide388-size-reminder`) | That session's `alm` changes reached neither taskbag (its commit only deleted old files). A03-tide388 was copied as the old folder had it: in progress, held by `claude/a03-tide388-size-reminder`, no label. That session must redo its evidence, AI decision, label and done in the new taskbag. |
+| Empty `.keep` files | `taskbag-allomos-4/tasks/.keep`, `handoffs/.keep` | Not needed in the new taskbag. |
 
-Done dates, approvals and dependencies were never stored in the old taskbag. They stay in the card files' Approvals and Notes, unchanged.
+## Card files and their tasks
 
-## Things to know
+Each old `taskbag-allomos-4/tasks/<id>/card.md` became `tasks/<id>/card.md` in the new taskbag, for the same task. No card was left out or copied twice.
 
-- **The new taskbag's repository has no remote**, so `alm … --push` commits but warns `push_failed`. Adding a remote is the owner's call.
-- **Older branches and worktrees** (`claude/a00-24-decks`, `claude/a05-03-setup-wizard`, `claude/a01-run`, the detached `run` worktree) still contain the old `.allomos/taskbag/`, which `alm` finds by default there. Use `ALLOMOS_TASKBAG=/Users/wanghui/coding/glidepace/allomos-taskbag/.allomos/taskbag`. When such a branch is merged, keep the old taskbag files deleted.
-- Decision records [0010](./decisions/0010-project-data-folder.md) and [0015](./decisions/0015-product-name-allomos.md) describe the taskbag's default place; as dated records they were not changed.
+| Old card file | Task |
+|---|---|
+| `tasks/A00-01/card.md` | `A00-01` |
+| `tasks/A00-02/card.md` | `A00-02` |
+| `tasks/A00-03/card.md` | `A00-03` |
+| `tasks/A00-04/card.md` | `A00-04` |
+| `tasks/A00-05/card.md` | `A00-05` |
+| `tasks/A00-06/card.md` | `A00-06` |
+| `tasks/A00-07/card.md` | `A00-07` |
+| `tasks/A00-08/card.md` | `A00-08` |
+| `tasks/A00-09/card.md` | `A00-09` |
+| `tasks/A00-10/card.md` | `A00-10` |
+| `tasks/A00-11/card.md` | `A00-11` |
+| `tasks/A00-12/card.md` | `A00-12` |
+| `tasks/A00-13/card.md` | `A00-13` |
+| `tasks/A00-14/card.md` | `A00-14` |
+| `tasks/A00-15/card.md` | `A00-15` |
+| `tasks/A00-16/card.md` | `A00-16` |
+| `tasks/A00-17/card.md` | `A00-17` |
+| `tasks/A00-18/card.md` | `A00-18` |
+| `tasks/A00-19/card.md` | `A00-19` |
+| `tasks/A00-20/card.md` | `A00-20` |
+| `tasks/A00-21/card.md` | `A00-21` |
+| `tasks/A00-22/card.md` | `A00-22` |
+| `tasks/A00-23/card.md` | `A00-23` |
+| `tasks/A00-24/card.md` | `A00-24` |
+| `tasks/A00-25/card.md` | `A00-25` |
+| `tasks/A00-28/card.md` | `A00-28` |
+| `tasks/A00-29/card.md` | `A00-29` |
+| `tasks/A01-01/card.md` | `A01-01` |
+| `tasks/A01-02/card.md` | `A01-02` |
+| `tasks/A01-03/card.md` | `A01-03` |
+| `tasks/A01-04/card.md` | `A01-04` |
+| `tasks/A01-05/card.md` | `A01-05` |
+| `tasks/A01-06/card.md` | `A01-06` |
+| `tasks/A01-07/card.md` | `A01-07` |
+| `tasks/A01-08/card.md` | `A01-08` |
+| `tasks/A01-09/card.md` | `A01-09` |
+| `tasks/A01-10/card.md` | `A01-10` |
+| `tasks/A01-11/card.md` | `A01-11` |
+| `tasks/A01-12/card.md` | `A01-12` |
+| `tasks/A01-13/card.md` | `A01-13` |
+| `tasks/A01-14/card.md` | `A01-14` |
+| `tasks/A01-15/card.md` | `A01-15` |
+| `tasks/A01-16/card.md` | `A01-16` |
+| `tasks/A01-17/card.md` | `A01-17` |
+| `tasks/A01-18/card.md` | `A01-18` |
+| `tasks/A01-19/card.md` | `A01-19` |
+| `tasks/A01-20/card.md` | `A01-20` |
+| `tasks/A01-21/card.md` | `A01-21` |
+| `tasks/A01-24/card.md` | `A01-24` |
+| `tasks/A01-25/card.md` | `A01-25` |
+| `tasks/A01-26/card.md` | `A01-26` |
+| `tasks/A01-27/card.md` | `A01-27` |
+| `tasks/A01-28/card.md` | `A01-28` |
+| `tasks/A01-29/card.md` | `A01-29` |
+| `tasks/A01-31/card.md` | `A01-31` |
+| `tasks/A01-32/card.md` | `A01-32` |
+| `tasks/A01-34/card.md` | `A01-34` |
+| `tasks/A01-36/card.md` | `A01-36` |
+| `tasks/A01-37/card.md` | `A01-37` |
+| `tasks/A01-38/card.md` | `A01-38` |
+| `tasks/A01-39/card.md` | `A01-39` |
+| `tasks/A01-41/card.md` | `A01-41` |
+| `tasks/A01-42/card.md` | `A01-42` |
+| `tasks/A01-43/card.md` | `A01-43` |
+| `tasks/A01-44/card.md` | `A01-44` |
+| `tasks/A01-45/card.md` | `A01-45` |
+| `tasks/A01-46/card.md` | `A01-46` |
+| `tasks/A01-47/card.md` | `A01-47` |
+| `tasks/A01-48/card.md` | `A01-48` |
+| `tasks/A02-01/card.md` | `A02-01` |
+| `tasks/A03-01/card.md` | `A03-01` |
+| `tasks/A03-02/card.md` | `A03-02` |
+| `tasks/A03-03/card.md` | `A03-03` |
+| `tasks/A03-04/card.md` | `A03-04` |
+| `tasks/A03-05/card.md` | `A03-05` |
+| `tasks/A03-06/card.md` | `A03-06` |
+| `tasks/A03-07/card.md` | `A03-07` |
+| `tasks/A03-08/card.md` | `A03-08` |
+| `tasks/A03-09/card.md` | `A03-09` |
+| `tasks/A03-10/card.md` | `A03-10` |
+| `tasks/A03-11/card.md` | `A03-11` |
+| `tasks/A03-12/card.md` | `A03-12` |
+| `tasks/A03-13/card.md` | `A03-13` |
+| `tasks/A03-14/card.md` | `A03-14` |
+| `tasks/A03-15/card.md` | `A03-15` |
+| `tasks/A03-16/card.md` | `A03-16` |
+| `tasks/A03-18/card.md` | `A03-18` |
+| `tasks/A03-19/card.md` | `A03-19` |
+| `tasks/A03-20/card.md` | `A03-20` |
+| `tasks/A03-21/card.md` | `A03-21` |
+| `tasks/A03-22/card.md` | `A03-22` |
+| `tasks/A04-01/card.md` | `A04-01` |
+| `tasks/A05-01/card.md` | `A05-01` |
+| `tasks/A05-02/card.md` | `A05-02` |
+| `tasks/A05-03/card.md` | `A05-03` |
+| `tasks/A05-05/card.md` | `A05-05` |
+| `tasks/A05-06/card.md` | `A05-06` |
+| `tasks/A07-01/card.md` | `A07-01` |
+| `tasks/A07-02/card.md` | `A07-02` |
+| `tasks/A07-03/card.md` | `A07-03` |
+| `tasks/A07-04/card.md` | `A07-04` |
+| `tasks/A07-05/card.md` | `A07-05` |
+| `tasks/A07-06/card.md` | `A07-06` |
+| `tasks/A07-07/card.md` | `A07-07` |
+| `tasks/A07-08/card.md` | `A07-08` |
+| `tasks/A07-09/card.md` | `A07-09` |
+| `tasks/A07-10/card.md` | `A07-10` |
+| `tasks/A07-11/card.md` | `A07-11` |
+| `tasks/A07-12/card.md` | `A07-12` |
+| `tasks/A07-13/card.md` | `A07-13` |
+| `tasks/A07-14/card.md` | `A07-14` |
+| `tasks/A07-15/card.md` | `A07-15` |
+| `tasks/A07-16/card.md` | `A07-16` |
+| `tasks/A07-17/card.md` | `A07-17` |
+| `tasks/A07-18/card.md` | `A07-18` |
 
-## Check
-
-`alm --taskbag ../allomos-taskbag/.allomos/taskbag list --json` reports `"issues": []`.
-
-## Undo
-
-`git revert -m 1 <merge commit>` in this repository brings back the old taskbag and the old rules; `git -C ../allomos-taskbag revert 0d26e76` empties the new taskbag again.
+115 card files, 115 tasks with a card.
