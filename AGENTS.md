@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v23)
+## Tasks: Allomos (v24)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -90,9 +90,10 @@ the project notes (below) and your own handoff file.
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason "<what changed>"`.
-- Approvals: when you ask the person to approve a plan with `alm confirm`, show the evidence
-  (`--evidence <file.md>`) and name the task (`--task <id>`). A Go ahead covers only the plan
-  shown; if the plan changes afterwards, ask again.
+- Approvals: ask the person in the conversation. Only on a job the person gave you from the
+  Allomos app (they do not see your conversation) ask with `alm confirm`, showing the evidence
+  (`--evidence <file.md>`) and naming the task (`--task <id>`); in a quiet run, `alm wait`
+  instead. A Go ahead covers only the plan shown; if the plan changes afterwards, ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each one with `alm ai-decided <id> "<what and why>"`, so the approver can review it

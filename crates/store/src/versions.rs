@@ -73,7 +73,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 23: `alm claim`, `alm label`, `alm release`, `alm done` and `alm handoff` ask for a quota report
 /// when the agent's last one is missing or 30 minutes old; the agent reads its usage then and
 /// reports it (Task-A03-flour054).
-pub const SECTION_VERSION: u32 = 23;
+/// 24: approvals are asked in the conversation; `alm confirm` only on a job the person gave from
+/// the Allomos app (approver, 2026-10-22; Task-A03-bonsai517).
+pub const SECTION_VERSION: u32 = 24;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

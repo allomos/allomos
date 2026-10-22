@@ -2254,7 +2254,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v23)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v24)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2264,7 +2264,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v23)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v24)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();

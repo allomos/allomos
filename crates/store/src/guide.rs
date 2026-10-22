@@ -283,7 +283,8 @@ Ask the person:
   shows your plan in the Allomos app, with its evidence (what you checked and the results) under
   it, and waits; exit 0 means go ahead, anything else means change nothing. A Go ahead covers
   only what was shown (its fingerprint is printed); with `--task` it is recorded in that task's
-  history. If the plan changes afterwards, ask again.
+  history. If the plan changes afterwards, ask again. Use it only on a job the person gave you
+  from the Allomos app; otherwise ask in the conversation.
 - `alm progress --title \"<job>\" --step \"<what now>\" [--done <n> --of <total>]`, then
   `alm progress --step …` at each step and `alm progress --finished \"<what happened>\"` at the
   end: on a job the person gave you from the Allomos app, the app shows your progress in a popup.
@@ -472,10 +473,12 @@ Rules:
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
-- Before a change the person must agree to, show your plan with `alm confirm` (with the evidence,
-  `--evidence`, and the task, `--task`) and change nothing unless it exits 0 (in a quiet run, park
-  it with `alm wait` instead: step 8). A Go ahead covers only the plan shown: if it changes, ask
-  again.
+- A change the person must agree to (an outside effect, or anything that is not a routine choice:
+  below): ask in the conversation. Only on a job the person gave you from the Allomos app (they do
+  not see your conversation) show your plan with `alm confirm` instead, with the evidence
+  (`--evidence`) and the task (`--task`), and change nothing unless it exits 0. In a quiet run,
+  park it with `alm wait` instead (step 8). A Go ahead covers only the plan shown: if it changes,
+  ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
