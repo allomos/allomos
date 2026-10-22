@@ -190,12 +190,13 @@ button.link:hover { text-decoration: underline; }
 /* The mark's opening round (Task-A07-apex359): the waiting animation above, once, in the still
    mark's own shapes (BrandMark.tsx). The balls are drawn where they land and start 494 px back on
    their rings; the round ends on the finished mark, held, with no fade, so the still mark that
-   follows is the same picture. 8 s, like one round of the loader. */
-.mark-intro .mi-ring-jade { transform-origin: 265px 512px; animation: mi-ring-jade 8s 1 both; }
-.mark-intro .mi-ring-terra { transform-origin: 512px 265px; animation: mi-ring-terra 8s 1 both; }
-.mark-intro .mi-jade { transform-origin: 759px 512px; animation: mi-jade 8s 1 both; }
-.mark-intro .mi-terra { transform-origin: 512px 759px; animation: mi-terra 8s 1 both; }
-.mark-intro .mi-spark { transform-origin: 512px 512px; animation: mi-spark 8s 1 both; }
+   follows is the same picture. 3 s: the same steps as the loader's 8 s round, faster, because here
+   nothing waits and the window is ready to use while it plays (approver, 2026-10-22). */
+.mark-intro .mi-ring-jade { transform-origin: 265px 512px; animation: mi-ring-jade 3s 1 both; }
+.mark-intro .mi-ring-terra { transform-origin: 512px 265px; animation: mi-ring-terra 3s 1 both; }
+.mark-intro .mi-jade { transform-origin: 759px 512px; animation: mi-jade 3s 1 both; }
+.mark-intro .mi-terra { transform-origin: 512px 759px; animation: mi-terra 3s 1 both; }
+.mark-intro .mi-spark { transform-origin: 512px 512px; animation: mi-spark 3s 1 both; }
 @keyframes mi-ring-jade {
   0%, 10% { transform: scale(0.5); opacity: 0; animation-timing-function: ease-out; }
   17.5%, 100% { transform: scale(1); opacity: 1; }

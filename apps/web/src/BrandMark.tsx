@@ -1,6 +1,7 @@
 // The Allomos mark (Task-A07-apex359): the top bar's and the About window's mark. When a window
 // opens, the mark first plays the waiting animation (IconLoader.tsx) once, in the mark's own
-// shapes, size and place, and ends on the still mark, so nothing jumps when it stops. Once per
+// shapes, size and place, faster than the loader (3 s, approver 2026-10-22), and ends on the still
+// mark, so nothing jumps when it stops. Once per
 // window: a later render, a reload of the taskbag or another project in the same window shows the
 // still mark. With reduced motion the still mark shows at once.
 
