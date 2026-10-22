@@ -86,9 +86,7 @@
   "folder_not_empty": [
     "path"
   ],
-  "handoff_not_found": [
-    "file"
-  ],
+  "handoff_empty": [],
   "holder_missing": [],
   "human_check_steps_empty": [],
   "human_check_steps_missing": [
@@ -221,7 +219,6 @@
     "path",
     "detail"
   ],
-  "template_empty": [],
   "took_over": [
     "id",
     "previous"

@@ -1,9 +1,9 @@
-// Searching the task list (Task-A01-36): which tasks and handoffs hold the words typed in the search
+// Searching the task list (Task-A01-36): which tasks hold the words typed in the search
 // box, and where in their text, so the window can show only those and mark the words. Kept apart
 // from React so it can be tested with Node alone (`npm --prefix apps/web test`). Only type imports
 // here: Node strips them.
 
-import type { Handoff, Task } from "./types";
+import type { Task } from "./types";
 
 /** One stretch of shown text: `hit` when it matches a search word. */
 export interface Piece {
@@ -111,11 +111,6 @@ function allIn(texts: string[], terms: string[]): boolean {
 /** A task matches when each word is in its ID, title or description (Task-A01-36). */
 export function taskMatches(task: Pick<Task, "id" | "title" | "description">, terms: string[]): boolean {
   return terms.length === 0 || allIn([task.id, task.title, task.description ?? ""], terms);
-}
-
-/** A handoff matches when each word is in its summary, text, writer or the task IDs it names. */
-export function handoffMatches(h: Pick<Handoff, "summary" | "body" | "writer" | "tasks">, terms: string[]): boolean {
-  return terms.length === 0 || allIn([h.summary, h.body, h.writer, ...h.tasks], terms);
 }
 
 /**

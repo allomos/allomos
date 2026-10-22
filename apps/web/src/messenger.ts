@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { withDecisions } from "./stopFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, Handoff, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 /** What the About window shows of the app itself (Task-A07-28). */
 export interface AboutInfo {
@@ -61,6 +61,8 @@ export interface Messenger {
   onConnectMenu(handler: () => void): Promise<() => void>;
   /** Calls `handler` when File → Update the Taskbag… is chosen (Task-A00-30, Task-A01-45). */
   onMoveTasksInMenu(handler: () => void): Promise<() => void>;
+  /** Calls `handler` when File → Handoff Settings… is chosen (Task-A03-polar770). */
+  onHandoffSettingsMenu(handler: () => void): Promise<() => void>;
   /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
    * request for whichever applies typed in (`alm move-in` prints it; Task-A03-27: an out-of-date
@@ -103,17 +105,13 @@ export interface Messenger {
   moveTaskbagAside(root: string): Promise<Opened>;
   /** The taskbag's format compared with this Allomos's, connected or not. */
   taskbagFormat(root: string): Promise<{ format: FormatState; current: string }>;
-  /** The project's handoff rules and template (Task-A03-06). */
+  /** The project's handoff rules (Task-A03-06). */
   handoffSettings(root: string): Promise<HandoffSettings>;
   /** Changes the project's handoff rules, or one agent's override; resolves to the settings as saved. Rejects with a Problem. */
   setHandoffRules(
     root: string,
     change: { quota?: string; context?: string; writeWhen?: string; agent?: string; clear?: boolean },
   ): Promise<HandoffSettings>;
-  /** Replaces the handoff template. Rejects with a Problem. */
-  setHandoffTemplate(root: string, text: string): Promise<HandoffSettings>;
-  /** Every handoff, newest first. */
-  listHandoffs(root: string): Promise<Handoff[]>;
   /** One task's recorded changes, newest first (Task-A01-17). */
   taskHistory(root: string, id: string): Promise<TaskHistory>;
   /** The person's name the app records its task changes under; null until it has been asked (Task-A01-18). */
@@ -158,8 +156,6 @@ export interface Messenger {
   changeIteration(root: string, id: string, change: IterationChange): Promise<Iteration>;
   deleteArea(root: string, id: string): Promise<void>;
   deleteIteration(root: string, id: string): Promise<void>;
-  /** Writes a new handoff by a person. Rejects with a Problem. */
-  writeHandoff(root: string, writer: string, tasks: string[], body: string): Promise<Handoff>;
   /** Opens the page where a newer Allomos is downloaded, in the web browser. */
   openDownloadPage(): Promise<void>;
   /** The About window (Task-A07-28): the app's name and version. */
@@ -204,7 +200,7 @@ export interface Messenger {
   projectSetup(root: string): Promise<SetupState>;
   /** Records `folder` as the project folder of the taskbag at `root`. Rejects with a Problem. */
   setProjectFolder(root: string, folder: string): Promise<SetupState>;
-  /** Enables or disables File → Connect with the Agents… and File → Move the Cards In…. */
+  /** Enables or disables File → Connect with the Agents…, File → Update the Taskbag… and File → Handoff Settings…. */
   setConnectEnabled(enabled: boolean): Promise<void>;
 }
 
@@ -216,6 +212,7 @@ export interface MenuTexts {
   noRecent: string;
   connect: string;
   moveTasksIn: string;
+  handoffSettings: string;
 }
 
 export const desktopMessenger: Messenger = {
@@ -246,6 +243,7 @@ export const desktopMessenger: Messenger = {
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
+  onHandoffSettingsMenu: (handler) => getCurrentWebviewWindow().listen("menu:handoff_settings", () => handler()),
   moveTasksIn: (agent, taskbag, language) => invoke<void>("move_tasks_in", { agent, taskbag, language }),
   moveTasksInRequest: (taskbag, language) => invoke<string>("move_tasks_in_request", { taskbag, language }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
@@ -289,8 +287,6 @@ export const desktopMessenger: Messenger = {
       agent: c.agent ?? null,
       clear: c.clear ?? false,
     }),
-  setHandoffTemplate: (root, text) => invoke<HandoffSettings>("set_handoff_template", { root, text }),
-  listHandoffs: (root) => invoke<Handoff[]>("list_handoffs", { root }),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   ownerName: () => invoke<string | null>("owner_name"),
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
@@ -305,7 +301,6 @@ export const desktopMessenger: Messenger = {
   changeIteration: (root, id, change) => invoke<Iteration>("change_iteration", { root, id, change }),
   deleteArea: (root, id) => invoke<void>("delete_area", { root, id }),
   deleteIteration: (root, id) => invoke<void>("delete_iteration", { root, id }),
-  writeHandoff: (root, writer, tasks, body) => invoke<Handoff>("write_handoff", { root, writer, tasks, body }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   progressReports: (project) => invoke<Progress[]>("progress_reports", { project }),

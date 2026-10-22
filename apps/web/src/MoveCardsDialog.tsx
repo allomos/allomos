@@ -12,6 +12,8 @@
 // (2026-10-18, `updateTaskbagFlow.ts`): only the agent used last while it is not registered under
 // `## Agents set up`, else every agent. A taskbag with no tasks is not a reason to show it, but
 // File → Update the Taskbag… then asks the agent to look for the tasks the project already keeps.
+// Old handoff files in the taskbag's `handoffs/` are a case too (Task-A03-polar770): the agent
+// moves what is still useful into the tasks they name and removes them.
 // `MoveCardsPanel` is the dialog's content, also shown as the setup wizard's step 4 when a
 // connected project has card files to move in (Task-A05-09).
 
@@ -33,6 +35,7 @@ export function MoveCardsDialog({
   messenger,
   root,
   found,
+  handoffs,
   moveIn,
   section,
   noTasks,
@@ -41,6 +44,8 @@ export function MoveCardsDialog({
   messenger: Messenger;
   /** The open taskbag. */
   root: string;
+  /** An older taskbag's handoff files, to move into their tasks (Task-A03-polar770). */
+  handoffs?: string[];
   /** The instruction files whose Allomos section is out of date, as one text (Task-A03-27). */
   section?: string | null;
   /** The taskbag has no tasks yet: the agent looks for the project's own (Task-A03-24). */
@@ -57,7 +62,7 @@ export function MoveCardsDialog({
     <div className="overlay" role="presentation">
       <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
-        <MoveCardsPanel messenger={messenger} root={root} found={found} moveIn={moveIn} section={section} noTasks={noTasks} onClose={onClose} />
+        <MoveCardsPanel messenger={messenger} root={root} found={found} handoffs={handoffs} moveIn={moveIn} section={section} noTasks={noTasks} onClose={onClose} />
       </section>
     </div>
   );
@@ -69,6 +74,7 @@ export function MoveCardsPanel({
   messenger,
   root,
   found,
+  handoffs = [],
   moveIn,
   section = null,
   noTasks = false,
@@ -80,6 +86,8 @@ export function MoveCardsPanel({
   messenger: Messenger;
   root: string;
   found: CardRow[];
+  /** An older taskbag's handoff files: the request moves them into their tasks (Task-A03-polar770). */
+  handoffs?: string[];
   /** An older taskbag renamed aside: the dialog asks for its tasks to be moved in (Task-A01-45). */
   moveIn?: MoveIn | null;
   /** The instruction files whose Allomos section is out of date: the request renews it too. */
@@ -123,7 +131,7 @@ export function MoveCardsPanel({
 
   /** Whether card files are part of it: some were found, or nothing else is to be done (then the
    * agent looks for card files no link names, as before). */
-  const cardsPart = found.length > 0 || (!section && !noTasks);
+  const cardsPart = found.length > 0 || (!section && !noTasks && handoffs.length === 0);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
@@ -140,7 +148,7 @@ export function MoveCardsPanel({
       saveOpened(root, agent);
       agentOpened(root, moveIn ? "move_in" : section ? "update" : "cards");
       const name = t(AGENT_KEY[agent]);
-      const kind = moveIn ? "move" : section ? "update" : cardsPart ? "cards" : "empty";
+      const kind = moveIn ? "move" : section ? "update" : cardsPart ? "cards" : handoffs.length > 0 ? "old_handoffs" : "empty";
       if (tool?.how === "paste") {
         onClose(t(`${kind}.asked_paste`, { agent: name, keys: PASTE_KEYS }));
       } else {
@@ -244,6 +252,20 @@ export function MoveCardsPanel({
           )}
           <p>{t("cards.update")}</p>
           <p className="muted small">{t("cards.body")}</p>
+        </>
+      )}
+
+      {request === null && !moveIn && handoffs.length > 0 && (
+        <>
+          <p>{t("old_handoffs.found", { count: handoffs.length })}</p>
+          <ul className="card-found small">
+            {handoffs.map((h) => (
+              <li key={h}>
+                <code>{h}</code>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">{t("old_handoffs.body")}</p>
         </>
       )}
 

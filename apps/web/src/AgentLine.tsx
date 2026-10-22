@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
-import { localTime } from "./handoffFlow";
+import { localTime } from "./timeFlow";
 import type { Messenger } from "./messenger";
 import { ageText, agentName, chips, freshness, popupRows, tone } from "./quotaFlow";
 import type { AgentStatus, QuotaReport } from "./types";

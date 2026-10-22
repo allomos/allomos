@@ -209,6 +209,8 @@ export interface Opened {
   last_changed?: Record<string, string>;
   /** Card files agents reported as still in the project folder (Task-A00-30). */
   cards_outside?: CardOutside[];
+  /** An older taskbag's handoff files in `handoffs/` (Task-A03-polar770): the taskbag needs updating. */
+  old_handoffs?: string[];
   /** Each task's version, by task ID (Task-A01-57): sent back when a title or description is saved. */
   versions?: Record<string, string>;
 }
@@ -259,17 +261,6 @@ export interface AgentStatus {
   holders: string[];
 }
 
-/** One handoff file (crates/store/src/handoff.rs, Task-A03-06). Times are `YYYY-MM-DDTHH:MMZ`, UTC. */
-export interface Handoff {
-  file: string;
-  writer: string;
-  tasks: string[];
-  written: string;
-  updated: string;
-  summary: string;
-  body: string;
-}
-
 export interface Gates {
   quota_gate?: number;
   context_gate?: number;
@@ -286,7 +277,6 @@ export interface HandoffSettings {
   rules: HandoffRules;
   /** With the defaults filled in. */
   applied: { quota_gate: number; context_gate: number; write_when: string; override_for: string | null };
-  template: string;
 }
 
 /** A taskbag's format compared with this Allomos's (crates/store/src/versions.rs). */

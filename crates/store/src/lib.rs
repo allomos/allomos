@@ -249,9 +249,9 @@ pub fn agent_section() -> String {
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
-the project notes (below) and your own handoff file.
+the project notes (below).
 
-- Start a session with `alm next` (every ready task nobody holds, each with its handoff, and the
+- Start a session with `alm next` (every ready task nobody holds, each with its handoff note, and the
   rule for choosing; `--iteration <id>` for one iteration; then the project notes' Running and
   Pitfalls), or `alm list`.
 - Take a task: get the latest changes first, then `alm claim <id> --as <your session name>
@@ -320,9 +320,14 @@ the project notes (below) and your own handoff file.
   link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
   propose moving them in, following `alm guide move-cards`; the person can also start it with
   **Update the taskbag…** in the Allomos app (`alm move-in` prints that request).
-- Handoff: `alm handoff-rules` says when to write one (quota and context gates); write it with
-  `alm handoff --tasks <ids> --as <your session name>`, for any reader, agent or person.
-  Whoever continues reads it with `alm next` or `alm show <id>`.
+- Handoff: `alm handoff-rules` says when to write one (quota and context gates). A handoff is
+  written into each task, for any reader, agent or person: `alm handoff <id> --as <your session
+  name> --text \"<where it stopped, the one next step, who it waits on>\"` (or `--from <file.md>`)
+  replaces the task's handoff note; `--evidence \"<what>\"` adds what was done that must not run
+  twice (an outside effect) under its description's Evidence; several tasks: once for each.
+  Whoever continues reads it with `alm next` or `alm show <id>`. There are no handoff files: if
+  `alm next` finds old ones in the taskbag's `handoffs/`, the taskbag needs updating (**Update
+  the taskbag…** in the Allomos app, or `alm move-in`).
 - Quota: each time you read your usage (in Claude Code: `get_usage`), at the handoff gate's check
   and whenever `alm` asks, report the figure with `alm quota --agent <your agent's id, e.g.
   claude-code or codex> --left <percent> [--resets <local date and time>] [--account <name, only
@@ -344,8 +349,8 @@ Shared rules: every AI agent on this project follows one set of shared rules, in
 
 Project notes: the taskbag's `project-notes.md` holds what every session must know whatever its
 task: what is running, pitfalls, where credentials live (never their values). Read it at the
-start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files (your handoff
-file aside), you edit it directly, and you keep it true while you work: update it when you start
+start (`alm next` shows its Running and Pitfalls). Unlike the other taskbag files, you edit it
+directly, and you keep it true while you work: update it when you start
 or stop a server or process, create or change a hosted resource or a remote repository, learn a
 pitfall that would change what the next session does, or a credential moves. Change lines in
 place and remove lines that are no longer true; then save and share that file with your version
@@ -1285,12 +1290,7 @@ pub fn init_with_labels(
             (".gitattributes", GITATTRIBUTES.to_string()),
             ("areas/.keep", String::new()),
             ("tasks/.keep", String::new()),
-            (
-                handoff::TEMPLATE_FILE,
-                handoff::DEFAULT_TEMPLATE.to_string(),
-            ),
             (handoff::NOTES_FILE, handoff::DEFAULT_NOTES.to_string()),
-            ("handoffs/.keep", String::new()),
             (&events::new_file(root), json_text(&first)),
         ],
     )
@@ -2108,10 +2108,10 @@ pub fn stamp(root: &Path) -> u64 {
         }
     };
     add(&root.join(PROJECT_FILE));
-    add(&root.join(handoff::TEMPLATE_FILE));
     add(&root.join(handoff::NOTES_FILE));
     // A new event changes its folder's time; reading every event file here would grow with history.
     add(&root.join(events::EVENTS_DIR));
+    // An older taskbag's handoff files (Task-A03-polar770): the notice goes once they are moved.
     for folder in ["areas", "iterations", handoff::HANDOFFS_DIR] {
         for p in sorted_entries(&root.join(folder)) {
             add(&p);
@@ -2806,15 +2806,6 @@ mod tests {
             ops::new_task(&bag, "A01-01", "A01", "Do it", Some("Why\nand how\n")).unwrap();
         lock.create_task(&task).unwrap();
         drop(lock);
-        handoff::write(
-            &root,
-            "me",
-            Some(&["A01-01".to_string()]),
-            Some("Baking bread\n"),
-            &["A01-01".to_string()],
-            false,
-        )
-        .unwrap();
 
         to_crlf(&root);
         assert!(
@@ -2826,10 +2817,6 @@ mod tests {
         assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
         let bag = loaded.taskbag.unwrap();
         assert_eq!(bag.tasks[0].description, "Why\nand how\n");
-        let h = handoff::latest_for(&root, "A01-01").expect("the handoff's header is read");
-        assert_eq!(h.writer, "me");
-        assert_eq!(h.summary, "Baking bread");
-        assert!(!handoff::template(&root).contains('\r'));
 
         // What Allomos writes back has `\n` only, even from text that came with `\r\n`.
         let lock = Lock::acquire(&root, Duration::ZERO).unwrap();

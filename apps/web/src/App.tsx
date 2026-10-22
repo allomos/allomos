@@ -9,18 +9,18 @@ import { ProgressDialog } from "./ProgressDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
 import { MoveCardsDialog } from "./MoveCardsDialog";
-import { cardRows, cardsNotice, tasksInStart } from "./moveCardsFlow";
+import { cardRows, cardsNotice, oldHandoffs, tasksInStart } from "./moveCardsFlow";
 import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
 import { outdatedFiles, updateNotice } from "./versionFlow";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
-import { HandoffForm, HandoffSettingsDialog, HandoffsView } from "./Handoffs";
-import { latestFor, localTime } from "./handoffFlow";
-import { setKeys, toggleKey, visibleItems, withKey, withoutKey } from "./foldFlow";
+import { HandoffSettingsDialog } from "./HandoffSettings";
+import { localTime } from "./timeFlow";
+import { setKeys, toggleKey, visibleItems } from "./foldFlow";
 import { groupCount } from "./groupCountFlow";
-import { collapsedWhileSearching, handoffMatches, searchGroups, searchTerms, taskMatches } from "./searchFlow";
-import { DescriptionHit, HandoffHits, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
+import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from "./searchFlow";
+import { DescriptionHit, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
   FILTER_STATES,
@@ -53,7 +53,7 @@ import { GroupEditForm } from "./GroupEditForm";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck, Handoff } from "./types";
+import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -412,6 +412,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         noRecent: t("menu.no_recent"),
         connect: t("menu.connect"),
         moveTasksIn: t("menu.move_cards"),
+        handoffSettings: t("menu.handoff_settings"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -543,11 +544,22 @@ export function App({ messenger }: { messenger: Messenger }) {
             </button>
           </div>
         )}
+        {/* An older taskbag's handoff files (Task-A03-polar770): a handoff now lives in its task;
+            an agent moves what is still useful into the tasks and removes the files. */}
+        {opened && oldHandoffs(opened).length > 0 && (
+          <div className="banner update" role="status">
+            <span>{t("old_handoffs.notice", { count: oldHandoffs(opened).length })}</span>
+            <button type="button" className="primary" onClick={() => void openTasksIn()}>
+              {t("cards.button")}
+            </button>
+          </div>
+        )}
         {opened && movingCards && (
           <MoveCardsDialog
             messenger={messenger}
             root={opened.root}
             found={cardRows(opened)}
+            handoffs={oldHandoffs(opened)}
             moveIn={movingCards.moveIn}
             section={movingCards.section}
             noTasks={(opened.loaded.taskbag?.tasks.length ?? 1) === 0}
@@ -1042,9 +1054,10 @@ function HopFigure() {
   );
 }
 
-/** How the task list is grouped, or the Handoffs tab after Iterations (Task-A03-06); remembered
- * in the window's storage (Task-A01-15). */
-type GroupBy = "area" | "iteration" | "handoffs";
+/** How the task list is grouped; remembered in the window's storage (Task-A01-15). The Handoffs
+ * tab after Iterations (Task-A03-06) is gone (Task-A03-polar770): a remembered "handoffs" reads
+ * as by area. */
+type GroupBy = "area" | "iteration";
 const GROUP_BY_KEY = "allomos.groupBy";
 const STATE_FILTER_KEY = "allomos.stateFilter";
 const SORT_KEY = "allomos.iterationSort";
@@ -1052,7 +1065,7 @@ const SORT_KEY = "allomos.iterationSort";
 function readGroupBy(): GroupBy {
   try {
     const g = localStorage.getItem(GROUP_BY_KEY);
-    return g === "iteration" || g === "handoffs" ? g : "area";
+    return g === "iteration" ? g : "area";
   } catch {
     return "area";
   }
@@ -1109,25 +1122,16 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  // Handoffs (Task-A03-06), read again whenever the taskbag reloads (their files are in its stamp).
-  const [handoffs, setHandoffs] = useState<Handoff[]>([]);
-  useEffect(() => {
-    let live = true;
-    messenger
-      .listHandoffs(opened.root)
-      .then((list) => live && setHandoffs(list))
-      .catch(() => live && setHandoffs([]));
-    return () => {
-      live = false;
-    };
-  }, [messenger, opened]);
-  const [handoffTask, setHandoffTask] = useState<string | null>(null);
-  // Collapsed groups and open handoffs, remembered per project (Task-A01-26).
+  // Collapsed groups, remembered per project (Task-A01-26).
   const [collapsed, setCollapsed] = useFold(opened.root, "groups");
-  const [openHandoffs, setOpenHandoffs] = useFold(opened.root, "handoffs");
-  // The handoffs the tab shows now, for Collapse all / Expand all.
-  const [shownHandoffs, setShownHandoffs] = useState<string[]>([]);
-  const [handoffDialog, setHandoffDialog] = useState<"settings" | "write" | null>(null);
+  // File → Handoff Settings… (Task-A03-polar770): when agents must write a handoff.
+  const [handoffSettings, setHandoffSettings] = useState(false);
+  useEffect(() => {
+    const stop = messenger.onHandoffSettingsMenu(() => setHandoffSettings(true));
+    return () => {
+      void stop.then((f) => f()).catch(() => undefined);
+    };
+  }, [messenger]);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
   // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
@@ -1166,8 +1170,7 @@ function TaskbagView({
   };
   const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
   const stop = (task: Task) => stopText(task, box?.tasks ?? [], t);
-  // The search box (Task-A01-36): one search for the task list and the Handoffs tab, emptied when
-  // another project opens. Cmd/Ctrl+F focuses it.
+  // The search box (Task-A01-36): the task list's search, emptied when another project opens. Cmd/Ctrl+F focuses it.
   const [query, setQuery] = useState("");
   const terms = searchTerms(query);
   const searching = terms.length > 0;
@@ -1227,7 +1230,6 @@ function TaskbagView({
   // holds a match, so it opens even if it was collapsed (the collapsed list itself is kept).
   const found = searchGroups(filtered, terms);
   const folded = collapsedWhileSearching(collapsed, found, terms);
-  const foundHandoffs = searching ? handoffs.filter((h) => handoffMatches(h, terms)) : [];
   // Task-A01-48: with a filter on, a search lists only the tasks passing both (the search narrows
   // `filtered`, not the whole list); tasks it finds that the filter hides are only counted.
   const matches = searching && box ? box.tasks.filter((task) => taskMatches(task, terms)).length : 0;
@@ -1239,10 +1241,7 @@ function TaskbagView({
   const nothingShown = !searching && stateFilter !== "all" && filtered.length === 0;
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(found, folded);
-  const foldAll = (on: boolean) => {
-    if (groupBy === "handoffs") setOpenHandoffs((keys) => setKeys(keys, shownHandoffs, !on));
-    else setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
-  };
+  const foldAll = (on: boolean) => setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
 
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1438,13 +1437,12 @@ function TaskbagView({
           {box && (
             <div className="list-tools">
               <div className="group-by" role="group" aria-label={t("group.label")}>
-                {(["area", "iteration", "handoffs"] as const).map((g) => (
+                {(["area", "iteration"] as const).map((g) => (
                   <button key={g} type="button" aria-pressed={groupBy === g} onClick={() => choose(g)}>
-                    {t(g === "area" ? "group.by_area" : g === "iteration" ? "group.by_iteration" : "group.handoffs")}
+                    {t(g === "area" ? "group.by_area" : "group.by_iteration")}
                   </button>
                 ))}
               </div>
-              {/* Task-A01-44: the Handoffs tab follows the filter too. */}
               <label className="state-filter small">
                 {t("filter.label")}{" "}
                 <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
@@ -1460,7 +1458,7 @@ function TaskbagView({
                   ))}
                 </select>
               </label>
-              {groupBy !== "handoffs" && <SortMenu sort={sort} onChange={chooseSort} />}
+              <SortMenu sort={sort} onChange={chooseSort} />
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
@@ -1479,34 +1477,6 @@ function TaskbagView({
             className={selected ? (paneRatio !== null ? "list-layout with-pane sized" : "list-layout with-pane") : "list-layout"}
             style={paneRatio !== null ? ({ "--pane-width": `${paneRatio * 100}%` } as CSSProperties) : undefined}
           >
-            {groupBy === "handoffs" ? (
-              <HandoffsView
-                handoffs={handoffs}
-                terms={terms}
-                tasks={box.tasks}
-                stateFilter={stateFilter}
-                onShowAll={() => chooseFilter("all")}
-                task={handoffTask}
-                onTask={setHandoffTask}
-                onOpenTask={(id) => {
-                  choose("area");
-                  // Its area may be collapsed: open it, so the task is seen in the list.
-                  const task = box.tasks.find((x) => x.id === id);
-                  if (task) {
-                    const key = box.areas.some((a) => a.id === task.area) ? `a-${task.area}` : "lost";
-                    setCollapsed((keys) => withoutKey(keys, key));
-                  }
-                  setSelectedId(id);
-                }}
-                openKeys={openHandoffs}
-                onToggle={(file) => setOpenHandoffs((keys) => toggleKey(keys, file))}
-                onShown={setShownHandoffs}
-                onWrite={() => setHandoffDialog("write")}
-                onSettings={() => setHandoffDialog("settings")}
-                onLink={openLink}
-                refreshLine={refreshLine}
-              />
-            ) : (
             <div className="areas">
               <ListBanners search={banners.search} filter={banners.filter} onShowAll={() => chooseFilter("all")} />
               {refreshLine}
@@ -1548,20 +1518,8 @@ function TaskbagView({
               {!searching && groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
                 <p className="muted">{t("box.empty")}</p>
               )}
-              {/* Task-A01-36: handoffs the search found, after the tasks; or that nothing was found. */}
-              {searching && (
-                <HandoffHits
-                  handoffs={foundHandoffs}
-                  terms={terms}
-                  onOpen={(file) => {
-                    setHandoffTask(null);
-                    setOpenHandoffs((keys) => withKey(keys, file));
-                    choose("handoffs");
-                  }}
-                />
-              )}
               {/* Matches the filter hides are not "nothing": the filter banner says so (Task-A01-48). */}
-              {searching && matches === 0 && foundHandoffs.length === 0 && (
+              {searching && matches === 0 && (
                 <p className="muted search-none" role="status">
                   {t("search.nothing", { query: query.trim() })}
                 </p>
@@ -1577,7 +1535,6 @@ function TaskbagView({
                 </p>
               )}
             </div>
-            )}
             {/* Task-A01-56: drag the pane's inner edge to change its width; it is kept for next time. */}
             {selected && <PaneResizer layout={layoutRef} ratio={paneRatio} onRatio={setPaneRatio} />}
             {selected && (
@@ -1589,7 +1546,6 @@ function TaskbagView({
                 iteration={iterations.find((i) => i.id === selected.iteration)}
                 onClose={() => setSelectedId(null)}
                 onLink={openLink}
-                latest={latestFor(handoffs, selected.id)}
                 history={history?.id === selected.id ? history.history : null}
                 labels={box.project.labels}
                 iterations={iterations}
@@ -1599,24 +1555,9 @@ function TaskbagView({
                 onReview={() => reviewDecisions(selected.id)}
                 nextIterationId={nextIds?.iteration ?? null}
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
-                onAllHandoffs={() => {
-                  setHandoffTask(selected.id);
-                  choose("handoffs");
-                }}
               />
             )}
-            {handoffDialog === "settings" && (
-              <HandoffSettingsDialog messenger={messenger} root={opened.root} onClose={() => setHandoffDialog(null)} />
-            )}
-            {handoffDialog === "write" && (
-              <HandoffForm
-                messenger={messenger}
-                root={opened.root}
-                tasks={box.tasks}
-                task={handoffTask ?? selectedId}
-                onClose={() => setHandoffDialog(null)}
-              />
-            )}
+            {handoffSettings && <HandoffSettingsDialog messenger={messenger} root={opened.root} onClose={() => setHandoffSettings(false)} />}
           </div>
         </>
       ) : (

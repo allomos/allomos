@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allBlockersDone, blockers, bothBanner, filterBanner, filterGroups, filterName, handoffGroups, hiddenByFilter, searchBanner, taskCount, taskListBanners, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { allBlockersDone, blockers, bothBanner, filterBanner, filterGroups, filterName, hiddenByFilter, searchBanner, taskCount, taskListBanners, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
 import type { Opened, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -162,23 +162,6 @@ test("the filter leaves out groups with no match and keeps the whole list for th
   assert.deepEqual(filterGroups(groups, "waiting"), []);
 });
 
-test("handoffs are groups of the tasks they name; a task named twice counts once", () => {
-  const all = [task({ id: "A-1", state: "waiting" }), task({ id: "A-2", state: "done" })];
-  const groups = handoffGroups(
-    [
-      { file: "h1.md", tasks: ["A-1", "A-2"] },
-      { file: "h2.md", tasks: ["A-2", "X-9"] },
-      { file: "h3.md", tasks: ["A-1"] },
-      { file: "h4.md", tasks: [] },
-    ],
-    all,
-  );
-  assert.deepEqual(groups[1].tasks.map((x) => x.id), ["A-2"]);
-  const kept = filterGroups(groups, "human");
-  assert.deepEqual(kept.map((g) => g.file), ["h1.md", "h3.md"]);
-  assert.equal(taskCount(kept), 1);
-});
-
 test("the filter banner counts tasks and the groups left out", () => {
   assert.deepEqual(filterBanner("all", { kind: "area", tasks: 3, groups: 2, total: 7 }, t), []);
   assert.equal(
@@ -190,10 +173,6 @@ test("the filter banner counts tasks and the groups left out", () => {
     "**1 task** is blocked, in 1 of 2 iterations. The 1 iteration with none is left out.",
   );
   assert.equal(plain(filterBanner("ready", { kind: "area", tasks: 4, groups: 3, total: 3 }, t)), "**4 tasks** are ready, in 3 areas.");
-  assert.equal(
-    plain(filterBanner("waiting", { kind: "handoff", tasks: 2, groups: 3, total: 5 }, t)),
-    "**2 tasks** are waiting, in 3 of 5 handoffs. The 2 handoffs with none are left out.",
-  );
 });
 
 test("nothing matches: only the banner, saying every group is left out", () => {
@@ -266,8 +245,7 @@ test("filter and search narrow the task list together; clearing either falls bac
 
 test("the search banner says how much was found", () => {
   assert.equal(plain(searchBanner("task", 2, "alm", t)), "**2 tasks** found for “alm”.");
-  assert.equal(plain(searchBanner("handoff", 1, "alm", t)), "**1 handoff** found for “alm”.");
-  assert.equal(plain(searchBanner("handoff", 2, "alm", t, "In progress")), "**2 handoffs** found for “alm” with the “In progress” filter on.");
+  assert.equal(plain(searchBanner("task", 2, "alm", t, "In progress")), "**2 tasks** found for “alm” with the “In progress” filter on.");
 });
 
 test("Not done keeps every task neither done nor dropped, is remembered, and is worded (A01-party987)", () => {

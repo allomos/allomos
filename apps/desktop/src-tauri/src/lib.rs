@@ -50,6 +50,9 @@ struct Opened {
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
     /// "N tasks keep their card files in the project folder" with **Update the taskbag…**.
     cards_outside: Vec<allomos_core::card::Outside>,
+    /// An older taskbag's handoff files in `handoffs/` (Task-A03-polar770): the taskbag needs
+    /// updating, with **Update the taskbag…**, until they are moved into their tasks.
+    old_handoffs: Vec<String>,
     /// Each task's version, by task ID (Task-A01-57): the task pane sends back the version it
     /// showed when it saves a title or description, so a newer change is never overwritten.
     versions: std::collections::BTreeMap<String, String>,
@@ -131,6 +134,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
         cards_outside,
+        old_handoffs: allomos_store::handoff::legacy(&root),
         root,
         readme_added: false,
     }
@@ -166,6 +170,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
+        old_handoffs: Vec::new(),
         versions: Default::default(),
         root,
         readme_added,
@@ -904,19 +909,19 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
+        old_handoffs: Vec::new(),
         versions: Default::default(),
         root,
         readme_added: false,
     })
 }
 
-/// The project's handoff rules (as written, and with the defaults filled in) and its template
-/// (Task-A03-06), for the Handoff settings dialog.
+/// The project's handoff rules (as written, and with the defaults filled in) (Task-A03-06), for
+/// the Handoff settings dialog (File → Handoff Settings…, Task-A03-polar770).
 #[derive(Serialize)]
 struct HandoffSettings {
     rules: allomos_core::HandoffRules,
     applied: allomos_core::AppliedRules,
-    template: String,
 }
 
 fn handoff_settings_of(root: &Path) -> Result<HandoffSettings, Problem> {
@@ -932,7 +937,6 @@ fn handoff_settings_of(root: &Path) -> Result<HandoffSettings, Problem> {
     Ok(HandoffSettings {
         applied: rules.applied(None),
         rules,
-        template: allomos_store::handoff::template(root),
     })
 }
 
@@ -976,38 +980,10 @@ fn set_handoff_rules(
     handoff_settings_of(&root)
 }
 
-#[tauri::command]
-fn set_handoff_template(root: PathBuf, text: String) -> Result<HandoffSettings, Problem> {
-    allomos_store::handoff::set_template(&root, &text)?;
-    handoff_settings_of(&root)
-}
-
 /// One task's history, newest first, and when the taskbag started recording (Task-A01-17).
 #[tauri::command]
 fn task_history(root: PathBuf, id: String) -> allomos_store::events::History {
     allomos_store::events::history(&root, &id)
-}
-
-/// Every handoff in the taskbag, newest first (the Handoffs tab and the task pane).
-#[tauri::command]
-fn list_handoffs(root: PathBuf) -> Vec<allomos_store::handoff::Handoff> {
-    allomos_store::handoff::list(&root)
-}
-
-/// A handoff written by a person in the app: the same file an agent writes with `alm handoff`.
-#[tauri::command]
-fn write_handoff(
-    root: PathBuf,
-    writer: String,
-    tasks: Vec<String>,
-    body: String,
-) -> Result<allomos_store::handoff::Handoff, Problem> {
-    let known: Vec<String> = load(&root)
-        .taskbag
-        .map(|b| b.tasks.into_iter().map(|t| t.id).collect())
-        .unwrap_or_default();
-    allomos_store::handoff::write(&root, &writer, Some(&tasks), Some(&body), &known, true)
-        .map(|w| w.handoff)
 }
 
 /// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
@@ -1120,12 +1096,13 @@ fn set_project_folder(root: PathBuf, folder: PathBuf) -> Result<SetupState, Prob
     setup_state(&root)
 }
 
-/// File → Connect with the Agents… and File → Update the Taskbag… are offered only while a
-/// taskbag is open.
+/// File → Connect with the Agents…, File → Update the Taskbag… and File → Handoff Settings… are
+/// offered only while a taskbag is open.
 #[tauri::command]
 fn set_connect_enabled(texts: tauri::State<MenuTexts>, enabled: bool) {
     let _ = texts.connect.set_enabled(enabled);
     let _ = texts.move_tasks_in.set_enabled(enabled);
+    let _ = texts.handoff_settings.set_enabled(enabled);
 }
 
 /// The job **Update the taskbag…** asks an agent to do, for its progress popup (Task-A05-08):
@@ -1368,7 +1345,10 @@ fn fit_to_screen(window: &tauri::WebviewWindow) {
         .flatten()
         .or_else(|| window.primary_monitor().ok().flatten());
     if let Some(monitor) = monitor {
-        let area = monitor.work_area().size.to_logical::<f64>(monitor.scale_factor());
+        let area = monitor
+            .work_area()
+            .size
+            .to_logical::<f64>(monitor.scale_factor());
         let (width, height) = window_size(area.width, area.height);
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
         let _ = window.center();
@@ -1447,6 +1427,10 @@ const CONNECT_ID: &str = "connect";
 const CONNECT_EVENT: &str = "menu:connect";
 const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
+/// File → Handoff Settings…: when agents must write a handoff (Task-A03-polar770; it was a
+/// button on the Handoffs tab, removed).
+const HANDOFF_SETTINGS_ID: &str = "handoff_settings";
+const HANDOFF_SETTINGS_EVENT: &str = "menu:handoff_settings";
 const CHECK_UPDATES_ID: &str = "check_updates";
 /// The website the About window links to, and the words it shows (Task-A07-22).
 const WEBSITE: &str = "https://www.allomos.com";
@@ -1480,6 +1464,7 @@ struct MenuTexts {
     new_window: MenuItem<Wry>,
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
+    handoff_settings: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
     /// **Restart to Update to Allomos <version>** (Task-A07-17).
@@ -1561,6 +1546,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         false,
         None::<&str>,
     )?;
+    let handoff_settings = MenuItem::with_id(
+        app,
+        HANDOFF_SETTINGS_ID,
+        "Handoff Settings…",
+        // Enabled by the window while a taskbag is open.
+        false,
+        None::<&str>,
+    )?;
     fill_recent(app, &recent, &Recent::default())?;
     let existing = menu
         .items()?
@@ -1569,8 +1562,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .find(|s| s.text().is_ok_and(|t| t == "File"));
     let file = match existing {
         Some(file) => {
-            file.prepend_items(&[&new_window, &recent, &connect_item, &move_tasks_in])?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 4)?;
+            file.prepend_items(&[
+                &new_window,
+                &recent,
+                &connect_item,
+                &move_tasks_in,
+                &handoff_settings,
+            ])?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 5)?;
             file
         }
         None => {
@@ -1578,7 +1577,13 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
                 app,
                 "File",
                 true,
-                &[&new_window, &recent, &connect_item, &move_tasks_in],
+                &[
+                    &new_window,
+                    &recent,
+                    &connect_item,
+                    &move_tasks_in,
+                    &handoff_settings,
+                ],
             )?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
@@ -1623,6 +1628,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         new_window,
         connect: connect_item,
         move_tasks_in,
+        handoff_settings,
         check_updates,
         update_action: Mutex::new(UpdateAction::Check),
         recent,
@@ -1729,6 +1735,7 @@ struct MenuWords {
     no_recent: String,
     connect: String,
     move_tasks_in: String,
+    handoff_settings: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1740,6 +1747,7 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
+    let _ = texts.handoff_settings.set_text(words.handoff_settings);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -1815,6 +1823,8 @@ pub fn run() {
                 send(CONNECT_EVENT, None);
             } else if id == MOVE_TASKS_IN_ID {
                 send(MOVE_TASKS_IN_EVENT, None);
+            } else if id == HANDOFF_SETTINGS_ID {
+                send(HANDOFF_SETTINGS_EVENT, None);
             } else if id == CHECK_UPDATES_ID {
                 let action = *app
                     .state::<MenuTexts>()
@@ -1860,9 +1870,6 @@ pub fn run() {
             set_update_item,
             handoff_settings,
             set_handoff_rules,
-            set_handoff_template,
-            list_handoffs,
-            write_handoff,
             create_taskbag,
             task_history,
             show_in_file_manager,

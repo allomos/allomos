@@ -40,6 +40,12 @@ export function cardRows(opened: Opened | null): CardRow[] {
   }));
 }
 
+/** An older taskbag's handoff files in `handoffs/` (Task-A03-polar770): their notice, and part of
+ * Update the taskbag…. */
+export function oldHandoffs(opened: Opened | null): string[] {
+  return opened?.old_handoffs ?? [];
+}
+
 /** How many tasks the notice names; 0: no notice. */
 export function cardsNotice(opened: Opened | null): number {
   return cardsOutside(opened).length;

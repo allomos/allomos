@@ -1,10 +1,9 @@
-// Collapsing and expanding sections (Task-A01-26): area and iteration groups in the task list, and
-// handoffs in the Handoffs tab. Kept apart from React so it can be tested with Node alone
+// Collapsing and expanding sections (Task-A01-26): area and iteration groups in the task list. Kept apart from React so it can be tested with Node alone
 // (`npm --prefix apps/web test`). Only type imports here: Node strips them.
 
 /** Which list a set of keys belongs to. Groups start expanded, so their set holds the collapsed
- * ones; handoffs start collapsed (date, writer and first line), so their set holds the open ones. */
-export type FoldList = "groups" | "handoffs";
+ * ones. (The Handoffs tab's list is gone, Task-A03-polar770.) */
+export type FoldList = "groups";
 
 /** The window-storage key for one project's list: remembered per project, per viewer. */
 export function foldStorageKey(root: string, list: FoldList): string {

@@ -1,13 +1,11 @@
-// Searching the task list (Task-A01-36): the search box above the list, the marked words, and the
-// handoffs a search finds. What matches is decided in searchFlow.ts.
+// Searching the task list (Task-A01-36): the search box above the list and the marked words. What
+// matches is decided in searchFlow.ts.
 
 import { forwardRef, useState } from "react";
 import { useI18n } from "./i18n";
-import { localTime } from "./handoffFlow";
 import { pieces, snippet, type Piece } from "./searchFlow";
 import { refreshText, type Refreshed } from "./refreshFlow";
 import type { Words } from "./stopFlow";
-import type { Handoff } from "./types";
 
 /** The shortcut that focuses the search box, as this computer writes it. */
 const SHORTCUT = /Mac/.test(navigator.userAgent) ? "⌘F" : "Ctrl+F";
@@ -76,54 +74,6 @@ export function DescriptionHit({ text, terms }: { text: string; terms: string[] 
     <span className="search-snippet">
       <span className="search-where">{t("search.in_description")}</span> <Marked parts={parts} />
     </span>
-  );
-}
-
-/** Handoffs a search found, below the tasks, marked as handoffs; clicking one opens it in the Handoffs tab. */
-export function HandoffHits({ handoffs, terms, onOpen }: { handoffs: Handoff[]; terms: string[]; onOpen: (file: string) => void }) {
-  const { t } = useI18n();
-  if (handoffs.length === 0) return null;
-  return (
-    <section className="area search-handoffs" aria-label={t("search.handoffs")}>
-      <header className="area-head">
-        <h2>{t("search.handoffs")}</h2>
-        <span className="count">{t("search.handoff_count", { count: handoffs.length })}</span>
-      </header>
-      <ul className="tasks">
-        {handoffs.map((h) => {
-          const body = snippet(h.body, terms);
-          return (
-            <li key={h.file} className="task handoff-hit" tabIndex={0} onClick={() => onOpen(h.file)} onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen(h.file);
-              }
-            }}>
-              <span className="kind">{t("search.handoff_kind")}</span>
-              <span className="title">
-                <Highlight text={h.summary || t("handoffs.empty")} terms={terms} />
-              </span>
-              <span className="when small">{localTime(h.updated)}</span>
-              <span className="meta">
-                <span>
-                  <Highlight text={h.writer || t("handoffs.unknown_writer")} terms={terms} />
-                </span>
-                {h.tasks.length > 0 && (
-                  <span>
-                    <Highlight text={h.tasks.join(", ")} terms={terms} />
-                  </span>
-                )}
-                {body && (
-                  <span className="search-snippet">
-                    <Marked parts={body} />
-                  </span>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
   );
 }
 

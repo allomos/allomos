@@ -13,8 +13,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useI18n } from "./i18n";
 import { WhoForm } from "./WhoForm";
 import { Markdown } from "./Markdown";
-import { LatestHandoff } from "./Handoffs";
-import { localTime } from "./handoffFlow";
+import { localTime } from "./timeFlow";
 import { changeLine } from "./historyFlow";
 import {
   EMPTY_NEW_ITERATION,
@@ -37,7 +36,7 @@ import { canReopen, reopenEdit } from "./reopenFlow";
 import { ACTIVE_MINUTES, check, paneAgent, session } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
-import { isProblem, type Area, type Edit, type Handoff, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
+import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
   task,
@@ -46,8 +45,6 @@ export function TaskPane({
   iteration,
   onClose,
   onLink,
-  latest,
-  onAllHandoffs,
   history,
   labels,
   iterations,
@@ -66,10 +63,6 @@ export function TaskPane({
   iteration: Iteration | undefined;
   onClose: () => void;
   onLink: (href: string) => void;
-  /** The task's latest handoff (Task-A03-06). */
-  latest: Handoff | null;
-  /** Opens the Handoffs tab on this task. */
-  onAllHandoffs: () => void;
   /** The task's recorded changes; null until read, or when they cannot be. */
   history: TaskHistory | null;
   /** The project's label ladder, lowest step first. */
@@ -613,7 +606,6 @@ export function TaskPane({
           <p className="muted small">{t("pane.no_description")}</p>
         )}
       </section>
-      <LatestHandoff handoff={latest} onAll={onAllHandoffs} />
       <section>
         <h3>{t("pane.history")}</h3>
         {!history?.since ? (

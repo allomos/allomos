@@ -4,7 +4,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   collapsedWhileSearching,
-  handoffMatches,
   hitRanges,
   pieces,
   searchGroups,
@@ -101,15 +100,6 @@ test("a cut never splits a character written with two units", () => {
   const s = snippet(`${"😀".repeat(30)}找到`, ["找到"], 5);
   assert.ok(s);
   assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s.map((p) => p.text).join("")));
-});
-
-test("handoffs are found by summary, text, writer or the tasks they name", () => {
-  const h = { summary: "交接：搜索框完成一半", body: "Next: highlight the words.", writer: "claude/a01-36", tasks: ["A01-36"] };
-  assert.ok(handoffMatches(h, searchTerms("搜索框")));
-  assert.ok(handoffMatches(h, searchTerms("HIGHLIGHT")));
-  assert.ok(handoffMatches(h, searchTerms("claude")));
-  assert.ok(handoffMatches(h, searchTerms("a01-36 highlight")));
-  assert.ok(!handoffMatches(h, searchTerms("burndown")));
 });
 
 test("groups keep only matching tasks, keep their whole count, and empty groups are left out", () => {

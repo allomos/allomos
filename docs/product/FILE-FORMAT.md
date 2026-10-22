@@ -39,10 +39,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
     A01-02/
       task.json
       description.md
-  handoff-template.md   the outline every handoff follows (allomos/2)
   project-notes.md      what every session must know: running, pitfalls, where credentials live
-  handoffs/             one file per session (allomos/2)
-    2026-10-12-1130-claude-a03-06.md
   events/               one file per change: the history (allomos/3)
     .keep
     2026-10-13-140205-123-k7f3q2.json
@@ -65,25 +62,20 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 
 - `handoff` (no, `allomos/2`): when a handoff must be written (task `A03-06`). Every field is optional and missing ones take their defaults: `quota_gate` (percentage of the 5-hour quota left; default 3), `context_gate` (percentage of context used; default 90), `write_when` (text; default "after every meaningful step: a task finished, a finding, a commit, a process started or stopped"), and `overrides`: an agent's or account's own `quota_gate` / `context_gate`, by name (`codex`, `claude/work`); a holder `codex/a01-03` gets the override `codex`. Gates are whole numbers from 0 to 100 (`invalid_percent`). Changed with `alm handoff-rules` or the app's Handoff settings.
 
-## Handoffs (`allomos/2`)
+## Handoffs (`allomos/2`; in the task since A03-polar770)
 
-Added by task `A03-06`. A handoff is the short note a session leaves so whoever continues, an agent or a person, does not start blind; it is written for any reader, because the writer does not know who takes over (owner, 2026-10-12).
+Added by task `A03-06`. A handoff is what a session leaves so whoever continues, an agent or a person, does not start blind; it is written for any reader, because the writer does not know who takes over (owner, 2026-10-12).
 
-- **`handoffs/<date>-<time>-<writer>.md`**: one file per session (`alm handoff --as <session>` updates the same file; a person writing in the app makes a new one each time). It starts with a header, then the text:
+Since task `A03-polar770` (approver, 2026-10-22) a handoff lives in the task itself, with no file of its own and no change of format (still `allomos/5`). `alm handoff <id> --as <session> --text "<handoff>"` (or `--from <file.md>`) in one change:
 
-  ```text
-  ---
-  writer: claude/a03-06-handoffs
-  tasks: A03-06, A01-27
-  written: 2026-10-12T11:30Z
-  updated: 2026-10-12T13:05Z
-  ---
-  ```
+- replaces the task's **`handoff_note`** (where it stopped, the one next step, who it waits on);
+- with `--evidence "<what>"`, adds `- <YYYY-MM-DD>, <session>: <what>` as the last item under the description's **Evidence** heading (`## Evidence` at any level, or a line that is only `**Evidence**`), or adds `## Evidence` at the end when there is none;
+- records an event (command `handoff`) with the changed fields plus `{ "field": "handed_off_by", "to": "<session>" }`, which lives only in the history, like `reopen_note`.
 
-  `tasks` lists the tasks it covers (empty for a session with no task). Times are UTC. `alm show`, `alm next`, the task pane and the Handoffs tab find a task's handoffs through this list. Agents fill in their own file directly: one of the two exceptions to "never edit the taskbag by hand" (the other is `project-notes.md`).
-- **`handoff-template.md`**: the outline. Part 1, for anyone in plain words; part 2, restart details. Replaced with `alm handoff-template --set` or in the app.
+Same holder rule as other changes; several tasks: once for each. An older taskbag may still hold **`handoffs/`** (one file per session, with a `writer` / `tasks` / `written` / `updated` header) and **`handoff-template.md`**: `alm` reads neither. While `handoffs/` holds any file other than hidden ones (`.keep`), the taskbag needs updating: `alm next` says so (`old_handoffs`, `handoffs` in `--json`), the app shows a notice with **Update the taskbag…**, and the request (`agent_move_handoffs_request_in`, versioned `MOVE_HANDOFFS_REQUEST_VERSION`) asks the agent to write what is still useful into the tasks the files name, skip tasks that are done or dropped, then remove the files, the template and the folder, after the person's Go ahead.
+
 - **`project-notes.md`**: what every session must know whatever its task: what is running, pitfalls, where credentials live (never their values, and no personal details such as email addresses or account names: placeholders only, task `A03-29`). A standard part of every taskbag (task `A03-20`): `alm init` creates it; agents edit it directly (the other exception to "never edit the taskbag by hand") and keep it true while the project is built, as Allomos's section in AGENTS.md (`alm brief`, v7) says. `alm next` shows its `## Running` and `## Pitfalls` sections (the first `##` heading starting with that word, any case) and the day the file last changed (its modification time on this computer, UTC); a missing file is said plainly, not an error. `alm handoff` reminds to update it. Both add `project_notes` to `--json` (`file`, `path`, `found`, `changed`, `running`, `pitfalls`).
-- A task's `handoff_note` stays: the one line left on release.
+- A task's `handoff_note` is also set on release (`alm release --note`) and with `alm note`.
 
 ## Events (`allomos/3`)
 
@@ -124,7 +116,7 @@ Added by task `A01-17` (R7). Every change Allomos makes to a task, an area, an i
 - **Reopening** (task `A01-50`): `alm reopen <id> --note "<why>"` (or the app's **Reopen…**) turns a `done` or `dropped` task into `ready`, held by nobody, and clears its `label`, `without_human_check` and `human_check_steps`; its description, handoff note and next dependency stay. Its event (command `reopen`) lists those changes plus `{ "field": "reopen_note", "to": "<why>" }`, which, like `ai_decision`, lives only in the history, so `task.json` gains no field and the format does not change.
 - **Branches** (task `A03-22`): a task's **base branch** (the Git branch it starts from and merges back into, by its real name) and **working branch** (the branch the work is done on) are event changes named `base_branch` and `working_branch`: in the `add task` event (the base `alm add task` chose, or the person picked in the app), in the `claim` event (the working branch, and the base of a task that had none), and in a `base` event (`alm base`). A task's branches are the last value each field was given; a change with only a `from` empties it. Like AI decisions they are worked out from the events alone, so `task.json` has no field for them and the format stays `allomos/4`; an older Allomos reads these events like any other. Tasks made before have no base until they are claimed.
 - **The agent** (task `A03-27`): `agent` and `tool` are new optional fields; the format stays `allomos/4`, so no taskbag needs moving in. An Allomos built before task `A01-55` reports each event that has them as having an unknown field and leaves it out of the history, until it is updated.
-- **Not events:** handoffs and the handoff template (each handoff carries its own writer and times), and reading.
+- **Not events:** reading.
 - **One-time numbers** (task `A01-58`): a change made with `alm --request-id <id>` adds one more change to each event it writes, named `request_id`, whose `to` is `{"id": "<id>", "input": "<fingerprint of the command's words and who ran it>"}`. When the same number comes again, `alm` finds these events and returns the first result instead of changing anything; the same number with another input is refused (`request_reused`). The number is kept as long as the history; a task's history leaves it out. Like the branches it lives in the events alone, so the format stays `allomos/4` and an older Allomos reads these events like any other.
 - **Packed months** (task `A01-59`, approver 2026-10-20): so `events/` does not grow by one file per change forever, `alm` packs the history by itself during any command it runs from the 28th of a month (UTC): every earlier month whose changes are still single files gets one file, `events/<yyyy-mm>.events` (for example `events/2026-09.events`), and those single files are removed. Each line of it is one change, `{"file": "<the single file's name>", "event": {…}}`, in file-name order, so the same changes give the same file on every computer and two computers packing the same month do not conflict. A single file of an already packed month that arrives later is taken in on the next packing. Readers read the packed files and the single files together, each change under its original file name, so the history shows the same as before. The command says what it packed and prints the Git commands that share the packed file and the removed single files. An older Allomos reads only `.json` files in `events/`: it skips the packed months without an error, and until it is updated it shows only the history not packed yet.
 - **Unknown fields are ignored in events** (task `A01-55`, approver 2026-10-19), unlike in every other file. Events are written only by `alm` and the app, never by hand, so a field this Allomos does not know was added by a newer one; ignoring it keeps that change in the history. Builds before `A01-55` refuse such an event instead.
@@ -169,7 +161,7 @@ Unknown fields in an iteration file are read past, not refused (since `allomos/5
 | `blocked_by` | no (`allomos/4`) | For a `blocked` task: the IDs of the tasks in this taskbag that must finish first, as a list (`alm block <id> --by <task-id>…`). **At least one when `state` is `blocked`**; each a task of this taskbag and not the task itself. A dropped blocker is allowed but flagged ("A01-30 (dropped; still blocked?)") and never counts as done. When every blocker is done, `alm next` says so; nothing moves the task by itself (`alm unblock <id>` does). Left out when empty; cleared when the task leaves `blocked`. |
 | `next_dependency` | no | The single thing needed for the next label. |
 | `iteration` | no | ID of an existing iteration the task is planned in. Without it the task is unplanned. |
-| `handoff_note` | no | A short note left by the last holder on release (`alm release --note`) for whoever picks the task up next. Each release replaces it, or removes it when no note is given. |
+| `handoff_note` | no | The task's handoff for whoever picks it up next: where it stopped, the next step, who it waits on. Written with `alm handoff <id>` ([§ Handoffs](#handoffs-allomos2-in-the-task-since-a03-polar770)), `alm note`, or on release (`alm release --note`); each replaces it, and a release without a note removes it. |
 | `without_human_check` | no (`allomos/4`) | Why the task was finished without the human check: the work is finished and only a person's hands-on check is left, in quiet and normal run mode alike (task `A03-31`). Written by `alm done <id> --without-human-check "<text>"` (the old flag `--without-owner` still works); empty text is refused (`without_human_check_missing`). While a `done` task has it, the task is **to check**: `alm human` lists it and the app shows "Not human-checked". Marking it checked (`alm checked <id>`, the app's **Checked** button, or the top label set on the done task) clears it together with `human_check_steps`; the task's history keeps both. `alm` records what the agent says; it does not check the run mode, nor whether only the human check is left (task `A03-15`, task `A03-18`, task `A03-31`). |
 | `human_check_steps` | no (`allomos/4`) | How a person checks the task, in Markdown: the test folder, what to open, what to click, what they should see. Written with `alm done <id> --without-human-check "<why>" --steps <file.md>` (an empty file is refused, `human_check_steps_empty`); without it, `alm done` warns `human_check_steps_missing` and shows how to write them, but does not refuse. Shown in the task pane and by `alm show` / `alm human --steps`. |
 

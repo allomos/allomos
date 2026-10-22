@@ -37,8 +37,7 @@ Allomos relies on these terms. Use them as defined here, in commands and when yo
 about the project's tasks.
 
 - **Taskbag**: the folder holding the project's tasks (`.allomos/taskbag/`): readable JSON and
-  Markdown files kept in your version control tool (Git, for example). Change it only with `alm`, except the project notes and your
-  own handoff file.
+  Markdown files kept in your version control tool (Git, for example). Change it only with `alm`, except the project notes.
 - **Project notes**: the taskbag's `project-notes.md`: what every session must know whatever its
   task (what is running, pitfalls, where the code and the taskbag are kept online, where
   credentials live, never their values; no personal details such as email addresses or account
@@ -72,7 +71,9 @@ about the project's tasks.
   the task.
 - **Holder**: the person or agent session working a task (`--as <name>`). One holder at a time.
 - **Next dependency**: the one thing needed before the task's next label.
-- **Handoff note**: what the next holder needs to know, left when a task is released.
+- **Handoff note**: what the next holder needs to know: where the work stopped, the one next
+  step, who it waits on. Written with `alm handoff` (or left when a task is released); a handoff
+  lives in the task itself, not in a file of its own.
 - **Task language**: the language new and changed tasks are written in (titles, descriptions,
   notes). `alm task-language` tells you which; by default it follows the language the person
   uses Allomos in.
@@ -94,8 +95,8 @@ Fixed for every project:
 - **The seven states**: backlog, ready, in progress, waiting, blocked, done, dropped.
 - **The words \"area\" and \"iteration\"**: a project cannot rename them yet (planned: requirement
   R90). Use these words with `alm`, even if the team says \"workstream\" or \"sprint\".
-- **The file format**: never edit the taskbag's files by hand (except `project-notes.md` and your
-  own handoff file); `alm` checks every change.
+- **The file format**: never edit the taskbag's files by hand (except `project-notes.md`); `alm`
+  checks every change.
 
 Read the project's current areas, iterations and tasks with `alm list` (`--by iteration`), and its
 ladder in the taskbag's project.json.
@@ -182,7 +183,7 @@ prints none: save the new taskbag yourself.
 
 See:
 - `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
-  latest handoff, and the rule for choosing one; then the blocked tasks whose blockers are all
+  handoff note, and the rule for choosing one; then the blocked tasks whose blockers are all
   done. `alm` chooses and moves nothing; you do.
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
   (`--state blocked`, `--state waiting`, …);
@@ -214,8 +215,7 @@ Work a task:
   `alm unblock <id>` (ready, or in progress when someone holds it).
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
 - `alm done <id> [--without-human-check \"<why>\" --steps <file.md>]`: finished (see
-  `alm guide workflow`, step 7); it ends with the rule for checking the handoffs that name the
-  task; follow it. The steps are Markdown for the person who checks it: the test folder, what to
+  `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
   open, what to click, what they should see. On a task already done, it only records its human
   check again (the old `--without-owner` still works).
 - `alm checked <id>`: a person has checked the finished task: it gets the top label and leaves
@@ -266,19 +266,17 @@ Plan:
   `alm add task`, `alm title` and `alm describe`);
   `alm task-language <code|ui>` sets it.
 
-Handoffs (the note a session leaves so whoever continues does not start blind):
+Handoffs (what a session leaves in each task so whoever continues does not start blind):
 - `alm handoff-rules`: when to write one (quota and context gates, with any override for you);
   `--quota <n> --context <n> [--write-when \"<text>\"] [--agent <name>] [--clear]` change them.
-- `alm handoff --tasks <id,id> --as <your session name>`: this session's handoff file, made from
-  the template the first time (later calls update the same file); fill it in, or pass
-  `--from <file.md>`. It prints the file's path, and reminds you to update `project-notes.md` if
-  what is running or a pitfall changed.
-- `alm handoffs [--task <id>] [--latest]`: handoffs, newest first. `alm next` and `alm show <id>`
-  show a task's latest one.
-- `alm handoffs --check [--task <id>]`: the rule for checking the handoffs yourself, one by one,
-  and removing those whose tasks are all done or dropped.
-- `alm handoff --remove <file>`: remove a handoff whose tasks are all finished (the version history keeps it).
-- `alm handoff-template [--set <file.md>]`: show or replace the project's template.
+- `alm handoff <id> --as <your session name> --text \"<handoff>\"` (or `--from <file.md>`)
+  `[--evidence \"<what>\"]`: hand the task off. The text replaces its handoff note (where it
+  stopped, the one next step, who it waits on); `--evidence` adds, dated and signed, what was done
+  that must not run twice (an outside effect) under its description's **Evidence**; its history
+  records who handed it off. Several tasks: once for each. It reminds you to update
+  `project-notes.md` if what is running or a pitfall changed. `alm next` and `alm show <id>` show
+  the note. There are no handoff files: old ones in the taskbag's `handoffs/` folder mean the
+  taskbag needs updating (`alm next` says so; **Update the taskbag…** or `alm move-in`).
 
 Ask the person:
 - `alm confirm --title \"<heading>\" --plan <file.md> [--evidence <file.md>] [--task <id>]`:
@@ -384,15 +382,15 @@ const WORKFLOW: &str = "# How to work the tasks
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
    otherwise one from the active iteration (listed first: the one marked active, or else the
    first planned one), else the earliest iteration, whose next dependency is met. Read its handoff
-   first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
+   note first (`alm show <id>`), and the project notes' Running, Pitfalls and Repositories, which
    `alm next` shows (the whole file is the taskbag's `project-notes.md`).
-   **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with it):
-   check the real state before trusting it: the working copy, branch and running processes it
+   **Taking over from a handoff** (`alm next` and `alm show` repeat these two rules with a
+   handoff note): check the real state before trusting it: the working copy, branch and running processes it
    names (as your version control tool shows them; in Git: `git worktree list`, `git status -sb`;
    and listening ports). What the previous session still
    holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the
-   question with `alm wait`). What the handoff lists as already done (its **Already done, do not
-   repeat** line) is not done again: a change of agent, account or session keeps the approvals
+   question with `alm wait`). What the task's **Evidence** lists as already done is not done
+   again: a change of agent, account or session keeps the approvals
    and what was done; it does not authorize repeating it.
 2. Hold one task at a time. Pull first (get the latest changes), then `alm claim <id> --as <your
    session name> --branch <the branch you are on>` (as your version control tool shows it; in
@@ -431,11 +429,12 @@ const WORKFLOW: &str = "# How to work the tasks
    `alm next`'s list: they are skipped by their state. When `alm next` says all of a task's
    blockers are done, check it, then `alm unblock <id>`.
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
-   every meaningful step): `alm handoff --tasks <id> --as <your session name>`, then fill in the
-   file it names, in plain words first, for any reader: you do not know who takes over, an agent
-   or a person; under **Already done, do not repeat**, list each operation with an outside
-   effect that must not run twice (or none). Evidence goes in the task's description (`alm describe`, under an **Evidence**
-   heading), not in the handoff.
+   every meaningful step), into each task you worked: `alm handoff <id> --as <your session name>
+   --text \"<where it stopped, the one next step, who it waits on>\"`, in plain words first, for
+   any reader: you do not know who takes over, an agent or a person. It replaces the task's
+   handoff note, so write the whole of it each time. Each operation with an outside effect that
+   must not run twice goes in with `--evidence \"<what>\"` (under the description's
+   **Evidence**); other evidence with `alm describe`.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
 7. Finished: once the task has the top label of the ladder (a person has checked it: the
@@ -453,7 +452,7 @@ const WORKFLOW: &str = "# How to work the tasks
 8. Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
    another), ask the person to choose quiet or normal mode: show them what
    `alm guide run-modes` prints (in the task language), as it is, and do not start until they
-   choose. Write the choice in your handoff (under Approvals in force: \"Run mode: quiet\" or
+   choose. Write the choice in your handoff (in the task's handoff note: \"Run mode: quiet\" or
    \"Run mode: normal\", who chose it and when) and follow it until the run ends. Both modes
    finish a task the same way (step 7); they differ only in what you do when you need the
    person during the run. In normal mode you stop and ask. In quiet mode (a quiet run),
@@ -472,8 +471,7 @@ const WORKFLOW: &str = "# How to work the tasks
 
 Rules:
 - Never edit the taskbag's files by hand, and never invent progress, verification or approvals.
-  Two exceptions: fill in your own handoff file, the one `alm handoff` names; and keep
-  `project-notes.md` true. Update it when you start or stop a server or process, create or change
+  One exception: keep `project-notes.md` true. Update it when you start or stop a server or process, create or change
   a hosted resource or a remote repository, learn a pitfall that would change what the next
   session does, or a credential moves; change lines in place, remove lines no longer true, and
   save and share that file with your version control tool yourself.
@@ -508,8 +506,8 @@ const RUN_MODES_EN: &str = "# Run modes: quiet or normal
 
 For the agent: before an automatic or loop run begins (a card run, `/loop`, several tasks one
 after another), show the person everything below the line, as it is, and ask them to choose
-quiet or normal mode. Do not start until they choose. Write the choice in your handoff (under
-Approvals in force: \"Run mode: quiet\" or \"Run mode: normal\", who chose it and when) and
+quiet or normal mode. Do not start until they choose. Write the choice in your handoff (in the
+task's handoff note: \"Run mode: quiet\" or \"Run mode: normal\", who chose it and when) and
 follow it until the run ends.
 
 ---
@@ -546,8 +544,8 @@ When the run is over:
      (`alm checked <id>`, or the Checked button in the app). When it does not, reopen it with
      what is wrong (`alm reopen <id> --note \"<what is wrong>\"`, or the Reopen… button in the
      app): it becomes ready again, with the reason in its history, so a later run picks it up.
-2. Read the run's handoff (`alm handoffs` lists them, newest first) for anything left running or
-   unfinished.
+2. Read the handoff notes of the tasks the run worked (`alm show <id>`; `alm history <id>` shows
+   who handed each off) for anything left running or unfinished.
 
 ## Normal mode: I ask as usual
 
@@ -568,7 +566,7 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 
 エージェントへ：自動実行やループ実行（カード・ラン、`/loop`、複数のタスクを続けて進めるもの）を
 始める前に、下の線より後ろをそのまま相手に見せ、静かモードか通常モードかを選んでもらいます。
-選ばれるまで始めません。選ばれたモードはハンドオフに書き（Approvals in force に
+選ばれるまで始めません。選ばれたモードはハンドオフに書き（タスクの引き継ぎメモに
 「Run mode: quiet」または「Run mode: normal」と、誰がいつ選んだか）、実行が終わるまでそれに従います。
 
 ---
@@ -603,8 +601,8 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
    - **To check（確認待ち）：** 各タスクの確認手順に従って試します。動けば確認済みにします
      （`alm checked <id>`、またはアプリの「確認済み」ボタン）。動かなければ、何がおかしいかを書いて
      再開します（`alm reopen <id> --note \"<何がおかしいか>\"`、またはアプリの「再開…」ボタン）。タスクは理由を履歴に残して準備完了に戻り、次の実行がそれを拾います。
-2. この実行のハンドオフ（`alm handoffs` で新しい順に一覧できます）を読み、動いたままのものや
-   終わっていないものがないか確かめます。
+2. この実行で扱ったタスクの引き継ぎメモ（`alm show <id>`。誰が引き継いだかは `alm history <id>`）を読み、
+   動いたままのものや終わっていないものがないか確かめます。
 
 ## 通常モード：いつもどおり聞きます
 
@@ -623,7 +621,7 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 
 给智能体：在自动运行或循环运行（卡片连跑、`/loop`、一个接一个地做多个任务）开始之前，把下面
 分隔线之后的内容原样给对方看，请对方选择安静模式或普通模式。对方选定之前不要开始。把选择写进
-你的交接（在 Approvals in force 下写「Run mode: quiet」或「Run mode: normal」，以及谁、何时选的），
+你的交接（在任务的交接备注里写「Run mode: quiet」或「Run mode: normal」，以及谁、何时选的），
 并一直照此运行到结束。
 
 ---
@@ -655,7 +653,7 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
    - **To check（待检查）：** 按每个任务的检查步骤去试。没问题就标为已检查（`alm checked <id>`，
      或应用里的「已检查」按钮）。有问题就写明哪里不对并重新打开它（`alm reopen <id> --note \"<哪里不对>\"`，
      或应用里的「重新打开…」按钮）：它会重新变为就绪，原因记在历史里，之后的运行会接着做。
-2. 阅读这次运行的交接（`alm handoffs` 按从新到旧列出），看看有没有仍在运行或没做完的东西。
+2. 阅读这次运行做过的任务的交接备注（`alm show <id>`；谁交接的见 `alm history <id>`），看看有没有仍在运行或没做完的东西。
 
 ## 普通模式：照常提问
 
@@ -1595,8 +1593,8 @@ mod tests {
             "check the real state before trusting it",
             "git worktree list",
             "is not yours to change or remove; if unsure, ask the person",
-            "Already done, do not repeat",
-            "is not done again",
+            "What the task's **Evidence** lists as already done is not done again",
+            "`alm handoff <id> --as <your session name> --text",
             "keeps the approvals and what was done; it does not authorize repeating it",
         ] {
             assert!(workflow.contains(words), "{words}");
@@ -2045,7 +2043,7 @@ mod tests {
                 "To check",
                 "`alm checked <id>`",
                 "`alm reopen <id> --note",
-                "`alm handoffs`",
+                "`alm show <id>`",
             ] {
                 assert!(text.contains(words), "{language}: {words}");
             }

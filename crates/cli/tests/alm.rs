@@ -283,10 +283,17 @@ fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
             "Not ready",
         ],
     );
-    // A handoff covering a listed task comes with it.
+    // A handed-off task comes with its handoff note (Task-A03-polar770).
     ok(
         &repo,
-        &["handoff", "--as", "claude/run", "--tasks", "A01-02"],
+        &[
+            "handoff",
+            "A01-02",
+            "--as",
+            "claude/run",
+            "--text",
+            "stopped at tests",
+        ],
     );
 
     let v = ok(&repo, &["next"]);
@@ -298,8 +305,9 @@ fn next_lists_every_free_ready_task_with_the_rule_for_choosing() {
         .collect();
     // Earliest iteration first, unplanned last.
     assert_eq!(ids, ["A02-01", "A01-02", "A01-01"]);
-    assert_eq!(v["tasks"][1]["handoff"]["writer"], "claude/run");
-    assert_eq!(v["tasks"][0]["handoff"], Value::Null);
+    assert_eq!(v["tasks"][1]["handoff_note"], "stopped at tests");
+    assert_eq!(v["tasks"][0]["handoff_note"], Value::Null);
+    assert!(v["tasks"][1].get("handoff").is_none(), "{v}");
     let rule = v["instruction"].as_str().unwrap();
     assert!(
         rule.starts_with("Take the task the person named, if any."),
@@ -567,8 +575,6 @@ fn git_sees_only_text_files() {
             ".allomos/taskbag/.gitignore",
             ".allomos/taskbag/areas/.keep",
             ".allomos/taskbag/areas/A01.json",
-            ".allomos/taskbag/handoff-template.md",
-            ".allomos/taskbag/handoffs/.keep",
             ".allomos/taskbag/project-notes.md",
             ".allomos/taskbag/project.json",
             ".allomos/taskbag/tasks/.keep",
@@ -1036,7 +1042,14 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
         ],
         &["--as", "a", "claim", "A01-01", "--branch", "main"],
         &["--as", "a", "label", "A01-01", "human verified"],
-        &["--as", "a", "handoff", "--tasks", "A01-01"],
+        &[
+            "--as",
+            "a",
+            "handoff",
+            "A01-01",
+            "--text",
+            "done; nothing left",
+        ],
         &["--as", "a", "done", "A01-01"],
         &["next"],
     ] {
@@ -1083,9 +1096,7 @@ fn each_change_names_exactly_the_files_it_wrote() {
     let root = repo.join(".allomos/taskbag");
     let steps = tmp("steps").join("steps.md");
     fs::write(&steps, "Open it.\n").unwrap();
-    let template = tmp("template").join("t.md");
-    fs::write(&template, "# Handoff\n\nWhat next.\n").unwrap();
-    let (steps, template) = (steps.to_str().unwrap(), template.to_str().unwrap());
+    let steps = steps.to_str().unwrap();
     let commands: Vec<Vec<&str>> = vec![
         vec!["add", "iteration", "I01", "One"],
         vec!["add", "iteration", "I02", "Two"],
@@ -1140,8 +1151,16 @@ fn each_change_names_exactly_the_files_it_wrote() {
         vec!["project", "--name", "Demo 2"],
         vec!["task-language", "ja"],
         vec!["handoff-rules", "--quota", "5"],
-        vec!["handoff-template", "--set", template],
-        vec!["--as", "b", "handoff", "--tasks", "A01-02"],
+        vec![
+            "--as",
+            "b",
+            "handoff",
+            "A01-02",
+            "--text",
+            "all done",
+            "--evidence",
+            "deployed",
+        ],
     ];
     // An unrelated uncommitted change sits in the taskbag the whole time.
     fs::write(root.join("project-notes.md"), "Changed by hand.\n").unwrap();
@@ -1184,13 +1203,6 @@ fn each_change_names_exactly_the_files_it_wrote() {
             );
         }
     }
-    // Removing a finished handoff names the removed file.
-    let file = ok(&repo, &["handoffs"])["handoffs"][0]["file"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let v = ok(&repo, &["handoff", "--remove", &file]);
-    assert_eq!(v["changed_files"], json!([file]));
 }
 
 /// `alm describe` and `alm note` change a task's description and handoff note through the same
@@ -2254,7 +2266,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v24)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v25)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2264,7 +2276,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v24)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v25)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -2351,9 +2363,15 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
     );
 
     // `alm handoff` reminds, with the day.
-    let v = ok(&repo, &["handoff", "--as", "s/one", "--tasks", "A01-01"]);
+    let v = ok(
+        &repo,
+        &["handoff", "A01-01", "--as", "s/one", "--text", "n"],
+    );
     assert_eq!(v["project_notes"]["changed"], "2026-10-14");
-    let out = alm(&repo, &["handoff", "--as", "s/one"]);
+    let out = alm(
+        &repo,
+        &["handoff", "A01-01", "--as", "s/one", "--text", "n"],
+    );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(
         text.contains(
@@ -2374,9 +2392,15 @@ fn project_notes_are_in_the_brief_next_and_handoff() {
         text.contains("Project notes: this taskbag has no project-notes.md yet"),
         "{text}"
     );
-    let v = ok(&repo, &["handoff", "--as", "s/one"]);
+    let v = ok(
+        &repo,
+        &["handoff", "A01-01", "--as", "s/one", "--text", "n"],
+    );
     assert_eq!(v["project_notes"]["found"], false);
-    let out = alm(&repo, &["handoff", "--as", "s/one"]);
+    let out = alm(
+        &repo,
+        &["handoff", "A01-01", "--as", "s/one", "--text", "n"],
+    );
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
@@ -2409,22 +2433,11 @@ fn project_notes_path_is_tidy_from_a_worktree() {
         .join("project-notes.md");
     let v = ok(&worktree, &["--taskbag", rel, "next"]);
     assert_eq!(v["project_notes"]["path"], want.display().to_string());
-    for args in [
-        vec!["--taskbag", rel, "next"],
-        vec!["--taskbag", rel, "handoff", "--as", "s/one"],
-    ] {
-        let out = alm(&worktree, &args);
-        assert_eq!(out.status.code(), Some(0), "{args:?}");
-        let text = String::from_utf8(out.stdout).unwrap();
-        assert!(
-            text.contains(&want.display().to_string()),
-            "{args:?}: {text}"
-        );
-        assert!(
-            !text.contains("/../") && !text.contains("/./"),
-            "{args:?}: {text}"
-        );
-    }
+    let out = alm(&worktree, &["--taskbag", rel, "next"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains(&want.display().to_string()), "{text}");
+    assert!(!text.contains("/../") && !text.contains("/./"), "{text}");
 }
 
 /// After `alm add task`, alm tells the agent what to do next (Task-A03-33): plan it in an
@@ -2815,7 +2828,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
             &["add", "task", "--area", "A01", "--title", "x"],
             &["labels", "a,b"],
             &["rename", "label", "implemented", "built"],
-            &["handoff", "--as", "a"],
+            &["handoff", "A01-01", "--as", "a", "--text", "n"],
             &["handoff-rules"],
         ] {
             let v = refused(&repo, args, 1, "taskbag_to_move_in");
@@ -3321,8 +3334,8 @@ fn handoff_rules_have_defaults_overrides_and_refusals() {
     assert!(!project.contains("handoff"), "{project}");
 }
 
-/// Whoever takes a task over is told, where its handoff is shown, to check the real state first
-/// and to repeat nothing already done; the template asks for what was done (Task-A03-23).
+/// Whoever takes a task over is told, where its handoff note is shown, to check the real state
+/// first and to repeat nothing already done (Task-A03-23).
 #[test]
 fn show_and_next_give_the_taking_over_rules_with_a_handoff() {
     let repo = filled();
@@ -3334,14 +3347,16 @@ fn show_and_next_give_the_taking_over_rules_with_a_handoff() {
     assert!(!text(&["show", "A01-01"]).contains("Taking over"));
     assert!(!text(&["next"]).contains("Taking over"));
 
-    let v = ok(
+    ok(
         &repo,
-        &["handoff", "--as", "claude/run", "--tasks", "A01-01"],
-    );
-    let written = fs::read_to_string(v["path"].as_str().unwrap()).unwrap();
-    assert!(
-        written.contains("- **Already done, do not repeat:**"),
-        "{written}"
+        &[
+            "handoff",
+            "A01-01",
+            "--as",
+            "claude/run",
+            "--text",
+            "stopped at tests",
+        ],
     );
 
     for args in [&["show", "A01-01"][..], &["next"][..]] {
@@ -3363,65 +3378,151 @@ fn show_and_next_give_the_taking_over_rules_with_a_handoff() {
     }
 }
 
+/// Task-A03-polar770: `alm handoff` writes the handoff into the task: its note, its evidence and
+/// its history; no handoff file is made. The next session finds it with `alm show` and `alm next`.
 #[test]
-fn a_session_writes_one_handoff_that_the_next_one_finds() {
+fn a_handoff_is_written_into_the_task_that_the_next_one_finds() {
     let repo = filled();
-    let ids: Vec<String> = ok(&repo, &["list"])["areas"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .flat_map(|a| a["tasks"].as_array().unwrap().clone())
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect();
-    let (one, two) = (&ids[0], &ids[1]);
-    refused(&repo, &["handoff"], 1, "holder_missing");
-
-    let tasks = format!("{one},{two}");
-    let v = ok(&repo, &["handoff", "--as", "claude/run", "--tasks", &tasks]);
-    assert_eq!(v["created"], true);
-    let path = PathBuf::from(v["path"].as_str().unwrap());
-    let text = fs::read_to_string(&path).unwrap();
-    assert!(text.contains("## For anyone, in plain words"), "{text}");
-
-    // The agent fills it in; a second call is the same file.
-    let draft = repo.join("draft.md");
-    fs::write(&draft, "# Handoff\n\n- **What was being done:** baking\n").unwrap();
-    let v = ok(
-        &repo,
-        &["handoff", "--as", "claude/run", "--from", "draft.md"],
-    );
-    assert_eq!(v["created"], false);
-    assert_eq!(v["path"].as_str().unwrap(), path.to_str().unwrap());
-    assert_eq!(v["handoff"]["tasks"], json!([one, two]));
-
-    let v = ok(&repo, &["show", two]);
-    assert_eq!(v["handoff"]["writer"], "claude/run");
-    assert_eq!(v["handoff"]["summary"], "What was being done: baking");
-    let v = ok(&repo, &["handoffs", "--task", one]);
-    assert_eq!(v["handoffs"].as_array().unwrap().len(), 1);
+    ok(&repo, &["--as", "claude/run", "claim", "A01-01"]);
     refused(
         &repo,
-        &["handoff", "--as", "x", "--tasks", "Z9-99"],
+        &["handoff", "A01-01", "--text", "n"],
+        1,
+        "holder_missing",
+    );
+    refused(
+        &repo,
+        &["handoff", "A01-01", "--as", "claude/run", "--text", " "],
+        1,
+        "handoff_empty",
+    );
+    refused(
+        &repo,
+        &["handoff", "Z9-99", "--as", "claude/run", "--text", "n"],
         1,
         "task_not_found",
     );
-}
-
-#[test]
-fn the_template_can_be_shown_and_replaced() {
-    let repo = filled();
-    let v = ok(&repo, &["handoff-template"]);
-    assert!(v["template"].as_str().unwrap().starts_with("# Handoff"));
-    fs::write(repo.join("t.md"), "# Ours\n").unwrap();
-    let v = ok(&repo, &["handoff-template", "--set", "t.md"]);
-    assert_eq!(v["template"], "# Ours\n");
-    fs::write(repo.join("empty.md"), "\n").unwrap();
     refused(
         &repo,
-        &["handoff-template", "--set", "empty.md"],
+        &["handoff", "A01-01", "--as", "codex/other", "--text", "n"],
         1,
-        "template_empty",
+        "task_held",
     );
+
+    let v = ok(
+        &repo,
+        &[
+            "handoff",
+            "A01-01",
+            "--as",
+            "claude/run",
+            "--text",
+            "Stopped at docs. Next: the guide.",
+            "--evidence",
+            "Deployed v1 to staging.",
+        ],
+    );
+    assert_eq!(
+        v["task"]["handoff_note"],
+        "Stopped at docs. Next: the guide."
+    );
+    let named: Vec<&str> = v["changed_files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f.as_str().unwrap())
+        .collect();
+    assert!(
+        named.iter().all(|f| !f.starts_with("handoffs/")),
+        "{named:?}"
+    );
+    assert!(!repo.join(".allomos/taskbag/handoffs").exists());
+    let v = ok(&repo, &["show", "A01-01"]);
+    let description = v["task"]["description"].as_str().unwrap();
+    assert!(description.contains("## Evidence\n\n- "), "{description}");
+    assert!(
+        description.ends_with(", claude/run: Deployed v1 to staging.\n"),
+        "{description}"
+    );
+    let text = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(
+        text.contains("handoff note: Stopped at docs. Next: the guide."),
+        "{text}"
+    );
+
+    // From a file, and again: the note is replaced, not kept twice; the history says who.
+    fs::write(repo.join("draft.md"), "Stopped at the guide.\n").unwrap();
+    ok(
+        &repo,
+        &[
+            "handoff",
+            "A01-01",
+            "--as",
+            "claude/run",
+            "--from",
+            "draft.md",
+        ],
+    );
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["task"]["handoff_note"], "Stopped at the guide.");
+    let events = ok(&repo, &["history", "A01-01"])["events"].clone();
+    let handoffs: Vec<&Value> = events
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["command"] == "handoff")
+        .collect();
+    assert_eq!(handoffs.len(), 2, "{events}");
+    assert!(
+        handoffs.iter().all(|e| e["by"] == "claude/run"
+            && e["changes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c["field"] == "handed_off_by" && c["to"] == "claude/run")),
+        "{events}"
+    );
+
+    // The old commands are gone.
+    for gone in [&["handoffs"][..], &["handoff-template"]] {
+        let out = alm(&repo, gone);
+        assert_ne!(out.status.code(), Some(0), "{gone:?}");
+    }
+}
+
+/// Task-A03-polar770: an older taskbag's `handoffs/` folder makes `alm next` say the taskbag needs
+/// updating, naming the files; alm reads nothing in them.
+#[test]
+fn old_handoff_files_make_next_ask_for_an_update() {
+    let repo = filled();
+    assert!(ok(&repo, &["next"])["handoffs"].is_null());
+    let dir = repo.join(".allomos/taskbag/handoffs");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join(".keep"), "").unwrap();
+    assert!(ok(&repo, &["next"])["handoffs"].is_null());
+    fs::write(
+        dir.join("2026-10-12-1130-claude-run.md"),
+        "---\nwriter: claude/run\n---\nold\n",
+    )
+    .unwrap();
+    let v = ok(&repo, &["next"]);
+    assert_eq!(
+        v["old_handoffs"],
+        json!(["handoffs/2026-10-12-1130-claude-run.md"])
+    );
+    let line = v["handoffs"].as_str().unwrap();
+    assert!(
+        line.starts_with(
+            "This taskbag needs updating: its `handoffs/` folder still holds 1 old handoff file(s)"
+        ),
+        "{line}"
+    );
+    assert!(
+        line.contains("Update the taskbag…") && line.contains("`alm move-in`"),
+        "{line}"
+    );
+    let text = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(text.contains(line), "{text}");
 }
 
 /// The event files in a taskbag (Task-A01-17).
@@ -3607,66 +3708,13 @@ fn two_copies_with_different_events_merge_without_conflict() {
     assert_eq!(theirs["events"][0]["by"], "codex/b");
 }
 
+/// Task-A03-polar770: `alm done` no longer asks to check handoff files.
 #[test]
-fn done_and_handoffs_check_give_the_agent_the_rule_to_check_itself() {
+fn done_asks_nothing_about_handoff_files() {
     let repo = filled();
-    // alm done always ends with the rule for the finished task; alm looks at no handoff.
-    ok(&repo, &["--as", "a", "claim", "A02-01"]);
-    let v = ok(&repo, &["--as", "a", "done", "A02-01"]);
-    let rule = v["handoff_check"]["instruction"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert!(
-        rule.starts_with("Now check the handoffs that name A02-01 yourself"),
-        "{rule}"
-    );
-    assert!(rule.contains("`alm handoffs --task A02-01`"));
-    assert!(rule.contains("`alm handoff --remove <file>`."));
-    ok(&repo, &["--as", "b", "claim", "A01-01"]);
-    let text = String::from_utf8(alm(&repo, &["--as", "b", "done", "A01-01"]).stdout).unwrap();
-    assert!(text.starts_with("A01-01  done"), "{text}");
-    assert!(text.contains("Now check the handoffs that name A01-01 yourself, one by one:\n1. Get the list: `alm handoffs --task A01-01`."), "{text}");
-
-    // alm handoffs --check: only the rule, with or without a task.
-    let v = ok(&repo, &["handoffs", "--check"]);
-    assert!(v.get("handoffs").is_none(), "{v}");
-    assert!(
-        v["instruction"]
-            .as_str()
-            .unwrap()
-            .contains("1. Get the list: `alm handoffs`.")
-    );
-    let v = ok(&repo, &["handoffs", "--check", "--task", "A01-01"]);
-    // The done's text: the task, the rule, then the Git commands for the done itself.
-    let rule = text.split_once('\n').unwrap().1;
-    let rule = &rule[..rule
-        .find("\nSave this change in your version control tool")
-        .unwrap()];
-    assert_eq!(v["instruction"], json!(rule));
-
-    // The agent removes a handoff by the name alm handoffs lists; then it is gone.
-    let file = ok(&repo, &["handoff", "--as", "s/one", "--tasks", "A01-01"])["handoff"]["file"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let v = ok(&repo, &["handoff", "--remove", &file]);
-    assert_eq!(v["removed"]["writer"], "s/one");
-    assert_eq!(ok(&repo, &["handoffs"])["handoffs"], json!([]));
-    assert_eq!(ok(&repo, &["list"])["issues"], json!([]));
-    refused(
-        &repo,
-        &["handoff", "--remove", &file],
-        1,
-        "handoff_not_found",
-    );
-    refused(
-        &repo,
-        &["handoff", "--remove", "../project.json"],
-        1,
-        "handoff_not_found",
-    );
-    assert!(repo.join(".allomos/taskbag/project.json").is_file());
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(&repo, &["--as", "a", "done", "A01-01"]);
+    assert!(v.get("handoff_check").is_none(), "{v}");
 }
 
 /// Decision 0016 (Task-A01-31): waiting on a person, with an optional who.

@@ -118,9 +118,8 @@ export function filterName(filter: StateFilter, t: T): string {
   return t(`state.${filter}` as Key);
 }
 
-/** What a filtered list is grouped by: areas, iterations, or handoffs (each the group of the tasks
- * it names) (Task-A01-44). */
-export type GroupKind = "area" | "iteration" | "handoff";
+/** What a filtered list is grouped by: areas or iterations (Task-A01-44). */
+export type GroupKind = "area" | "iteration";
 
 /**
  * The groups as the filter shows them (Task-A01-44): each with only the tasks the filter keeps,
@@ -134,14 +133,9 @@ export function filterGroups<G extends { tasks: Task[]; counted?: Task[] }>(grou
     .filter((g) => g.tasks.length > 0);
 }
 
-/** How many different tasks the groups show: a task named by two handoffs counts once. */
+/** How many different tasks the groups show: a task in two groups counts once. */
 export function taskCount(groups: readonly { tasks: readonly Task[] }[]): number {
   return new Set(groups.flatMap((g) => g.tasks.map((task) => task.id))).size;
-}
-
-/** Each handoff, by its file, as a group of the tasks it names that are in the taskbag. */
-export function handoffGroups(handoffs: readonly { file: string; tasks: string[] }[], tasks: readonly Task[]): { file: string; tasks: Task[] }[] {
-  return handoffs.map((h) => ({ file: h.file, tasks: h.tasks.flatMap((id) => tasks.filter((task) => task.id === id)) }));
 }
 
 /** A stretch of a banner's words; a `strong` one is shown in bold. */
@@ -242,7 +236,7 @@ export function bothBanner(filter: StateFilter, c: BothCount, t: T): Words {
 
 /** The search banner's words (Task-A01-44): "**2 tasks** found for “blocked”."; under a Show filter
  * (`filter`, its name) "**2 tasks** found for “blocked” with the “Waiting” filter on." (Task-A01-48). */
-export function searchBanner(kind: "task" | "handoff", count: number, query: string, t: T, filter?: string): Words {
+export function searchBanner(kind: "task", count: number, query: string, t: T, filter?: string): Words {
   const who = t(`search.who.${kind}_${one(count)}` as Key, { count });
   if (filter !== undefined) return withWho(t("search.banner_filtered", { who: MARK, query, filter }), who);
   return withWho(t("search.banner", { who: MARK, query }), who);

@@ -75,7 +75,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// reports it (Task-A03-flour054).
 /// 24: approvals are asked in the conversation; `alm confirm` only on a job the person gave from
 /// the Allomos app (approver, 2026-10-22; Task-A03-bonsai517).
-pub const SECTION_VERSION: u32 = 24;
+/// 25: a handoff is written into each task (`alm handoff <id> --text`, `--evidence`); no handoff
+/// files, and old ones in `handoffs/` mean the taskbag needs updating (Task-A03-polar770).
+pub const SECTION_VERSION: u32 = 25;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

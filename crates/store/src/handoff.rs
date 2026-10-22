@@ -1,53 +1,29 @@
-//! Handoffs (Task-A03-06): the short notes a session leaves so that whoever continues, an agent
-//! or a person, does not start blind. One small file per session in `handoffs/`, beside `tasks/`,
-//! naming the tasks it covers; the outline comes from the project's `handoff-template.md`. What
-//! every session must know whatever its task lives in `project-notes.md`.
+//! Handoffs (Task-A03-06): what a session leaves so that whoever continues, an agent or a
+//! person, does not start blind. Since Task-A03-polar770 (approver 2026-10-22) a handoff lives in
+//! the task itself: its handoff note, its description's **Evidence** and its history
+//! (`alm handoff`, `allomos_core::ops::hand_off`); there are no handoff files. An older taskbag's
+//! `handoffs/` folder is only found and reported ([`legacy`]), for **Update the taskbag…** to move
+//! what is still useful into the tasks. What every session must know whatever its task lives in
+//! `project-notes.md`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use allomos_core::Problem;
 use serde::Serialize;
 
-use crate::{Lock, write_atomic, write_failed};
-
-pub const TEMPLATE_FILE: &str = "handoff-template.md";
 pub const NOTES_FILE: &str = "project-notes.md";
+/// The folder older taskbags kept handoff files in (Task-A03-06 to Task-A03-polar770).
 pub const HANDOFFS_DIR: &str = "handoffs";
-
-/// How long writing a handoff waits for another writer.
-const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
-
-/// The default outline of one handoff. Written for any reader, because the writer does not know
-/// who will take over (owner, 2026-10-12): part 1 in plain words, part 2 to restart the work.
-pub const DEFAULT_TEMPLATE: &str = "# Handoff
-
-## For anyone, in plain words
-
-- **What was being done:**
-- **Where it stopped:**
-- **Verified, and not verified yet:**
-- **Waiting on whom:**
-- **The next step (one):**
-
-## Restart details
-
-- **Checkout:** <!-- worktree, branch, last commit, pushed or not -->
-- **Uncommitted changes:** <!-- file, and why; or none -->
-- **Running:** <!-- what, port, how to restart it, safe to stop; or none -->
-- **Approvals in force:** <!-- what is approved, and what is not -->
-- **Already done, do not repeat:** <!-- operations with an outside effect that must not run twice (an email sent, a deployment, SQL applied, a hosted resource or remote created or changed); or none -->
-
-<!-- Keep each line short. Evidence (numbers, logs, versions) goes in the task's description, not here. -->
-";
+/// Their template, which went with them.
+pub const OLD_TEMPLATE_FILE: &str = "handoff-template.md";
 
 /// What `alm next` and `alm show` add when they show a task's handoff (Task-A03-23, approver
 /// 2026-10-16): the rules for the one taking over, not only for the one writing. `alm` checks
 /// nothing itself; the agent does ("alm tells; the agent checks").
 pub const TAKING_OVER: &str = "Taking over from a handoff:
-1. Check the real state before trusting the handoff: the working copy, branch and running processes it names (as your version control tool shows them; in Git: `git worktree list`, `git status -sb`; and listening ports). What the previous session still holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the question with `alm wait`).
-2. What the handoff lists as already done is not done again. A change of agent, account or session keeps the approvals and what was done; it does not authorize repeating it.
+1. Check the real state before trusting the handoff note: the working copy, branch and running processes it names (as your version control tool shows them; in Git: `git worktree list`, `git status -sb`; and listening ports). What the previous session still holds is not yours to change or remove; if unsure, ask the person (in a quiet run, park the question with `alm wait`).
+2. What the task's Evidence lists as already done is not done again. A change of agent, account or session keeps the approvals and what was done; it does not authorize repeating it.
 ";
 
 /// The default `project-notes.md`.
@@ -170,298 +146,94 @@ fn notes_section(text: &str, name: &str) -> Option<String> {
     Some(body.join("\n").trim().to_string())
 }
 
-/// One handoff file.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Handoff {
-    /// Path relative to the taskbag, `handoffs/<name>.md`.
-    pub file: String,
-    /// The session or person who wrote it.
-    pub writer: String,
-    /// The tasks it covers; empty for a session with no task.
-    pub tasks: Vec<String>,
-    /// When it was first written and last changed, `YYYY-MM-DDTHH:MMZ` (UTC).
-    pub written: String,
-    pub updated: String,
-    /// The first line that says something, for lists.
-    pub summary: String,
-    /// The text below the header.
-    pub body: String,
-}
-
-/// The project's template; the default when the file is missing.
-pub fn template(root: &Path) -> String {
-    crate::read_text(&root.join(TEMPLATE_FILE)).unwrap_or_else(|_| DEFAULT_TEMPLATE.to_string())
-}
-
-/// Replace the project's template. An empty text is refused.
-pub fn set_template(root: &Path, text: &str) -> Result<(), Problem> {
-    if text.trim().is_empty() {
-        return Err(Problem::TemplateEmpty);
-    }
-    let lock = Lock::acquire(root, LOCK_WAIT)?;
-    let mut text = text.to_string();
-    if !text.ends_with('\n') {
-        text.push('\n');
-    }
-    write_atomic(&lock.root().join(TEMPLATE_FILE), &text)
-}
-
-/// Every handoff, most recently changed first.
-pub fn list(root: &Path) -> Vec<Handoff> {
-    let mut all: Vec<Handoff> = fs::read_dir(root.join(HANDOFFS_DIR))
+/// The handoff files an older taskbag keeps in `handoffs/` (Task-A03-polar770): their paths
+/// relative to the taskbag (`handoffs/<name>.md`), sorted. Empty when there is no such folder or
+/// it holds no files (a `.keep` and other hidden files do not count). Their contents are not
+/// read: whether they are still useful is the agent's to check ("alm tells; the agent checks").
+pub fn legacy(root: &Path) -> Vec<String> {
+    let mut files: Vec<String> = fs::read_dir(root.join(HANDOFFS_DIR))
         .into_iter()
         .flatten()
         .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
-        .filter_map(|p| {
-            let text = fs::read_to_string(&p).ok()?;
-            let name = p.file_name()?.to_str()?.to_string();
-            Some(parse(&format!("{HANDOFFS_DIR}/{name}"), &text))
-        })
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| e.file_name().to_str().map(String::from))
+        .filter(|name| !name.starts_with('.'))
+        .map(|name| format!("{HANDOFFS_DIR}/{name}"))
         .collect();
-    all.sort_by(|a, b| b.updated.cmp(&a.updated).then(b.file.cmp(&a.file)));
-    all
+    files.sort();
+    files
 }
 
-/// The most recent handoff that names `task`.
-pub fn latest_for(root: &Path, task: &str) -> Option<Handoff> {
-    list(root)
-        .into_iter()
-        .find(|h| h.tasks.iter().any(|t| t == task))
-}
+/// Changes when the text of [`agent_move_handoffs_request_in`] changes.
+pub const MOVE_HANDOFFS_REQUEST_VERSION: u32 = 1;
 
-/// Read one handoff file: a header between `---` lines (`writer:`, `tasks:`, `written:`,
-/// `updated:`), then the text. A file without a header is all text, by an unknown writer.
-/// `\r\n` line endings (a checkout on Windows) read the same as `\n`.
-pub fn parse(file: &str, text: &str) -> Handoff {
-    let text = &crate::lf(text);
-    let mut h = Handoff {
-        file: file.to_string(),
-        writer: String::new(),
-        tasks: Vec::new(),
-        written: String::new(),
-        updated: String::new(),
-        summary: String::new(),
-        body: text.to_string(),
-    };
-    if let Some(rest) = text.strip_prefix("---\n") {
-        if let Some(end) = rest.find("\n---\n") {
-            for line in rest[..end].lines() {
-                let Some((key, value)) = line.split_once(':') else {
-                    continue;
-                };
-                let value = value.trim();
-                match key.trim() {
-                    "writer" => h.writer = value.to_string(),
-                    "tasks" => {
-                        h.tasks = value
-                            .split(',')
-                            .map(str::trim)
-                            .filter(|t| !t.is_empty())
-                            .map(String::from)
-                            .collect()
-                    }
-                    "written" => h.written = value.to_string(),
-                    "updated" => h.updated = value.to_string(),
-                    _ => {}
-                }
-            }
-            h.body = rest[end + 5..].trim_start_matches('\n').to_string();
-        }
-    }
-    if h.updated.is_empty() {
-        h.updated = h.written.clone();
-    }
-    h.summary = summary(&h.body);
-    h
-}
-
-/// The first line with something in it: not a heading, not a comment, not an empty template field
-/// (a hint in `<!-- -->` does not count).
-fn summary(body: &str) -> String {
-    body.lines()
-        .map(without_comments)
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(|l| l.trim_start_matches(['-', '*', ' ']).to_string())
-        .map(|l| {
-            // "**What was being done:** baking" → "What was being done: baking"
-            l.replace("**", "")
-        })
-        .find(|l| !l.ends_with(':'))
-        .unwrap_or_default()
-}
-
-/// `line` without `<!-- … -->` parts.
-fn without_comments(line: &str) -> String {
-    let mut out = String::new();
-    let mut rest = line;
-    while let Some(start) = rest.find("<!--") {
-        out.push_str(&rest[..start]);
-        match rest[start..].find("-->") {
-            Some(end) => rest = &rest[start + end + 3..],
-            None => return out,
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
-fn header(h: &Handoff) -> String {
-    format!(
-        "---\nwriter: {}\ntasks: {}\nwritten: {}\nupdated: {}\n---\n\n",
-        h.writer,
-        h.tasks.join(", "),
-        h.written,
-        h.updated
-    )
-}
-
-/// What [`write`] did.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Written {
-    pub handoff: Handoff,
-    /// The full path, for the agent to open and fill in.
-    pub path: PathBuf,
-    /// False when this session's file was there already and was updated.
-    pub created: bool,
-}
-
-/// Write `writer`'s handoff (`alm handoff`, the app's form). The session's newest file is updated
-/// when it has one, otherwise a new file is made from the template. `fresh`: always a new file (a
-/// person writing in the app has no session; each handoff is its own). `tasks`: replaces the list of
-/// tasks it covers (each must exist); `body`: replaces the text. With neither, a new file gets the
-/// template and an existing one only its time.
-pub fn write(
-    root: &Path,
-    writer: &str,
-    tasks: Option<&[String]>,
-    body: Option<&str>,
-    known_tasks: &[String],
-    fresh: bool,
-) -> Result<Written, Problem> {
-    let writer = writer.trim();
-    if writer.is_empty() {
-        return Err(Problem::HolderMissing);
-    }
-    if let Some(missing) = tasks
-        .unwrap_or_default()
+/// What **Update the taskbag…** asks when an older taskbag still keeps handoff files in
+/// `handoffs/` (Task-A03-polar770, approver 2026-10-22: "legacy handoff folder should trigger a
+/// taskbag update"), in an interface language (`en`, `zh-CN`, `ja`; English otherwise): write what
+/// is still useful in each file into the tasks it names (`alm handoff`, evidence with
+/// `alm describe`), skip tasks that are done or dropped, then remove the files and the folder,
+/// after the person's Go ahead in the app. `files`: [`legacy`]'s list.
+pub fn agent_move_handoffs_request_in(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    files: &[String],
+) -> String {
+    let header = crate::convert::migration_header_in(language, project, taskbag);
+    let version = MOVE_HANDOFFS_REQUEST_VERSION;
+    let folder = crate::tidy(taskbag).join(HANDOFFS_DIR);
+    let folder = crate::shown(&folder);
+    let list: String = files
         .iter()
-        .find(|t| !known_tasks.contains(t))
-    {
-        return Err(Problem::TaskNotFound {
-            id: missing.clone(),
-        });
-    }
-    let lock = Lock::acquire(root, LOCK_WAIT)?;
-    let now = utc_now();
-    let existing = list(lock.root())
-        .into_iter()
-        .find(|h| !fresh && h.writer == writer);
-    let created = existing.is_none();
-    let mut h = match existing {
-        Some(h) => h,
-        None => Handoff {
-            file: free_name(
-                lock.root(),
-                &format!("{}-{}", file_stamp(&now), slug(writer)),
-            ),
-            writer: writer.to_string(),
-            tasks: Vec::new(),
-            written: now.clone(),
-            updated: now.clone(),
-            summary: String::new(),
-            body: template(lock.root()),
-        },
-    };
-    if let Some(tasks) = tasks {
-        h.tasks = tasks.to_vec();
-    }
-    if let Some(body) = body {
-        h.body = body.to_string();
-    }
-    if !h.body.ends_with('\n') {
-        h.body.push('\n');
-    }
-    h.updated = now;
-    h.summary = summary(&h.body);
-    let path = lock.root().join(&h.file);
-    let dir = lock.root().join(HANDOFFS_DIR);
-    fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
-    write_atomic(&path, &format!("{}{}", header(&h), h.body))?;
-    Ok(Written {
-        handoff: h,
-        path,
-        created,
-    })
-}
+        .map(|f| format!("- `{f}`"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    let template = OLD_TEMPLATE_FILE;
+    match language {
+        "zh-CN" => format!(
+            "请把这个任务包里旧的交接文件搬进各自的任务，然后删掉它们（搬交接请求 v{version}）。
 
-/// Remove a handoff whose work is finished (`alm handoff --remove`, Task-A03-13). `file` is its
-/// name as `alm handoffs` prints it (`handoffs/<name>.md`) or just `<name>.md`. The file is
-/// deleted; Git history keeps it (owner, 2026-10-13).
-pub fn remove(root: &Path, file: &str) -> Result<Handoff, Problem> {
-    let name = file.trim();
-    let name = name
-        .strip_prefix(&format!("{HANDOFFS_DIR}/"))
-        .unwrap_or(name);
-    let missing = || Problem::HandoffNotFound {
-        file: file.to_string(),
-    };
-    if name.is_empty()
-        || name.contains(['/', '\\'])
-        || name.starts_with('.')
-        || !name.ends_with(".md")
-    {
-        return Err(missing());
-    }
-    let lock = Lock::acquire(root, LOCK_WAIT)?;
-    let path = lock.root().join(HANDOFFS_DIR).join(name);
-    let text = fs::read_to_string(&path).map_err(|_| missing())?;
-    fs::remove_file(&path).map_err(|e| write_failed(&path, e))?;
-    crate::note_written(&path);
-    Ok(parse(&format!("{HANDOFFS_DIR}/{name}"), &text))
-}
+{header}
 
-/// `handoffs/<base>.md`, or `<base>-2.md`, … when that is taken.
-fn free_name(root: &Path, base: &str) -> String {
-    let mut n = 1;
-    loop {
-        let name = if n == 1 {
-            format!("{base}.md")
-        } else {
-            format!("{base}-{n}.md")
-        };
-        if !root.join(HANDOFFS_DIR).join(&name).exists() {
-            return format!("{HANDOFFS_DIR}/{name}");
-        }
-        n += 1;
-    }
-}
+交接现在直接写在任务里：`alm handoff <id> --as <会话名> --text \"<停在哪里、下一步、在等谁>\"`（或 `--from <file.md>`），证据加 `--evidence \"<不可重复执行的操作>\"`。任务包的 `{folder}` 文件夹里还有这些旧的交接文件：
 
-/// A writer's name as part of a file name: `claude/a03-06` → `claude-a03-06`.
-fn slug(writer: &str) -> String {
-    let s: String = writer
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    let s = s.trim_matches('-').to_string();
-    if s.is_empty() {
-        "session".to_string()
-    } else {
-        s
-    }
-}
+{list}
+1. 逐个读这些文件，对照它点名的每个任务（`alm show <id>`）和真实状态（工作副本、分支、正在运行的进程）。`alm` 不判断内容，由你检查。
+2. 每个任务，只把仍然有用、任务里还没有的内容写进去：停在哪里和下一步用 `alm handoff`，已经做过、不能再做的对外操作写进描述的 **Evidence**（`alm handoff --evidence`，或 `alm describe`）。任务已完成或已放弃的，不用写。过时的内容不要搬。
+3. 然后删掉这些文件、`{template}`（如果有）和 `{folder}` 文件夹，用你的版本控制工具保存并共享。
+4. 先用 `alm confirm` 在 Allomos 应用里给用户看完整计划（每个文件写进哪个任务、写什么，哪些不搬）。用户选择“继续”之前，什么都不要改。
+"
+        ),
+        "ja" => format!(
+            "このタスクバッグに残っている古い引き継ぎファイルを、それぞれのタスクに移してから削除してください（引き継ぎの移し入れの依頼 v{version}）。
 
-/// `2026-10-12T11:30Z` → `2026-10-12-1130`.
-fn file_stamp(stamp: &str) -> String {
-    stamp.replace('T', "-").replace([':', 'Z'], "")
+{header}
+
+引き継ぎは今、タスクそのものに書きます：`alm handoff <id> --as <セッション名> --text \"<どこで止まったか、次の一歩、誰を待っているか>\"`（または `--from <file.md>`）。証拠は `--evidence \"<繰り返してはいけない操作>\"` で加えます。タスクバッグの `{folder}` フォルダーには、まだ次の古い引き継ぎファイルがあります：
+
+{list}
+1. ファイルを一つずつ読み、名前の挙がっている各タスク（`alm show <id>`）と実際の状態（作業コピー、ブランチ、動いているプロセス）と照らし合わせます。`alm` は内容を判断しません。確かめるのはあなたです。
+2. タスクごとに、まだ役に立ち、タスクにまだ書かれていないことだけを書きます：どこで止まったかと次の一歩は `alm handoff`、すでに行った、繰り返してはいけない外部への操作は説明の **Evidence**（`alm handoff --evidence`、または `alm describe`）に。完了または取りやめたタスクには書きません。古くなった内容は移しません。
+3. それからこれらのファイル、`{template}`（あれば）と `{folder}` フォルダーを削除し、バージョン管理ツールで保存して共有します。
+4. まず `alm confirm` で計画全体（どのファイルをどのタスクに何を書くか、何を移さないか）を Allomos アプリでユーザーに見せます。ユーザーが「進める」を選ぶまで何も変えないでください。
+"
+        ),
+        _ => format!(
+            "Please move this taskbag's old handoff files into their tasks, then remove them (move-handoffs request v{version}).
+
+{header}
+
+A handoff is now written into the task itself: `alm handoff <id> --as <session name> --text \"<where it stopped, the next step, who it waits on>\"` (or `--from <file.md>`), with `--evidence \"<operations that must not run twice>\"` for evidence. The taskbag's `{folder}` folder still holds these old handoff files:
+
+{list}
+1. Read each file and compare it with every task it names (`alm show <id>`) and with the real state (working copies, branches, running processes). `alm` judges nothing in them: you check.
+2. For each task, write in only what is still useful and not in the task yet: where it stopped and the next step with `alm handoff`; operations with an outside effect that were done and must not run twice under the description's **Evidence** (`alm handoff --evidence`, or `alm describe`). Write nothing for a task that is done or dropped. Do not move what is out of date.
+3. Then remove these files, `{template}` (if there is one) and the `{folder}` folder, and save and share that with your version control tool.
+4. First show the whole plan to the person in the Allomos app with `alm confirm` (which file goes into which task and what it says, and what is not moved). Change nothing until the person chooses Go ahead.
+"
+        ),
+    }
 }
 
 /// Now, in UTC, as `YYYY-MM-DDTHH:MMZ`. Tests may fix it with `ALLOMOS_NOW`.
@@ -516,18 +288,31 @@ mod tests {
         assert_eq!(civil_from_days(0), (1970, 1, 1));
         assert_eq!(civil_from_days(20_738), (2026, 10, 12));
         assert_eq!(civil_from_days(11_016), (2000, 2, 29));
-        assert_eq!(file_stamp("2026-10-12T11:30Z"), "2026-10-12-1130");
-        assert_eq!(slug("claude/a03-06 handoffs"), "claude-a03-06-handoffs");
     }
 
+    /// Task-A03-polar770: a new taskbag has project notes, and no handoff files or template.
     #[test]
-    fn init_makes_the_template_notes_and_folder() {
+    fn init_makes_the_notes_and_no_handoff_files() {
         let root = tmp("init");
         init(&root, "p", "P").unwrap();
-        assert_eq!(template(&root), DEFAULT_TEMPLATE);
         assert!(root.join(NOTES_FILE).is_file());
-        assert!(root.join(HANDOFFS_DIR).join(".keep").is_file());
-        assert!(list(&root).is_empty());
+        assert!(!root.join(HANDOFFS_DIR).exists());
+        assert!(!root.join(OLD_TEMPLATE_FILE).exists());
+        assert!(legacy(&root).is_empty());
+    }
+
+    /// Task-A03-polar770: an older taskbag's handoff files are found, not read; `.keep` and an
+    /// empty folder do not count.
+    #[test]
+    fn old_handoff_files_are_found() {
+        let root = tmp("legacy");
+        init(&root, "p", "P").unwrap();
+        fs::create_dir_all(root.join(HANDOFFS_DIR)).unwrap();
+        fs::write(root.join(HANDOFFS_DIR).join(".keep"), "").unwrap();
+        assert!(legacy(&root).is_empty());
+        fs::write(root.join(HANDOFFS_DIR).join("b.md"), "x").unwrap();
+        fs::write(root.join(HANDOFFS_DIR).join("a.md"), "not even a header").unwrap();
+        assert_eq!(legacy(&root), ["handoffs/a.md", "handoffs/b.md"]);
     }
 
     #[test]
@@ -611,119 +396,12 @@ mod tests {
         assert_eq!(project_notes(&root).repositories, None);
     }
 
-    #[test]
-    fn one_file_per_session_covering_several_tasks() {
-        let root = tmp("write");
-        init(&root, "p", "P").unwrap();
-        let known = vec!["A1-01".to_string(), "A1-02".to_string()];
-        let first = write(&root, "claude/run", None, None, &known, false).unwrap();
-        assert!(first.created);
-        assert!(
-            first.handoff.file.starts_with("handoffs/")
-                && first.handoff.file.ends_with("-claude-run.md")
-        );
-        let text = fs::read_to_string(&first.path).unwrap();
-        assert!(
-            text.starts_with("---\nwriter: claude/run\ntasks: \n"),
-            "{text}"
-        );
-        assert!(text.contains("## For anyone, in plain words"));
-
-        // The same session again: the same file, now covering two tasks with its own words.
-        let body = "# Handoff\n\n- **What was being done:** baking bread\n";
-        let again = write(&root, "claude/run", Some(&known), Some(body), &known, false).unwrap();
-        assert!(!again.created);
-        assert_eq!(again.path, first.path);
-        assert_eq!(again.handoff.summary, "What was being done: baking bread");
-        assert_eq!(list(&root).len(), 1);
-        assert_eq!(latest_for(&root, "A1-02").unwrap().writer, "claude/run");
-
-        // Another session: its own file; a task it does not name keeps the older handoff.
-        write(&root, "codex/x", Some(&known[..1]), None, &known, false).unwrap();
-        assert_eq!(list(&root).len(), 2);
-        assert_eq!(latest_for(&root, "A1-02").unwrap().writer, "claude/run");
-        assert_eq!(latest_for(&root, "A9-99"), None);
-
-        // Unknown tasks and nameless writers are refused.
-        let bad = ["A9-99".to_string()];
-        assert_eq!(
-            write(&root, "codex/x", Some(&bad), None, &known, false)
-                .unwrap_err()
-                .code(),
-            "task_not_found"
-        );
-        assert_eq!(
-            write(&root, " ", None, None, &known, false)
-                .unwrap_err()
-                .code(),
-            "holder_missing"
-        );
-    }
-
-    #[test]
-    fn a_handoff_is_removed_and_others_stay() {
-        let root = tmp("remove");
-        init(&root, "p", "P").unwrap();
-        let known = vec!["A1-01".to_string(), "A1-02".to_string()];
-        let both = write(&root, "claude/both", Some(&known), None, &known, false).unwrap();
-        write(&root, "codex/one", Some(&known[..1]), None, &known, false).unwrap();
-        write(&root, "codex/none", None, None, &known, false).unwrap();
-
-        // Removed by its listed name or its bare name; then it is gone from the list.
-        let gone = remove(&root, &both.handoff.file).unwrap();
-        assert_eq!(gone.writer, "claude/both");
-        assert!(!both.path.exists());
-        assert_eq!(list(&root).len(), 2);
-        let name = list(&root)[0]
-            .file
-            .trim_start_matches("handoffs/")
-            .to_string();
-        remove(&root, &name).unwrap();
-        assert_eq!(list(&root).len(), 1);
-
-        // Missing files and anything outside handoffs/ are refused.
-        for bad in [
-            &both.handoff.file[..],
-            "../project.json",
-            "handoffs/.keep",
-            "x.json",
-            "",
-        ] {
-            assert_eq!(
-                remove(&root, bad).unwrap_err().code(),
-                "handoff_not_found",
-                "{bad}"
-            );
-        }
-        assert!(root.join("project.json").is_file());
-    }
-
-    #[test]
-    fn a_person_writes_a_new_handoff_each_time() {
-        let root = tmp("fresh");
-        init(&root, "p", "P").unwrap();
-        let a = write(&root, "will", None, Some("one"), &[], true).unwrap();
-        let b = write(&root, "will", None, Some("two"), &[], true).unwrap();
-        assert!(a.created && b.created);
-        assert_ne!(a.path, b.path);
-        assert_eq!(list(&root).len(), 2);
-    }
-
-    /// The template asks for what must not run twice (Task-A03-23).
-    #[test]
-    fn the_template_lists_what_was_already_done() {
-        let restart = DEFAULT_TEMPLATE.split("## Restart details").nth(1).unwrap();
-        assert!(restart.contains("- **Already done, do not repeat:**"));
-        assert!(restart.contains("must not run twice"));
-        assert!(restart.contains("or none"));
-    }
-
     /// The taking-over rules, in plain words (Task-A03-23).
     #[test]
     fn the_taking_over_rules_say_check_and_do_not_repeat() {
         let flat = TAKING_OVER.split_whitespace().collect::<Vec<_>>().join(" ");
         for words in [
-            "Check the real state before trusting the handoff",
+            "Check the real state before trusting the handoff note",
             "git worktree list",
             "listening ports",
             "still holds is not yours to change or remove",
@@ -736,28 +414,21 @@ mod tests {
     }
 
     #[test]
-    fn an_unfilled_template_has_no_summary() {
-        assert_eq!(summary(DEFAULT_TEMPLATE), "");
-        let half = DEFAULT_TEMPLATE.replace("- **Running:** <!--", "- **Running:** oven on <!--");
-        assert_eq!(summary(&half), "Running: oven on");
-    }
-
-    #[test]
-    fn a_file_without_a_header_is_still_listed() {
-        let h = parse("handoffs/old.md", "Stopped at the oven.\n");
-        assert_eq!(h.summary, "Stopped at the oven.");
-        assert!(h.tasks.is_empty() && h.writer.is_empty());
-    }
-
-    #[test]
-    fn the_template_can_be_replaced_but_not_emptied() {
-        let root = tmp("template");
+    fn the_move_handoffs_request_lists_the_files_and_waits_for_go_ahead() {
+        let root = tmp("request");
         init(&root, "p", "P").unwrap();
-        set_template(&root, "# Ours\n\n- Where:").unwrap();
-        assert_eq!(template(&root), "# Ours\n\n- Where:\n");
-        assert_eq!(
-            set_template(&root, "  \n").unwrap_err().code(),
-            "template_empty"
-        );
+        let files = ["handoffs/a.md".to_string()];
+        for language in ["en", "zh-CN", "ja"] {
+            let r = agent_move_handoffs_request_in(language, root.parent().unwrap(), &root, &files);
+            for words in [
+                "`handoffs/a.md`",
+                "alm handoff <id> --as",
+                "--evidence",
+                "alm confirm",
+                "handoff-template.md",
+            ] {
+                assert!(r.contains(words), "{language}: {words}\n{r}");
+            }
+        }
     }
 }

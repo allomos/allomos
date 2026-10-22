@@ -1,7 +1,8 @@
 //! What **Update the taskbag…** asks an agent to do, as one request (approver 2026-10-17: one
-//! request covers every update due). The taskbag needs updating only in three cases (approver
+//! request covers every update due). The taskbag needs updating only in these cases (approver
 //! 2026-10-18, Task-A03-27): card files kept outside the taskbag, an older taskbag whose tasks are
-//! moved into a new one, and an out-of-date Allomos section in the project's instruction files.
+//! moved into a new one, an out-of-date Allomos section in the project's instruction files, and
+//! old handoff files in `handoffs/` (Task-A03-polar770, approver 2026-10-22).
 //! An agent not yet listed under `## Agents set up` is not one of them: each agent registers itself
 //! when it starts work (the standing rules in AGENTS.md, `alm guide agent-files`).
 
@@ -9,13 +10,15 @@ use std::path::Path;
 
 use crate::cards;
 use crate::convert::{agent_convert_request_in, agent_move_in_request_in};
+use crate::handoff;
 use crate::versions;
 
 /// The request, in an interface language (`en`, `zh-CN`, `ja`; English otherwise):
 /// - an older taskbag's tasks to move in ([`agent_move_in_request_in`], which renews the section
 ///   too); else
 /// - an out-of-date section ([`versions::agent_update_request_in`]), card files kept outside the
-///   taskbag ([`cards::agent_move_cards_request_in`]) when some are known, and, for a taskbag with
+///   taskbag ([`cards::agent_move_cards_request_in`]) when some are known, old handoff files
+///   ([`handoff::agent_move_handoffs_request_in`]) when there are some, and, for a taskbag with
 ///   no tasks yet, looking for the tasks the project already keeps ([`agent_convert_request_in`];
 ///   approver 2026-10-19: the wizard's step 4 asks for it), each that applies; else
 /// - with none of them: card files no link names (the move-cards request). File → Update the
@@ -26,12 +29,16 @@ pub fn agent_update_taskbag_request_in(language: &str, project: &Path, taskbag: 
     }
     let section = versions::check_connected(taskbag).filter(|c| !c.outdated_files().is_empty());
     let cards = !cards::outside(taskbag).is_empty();
+    let handoffs = handoff::legacy(taskbag);
     let no_tasks = crate::load(taskbag)
         .taskbag
         .is_some_and(|bag| bag.tasks.is_empty());
     let parts: Vec<String> = [
         section.map(|c| versions::agent_update_request_in(language, project, taskbag, &c)),
         cards.then(|| cards::agent_move_cards_request_in(language, project, taskbag)),
+        (!handoffs.is_empty()).then(|| {
+            handoff::agent_move_handoffs_request_in(language, project, taskbag, &handoffs)
+        }),
         no_tasks.then(|| agent_convert_request_in(language, project, taskbag)),
     ]
     .into_iter()
@@ -126,5 +133,14 @@ mod tests {
             "{r}"
         );
         assert!(r.contains("\n---\n"), "{r}");
+        // Old handoff files: their request too (Task-A03-polar770).
+        assert!(!r.contains("move-handoffs request"), "{r}");
+        fs::create_dir_all(tb.join("handoffs")).unwrap();
+        fs::write(tb.join("handoffs/old.md"), "x").unwrap();
+        let r = agent_update_taskbag_request_in("en", &p, &tb);
+        assert!(
+            r.contains("move-handoffs request") && r.contains("`handoffs/old.md`"),
+            "{r}"
+        );
     }
 }

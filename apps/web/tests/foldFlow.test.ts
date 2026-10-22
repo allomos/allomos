@@ -4,9 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { foldStorageKey, parseKeys, setKeys, toggleKey, visibleItems, withKey, withoutKey } from "../src/foldFlow.ts";
 
-test("each project and each list has its own storage key", () => {
+test("each project has its own storage key", () => {
   assert.notEqual(foldStorageKey("/p/one", "groups"), foldStorageKey("/p/two", "groups"));
-  assert.notEqual(foldStorageKey("/p/one", "groups"), foldStorageKey("/p/one", "handoffs"));
 });
 
 test("remembered keys survive a round trip; unreadable storage counts as nothing", () => {

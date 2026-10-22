@@ -438,36 +438,25 @@ enum Command {
         #[arg(long)]
         clear: bool,
     },
-    /// Show the project's handoff template, or replace it with --set.
-    #[command(name = "handoff-template")]
-    HandoffTemplate {
-        #[arg(long, value_name = "FILE")]
-        set: Option<PathBuf>,
-    },
-    /// Write this session's handoff (--as): made from the template the first time, the same file
-    /// later. Prints its path; fill it in, or pass --from.
+    /// Hand a task off (--as your session): its handoff note becomes this text (where it stopped,
+    /// the one next step, who it waits on), --evidence is added under its description's Evidence,
+    /// and its history records who handed it off. Several tasks: once for each.
     Handoff {
-        /// The tasks it covers, separated by commas.
-        #[arg(long, value_name = "ID,ID")]
-        tasks: Option<String>,
-        /// A Markdown file with the handoff's text.
+        id: String,
+        /// The handoff note's text.
+        #[arg(
+            long,
+            value_name = "TEXT",
+            conflicts_with = "from",
+            required_unless_present = "from"
+        )]
+        text: Option<String>,
+        /// A Markdown file with the handoff note's text.
         #[arg(long, value_name = "FILE")]
         from: Option<PathBuf>,
-        /// Remove this handoff (as `alm handoffs` names it) once all its tasks are finished.
-        #[arg(long, value_name = "FILE", conflicts_with_all = ["tasks", "from"])]
-        remove: Option<String>,
-    },
-    /// List handoffs, newest first.
-    Handoffs {
-        /// Only those that name this task.
-        #[arg(long, value_name = "ID")]
-        task: Option<String>,
-        /// Only the newest one.
-        #[arg(long)]
-        latest: bool,
-        /// Only the rule for checking the handoffs yourself and removing finished ones.
-        #[arg(long, conflicts_with = "latest")]
-        check: bool,
+        /// What was done that must not run twice (an outside effect), for the description's Evidence.
+        #[arg(long, value_name = "TEXT")]
+        evidence: Option<String>,
     },
 }
 
@@ -617,6 +606,7 @@ impl Command {
             | Command::Title { id, .. }
             | Command::Describe { id, .. }
             | Command::Note { id, .. }
+            | Command::Handoff { id, .. }
             | Command::Card { id, .. }
             | Command::Drop { id }
             | Command::Reopen { id, .. } => Some(id),
@@ -634,9 +624,6 @@ impl Command {
             | Command::Human { .. }
             | Command::MoveIn { .. }
             | Command::HandoffRules { .. }
-            | Command::HandoffTemplate { .. }
-            | Command::Handoff { .. }
-            | Command::Handoffs { .. }
             | Command::Cards { .. }
             | Command::Next { .. } => None,
         }
@@ -663,9 +650,6 @@ impl Command {
         {
             return quota.is_some() || context.is_some() || write_when.is_some() || *clear;
         }
-        if let Command::HandoffTemplate { set } = self {
-            return set.is_some();
-        }
         if let Command::Cards { what } = self {
             return what.is_some();
         }
@@ -681,7 +665,6 @@ impl Command {
                 | Command::Brief
                 | Command::Quota { .. }
                 | Command::Guide { .. }
-                | Command::Handoffs { .. }
                 | Command::MoveIn { .. }
         )
     }
@@ -737,9 +720,7 @@ impl Command {
             Command::Next { .. } => "next",
             Command::MoveIn { .. } => "move-in",
             Command::HandoffRules { .. } => "handoff-rules",
-            Command::HandoffTemplate { .. } => "handoff-template",
             Command::Handoff { .. } => "handoff",
-            Command::Handoffs { .. } => "handoffs",
         }
     }
 }
@@ -1550,24 +1531,6 @@ fn iteration_heading(it: &Iteration) -> String {
     s
 }
 
-/// One line about a handoff: file, writer, when, tasks, and its first line.
-fn handoff_line(h: &handoff::Handoff) -> String {
-    let tasks = if h.tasks.is_empty() {
-        "no task".to_string()
-    } else {
-        h.tasks.join(", ")
-    };
-    format!(
-        "handoff: {} ({}, {}, {}): {}\n",
-        h.file, h.writer, h.updated, tasks, h.summary
-    )
-}
-
-/// A handoff for `--json` lists: everything but its text.
-fn handoff_brief(h: &handoff::Handoff) -> Value {
-    json!({ "file": h.file, "writer": h.writer, "tasks": h.tasks, "written": h.written, "updated": h.updated, "summary": h.summary })
-}
-
 /// When to write a handoff, for the agent that asked.
 /// The project notes for `alm next`: where they are, the day they last changed, then their
 /// Running and Pitfalls sections as written (Task-A03-20).
@@ -2050,10 +2013,6 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     part(g.context_gate)
                 ));
             }
-            text.push_str(&format!(
-                "Template: {}\n",
-                root.join(handoff::TEMPLATE_FILE).display()
-            ));
             let mut done = Done::new(
                 json!({ "taskbag": root, "handoff_rules": rules, "applied": applied }),
                 text,
@@ -2061,105 +2020,46 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::HandoffTemplate { set } => {
-            let root = locate(cli, cwd)?;
-            if let Some(file) = set {
-                let file = cwd.join(file);
-                let text = read_text(&file).map_err(|e| Problem::ReadFailed {
-                    detail: format!("{}: {e}", file.display()),
-                })?;
-                handoff::set_template(&root, &text)?;
-            }
-            let text = handoff::template(&root);
-            Ok(Done::new(
-                json!({ "taskbag": root, "template": text, "path": root.join(handoff::TEMPLATE_FILE) }),
-                text,
-            ))
-        }
         Command::Handoff {
-            remove: Some(file), ..
+            id,
+            text,
+            from,
+            evidence,
         } => {
             let root = locate(cli, cwd)?;
-            let gone = handoff::remove(&root, file)?;
-            Ok(Done::new(
-                json!({ "taskbag": root, "removed": handoff_brief(&gone) }),
-                format!("Removed the handoff {}.\n", gone.file),
-            ))
-        }
-        Command::Handoff { tasks, from, .. } => {
-            let root = locate(cli, cwd)?;
-            let me = me.ok_or(Problem::HolderMissing)?;
-            let (bag, issues) = taskbag_of(&root, load(&root))?;
-            let known: Vec<String> = bag.tasks.iter().map(|t| t.id.clone()).collect();
-            let tasks: Option<Vec<String>> = tasks.as_ref().map(|list| {
-                list.split(',')
-                    .map(str::trim)
-                    .filter(|t| !t.is_empty())
-                    .map(String::from)
-                    .collect()
-            });
-            let body = match from {
+            let note = match from {
                 Some(file) => {
                     let file = cwd.join(file);
-                    Some(read_text(&file).map_err(|e| Problem::ReadFailed {
+                    read_text(&file).map_err(|e| Problem::ReadFailed {
                         detail: format!("{}: {e}", file.display()),
-                    })?)
+                    })?
                 }
-                None => None,
+                None => text.clone().unwrap_or_default(),
             };
-            let w = handoff::write(&root, me, tasks.as_deref(), body.as_deref(), &known, false)?;
+            let now = handoff::utc_now();
+            let day = now.get(..10).unwrap_or(&now);
+            let changed = allomos_store::change_task(&root, Actor::alm(me), lock_wait(), |bag| {
+                ops::hand_off(bag, id, me, &note, evidence.as_deref(), day).map(|o| (o, "handoff"))
+            })?;
             let notes = handoff::project_notes(&root);
             let text = format!(
-                "{} {}\n{}{}",
-                if w.created {
-                    "Started this session's handoff:"
-                } else {
-                    "Updated this session's handoff:"
-                },
-                w.path.display(),
-                if body.is_none() {
-                    "Fill it in, in plain words first, for any reader. Evidence goes in the task's description (alm describe).\n"
+                "{}\nHanded off: its handoff note is set{}; `alm show {}` shows it.\n{}",
+                task_line(&changed.task),
+                if evidence.is_some() {
+                    " and the evidence is under its description's Evidence"
                 } else {
                     ""
                 },
+                changed.task.id,
                 notes_reminder(&notes)
             );
             let mut done = Done::new(
-                json!({ "taskbag": root, "handoff": w.handoff, "path": w.path, "created": w.created, "project_notes": notes }),
+                json!({ "taskbag": root, "task": task_json(&changed.task), "project_notes": notes }),
                 text,
             );
-            done.issues = issues;
+            done.warnings = changed.warnings;
+            done.issues = changed.issues;
             Ok(done)
-        }
-        Command::Handoffs {
-            task, check: true, ..
-        } => {
-            // Only the rule: the agent gets the list and checks it itself (owner, 2026-10-13).
-            let root = locate(cli, cwd)?;
-            let instruction = check_rule(task.as_deref());
-            Ok(Done::new(
-                json!({ "taskbag": root, "instruction": instruction }),
-                instruction,
-            ))
-        }
-        Command::Handoffs { task, latest, .. } => {
-            let root = locate(cli, cwd)?;
-            let mut all = handoff::list(&root);
-            if let Some(task) = task {
-                all.retain(|h| h.tasks.iter().any(|t| t == task));
-            }
-            if *latest {
-                all.truncate(1);
-            }
-            let text = if all.is_empty() {
-                "No handoffs.\n".to_string()
-            } else {
-                all.iter().map(handoff_line).collect()
-            };
-            Ok(Done::new(
-                json!({ "taskbag": root, "handoffs": all.iter().map(handoff_brief).collect::<Vec<_>>() }),
-                text,
-            ))
         }
         Command::MoveIn { language } => {
             let root = locate(cli, cwd)?;
@@ -2715,11 +2615,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str("AI decided (to review):\n");
                 text.push_str(&decision_lines(&decisions));
             }
-            let latest = handoff::latest_for(&root, &task.id);
-            if let Some(h) = &latest {
-                text.push_str(&handoff_line(h));
-                // Whoever takes over checks before trusting it and repeats nothing (Task-A03-23).
-                text.push_str(handoff::TAKING_OVER);
+            // Whoever takes over checks before trusting the handoff note and repeats nothing
+            // (Task-A03-23).
+            let taking_over = task.handoff_note.as_ref().map(|_| handoff::TAKING_OVER);
+            if let Some(rules) = taking_over {
+                text.push_str(rules);
             }
             if ops::all_blockers_done(&bag, &task) {
                 text.push_str(&format!(
@@ -2732,7 +2632,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "handoff": latest.as_ref().map(handoff_brief), "taking_over": latest.as_ref().map(|_| handoff::TAKING_OVER) }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -2810,7 +2710,6 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             }
             let mut listed = Vec::new();
             for t in &tasks {
-                let latest = handoff::latest_for(&root, &t.id);
                 text.push_str(&format!("{}\n", task_line(t)));
                 if let Some(i) = &t.iteration {
                     text.push_str(&format!("  iteration: {i}\n"));
@@ -2821,20 +2720,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 if let Some(note) = &t.handoff_note {
                     text.push_str(&format!("  handoff note: {note}\n"));
                 }
-                if let Some(h) = &latest {
-                    text.push_str(&format!("  {}", handoff_line(h)));
-                }
-                let mut v = task_json(t);
-                v["handoff"] = latest.as_ref().map(handoff_brief).into();
-                listed.push(v);
+                listed.push(task_json(t));
             }
             if !tasks.is_empty() {
                 text.push('\n');
             }
-            // Once, when a listed task has a handoff: the rules for taking over (Task-A03-23).
-            let taking_over = listed
+            // Once, when a listed task has a handoff note: the rules for taking over (Task-A03-23).
+            let taking_over = tasks
                 .iter()
-                .any(|v| !v["handoff"].is_null())
+                .any(|t| t.handoff_note.is_some())
                 .then_some(handoff::TAKING_OVER);
             if let Some(rules) = taking_over {
                 text.push_str(rules);
@@ -2883,6 +2777,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let outside = allomos_store::cards::outside(&root);
             let cards = next_cards_line(outside.len());
             text.push_str(&cards);
+            // Old handoff files (Task-A03-polar770): the taskbag needs updating; alm only says
+            // they are there.
+            let old_handoffs = handoff::legacy(&root);
+            let handoffs_line = next_handoffs_line(&old_handoffs);
+            text.push_str(&handoffs_line);
             // At the start of a session: when this agent must write its handoff (Task-A03-06).
             let rules = bag.project.handoff.clone().unwrap_or_default().applied(me);
             text.push_str(&rules_line(&rules));
@@ -2902,6 +2801,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "project_notes": notes,
                     "cards_outside": outside,
                     "cards": if cards.is_empty() { Value::Null } else { json!(cards.trim_end()) },
+                    "old_handoffs": old_handoffs,
+                    "handoffs": if handoffs_line.is_empty() { Value::Null } else { json!(handoffs_line.trim_end()) },
                     "active_iteration": ops::active_iteration(&bag).map(|i| i.id.clone()),
                     "finished_iteration": finished.as_ref().map(|(done_it, next_it, words)| json!({ "iteration": done_it, "next": next_it, "suggestion": words })),
                 }),
@@ -3013,7 +2914,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => None,
             };
-            let mut done = change(cli, cwd, |bag| {
+            change(cli, cwd, |bag| {
                 ops::finish(
                     bag,
                     id,
@@ -3021,9 +2922,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     without_human_check.as_deref(),
                     steps.as_deref(),
                 )
-            })?;
-            ask_to_check_handoffs(id, &mut done);
-            Ok(done)
+            })
         }
         Command::Checked { id } => change(cli, cwd, |bag| ops::checked(bag, id)),
         Command::Recheck { id, reason, steps } => {
@@ -3384,33 +3283,6 @@ fn save_project(
     lock.record(&event, |l| l.save_project(after))
 }
 
-/// The rule for the agent to check the handoffs itself (`alm handoffs --check`, and after
-/// `alm done` for the finished task). `alm` looks at nothing: the agent gets the list, checks each
-/// handoff and removes the finished ones (owner, 2026-10-13; Task-A03-13).
-fn check_rule(task: Option<&str>) -> String {
-    let (what, list) = match task {
-        Some(id) => (
-            format!("the handoffs that name {id}"),
-            format!("`alm handoffs --task {id}`"),
-        ),
-        None => ("the handoffs".to_string(), "`alm handoffs`".to_string()),
-    };
-    format!(
-        "Now check {what} yourself, one by one:\n\
-         1. Get the list: {list}.\n\
-         2. For each handoff, look up every task it names (`alm show <id>`).\n\
-         3. If all of them are done or dropped, remove the handoff: `alm handoff --remove <file>`.\n\
-         4. Otherwise leave it as it is.\n"
-    )
-}
-
-/// After `alm done`: the rule for checking the handoffs that name the finished task.
-fn ask_to_check_handoffs(id: &str, done: &mut Done) {
-    let instruction = check_rule(Some(id));
-    done.text.push_str(&instruction);
-    done.fields["handoff_check"] = json!({ "instruction": instruction });
-}
-
 /// One change to one task, under the taskbag's lock: load, apply the rule, write it and its event.
 /// The app makes its changes through the same `allomos_store::change_task` (Task-A01-18).
 fn change(
@@ -3469,6 +3341,19 @@ kept in the project folder. If you find others, report them with `alm cards foun
 /// `alm next`'s line about card files (Task-A00-30): the ones still outside the taskbag (linked
 /// or reported). None are: no line at all (Task-A03-34, approver 2026-10-20), so `alm next`
 /// prints only what is useful.
+/// What `alm next` says when an older taskbag still keeps handoff files (Task-A03-polar770):
+/// nothing when there are none.
+fn next_handoffs_line(files: &[String]) -> String {
+    if files.is_empty() {
+        return String::new();
+    }
+    format!(
+        "This taskbag needs updating: its `handoffs/` folder still holds {} old handoff file(s) ({}). A handoff is now written into the task (`alm handoff <id>`). Tell the person: they choose Update the taskbag… in the Allomos app (or you run `alm move-in` and follow the request it prints), which moves what is still useful into the tasks and removes the files after their Go ahead.\n",
+        files.len(),
+        files.join(", ")
+    )
+}
+
 fn next_cards_line(outside: usize) -> String {
     if outside > 0 {
         format!(

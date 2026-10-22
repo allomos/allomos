@@ -948,6 +948,95 @@ pub fn set_handoff_note(
     Ok(Outcome::plain(task))
 }
 
+/// What a handoff records only in the task's history: who handed it off (Task-A03-polar770).
+pub const HANDED_OFF_BY: &str = "handed_off_by";
+
+/// A session hands a task off (`alm handoff`, Task-A03-polar770, approver 2026-10-22): the
+/// handoff lives in the task itself, not in a file of its own. `note` replaces the task's handoff
+/// note (where it stopped, the one next step, who it waits on); `evidence`, when given, is added
+/// under the description's **Evidence** heading (made at the end when there is none), dated and
+/// signed; the history records who handed it off, even when the note did not change. Same holder
+/// rule as other changes; allowed in any state.
+pub fn hand_off(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    note: &str,
+    evidence: Option<&str>,
+    day: &str,
+) -> Result<Outcome, Problem> {
+    let me = me
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .ok_or(Problem::HolderMissing)?;
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, Some(me))?;
+    task.handoff_note = Some(non_empty(Some(note)).ok_or(Problem::HandoffEmpty)?);
+    if let Some(evidence) = evidence.and_then(|e| non_empty(Some(e))) {
+        task.description = with_evidence(&task.description, &format!("{day}, {me}: {evidence}"));
+    }
+    let mut outcome = Outcome::plain(task);
+    outcome.recorded.push(Change {
+        field: HANDED_OFF_BY.to_string(),
+        from: None,
+        to: Some(serde_json::Value::String(me.to_string())),
+    });
+    Ok(outcome)
+}
+
+/// `description` with `entry` added as the last item under its **Evidence** heading: a Markdown
+/// heading (`## Evidence`, any level) or a line that is only `**Evidence**` (with or without a
+/// colon), any case. Its section ends at the next heading of the same or a higher level (or, for a
+/// bold line, at the next heading or bold line on its own). With no such heading, one is added at
+/// the end.
+fn with_evidence(description: &str, entry: &str) -> String {
+    let item = format!("- {}", entry.trim().replace('\n', "\n  "));
+    let lines: Vec<&str> = description.trim_end().lines().collect();
+    let level = |l: &str| {
+        let hashes = l.chars().take_while(|c| *c == '#').count();
+        (hashes > 0 && l[hashes..].starts_with(' ')).then_some(hashes)
+    };
+    let bold = |l: &str| {
+        let t = l.trim();
+        t.len() > 4 && t.starts_with("**") && t.ends_with("**")
+    };
+    let is_evidence = |l: &str| {
+        let t = l
+            .trim()
+            .trim_start_matches('#')
+            .trim()
+            .trim_matches('*')
+            .trim_end_matches(':');
+        (level(l).is_some() || bold(l)) && t.trim().eq_ignore_ascii_case("evidence")
+    };
+    let Some(start) = lines.iter().position(|l| is_evidence(l)) else {
+        let body = description.trim_end();
+        let gap = if body.is_empty() { "" } else { "\n\n" };
+        return format!("{body}{gap}## Evidence\n\n{item}\n");
+    };
+    let end = match level(lines[start]) {
+        Some(n) => lines[start + 1..]
+            .iter()
+            .position(|l| level(l).is_some_and(|m| m <= n)),
+        None => lines[start + 1..]
+            .iter()
+            .position(|l| level(l).is_some() || bold(l)),
+    }
+    .map_or(lines.len(), |i| start + 1 + i);
+    // After the section's last line with something in it.
+    let last = (start..end)
+        .rev()
+        .find(|&i| !lines[i].trim().is_empty())
+        .unwrap_or(start);
+    let mut out: Vec<String> = lines[..=last].iter().map(|l| l.to_string()).collect();
+    if last == start {
+        out.push(String::new());
+    }
+    out.push(item);
+    out.extend(lines[last + 1..].iter().map(|l| l.to_string()));
+    out.join("\n") + "\n"
+}
+
 /// The version of a task as it is now (Task-A01-57): a short fingerprint of everything saved in
 /// its `task.json` and `description.md`. It changes with every change to the task, so a writer
 /// that read version `v` can tell whether the task changed since.
@@ -1293,6 +1382,103 @@ mod tests {
             let i = $s.tasks.iter().position(|x| x.id == t.id).unwrap();
             $s.tasks[i] = t;
         }};
+    }
+
+    /// Task-A03-polar770: a handoff replaces the note, adds evidence under its heading and is
+    /// recorded with who handed off; the holder rule holds; an empty note is refused.
+    #[test]
+    fn a_handoff_is_written_into_the_task() {
+        let mut s = bag();
+        put!(
+            s,
+            claim(&s, "A01-01", Some("claude/x"), false).unwrap().task
+        );
+        let o = hand_off(
+            &s,
+            "A01-01",
+            Some("claude/x"),
+            "Stopped at tests; next: docs.",
+            None,
+            "2026-10-22",
+        )
+        .unwrap();
+        assert_eq!(
+            o.task.handoff_note.as_deref(),
+            Some("Stopped at tests; next: docs.")
+        );
+        assert_eq!(o.task.description, "Why.\n");
+        assert_eq!(o.recorded[0].field, HANDED_OFF_BY);
+        assert_eq!(o.recorded[0].to, Some(serde_json::json!("claude/x")));
+        put!(s, o.task);
+        // Evidence: a heading is added at the end, then each entry goes under it.
+        let o = hand_off(
+            &s,
+            "A01-01",
+            Some("claude/x"),
+            "n2",
+            Some("deployed v1"),
+            "2026-10-22",
+        )
+        .unwrap();
+        assert_eq!(
+            o.task.description,
+            "Why.\n\n## Evidence\n\n- 2026-10-22, claude/x: deployed v1\n"
+        );
+        put!(s, o.task);
+        let o = hand_off(
+            &s,
+            "A01-01",
+            Some("claude/x"),
+            "n3",
+            Some("SQL applied"),
+            "2026-10-23",
+        )
+        .unwrap();
+        assert!(
+            o.task.description.ends_with(
+                "- 2026-10-22, claude/x: deployed v1\n- 2026-10-23, claude/x: SQL applied\n"
+            ),
+            "{}",
+            o.task.description
+        );
+        // Someone else may not; a nameless writer and an empty note are refused.
+        assert_eq!(
+            hand_off(&s, "A01-01", Some("codex/y"), "n", None, "d")
+                .unwrap_err()
+                .code(),
+            "task_held"
+        );
+        assert_eq!(
+            hand_off(&s, "A01-01", None, "n", None, "d")
+                .unwrap_err()
+                .code(),
+            "holder_missing"
+        );
+        assert_eq!(
+            hand_off(&s, "A01-01", Some("claude/x"), "  ", None, "d")
+                .unwrap_err()
+                .code(),
+            "handoff_empty"
+        );
+    }
+
+    #[test]
+    fn evidence_goes_at_the_end_of_its_section() {
+        // A bold heading, followed by another section.
+        let d = "**Outcome.** x\n\n**Evidence**\n- one\n\n**Notes.**\n- n\n";
+        assert_eq!(
+            with_evidence(d, "two"),
+            "**Outcome.** x\n\n**Evidence**\n- one\n- two\n\n**Notes.**\n- n\n"
+        );
+        // A Markdown heading: deeper headings stay inside, the next one at its level ends it.
+        let d = "# T\n\n## Evidence\n\n### Run 1\nok\n\n## Later\nz";
+        assert_eq!(
+            with_evidence(d, "a\nb"),
+            "# T\n\n## Evidence\n\n### Run 1\nok\n- a\n  b\n\n## Later\nz\n"
+        );
+        // An empty heading, and an empty description.
+        assert_eq!(with_evidence("## evidence:", "e"), "## evidence:\n\n- e\n");
+        assert_eq!(with_evidence("", "e"), "## Evidence\n\n- e\n");
     }
 
     /// Decision 0016: `alm block` refuses an empty list, the task itself and an unknown ID; a

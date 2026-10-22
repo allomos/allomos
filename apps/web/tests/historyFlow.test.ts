@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { changeLine, fieldName, valueText } from "../src/historyFlow.ts";
-import { localTime } from "../src/handoffFlow.ts";
+import { localTime } from "../src/timeFlow.ts";
 
 // Stands in for the interface's `t`: the key, with any parameters after it.
 const t = (key: string, params?: Record<string, string | number>) =>

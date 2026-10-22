@@ -73,10 +73,8 @@ problems! {
     InstructionsOutdated { files, current } => "instructions_outdated", "Allomos's section in {files} is out of date (this Allomos writes version {current}). Update it now: replace that section with the output of `alm brief`, keep the rest of the file, and commit only those files.";
     /// A handoff gate is not a percentage (Task-A03-06).
     InvalidPercent { value } => "invalid_percent", "\"{value}\" is not a percentage. Use a whole number from 0 to 100.";
-    /// The handoff template may not be empty (Task-A03-06).
-    TemplateEmpty => "template_empty", "The handoff template cannot be empty.";
-    /// `alm handoff --remove` named no handoff file (Task-A03-13).
-    HandoffNotFound { file } => "handoff_not_found", "There is no handoff \"{file}\". `alm handoffs` lists them.";
+    /// `alm handoff` with no words for the task's handoff note (Task-A03-polar770).
+    HandoffEmpty => "handoff_empty", "Say where the work stopped and the one next step: `alm handoff <id> --as <session> --text \"<handoff>\"` (or `--from <file.md>`).";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
     LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     /// `alm rename label` with an empty new name (Task-A01-32).
