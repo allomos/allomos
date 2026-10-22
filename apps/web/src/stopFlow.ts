@@ -71,21 +71,24 @@ export function withDecisions(opened: Opened): Opened {
   return { ...opened, loaded: { ...opened.loaded, taskbag: { ...box, tasks } } };
 }
 
-/** The list's state filter: every state, one, or every task that needs a person: to check, to
- * answer (waiting) or to review (AI decisions), as `alm human` lists them (Task-A03-18, A03-19). */
-export type StateFilter = "all" | "human" | State;
+/** The list's state filter: every state, one, every task not done yet (`open`: neither done nor
+ * dropped, Task-A01-party987), or every task that needs a person: to check, to answer (waiting) or
+ * to review (AI decisions), as `alm human` lists them (Task-A03-18, A03-19). */
+export type StateFilter = "all" | "open" | "human" | State;
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
 /** The tasks the filter keeps. */
 export function keepState(filter: StateFilter, task: Task): boolean {
   if (filter === "human") return toCheck(task) || task.state === "waiting" || toReview(task);
+  // A dropped task will never be done, so "not done" leaves it out as well (as A01-timber110).
+  if (filter === "open") return task.state !== "done" && task.state !== "dropped";
   return filter === "all" || task.state === filter;
 }
 
 /** A stored filter read back; anything else is "all". */
 export function readFilter(value: string | null): StateFilter {
-  if (value === "human") return "human";
+  if (value === "human" || value === "open") return value;
   return value && (FILTER_STATES as string[]).includes(value) ? (value as State) : "all";
 }
 
@@ -111,6 +114,7 @@ export function hiddenText(hidden: Hidden, t: T): string {
 export function filterName(filter: StateFilter, t: T): string {
   if (filter === "all") return t("filter.all");
   if (filter === "human") return t("filter.human");
+  if (filter === "open") return t("filter.open");
   return t(`state.${filter}` as Key);
 }
 

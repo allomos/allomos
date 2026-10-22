@@ -269,3 +269,28 @@ test("the search banner says how much was found", () => {
   assert.equal(plain(searchBanner("handoff", 1, "alm", t)), "**1 handoff** found for “alm”.");
   assert.equal(plain(searchBanner("handoff", 2, "alm", t, "In progress")), "**2 handoffs** found for “alm” with the “In progress” filter on.");
 });
+
+test("Not done keeps every task neither done nor dropped, is remembered, and is worded (A01-party987)", () => {
+  const states = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"] as const;
+  const kept = states.filter((state) => keepState("open", task({ state })));
+  assert.deepEqual(kept, ["backlog", "ready", "in_progress", "waiting", "blocked"]);
+  assert.equal(readFilter("open"), "open");
+  assert.equal(filterName("open", t), "Not done");
+  const all = [...states.map((state, i) => task({ id: `A01-${i}`, state })), task({ id: "A01-9", state: "done" })];
+  const hidden = hiddenByFilter("open", all);
+  assert.equal(hidden.count, 3);
+  assert.deepEqual(hidden.states, [
+    { state: "done", count: 2 },
+    { state: "dropped", count: 1 },
+  ]);
+  assert.equal(hiddenText(hidden, t), "3 more hidden by the filter: 2 Done, 1 Dropped");
+  assert.equal(
+    plain(filterBanner("open", { kind: "area", tasks: 12, groups: 3, total: 3 }, t)),
+    "**12 tasks** are still open, in 3 areas.",
+  );
+  assert.equal(plain(filterBanner("open", { kind: "iteration", tasks: 0, groups: 0, total: 2 }, t)), "No task is still open. All 2 iterations are left out.");
+  assert.equal(
+    plain(bothBanner("open", { kind: "area", query: "alm", tasks: 2, groups: 1, matches: 5 }, t)),
+    "Filter and search together: only tasks that are still open and hold “alm” are listed, in 1 area. 3 more matches are hidden by the filter.",
+  );
+});

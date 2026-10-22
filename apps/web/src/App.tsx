@@ -1439,6 +1439,8 @@ function TaskbagView({
                 {t("filter.label")}{" "}
                 <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
                   <option value="all">{t("filter.all")}</option>
+                  {/* Task-A01-party987: every task not done yet, neither done nor dropped. */}
+                  <option value="open">{t("filter.open")}</option>
                   {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
                   <option value="human">{t("filter.human")}</option>
                   {FILTER_STATES.map((s) => (
