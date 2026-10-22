@@ -1239,8 +1239,6 @@ function TaskbagView({
   const nothingShown = !searching && stateFilter !== "all" && filtered.length === 0;
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(found, folded);
-  // Task-A01-47: when the list was last read and how, with Refresh now, under the banners.
-  const refreshLine = refreshed && <RefreshLine refreshed={refreshed} onRefresh={() => onRefresh().catch(onError)} />;
   const foldAll = (on: boolean) => {
     if (groupBy === "handoffs") setOpenHandoffs((keys) => setKeys(keys, shownHandoffs, !on));
     else setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
@@ -1317,6 +1315,15 @@ function TaskbagView({
     await messenger.saveOwnerName(name);
     setOwnerName(name);
   };
+  // Task-A01-47: when the list was last read and how, with Refresh now, under the banners; then
+  // (Task-A01-wheel747, moved from the toolbar) the saved name changes are recorded as, on the same line.
+  const refreshLine = (
+    <div className="list-status">
+      {refreshed && <RefreshLine refreshed={refreshed} onRefresh={() => onRefresh().catch(onError)} />}
+      {/* Task-A01-40: the saved name changes are recorded as, and where to change it. */}
+      <WhoLine name={ownerName} onSave={saveOwnerName} />
+    </div>
+  );
   const editTask = async (id: string, edit: Edit) => {
     await messenger.editTask(opened.root, id, edit);
     await onReload().catch(() => undefined);
@@ -1455,8 +1462,6 @@ function TaskbagView({
               </label>
               {groupBy !== "handoffs" && <SortMenu sort={sort} onChange={chooseSort} />}
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
-              {/* Task-A01-40: the saved name changes are recorded as, and where to change it. */}
-              <WhoLine name={ownerName} onSave={saveOwnerName} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
                 <button type="button" className="link small" onClick={() => foldAll(true)}>

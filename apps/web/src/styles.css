@@ -597,6 +597,11 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .filter-banner strong { color: var(--info); }
 .filter-banner button { padding: 4px 12px; color: var(--info); border-color: var(--info); background: transparent; white-space: nowrap; }
 .filter-banner button:hover { background: var(--surface); }
+/* Task-A01-wheel747: the refresh line, then the name changes are recorded as, on one line; the
+ * name part wraps below when the window is narrow. */
+.list-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.list-status .who-line { align-items: baseline; }
+.list-status .who-line button.link { align-self: baseline; font-size: inherit; }
 /* Task-A01-47: when the list was last read, quiet grey text with no box, Refresh now as a link. */
 .refresh-line { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .refresh-line button.link { align-self: baseline; font-size: inherit; }
