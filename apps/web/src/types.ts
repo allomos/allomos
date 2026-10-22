@@ -136,13 +136,26 @@ export interface TaskEvent {
   command: string;
   kind: "task" | "area" | "iteration" | "project";
   id?: string;
+  /** The AI agent `alm` ran under (`claude`, `codex`), when recorded (Task-A03-27). */
+  agent?: string;
+  tool?: string;
   changes: FieldChange[];
+}
+
+/** When a name last changed anything in the taskbag, and its newest recorded agent (Task-A03-37). */
+export interface Seen {
+  by: string;
+  at: string;
+  agent?: string;
+  tool?: string;
 }
 
 /** A task's history: newest first, and when the taskbag started recording (null: not yet). */
 export interface TaskHistory {
   since: string | null;
   events: TaskEvent[];
+  /** Everyone named in the task's events, with their newest change anywhere in the taskbag. */
+  seen?: Seen[];
 }
 
 /** A problem from Rust: a code the interface words in the chosen language (see i18n/codes.json). */

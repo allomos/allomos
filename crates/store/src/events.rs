@@ -486,6 +486,44 @@ pub struct History {
     pub events: Vec<Event>,
     /// Event files that could not be read.
     pub issues: Vec<Issue>,
+    /// Everyone named in the task's events, with their newest change anywhere in the taskbag
+    /// (Task-A03-37): the task pane says whether its holder's session is still active from it.
+    pub seen: Vec<Seen>,
+}
+
+/// When someone (an `--as` name) last changed anything in the taskbag, and the agent they ran
+/// under when known. Allomos cannot see whether a session is running; a recent change is the
+/// only sign it has (approver, 2026-10-22).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Seen {
+    pub by: String,
+    /// `2026-10-13T14:02:05Z`, UTC.
+    pub at: String,
+    /// The newest agent recorded for this name ([`Event::agent`]): `claude` or `codex`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+}
+
+/// [`Seen`] for each name in `names`, from `all` (oldest first); a name with no event is left out.
+fn seen_of(all: &[Event], names: &[String]) -> Vec<Seen> {
+    names
+        .iter()
+        .filter_map(|name| {
+            let mine = || all.iter().rev().filter(|e| e.by.as_deref() == Some(name));
+            let at = mine().next()?.at.clone();
+            let (agent, tool) = mine()
+                .find(|e| e.agent.is_some())
+                .map_or((None, None), |e| (e.agent.clone(), e.tool.clone()));
+            Some(Seen {
+                by: name.clone(),
+                at,
+                agent,
+                tool,
+            })
+        })
+        .collect()
 }
 
 /// The history of the task `id`. Changes made before the taskbag started recording have no
@@ -494,8 +532,9 @@ pub fn history(root: &Path, id: &str) -> History {
     let (all, issues) = list(root);
     let since = all.first().map(|e| e.at.clone());
     let mut events: Vec<Event> = all
-        .into_iter()
+        .iter()
         .filter(|e| e.kind == Kind::Task && e.id.as_deref() == Some(id))
+        .cloned()
         .map(|mut e| {
             // A one-time number (Task-A01-58) is not a change to the task: not shown.
             e.changes
@@ -504,8 +543,15 @@ pub fn history(root: &Path, id: &str) -> History {
         })
         .collect();
     events.reverse();
+    let mut names: Vec<String> = Vec::new();
+    for by in events.iter().filter_map(|e| e.by.as_deref()) {
+        if !by.is_empty() && !names.iter().any(|n| n == by) {
+            names.push(by.to_string());
+        }
+    }
     History {
         since,
+        seen: seen_of(&all, &names),
         events,
         issues,
     }
@@ -560,6 +606,51 @@ mod tests {
                 Vec::new()
             },
         }
+    }
+
+    #[test]
+    fn history_says_when_each_name_on_the_task_last_changed_anything() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-test-seen-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let put = |name: &str, e: &Event| {
+            fs::create_dir_all(dir.join(EVENTS_DIR)).unwrap();
+            fs::write(dir.join(EVENTS_DIR).join(name), json_text(e)).unwrap();
+        };
+        let mut on_task = event(
+            "2026-10-13T10:00:00Z",
+            Kind::Task,
+            Some("claude"),
+            Some("claude_app"),
+            true,
+        );
+        put("2026-10-13-100000-000-aaaaaa.json", &on_task);
+        // A newer change by the same name on another task, recording no agent, counts as seen;
+        // the agent is the newest one recorded.
+        on_task.at = "2026-10-14T09:00:00Z".into();
+        on_task.id = Some("A01-02".into());
+        on_task.agent = None;
+        on_task.tool = None;
+        put("2026-10-14-090000-000-aaaaaa.json", &on_task);
+        // Someone who never touched this task is not listed.
+        let mut other = event("2026-10-15T09:00:00Z", Kind::Task, None, None, true);
+        other.by = Some("codex/x".into());
+        other.id = Some("A01-02".into());
+        put("2026-10-15-090000-000-aaaaaa.json", &other);
+        assert_eq!(
+            history(&dir, "A01-01").seen,
+            vec![Seen {
+                by: "s".into(),
+                at: "2026-10-14T09:00:00Z".into(),
+                agent: Some("claude".into()),
+                tool: Some("claude_app".into()),
+            }]
+        );
+        assert_eq!(history(&dir, "A01-09").seen, Vec::new());
     }
 
     #[test]

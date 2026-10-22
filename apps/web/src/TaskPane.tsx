@@ -6,7 +6,8 @@
 // whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39). A task
 // with AI decisions nobody has reviewed shows "AI decisions to review", the decisions and a Reviewed button,
 // like `alm reviewed` (Task-A03-19). A done or dropped task has Reopen…, which asks why and works
-// like `alm reopen` (Task-A01-50).
+// like `alm reopen` (Task-A01-50). Responsible person, agent, check and session are separate
+// rows (Task-A03-37), and History names the agent behind each change.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -33,6 +34,8 @@ import {
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
+import { ACTIVE_MINUTES, check, paneAgent, session } from "./sessionFlow";
+import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
 import { isProblem, type Area, type Edit, type Handoff, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
@@ -433,15 +436,32 @@ export function TaskPane({
     : task.iteration
       ? task.iteration
       : t("box.unplanned");
-  // The area, holder and "finished without the human check" are not changed here: holders are
-  // agent sessions (owner, 2026-10-14), and the others have no change of their own in `alm` (the
-  // Checked button below clears the note).
-  const rows: [string, string | null, EditField | null][] = [
+  // Task-A03-37: who is responsible, which agent, the check and the session, each on its own row.
+  const agent = paneAgent(task, history);
+  const sess = session(task, history, new Date());
+  const agentText = agent
+    ? (() => {
+        const who = agent.agent ? t("pane.agent_value", { by: agent.by, agent: agentName(agentId(agent.agent)) }) : agent.by;
+        return agent.holding ? who : t("pane.agent_last", { who });
+      })()
+    : null;
+  const sessionText = !sess
+    ? null
+    : sess.kind === "unknown"
+      ? t("session.unknown")
+      : t(sess.kind === "active" ? "session.active" : "session.last_seen", { time: localTime(sess.at) });
+  // The area, agent, check and session are not changed here: holders are agent sessions (owner,
+  // 2026-10-14), and the others have no change of their own in `alm` (the Checked button below
+  // clears the note). The fourth item is the label's hover text.
+  const rows: [string, string | null, EditField | null, string?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
     [t("pane.state"), stopText(task, tasks, t) ?? t(`state.${task.state}`), "state"],
     [t("pane.label"), task.label, "label"],
-    [t("pane.holder"), task.holder, null],
+    [t("pane.responsible"), ownerName ?? t("task.you"), null, t("pane.responsible_title")],
+    [t("pane.agent"), agentText, null],
+    [t("pane.check"), t(`check.${check(task, labels)}`), null],
+    [t("pane.session"), sessionText, null, t("pane.session_title", { minutes: ACTIVE_MINUTES })],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],
     [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
     [
@@ -558,9 +578,9 @@ export function TaskPane({
         </div>
       )}
       <dl className="fields">
-        {rows.map(([label, value, field]) => (
+        {rows.map(([label, value, field, title]) => (
           <div key={label}>
-            <dt>{label}</dt>
+            <dt title={title}>{label}</dt>
             {field && editing === field ? (
               <dd>{editor(field)}</dd>
             ) : (
@@ -607,6 +627,7 @@ export function TaskPane({
                 <li key={`${e.at}-${i}`} className="small">
                   <span className="muted">
                     {localTime(e.at)} · {e.by || t("pane.history_someone")}
+                    {e.agent && ` · ${agentName(agentId(e.agent))}`}
                   </span>
                   {e.changes.map((c, j) => (
                     <div key={`${c.field}-${j}`}>{changeLine(c, t)}</div>
