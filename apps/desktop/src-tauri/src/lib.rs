@@ -1033,6 +1033,13 @@ fn restart_to_update(app: AppHandle) {
     });
 }
 
+/// **Restart to Update** on the update notice: the same as the menu item, so the two never offer
+/// different steps.
+#[tauri::command]
+fn restart_to_update_now(app: AppHandle) {
+    restart_to_update(app);
+}
+
 /// "Skip this version" on the update notice.
 #[tauri::command]
 fn skip_update(version: String) {
@@ -1867,6 +1874,7 @@ pub fn run() {
             open_download_page,
             update_status,
             skip_update,
+            restart_to_update_now,
             set_update_item,
             handoff_settings,
             set_handoff_rules,

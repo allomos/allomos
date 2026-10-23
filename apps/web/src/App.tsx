@@ -833,7 +833,8 @@ function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: u
 }
 
 /** **A newer Allomos is available** (Task-A07-16). The app asks GitHub at start and then once a
- * day; Check for Updates… asks now and always answers. Download opens the releases page; "Skip
+ * day; Check for Updates… asks now and always answers. Download opens the releases page, or
+ * Restart to Update installs the downloaded version, as the menu item does; "Skip
  * this version" is remembered; × hides this version in this window. */
 function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e: unknown) => void }) {
   const { t } = useI18n();
@@ -908,9 +909,17 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
         <path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12" />
       </svg>
       <span>{t("update.available", { latest: note.latest, current: note.current })}</span>
-      <button type="button" className="primary" onClick={() => messenger.openDownloadPage().catch(onError)}>
-        {t("update.download")}
-      </button>
+      {/* The same step as the menu item: Restart to Update once the installer is downloaded and
+          checked, otherwise Download (approver, 2026-10-23: the two disagreed). */}
+      {note.ready ? (
+        <button type="button" className="primary" onClick={() => messenger.restartToUpdate().catch(onError)}>
+          {t("menu.restart_update", { latest: note.latest })}
+        </button>
+      ) : (
+        <button type="button" className="primary" onClick={() => messenger.openDownloadPage().catch(onError)}>
+          {t("update.download")}
+        </button>
+      )}
       <button type="button" onClick={skip}>
         {t("update.skip")}
       </button>

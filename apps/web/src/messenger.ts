@@ -174,6 +174,8 @@ export interface Messenger {
   setUpdateItem(text: string, action: "check" | "download" | "restart"): Promise<void>;
   /** Calls `handler` when a newer version's installer is downloaded and checked (Task-A07-17). */
   onUpdateReady(handler: () => void): Promise<() => void>;
+  /** **Restart to Update** on the update notice: the same as the menu item (Task-A07-17). */
+  restartToUpdate(): Promise<void>;
   /** Calls `handler` when Restart to Update could not install the new version. */
   onUpdateFailed(handler: (problem: Problem) => void): Promise<() => void>;
   /** Whether to offer **Install the alm command** (Task-A07-12). */
@@ -271,6 +273,7 @@ export const desktopMessenger: Messenger = {
   updateStatus: (asked) => invoke<UpdateStatus>("update_status", { asked }),
   skipUpdate: (version) => invoke<void>("skip_update", { version }),
   setUpdateItem: (text, action) => invoke<void>("set_update_item", { text, action }),
+  restartToUpdate: () => invoke<void>("restart_to_update_now"),
   onUpdateReady: (handler) => getCurrentWebviewWindow().listen("update:ready", () => handler()),
   onUpdateFailed: (handler) => getCurrentWebviewWindow().listen<Problem>("update:failed", (e) => handler(e.payload)),
   onCheckUpdatesMenu: (handler) => getCurrentWebviewWindow().listen("menu:check_updates", () => handler()),

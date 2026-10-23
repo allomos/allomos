@@ -7,8 +7,9 @@ import type { UpdateStatus } from "./types";
 export const UPDATE_LOOK_MS = 60 * 60 * 1000;
 
 export type UpdateNote =
-  /** The notice with Download, Skip this version and ×. */
-  | { kind: "offer"; latest: string; current: string }
+  /** The notice with Download (or Restart to Update once `ready`, as the menu item has it),
+   * Skip this version and ×. */
+  | { kind: "offer"; latest: string; current: string; ready: boolean }
   /** Only after Check for Updates…: nothing newer. */
   | { kind: "current"; current: string }
   /** Only after Check for Updates…: GitHub did not answer. */
@@ -36,7 +37,7 @@ export function updateMenuItem(status: UpdateStatus | null): UpdateMenuItem {
 export function updateNote(status: UpdateStatus | null, asked: boolean, hidden: string | null): UpdateNote | null {
   if (!status) return null;
   if (status.newer && (asked || status.newer !== hidden)) {
-    return { kind: "offer", latest: status.newer, current: status.current };
+    return { kind: "offer", latest: status.newer, current: status.current, ready: status.ready === status.newer };
   }
   if (!asked) return null;
   if (status.failed) return { kind: "failed" };

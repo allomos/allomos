@@ -16,7 +16,17 @@ test("a newer version is offered", () => {
     kind: "offer",
     latest: "0.1.6",
     current: "0.1.5",
+    ready: false,
   });
+});
+
+test("the notice offers Restart to Update once the installer is ready, as the menu does", () => {
+  const ready = status({ newer: "0.1.6", available: "0.1.6", ready: "0.1.6" });
+  assert.deepEqual(updateNote(ready, false, null), { kind: "offer", latest: "0.1.6", current: "0.1.5", ready: true });
+  assert.deepEqual(updateMenuItem(ready), { action: "restart", latest: "0.1.6" });
+  // An installer for an older find does not make the notice offer a restart to a newer one.
+  const older = status({ newer: "0.1.7", available: "0.1.7", ready: "0.1.6" });
+  assert.deepEqual(updateNote(older, false, null), { kind: "offer", latest: "0.1.7", current: "0.1.5", ready: false });
 });
 
 test("a check on its own is quiet when up to date or offline", () => {
