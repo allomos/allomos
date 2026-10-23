@@ -32,7 +32,7 @@ A person may register several runners (laptop, desktop, a shared build machine).
 2. Allomos records a **dispatch** event and sends the request to the runner.
 3. The runner creates the worktree/branch (named from the task id, e.g. `claude/A01-01-walking-skeleton`), writes the task brief (outcome, done-when, links, approval limits) into the prompt, and starts the agent.
 4. The runner reports back the **session id**, worktree path, branch and how to resume; Allomos **claims** the task for that session automatically.
-5. The agent then reports progress through the `alm` CLI / MCP, as for any session.
+5. The agent then reports progress through the `alm` CLI, as for any session (MCP deferred, [0018](./0018-mcp-deferred-agents-use-alm.md)).
 
 ### What happens on "Open session"
 

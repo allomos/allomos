@@ -23,7 +23,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **A free local app** ([D12](../decisions/0012-free-local-app-paid-cloud.md)): developers and team leaders can use the desktop app on their own computer free of charge, with no account; paying is optional and only for cloud features.
 - **Purely local projects**: project and task information stays on the user’s machine; no sign-in or hosted service is required for tracking.
 - **Optional cloud projects**: users choose cloud storage and collaboration; teammates sign in, see live updates, and act on tasks.
-- **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through a CLI / MCP server, cheaply, with one holder per task (R12).
+- **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through the `alm` CLI, cheaply, with one holder per task (R12).
 - **A desktop app as the hub**, with the full feature set. Web and mobile companion apps connect to the running desktop app to view projects, including progress and status ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md), R69–R71).
 - **Interfaces for people and agents**, with desktop/mobile human use and browser/human CLI considered in the design. Shared structure and platform patterns are documented in [INTERFACES.md](./INTERFACES.md) (R60–R68; detailed design proposed).
 - A **"waiting on me"** inbox for checks and approvals owed by a person.
@@ -121,7 +121,6 @@ flowchart TD
     HUB["Allomos desktop app · the one authority (Rust)<br/>project rules · validation · events · burndown and forecast"]
     HUB --> TB[("Taskbag .allomos/taskbag/<br/>files tracked by Git<br/>Iteration 1")]
     HUB --> GIT["Runs your git<br/>commit · push · pull<br/>Iteration 6"]
-    HUB --> MCP["MCP server for agents<br/>Iteration 3"]
     HUB --> RUN["Start / open Claude Code and Codex<br/>Iteration 8"]
     HUB --> SRV["Local server + pairing codes<br/>Iteration 9–10"]
     CLI["allomos / alm command (Rust)<br/>same rules"] --> TB
@@ -138,13 +137,12 @@ flowchart TD
 
 ### Details
 
-- **Interface separation:** human clients, CLI, MCP and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `crates/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
-- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI, MCP server and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: **Tauri 2** (owner, 2026-10-04); macOS and Windows released together; unsigned builds until the first public release.
+- **Interface separation:** human clients, CLI and generated-file import call shared application commands/queries for permissions, validation and event recording, above local/cloud storage adapters. `crates/core` retains pure model/calculation rules; the application layer owns side effects. Desktop/mobile presentation and platform capabilities adapt around this shared behavior; layout, framework and process boundaries remain open ([INTERFACES.md](./INTERFACES.md)).
+- **Desktop hub** ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md)): one desktop application holds the local project store, runs the shared commands, and hosts a **local server** for the web and mobile companions. The CLI and agent runner talk to the same local authority. It ships for **macOS and Windows**, and its window shows the **same web interface** that it serves to browser and phone companions; only the desktop adds native parts ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Framework: **Tauri 2** (owner, 2026-10-04); macOS and Windows released together; unsigned builds until the first public release.
 - **Monorepo — Rust workspace + TypeScript interface** ([D11](../decisions/0011-desktop-framework-and-shared-code.md)). Proposed layout; the first code card confirms it:
   - `crates/core` — Rust: domain model, validation, events, burndown and forecast (pure, unit-tested; the one authority for project rules)
   - `crates/store` — Rust: reads and writes the project's user-chosen taskbag ([D10](../decisions/0010-project-data-folder.md)) as Git-tracked JSON/Markdown files (D7); runs the `git` command; keeps the rebuildable index outside the folder
   - `crates/cli` — Rust: the `allomos` command (alias `alm`, R88) for people and agents (`alm claim`, `alm label`, `alm wait`, `alm done`, `alm release`, `alm next`)
-  - `crates/mcp` — Rust: MCP server (official `rmcp` SDK) exposing the same operations to Claude Code and Codex
   - `crates/runner` — Rust: starts and resumes agents, creates worktrees, reports session state
   - `crates/importer` — Rust: Markdown board → Allomos (first target: the SSR `TASK_BOARD.md` + `workstreams/`; SSR workstreams become areas) and AI-generated bundles
   - `apps/desktop` — Tauri 2 app for macOS and Windows: wraps the crates above, hosts the local server for companions, shows `apps/web` in its window
@@ -166,7 +164,7 @@ flowchart TD
 |---|---|---|---|---|---|
 | **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **Allomos's own development tasks** on a Mac; the agents building Allomos update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the taskbag (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`allomos` CLI** (short alias `alm`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · Allomos's own cards moved in from Markdown · *no server* | R91, R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
 | **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`allomos` / `alm` CLI** for Windows · one build pipeline producing both systems' builds (`A07-02`) · fixes for Windows differences (paths, line endings, the WebView2 engine) (`A07-03`) · **tasks grouped by iteration**: tasks get an optional iteration, set with `alm`; the list switches between by area and by iteration (`A01-15`, first) · **task pane** beside the list with one task's details (`A01-16`) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes (`A01-17` history, `A01-18` edit, `A01-19` create) · exit check on a Mac and a workmate's Windows machine (`A07-04`) | R81, R85 (released together from here on), R1–R2 (editing in the app), R89 (iterations) |
-| **Next** | **3** | **v0.3 — MCP for agents** | Claude Code and Codex use Allomos through **MCP tools**, not only shell commands | **MCP server** (`alm mcp`, started by the agent on the same computer); safe retries and stale-edit checks; `alm init` and the app switch the server on in the project's `.mcp.json`, and the server sends instructions that tell agents when to use it (owner, 2026-10-07) | R11 (MCP), R63–R65 |
+| ~~Next~~ | ~~3~~ | ~~v0.3 — MCP for agents~~ | **Deferred** (approver, 2026-10-24, [D18](../decisions/0018-mcp-deferred-agents-use-alm.md)): agents keep using `alm`, which already has safe retries (`--request-id`) and stale-edit checks (`--expected-version`); the iteration is closed, its done tasks moved to Iteration 2 | — | ~~R11 (MCP)~~ |
 | **Next** | **4** | **v0.4 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
 | **Next** | **5** | **v0.5 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
 | **Later** | **6** | **v0.6 — Git in the app** | The owner **commits and pushes task changes** without leaving Allomos | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
@@ -197,7 +195,7 @@ flowchart TD
    - `git diff` shows readable changes;
    - Allomos's own cards now live in its taskbag, and agents use `alm` instead of `TASK_BOARD.md`.
 2. The same checks pass on Windows; one pipeline builds both systems; on both systems, a task created and edited in the app appears in `alm list` and in `git diff` as readable changes.
-3. Claude Code and Codex each claim and update a task through MCP; repeating a request does not repeat its effect.
+3. ~~Claude Code and Codex each claim and update a task through MCP~~ (deferred, [D18](../decisions/0018-mcp-deferred-agents-use-alm.md)).
 4. Progress bars, state chart and throughput match a known test project; "waiting on me" lists exactly the owner's items.
 5. The burndown and the finish-date range show for Allomos's own project; the calculations are checked with fixed test data.
 6. Committing from the app runs the user's own `git`, including hooks; a refused commit shows the hook's message.

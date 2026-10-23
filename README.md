@@ -39,7 +39,7 @@ All four work on the same taskbag.
 
 ### Switch between AI agents: Claude runs out, Codex picks up
 
-- **The same commands for every agent.** Claude Code, Codex and others claim, update and release tasks with the `alm` command (MCP *(planned, v0.3)*).
+- **The same commands for every agent.** Claude Code, Codex and others claim, update and release tasks with the `alm` command.
 - **Resume in one step.** A new session asks for the next task and gets its proven step and the last handoff note.
 - **Start or reopen a session** in the agent you choose, straight from the task *(planned, v0.8)*.
 
@@ -89,7 +89,7 @@ Progress by area with each task's proven step; the decisions only you can make, 
 | Local app: **free** | Cloud: **optional** |
 |---|---|
 | No account, no card, no trial clock | Only if you want it; pricing to be announced |
-| Switch between AI agents and accounts, by command line (and MCP, planned) | Switch between teammates live: a cloud copy on any computer |
+| Switch between AI agents and accounts, by command line | Switch between teammates live: a cloud copy on any computer |
 | Desktop app for macOS and Windows | Team sign-in, email invitations and roles |
 | Local projects in your own repositories | Live collaboration and merged edits |
 | Burndown, forecast, and phone and browser at home | |
@@ -102,7 +102,7 @@ Your data stays local unless you choose to share it.
 |---|---|---|
 | Done | v0.1 macOS local tracker | switch |
 | Now | v0.2 macOS + Windows, editing | switch |
-| Next | v0.3 MCP for agents · v0.4 progress view · v0.5 burndown and forecast | switch · progress |
+| Next | v0.4 progress view · v0.5 burndown and forecast | progress |
 | Later | v0.8 start and open agents · v0.9 phone at home · v0.10 phone anywhere | switch · progress · skills |
 | Then | v0.13 cloud copy · v0.14 teams · v1.0 public release | switch |
 

@@ -11,7 +11,7 @@ A **CLI** is a command-line interface used from a terminal by people, scripts an
 - Allomos must be well structured for both humans and AI agents (R60).
 - Human interfaces include desktop and mobile; browser and human CLI interfaces must also be considered in the design (R61–R62).
 - **The desktop app provides the complete feature set; web and mobile apps are companions that connect to the running desktop app and view its projects, including progress and status** (R69–R71, accepted 2026-10-04). Operating systems, the mobile form, whether companions may edit, and release order are not selected.
-- Agents already require structured task updates through CLI and MCP (R11). MCP is a protocol through which compatible agent clients discover and call tools.
+- Agents already require structured task updates through the CLI (R11). MCP, a protocol through which compatible agent clients discover and call tools, is deferred ([0018](../decisions/0018-mcp-deferred-agents-use-alm.md)); where this contract names MCP, it applies only if MCP returns.
 - Local project tracking stores project/task information on the user's device without sign-in or an Allomos hosted service (R40–R43). Cloud projects require sign-in (R42). A client cannot silently publish local data to provide cross-device access.
 - A person sets up a new project by describing it to an agent through **Build a new app…**; the agent records it with `alm` (generated-file import, R50–R51, dropped 2026-10-20).
 

@@ -21,3 +21,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0015](./0015-product-name-allomos.md) | The product is called Allomos (换肩); a project's data is its taskbag, always in `.allomos/taskbag/` | Accepted 2026-10-10 |
 | [0016](./0016-waiting-and-blocked-states.md) | Waiting on a person and blocked by another task are two different states (`waiting` narrowed, new `blocked`) | **Accepted** 2026-10-14 |
 | [0017](./0017-agents-run-git-not-alm.md) | `alm` and the app never run Git; each change tells the agent the exact Git commands to share it | **Accepted** 2026-10-14 |
+| [0018](./0018-mcp-deferred-agents-use-alm.md) | MCP is deferred: agents use the `alm` command; Iteration 3 is closed | **Accepted** 2026-10-24 |
