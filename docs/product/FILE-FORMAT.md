@@ -138,7 +138,7 @@ An **iteration** is *when* tasks are planned: a time-box that ends in a release 
 |---|---|---|
 | `id` | yes | Iteration ID, unique in the project (e.g. `I02`). |
 | `name` | yes | What the iteration delivers, e.g. `v0.2 — macOS + Windows`. |
-| `order` | no | Sort order on screen; default `0`, then by ID. |
+| `order` | no | Sort order on screen; default `0`, then by ID. `alm move iteration <id> --before <id>` (or `--after <id>`) (task `A00-skate868`) numbers every iteration again 1, 2, 3… in the new order and records one `move iteration` event for each one whose order changed. |
 | `start` | no | First day, `YYYY-MM-DD`. |
 | `end` | no | Last day, `YYYY-MM-DD`. |
 | `release` | no | The release it produces, e.g. `v0.2`. |

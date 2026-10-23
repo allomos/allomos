@@ -1705,6 +1705,34 @@ pub fn change_iteration(
     })
 }
 
+/// An iteration moved before or after another one (`alm move iteration`, Task-A00-skate868): under
+/// the lock, by the `crates/core` rule, recorded as one `move iteration` event for each iteration
+/// whose order changed. Returns the iterations changed; a move that changes nothing writes none.
+pub fn move_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    place: ops::Place<'_>,
+) -> Result<Added<Vec<Iteration>>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let moved = ops::move_iteration(&bag, id, place)?;
+    for iteration in &moved {
+        let before = bag.iterations.iter().find(|i| i.id == iteration.id);
+        let event = actor.event(
+            "move iteration",
+            Kind::Iteration,
+            Some(&iteration.id),
+            event::changes(before, iteration, &[]),
+        );
+        lock.record(&event, |l| l.save_iteration(iteration))?;
+    }
+    Ok(Added {
+        item: moved,
+        issues,
+    })
+}
+
 /// An area deleted, the same way for `alm delete area` and the app (Task-A01-29): refused while
 /// any task is in it (done and dropped ones too); otherwise its file is removed under the lock,
 /// recorded as one `delete area` event listing what it had. Returns the area as it was.

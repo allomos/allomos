@@ -448,6 +448,49 @@ pub fn change_iteration(
     Ok(iteration)
 }
 
+/// Where `alm move iteration` puts an iteration (Task-A00-skate868): next to another one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place<'a> {
+    Before(&'a str),
+    After(&'a str),
+}
+
+/// The iterations whose order changes when `id` is moved before or after another one (`alm move
+/// iteration`, Task-A00-skate868). Every iteration is numbered 1, 2, 3… in the new sequence and
+/// only those whose number changed are returned; IDs, names, releases, dates and states stay.
+/// Moving an iteration next to itself, or to where it already is, changes nothing.
+pub fn move_iteration(
+    taskbag: &Taskbag,
+    id: &str,
+    place: Place<'_>,
+) -> Result<Vec<Iteration>, Problem> {
+    let moved = find_iteration(taskbag, id)?;
+    let next_to = match place {
+        Place::Before(other) | Place::After(other) => find_iteration(taskbag, other)?.id,
+    };
+    let mut sequence: Vec<&Iteration> = taskbag.iterations.iter().collect();
+    sequence.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
+    if next_to != moved.id {
+        sequence.retain(|i| i.id != moved.id);
+        let at = sequence
+            .iter()
+            .position(|i| i.id == next_to)
+            .expect("found above");
+        let at = match place {
+            Place::Before(_) => at,
+            Place::After(_) => at + 1,
+        };
+        let original = taskbag.iterations.iter().find(|i| i.id == moved.id);
+        sequence.insert(at, original.expect("found above"));
+    }
+    Ok(sequence
+        .into_iter()
+        .zip(1u32..)
+        .filter(|(i, order)| i.order != *order)
+        .map(|(i, order)| Iteration { order, ..i.clone() })
+        .collect())
+}
+
 /// The iteration marked active, if one is (Task-A01-root343). Should a hand edit leave more than
 /// one, the first in order; `validate` reports the rest.
 pub fn marked_active(taskbag: &Taskbag) -> Option<&Iteration> {
@@ -2336,6 +2379,43 @@ mod tests {
         );
         assert_eq!(
             change_iteration(&s, "I09", &IterationChange::default()),
+            Err(Problem::UnknownIteration {
+                iteration: "I09".into()
+            })
+        );
+
+        // Moving (Task-A00-skate868): renumbered 1, 2, 3… in the new sequence; only those whose
+        // order changed come back, with nothing else changed.
+        let mut m = s.clone();
+        for (id, name) in [("I02", "Two"), ("I03", "Three"), ("I04", "Four")] {
+            let it = new_iteration(&m, id, name, IterationDetails::default()).unwrap();
+            m.iterations.push(it);
+        }
+        let orders = |moved: Vec<Iteration>| -> Vec<(String, u32)> {
+            moved.into_iter().map(|i| (i.id, i.order)).collect()
+        };
+        let pairs = |p: &[(&str, u32)]| -> Vec<(String, u32)> {
+            p.iter().map(|(i, o)| (i.to_string(), *o)).collect()
+        };
+        let before = move_iteration(&m, "I04", Place::Before("I02")).unwrap();
+        assert_eq!(before[0].name, "Four");
+        assert_eq!(orders(before), pairs(&[("I04", 2), ("I02", 3), ("I03", 4)]));
+        assert_eq!(
+            orders(move_iteration(&m, "I01", Place::After("I03")).unwrap()),
+            pairs(&[("I02", 1), ("I03", 2), ("I01", 3)])
+        );
+        assert!(
+            move_iteration(&m, "I02", Place::After("I01"))
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            move_iteration(&m, "I02", Place::Before("I02"))
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            move_iteration(&m, "I02", Place::Before("I09")),
             Err(Problem::UnknownIteration {
                 iteration: "I09".into()
             })

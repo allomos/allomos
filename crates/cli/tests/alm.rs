@@ -1864,6 +1864,82 @@ fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
 /// writes one event; a delete is refused while any task is in it, done and dropped ones too; a bad
 /// date has `alm add iteration`'s code.
 #[test]
+fn an_iteration_is_moved_before_or_after_another() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    let events = || fs::read_dir(bag.join("events")).unwrap().count();
+    for (id, name) in [
+        ("I01", "One"),
+        ("I02", "Two"),
+        ("I03", "Three"),
+        ("I04", "Four"),
+    ] {
+        ok(&repo, &["add", "iteration", id, name]);
+    }
+    ok(&repo, &["change", "iteration", "I03", "--release", "v0.3"]);
+    let ids = |v: &Value| -> Vec<String> {
+        v["iterations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["id"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let before = events();
+
+    // Task-A00-skate868: one event per iteration whose order changed; nothing else changes.
+    let v = ok(&repo, &["move", "iteration", "I03", "--before", "I02"]);
+    assert_eq!(v["command"], "move iteration");
+    assert_eq!(ids(&v), ["I01", "I03", "I02", "I04"]);
+    assert_eq!(v["moved"].as_array().unwrap().len(), 2);
+    assert_eq!(events(), before + 2);
+    let v = ok(&repo, &["move", "iteration", "I04", "--before", "I03"]);
+    assert_eq!(ids(&v), ["I01", "I04", "I03", "I02"]);
+    let v = ok(&repo, &["move", "iteration", "I01", "--after", "I02"]);
+    assert_eq!(ids(&v), ["I04", "I03", "I02", "I01"]);
+    let v = ok(&repo, &["list", "--by", "iteration"]);
+    assert_eq!(ids(&v), ["I04", "I03", "I02", "I01"]);
+    assert_eq!(v["iterations"][1]["release"], "v0.3");
+    assert_eq!(v["issues"], json!([]));
+
+    // Already there: nothing written.
+    let before = events();
+    let v = ok(&repo, &["move", "iteration", "I03", "--after", "I04"]);
+    assert_eq!(v["moved"], json!([]));
+    ok(&repo, &["move", "iteration", "I03", "--before", "I03"]);
+    assert_eq!(events(), before);
+
+    // Refusals.
+    refused(
+        &repo,
+        &["move", "iteration", "I09", "--before", "I01"],
+        1,
+        "unknown_iteration",
+    );
+    refused(
+        &repo,
+        &["move", "iteration", "I01", "--after", "I09"],
+        1,
+        "unknown_iteration",
+    );
+    for args in [
+        &["move", "iteration", "I01"][..],
+        &[
+            "move",
+            "iteration",
+            "I01",
+            "--before",
+            "I02",
+            "--after",
+            "I03",
+        ][..],
+    ] {
+        assert!(!alm(&repo, args).status.success(), "{args:?}");
+    }
+    assert_eq!(events(), before);
+}
+
+#[test]
 fn areas_and_iterations_are_renamed_changed_and_deleted() {
     let repo = filled();
     let bag = repo.join(".allomos/taskbag");

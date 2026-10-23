@@ -103,6 +103,10 @@ enum Command {
     /// [--state planned|active|closed]`.
     #[command(subcommand)]
     Change(ChangeWhat),
+    /// Move an iteration to another place in the plan: `alm move iteration <id> --before <id>`
+    /// (or `--after <id>`). Only the order changes.
+    #[command(subcommand)]
+    Move(MoveWhat),
     /// Delete an area or an iteration; refused while any task is in it, done and dropped ones too.
     #[command(subcommand)]
     Delete(Delete),
@@ -559,6 +563,22 @@ enum ChangeWhat {
 }
 
 #[derive(Subcommand)]
+enum MoveWhat {
+    /// Put an iteration just before or just after another one (Task-A00-skate868). Its ID, name,
+    /// release, dates and state stay; the iterations are numbered again in the new order.
+    #[command(group(clap::ArgGroup::new("place").required(true).args(["before", "after"])))]
+    Iteration {
+        id: String,
+        /// The iteration it goes just before.
+        #[arg(long, value_name = "ID")]
+        before: Option<String>,
+        /// The iteration it goes just after.
+        #[arg(long, value_name = "ID")]
+        after: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum Delete {
     /// Delete an area. Refused while any task is in it, done and dropped ones included.
     Area { id: String },
@@ -585,6 +605,7 @@ impl Command {
             Command::Rename(Rename::Label { old, .. }) => Some(old),
             Command::Rename(Rename::Area { id, .. })
             | Command::Change(ChangeWhat::Iteration { id, .. })
+            | Command::Move(MoveWhat::Iteration { id, .. })
             | Command::Delete(Delete::Area { id } | Delete::Iteration { id }) => Some(id),
             Command::Show { id }
             | Command::History { id }
@@ -685,6 +706,7 @@ impl Command {
             Command::Rename(Rename::Area { .. }) => "rename area",
             Command::Rename(Rename::Label { .. }) => "rename label",
             Command::Change(ChangeWhat::Iteration { .. }) => "change iteration",
+            Command::Move(MoveWhat::Iteration { .. }) => "move iteration",
             Command::Delete(Delete::Area { .. }) => "delete area",
             Command::Delete(Delete::Iteration { .. }) => "delete iteration",
             Command::List { .. } => "list",
@@ -2414,6 +2436,40 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text,
             );
             done.issues = changed.issues;
+            Ok(done)
+        }
+        Command::Move(MoveWhat::Iteration { id, before, after }) => {
+            let root = locate(cli, cwd)?;
+            let place = match (before, after) {
+                (Some(other), _) => ops::Place::Before(other),
+                (None, Some(other)) => ops::Place::After(other),
+                (None, None) => unreachable!("clap requires --before or --after"),
+            };
+            let moved =
+                allomos_store::move_iteration(&root, Actor::alm(me), lock_wait(), id, place)?;
+            let (word, other) = match place {
+                ops::Place::Before(o) => ("before", o),
+                ops::Place::After(o) => ("after", o),
+            };
+            let mut text = if moved.item.is_empty() {
+                format!("{id} is already there; nothing changed.\n")
+            } else {
+                format!("Moved iteration {id} {word} {other}\n")
+            };
+            let mut order: Vec<Iteration> = Vec::new();
+            if let Ok((bag, _)) = taskbag_of(&root, load(&root)) {
+                order = bag.iterations;
+                order.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
+                text.push_str("The iterations, in order:\n");
+                for it in &order {
+                    text.push_str(&format!("  {}\n", iteration_heading(it)));
+                }
+            }
+            let mut done = Done::new(
+                json!({ "taskbag": root, "moved": moved.item, "iterations": order }),
+                text,
+            );
+            done.issues = moved.issues;
             Ok(done)
         }
         Command::Delete(what) => {
