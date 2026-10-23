@@ -60,7 +60,7 @@ export function MoveCardsDialog({
   const { t } = useI18n();
   return (
     <div className="overlay" role="presentation">
-      <section className="dialog wizard" role="dialog" aria-modal="true" aria-labelledby="cards-title">
+      <section className="dialog wizard move-cards" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
         <MoveCardsPanel messenger={messenger} root={root} found={found} handoffs={handoffs} moveIn={moveIn} section={section} noTasks={noTasks} onClose={onClose} />
       </section>
@@ -226,7 +226,7 @@ export function MoveCardsPanel({
     </>
   );
 
-  return (
+  const intro = (
     <>
       {request === null && moveIn && (
         <>
@@ -280,9 +280,25 @@ export function MoveCardsPanel({
       {request === null && offer?.kind === "manual" && <p className="small">{t("cards.only_manual", { agent: offer.group })}</p>}
 
       {extra}
+    </>
+  );
 
-      {/* In the wizard its body already scrolls; on its own, this part scrolls. */}
-      {actionsIn === undefined ? <div className="dialog-body wizard-body">{chooser}</div> : chooser}
+  return (
+    <>
+      {/* In the wizard its body already scrolls; on its own, the explanation, the list of what
+          Allomos found and the agent picker scroll together, so a long list cannot squeeze the
+          text above it. */}
+      {actionsIn === undefined ? (
+        <div className="dialog-body wizard-body">
+          {intro}
+          {chooser}
+        </div>
+      ) : (
+        <>
+          {intro}
+          {chooser}
+        </>
+      )}
 
       {error && <p className="banner error">{error}</p>}
 

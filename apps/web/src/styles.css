@@ -462,6 +462,8 @@ button.link:hover { text-decoration: underline; }
 
 /* The setup wizard (Task-A05-03): the confirm dialog's frame, with steps that may hold the agents panel. */
 .wizard { grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+/* Update the taskbag on its own: title, one scrolling body (explanation, list, agents), error, buttons. */
+.move-cards { grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .wizard-body { display: grid; gap: 10px; align-content: start; }
 .wizard-body h3 { margin: 0; font-size: 16px; }
 .wizard-body p { margin: 0; }
