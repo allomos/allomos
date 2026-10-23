@@ -1,6 +1,7 @@
 // Is the open project up to date with this Allomos (Task-A01-25)? Kept apart from React so it can
 // be tested with Node alone (`npm --prefix apps/web test`). Only type imports here: Node strips them.
 
+import type { Message } from "./i18n";
 import type { VersionCheck } from "./types";
 
 /** The instruction files whose Allomos section is older than this Allomos's, or has no version. */
@@ -33,4 +34,16 @@ export function updateNotice(check: VersionCheck | null): UpdateNotice | null {
 /** Whether a notice is about moving tasks in from an older taskbag, rather than the instructions. */
 export function movingTasks(notice: UpdateNotice | null): boolean {
   return notice?.kind === "move_in" || notice?.kind === "moving_in";
+}
+
+/** The lines of the one **Update the taskbag…** banner (Task-A03-train969): every reason the
+ * taskbag needs updating, one after another, under a single button; empty: no banner. */
+export function updateTaskbagLines(notice: UpdateNotice | null, cards: number, handoffs: number): Message[] {
+  const lines: Message[] = [];
+  if (notice?.kind === "move_in") lines.push({ key: "move.notice_old", params: { found: notice.found } });
+  else if (notice?.kind === "moving_in") lines.push({ key: "move.notice_waiting", params: { old: notice.old } });
+  else if (notice?.kind === "section") lines.push({ key: "update.notice_section", params: { files: notice.files } });
+  if (cards > 0) lines.push({ key: "cards.notice", params: { count: cards } });
+  if (handoffs > 0) lines.push({ key: "old_handoffs.notice", params: { count: handoffs } });
+  return lines;
 }

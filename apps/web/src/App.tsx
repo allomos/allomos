@@ -12,7 +12,8 @@ import { MoveCardsDialog } from "./MoveCardsDialog";
 import { cardRows, cardsNotice, oldHandoffs, tasksInStart } from "./moveCardsFlow";
 import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
-import { outdatedFiles, updateNotice } from "./versionFlow";
+import { outdatedFiles } from "./versionFlow";
+import { UpdateTaskbagNotice } from "./UpdateTaskbagNotice";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { HandoffSettingsDialog } from "./HandoffSettings";
@@ -53,7 +54,7 @@ import { GroupEditForm } from "./GroupEditForm";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory, VersionCheck } from "./types";
+import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -523,36 +524,17 @@ export function App({ messenger }: { messenger: Messenger }) {
             {noteText(n)}
           </Banner>
         ))}
-        {/* Out of date with this Allomos (Task-A01-25): an agent does it, from the Connect panel;
-            or an older Allomos's taskbag whose tasks are to be moved in (Task-A01-45): Update the
-            taskbag…, the same dialog as for card files. */}
+        {/* Every reason the taskbag needs updating, in one banner with one Update the
+            taskbag… button (Task-A03-train969). */}
         {opened && (
-          <VersionNotice
+          <UpdateTaskbagNotice
             messenger={messenger}
             root={opened.root}
+            cards={cardsNotice(opened)}
+            handoffs={oldHandoffs(opened).length}
             onUpdate={openTasksIn}
             onOlder={setOlderShown}
           />
-        )}
-        {/* Card files still in the project folder (Task-A00-30): named by the tasks' Card: links
-            (Task-A01-51) or reported by an agent. */}
-        {opened && cardsNotice(opened) > 0 && (
-          <div className="banner update" role="status">
-            <span>{t("cards.notice", { count: cardsNotice(opened) })}</span>
-            <button type="button" className="primary" onClick={() => void openTasksIn()}>
-              {t("cards.button")}
-            </button>
-          </div>
-        )}
-        {/* An older taskbag's handoff files (Task-A03-polar770): a handoff now lives in its task;
-            an agent moves what is still useful into the tasks and removes the files. */}
-        {opened && oldHandoffs(opened).length > 0 && (
-          <div className="banner update" role="status">
-            <span>{t("old_handoffs.notice", { count: oldHandoffs(opened).length })}</span>
-            <button type="button" className="primary" onClick={() => void openTasksIn()}>
-              {t("cards.button")}
-            </button>
-          </div>
         )}
         {opened && movingCards && (
           <MoveCardsDialog
@@ -688,78 +670,6 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
       </main>
-    </div>
-  );
-}
-
-/** How often the update notice checks again: an agent's update shows without reopening. */
-const VERSION_CHECK_MS = 4000;
-
-/** "Allomos's instructions are out of date" (Task-A01-25), or "This taskbag was written by an
- * older Allomos" (Task-A01-45: the old folder is renamed aside, a new taskbag created, and an agent
- * moves the tasks across), each with **Update the taskbag…**, the same dialog as for card files
- * (Task-A03-27: the cases the taskbag needs updating). Asked
- * when the folder opens (every way of opening one) and every few seconds while it is open.
- * Allomos never changes the tasks or the instructions itself. */
-function VersionNotice({
-  messenger,
-  root,
-  onUpdate,
-  onOlder,
-}: {
-  messenger: Messenger;
-  root: string;
-  /** Update the taskbag…: rename an older taskbag aside (unless it already is), then open the
-   * dialog that asks an agent for whichever update applies. */
-  onUpdate: () => Promise<void>;
-  /** Whether this notice says the taskbag is from an older Allomos, so the problem list does not
-   * say it again. */
-  onOlder: (shown: boolean) => void;
-}) {
-  const { t } = useI18n();
-  const [check, setCheck] = useState<VersionCheck | null>(null);
-  useEffect(() => {
-    let live = true;
-    setCheck(null);
-    const look = () =>
-      messenger
-        .versionCheck(root)
-        .then((c) => live && setCheck(c))
-        .catch(() => undefined);
-    void look();
-    const timer = window.setInterval(() => void look(), VERSION_CHECK_MS);
-    return () => {
-      live = false;
-      window.clearInterval(timer);
-    };
-  }, [messenger, root]);
-  const [busy, setBusy] = useState(false);
-  const notice = updateNotice(check);
-  const older = notice?.kind === "move_in";
-  useEffect(() => {
-    onOlder(older);
-    return () => onOlder(false);
-  }, [older, onOlder]);
-  if (!notice) return null;
-  const update = () => {
-    setBusy(true);
-    void onUpdate().finally(() => {
-      setBusy(false);
-      setCheck(null);
-    });
-  };
-  return (
-    <div className="banner update" role="status">
-      <span>
-        {notice.kind === "move_in"
-          ? t("move.notice_old", { found: notice.found })
-          : notice.kind === "moving_in"
-            ? t("move.notice_waiting", { old: notice.old })
-            : t("update.notice_section", { files: notice.files })}
-      </span>
-      <button type="button" className="primary" onClick={update} disabled={busy}>
-        {t("cards.button")}
-      </button>
     </div>
   );
 }

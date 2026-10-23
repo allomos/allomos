@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { movingTasks, outdatedFiles, updateNotice } from "../src/versionFlow.ts";
+import { movingTasks, outdatedFiles, updateNotice, updateTaskbagLines } from "../src/versionFlow.ts";
 import type { VersionCheck } from "../src/types.ts";
 
 const check = (
@@ -60,4 +60,18 @@ test("renamed aside, with no task moved in yet: the move is offered again", () =
 
 test("a newer taskbag is left to the problem list", () => {
   assert.equal(updateNotice(check({ state: "newer", found: "allomos/9" }, [{ file: "AGENTS.md", version: 1 }])), null);
+});
+
+test("one Update the taskbag banner lists every reason, in order (Task-A03-train969)", () => {
+  assert.deepEqual(updateTaskbagLines(null, 0, 0), []);
+  assert.deepEqual(updateTaskbagLines({ kind: "section", files: "AGENTS.md" }, 0, 1), [
+    { key: "update.notice_section", params: { files: "AGENTS.md" } },
+    { key: "old_handoffs.notice", params: { count: 1 } },
+  ]);
+  assert.deepEqual(updateTaskbagLines({ kind: "move_in", found: "allomos/3" }, 2, 3), [
+    { key: "move.notice_old", params: { found: "allomos/3" } },
+    { key: "cards.notice", params: { count: 2 } },
+    { key: "old_handoffs.notice", params: { count: 3 } },
+  ]);
+  assert.deepEqual(updateTaskbagLines(null, 2, 0), [{ key: "cards.notice", params: { count: 2 } }]);
 });
