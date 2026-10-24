@@ -131,7 +131,7 @@ pub fn next_task_id(taskbag: &Taskbag, area: &str) -> Result<String, Problem> {
 /// The next free ID after `ids` (in their order), following the project's own pattern
 /// `<letters><number>`: the letters of the last such ID (`fallback` when there is none), one more
 /// than the highest number used with them, as wide as the widest one (at least two digits). IDs of
-/// another shape do not count. Shared by areas (`A08` after `A07`) and iterations (`I16`).
+/// another shape do not count. Used for areas (`A08` after `A07`).
 fn next_numbered_id<'a>(ids: impl Iterator<Item = &'a str> + Clone, fallback: &'a str) -> String {
     let split = |id: &'a str| -> Option<(&'a str, &'a str)> {
         let at = id.trim_end_matches(|c: char| c.is_ascii_digit()).len();
@@ -160,12 +160,10 @@ pub fn next_area_id(taskbag: &Taskbag) -> String {
     next_numbered_id(areas.iter().map(|a| a.id.as_str()), "A")
 }
 
-/// The next free iteration ID (`alm add iteration` without one; the app's suggestion,
-/// Task-A01-19): `I16` after `I01`–`I15`, `I01` in a taskbag with no iterations.
+/// A new iteration ID (`alm add iteration` without one; the app's suggestion, Task-A01-19): an
+/// unused `I-<labor word>`, for example `I-knit` (Task-A00-rope803).
 pub fn next_iteration_id(taskbag: &Taskbag) -> String {
-    let mut iterations: Vec<&Iteration> = taskbag.iterations.iter().collect();
-    iterations.sort_by_key(|i| i.order);
-    next_numbered_id(iterations.iter().map(|i| i.id.as_str()), "I")
+    crate::ids::new_iteration_id(|id| taskbag.iterations.iter().any(|i| i.id == id))
 }
 
 /// The project with a new task language (`alm language`): `ui` to follow the Allomos app's
@@ -392,6 +390,37 @@ pub fn rename_area(taskbag: &Taskbag, id: &str, name: &str) -> Result<Area, Prob
     let mut area = find_area(taskbag, id)?;
     area.name = non_empty(Some(name)).ok_or(Problem::AreaNameMissing)?;
     Ok(area)
+}
+
+/// An iteration with a new ID, and every task planned in it moved along (`alm rename iteration`,
+/// Task-A00-rope803): done and dropped tasks too. Its name, release, dates, state and order stay.
+/// The new ID must be valid and unused; renaming to the same ID changes nothing.
+pub fn rename_iteration(
+    taskbag: &Taskbag,
+    old: &str,
+    new: &str,
+) -> Result<(Iteration, Vec<Task>), Problem> {
+    let mut iteration = find_iteration(taskbag, old)?;
+    if new == old {
+        return Ok((iteration, Vec::new()));
+    }
+    check_id(new)?;
+    if taskbag.iterations.iter().any(|i| i.id == new) {
+        return Err(Problem::DuplicateIterationId {
+            id: new.to_string(),
+        });
+    }
+    iteration.id = new.to_string();
+    let tasks = taskbag
+        .tasks
+        .iter()
+        .filter(|t| t.iteration.as_deref() == Some(old))
+        .map(|t| Task {
+            iteration: Some(new.to_string()),
+            ..t.clone()
+        })
+        .collect();
+    Ok((iteration, tasks))
 }
 
 /// What `alm change iteration` changes (Task-A01-29). A field left out (`None`) stays as it is;
@@ -1764,7 +1793,12 @@ mod tests {
         let mut s = bag();
         s.areas.clear();
         assert_eq!(next_area_id(&s), "A01");
-        assert_eq!(next_iteration_id(&s), "I01");
+        // Iterations get an unused `I-<labor word>` (Task-A00-rope803).
+        let labor = |id: &str| {
+            id.strip_prefix("I-")
+                .is_some_and(|w| w.len() >= 3 && w.chars().all(|c| c.is_ascii_lowercase()))
+        };
+        assert!(labor(&next_iteration_id(&s)), "{}", next_iteration_id(&s));
         for id in ["A00", "A01", "A07"] {
             s.areas.push(new_area(&s, id, "x").unwrap());
         }
@@ -1774,7 +1808,7 @@ mod tests {
             s.iterations
                 .push(new_iteration(&s, &id, "x", IterationDetails::default()).unwrap());
         }
-        assert_eq!(next_iteration_id(&s), "I16");
+        assert!(labor(&next_iteration_id(&s)));
         // Other shapes do not count; the last area's letters are followed; width is kept.
         s.areas.push(new_area(&s, "misc", "x").unwrap());
         assert_eq!(next_area_id(&s), "A08");

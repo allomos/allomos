@@ -2497,7 +2497,9 @@ mod tests {
         let root = dir.join(allomos_store::DEFAULT_DIR);
         init(&root, "p", "P").unwrap();
         let ids = next_ids(root.clone()).unwrap();
-        assert_eq!((ids.area.as_str(), ids.iteration.as_str()), ("A01", "I01"));
+        assert_eq!(ids.area, "A01");
+        // An unused `I-<labor word>` (Task-A00-rope803).
+        assert!(ids.iteration.starts_with("I-"), "{}", ids.iteration);
         assert!(ids.tasks.is_empty());
 
         // Without the person's name, nothing is added.
@@ -2530,7 +2532,7 @@ mod tests {
             })
         );
         let ids = next_ids(root.clone()).unwrap();
-        assert_eq!(ids.iteration, "I08");
+        assert!(ids.iteration.starts_with("I-"), "{}", ids.iteration);
         // A word ID in the area (Task-A01-54).
         let suggested = ids.tasks.get("A01").unwrap();
         assert!(
@@ -2580,7 +2582,7 @@ mod tests {
         }))
         .unwrap();
         let t = add_iteration_and_plan_as(&root, Some("Will"), "A01-01", pane).unwrap();
-        assert_eq!(t.iteration.as_deref(), Some("I08"));
+        assert!(t.iteration.as_deref().is_some_and(|i| i.starts_with("I-")));
         let h = allomos_store::events::history(&root, "A01-01");
         assert_eq!(
             (h.events[0].command.as_str(), h.events[0].via.as_str()),

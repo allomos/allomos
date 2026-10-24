@@ -1641,6 +1641,51 @@ pub fn rename_area(
     Ok(Added { item: area, issues })
 }
 
+/// What [`rename_iteration`] changed: the iteration under its new ID, and the tasks moved along.
+pub type RenamedIteration = (Iteration, Vec<Task>);
+
+/// An iteration given a new ID (`alm rename iteration`, Task-A00-rope803): under the lock, by the
+/// `crates/core` rule, its file written under the new ID and the old one removed, recorded as one
+/// `rename iteration` event for it (its `id` from the old to the new) and one for each task
+/// planned in it. Renaming to the same ID writes nothing.
+pub fn rename_iteration(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    old: &str,
+    new: &str,
+) -> Result<Added<RenamedIteration>, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let (iteration, tasks) = ops::rename_iteration(&bag, old, new)?;
+    if iteration.id != old {
+        let before = bag.iterations.iter().find(|i| i.id == old);
+        let event = actor.event(
+            "rename iteration",
+            Kind::Iteration,
+            Some(&iteration.id),
+            event::changes(before, &iteration, &[]),
+        );
+        lock.record(&event, |l| {
+            l.save_iteration(&iteration)?;
+            l.remove_item("iterations", old)
+        })?;
+        for task in &tasks {
+            let before = bag.tasks.iter().find(|t| t.id == task.id);
+            let event = actor.event(
+                "rename iteration",
+                Kind::Task,
+                Some(&task.id),
+                event::changes(before, task, event::TASK_FIELDS),
+            );
+            lock.record(&event, |l| l.save_task(task))?;
+        }
+    }
+    Ok(Added {
+        item: (iteration, tasks),
+        issues,
+    })
+}
+
 /// What [`rename_label`] changed: the new ladder, and the tasks whose label changed.
 pub type RenamedLabel = (Vec<String>, Vec<Task>);
 

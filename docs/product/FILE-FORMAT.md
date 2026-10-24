@@ -136,7 +136,7 @@ An **iteration** is *when* tasks are planned: a time-box that ends in a release 
 
 | Field | Required | Meaning |
 |---|---|---|
-| `id` | yes | Iteration ID, unique in the project (e.g. `I02`). |
+| `id` | yes | Iteration ID, unique in the project. New ones are `I-` plus a labor word (e.g. `I-knit`; task `A00-rope803`): `alm add iteration` without an ID picks an unused one. Older numbered IDs (`I02`) still work. `alm rename iteration <old> <new>` changes it and the `iteration` of every task planned in it, recorded as `rename iteration` events (the iteration's lists its `id` from the old to the new). |
 | `name` | yes | What the iteration delivers, e.g. `v0.2 — macOS + Windows`. |
 | `order` | no | Sort order on screen; default `0`, then by ID. `alm move iteration <id> --before <id>` (or `--after <id>`) (task `A00-skate868`) numbers every iteration again 1, 2, 3… in the new order and records one `move iteration` event for each one whose order changed. |
 | `start` | no | First day, `YYYY-MM-DD`. |

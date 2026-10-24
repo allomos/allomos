@@ -44,6 +44,32 @@ pub fn new_task_id(area: &str, mut taken: impl FnMut(&str) -> bool) -> String {
     }
 }
 
+/// Labor words for iteration IDs (Task-A00-rope803), one per line, lowercase, 3–6 letters.
+const LABOR: &str = include_str!("ids/labor.txt");
+
+/// A new iteration ID not in `taken`: `I-<labor word>`, an unused one drawn at random (approver,
+/// 2026-10-24: iterations are named by a word, not by a number that looks like their place in the
+/// plan). Once every word is used, `I-<word><two digits>`.
+pub fn new_iteration_id(mut taken: impl FnMut(&str) -> bool) -> String {
+    let words: Vec<&str> = LABOR.lines().filter(|w| !w.is_empty()).collect();
+    let free: Vec<String> = words
+        .iter()
+        .map(|w| format!("I-{w}"))
+        .filter(|id| !taken(id))
+        .collect();
+    if !free.is_empty() {
+        return free[(random() % free.len() as u64) as usize].clone();
+    }
+    loop {
+        let n = random();
+        let word = words[(n % words.len() as u64) as usize];
+        let id = format!("I-{word}{:02}", (n / words.len() as u64) % 100);
+        if !taken(&id) {
+            return id;
+        }
+    }
+}
+
 /// Whether `id` has the older, numbered shape (`A01-53`, `A01-03-01`): only digits after the
 /// area.
 pub fn numbered(id: &str) -> bool {
@@ -176,5 +202,30 @@ mod tests {
                 && !numbered("A01")
                 && !numbered("A01-tiger042")
         );
+    }
+
+    /// Task-A00-rope803: an unused `I-<labor word>`; once all are used, a word with two digits.
+    #[test]
+    fn iteration_ids_are_unused_labor_words() {
+        let labor: Vec<&str> = LABOR.lines().filter(|w| !w.is_empty()).collect();
+        assert!(labor.len() >= 100);
+        for w in &labor {
+            assert!((3..=6).contains(&w.len()) && w.chars().all(|c| c.is_ascii_lowercase()));
+        }
+        for w in [
+            "dig", "plow", "sow", "knit", "haul", "tally", "stoke", "forge", "glean",
+        ] {
+            assert!(labor.contains(&w), "{w}");
+        }
+        let id = new_iteration_id(|_| false);
+        assert!(labor.contains(&id.strip_prefix("I-").unwrap()), "{id}");
+        // Only one left: that one.
+        for _ in 0..20 {
+            assert_eq!(new_iteration_id(|id| id != "I-sow"), "I-sow");
+        }
+        // None left: a word and two digits, never a used one.
+        let id = new_iteration_id(|id| !id.ends_with(|c: char| c.is_ascii_digit()));
+        let (word, digits) = id[2..].split_at(id.len() - 4);
+        assert!(labor.contains(&word) && digits.len() == 2, "{id}");
     }
 }

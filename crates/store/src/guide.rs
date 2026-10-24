@@ -84,7 +84,7 @@ const CUSTOMIZE: &str = "# What a project may change, and what is fixed
 | Term | This project may change | How |
 |---|---|---|
 | Areas | which areas exist, their IDs and names | `alm add area <id> \"<name>\"`, `alm rename area`, `alm delete area` (only an empty one) |
-| Iterations | which exist, their names, releases and dates; which task is in which | `alm add iteration`, `alm change iteration`, `alm move iteration` (its place in the plan), `alm delete iteration` (only an empty one), `alm plan` |
+| Iterations | which exist, their names, releases and dates; which task is in which | `alm add iteration`, `alm change iteration`, `alm rename iteration` (its ID, with its tasks), `alm move iteration` (its place in the plan), `alm delete iteration` (only an empty one), `alm plan` |
 | Label ladder | its steps and their order | `alm labels \"<a,b,…>\"` (refused if a task's label would be left off); `alm rename label \"<old>\" \"<new>\"` renames a step and the tasks that carry it |
 | Task IDs and titles | any ID of letters, digits, `-` or `_` (for example A01-02) | `alm add task <id> --area <id> --title \"…\"` |
 | Description | free Markdown in description.md | written with `alm add task --description` |
@@ -238,9 +238,12 @@ Work a task:
 
 Plan:
 - `alm add area [<id>] \"<name>\"`, `alm add iteration [<id>] \"<name>\" [--release …] [--start …]
-  [--end …]`: without an ID, the next free one, like A08 or I16.
+  [--end …]`: without an ID, the next free one: an area gets A08 after A07, an iteration an
+  unused labor word, like I-knit.
 - `alm rename area <id> \"<name>\"`; `alm change iteration <id> [--name …] [--release …]
   [--start …] [--end …]` (an empty value clears a release or date). IDs stay.
+- `alm rename iteration <old> <new>`: give an iteration a new ID (`I-<word>`, like I-knit); every
+  task planned in it moves along.
 - `alm move iteration <id> --before <id>` (or `--after <id>`): put an iteration in another place
   in the plan; only the order changes.
 - `alm delete area <id>`, `alm delete iteration <id>`: refused while any task is in it, done and

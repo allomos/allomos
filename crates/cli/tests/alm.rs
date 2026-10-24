@@ -1826,15 +1826,16 @@ fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
     assert_eq!(ok(&repo, &["add", "area", "Next"])["area"]["id"], "A08");
 
     let v = ok(&repo, &["add", "iteration", "First", "--release", "v0.1"]);
-    assert_eq!(
-        (&v["iteration"]["id"], &v["iteration"]["release"]),
-        (&json!("I01"), &json!("v0.1"))
-    );
+    // An unused `I-<labor word>` (Task-A00-rope803).
+    let first = v["iteration"]["id"].as_str().unwrap().to_string();
+    assert!(first.starts_with("I-"), "{first}");
+    assert_eq!(v["iteration"]["release"], "v0.1");
     let v = ok(
         &repo,
         &["add", "iteration", "Second", "--start", "2026-10-15"],
     );
-    assert_eq!(v["iteration"]["id"], "I02");
+    let second = v["iteration"]["id"].as_str().unwrap();
+    assert!(second.starts_with("I-") && second != first, "{second}");
     assert_eq!(events(), before + 5);
 
     // Refused with the same codes as before, and nothing written.
@@ -1846,7 +1847,7 @@ fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
     );
     refused(
         &repo,
-        &["add", "iteration", "I01", "Again"],
+        &["add", "iteration", &first, "Again"],
         1,
         "duplicate_iteration_id",
     );
@@ -1857,12 +1858,85 @@ fn add_area_and_iteration_without_an_id_take_the_next_free_one() {
         "invalid_date",
     );
     assert_eq!(events(), before + 5);
-    assert!(!repo.join(".allomos/taskbag/iterations/I03.json").exists());
+    let files = fs::read_dir(repo.join(".allomos/taskbag/iterations")).unwrap();
+    assert_eq!(files.count(), 2);
 }
 
-/// `alm rename area`, `alm change iteration`, `alm delete area|iteration` (Task-A01-29): each
-/// writes one event; a delete is refused while any task is in it, done and dropped ones too; a bad
-/// date has `alm add iteration`'s code.
+/// `alm rename iteration` (Task-A00-rope803): a new ID, with every task planned in it moved
+/// along; one event for the iteration and one for each task.
+#[test]
+fn an_iteration_is_renamed_with_its_tasks() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    let events = || fs::read_dir(bag.join("events")).unwrap().count();
+    ok(
+        &repo,
+        &["add", "iteration", "I01", "One", "--release", "v0.1"],
+    );
+    ok(&repo, &["add", "iteration", "I02", "Two"]);
+    ok(&repo, &["change", "iteration", "I01", "--state", "active"]);
+    let tasks: Vec<String> = ok(&repo, &["list"])["areas"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|a| a["tasks"].as_array().unwrap().clone())
+        .map(|t| t["id"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(tasks.len(), 3);
+    ok(&repo, &["plan", &tasks[0], "I01"]);
+    ok(&repo, &["plan", &tasks[1], "I01"]);
+    ok(&repo, &["plan", &tasks[2], "I02"]);
+    ok(&repo, &["drop", &tasks[1]]);
+    let before = events();
+
+    let v = ok(&repo, &["rename", "iteration", "I01", "I-knit"]);
+    assert_eq!(v["command"], "rename iteration");
+    assert_eq!(
+        (
+            &v["iteration"]["id"],
+            &v["iteration"]["release"],
+            &v["iteration"]["state"]
+        ),
+        (&json!("I-knit"), &json!("v0.1"), &json!("active"))
+    );
+    assert_eq!(v["tasks"].as_array().unwrap().len(), 2);
+    assert_eq!(events(), before + 3);
+    assert!(!bag.join("iterations/I01.json").exists());
+    assert!(bag.join("iterations/I-knit.json").exists());
+    for (t, it) in [
+        (&tasks[0], "I-knit"),
+        (&tasks[1], "I-knit"),
+        (&tasks[2], "I02"),
+    ] {
+        assert_eq!(ok(&repo, &["show", t])["task"]["iteration"], it, "{t}");
+    }
+    let v = ok(&repo, &["list", "--json"]);
+    assert_eq!(v["issues"], json!([]));
+
+    // The same ID: nothing written. Refusals: nothing written.
+    let before = events();
+    ok(&repo, &["rename", "iteration", "I-knit", "I-knit"]);
+    refused(
+        &repo,
+        &["rename", "iteration", "I09", "I-sow"],
+        1,
+        "unknown_iteration",
+    );
+    refused(
+        &repo,
+        &["rename", "iteration", "I02", "I-knit"],
+        1,
+        "duplicate_iteration_id",
+    );
+    refused(
+        &repo,
+        &["rename", "iteration", "I02", "I.sow"],
+        1,
+        "invalid_id",
+    );
+    assert_eq!(events(), before);
+}
+
 #[test]
 fn an_iteration_is_moved_before_or_after_another() {
     let repo = filled();
@@ -1939,6 +2013,9 @@ fn an_iteration_is_moved_before_or_after_another() {
     assert_eq!(events(), before);
 }
 
+/// `alm rename area`, `alm change iteration`, `alm delete area|iteration` (Task-A01-29): each
+/// writes one event; a delete is refused while any task is in it, done and dropped ones too; a bad
+/// date has `alm add iteration`'s code.
 #[test]
 fn areas_and_iterations_are_renamed_changed_and_deleted() {
     let repo = filled();

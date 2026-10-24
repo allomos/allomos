@@ -130,7 +130,7 @@ fn present(value: Option<&Value>) -> Option<Value> {
 
 /// The fields that differ between `before` (`None`: the item is new) and `after`, listed in
 /// `order` first and then by name. A new item's `id` is not listed: the event names the item.
-/// A changed `id` (only the project's can change) is.
+/// A changed `id` (the project's, or an iteration's with `alm rename iteration`) is.
 pub fn changes<T: Serialize>(before: Option<&T>, after: &T, order: &[&str]) -> Vec<Change> {
     let old = before.map(object).unwrap_or_default();
     let new = object(after);

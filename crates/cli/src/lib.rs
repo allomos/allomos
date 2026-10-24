@@ -95,8 +95,9 @@ enum Command {
     /// Add an area or a task.
     #[command(subcommand)]
     Add(Add),
-    /// Rename an area (`alm rename area <id> "<name>"`; its ID stays), or a label of the ladder
-    /// with every task that carries it (`alm rename label "<old>" "<new>"`).
+    /// Rename an area (`alm rename area <id> "<name>"`; its ID stays), give an iteration a new ID
+    /// with every task planned in it (`alm rename iteration <old> <new>`), or rename a label of the
+    /// ladder with every task that carries it (`alm rename label "<old>" "<new>"`).
     #[command(subcommand)]
     Rename(Rename),
     /// Change an iteration: `alm change iteration <id> [--name] [--release] [--start] [--end]
@@ -533,6 +534,9 @@ enum Add {
 enum Rename {
     /// Give an area a new name; its ID stays.
     Area { id: String, name: String },
+    /// Give an iteration a new ID, for example `I-knit` (Task-A00-rope803). Every task planned in
+    /// it, done and dropped ones too, moves along; its name, release, dates, state and order stay.
+    Iteration { old: String, new: String },
     /// Rename a step of the label ladder, and the label of every task that carries it (done and
     /// dropped ones too). Its place on the ladder stays.
     Label { old: String, new: String },
@@ -602,7 +606,7 @@ impl Command {
             Command::Add(Add::Area { first, name } | Add::Iteration { first, name, .. }) => {
                 id_and_name(first, name).0
             }
-            Command::Rename(Rename::Label { old, .. }) => Some(old),
+            Command::Rename(Rename::Label { old, .. } | Rename::Iteration { old, .. }) => Some(old),
             Command::Rename(Rename::Area { id, .. })
             | Command::Change(ChangeWhat::Iteration { id, .. })
             | Command::Move(MoveWhat::Iteration { id, .. })
@@ -705,6 +709,7 @@ impl Command {
             Command::Add(Add::Task { .. }) => "add task",
             Command::Rename(Rename::Area { .. }) => "rename area",
             Command::Rename(Rename::Label { .. }) => "rename label",
+            Command::Rename(Rename::Iteration { .. }) => "rename iteration",
             Command::Change(ChangeWhat::Iteration { .. }) => "change iteration",
             Command::Move(MoveWhat::Iteration { .. }) => "move iteration",
             Command::Delete(Delete::Area { .. }) => "delete area",
@@ -2362,6 +2367,34 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let area = renamed.item;
             let text = format!("Renamed area {} ({})\n", area.id, area.name);
             let mut done = Done::new(json!({ "taskbag": root, "area": area }), text);
+            done.issues = renamed.issues;
+            Ok(done)
+        }
+        Command::Rename(Rename::Iteration { old, new }) => {
+            let root = locate(cli, cwd)?;
+            let renamed =
+                allomos_store::rename_iteration(&root, Actor::alm(me), lock_wait(), old, new)?;
+            let (iteration, tasks) = renamed.item;
+            let mut text = if iteration.id == *old {
+                format!("{old} already has that ID; nothing changed.\n")
+            } else {
+                format!(
+                    "Renamed iteration {old} to {}\n",
+                    iteration_heading(&iteration)
+                )
+            };
+            if !tasks.is_empty() {
+                let ids: Vec<&str> = tasks.iter().map(|t| t.id.as_str()).collect();
+                text.push_str(&format!(
+                    "Moved {} task(s) along: {}\n",
+                    ids.len(),
+                    ids.join(", ")
+                ));
+            }
+            let mut done = Done::new(
+                json!({ "taskbag": root, "iteration": iteration, "tasks": tasks.iter().map(task_json).collect::<Vec<_>>() }),
+                text,
+            );
             done.issues = renamed.issues;
             Ok(done)
         }
