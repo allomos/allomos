@@ -113,16 +113,16 @@ Desktop/mobile human use is accepted; browser and human CLI must be considered. 
 flowchart TD
     UI["Shared web interface<br/>TypeScript + React<br/>one source code"]
     UI --> DW["Desktop window<br/>Tauri · macOS + Windows<br/>Iteration 1–2"]
-    UI --> BC["Browser companion<br/>Iteration 9–10"]
-    UI --> PC["Phone companion<br/>phone-friendly web page<br/>Iteration 9–10"]
+    UI --> BC["Browser companion<br/>Iteration 4–5"]
+    UI --> PC["Phone companion<br/>phone-friendly web page<br/>Iteration 4–5"]
     DW -- requests --> HUB
     BC -- "requests (paired)" --> HUB
     PC -- "requests (paired)" --> HUB
     HUB["Allomos desktop app · the one authority (Rust)<br/>project rules · validation · events · burndown and forecast"]
     HUB --> TB[("Taskbag .allomos/taskbag/<br/>files tracked by Git<br/>Iteration 1")]
-    HUB --> GIT["Runs your git<br/>commit · push · pull<br/>Iteration 6"]
-    HUB --> RUN["Start / open Claude Code and Codex<br/>Iteration 8"]
-    HUB --> SRV["Local server + pairing codes<br/>Iteration 9–10"]
+    HUB --> GIT["Runs your git<br/>commit · push · pull<br/>Iteration 8"]
+    HUB --> RUN["Start / open Claude Code and Codex<br/>Iteration 10"]
+    HUB --> SRV["Local server + pairing codes<br/>Iteration 4–5"]
     CLI["allomos / alm command (Rust)<br/>same rules"] --> TB
     TB -. "optional cloud copy" .-> CLOUD["Cloud service · optional, paid<br/>Iteration 13–14"]
 ```
@@ -132,7 +132,7 @@ flowchart TD
 - **The `alm` command** uses the same Rust rules on the same taskbag.
 
 **Open points:**
-1. **How the interface reaches the Rust side inside the desktop window.** The proposal is the same kind of connection a browser will later use, so the interface never changes. Iteration 1 has no local server yet (it arrives in Iteration 9), so task `A01-01` picks a first connection that can switch over later without rewriting the interface.
+1. **How the interface reaches the Rust side inside the desktop window.** The proposal is the same kind of connection a browser will later use, so the interface never changes. Iteration 1 has no local server yet (it arrives in Iteration 4), so task `A01-01` picks a first connection that can switch over later without rewriting the interface.
 2. **Two writers on one taskbag.** In Iteration 1, both the desktop app and `alm` can change the same `.allomos/taskbag/`. "One writer at a time" (R75) needs a mechanism, for example a lock file or `alm` passing changes through the running desktop app. The `alm` command card decides this.
 
 ### Details
@@ -158,20 +158,20 @@ flowchart TD
 
 **Rapid iteration (owner, 2026-10-04; the 15 iterations confirmed the same day).** Iterations are numbered 1–15; each ends in a release (v0.1 … v0.14, then v1.0). Allomos grows from a small prototype. **Every release is a usable product**: an installable desktop app (macOS and Windows; unsigned builds until v1.0) that someone can use for real work, and that the next release extends. Each release is built as thin end-to-end slices: interface → Rust rules → files in the taskbag. No release is "only a library" or "only a backend". Agents and the owner use each release on real projects (Allomos itself, the SSR migration) before the next one starts, and what they learn can reorder the later releases.
 
-**Now / Next / Later** — iterations kept small (owner, 2026-10-04): each adds one visible capability to an app that already works.
+**Now / Next / Later** — iterations kept small (owner, 2026-10-04): each adds one visible capability to an app that already works. The order follows the iterations in the taskbag (`alm list --by iteration`), which is the authority; the companions moved up to 4–5 there, ahead of the progress view and burndown.
 
 | Phase | # | Release | Usable for | What ships (products and contents) | Requirements |
 |---|---|---|---|---|---|
 | **Now** | **1** | **v0.1 — macOS local tracker** (prototype) | The owner tracks **Allomos's own development tasks** on a Mac; the agents building Allomos update them from the terminal | **macOS desktop app** (Tauri, unsigned): opens or creates the taskbag (standalone or inside a repo), tasks grouped by area with state, label, holder, waiting-on and next dependency (**view only in the app**; tasks are created and changed with the CLI), every change recorded as an event in Git-tracked JSON/Markdown files · **`allomos` CLI** (short alias `alm`) for macOS: `init`, add, list, show, claim, label, wait, done, release · **file format v1** · Allomos's own cards moved in from Markdown · *no server* | R91, R1, R2, R7 (events), R10, R11 (CLI), R12 (local), R13, R14, R25, R40–R41, R62 (human CLI), R69, R72–R75, R82, R86, R87–R88, R89 (optional iteration field) |
 | **Next** | **2** | **v0.2 — macOS + Windows** | The same, on **Windows** as well, and the owner **creates and edits tasks in the app** | **Windows desktop app** and **`allomos` / `alm` CLI** for Windows · one build pipeline producing both systems' builds (`A07-02`) · fixes for Windows differences (paths, line endings, the WebView2 engine) (`A07-03`) · **tasks grouped by iteration**: tasks get an optional iteration, set with `alm`; the list switches between by area and by iteration (`A01-15`, first) · **task pane** beside the list with one task's details (`A01-16`) · **create and edit tasks in the app** (both systems), recorded as events like CLI changes (`A01-17` history, `A01-18` edit, `A01-19` create) · exit check on a Mac and a workmate's Windows machine (`A07-04`) | R81, R85 (released together from here on), R1–R2 (editing in the app), R89 (iterations) |
 | ~~Next~~ | ~~3~~ | ~~v0.3 — MCP for agents~~ | **Deferred** (approver, 2026-10-24, [D18](../decisions/0018-mcp-deferred-agents-use-alm.md)): agents keep using `alm`, which already has safe retries (`--request-id`) and stale-edit checks (`--expected-version`); the iteration is closed, its done tasks moved to Iteration 2 | — | ~~R11 (MCP)~~ |
-| **Next** | **4** | **v0.4 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
-| **Next** | **5** | **v0.5 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
-| **Later** | **6** | **v0.6 — Git in the app** | The owner **commits and pushes task changes** without leaving Allomos | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
-| **Later** | **7** | **v0.7 — Import the SSR board** | The owner tracks the **SSR migration** in Allomos | SSR importer (in the app and `alm import`) with a reconciliation report | R15 |
-| **Later** | **8** | **v0.8 — Start and open agents** | The owner **starts a task in Claude Code or Codex from Allomos and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
-| **Later** | **9** | **v0.9 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by a 9-digit code shown on the desktop (no email); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
-| **Later** | **10** | **v0.10 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
+| **Next** | **4** | **v0.4 — Companions at home** | The owner **views progress from a phone or another computer on the same network** | Desktop app's **local server**; **web companion** and **phone companion** (the same web interface, served by the desktop); pairing by a 9-digit code shown on the desktop (no email); "start the desktop app" message when it is off | R62 (browser), R67–R68, R70–R71, R79–R80, R83–R84 |
+| **Next** | **5** | **v0.5 — Companions anywhere** | The owner **approves things from the phone, also away from home** | **Remote-access link** (free tunnel or relay service, needs approval); companions send actions to the desktop, which checks, applies and records them | R77–R78 |
+| **Next** | **6** | **v0.6 — Progress view** | The owner sees **how far each area has got** and **what is waiting on them** | Desktop app: per-area progress bars, state distribution, weekly throughput, "waiting on me" list | R3, R24 (local), R89–R90 (views per iteration, renamed terms) |
+| **Next** | **7** | **v0.7 — Burndown and forecast** | The owner sees **when the project will likely finish** | Desktop app: burndown (task counts, optional sizes, scope line) and a 50% / 85% finish-date range | R4–R6 |
+| **Later** | **8** | **v0.8 — Git in the app** | The owner **commits and pushes task changes** without leaving Allomos | Desktop app: Git panel (status, diff, commit, push, pull through the `git` command; asks to install `git` if missing); the app refreshes when agents change files | R76 |
+| **Later** | **9** | **v0.9 — Import the SSR board** | The owner tracks the **SSR migration** in Allomos | SSR importer (in the app and `alm import`) with a reconciliation report | R15 |
+| **Later** | **10** | **v0.10 — Start and open agents** | The owner **starts a task in Claude Code or Codex from Allomos and jumps back into it** | Desktop app: "Start in agent", "Open session", session status (running / waiting / exited) | R30–R33, R66 |
 | ~~Later~~ | ~~11~~ | ~~v0.11 — New projects in minutes~~ | **Dropped** (owner, 2026-10-20): **Build a new app…** is enough | — | ~~R50–R55~~ |
 | **Later** | **12** | **v0.12 — Timeline and export** | The owner sees a **timeline** and can **share a Markdown report** | Desktop app: timeline (gantt) generated from events; Markdown export | R8 |
 | **Later** | **13** | **v0.13 — Cloud copy** | The owner **keeps a project in the cloud and works on it from two computers** | **Cloud service**, the first hosted server: sign-in, publish, clone, push and pull a project; **cloud web app** (the same web interface) | R42–R43, R92 (first paid features) |
@@ -212,15 +212,15 @@ flowchart TD
 **Rules for the roadmap**
 
 - **Only "Now" is committed.** "Next" and "Later" are direction and may be reordered after each release, based on what using it teaches. Reordering is the owner's decision.
-- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from Allomos itself once Iteration 5 exists.
+- **No dates.** Agents' capacity is not yet known; the roadmap shows order and outcomes, not deadlines. Forecasts come from Allomos itself once Iteration 7 exists.
 - **Each release reserves room for fixing and tidying**: about a fifth of its work goes to the problems found in the previous release.
 - **Dependencies to watch:**
   - Iteration 2's exit check runs on **a workmate's Windows machine** (owner, 2026-10-04). The agent prepares an unsigned Windows build and a short step-by-step check list. The workmate installs it, runs the checks and reports the results, which are recorded on the card. Expect a Windows security warning on install, because builds are unsigned until Iteration 15.
-  - Iteration 8 needs the agent launch research (`A03-01`).
-  - Iterations 9–10 build on the remote-access research (`A04-01`); pairing needs no email service (owner, 2026-10-14); a hosted relay (10) needs the owner's approval before it is set up.
+  - Iteration 10 needs the agent launch research (`A03-01`).
+  - Iterations 4–5 build on the remote-access research (`A04-01`); pairing needs no email service (owner, 2026-10-14); a hosted relay (5) needs the owner's approval before it is set up.
   - Iteration 13 needs the cloud hosting choice and approval for hosted resources.
   - Iteration 15 needs the code-signing purchase.
-  - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 9–10 choose services that use the user's own account or a free tier.
+  - Free users must cost (almost) nothing ([D12](../decisions/0012-free-local-app-paid-cloud.md)): Iterations 4–5 choose services that use the user's own account or a free tier.
 - **Dogfooding (owner, 2026-10-04):** Iteration 1's first real project is **Allomos itself**. When Iteration 1 passes its exit check, Allomos's own cards move from Markdown into a taskbag inside this repository, and the agents building Allomos track their work in it from then on (done 2026-10-06, task `A01-07`). This is the first real test of every release.
 
 ## 10. Open questions

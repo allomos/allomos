@@ -29,14 +29,14 @@ The single list of open questions and approvals. Remove a row when it is answere
 |---|---|---|
 | Roles: separate approver, or always the owner? Sign-in method (magic link / password / GitHub / Google)? Agent tokens per session or per provider? Membership per project or per organization? | [0004](./decisions/0004-team-accounts-and-roles.md) | W03, W06 |
 | Agent sessions: which surfaces first (CLI / desktop / cloud)? Runners on whose machines, and may teammates start agents on yours? Create worktrees automatically? Set model and effort per task? | [0005](./decisions/0005-start-and-open-agent-sessions.md) | W07 |
-| **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 10, 13–15 |
+| **Free local app** (0012 accepted): open-source the local app or keep it closed but free? Companions away from home: free via the user's own tunnel account, a paid hosted relay, or both? What else is paid besides cloud copy and teams? Any limits on free use (recommended: none)? | [0012](./decisions/0012-free-local-app-paid-cloud.md) | Iterations 5, 13–15 |
 | Local projects: how a local project records who did what, and whether companions may start agents | [0005](./decisions/0005-start-and-open-agent-sessions.md), [0006](./decisions/0006-local-and-cloud-projects.md) | W05, W07 |
 | **Check in the app:** choose a new empty folder; it should get `AGENTS.md` and `CLAUDE.md` telling AI agents to use `alm`, and the notice should say so | `A01-13` | A01-13 Done |
 | **Rest of v0.2:** approve (or change) the cards for change history, editing and creating in the app, and Windows; `A07-02` also needs approval to run a build pipeline on GitHub Actions | `A01-17`, `A01-18`, `A01-19`, `A07-02`, `A07-03`, `A07-04` | Iteration 2 |
-| Remote access and pairing email: accept or change the recommendation (own Tailscale account; later a paid relay; one Allomos email helper on Cloudflare Workers + Resend, which needs a domain) | `A04-01`, [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | Iteration 10 |
-| Agent sessions: read the findings; approve short real trials of Claude Code and Codex if wanted (Codex CLI on this Mac is broken and needs reinstalling) | `A03-01`, [0005](./decisions/0005-start-and-open-agent-sessions.md) | Iteration 8 |
+| Remote access and pairing email: accept or change the recommendation (own Tailscale account; later a paid relay; one Allomos email helper on Cloudflare Workers + Resend, which needs a domain) | `A04-01`, [0009](./decisions/0009-desktop-hub-with-web-and-mobile-companions.md) | Iteration 5 |
+| Agent sessions: read the findings; approve short real trials of Claude Code and Codex if wanted (Codex CLI on this Mac is broken and needs reinstalling) | `A03-01`, [0005](./decisions/0005-start-and-open-agent-sessions.md) | Iteration 10 |
 | Cloud hosting target (Vercel or Cloudflare) and domain | [PLAN § 8](./product/PLAN.md#8-architecture-proposed) | Iteration 13 |
-| Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 7 |
+| Importer: one-time import of the SSR board, or keep syncing during the transition? | [PLAN § 9](./product/PLAN.md#9-roadmap--releases) | Iteration 9 |
 
 ## Roadmap — not yet carded
 
