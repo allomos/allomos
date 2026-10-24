@@ -5,6 +5,7 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
 import { WhoForm } from "./WhoForm";
+import { iterationPlaces, placedName } from "./iterationPlace";
 import { canAdd, pickArea, refreshItem, refreshTask, startItem, startTask, toNewIteration, toNewTask, type BaseChoice, type Creating, type ItemDraft, type TaskDraft } from "./createFlow";
 import { isProblem, type Area, type Iteration, type NewIteration, type NewTask, type NextIds } from "./types";
 
@@ -98,9 +99,11 @@ export function CreateForm({
   };
 
   const title = t(creating.kind === "task" ? "create.new_task" : creating.kind === "area" ? "create.new_area" : "create.new_iteration");
+  // Task-A00-turkey877: each iteration's place in the plan before its name.
+  const places = iterationPlaces(iterations);
   const iterationName = (id: string) => {
     const it = iterations.find((i) => i.id === id);
-    return it ? (it.release ? `${it.name} (${it.release})` : it.name) : id;
+    return it ? placedName(places.get(id), it.release ? `${it.name} (${it.release})` : it.name) : id;
   };
 
   if (!ownerName) {

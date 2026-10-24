@@ -52,6 +52,7 @@ import { CreateForm, type AddRequest } from "./CreateForm";
 import { baseChoice, type Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
+import { iterationPlaces } from "./iterationPlace";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
@@ -1006,6 +1007,8 @@ type Group = {
   edit?: Editing;
   /** The iteration's state when active or closed, shown as a badge in its own colour (Task-A01-root343). */
   iterationState?: "active" | "closed";
+  /** The iteration's place in the plan, counted from 1, shown before its ID (Task-A00-turkey877). */
+  place?: number;
 };
 
 function TaskbagView({
@@ -1109,6 +1112,7 @@ function TaskbagView({
   // The groups in the order they are shown; the task pane's arrow keys follow this order.
   const groups: Group[] = [];
   if (box && groupBy === "iteration") {
+    const places = iterationPlaces(iterations);
     for (const it of iterations) {
       groups.push({
         key: `i-${it.id}`,
@@ -1120,6 +1124,7 @@ function TaskbagView({
         newTask: { area: null, iteration: it.id },
         edit: { kind: "iteration", id: it.id },
         iterationState: it.id === activeIteration ? "active" : it.state === "closed" ? "closed" : undefined,
+        place: places.get(it.id),
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
@@ -1411,6 +1416,7 @@ function TaskbagView({
                   name={g.name}
                   sub={g.sub}
                   iterationState={g.iterationState}
+                  place={g.place}
                   empty={g.empty}
                   tasks={g.tasks}
                   counted={g.counted}
@@ -1547,6 +1553,7 @@ function TaskGroup({
   name,
   sub,
   iterationState,
+  place,
   empty,
   tasks,
   counted,
@@ -1571,6 +1578,7 @@ function TaskGroup({
   /** An active or closed iteration: a badge and colour of its own (Task-A01-root343). The active
    * one is the one marked active, or else the first planned one, as alm finds it. */
   iterationState?: "active" | "closed";
+  place?: number;
   empty: string;
   tasks: Task[];
   /** Every task of the group, for its count and progress, when `tasks` is filtered by state. */
@@ -1610,6 +1618,7 @@ function TaskGroup({
       <header className="area-head">
         <h2>
           <button type="button" className="fold" aria-expanded={!collapsed} onClick={onToggle}>
+            {place !== undefined && <span className="place">{place}</span>}
             {id && <span className="id">{id}</span>} {name}
           </button>
           {iterationState && <span className={`badge iteration-${iterationState}`}>{t(`iteration.state_${iterationState}`)}</span>}
