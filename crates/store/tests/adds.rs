@@ -99,16 +99,19 @@ fn each_new_item_writes_one_event_and_a_planned_task_two() {
         start: Some("2026-10-15"),
         end: Some("2026-10-30"),
     };
+    // Without an ID an iteration gets a word ID, `I-<word>` (Task-A00-rope803).
     let it = add_iteration(&root, APP, WAIT, None, "First", details)
         .unwrap()
         .item;
-    assert_eq!(
-        (it.id.as_str(), it.release.as_deref()),
-        ("I01", Some("v0.1"))
+    assert!(
+        it.id.starts_with("I-") && !allomos_core::ids::numbered(&it.id),
+        "{}",
+        it.id
     );
+    assert_eq!(it.release.as_deref(), Some("v0.1"));
     assert_eq!(
         events_since(&root, start + 1),
-        [ev("add iteration", "iteration", "I01")]
+        [ev("add iteration", "iteration", &it.id)]
     );
 
     // A task without an iteration: one event, in backlog.
@@ -128,12 +131,12 @@ fn each_new_item_writes_one_event_and_a_planned_task_two() {
     );
 
     // With an iteration: added, then planned, under one lock: two events, as typing both.
-    let t = add_task(&root, APP, WAIT, &task(Some("A01-07"), "A01", Some("I01")))
+    let t = add_task(&root, APP, WAIT, &task(Some("A01-07"), "A01", Some(&it.id)))
         .unwrap()
         .item;
     assert_eq!(
         (t.id.as_str(), t.iteration.as_deref()),
-        ("A01-07", Some("I01"))
+        ("A01-07", Some(it.id.as_str()))
     );
     assert_eq!(
         events_since(&root, start + 3),
@@ -150,7 +153,7 @@ fn each_new_item_writes_one_event_and_a_planned_task_two() {
     // The files say the same: `alm list` reads these.
     let bag = load(&root).taskbag.unwrap();
     let saved = bag.tasks.iter().find(|t| t.id == "A01-07").unwrap();
-    assert_eq!(saved.iteration.as_deref(), Some("I01"));
+    assert_eq!(saved.iteration.as_deref(), Some(it.id.as_str()));
     assert_eq!(saved.description, "Why.\n");
     assert_eq!(bag.iterations[0].end.as_deref(), Some("2026-10-30"));
 }
@@ -284,7 +287,8 @@ fn a_new_iteration_from_the_task_pane_is_added_then_planned() {
     }
     assert_eq!(snapshot(&root), before, "a refusal changes no file");
 
-    // Added with the next free ID, then the task planned in it: two events, as typing both.
+    // Added with a word ID (Task-A00-rope803), then the task planned in it: two events, as
+    // typing both.
     let start = events::list(&root).0.len();
     let details = IterationDetails {
         start: Some("2026-11-01"),
@@ -293,12 +297,17 @@ fn a_new_iteration_from_the_task_pane_is_added_then_planned() {
     };
     let (it, changed) =
         add_iteration_and_plan(&root, APP, WAIT, "A01-01", None, " Two ", details).unwrap();
-    assert_eq!((it.id.as_str(), it.name.as_str()), ("I02", "Two"));
-    assert_eq!(changed.task.iteration.as_deref(), Some("I02"));
+    assert!(
+        it.id.starts_with("I-") && !allomos_core::ids::numbered(&it.id),
+        "{}",
+        it.id
+    );
+    assert_eq!(it.name, "Two");
+    assert_eq!(changed.task.iteration.as_deref(), Some(it.id.as_str()));
     assert_eq!(
         events_since(&root, start),
         [
-            ev("add iteration", "iteration", "I02"),
+            ev("add iteration", "iteration", &it.id),
             ev("plan", "task", "A01-01")
         ]
     );
@@ -307,7 +316,7 @@ fn a_new_iteration_from_the_task_pane_is_added_then_planned() {
     assert_eq!(plan.changes[0].field, "iteration");
     let bag = load(&root).taskbag.unwrap();
     assert_eq!(bag.iterations[1].start.as_deref(), Some("2026-11-01"));
-    assert_eq!(bag.tasks[0].iteration.as_deref(), Some("I02"));
+    assert_eq!(bag.tasks[0].iteration.as_deref(), Some(it.id.as_str()));
 
     // Waits for `alm`'s lock like every other change.
     let held = Lock::acquire(&root, Duration::ZERO).unwrap();
