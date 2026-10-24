@@ -1538,7 +1538,7 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
 
     let text = String::from_utf8(alm(&repo, &["list", "--by", "iteration"]).stdout).unwrap();
     assert!(
-        text.starts_with("I01  v0.1  (v0.1, until 2026-10-07)  [active]\n  A01-01  done"),
+        text.starts_with("1  I01  v0.1  (v0.1, until 2026-10-07)  [active]\n  A01-01  done"),
         "{text}"
     );
     assert!(
@@ -3676,6 +3676,69 @@ fn old_handoff_files_make_next_ask_for_an_update() {
     );
     let text = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
     assert!(text.contains(line), "{text}");
+}
+
+/// Task-A00-storm072: `alm list --by iteration` lists every iteration, empty ones too, each with
+/// its place in the plan, as the app shows it; the place follows `alm move iteration` and stays
+/// the same with `--iteration`.
+#[test]
+fn list_by_iteration_shows_every_iteration_with_its_place() {
+    let repo = filled();
+    for (id, name) in [("I01", "One"), ("I02", "Two"), ("I03", "Three")] {
+        ok(&repo, &["add", "iteration", id, name]);
+    }
+    ok(&repo, &["plan", "A01-01", "I02"]);
+    let places = |v: &Value| -> Vec<(String, u64, usize)> {
+        v["iterations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|g| {
+                (
+                    g["id"].as_str().unwrap().to_string(),
+                    g["place"].as_u64().unwrap(),
+                    g["tasks"].as_array().unwrap().len(),
+                )
+            })
+            .collect()
+    };
+    let v = ok(&repo, &["list", "--by", "iteration"]);
+    assert_eq!(
+        places(&v),
+        [
+            ("I01".into(), 1, 0),
+            ("I02".into(), 2, 1),
+            ("I03".into(), 3, 0)
+        ]
+    );
+    let text = String::from_utf8(alm(&repo, &["list", "--by", "iteration"]).stdout).unwrap();
+    assert!(
+        text.contains("1  I01  One  [active]\n  (none)\n2  I02  Two\n  A01-01  "),
+        "{text}"
+    );
+    assert!(text.contains("3  I03  Three\n  (none)\n"), "{text}");
+    // A filter that leaves an iteration with nothing still shows its heading.
+    let v = ok(&repo, &["list", "--by", "iteration", "--state", "done"]);
+    assert_eq!(v["iterations"].as_array().unwrap().len(), 3);
+
+    // Moved: the places follow the new order.
+    ok(&repo, &["move", "iteration", "I03", "--before", "I01"]);
+    let v = ok(&repo, &["list", "--by", "iteration"]);
+    assert_eq!(
+        places(&v),
+        [
+            ("I03".into(), 1, 0),
+            ("I01".into(), 2, 0),
+            ("I02".into(), 3, 1)
+        ]
+    );
+    // One iteration: still its place in the whole plan.
+    let v = ok(&repo, &["list", "--by", "iteration", "--iteration", "I02"]);
+    assert_eq!(places(&v), [("I02".into(), 3, 1)]);
+    let text =
+        String::from_utf8(alm(&repo, &["list", "--by", "iteration", "--iteration", "I02"]).stdout)
+            .unwrap();
+    assert!(text.starts_with("3  I02  Two\n"), "{text}");
 }
 
 /// The event files in a taskbag (Task-A01-17).

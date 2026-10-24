@@ -188,6 +188,9 @@ See:
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
   (`--state blocked`, `--state waiting`, …);
   `--without-human-check`: only tasks finished without the human check, not checked since.
+  `--by iteration` lists every iteration, empty ones too, each starting with its place in the
+  plan (1, 2, 3…, as the app shows it; `place` in `--json`), counted from the plan's order, so it
+  changes after `alm move iteration`, and stays the same with `--iteration <id>`.
 - `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person: **To check**
   (finished without the human check, each with why; `--steps` adds how to check it) and **To
   answer** (waiting on a person, each with what; backlog tasks are not listed), then

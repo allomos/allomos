@@ -2569,12 +2569,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             // In the taskbag's order: numbered IDs, then word IDs as they were made (A01-54).
             let tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
             let mut text = String::new();
-            let mut group = |heading: String, members: &[&&Task]| {
-                if members.is_empty() {
+            // `always`: the heading is shown even with no tasks to list (each iteration,
+            // Task-A00-storm072); other groups only when they list some.
+            let mut group = |heading: String, members: &[&&Task], always: bool| {
+                if members.is_empty() && !always {
                     return;
                 }
                 text.push_str(&heading);
                 text.push('\n');
+                if members.is_empty() {
+                    text.push_str("  (none)\n");
+                }
                 for t in members {
                     text.push_str(&format!("  {}\n", task_line(t)));
                     if let Some(line) = stop_line(&bag, t) {
@@ -2591,7 +2596,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let fields = if by == "iteration" {
                 let active = ops::active_iteration(&bag).map(|i| i.id.clone());
                 let mut groups = Vec::new();
-                for it in &bag.iterations {
+                // Each iteration's place in the plan, counted from 1 in plan order (the taskbag
+                // keeps them by `order`, then ID), as the app shows it (Task-A00-turkey877): shown,
+                // never stored, so it follows `alm move iteration` (Task-A00-storm072).
+                for (place, it) in (1..).zip(&bag.iterations) {
                     if iteration.as_ref().is_some_and(|x| x != &it.id) {
                         continue;
                     }
@@ -2600,13 +2608,14 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         .filter(|t| t.iteration.as_ref() == Some(&it.id))
                         .collect();
                     let is_active = active.as_ref() == Some(&it.id);
-                    let mut heading = iteration_heading(it);
+                    let mut heading = format!("{place}  {}", iteration_heading(it));
                     // The first planned iteration, active because none is marked (Task-A01-root343).
                     if is_active && it.state.is_planned() {
                         heading.push_str("  [active]");
                     }
-                    group(heading, &members);
+                    group(heading, &members, true);
                     let mut g = json!(it);
+                    g["place"] = json!(place);
                     g["active"] = json!(is_active);
                     g["tasks"] = json!(tasks_json(&members));
                     groups.push(g);
@@ -2620,7 +2629,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                             .is_none_or(|i| !bag.iterations.iter().any(|x| &x.id == i))
                     })
                     .collect();
-                group("Unplanned".to_string(), &unplanned);
+                group("Unplanned".to_string(), &unplanned, false);
                 json!({ "taskbag": root, "iterations": groups, "unplanned": tasks_json(&unplanned) })
             } else {
                 let mut groups = Vec::new();
@@ -2629,7 +2638,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         continue;
                     }
                     let members: Vec<&&Task> = tasks.iter().filter(|t| t.area == a.id).collect();
-                    group(format!("{}  {}", a.id, a.name), &members);
+                    group(format!("{}  {}", a.id, a.name), &members, false);
                     groups.push(json!({
                         "id": a.id, "name": a.name, "order": a.order,
                         "tasks": tasks_json(&members),
