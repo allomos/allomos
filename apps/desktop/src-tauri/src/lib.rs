@@ -1056,6 +1056,80 @@ fn project_folders(root: PathBuf) -> Result<Vec<allomos_store::folders::FolderIn
     allomos_store::folders::list(&root)
 }
 
+/// Bind a project folder, as `alm folder add` does: recorded in `project.json` and Allomos's
+/// section written into its AGENTS.md (Task-A05-plaza078). Returns the folders after.
+#[tauri::command]
+fn bind_folder(
+    root: PathBuf,
+    path: PathBuf,
+) -> Result<Vec<allomos_store::folders::FolderInfo>, Problem> {
+    let wait = std::time::Duration::from_secs(5);
+    allomos_store::folders::add(&root, allomos_store::Actor::APP, wait, &path, None)?;
+    allomos_store::folders::list(&root)
+}
+
+/// Give a folder a new short name, as `alm folder rename` does; the folder on disk keeps its name.
+#[tauri::command]
+fn rename_folder(
+    root: PathBuf,
+    name: String,
+    new_name: String,
+) -> Result<Vec<allomos_store::folders::FolderInfo>, Problem> {
+    let wait = std::time::Duration::from_secs(5);
+    allomos_store::folders::rename(&root, allomos_store::Actor::APP, wait, &name, &new_name)?;
+    allomos_store::folders::list(&root)
+}
+
+/// Record where a folder that is not found is now, as `alm folder locate` does; no files move.
+#[tauri::command]
+fn locate_folder(
+    root: PathBuf,
+    name: String,
+    path: PathBuf,
+) -> Result<Vec<allomos_store::folders::FolderInfo>, Problem> {
+    let wait = std::time::Duration::from_secs(5);
+    allomos_store::folders::locate(&root, allomos_store::Actor::APP, wait, &name, &path)?;
+    allomos_store::folders::list(&root)
+}
+
+/// Unbind a folder, as `alm folder remove --confirm` does: its tasks stay, its files stay, and only
+/// Allomos's section leaves its AGENTS.md. The dialog asks first.
+#[tauri::command]
+fn unbind_folder(
+    root: PathBuf,
+    name: String,
+) -> Result<Vec<allomos_store::folders::FolderInfo>, Problem> {
+    let wait = std::time::Duration::from_secs(5);
+    allomos_store::folders::remove(&root, allomos_store::Actor::APP, wait, &name)?;
+    allomos_store::folders::list(&root)
+}
+
+/// Show one of the taskbag's bound folders in the file manager: only a folder bound to this
+/// taskbag, never any path a request names.
+#[tauri::command]
+fn show_folder_in_file_manager(root: PathBuf, name: String) -> Result<(), Problem> {
+    let folder = allomos_store::folders::list(&root)?
+        .into_iter()
+        .find(|f| f.name == name && f.exists)
+        .ok_or_else(|| Problem::FolderUnknown {
+            folder: name.clone(),
+            folders: String::new(),
+        })?;
+    let program = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    let mut command = agents::command(program);
+    command.arg(allomos_store::plain_path(&folder.full));
+    command.spawn().map(drop).map_err(|e| Problem::OpenFailed {
+        path: folder.full.display().to_string(),
+        detail: e.to_string(),
+    })
+}
+
 /// Rename the project, as `alm project --name` does (Task-A05-camera758's settings, General;
 /// Task-A05-chalk937). The ID stays. Returns the name as saved.
 #[tauri::command]
@@ -2236,6 +2310,11 @@ pub fn run() {
             set_lan_viewing,
             rename_project,
             project_folders,
+            bind_folder,
+            rename_folder,
+            locate_folder,
+            unbind_folder,
+            show_folder_in_file_manager,
             set_task_language,
             change_ladder,
             lan_pairing,

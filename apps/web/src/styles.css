@@ -90,6 +90,16 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .settings-value { overflow-wrap: anywhere; }
 .settings-section select { max-width: 100%; }
 .folder-picker { display: grid; gap: 4px; border: none; padding: 0; margin: 0; }
+.project-folders { width: 100%; display: grid; gap: 8px; justify-items: start; }
+.folder-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; width: 100%; }
+.folder-rows li { display: grid; gap: 2px; }
+.folder-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.folder-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.folder-badge { font-size: 0.8em; border-radius: 999px; padding: 0 7px; border: 1px solid var(--line); }
+.folder-badge.ok { color: var(--ok, inherit); }
+.folder-badge.warn, .folder-badge.missing { color: var(--warn); border-color: var(--warn); }
+.banner.unbind-confirm { display: grid; gap: 6px; align-items: start; }
+.unbind-confirm ul { margin: 0; padding-left: 18px; }
 .folder-chip { border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; font-size: 0.85em; }
 .ladder-edit { display: grid; gap: 6px; justify-items: start; width: 100%; }
 .ladder-edit ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; width: 100%; }

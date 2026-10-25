@@ -122,6 +122,14 @@ export interface Messenger {
   renameProject(root: string, name: string): Promise<string>;
   /** The taskbag's bound project folders, each with whether it is found (Task-A01-sketch327). */
   projectFolders(root: string): Promise<ProjectFolderInfo[]>;
+  /** Binds a folder, as `alm folder add` (Task-A05-plaza078); resolves to the folders after. */
+  bindFolder(root: string, path: string): Promise<ProjectFolderInfo[]>;
+  renameFolder(root: string, name: string, newName: string): Promise<ProjectFolderInfo[]>;
+  /** Records where a folder that is not found is now; no files move. */
+  locateFolder(root: string, name: string, path: string): Promise<ProjectFolderInfo[]>;
+  /** Unbinds a folder: its tasks and files stay; only Allomos's section leaves its AGENTS.md. */
+  unbindFolder(root: string, name: string): Promise<ProjectFolderInfo[]>;
+  showFolderInFileManager(root: string, name: string): Promise<void>;
   /** Sets the language tasks are written in, as `alm task-language` (`ui`: follow the interface). */
   setTaskLanguage(root: string, value: string): Promise<void>;
   /** Changes the progress ladder as edited (Task-A05-yeti951); resolves to the saved ladder. */
@@ -350,6 +358,11 @@ export const desktopMessenger: Messenger = {
   deleteIteration: (root, id) => invoke<void>("delete_iteration", { root, id }),
   renameProject: (root, name) => invoke<string>("rename_project", { root, name }),
   projectFolders: (root) => invoke<ProjectFolderInfo[]>("project_folders", { root }),
+  bindFolder: (root, path) => invoke<ProjectFolderInfo[]>("bind_folder", { root, path }),
+  renameFolder: (root, name, newName) => invoke<ProjectFolderInfo[]>("rename_folder", { root, name, newName }),
+  locateFolder: (root, name, path) => invoke<ProjectFolderInfo[]>("locate_folder", { root, name, path }),
+  unbindFolder: (root, name) => invoke<ProjectFolderInfo[]>("unbind_folder", { root, name }),
+  showFolderInFileManager: (root, name) => invoke<void>("show_folder_in_file_manager", { root, name }),
   setTaskLanguage: (root, value) => invoke<void>("set_task_language", { root, value }),
   changeLadder: (root, steps) => invoke<string[]>("change_ladder", { root, steps }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
