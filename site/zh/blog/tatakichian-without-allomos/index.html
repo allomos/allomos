@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>同一个输入法，不用换肩再做一遍 · 换肩 Allomos 博客</title>
+<meta name="description" content="对比实验：把做 Tatakikun 的那段话原样交给 Claude Code，不分版本、不记任务。28 分钟出了原型，装进系统又折腾了二十多分钟，功能和原型版 Tatakikun 几乎一样，留下的是一个项目文件夹。">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/blog/tatakichian-without-allomos/">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/blog/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/blog/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="同一个输入法，不用换肩再做一遍 · 换肩 Allomos 博客">
+<meta property="og:description" content="对比实验：把做 Tatakikun 的那段话原样交给 Claude Code，不分版本、不记任务。28 分钟出了原型，装进系统又折腾了二十多分钟，功能和原型版 Tatakikun 几乎一样，留下的是一个项目文件夹。">
+<meta property="og:url" content="https://www.allomos.com/zh/blog/tatakichian-without-allomos/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap narrow">
+  <header>
+    <a class="brand" href="/zh/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a class="sec" href="/zh/products/">产品</a>
+      <a class="sec" href="/zh/blog/" aria-current="true">博客</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/blog/" lang="en">EN</a><a href="/zh/blog/tatakichian-without-allomos/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/blog/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <article class="post">
+    <p class="kicker k1"><a href="/zh/blog/">博客</a> · Allomos 换肩 · 实验记录</p>
+    <h1>同一个输入法，不用换肩再做一遍</h1>
+    <p class="meta"><time datetime="2026-10-25">2026-10-25</time> · <a href="https://x.com/wang3an">@wang3an</a> · <a href="https://x.com/wang3an/status/2112741057817665598">X 上的原帖 ↗</a></p>
+    <p class="lead">第三次实验是一次对比。<a href="/zh/blog/tatakikun-in-29-minutes/">上一篇</a>里，Claude 借着换肩（Allomos）的任务管理，二十九分钟做出了英中日输入法 Tatakikun。这次把同一段需求原样交给 Claude Code，不分版本、不记任务，看看“纯许愿式编程”能做到什么程度，也看看换肩到底起了什么作用。</p>
+    <figure><img src="/zh/blog/tatakichian-without-allomos/img/09.jpg" width="762" height="102" loading="lazy" alt="不用换肩做出来的 Tatakichian：键入 english，候选条上有英文、中文、日文。"><figcaption>最后的结果：不用换肩做出来的 Tatakichian，键入 english，候选条上英文、中文、日文都有。</figcaption></figure>
+    <p class="note">根据 @wang3an 2026 年 10 月 21 日、25 日的串贴整理 · 时间均为日本时间</p>
+    <ul class="stats"><li><strong>28 分钟</strong>Claude Code 写完原型（作者在串贴里的计时）</li><li><strong>又 24 分钟</strong>从写完（18:33）到能在系统里打字（18:57）</li><li><strong>0 个任务</strong>不分版本、不记任务，只有一个对话</li><li><strong>2.44 美元</strong>做完时会话面板显示的花费，Opus 5.5 Medium</li></ul>
+<h2>为什么要再做一遍</h2>
+<p class="when"><strong>10 月 21 日 12:01　串贴第 1 条</strong></p>
+<blockquote>昨晚花了几个小时，把输入法完善了。<br>我做一个对比试验，用 Claude Code 直接生成这样一个 app，看看能不能做到。看看 allomos 在整个过程中，以及完成后的维护和完善过程中，起到了什么样的作用。</blockquote>
+<p>“完善”指的是做完三个版本之后的那个晚上：全角标点、开源词库做的语言包、辅音缩写，都作为新任务加进了任务包，一个一个做完（见上一篇的结尾）。对比实验是四天后的周日下午才动手的。</p>
+<p class="when"><strong>10 月 25 日 17:24　串贴第 2 条</strong></p>
+<blockquote>虽然经过这些天的开发，我已经主观地认定，缺乏任务记录的纯许愿式编程，即便能够开发出原型产品，也无法顺利地继续演进。但我还是决定试一下这种原始的许愿式编程。<br>因为还存在一个疑问，就是不在许愿中增加迭代要求，缺乏过程记录的话，原型产品到底是什么样的可用程度？我感觉 AI 如果能够读到自己的开发记录，会更有效地纠正自己犯下的错误。<br>留下记录，是软件工程中重要的要求。我觉得对人，对 AI 都一样重要。</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/01.jpg" width="846" height="206" loading="lazy" alt="Claude 应用里的请求：和 Tatakikun 相同的一段需求，最后加一句“这个过程中不要问我任何问题，遇到任何选择都由你自行决定”。文件夹 tatakichian，Opus 5.5 Medium。"><figcaption>请求就是做 Tatakikun 时的那段话，最后加一句“这个过程中不要问我任何问题，遇到任何选择都由你自行决定”。空文件夹 tatakichian，Opus 5.5 Medium。</figcaption></figure>
+<p>这一次没有换肩：没有任务包，没有“领域”和“迭代”，也没有每做完一步就记下来的规则。Claude 自己列了一个五步的待办——看文件夹、准备三种语言的词典、写候选引擎、写横向候选条、测试——然后就开始写。</p>
+<h2>两次被拦下</h2>
+<p class="when"><strong>17:28　串贴第 3 条</strong></p>
+<blockquote>才进行几分钟，就遇到了奇怪的问题。我不知道为什么，只能 Rewind（重新开始？）</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/02.jpg" width="846" height="554" loading="lazy" alt="Claude 写完词典生成脚本和词库存储，正要写罗马字转假名和拼音音节时，消息被安全机制标记，只剩 Rewind 按钮。"><figcaption>写完词典生成脚本和词库存储，正要写“罗马字→假名、拼音音节”时，这条消息被 Claude 的安全机制标记了，界面上只剩一个 Rewind（回退）按钮。</figcaption></figure>
+<p class="when"><strong>17:30　串贴第 4 条</strong></p>
+<blockquote>我盲猜第二个选项应该会好些</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/03.jpg" width="411" height="301" loading="lazy" alt="Rewind 对话框：恢复“代码和对话”“只恢复对话”“只恢复代码”三个选项。"><figcaption>回退时要选恢复什么：代码和对话、只恢复对话、只恢复代码。作者选了第二个，只回退对话，已经写好的代码留着。</figcaption></figure>
+<p class="when"><strong>17:42　串贴第 5 条</strong></p>
+<blockquote>又遇到一次。但是它自己消失掉然后继续下去了。奇怪。</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/04.jpg" width="611" height="99" loading="lazy" alt="“Output blocked by content filtering policy”。"><figcaption>第二次的提示：“Output blocked by content filtering policy”（输出被内容过滤策略拦下）。</figcaption></figure>
+<p>为什么会被拦下，看不出来，这里只照实记下。只回退对话之后，Claude 接着已经写好的代码往下做。</p>
+<h2>28 分钟，和装不进系统</h2>
+<p class="when"><strong>18:33　串贴第 6 条</strong></p>
+<blockquote>28 分钟完成。看看效果怎么样。</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/05.jpg" width="758" height="645" loading="lazy" alt="Claude 的收尾说明：候选位置（原始字母串在最前、主行 8 个、语言标签、展开网格）、按键、已知的不足。"><figcaption>Claude 的收尾说明：原始字母串永远在第一个，主行放三种语言里最好的 8 个，每个候选带语言标签，展开后是可滚动的网格；还写了按键和已知的不足（日文长句切分不好、长音要打全）。</figcaption></figure>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/06.jpg" width="355" height="215" loading="lazy" alt="会话面板：Cost 2.44 美元，Opus 100%，缓存命中 97%。"><figcaption>这时的会话面板：2.44 美元，全部用 Opus，缓存命中 97%。</figcaption></figure>
+<p class="when"><strong>18:38　串贴第 7 条</strong></p>
+<blockquote>它搞错了。还得加工一下。</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/07.jpg" width="790" height="567" loading="lazy" alt="系统设置的添加输入法窗口里只有 Tatakikun，没有 Tatakichian；作者回复“不在”，Claude 发现缺少给输入源起显示名称的 InfoPlist.strings。"><figcaption>到系统设置里添加输入法，列表里只有 Tatakikun，没有 Tatakichian。作者回了两个字“不在”。Claude 比较两者后发现：Tatakikun 带着给输入源起显示名称的 InfoPlist.strings，Tatakichian 没有。</figcaption></figure>
+<p class="when"><strong>18:42　串贴第 8 条</strong></p>
+<blockquote>还是不在。它准备抄袭 tatakikun……这算作弊吗？</blockquote>
+<figure><img src="/zh/blog/tatakichian-without-allomos/img/08.jpg" width="790" height="217" loading="lazy" alt="作者：“still not there”。Claude：从代码签名、可执行文件和图标几方面把 Tatakichian 和 Tatakikun 对齐。"><figcaption>还是不在。Claude 接着从代码签名、可执行文件、图标几方面，把 Tatakichian 照着 Tatakikun 对齐。</figcaption></figure>
+<p>这是这次对比里不太公平的地方：同一台电脑上已经装着一个能用的 Tatakikun，Claude 解决“系统不认”的办法，就是去比对它。如果没有 Tatakikun，这一步要花多久，不知道。</p>
+<h2>折腾出来了</h2>
+<p class="when"><strong>18:57　串贴第 9 条</strong></p>
+<blockquote>折腾出来了。功能和 tatakikun 的原型版几乎是一样的。<br>这证明了一件事：AI 在开发小原型的时候，不需要分迭代，能完成任务。<br>留下来的成果：一个项目文件夹。</blockquote>
+<h2>两次放在一起看</h2>
+<ul><li><strong>需求</strong>：同一段话。Tatakichian 多了一句“不要问我任何问题”；Tatakikun 用的是换肩的安静模式，问题留到之后再问。</li><li><strong>做出原型</strong>：Tatakikun 29 分钟，三个版本、13 个任务，每个版本都有验收；Tatakichian 28 分钟，一个对话，没有版本。</li><li><strong>装进系统</strong>：Tatakikun 按 Claude 写好的两条命令安装、在系统设置里添加，就能打字；Tatakichian 在输入法列表里不出现，又改了二十多分钟，最后靠比对 Tatakikun 解决。</li><li><strong>花费</strong>：Tatakikun 会话 6.34 美元；Tatakichian 做完原型时会话面板显示 2.44 美元，之后修安装问题的部分没有截图，不在这个数里。</li><li><strong>留下来的</strong>：Tatakikun 留下任务包——每个任务做了什么、为什么那样决定、哪些还没让人检查过，第二天接着改的时候直接从任务包读；Tatakichian 留下一个项目文件夹和一段对话。</li></ul>
+<p>只看“能不能做出原型”，两边差不多：小原型不分迭代也做得出来，这一点作者的结论很明确。差别在原型之后。</p>
+<h2>之后才是软件工程</h2>
+<p class="when"><strong>19:04　串贴第 10 条</strong></p>
+<blockquote>如果要进一步开发的话，还是需要做软件工程管理才行。就算是有 allomos 帮忙管理任务，我都因为穿梭在 session 之中有点晕头转向了。如果只是纯靠 Claude Code 的界面，做后续的改进，赶上 tatakikun 的功能点，是会非常痛苦的。<br>AI，一方面给产品设计师提供了超级程序员，另一方面也给程序员提供了超级产品经理。<br>但是一个软件的开发，离不开软件工程管理。<br>对于小型的团队，主要是任务管理。<br>大一点的团队，就需要团队协作。<br>经理开始要进度管理，老板开始要预算和成本管理。<br>希望 allomos 能助上一肩之力。</blockquote>
+<p>Tatakikun 从三个版本走到 v0.5.1，中间加的全角标点、语言包、辅音缩写，都是在任务包里一个任务一个任务做的；换一个会话、换一个智能体接手，读任务包就知道做到了哪里。Tatakichian 要走同样的路，每一次都得先把对话翻一遍，或者重新让 AI 读一遍代码猜当初为什么这样写。</p>
+<p>“穿梭在 session 之中有点晕头转向”，也是写给换肩自己的：任务记下来了，人在多个会话之间切换时怎么不迷路，是接下来要做好的事。</p>
+    <hr>
+    <p class="note">另外两篇：</p><ul><li><a href="/zh/blog/tatakikun-in-29-minutes/">二十九分钟，做出一个英中日输入法</a></li><li><a href="/zh/blog/tosstoss-in-23-minutes/">二十三分钟，做出一个投桃</a></li></ul>
+  </article>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
