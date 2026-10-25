@@ -22,3 +22,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0016](./0016-waiting-and-blocked-states.md) | Waiting on a person and blocked by another task are two different states (`waiting` narrowed, new `blocked`) | **Accepted** 2026-10-14 |
 | [0017](./0017-agents-run-git-not-alm.md) | `alm` and the app never run Git; each change tells the agent the exact Git commands to share it | **Accepted** 2026-10-14 |
 | [0018](./0018-mcp-deferred-agents-use-alm.md) | MCP is deferred: agents use the `alm` command; Iteration 3 is closed | **Accepted** 2026-10-24 |
+| [0019](./0019-several-project-folders.md) | One taskbag tracks several project folders, each with a short name; each task names its folders (`allomos/6`) | **Accepted** 2026-10-25 |
