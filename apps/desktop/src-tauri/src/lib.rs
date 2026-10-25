@@ -1642,6 +1642,13 @@ async fn agent_status(root: PathBuf) -> AgentStatus {
     }
 }
 
+/// Which agents a folder's instruction files tell about Allomos, for the Agents section of the
+/// taskbag's settings (Task-A05-bag963): asked once for each project folder.
+#[tauri::command]
+fn agent_setup_of(project: PathBuf) -> allomos_store::AgentSetup {
+    agent_setup(&project)
+}
+
 /// Write Allomos's section into `project`'s AGENTS.md and CLAUDE.md directly, for when no
 /// agent is available. Returns the files changed.
 #[tauri::command]
@@ -2355,6 +2362,7 @@ pub fn run() {
             last_agent,
             write_agent_files,
             agent_status,
+            agent_setup_of,
             quota_reports,
             confirm_requests,
             answer_confirm_request,

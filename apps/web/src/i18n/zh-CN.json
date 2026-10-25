@@ -109,6 +109,7 @@
   "settings.ladder_none": "阶梯至少需要一级。",
   "settings.handoff": "交接",
   "settings.folders": "项目文件夹",
+  "settings.agents": "智能体",
   "folders.body": "这个任务包跟踪的文件夹，例如代码、网站和移动端仓库。每个文件夹的 AGENTS.md 都让 AI 智能体找回这个任务包。",
   "folders.none": "还没有绑定文件夹。",
   "folders.bind": "绑定文件夹…",
@@ -712,5 +713,12 @@
   "sort.name_desc": "Z → A",
   "sort.changed_asc": "最旧在前",
   "sort.changed_desc": "最新在前",
-  "task.modified": "修改时间 {time}"
+  "task.modified": "修改时间 {time}",
+  "agents_section.body": "这个任务包的项目文件夹里设置了哪些 AI 智能体：它们的说明文件（AGENTS.md、CLAUDE.md）指向这个任务包。",
+  "agents_section.set_up": "已设置",
+  "agents_section.not_set_up": "未设置",
+  "agents_section.count": "已在 {total} 个文件夹中的 {done} 个设置",
+  "agents_section.missing": "{name} 中未设置",
+  "agents_section.not_found": "在这台电脑上找不到 {name}",
+  "agents_section.set_up_action": "设置…"
 }

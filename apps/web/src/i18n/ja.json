@@ -109,6 +109,7 @@
   "settings.ladder_none": "はしごには少なくとも 1 段必要です。",
   "settings.handoff": "引き継ぎ",
   "settings.folders": "プロジェクトフォルダ",
+  "settings.agents": "エージェント",
   "folders.body": "このタスクバッグが追跡するフォルダ（コード、ウェブサイト、モバイルのリポジトリなど）。各フォルダの AGENTS.md が AI エージェントをこのタスクバッグへ案内します。",
   "folders.none": "まだフォルダが結び付けられていません。",
   "folders.bind": "フォルダを結び付ける…",
@@ -712,5 +713,12 @@
   "sort.name_desc": "Z → A",
   "sort.changed_asc": "古い順",
   "sort.changed_desc": "新しい順",
-  "task.modified": "更新日時 {time}"
+  "task.modified": "更新日時 {time}",
+  "agents_section.body": "このタスクバッグのプロジェクトフォルダで、どの AI エージェントが設定済みか：その指示ファイル（AGENTS.md、CLAUDE.md）がこのタスクバッグを指しています。",
+  "agents_section.set_up": "設定済み",
+  "agents_section.not_set_up": "未設定",
+  "agents_section.count": "{total} 個のフォルダのうち {done} 個で設定済み",
+  "agents_section.missing": "{name} では未設定",
+  "agents_section.not_found": "{name} がこのコンピュータに見つかりません",
+  "agents_section.set_up_action": "設定…"
 }

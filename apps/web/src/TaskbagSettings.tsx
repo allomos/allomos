@@ -5,9 +5,11 @@
 // the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
 // sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951).
 // Handoff holds the handoff rules (Task-A05-yacht960). Project folders binds, renames, locates
-// and unbinds the taskbag's folders (Task-A05-plaza078). Agents comes with its own task.
+// and unbinds the taskbag's folders (Task-A05-plaza078). Agents shows in which folders each agent
+// is set up, with Set up… for the others (Task-A05-bag963).
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AgentsSection } from "./AgentsSection";
 import { HandoffSection } from "./HandoffSettings";
 import { ProjectFolders } from "./ProjectFolders";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
@@ -17,7 +19,7 @@ import { middleEllipsis } from "./paths";
 import { isProblem, type VersionCheck } from "./types";
 import { movingTasks, updateNotice } from "./versionFlow";
 
-const SECTIONS = ["general", "folders", "tasks", "handoff"] as const;
+const SECTIONS = ["general", "folders", "agents", "tasks", "handoff"] as const;
 type Section = (typeof SECTIONS)[number];
 
 /** The location in its monospace font, shortened in the middle to the characters that fit its
@@ -238,6 +240,7 @@ export function TaskbagSettings({
   onShowInFileManager,
   onRename,
   onUpdate,
+  onSetUpAgent,
   onChanged,
   onClose,
 }: {
@@ -255,6 +258,8 @@ export function TaskbagSettings({
   onRename: (name: string) => Promise<void>;
   /** Update the Taskbag…, as the notice's button. */
   onUpdate: () => void;
+  /** Set up…: Connect with the Agents… for this project folder. */
+  onSetUpAgent: (folder: string) => void;
   /** After a change saved here: read the taskbag again. */
   onChanged: () => Promise<void>;
   onClose: () => void;
@@ -318,6 +323,7 @@ export function TaskbagSettings({
                 />
               </>
             )}
+            {section === "agents" && <AgentsSection messenger={messenger} root={root} onSetUp={onSetUpAgent} />}
             {section === "handoff" && <HandoffSection messenger={messenger} root={root} />}
             {section === "folders" && <ProjectFolders messenger={messenger} root={root} fileManagerKey={fileManagerKey} onChanged={onChanged} />}
           </div>
