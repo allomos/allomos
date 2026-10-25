@@ -674,6 +674,7 @@ pub fn new_task(
         description.push('\n');
     }
     Ok(Task {
+        folders: Default::default(),
         extra: Default::default(),
         id: id.to_string(),
         title,
@@ -1476,6 +1477,7 @@ mod tests {
     fn bag() -> Taskbag {
         let mut s = Taskbag {
             project: Project {
+                project_folders: Default::default(),
                 extra: Default::default(),
                 format: crate::FORMAT.into(),
                 id: "p".into(),

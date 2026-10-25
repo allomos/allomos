@@ -26,7 +26,7 @@ A project is often more than one folder: a code repository, a website repository
 
    One relative path per folder is enough for now; there is no path per computer. A teammate who keeps a folder somewhere else sees it as **not found** and points Allomos at it (**Locate…** in the app, `alm folder locate` on the command line).
 2. **Folders on each task.** Each task gets a `folders` list of those names. An **empty list means the task belongs to no particular folder** (planning, naming, decisions), not to all folders.
-3. **Format step to `allomos/6`.** Opening an `allomos/5` taskbag moves its `project_folder` into the list as the first entry. Allomos versions that do not know `allomos/6` refuse the taskbag with exit code 4, as they refuse any newer format today.
+3. **Format step to `allomos/6`, only when a person asks** (approver, 2026-10-25, answering A01-dime494: option B). A build that knows `allomos/6` still reads and writes an `allomos/5` taskbag as it is; it converts it only when a person runs the upgrade (`alm upgrade`, later also a button in the app), which moves `project_folder` into the list as the first entry and sets the format to `allomos/6`. Until then, task folders and folder commands say to upgrade first. Allomos versions that do not know `allomos/6` refuse an upgraded taskbag with exit code 4, as they refuse any newer format today, so the new release is installed before upgrading. (Recorded first as "opening an `allomos/5` taskbag moves it"; changed so nothing changes the taskbag behind the person's back.)
 4. **AGENTS.md in every folder.** Every bound folder's AGENTS.md carries the Allomos section, which points back to the taskbag with a path relative to that folder.
 5. **Description links** (`resolve_task_link`) may open files inside any bound folder, not only the first.
 6. **What `alm next` lists.** Run inside a bound folder, `alm next` lists only the tasks that name that folder; tasks with no folder are not listed there. They are listed when `alm next` runs in the taskbag, outside every bound folder, or with `--all-folders`.
@@ -57,6 +57,6 @@ A project is often more than one folder: a code repository, a website repository
 ## Consequences
 
 - **Requirements:** R95 states several project folders per taskbag; R73 is unchanged (a taskbag may still sit inside one of the folders).
-- **Data format:** `allomos/6`, with the move from `project_folder` described above. Older apps and `alm` refuse it; the release that brings it must say so.
+- **Data format:** `allomos/6`, with the move from `project_folder` described above, made by `alm upgrade`. Older apps and `alm` refuse an upgraded taskbag; the release that brings it must say so.
 - **Work that builds it**, each its own task: `alm folder` commands; task folders in `alm` (`--folder`, `--no-folder`, the `alm next` filter); the Project folders dialog in the app; folders in the task pane and the task list's filter.
 - **Shared rules:** the Allomos section of AGENTS.md (`alm brief`) gains the rule that the agent decides a new task's folders.

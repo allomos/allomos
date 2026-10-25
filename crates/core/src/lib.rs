@@ -8,6 +8,7 @@ pub mod branch;
 pub mod card;
 pub mod decision;
 pub mod event;
+pub mod folders;
 pub mod ids;
 mod model;
 pub mod ops;
@@ -17,8 +18,9 @@ mod validate;
 
 pub use model::{
     AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN, Extra,
-    FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project, State,
-    TASK_LANGUAGE_UI, Task, Taskbag, default_labels, format_version, valid_language,
+    FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project, ProjectFolder,
+    READ_FROM, State, TASK_LANGUAGE_UI, Task, Taskbag, default_labels, folder_name_from,
+    format_version, valid_folder_name, valid_language,
 };
 pub use problem::Problem;
 pub use validate::{

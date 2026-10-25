@@ -139,7 +139,7 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
                     },
                 )]);
             }
-            Some(n) if n < FORMAT_VERSION => {
+            Some(n) if n < crate::model::READ_FROM => {
                 return Err(vec![Issue::new(
                     file,
                     Some("format"),
@@ -417,8 +417,43 @@ pub fn validate_taskbag(
             }
         }
     }
+    // Project folders (decision 0019): valid, unique names; every task's folders among them.
+    let mut folder_names = HashSet::new();
+    for f in &project.project_folders {
+        if !crate::model::valid_folder_name(&f.name) {
+            issues.push(Issue::new(
+                "project.json",
+                Some("project_folders"),
+                Problem::FolderNameInvalid {
+                    name: f.name.clone(),
+                },
+            ));
+        } else if !folder_names.insert(f.name.as_str()) {
+            issues.push(Issue::new(
+                "project.json",
+                Some("project_folders"),
+                Problem::FolderNameTaken {
+                    name: f.name.clone(),
+                },
+            ));
+        }
+    }
     let mut task_ids = HashSet::new();
     for (file, task) in tasks {
+        for folder in task
+            .folders
+            .iter()
+            .filter(|f| !folder_names.contains(f.as_str()))
+        {
+            issues.push(Issue::new(
+                file,
+                Some("folders"),
+                Problem::FolderUnknown {
+                    folder: folder.clone(),
+                    folders: crate::folders::names(project),
+                },
+            ));
+        }
         if !task_ids.insert(task.id.as_str()) {
             issues.push(Issue::new(
                 file,
@@ -512,7 +547,7 @@ mod tests {
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/6","id":"d","name":"D","later":{"context":90}}"#,
+            r#"{"format":"allomos/7","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);
@@ -578,7 +613,8 @@ mod tests {
     /// is refused too.
     #[test]
     fn an_older_or_newer_format_is_not_read() {
-        for n in 1..FORMAT_VERSION {
+        // `allomos/5` stays readable until a person upgrades it (Task-A01-dime494).
+        for n in 1..crate::model::READ_FROM {
             let text = format!(r#"{{"format":"allomos/{n}","id":"d","name":"D","old_field":1}}"#);
             let err = parse_project("project.json", &text).unwrap_err();
             assert_eq!(err.len(), 1);

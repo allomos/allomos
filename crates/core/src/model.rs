@@ -13,7 +13,7 @@ pub type Extra = BTreeMap<String, Value>;
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/5";
+pub const FORMAT: &str = "allomos/6";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape. An older Allomos
 /// refuses a newer taskbag (Task-A01-25); this one reads only its own format. A taskbag in any
@@ -36,7 +36,16 @@ pub const FORMAT: &str = "allomos/5";
 /// know: they are kept and listed (see [`Extra`]). So the number goes up only for a change an older
 /// Allomos would get wrong (a file renamed or moved, an existing field's meaning changed), never for
 /// a new optional field or value.
-pub const FORMAT_VERSION: u32 = 5;
+/// 6: the taskbag's project folders, each with a short name (`project_folders`, replacing
+/// `project_folder`), and the folders each task belongs to (`folders`; decision 0019,
+/// Task-A01-dime494). An `allomos/5` taskbag is still read and written as it is; it becomes
+/// `allomos/6` only when a person asks (`alm upgrade`; approver, 2026-10-25).
+pub const FORMAT_VERSION: u32 = 6;
+
+/// The oldest format this Allomos reads and writes as it is ([`READ_FROM`]..=[`FORMAT_VERSION`]):
+/// `allomos/5` stays readable after `allomos/6`, so nothing changes a taskbag until a person
+/// upgrades it. Older formats are moved in by an agent (Task-A01-45).
+pub const READ_FROM: u32 = 5;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
 /// FlipHopper's `fliphopper/1`).
@@ -62,6 +71,10 @@ pub struct Project {
     /// records it (docs/product/OPEN-FOLDER-FLOW.md).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_folder: Option<String>,
+    /// `allomos/6`: the project folders, each with a short name and a path read like
+    /// `project_folder` (decision 0019). The first is the main one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project_folders: Vec<ProjectFolder>,
     /// The language new and changed tasks are written in: [`TASK_LANGUAGE_UI`] (follow the
     /// Allomos app's interface language, the default) or a language code such as `zh-CN`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -72,6 +85,59 @@ pub struct Project {
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
+}
+
+/// One project folder of an `allomos/6` taskbag (decision 0019).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProjectFolder {
+    /// Short, unique in the taskbag: lowercase letters, digits and `-`, such as `allomos-site`.
+    pub name: String,
+    /// Relative to the folder holding `.allomos/` (`.` for that folder), or absolute.
+    pub path: String,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+impl Project {
+    /// Written in `allomos/6` or later: task folders may be used.
+    pub fn upgraded(&self) -> bool {
+        format_version(&self.format).is_some_and(|n| n >= 6)
+    }
+
+    /// The main project folder as recorded: the first of `project_folders`, else `project_folder`.
+    pub fn main_folder(&self) -> Option<&str> {
+        self.project_folders
+            .first()
+            .map(|f| f.path.as_str())
+            .or(self.project_folder.as_deref())
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+    }
+}
+
+/// A folder's short name as decision 0019 writes it: lowercase letters, digits and `-`, 1 to 40.
+pub fn valid_folder_name(name: &str) -> bool {
+    (1..=40).contains(&name.len())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && !name.starts_with('-')
+}
+
+/// A folder name made from a folder's own name (`Allomos Site` → `allomos-site`); `main` when
+/// nothing usable is left.
+pub fn folder_name_from(base: &str) -> String {
+    let mut out = String::new();
+    for c in base.chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c.to_ascii_lowercase());
+        } else if !out.ends_with('-') && !out.is_empty() {
+            out.push('-');
+        }
+    }
+    let out: String = out.trim_end_matches('-').chars().take(40).collect();
+    let out = out.trim_end_matches('-').to_string();
+    if out.is_empty() { "main".into() } else { out }
 }
 
 /// Default quota gate: with this percentage of the 5-hour quota left, start nothing new; write the
@@ -357,6 +423,10 @@ pub struct Task {
     /// Cleared with the note when the task is checked.
     #[serde(default)]
     pub human_check_steps: Option<String>,
+    /// `allomos/6`: the names of the project folders this task belongs to; empty, none in
+    /// particular (decision 0019, Task-A01-dime494).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<String>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,

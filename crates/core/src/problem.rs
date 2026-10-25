@@ -59,6 +59,15 @@ problems! {
     FieldUnknown => "field_unknown", "This version of Allomos does not know this field: a newer version may have added it (update, then look again), or its name is mistyped. It is kept as it is.";
     /// A reminder, not an error (Task-A01-piano403): the item is shown with this value, kept as it is.
     ValueUnknown { value } => "value_unknown", "This version of Allomos does not know the value {value}: a newer version may have added it (update, then look again), or it is mistyped. It is kept as it is, and this version does not change it.";
+    /// Task-A01-dime494 (decision 0019): a folder name that is not one of the taskbag's folders.
+    FolderUnknown { folder, folders } => "folder_unknown", "{folder} is not one of this taskbag's project folders ({folders}).";
+    /// A folder's short name must be lowercase letters, digits and `-`.
+    FolderNameInvalid { name } => "folder_name_invalid", "{name} is not a valid folder name: use lowercase letters, digits and -, at most 40.";
+    FolderNameTaken { name } => "folder_name_taken", "Two project folders are named {name}; each needs its own name.";
+    /// `alm add task` while folders are bound, with neither `--folder` nor `--no-folder`.
+    FolderChoiceMissing { folders } => "folder_choice_missing", "Say which project folder this task belongs to: --folder <name> (repeatable) or --no-folder. This taskbag's folders: {folders}.";
+    /// Task folders need `allomos/6`; this taskbag is still in an older format.
+    UpgradeFirst { found, current } => "upgrade_first", "This taskbag is in {found}; task folders need {current}. Install the newest Allomos, then run alm upgrade (older Allomos versions refuse an upgraded taskbag).";
     /// Task-A05-yeti951: a step left out of the new ladder is still some tasks' label.
     LabelInUse { label, tasks } => "label_in_use", "The step {label} cannot be removed: these tasks still carry it: {tasks}. Change their labels first.";
     /// Task-A01-piano403: the state was written by a newer Allomos, or mistyped.

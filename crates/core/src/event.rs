@@ -114,6 +114,7 @@ pub const TASK_FIELDS: &[&str] = &[
     "title",
     "area",
     "iteration",
+    "folders",
     "state",
     "label",
     "holder",
@@ -210,6 +211,7 @@ mod tests {
 
     fn task() -> Task {
         Task {
+            folders: Default::default(),
             extra: Default::default(),
             id: "A01-01".into(),
             title: "First".into(),

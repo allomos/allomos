@@ -77,7 +77,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// the Allomos app (approver, 2026-10-22; Task-A03-bonsai517).
 /// 25: a handoff is written into each task (`alm handoff <id> --text`, `--evidence`); no handoff
 /// files, and old ones in `handoffs/` mean the taskbag needs updating (Task-A03-polar770).
-pub const SECTION_VERSION: u32 = 25;
+/// 26: when the taskbag has project folders, the agent decides a new task's folders
+/// (`--folder` / `--no-folder`), `alm folders`, and `alm next` inside a folder (Task-A01-dime494).
+pub const SECTION_VERSION: u32 = 26;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -173,7 +175,8 @@ pub fn format_state(root: &Path) -> FormatState {
         return FormatState::Unknown;
     };
     match format_version(&found) {
-        Some(n) if n == FORMAT_VERSION => FormatState::Current,
+        // `allomos/5` is read and written as it is until a person upgrades it (Task-A01-dime494).
+        Some(n) if (allomos_core::READ_FROM..=FORMAT_VERSION).contains(&n) => FormatState::Current,
         Some(n) if n > FORMAT_VERSION => FormatState::Newer { found },
         Some(_) => FormatState::Older { found },
         None => FormatState::Unknown,
@@ -183,6 +186,19 @@ pub fn format_state(root: &Path) -> FormatState {
 fn read_project(root: &Path) -> Option<Value> {
     let text = fs::read_to_string(root.join(PROJECT_FILE)).ok()?;
     serde_json::from_str(&text).ok()
+}
+
+/// The main project folder as `project.json` records it: the first of `project_folders`
+/// (`allomos/6`), else `project_folder`.
+fn recorded_folder(value: &Value) -> Option<String> {
+    value
+        .get("project_folders")
+        .and_then(|l| l.get(0)?.get("path"))
+        .or_else(|| value.get("project_folder"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
 }
 
 fn read_format(root: &Path) -> Option<String> {
@@ -330,7 +346,9 @@ pub fn move_aside(root: &Path) -> Result<MoveIn, Problem> {
                     .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
         })
         .unwrap_or_else(|| crate::id_from_name(&name));
-    let project_folder = text("project_folder")
+    let project_folder = read_project(root)
+        .as_ref()
+        .and_then(recorded_folder)
         .map(|r| crate::setup::join_recorded(&crate::allomos_folder(root), &r));
     let old = aside_name(root, version);
     fs::rename(root, &old).map_err(|e| Problem::WriteFailed {
@@ -403,14 +421,7 @@ pub fn check(root: &Path, project: &Path) -> VersionCheck {
 /// The project folder of the taskbag at `root`: the one recorded in `project.json` (read without
 /// the usual checks, so an older taskbag's counts too), else the folder holding `.allomos/`.
 pub fn project_folder(root: &Path) -> PathBuf {
-    let recorded = read_project(root).and_then(|value| {
-        value
-            .get("project_folder")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(String::from)
-    });
+    let recorded = read_project(root).as_ref().and_then(recorded_folder);
     match recorded {
         Some(r) => normalize(&crate::setup::join_recorded(
             picked_folder(root).unwrap_or(root),
@@ -425,12 +436,8 @@ pub fn project_folder(root: &Path) -> PathBuf {
 /// Allomos. `None` when no agent is connected yet, so nothing is checked.
 pub fn connected_project(root: &Path) -> Option<std::path::PathBuf> {
     let value = read_project(root)?;
-    let recorded = value
-        .get("project_folder")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    let folder = match recorded {
+    let recorded = recorded_folder(&value);
+    let folder = match recorded.as_deref() {
         Some(r) => {
             let base = picked_folder(root).unwrap_or(root);
             normalize(&crate::setup::join_recorded(base, r))
@@ -713,8 +720,11 @@ mod tests {
                 found: format!("allomos/{}", FORMAT_VERSION + 1)
             }
         );
-        // Every format below this Allomos's is older: none is "too old" (Task-A01-45).
-        for n in 1..FORMAT_VERSION {
+        // Every format below the readable ones is older: none is "too old" (Task-A01-45);
+        // `allomos/5` is still read and written as it is (Task-A01-dime494).
+        set_project_format(&root, "allomos/5");
+        assert_eq!(format_state(&root), FormatState::Current);
+        for n in 1..allomos_core::READ_FROM {
             set_project_format(&root, &format!("allomos/{n}"));
             assert_eq!(
                 format_state(&root),
@@ -731,7 +741,7 @@ mod tests {
     /// is refused with `taskbag_to_move_in`, and the check offers the move.
     #[test]
     fn an_older_taskbag_is_never_read_or_changed() {
-        for n in 1..FORMAT_VERSION {
+        for n in 1..allomos_core::READ_FROM {
             let (dir, root) = project(&format!("older-{n}"));
             fs::write(dir.join("AGENTS.md"), agent_section()).unwrap();
             set_project_format(&root, &format!("allomos/{n}"));
