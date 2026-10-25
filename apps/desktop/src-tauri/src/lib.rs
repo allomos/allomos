@@ -1418,6 +1418,46 @@ fn focused_window(app: &AppHandle) -> Option<String> {
 
 /// Open another window on the start page. `?new` tells it not to reopen the last folder.
 fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
+    open_window_at(app, "index.html?new")
+}
+
+/// File → Open Recent › a folder (Task-A01-deck174, approver 2026-10-25,
+/// replacing "in the current window", 2026-10-12): the window already showing its taskbag comes to
+/// the front; otherwise a new window opens it, and the window the menu was used from keeps what it
+/// showed.
+fn open_recent_in_window(app: &AppHandle, folder: &str) -> tauri::Result<()> {
+    let path = PathBuf::from(folder);
+    let root = match inspect(&path) {
+        Inspection::Found { root } => root,
+        _ => path.clone(),
+    };
+    let label = {
+        let windows = app.state::<Windows>();
+        let projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
+        window_showing(&projects, &root, "")
+    };
+    if let Some(window) = label.and_then(|l| app.get_webview_window(&l)) {
+        let _ = window.unminimize();
+        let _ = window.show();
+        return window.set_focus();
+    }
+    open_window_at(app, &format!("index.html?open={}", url_encode(folder)))
+}
+
+/// `text` for a URL's query: letters, digits and `-_.~` as they are, every other byte as `%XX`.
+fn url_encode(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+/// A new project window at `url` (the interface's page and its query).
+fn open_window_at(app: &AppHandle, url: &str) -> tauri::Result<()> {
     let n = app
         .state::<Windows>()
         .next
@@ -1426,7 +1466,7 @@ fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
     tauri::WebviewWindowBuilder::new(
         app,
         format!("window-{n}"),
-        tauri::WebviewUrl::App("index.html?new".into()),
+        tauri::WebviewUrl::App(url.into()),
     )
     .title("Allomos")
     .inner_size(1100.0, 720.0)
@@ -1530,7 +1570,6 @@ fn show_project_elsewhere(
 const NEW_WINDOW_ID: &str = "new_window";
 /// A recent folder's item is `recent:<position in the list>`.
 const RECENT_PREFIX: &str = "recent:";
-const OPEN_RECENT_EVENT: &str = "menu:open_recent";
 const CLEAR_RECENT_ID: &str = "recent_clear";
 const CLEAR_RECENT_EVENT: &str = "menu:clear_recent";
 const CONNECT_ID: &str = "connect";
@@ -1970,8 +2009,8 @@ pub fn run() {
             } else if id == CLEAR_RECENT_ID {
                 send(CLEAR_RECENT_EVENT, None);
             } else if let Some(folder) = recent_folder(&app.state::<MenuTexts>(), id) {
-                // In the current window (owner, 2026-10-12).
-                send(OPEN_RECENT_EVENT, Some(folder));
+                // In a new window, or the one already showing it (A01-deck174).
+                let _ = open_recent_in_window(app, &folder);
             }
         })
         .on_window_event(|window, event| {
@@ -2056,6 +2095,15 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The folder in a new window's address (A01-deck174): everything but plain letters, digits
+    /// and `-_.~` is escaped, so spaces, `&`, `#` and non-ASCII names arrive whole.
+    #[test]
+    fn a_recent_folder_goes_whole_into_the_address() {
+        assert_eq!(url_encode("/Users/a b/proj"), "%2FUsers%2Fa%20b%2Fproj");
+        assert_eq!(url_encode("x&y#z"), "x%26y%23z");
+        assert_eq!(url_encode("项目"), "%E9%A1%B9%E7%9B%AE");
+    }
     use allomos_store::agent_connect_request_in;
 
     fn args(list: &[&str]) -> Vec<OsString> {

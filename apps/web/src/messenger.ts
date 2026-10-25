@@ -49,8 +49,6 @@ export interface Messenger {
   showProjectElsewhere(root: string): Promise<boolean>;
   /** Calls `handler` when this window comes to the front. */
   onWindowFocus(handler: () => void): Promise<() => void>;
-  /** Calls `handler` with the folder chosen under File → Open Recent. */
-  onOpenRecentMenu(handler: (folder: string) => void): Promise<() => void>;
   /** Calls `handler` when File → Open Recent → Clear Menu is chosen. */
   onClearRecentMenu(handler: () => void): Promise<() => void>;
   /** Puts the app menu's words in the interface's language. */
@@ -258,7 +256,6 @@ export const desktopMessenger: Messenger = {
       if (payload) handler();
     }),
   // Menu events are sent to the window in front only (Task-A01-27), so each window listens for its own.
-  onOpenRecentMenu: (handler) => getCurrentWebviewWindow().listen<string>("menu:open_recent", (e) => handler(e.payload)),
   onClearRecentMenu: (handler) => getCurrentWebviewWindow().listen("menu:clear_recent", () => handler()),
   setMenuTexts: (words) => invoke<void>("set_menu_texts", { words }),
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),

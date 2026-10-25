@@ -68,6 +68,8 @@ const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
 const LAST_ROOT_KEY = "allomos.lastRoot";
 /** This window was opened with New window… (Task-A01-27): it starts on the start page. */
 const NEW_WINDOW = new URLSearchParams(window.location.search).has("new");
+/** This window was opened from File → Open Recent (A01-deck174): it opens that folder. */
+const OPEN_FOLDER = new URLSearchParams(window.location.search).get("open");
 /** Recently opened project folders, newest first, for File → Open Recent. */
 const RECENT_KEY = "allomos.recentFolders";
 const RECENT_MAX = 10;
@@ -350,9 +352,19 @@ export function App({ messenger }: { messenger: Messenger }) {
   }, [messenger, root]);
 
   // On start: a folder given on the command line wins; otherwise reopen the last one. A window
-  // from New window… starts on the start page (Task-A01-27).
+  // from New window… starts on the start page (Task-A01-27); one from File → Open Recent opens
+  // that folder (A01-deck174).
   useEffect(() => {
     if (NEW_WINDOW) return;
+    if (OPEN_FOLDER) {
+      // A folder that is gone shows the usual message, and leaves Open Recent.
+      void (async () => {
+        const info = await messenger.inspectFolder(OPEN_FOLDER).catch(() => null);
+        if (info?.inspection.kind === "not_a_folder") changeRecent((list) => list.filter((f) => f !== OPEN_FOLDER));
+        await openFolder(OPEN_FOLDER);
+      })();
+      return;
+    }
     void (async () => {
       let start: string | null;
       try {
@@ -435,7 +447,6 @@ export function App({ messenger }: { messenger: Messenger }) {
     [messenger, openFolder, changeRecent],
   );
   useEffect(() => {
-    const stopOpen = messenger.onOpenRecentMenu((folder) => void openRecent(folder));
     const stopClear = messenger.onClearRecentMenu(() => changeRecent(() => []));
     // File → Connect with the Agents… (enabled while a taskbag is open): the wizard at step 4, or
     // step 3 while no project folder is known.
@@ -449,12 +460,11 @@ export function App({ messenger }: { messenger: Messenger }) {
     const stopLan = messenger.onLanMenu(() => setLanShown(true));
     return () => {
       void stopLan.then((f) => f()).catch(() => undefined);
-      void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
       void stopCards.then((f) => f()).catch(() => undefined);
     };
-  }, [messenger, openRecent, changeRecent, openWizard, openTasksIn]);
+  }, [messenger, changeRecent, openWizard, openTasksIn]);
 
   const [lanShown, setLanShown] = useState(false);
 
