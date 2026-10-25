@@ -5153,3 +5153,108 @@ fn tasks_name_their_project_folders_after_an_upgrade() {
     let v = ok(&repo, &["list"]);
     assert_eq!(v["issues"], json!([]), "{v}");
 }
+
+/// Task-A05-taco639 (decision 0019): `alm folder` binds, renames, locates and unbinds a taskbag's
+/// project folders; binding writes Allomos's section into the folder's AGENTS.md, pointing back
+/// to the taskbag, and unbinding removes only that section and keeps the tasks.
+#[test]
+fn project_folders_are_bound_renamed_located_and_unbound() {
+    let repo = filled();
+    // Folders need allomos/6 (a new taskbag is).
+    let site = repo.join("site");
+    fs::create_dir(&site).unwrap();
+    fs::write(site.join("AGENTS.md"), "# Site\n\nBuild with make.\n").unwrap();
+    refused(
+        &repo,
+        &["folder", "add", "missing"],
+        1,
+        "startup_not_a_folder",
+    );
+    let v = ok(&repo, &["folder", "add", "site"]);
+    assert_eq!(v["folder"]["name"], "site");
+    assert_eq!(v["folder"]["path"], "site");
+    assert_eq!(v["folder_files"], json!(["AGENTS.md", "CLAUDE.md"]));
+    let agents = fs::read_to_string(site.join("AGENTS.md")).unwrap();
+    assert!(
+        agents.starts_with("# Site\n\nBuild with make.\n"),
+        "{agents}"
+    );
+    assert!(agents.contains("## Tasks: Allomos"), "{agents}");
+    assert!(
+        agents.contains("`../.allomos/taskbag`"),
+        "points back: {agents}"
+    );
+    assert_eq!(
+        fs::read_to_string(site.join("CLAUDE.md")).unwrap(),
+        "@AGENTS.md\n"
+    );
+    // An agent started in the folder finds the taskbag from what AGENTS.md says.
+    let v = ok(&site, &["--taskbag", "../.allomos/taskbag", "list"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+    // Refusals: a name taken, an invalid name, an unknown folder.
+    fs::create_dir(repo.join("other")).unwrap();
+    refused(
+        &repo,
+        &["folder", "add", "other", "--name", "site"],
+        1,
+        "folder_name_taken",
+    );
+    refused(
+        &repo,
+        &["folder", "add", "other", "--name", "Bad Name"],
+        1,
+        "folder_name_invalid",
+    );
+    refused(
+        &repo,
+        &["folder", "rename", "nope", "x"],
+        1,
+        "folder_unknown",
+    );
+    // A task in it, then rename: the task follows.
+    ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "--area",
+            "A01",
+            "--title",
+            "Site work",
+            "--folder",
+            "site",
+        ],
+    );
+    let v = ok(&repo, &["folder", "rename", "site", "web"]);
+    assert_eq!(v["folder"]["name"], "web");
+    assert_eq!(v["tasks"].as_array().unwrap().len(), 1);
+    let id = v["tasks"][0].as_str().unwrap().to_string();
+    assert_eq!(ok(&repo, &["show", &id])["task"]["folders"], json!(["web"]));
+    // Locate it after a move: no files move; the section is written where it now is.
+    let moved = repo.join("moved-site");
+    fs::rename(&site, &moved).unwrap();
+    let v = ok(&repo, &["folder", "list"]);
+    assert_eq!(v["folders"][0]["exists"], false);
+    let v = ok(&repo, &["folder", "locate", "web", "moved-site"]);
+    assert_eq!(v["folder"]["path"], "moved-site");
+    assert_eq!(v["folder"]["exists"], true);
+    assert_eq!(v["folder"]["section"], true);
+    // Remove: first only what it will do, then with --confirm.
+    let before = snapshot(&repo);
+    let v = ok(&repo, &["folder", "remove", "web"]);
+    assert_eq!(v["removed"], false);
+    assert_eq!(v["folder"]["tasks"], 1);
+    assert_eq!(v["folder"]["open"], 1);
+    assert_eq!(snapshot(&repo), before);
+    let v = ok(&repo, &["folder", "remove", "web", "--confirm"]);
+    assert_eq!(v["removed"], true);
+    let agents = fs::read_to_string(moved.join("AGENTS.md")).unwrap();
+    assert_eq!(agents, "# Site\n\nBuild with make.\n");
+    assert!(moved.join("CLAUDE.md").is_file(), "files stay");
+    // The task stays, with no folder now.
+    let t = ok(&repo, &["show", &id]);
+    assert_eq!(t["task"].get("folders"), None);
+    assert_eq!(ok(&repo, &["folder", "list"])["folders"], json!([]));
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+}

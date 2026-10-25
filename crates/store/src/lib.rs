@@ -30,6 +30,7 @@ pub mod cards;
 mod confirm;
 mod convert;
 pub mod events;
+pub mod folders;
 mod guide;
 pub mod handoff;
 pub mod progress;
@@ -692,7 +693,7 @@ pub fn agent_setup(project: &Path) -> AgentSetup {
 }
 
 /// Append `section` to a file whose current text is `text`, after one blank line.
-fn append(path: &Path, text: &str, section: &str) -> io::Result<()> {
+pub(crate) fn append(path: &Path, text: &str, section: &str) -> io::Result<()> {
     let gap = if text.is_empty() || text.ends_with("\n\n") {
         ""
     } else if text.ends_with('\n') {
@@ -1554,7 +1555,10 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
     }))
 }
 
-fn lock_for_change(root: &Path, wait: Duration) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
+pub(crate) fn lock_for_change(
+    root: &Path,
+    wait: Duration,
+) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
     versions::write_allowed(root)?;
     let lock = Lock::acquire(root, wait)?;
     let (bag, issues) = taskbag_of(root, lock.load())?;

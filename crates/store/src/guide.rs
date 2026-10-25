@@ -278,6 +278,23 @@ Plan:
   `alm add task`, `alm title` and `alm describe`);
   `alm task-language <code|ui>` sets it.
 
+Project folders (decision 0019: one taskbag, several folders, each with its own AGENTS.md):
+- `alm upgrade [--confirm]`: move an `allomos/5` taskbag to `allomos/6`, which folders need.
+  Without `--confirm` it only says what it will do; afterwards older Allomos versions refuse the
+  taskbag, so the person installs the newest Allomos first. Only when the person asks.
+- `alm folder list`: each folder's name, path, whether it is there, whether its AGENTS.md has
+  Allomos's section, and how many tasks name it.
+- `alm folder add <path> [--name <name>]`: bind a folder and write Allomos's section, pointing
+  back to the taskbag, into its AGENTS.md (and a CLAUDE.md that imports it, when there is none).
+- `alm folder rename <name> <new name>`: here and in every task that names it; the folder on
+  disk keeps its name. `alm folder locate <name> <path>`: where it is now (moves no files).
+- `alm folder remove <name> [--confirm]`: unbind it. Without `--confirm` it says what it will do;
+  tasks stay (the name is taken off them), files stay, only Allomos's section leaves AGENTS.md.
+  These print the files changed in the folder, to save in that folder's own repository.
+- `alm add task … --folder <name>` (repeatable) or `--no-folder`: required while the taskbag has
+  folders; you decide, alm does not guess. `alm folders <id> <name>…` or `--none` changes them.
+  `alm list --folder <name>`; inside a folder `alm next` lists only its tasks (`--all-folders`).
+
 Handoffs (what a session leaves in each task so whoever continues does not start blind):
 - `alm handoff-rules`: when to write one (quota and context gates, with any override for you);
   `--quota <n> --context <n> [--write-when \"<text>\"] [--agent <name>] [--clear]` change them.

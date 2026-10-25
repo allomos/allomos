@@ -388,6 +388,11 @@ enum Command {
         #[arg(long, conflicts_with = "names")]
         none: bool,
     },
+    /// The taskbag's project folders (decision 0019): list, add, rename, locate, remove.
+    Folder {
+        #[command(subcommand)]
+        what: FolderWhat,
+    },
     /// Upgrade this taskbag to the newest format (allomos/6: project folders and task folders;
     /// decision 0019). Without --confirm it only says what it will do. Older Allomos versions
     /// refuse an upgraded taskbag: install the newest Allomos first.
@@ -568,6 +573,32 @@ enum Add {
 }
 
 #[derive(Subcommand)]
+pub(crate) enum FolderWhat {
+    /// Each folder: its name, path, whether it is there, whether its AGENTS.md has Allomos's
+    /// section, and how many tasks name it.
+    List,
+    /// Bind a folder to the taskbag and write Allomos's section (pointing back here) into its
+    /// AGENTS.md. Default name: from the folder's own name.
+    Add {
+        path: PathBuf,
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Give a folder a new short name, here and in every task that names it; the folder on disk
+    /// keeps its name.
+    Rename { name: String, new_name: String },
+    /// Record where a folder is now, when it is not where the taskbag says. Moves no files.
+    Locate { name: String, path: PathBuf },
+    /// Unbind a folder. Without --confirm it says what it will do. Its tasks stay (the folder's
+    /// name is taken off them), its files stay, and only Allomos's section leaves its AGENTS.md.
+    Remove {
+        name: String,
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum Rename {
     /// Give an area a new name; its ID stays.
     Area { id: String, name: String },
@@ -690,6 +721,7 @@ impl Command {
             | Command::HandoffRules { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
+            | Command::Folder { .. }
             | Command::Next { .. } => None,
         }
     }
@@ -720,6 +752,15 @@ impl Command {
         }
         if let Command::Upgrade { confirm } = self {
             return *confirm;
+        }
+        match self {
+            Command::Folder {
+                what: FolderWhat::List,
+            } => return false,
+            Command::Folder {
+                what: FolderWhat::Remove { confirm, .. },
+            } => return *confirm,
+            _ => {}
         }
         !matches!(
             self,
@@ -760,6 +801,13 @@ impl Command {
             Command::List { .. } => "list",
             Command::Folders { .. } => "folders",
             Command::Upgrade { .. } => "upgrade",
+            Command::Folder { what } => match what {
+                FolderWhat::List => "folder list",
+                FolderWhat::Add { .. } => "folder add",
+                FolderWhat::Rename { .. } => "folder rename",
+                FolderWhat::Locate { .. } => "folder locate",
+                FolderWhat::Remove { .. } => "folder remove",
+            },
             Command::Show { .. } => "show",
             Command::History { .. } => "history",
             Command::Claim { .. } => "claim",
@@ -3322,6 +3370,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             allomos_core::folders::set(bag, id, me, names)
         }),
         Command::Upgrade { confirm } => folders::upgrade(&locate(cli, cwd)?, me, *confirm),
+        Command::Folder { what } => folders::folder(&locate(cli, cwd)?, me, what, cwd),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;
