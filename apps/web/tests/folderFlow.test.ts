@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { folderFilterValue, keepFolder, newTaskFolders, readFolderFilter, showFolders, toggleFolder, type FolderInfo } from "../src/folderFlow.ts";
 import type { Task } from "../src/types.ts";
 
-const folder = (name: string): FolderInfo => ({ name, path: name, exists: true, section: true, tasks: 0, open: 0 });
+const folder = (name: string): FolderInfo => ({ name, path: name, full: `/p/${name}`, exists: true, section: true, tasks: 0, open: 0 });
 const two = [folder("app"), folder("site")];
 const task = (folders?: string[]) => ({ id: "A01-01", folders }) as unknown as Task;
 

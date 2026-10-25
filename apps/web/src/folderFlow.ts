@@ -9,6 +9,8 @@ export interface FolderInfo {
   name: string;
   /** As project.json records it, relative to the folder holding `.allomos/`. */
   path: string;
+  /** Where that is on this computer. */
+  full: string;
   /** Found on this computer. */
   exists: boolean;
   section: boolean;

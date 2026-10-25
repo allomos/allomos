@@ -133,11 +133,11 @@ export function App({ messenger }: { messenger: Messenger }) {
   openedRef.current = opened;
   /** The setup wizard (Task-A05-03): at step 1, at step 2 for a folder without `.allomos`, or at
    * step 3 or 4 for the open taskbag. `n` counts openings, so each starts fresh. */
-  const [wizard, setWizard] = useState<{ folder?: string; resume?: { root: string; at: 3 | 4 }; n: number } | null>(
+  const [wizard, setWizard] = useState<{ folder?: string; resume?: { root: string; at: 3 | 4; project?: string }; n: number } | null>(
     null,
   );
   const openWizard = useCallback(
-    (how: { folder?: string; resume?: { root: string; at: 3 | 4 } }) => setWizard((w) => ({ ...how, n: (w?.n ?? 0) + 1 })),
+    (how: { folder?: string; resume?: { root: string; at: 3 | 4; project?: string } }) => setWizard((w) => ({ ...how, n: (w?.n ?? 0) + 1 })),
     [],
   );
   const [notices, setNotices] = useState<Note[]>([]);
@@ -611,6 +611,10 @@ export function App({ messenger }: { messenger: Messenger }) {
             onUpdate={() => {
               setSettingsShown(false);
               void openTasksIn();
+            }}
+            onSetUpAgent={(folder) => {
+              setSettingsShown(false);
+              openWizard({ resume: { root: opened.root, at: 4, project: folder } });
             }}
             onClose={() => setSettingsShown(false)}
           />

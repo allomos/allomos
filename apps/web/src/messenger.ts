@@ -215,6 +215,8 @@ export interface Messenger {
   dismissAlmOffer(mismatch: string): Promise<void>;
   /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
   agentStatus(root: string): Promise<AgentStatus>;
+  /** Which agents a folder's instruction files tell about Allomos (Task-A05-bag963). */
+  agentSetupOf(project: string): Promise<AgentStatus["setup"]>;
   /** Each agent account's quota as the agents reported it (`alm quota`), newest first (Task-A03-02). */
   quotaReports(): Promise<QuotaReport[]>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
@@ -315,6 +317,7 @@ export const desktopMessenger: Messenger = {
   agentsSetUp: (taskbag) => invoke<string[]>("agents_set_up", { taskbag }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
+  agentSetupOf: (project) => invoke<AgentStatus["setup"]>("agent_setup_of", { project }),
   quotaReports: () => invoke<QuotaReport[]>("quota_reports"),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),

@@ -64,7 +64,8 @@ export function SetupWizard({
   /** Start at step 2 with this folder (it has no `.allomos` yet). */
   folder?: string;
   /** Start at step 3 or 4 for the open taskbag at `root` (step 3 while no project folder is known). */
-  resume?: { root: string; at: 3 | 4 };
+  /** `project`: step 4 for this folder, without Change… (the settings' Agents section, Task-A05-bag963). */
+  resume?: { root: string; at: 3 | 4; project?: string };
   /** A taskbag is ready: the window shows it behind the dialog. `created`: it was just made. */
   onOpened: (o: Opened, created: boolean) => void;
   /** The project folder was recorded: the window's copy of the setup state is out of date. */
@@ -125,7 +126,8 @@ export function SetupWizard({
       live = false;
     };
   }, [messenger, fourRoot]);
-  const fourPage: StepFourPage | null = anyway ? "agents" : (four?.page ?? null);
+  // Set up… for one folder (the settings' Agents section) is always the agents page.
+  const fourPage: StepFourPage | null = anyway || resume?.project ? "agents" : (four?.page ?? null);
 
   /** Step 2 for `folder`: does it have `.allomos`? */
   const look = useCallback(
@@ -166,6 +168,7 @@ export function SetupWizard({
   // An open taskbag: show step 3 or 4.
   const resumeRoot = resume?.root;
   const resumeWanted = resume?.at;
+  const resumeProject = resume?.project;
   useEffect(() => {
     if (!resumeRoot || !resumeWanted) return;
     let live = true;
@@ -174,7 +177,9 @@ export function SetupWizard({
         const o = await messenger.openTaskbag(resumeRoot);
         const setup = await messenger.projectSetup(resumeRoot);
         if (!live) return;
-        if (resumeAt(setup, resumeWanted) === 4 && setup.project_folder) {
+        if (resumeWanted === 4 && resumeProject) {
+          setStep({ n: 4, opened: o, project: resumeProject, change: false });
+        } else if (resumeAt(setup, resumeWanted) === 4 && setup.project_folder) {
           setStep({ n: 4, opened: o, project: setup.project_folder, change: true });
         } else {
           setStep({ n: 3, opened: o, source: defaultSource(setup) });
@@ -187,7 +192,7 @@ export function SetupWizard({
       live = false;
     };
     // Read once per opening; the language only words an error.
-  }, [messenger, resumeRoot, resumeWanted]);
+  }, [messenger, resumeRoot, resumeWanted, resumeProject]);
 
   const choose = async () => {
     const path = await messenger.pickFolder(t("picker.title"));
