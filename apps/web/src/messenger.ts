@@ -67,6 +67,14 @@ export interface Messenger {
   lanStatus(): Promise<LanStatus>;
   /** Turns it on or off, remembered; resolves to the new status (with `error` when it could not start). */
   setLanViewing(on: boolean): Promise<LanStatus>;
+  /** Devices asking to pair and the paired devices (Task-A04-02-02). */
+  lanPairing(): Promise<PairingView>;
+  /** Approve (a code is shown) or refuse a device's request to pair. */
+  answerPairing(id: string, approve: boolean): Promise<PairingView>;
+  /** Remove a paired device: its access ends at once; the removal is recorded in each open taskbag. */
+  removePairedDevice(id: string): Promise<PairingView>;
+  /** Calls `handler` when a device asks to pair, or a request changes. */
+  onPairingChanged(handler: () => void): Promise<() => void>;
   /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
    * request for whichever applies typed in (`alm move-in` prints it; Task-A03-27: an out-of-date
@@ -222,6 +230,13 @@ export interface MenuTexts {
   lan: string;
 }
 
+/** Pairing (apps/desktop/src-tauri/src/pairing.rs, Task-A04-02-02): what the dialog shows. */
+export interface PairingView {
+  /** Devices waiting for an answer, and approved ones waiting for their code to be typed. */
+  asking: { id: string; name: string; code: string | null; expires_in: number | null; tries_left: number | null }[];
+  devices: { id: string; name: string; paired_at: string; last_seen: string | null }[];
+}
+
 /** "Allow devices on your network to view" (apps/desktop/src-tauri/src/lan.rs, Task-A04-02-01). */
 export interface LanStatus {
   on: boolean;
@@ -265,6 +280,10 @@ export const desktopMessenger: Messenger = {
   onLanMenu: (handler) => getCurrentWebviewWindow().listen("menu:lan_viewing", () => handler()),
   lanStatus: () => invoke<LanStatus>("lan_status"),
   setLanViewing: (on) => invoke<LanStatus>("set_lan_viewing", { on }),
+  lanPairing: () => invoke<PairingView>("lan_pairing"),
+  answerPairing: (id, approve) => invoke<PairingView>("answer_pairing", { id, approve }),
+  removePairedDevice: (id) => invoke<PairingView>("remove_paired_device", { id }),
+  onPairingChanged: (handler) => getCurrentWebviewWindow().listen("lan:pairing", () => handler()),
   moveTasksIn: (agent, taskbag, language, translate) => invoke<void>("move_tasks_in", { agent, taskbag, language, translate }),
   moveTasksInRequest: (taskbag, language, translate) => invoke<string>("move_tasks_in_request", { taskbag, language, translate }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),

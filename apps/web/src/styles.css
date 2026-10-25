@@ -693,6 +693,15 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .lan-address { display: grid; justify-items: start; gap: 8px; }
 .lan-qr svg { width: 180px; height: 180px; background: #fff; border-radius: 6px; }
 .lan-address code, .lan-fingerprint { overflow-wrap: anywhere; }
+.lan-pairing { display: grid; gap: 8px; border-top: 1px solid var(--line, #ddd); padding-top: 10px; }
+.lan-pairing h3 { margin: 4px 0 0; font-size: 14px; }
+.lan-ask { display: grid; gap: 6px; }
+.lan-ask p { margin: 0; }
+.lan-code { font: 600 28px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 2px; }
+.lan-devices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lan-devices li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.companion-pair { display: grid; gap: 8px; }
+.companion-pair label { display: grid; gap: 4px; }
 .companion { max-width: 560px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 10px; }
 .companion h1 { margin: 0; font-size: 22px; }
 .translate-choice { border: none; padding: 0; margin: 0; display: grid; gap: 4px; }

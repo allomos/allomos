@@ -2,12 +2,88 @@
 // default and remembered (approver, 2026-10-25). While on, the desktop app serves this interface
 // over self-signed HTTPS on the local network: the dialog shows the address, its QR code for a
 // phone, and the certificate's fingerprint, and says why the browser warns once and why the
-// system may ask about the firewall. Pairing (A04-02-02) and the companion's view (A04-02-03)
-// come next; until then another device sees the page but no taskbag data.
+// system may ask about the firewall. Pairing (A04-02-02): a device asking to connect is approved or
+// refused here, the approved one's 9-digit code is shown until it is typed or runs out, and the
+// paired devices are listed, each with Remove. The companion's view comes with A04-02-03.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "./i18n";
-import type { LanStatus, Messenger } from "./messenger";
+import type { LanStatus, Messenger, PairingView } from "./messenger";
+
+/** `m:ss` for a countdown in seconds. */
+export function countdown(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function Pairing({ messenger }: { messenger: Messenger }) {
+  const { t } = useI18n();
+  const [view, setView] = useState<PairingView | null>(null);
+  const reload = useCallback(() => void messenger.lanPairing().then(setView, () => setView(null)), [messenger]);
+  useEffect(() => {
+    reload();
+    // Once a second: the code's countdown, and "last seen".
+    const timer = window.setInterval(reload, 1000);
+    const stop = messenger.onPairingChanged(reload);
+    return () => {
+      window.clearInterval(timer);
+      void stop.then((f) => f());
+    };
+  }, [messenger, reload]);
+  if (!view) return null;
+  const when = (utc: string) => new Date(utc).toLocaleString();
+  return (
+    <div className="lan-pairing">
+      <h3>{t("lan.pairing")}</h3>
+      {view.asking.length === 0 && <p className="muted small">{t("lan.pairing_how")}</p>}
+      {view.asking.map((a) => (
+        <div key={a.id} className="lan-ask banner">
+          {a.code === null ? (
+            <>
+              <p>{t("lan.asks", { name: a.name })}</p>
+              <div className="row">
+                <button type="button" className="primary" onClick={() => void messenger.answerPairing(a.id, true).then(setView)}>
+                  {t("lan.approve")}
+                </button>
+                <button type="button" onClick={() => void messenger.answerPairing(a.id, false).then(setView)}>
+                  {t("lan.refuse")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>{t("lan.type_code", { name: a.name })}</p>
+              <p className="lan-code" aria-label={t("lan.code_label")}>{a.code}</p>
+              <p className="muted small">{t("lan.code_rules", { time: countdown(a.expires_in ?? 0), tries: a.tries_left ?? 0 })}</p>
+            </>
+          )}
+        </div>
+      ))}
+      <h3>{t("lan.devices")}</h3>
+      {view.devices.length === 0 ? (
+        <p className="muted small">{t("lan.no_devices")}</p>
+      ) : (
+        <ul className="lan-devices">
+          {view.devices.map((d) => (
+            <li key={d.id}>
+              <span>
+                <strong>{d.name}</strong>
+                <span className="muted small">
+                  {" "}
+                  {t("lan.paired_at", { when: when(d.paired_at) })}
+                  {d.last_seen ? ` · ${t("lan.last_seen", { when: when(d.last_seen) })}` : ""}
+                </span>
+              </span>
+              <button type="button" onClick={() => void messenger.removePairedDevice(d.id).then(setView)}>
+                {t("lan.remove")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function LanDialog({ messenger, onClose }: { messenger: Messenger; onClose: () => void }) {
   const { t } = useI18n();
@@ -60,7 +136,7 @@ export function LanDialog({ messenger, onClose }: { messenger: Messenger; onClos
                 </p>
               )}
               <p className="muted small">{t("lan.firewall")}</p>
-              <p className="muted small">{t("lan.pairing_next")}</p>
+              <Pairing messenger={messenger} />
             </>
           )}
         </div>

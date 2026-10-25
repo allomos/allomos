@@ -7,6 +7,7 @@
 mod agents;
 mod alm_command;
 mod lan;
+mod pairing;
 mod update;
 
 use std::ffi::OsString;
@@ -981,10 +982,58 @@ fn set_handoff_rules(
     handoff_settings_of(&root)
 }
 
-/// "Allow devices on your network to view" (Task-A04-02-01): the server while it runs.
-#[derive(Default)]
+/// "Allow devices on your network to view" (Task-A04-02-01): the server while it runs, and the
+/// paired devices (Task-A04-02-02).
 struct Lan {
     server: Mutex<Option<lan::Server>>,
+    pairing: pairing::Pairing,
+}
+
+impl Lan {
+    fn new() -> Lan {
+        Lan {
+            server: Mutex::new(None),
+            pairing: pairing::Pairing::load(allomos_store::settings_dir().as_deref()),
+        }
+    }
+}
+
+/// Tells the "Devices on your network" dialog that a request came or changed.
+const PAIRING_EVENT: &str = "lan:pairing";
+
+/// Record a pairing (`pair`) or a removal (`unpair`) in the history of every taskbag a window shows
+/// (approver, 2026-10-25, A04-02 decision 5): a project event whose `device` field (new, so older
+/// Allomos versions read past it) names the device. A taskbag that cannot be written to now is
+/// left out.
+fn record_pairing(app: &AppHandle, command: &str, device: &str) {
+    for root in lan::Source::open_taskbags(&AppSource(app.clone())) {
+        let Ok(lock) = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))
+        else {
+            continue;
+        };
+        let Some(bag) = lock.load().taskbag else {
+            continue;
+        };
+        let name = serde_json::Value::String(device.to_string());
+        let (from, to) = if command == "pair" {
+            (None, Some(name.clone()))
+        } else {
+            (Some(name.clone()), None)
+        };
+        let mut event = allomos_store::Actor::APP.event(
+            command,
+            allomos_core::event::Kind::Project,
+            Some(&bag.project.id),
+            vec![allomos_core::event::Change {
+                field: "device".into(),
+                from,
+                to,
+                extra: Default::default(),
+            }],
+        );
+        event.extra.insert("device".into(), name);
+        let _ = lock.record(&event, |_| Ok(()));
+    }
 }
 
 /// What the web interface's server reads from the app: its built files, and the taskbags the
@@ -1003,6 +1052,15 @@ impl lan::Source for AppSource {
         roots.sort();
         roots.dedup();
         roots
+    }
+    fn pairing(&self) -> &pairing::Pairing {
+        &self.0.state::<Lan>().inner().pairing
+    }
+    fn pairing_changed(&self) {
+        let _ = self.0.emit(PAIRING_EVENT, ());
+    }
+    fn paired(&self, device: &pairing::Device) {
+        record_pairing(&self.0, "pair", &device.name);
     }
 }
 
@@ -1076,6 +1134,28 @@ fn set_lan_viewing(app: AppHandle, lan: tauri::State<Lan>, on: bool) -> LanStatu
         None
     };
     lan_status_of(&lan, error)
+}
+
+/// The requests waiting for an answer and the paired devices (Task-A04-02-02).
+#[tauri::command]
+fn lan_pairing(lan: tauri::State<Lan>) -> pairing::View {
+    lan.pairing.view()
+}
+
+/// Approve (a code is shown) or refuse a device's request to pair.
+#[tauri::command]
+fn answer_pairing(lan: tauri::State<Lan>, id: String, approve: bool) -> pairing::View {
+    lan.pairing.answer(&id, approve);
+    lan.pairing.view()
+}
+
+/// Remove a paired device: its access ends at once, and the removal is recorded.
+#[tauri::command]
+fn remove_paired_device(app: AppHandle, lan: tauri::State<Lan>, id: String) -> pairing::View {
+    if let Some(device) = lan.pairing.remove(&id) {
+        record_pairing(&app, "unpair", &device.name);
+    }
+    lan.pairing.view()
 }
 
 /// One task's history, newest first, and when the taskbag started recording (Task-A01-17).
@@ -1953,7 +2033,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .manage(Windows::default())
-        .manage(Lan::default())
+        .manage(Lan::new())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -2041,6 +2121,9 @@ pub fn run() {
             set_handoff_rules,
             lan_status,
             set_lan_viewing,
+            lan_pairing,
+            answer_pairing,
+            remove_paired_device,
             create_taskbag,
             task_history,
             show_in_file_manager,

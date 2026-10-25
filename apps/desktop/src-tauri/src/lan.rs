@@ -6,9 +6,11 @@
 //! (so a device trusts it once); off by default and remembered; a fixed default port
 //! ([`DEFAULT_PORT`]), the next free one when it is taken. While it is off nothing listens.
 //!
-//! Only reading: every request other than GET or HEAD is refused. Until pairing (A04-02-02), the
-//! data endpoints answer only this computer itself; another device gets the page and
-//! `/api/hello`, nothing from a taskbag.
+//! Only reading: every request other than GET or HEAD is refused, except the two that pair a device
+//! (`POST /api/pair`, `POST /api/pair/code`; Task-A04-02-02, [`crate::pairing`]). The data
+//! endpoints answer this computer itself and paired devices, which send their token as
+//! `Authorization: Bearer <token>`; any other device gets the page and `/api/hello`, nothing from a
+//! taskbag.
 
 use std::io::{self, Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream, UdpSocket};
@@ -25,11 +27,13 @@ use serde::Serialize;
 pub const DEFAULT_PORT: u16 = 47470;
 const PORT_TRIES: u16 = 20;
 /// The folder, in the app's settings folder, holding the certificate and its key.
-const LAN_DIR: &str = "lan";
+pub(crate) const LAN_DIR: &str = "lan";
 const CERT_FILE: &str = "cert.pem";
 const KEY_FILE: &str = "key.pem";
 /// The most a request's head may take; a longer one is refused.
 const MAX_HEAD: usize = 16 * 1024;
+/// The most a request's body may take: pairing sends only a name or a code.
+const MAX_BODY: usize = 4 * 1024;
 
 /// The certificate the server shows, as PEM, and its SHA-256 fingerprint as people read it
 /// (`AB:CD:…`), shown beside the address so a person can compare it with what the browser shows.
@@ -71,7 +75,7 @@ pub fn identity(dir: &Path) -> io::Result<Identity> {
 }
 
 /// The key, readable by this user only where the system allows it.
-fn write_private(path: &Path, text: &str) -> io::Result<()> {
+pub(crate) fn write_private(path: &Path, text: &str) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
@@ -130,6 +134,9 @@ pub struct Request {
     pub path: String,
     pub query: String,
     pub peer: IpAddr,
+    /// The token after `Authorization: Bearer`, when sent.
+    pub token: Option<String>,
+    pub body: Vec<u8>,
 }
 
 impl Request {
@@ -184,30 +191,97 @@ impl Response {
     }
 }
 
-/// What the routes read from the app: a built file of the web interface (its bytes and type), and
-/// the taskbags its windows show.
+/// What the routes read from the app: a built file of the web interface (its bytes and type), the
+/// taskbags its windows show, and its pairing state, which it is told about when it changes.
 pub trait Source: Send + Sync {
     fn asset(&self, path: &str) -> Option<(Vec<u8>, String)>;
     fn open_taskbags(&self) -> Vec<PathBuf>;
+    fn pairing(&self) -> &crate::pairing::Pairing;
+    /// A request came or changed: the desktop app shows it again.
+    fn pairing_changed(&self);
+    /// A device paired: recorded in every open taskbag's history (approver, 2026-10-25).
+    fn paired(&self, device: &crate::pairing::Device);
 }
 
-/// The answer to one request. Reading only; data only for this computer until pairing exists.
+/// The JSON object in a request's body, if it is one.
+fn body_json(req: &Request) -> Option<serde_json::Map<String, serde_json::Value>> {
+    match serde_json::from_slice(&req.body).ok()? {
+        serde_json::Value::Object(map) => Some(map),
+        _ => None,
+    }
+}
+
+/// `POST /api/pair` `{"name": …}` and `POST /api/pair/code` `{"request": …, "code": …}`
+/// (Task-A04-02-02).
+fn pair_route(req: &Request, source: &dyn Source) -> Response {
+    let body = body_json(req).unwrap_or_default();
+    let text = |name: &str| body.get(name).and_then(|v| v.as_str()).unwrap_or_default();
+    let pairing = source.pairing();
+    if req.path == "/api/pair" {
+        return match pairing.ask(text("name")) {
+            Some(id) => {
+                source.pairing_changed();
+                Response::json(200, &serde_json::json!({ "request": id }))
+            }
+            None => Response::json(
+                400,
+                &serde_json::json!({ "error": "name_missing", "max": crate::pairing::NAME_MAX }),
+            ),
+        };
+    }
+    match pairing.confirm(text("request"), text("code")) {
+        Ok((device, token)) => {
+            source.paired(&device);
+            source.pairing_changed();
+            Response::json(
+                200,
+                &serde_json::json!({ "token": token, "device": device.name }),
+            )
+        }
+        Err(refusal) => {
+            source.pairing_changed();
+            Response::json(400, &refusal)
+        }
+    }
+}
+
+/// The answer to one request. Reading only, apart from pairing; data only for this computer and
+/// paired devices.
 pub fn route(req: &Request, source: &dyn Source) -> Response {
+    if req.method == "POST" && (req.path == "/api/pair" || req.path == "/api/pair/code") {
+        return pair_route(req, source);
+    }
     if req.method != "GET" && req.method != "HEAD" {
         return Response::json(
             405,
             &serde_json::json!({ "error": "read_only", "message": "Devices on the network can only view. Nothing can be changed from here." }),
         );
     }
+    let device = req
+        .token
+        .as_deref()
+        .and_then(|t| source.pairing().device_for(t));
     if req.path == "/api/hello" {
         return Response::json(
             200,
-            &serde_json::json!({ "app": "Allomos", "version": env!("CARGO_PKG_VERSION"), "pairing": false }),
+            &serde_json::json!({
+                "app": "Allomos",
+                "version": env!("CARGO_PKG_VERSION"),
+                "pairing": true,
+                "device": device.as_ref().map(|d| &d.name),
+            }),
         );
     }
+    if req.path == "/api/pair" {
+        let status = req
+            .param("request")
+            .map(|id| source.pairing().status(&id))
+            .unwrap_or(crate::pairing::Status::Expired);
+        return Response::json(200, &status);
+    }
     if let Some(rest) = req.path.strip_prefix("/api/") {
-        // Pairing comes with A04-02-02; until then only this computer reads data.
-        if !req.peer.is_loopback() {
+        // Only this computer itself and paired devices read data (Task-A04-02-02).
+        if !req.peer.is_loopback() && device.is_none() {
             return Response::json(
                 403,
                 &serde_json::json!({ "error": "pairing_required", "message": "Pair this device with the Allomos desktop app first." }),
@@ -366,7 +440,43 @@ fn serve(
             );
         }
     }
+    let end = head
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map_or(head.len(), |n| n + 4);
+    let mut body = head.split_off(end);
     let text = String::from_utf8_lossy(&head);
+    let header = |name: &str| {
+        text.lines().skip(1).find_map(|l| {
+            let (k, v) = l.split_once(':')?;
+            k.trim()
+                .eq_ignore_ascii_case(name)
+                .then(|| v.trim().to_string())
+        })
+    };
+    let length: usize = header("content-length")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    if length > MAX_BODY {
+        return answer(
+            &mut tls,
+            &Response::json(413, &serde_json::json!({ "error": "too_large" })),
+            false,
+        );
+    }
+    while body.len() < length {
+        let n = tls.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&buf[..n]);
+    }
+    body.truncate(length);
+    let token = header("authorization").and_then(|v| {
+        v.strip_prefix("Bearer ")
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+    });
     let mut first = text.lines().next().unwrap_or_default().split_whitespace();
     let method = first.next().unwrap_or_default().to_string();
     let target = first.next().unwrap_or("/");
@@ -376,6 +486,8 @@ fn serve(
         path: percent_decode(path),
         query: query.to_string(),
         peer: peer.ip(),
+        token,
+        body,
     };
     let res = route(&req, source);
     answer(&mut tls, &res, req.method == "HEAD")
@@ -384,9 +496,11 @@ fn serve(
 fn answer(out: &mut impl Write, res: &Response, head_only: bool) -> io::Result<()> {
     let reason = match res.status {
         200 => "OK",
+        400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        413 => "Content Too Large",
         431 => "Request Header Fields Too Large",
         _ => "",
     };
@@ -440,6 +554,16 @@ mod tests {
     struct Fake {
         index: bool,
         open: Vec<PathBuf>,
+        pairing: crate::pairing::Pairing,
+        paired: std::sync::Mutex<Vec<String>>,
+    }
+    fn fake(index: bool, open: Vec<PathBuf>) -> Fake {
+        Fake {
+            index,
+            open,
+            pairing: crate::pairing::Pairing::load(None),
+            paired: Default::default(),
+        }
     }
     impl Source for Fake {
         fn asset(&self, path: &str) -> Option<(Vec<u8>, String)> {
@@ -454,6 +578,13 @@ mod tests {
         fn open_taskbags(&self) -> Vec<PathBuf> {
             self.open.clone()
         }
+        fn pairing(&self) -> &crate::pairing::Pairing {
+            &self.pairing
+        }
+        fn pairing_changed(&self) {}
+        fn paired(&self, device: &crate::pairing::Device) {
+            self.paired.lock().unwrap().push(device.name.clone());
+        }
     }
 
     fn req(method: &str, target: &str, peer: IpAddr) -> Request {
@@ -463,6 +594,8 @@ mod tests {
             path: path.into(),
             query: query.into(),
             peer,
+            token: None,
+            body: Vec::new(),
         }
     }
     const LAN: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20));
@@ -480,10 +613,7 @@ mod tests {
 
     #[test]
     fn only_reading_is_answered() {
-        let f = Fake {
-            index: true,
-            open: vec![],
-        };
+        let f = fake(true, vec![]);
         for m in ["POST", "PUT", "PATCH", "DELETE"] {
             let r = route(&req(m, "/api/taskbags", HERE), &f);
             assert_eq!(r.status, 405, "{m}");
@@ -494,10 +624,7 @@ mod tests {
     #[test]
     fn data_only_for_this_computer_until_pairing() {
         let root = tmp("bag");
-        let f = Fake {
-            index: true,
-            open: vec![root.clone()],
-        };
+        let f = fake(true, vec![root.clone()]);
         let hello = route(&req("GET", "/api/hello", LAN), &f);
         assert_eq!(hello.status, 200);
         for path in ["/api/taskbags", "/api/taskbag?root=x", "/api/anything"] {
@@ -516,6 +643,70 @@ mod tests {
         assert_eq!(route(&req("GET", &mine, HERE), &f).status, 200);
     }
 
+    #[test]
+    fn a_paired_device_reads_and_a_removed_one_does_not() {
+        let root = tmp("paired");
+        let f = fake(true, vec![root.clone()]);
+        let post = |path: &str, body: serde_json::Value| {
+            let mut r = req("POST", path, LAN);
+            r.body = body.to_string().into_bytes();
+            let res = route(&r, &f);
+            let v: serde_json::Value = serde_json::from_slice(&res.body).unwrap();
+            (res.status, v)
+        };
+        let get = |path: &str, token: Option<&str>| {
+            let mut r = req("GET", path, LAN);
+            r.token = token.map(String::from);
+            let res = route(&r, &f);
+            let v: serde_json::Value = serde_json::from_slice(&res.body).unwrap_or_default();
+            (res.status, v)
+        };
+        assert_eq!(post("/api/pair", serde_json::json!({ "name": "" })).0, 400);
+        let (status, v) = post("/api/pair", serde_json::json!({ "name": "Phone" }));
+        assert_eq!(status, 200);
+        let id = v["request"].as_str().unwrap().to_string();
+        assert_eq!(
+            get(&format!("/api/pair?request={id}"), None).1["status"],
+            "waiting"
+        );
+        let asking = f.pairing.view().asking;
+        assert_eq!(asking[0].name, "Phone");
+        f.pairing.answer(&asking[0].id, true);
+        assert_eq!(
+            get(&format!("/api/pair?request={id}"), None).1["status"],
+            "approved"
+        );
+        let code = f.pairing.view().asking[0].code.clone().unwrap();
+        let (status, v) = post(
+            "/api/pair/code",
+            serde_json::json!({ "request": id, "code": "x" }),
+        );
+        assert_eq!(
+            (status, &v["error"]),
+            (400, &serde_json::json!("wrong_code"))
+        );
+        let (status, v) = post(
+            "/api/pair/code",
+            serde_json::json!({ "request": id, "code": code }),
+        );
+        assert_eq!(status, 200, "{v}");
+        let token = v["token"].as_str().unwrap().to_string();
+        assert_eq!(*f.paired.lock().unwrap(), ["Phone"]);
+        // Data now, with the token only.
+        assert_eq!(get("/api/taskbags", None).0, 403);
+        assert_eq!(get("/api/taskbags", Some("wrong")).0, 403);
+        assert_eq!(get("/api/taskbags", Some(&token)).0, 200);
+        assert_eq!(get("/api/hello", Some(&token)).1["device"], "Phone");
+        // Removed: nothing any more.
+        let device = f.pairing.view().devices[0].id.clone();
+        f.pairing.remove(&device);
+        assert_eq!(get("/api/taskbags", Some(&token)).0, 403);
+        assert_eq!(
+            get("/api/hello", Some(&token)).1["device"],
+            serde_json::Value::Null
+        );
+    }
+
     fn percent_encode(s: &str) -> String {
         s.bytes()
             .map(|b| {
@@ -530,10 +721,7 @@ mod tests {
 
     #[test]
     fn the_web_interface_is_served_with_index_for_pages() {
-        let f = Fake {
-            index: true,
-            open: vec![],
-        };
+        let f = fake(true, vec![]);
         assert_eq!(route(&req("GET", "/", LAN), &f).body, b"<html>app</html>");
         assert_eq!(
             route(&req("GET", "/some/page", LAN), &f).body,
@@ -542,10 +730,7 @@ mod tests {
         assert_eq!(route(&req("GET", "/assets/app.js", LAN), &f).body, b"js");
         assert_eq!(route(&req("GET", "/assets/gone.js", LAN), &f).status, 404);
         // Without the built interface: a page that says so.
-        let bare = Fake {
-            index: false,
-            open: vec![],
-        };
+        let bare = fake(false, vec![]);
         let r = route(&req("GET", "/", LAN), &bare);
         assert!(String::from_utf8_lossy(&r.body).contains("npm --prefix apps/web run build"));
     }
@@ -584,10 +769,7 @@ mod tests {
     #[test]
     fn it_listens_only_while_on_and_moves_off_a_taken_port() {
         let id = identity(&tmp("listen")).unwrap();
-        let source: Arc<dyn Source> = Arc::new(Fake {
-            index: true,
-            open: vec![],
-        });
+        let source: Arc<dyn Source> = Arc::new(fake(true, vec![]));
         let first = 47_900;
         let server = start(first, &id, source.clone()).unwrap();
         let port = server.port;
@@ -618,10 +800,8 @@ mod tests {
         }
         let root = tmp("e2e-bag");
         let id = identity(&tmp("e2e")).unwrap();
-        let source: Arc<dyn Source> = Arc::new(Fake {
-            index: true,
-            open: vec![root],
-        });
+        let shared = Arc::new(fake(true, vec![root]));
+        let source: Arc<dyn Source> = shared.clone();
         let server = start(47_950, &id, source).unwrap();
         let curl = |args: &[&str]| {
             let out = std::process::Command::new("curl")
@@ -645,6 +825,36 @@ mod tests {
             let r = curl(&[&format!("{lan}/api/taskbags")]);
             assert!(r.contains("pairing_required") && r.ends_with("403"), "{r}");
             assert!(curl(&[&format!("{lan}/api/hello")]).ends_with("200"));
+            // Pairing over the network (Task-A04-02-02): a body and a token header are read.
+            let body = |text: &str| text.rsplit_once('\n').unwrap().0.to_string();
+            let json =
+                |text: &str| -> serde_json::Value { serde_json::from_str(&body(text)).unwrap() };
+            let post = |path: &str, data: &str| {
+                curl(&[
+                    "-X",
+                    "POST",
+                    "-H",
+                    "Content-Type: application/json",
+                    "--data",
+                    data,
+                    &format!("{lan}{path}"),
+                ])
+            };
+            let asked = json(&post("/api/pair", r#"{"name":"Curl"}"#));
+            let request = asked["request"].as_str().unwrap();
+            let pending = shared.pairing.view().asking[0].clone();
+            shared.pairing.answer(&pending.id, true);
+            let code = shared.pairing.view().asking[0].code.clone().unwrap();
+            let paired = post(
+                "/api/pair/code",
+                &format!(r#"{{"request":"{request}","code":"{code}"}}"#),
+            );
+            assert!(paired.ends_with("200"), "{paired}");
+            let token = json(&paired)["token"].as_str().unwrap().to_string();
+            let auth = format!("Authorization: Bearer {token}");
+            assert!(curl(&["-H", &auth, &format!("{lan}/api/taskbags")]).ends_with("200"));
+            let big = format!(r#"{{"name":"{}"}}"#, "x".repeat(MAX_BODY));
+            assert!(post("/api/pair", &big).ends_with("413"));
         }
         server.stop();
     }
