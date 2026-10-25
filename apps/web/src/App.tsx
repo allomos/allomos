@@ -515,10 +515,9 @@ export function App({ messenger }: { messenger: Messenger }) {
               <strong>{opened.loaded.taskbag.project.name}</strong>
               <button type="button" className="link reveal settings-link" onClick={() => setSettingsShown(true)}>
                 <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M9.4 1l.3 1.8c.4.1.8.3 1.2.6l1.7-.7 1.4 2.4-1.4 1.1a4.6 4.6 0 0 1 0 1.4l1.4 1.1-1.4 2.4-1.7-.7c-.4.3-.8.5-1.2.6L9.4 15H6.6l-.3-1.8a4.6 4.6 0 0 1-1.2-.6l-1.7.7L2 10.9l1.4-1.1a4.6 4.6 0 0 1 0-1.4L2 7.3l1.4-2.4 1.7.7c.4-.3.8-.5 1.2-.6L6.6 1h2.8zM8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z"
-                  />
+                  {/* A regular six-tooth gear (Task-A05-lamp100): every tooth the same size and
+                      distance from the centre, so it reads as round. */}
+                  <path fill="currentColor" fillRule="evenodd" d="M5.68 3.24 L6.31 1.21 L9.69 1.21 L10.32 3.24 L10.96 3.61 L13.04 3.14 L14.73 6.07 L13.29 7.63 L13.29 8.37 L14.73 9.93 L13.04 12.86 L10.96 12.39 L10.32 12.76 L9.69 14.79 L6.31 14.79 L5.68 12.76 L5.04 12.39 L2.96 12.86 L1.27 9.93 L2.71 8.37 L2.71 7.63 L1.27 6.07 L2.96 3.14 L5.04 3.61Z M10.30 8.00 a2.3 2.3 0 1 0 -4.60 0 a2.3 2.3 0 1 0 4.60 0Z" />
                 </svg>
                 {t("top.settings")}
               </button>

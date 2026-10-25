@@ -74,8 +74,10 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .where { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
 .where-name { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .where-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.settings-link { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
-.settings-link svg { position: relative; top: 1px; }
+/* Task-A05-lamp100: on the name's baseline (the shared `button.link { align-self: start }` would
+   lift it to the top of the line), with the gear centred on the word. */
+.where-name .settings-link { align-self: baseline; display: inline; flex: none; white-space: nowrap; line-height: inherit; }
+.settings-link svg { vertical-align: -0.12em; margin-right: 4px; }
 .settings-dialog { width: min(720px, 100%); }
 .settings-body { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; min-height: 200px; }
 .settings-sections { display: grid; align-content: start; gap: 2px; }
