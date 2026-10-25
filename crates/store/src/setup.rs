@@ -48,10 +48,7 @@ pub fn relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
 /// A relative path may be written with `/` or `\` (an older Allomos on Windows wrote `..\app`);
 /// both are read as separators on every system.
 pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
-    let recorded = project.project_folder.as_deref()?.trim();
-    if recorded.is_empty() {
-        return None;
-    }
+    let recorded = project.main_folder()?;
     let path = join_recorded(&allomos_folder(root), recorded);
     // Tidy `.` and `..` without asking the disk, so a moved folder still gives a clear path.
     let mut clean = PathBuf::new();
@@ -65,6 +62,19 @@ pub fn project_folder_of(root: &Path, project: &Project) -> Option<PathBuf> {
         }
     }
     Some(clean)
+}
+
+/// Every project folder of an `allomos/6` taskbag (decision 0019) with its path read like
+/// [`project_folder_of`]'s: `(name, path)`, in the order `project.json` lists them.
+pub fn project_folder_paths(root: &Path, project: &Project) -> Vec<(String, PathBuf)> {
+    project
+        .project_folders
+        .iter()
+        .map(|f| {
+            let path = join_recorded(&allomos_folder(root), f.path.trim());
+            (f.name.clone(), std::path::absolute(&path).unwrap_or(path))
+        })
+        .collect()
 }
 
 /// `recorded` (a `project_folder` value) read from `base`: an absolute path as it is, a relative
@@ -101,7 +111,21 @@ pub fn record_project_folder(root: &Path, folder: &Path) -> Result<String, Probl
     })?;
     let before = parse_project(PROJECT_FILE, &text).map_err(|issues| issues[0].problem.clone())?;
     let mut project = before.clone();
-    project.project_folder = Some(recorded.clone());
+    if project.upgraded() {
+        // `allomos/6` (decision 0019): the main folder is the first of the list.
+        match project.project_folders.first_mut() {
+            Some(main) => main.path = recorded.clone(),
+            None => project.project_folders.push(allomos_core::ProjectFolder {
+                name: allomos_core::folder_name_from(
+                    &folder.file_name().unwrap_or_default().to_string_lossy(),
+                ),
+                path: recorded.clone(),
+                extra: Default::default(),
+            }),
+        }
+    } else {
+        project.project_folder = Some(recorded.clone());
+    }
     let event = crate::Actor::APP.event(
         "connect project folder",
         allomos_core::event::Kind::Project,
@@ -244,7 +268,11 @@ mod tests {
             }
         );
         let text = fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
-        assert!(text.contains("\"project_folder\": \".\""), "{text}");
+        // A new taskbag is `allomos/6`: the folder is the first of its project folders.
+        assert!(
+            text.contains("\"project_folders\"") && text.contains("\"path\": \".\""),
+            "{text}"
+        );
 
         // Allomos's section in AGENTS.md: Codex is told.
         fs::write(home.join("AGENTS.md"), crate::agent_section()).unwrap();

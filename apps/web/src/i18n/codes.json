@@ -87,8 +87,21 @@
   ],
   "field_missing": [],
   "field_unknown": [],
+  "folder_choice_missing": [
+    "folders"
+  ],
+  "folder_name_invalid": [
+    "name"
+  ],
+  "folder_name_taken": [
+    "name"
+  ],
   "folder_not_empty": [
     "path"
+  ],
+  "folder_unknown": [
+    "folder",
+    "folders"
   ],
   "handoff_empty": [],
   "holder_missing": [],
@@ -242,6 +255,10 @@
   ],
   "update_failed": [
     "detail"
+  ],
+  "upgrade_first": [
+    "found",
+    "current"
   ],
   "value_unknown": [
     "value"

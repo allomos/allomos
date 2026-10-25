@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v25)
+## Tasks: Allomos (v26)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -105,6 +105,11 @@ the project notes (below).
   `alm guide tasks` first, then `alm add task --area <area> --title "<outcome>" --branch
   <the branch you are on>`: on a task's working branch, the new task shares that task's base;
   otherwise the base is the branch you are on. alm prints which and why; `--base` overrides it.
+  When the taskbag has project folders (several folders, each with its own AGENTS.md), decide
+  which ones the task belongs to, or none, and say so: `--folder <name>` (repeatable) or
+  `--no-folder`; alm does not guess. `alm folders <id> <name>…` (or `--none`) changes them later.
+  Run inside a project folder, `alm next` lists only that folder's tasks (`--all-folders`: every
+  task).
 - Change a task's title, description or handoff note: `alm title <id> "<title>"`,
   `alm describe <id> --text "<markdown>"` (or `--from <file.md>`), `alm note <id> "<text>"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in

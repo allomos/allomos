@@ -119,6 +119,7 @@ mod tests {
             }],
             iterations: Vec::new(),
             tasks: vec![Task {
+                folders: Default::default(),
                 extra: Default::default(),
                 id: "A01-01".into(),
                 title: "First".into(),

@@ -2419,7 +2419,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v25)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v26)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2429,7 +2429,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v25)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v26)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -2986,7 +2986,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
         ] {
             let v = refused(&repo, args, 1, "taskbag_to_move_in");
             assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
-            assert_eq!(v["error"]["params"]["current"], "allomos/5");
+            assert_eq!(v["error"]["params"]["current"], "allomos/6");
             let message = v["error"]["message"].as_str().unwrap();
             assert!(message.contains("Update the taskbag…"), "{message}");
             assert!(message.contains("`alm move-in`"), "{message}");
@@ -4144,7 +4144,7 @@ fn block_shows_blockers_and_next_only_tells() {
 #[test]
 fn a_newer_taskbag_is_refused_by_an_older_build() {
     let repo = filled();
-    set_format(&repo, "allomos/6");
+    set_format(&repo, "allomos/7");
     refused(&repo, &["list"], 4, "taskbag_newer");
 }
 
@@ -5022,4 +5022,134 @@ fn future_fields_and_values_are_read_listed_and_kept() {
     refused(&repo, &["--as", "a", "claim", "A01-02"], 1, "state_unknown");
     assert_eq!(snapshot(&repo), before);
     assert_eq!(read("project.json")["theme"], json!({"dark": true}));
+}
+
+/// Task-A01-dime494 (decision 0019; approver 2026-10-25: option B): an `allomos/5` taskbag is
+/// read as it is until `alm upgrade --confirm`; then tasks name their project folders, chosen by
+/// whoever adds them, and `alm next` inside a folder lists only that folder's tasks.
+#[test]
+fn tasks_name_their_project_folders_after_an_upgrade() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    let project_file = bag.join("project.json");
+    let edit = |f: &dyn Fn(&mut Value)| {
+        let mut v: Value =
+            serde_json::from_str(&fs::read_to_string(&project_file).unwrap()).unwrap();
+        f(&mut v);
+        fs::write(&project_file, serde_json::to_string_pretty(&v).unwrap()).unwrap();
+    };
+    edit(&|v| {
+        v["format"] = json!("allomos/5");
+        v["project_folder"] = json!(".");
+    });
+    // Still read and changed as allomos/5; folders need the upgrade.
+    ok(&repo, &["list"]);
+    let add = |extra: &[&str]| {
+        let mut args = vec!["add", "task", "--area", "A01", "--title", "x"];
+        args.extend_from_slice(extra);
+        args.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+    };
+    fn strs(v: &[String]) -> Vec<&str> {
+        v.iter().map(String::as_str).collect()
+    }
+    ok(&repo, &strs(&add(&[])));
+    refused(
+        &repo,
+        &strs(&add(&["--folder", "main"])),
+        1,
+        "upgrade_first",
+    );
+    // `alm upgrade` alone says what it will do and changes nothing.
+    let before = snapshot(&repo);
+    let v = ok(&repo, &["upgrade"]);
+    assert_eq!(v["upgraded"], false);
+    assert_eq!(snapshot(&repo), before);
+    let v = ok(&repo, &["upgrade", "--confirm"]);
+    assert_eq!(v["upgraded"], true, "{v}");
+    let project: Value = serde_json::from_str(&fs::read_to_string(&project_file).unwrap()).unwrap();
+    assert_eq!(project["format"], "allomos/6");
+    assert_eq!(project.get("project_folder"), None);
+    assert_eq!(project["project_folders"][0]["path"], ".");
+    let main = project["project_folders"][0]["name"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(ok(&repo, &["upgrade", "--confirm"])["upgraded"], false);
+    // A second folder (binding comes with alm folder add, A05-taco639).
+    fs::create_dir(repo.join("site")).unwrap();
+    edit(&|v| {
+        v["project_folders"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({ "name": "site", "path": "site" }))
+    });
+    // The agent decides: neither option is refused, listing the folders.
+    let v = refused(&repo, &strs(&add(&[])), 1, "folder_choice_missing");
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("site (site)"),
+        "{v}"
+    );
+    refused(
+        &repo,
+        &strs(&add(&["--folder", "nope"])),
+        1,
+        "folder_unknown",
+    );
+    let v = ok(
+        &repo,
+        &strs(&add(&["--folder", "site", "--folder", "site"])),
+    );
+    let site_task = v["task"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["task"]["folders"], json!(["site"]));
+    let v = ok(&repo, &strs(&add(&["--no-folder"])));
+    let no_folder = v["task"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["task"].get("folders"), None);
+    // Changed later; recorded in the history.
+    ok(&repo, &["folders", "A01-01", &main]);
+    assert_eq!(
+        ok(&repo, &["show", "A01-01"])["task"]["folders"],
+        json!([main])
+    );
+    refused(&repo, &["folders", "A01-01", "nope"], 1, "folder_unknown");
+    let h = ok(&repo, &["history", "A01-01"]);
+    assert!(h.to_string().contains("\"field\":\"folders\""), "{h}");
+    // `alm list --folder`.
+    let v = ok(&repo, &["list", "--folder", "site"]);
+    let listed = v.to_string();
+    assert!(
+        listed.contains(&site_task) && !listed.contains("A01-01\""),
+        "{listed}"
+    );
+    // `alm next` inside a folder: only its tasks, not those with no folder.
+    for id in [&site_task, &no_folder, &"A01-01".to_string()] {
+        ok(&repo, &["ready", id]);
+    }
+    let ids = |v: &Value| -> Vec<String> {
+        v["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["id"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let v = ok(&repo.join("site"), &["next"]);
+    assert_eq!(v["folder"], "site");
+    assert_eq!(ids(&v), [site_task.clone()]);
+    let v = ok(&repo, &["next"]);
+    assert_eq!(v["folder"], json!(main));
+    assert!(ids(&v).contains(&"A01-01".to_string()) && !ids(&v).contains(&no_folder));
+    // In the taskbag, or with --all-folders: every ready task.
+    let v = ok(&repo.join("site"), &["next", "--all-folders"]);
+    assert_eq!(v["folder"], Value::Null);
+    assert!(ids(&v).contains(&no_folder) && ids(&v).contains(&site_task));
+    let v = ok(&bag, &["next"]);
+    assert!(ids(&v).contains(&no_folder));
+    // Clearing a task's folders.
+    ok(&repo, &["folders", "A01-01", "--none"]);
+    assert_eq!(ok(&repo, &["show", "A01-01"])["task"].get("folders"), None);
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
 }

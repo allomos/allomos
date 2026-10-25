@@ -223,6 +223,9 @@ enum Command {
         /// (`alm done --without-human-check`). `--without-owner` is its old name.
         #[arg(long, alias = "without-owner")]
         without_human_check: bool,
+        /// Only tasks that belong to this project folder (its short name).
+        #[arg(long, value_name = "NAME")]
+        folder: Option<String>,
     },
     /// What needs a person: To check (tasks finished without the human check, each with why)
     /// and To answer (tasks waiting on a person, each with what). Backlog tasks are not listed.
@@ -376,6 +379,22 @@ enum Command {
     },
     /// Set the task's handoff note (what the next one needs); no text clears it.
     Note { id: String, text: Option<String> },
+    /// Set the project folders a task belongs to, by their short names (decision 0019); --none:
+    /// no particular folder.
+    Folders {
+        id: String,
+        #[arg(required_unless_present = "none")]
+        names: Vec<String>,
+        #[arg(long, conflicts_with = "names")]
+        none: bool,
+    },
+    /// Upgrade this taskbag to the newest format (allomos/6: project folders and task folders;
+    /// decision 0019). Without --confirm it only says what it will do. Older Allomos versions
+    /// refuse an upgraded taskbag: install the newest Allomos first.
+    Upgrade {
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Card files still outside the taskbag (linked from a task's description, or reported);
     /// `alm cards found <id>=<path>…` reports others you found (see `alm guide move-cards`).
     Cards {
@@ -416,6 +435,10 @@ enum Command {
         /// Only tasks planned in this iteration.
         #[arg(long)]
         iteration: Option<String>,
+        /// List every task, also when run inside one of the taskbag's project folders (there,
+        /// only that folder's tasks are listed).
+        #[arg(long)]
+        all_folders: bool,
     },
     /// Print the request the app's Update the taskbag… gives an AI agent: for a taskbag written by
     /// an older Allomos, moving its tasks into a new taskbag, like another task system; otherwise,
@@ -534,6 +557,13 @@ enum Add {
         /// (Task-A01-root343); otherwise none.
         #[arg(long, value_name = "ID")]
         iteration: Option<String>,
+        /// A project folder it belongs to, by its short name (repeatable; decision 0019). While
+        /// the taskbag has folders, say --folder or --no-folder: you decide, alm does not guess.
+        #[arg(long = "folder", value_name = "NAME", conflicts_with = "no_folder")]
+        folders: Vec<String>,
+        /// It belongs to no particular folder (planning, naming, decisions).
+        #[arg(long)]
+        no_folder: bool,
     },
 }
 
@@ -639,6 +669,7 @@ impl Command {
             | Command::Title { id, .. }
             | Command::Describe { id, .. }
             | Command::Note { id, .. }
+            | Command::Folders { id, .. }
             | Command::Handoff { id, .. }
             | Command::Card { id, .. }
             | Command::Drop { id }
@@ -658,6 +689,7 @@ impl Command {
             | Command::MoveIn { .. }
             | Command::HandoffRules { .. }
             | Command::Cards { .. }
+            | Command::Upgrade { .. }
             | Command::Next { .. } => None,
         }
     }
@@ -685,6 +717,9 @@ impl Command {
         }
         if let Command::Cards { what } = self {
             return what.is_some();
+        }
+        if let Command::Upgrade { confirm } = self {
+            return *confirm;
         }
         !matches!(
             self,
@@ -723,6 +758,8 @@ impl Command {
             Command::Delete(Delete::Area { .. }) => "delete area",
             Command::Delete(Delete::Iteration { .. }) => "delete iteration",
             Command::List { .. } => "list",
+            Command::Folders { .. } => "folders",
+            Command::Upgrade { .. } => "upgrade",
             Command::Show { .. } => "show",
             Command::History { .. } => "history",
             Command::Claim { .. } => "claim",
@@ -1819,6 +1856,8 @@ fn decision_lines(decisions: &[Decision]) -> String {
 }
 
 /// One line about a task: ID, state, label, holder, title.
+mod folders;
+
 fn task_line(t: &Task) -> String {
     format!(
         "{}  {}  {}  {}  {}",
@@ -2319,12 +2358,27 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     branch,
                     base,
                     iteration,
+                    folders,
+                    no_folder,
                 } => {
+                    let current = taskbag_of(&root, load(&root)).ok();
+                    // While the taskbag has folders, the agent decides one, several or none
+                    // (approver, 2026-10-25; Task-A01-dime494): alm does not guess.
+                    if let Some((bag, _)) = &current {
+                        if !bag.project.project_folders.is_empty()
+                            && folders.is_empty()
+                            && !no_folder
+                        {
+                            return Err(Problem::FolderChoiceMissing {
+                                folders: allomos_core::folders::names(&bag.project),
+                            });
+                        }
+                    }
                     // A new task goes into the active iteration unless another is named
                     // (approver, 2026-10-22; Task-A01-root343).
-                    let active = taskbag_of(&root, load(&root))
-                        .ok()
-                        .and_then(|(bag, _)| ops::active_iteration(&bag).map(|i| i.id.clone()));
+                    let active = current
+                        .as_ref()
+                        .and_then(|(bag, _)| ops::active_iteration(bag).map(|i| i.id.clone()));
                     let planned_in = iteration.clone().or(active.clone());
                     let new = allomos_store::NewTask {
                         id: id.clone(),
@@ -2334,6 +2388,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         iteration: planned_in.clone(),
                         branch: branch.clone(),
                         base: base.clone(),
+                        folders: folders.clone(),
                     };
                     let added = allomos_store::add_task_with_base(&root, actor, lock_wait(), &new)?;
                     let task = added.task;
@@ -2555,9 +2610,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             state,
             mine,
             without_human_check,
+            folder,
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
+            if let Some(f) = folder {
+                allomos_core::folders::check(&bag.project, std::slice::from_ref(f))?;
+            }
             if *mine && me.is_none() {
                 return Err(Problem::HolderMissing);
             }
@@ -2581,6 +2640,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     && state.as_ref().is_none_or(|s| t.state.as_str() == s)
                     && (!*mine || t.holder.as_deref() == me)
                     && (!*without_human_check || t.to_check())
+                    && folder.as_ref().is_none_or(|f| t.folders.contains(f))
             };
             // In the taskbag's order: numbered IDs, then word IDs as they were made (A01-54).
             let tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
@@ -2685,11 +2745,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .collect::<Vec<_>>()
                     .join(", ")
             });
+            let folders_text = (!task.folders.is_empty()).then(|| task.folders.join(", "));
             let fields = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
                 ("area", Some(task.area.as_str())),
                 ("iteration", task.iteration.as_deref()),
+                ("folders", folders_text.as_deref()),
                 ("state", Some(task.state.as_str())),
                 ("label", task.label.as_deref()),
                 ("holder", task.holder.as_deref()),
@@ -2778,11 +2840,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Next { iteration } => {
+        Command::Next {
+            iteration,
+            all_folders,
+        } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             // `alm` lists; the agent chooses (Task-A03-14).
-            let tasks = ops::next(&bag, iteration.as_deref())?;
+            let mut tasks = ops::next(&bag, iteration.as_deref())?;
+            // Run inside a project folder: only its tasks, without those that have no folder
+            // (approver, 2026-10-25; Task-A01-dime494).
+            let here = (!*all_folders)
+                .then(|| folders::folder_here(&root, &bag.project, cwd))
+                .flatten();
+            if let Some(name) = &here {
+                tasks = allomos_core::folders::in_folder(tasks, name);
+            }
             let instruction = if tasks.is_empty() {
                 match iteration {
                     Some(i) => format!(
@@ -2797,6 +2870,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 CHOOSING_RULE.to_string()
             };
             let mut text = String::new();
+            if let Some(name) = &here {
+                text.push_str(&format!(
+                    "Inside project folder {name}: only its tasks are listed (tasks with no folder are left out). `alm next --all-folders` lists every task.\n\n"
+                ));
+            }
             // The active iteration all done: suggest the next step; alm changes no state
             // (approver, 2026-10-22; Task-A01-root343).
             let finished = ops::finished_active(&bag).map(|(done_it, next_it)| {
@@ -2918,6 +2996,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "old_handoffs": old_handoffs,
                     "handoffs": if handoffs_line.is_empty() { Value::Null } else { json!(handoffs_line.trim_end()) },
                     "active_iteration": ops::active_iteration(&bag).map(|i| i.id.clone()),
+                    "folder": here,
                     "finished_iteration": finished.as_ref().map(|(done_it, next_it, words)| json!({ "iteration": done_it, "next": next_it, "suggestion": words })),
                 }),
                 text,
@@ -3239,6 +3318,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Note { id, text } => change(cli, cwd, |bag| {
             ops::set_handoff_note(bag, id, me, text.as_deref())
         }),
+        Command::Folders { id, names, .. } => change(cli, cwd, |bag| {
+            allomos_core::folders::set(bag, id, me, names)
+        }),
+        Command::Upgrade { confirm } => folders::upgrade(&locate(cli, cwd)?, me, *confirm),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;

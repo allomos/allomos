@@ -64,8 +64,8 @@ pub use settings::{
     saved_owner_name, saved_ui_language, settings_dir, skip_update, task_language, update_memory,
 };
 pub use setup::{
-    SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
-    setup_state,
+    SetupState, allomos_folder, project_folder_of, project_folder_paths, record_project_folder,
+    relative_path, setup_state,
 };
 pub use update_taskbag::{agent_update_taskbag_request_in, agent_update_taskbag_request_with};
 
@@ -311,6 +311,11 @@ the project notes (below).
   `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --branch
   <the branch you are on>`: on a task's working branch, the new task shares that task's base;
   otherwise the base is the branch you are on. alm prints which and why; `--base` overrides it.
+  When the taskbag has project folders (several folders, each with its own AGENTS.md), decide
+  which ones the task belongs to, or none, and say so: `--folder <name>` (repeatable) or
+  `--no-folder`; alm does not guess. `alm folders <id> <name>…` (or `--none`) changes them later.
+  Run inside a project folder, `alm next` lists only that folder's tasks (`--all-folders`: every
+  task).
 - Change a task's title, description or handoff note: `alm title <id> \"<title>\"`,
   `alm describe <id> --text \"<markdown>\"` (or `--from <file.md>`), `alm note <id> \"<text>\"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
@@ -978,6 +983,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     fs::write(root.join(".gitignore"), GITIGNORE)?;
     fs::write(root.join(".gitattributes"), GITATTRIBUTES)?;
     let project = Project {
+        project_folders: Default::default(),
         extra: Default::default(),
         format: FORMAT.to_string(),
         id: "project".to_string(),
@@ -1029,6 +1035,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     for (id, title, area, state, label, description) in tasks {
         let dir = root.join("tasks").join(id);
         let task = Task {
+            folders: Default::default(),
             extra: Default::default(),
             id: id.into(),
             title: title.into(),
@@ -1263,6 +1270,7 @@ pub fn init_with_labels(
         });
     }
     let project = Project {
+        project_folders: Default::default(),
         extra: Default::default(),
         format: FORMAT.to_string(),
         id: id.to_string(),
@@ -1514,6 +1522,38 @@ pub fn taskbag_of(root: &Path, loaded: Loaded) -> Result<(Taskbag, Vec<Issue>), 
 /// not write ([`versions::write_allowed`]: a newer one, or an older one whose tasks are to be moved
 /// in, Task-A01-45); take the lock (waiting up to `wait` for another writer), then load what the
 /// change builds on.
+/// What [`upgrade`] did: the format before and after, and the main folder's new name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Upgraded {
+    pub from: String,
+    pub to: String,
+    pub folder: Option<String>,
+}
+
+/// Upgrade an `allomos/5` taskbag to `allomos/6` (decision 0019, Task-A01-dime494), which only
+/// a person asks for (approver, 2026-10-25): `project_folder` becomes the first of
+/// `project_folders`, named after the folder. `None` when it is already up to date.
+pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgraded>, Problem> {
+    let (lock, bag, _) = lock_for_change(root, wait)?;
+    let base = setup::project_folder_of(root, &bag.project)
+        .and_then(|f| f.file_name().map(|n| n.to_string_lossy().into_owned()));
+    let Some(project) = allomos_core::folders::upgraded(&bag.project, base.as_deref()) else {
+        return Ok(None);
+    };
+    let event = actor.event(
+        "upgrade",
+        Kind::Project,
+        Some(&project.id),
+        event::changes(Some(&bag.project), &project, &[]),
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
+    Ok(Some(Upgraded {
+        from: bag.project.format.clone(),
+        to: project.format.clone(),
+        folder: project.project_folders.first().map(|f| f.name.clone()),
+    }))
+}
+
 fn lock_for_change(root: &Path, wait: Duration) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
     versions::write_allowed(root)?;
     let lock = Lock::acquire(root, wait)?;
@@ -1847,6 +1887,10 @@ pub struct NewTask {
     /// The base given (`--base`, or the person's pick in the app): it wins over `branch`.
     #[serde(default)]
     pub base: Option<String>,
+    /// The project folders it belongs to (`alm add task --folder`, decision 0019); empty: none in
+    /// particular. Each must be one of the taskbag's folders.
+    #[serde(default)]
+    pub folders: Vec<String>,
 }
 
 /// What [`add_task_with_base`] did: the task, the base it got and why, and warnings.
@@ -1891,7 +1935,8 @@ pub fn add_task_with_base(
         Some(id) => id.clone(),
         None => ops::next_task_id(&bag, &new.area)?,
     };
-    let task = ops::new_task(&bag, &id, &new.area, &new.title, new.description.as_deref())?;
+    let mut task = ops::new_task(&bag, &id, &new.area, &new.title, new.description.as_deref())?;
+    task.folders = allomos_core::folders::check(&bag.project, &new.folders)?;
     let recorded = branches(root);
     let filled = |v: &Option<String>| v.clone().filter(|b| !b.trim().is_empty());
     let base = branch::choose_base(
