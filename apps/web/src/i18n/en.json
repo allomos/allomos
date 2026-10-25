@@ -720,5 +720,10 @@
   "agents_section.count": "Set up in {done} of {total} folders",
   "agents_section.missing": "Not set up in {name}",
   "agents_section.not_found": "{name} is not found on this computer",
-  "agents_section.set_up_action": "Set Up…"
+  "agents_section.set_up_action": "Set Up…",
+  "upgrade.notice": "This taskbag is in {found}; this Allomos writes {current}. An AI agent can upgrade it.",
+  "upgrade.found": "This taskbag is in {found}. Updating upgrades it first: project folders and task folders need the newer format. The agent shows its plan in Allomos and changes nothing until you choose Go ahead.",
+  "upgrade.warning": "After the upgrade, older Allomos versions (the app, alm, and every agent session using them) refuse this taskbag until the newest Allomos is installed.",
+  "upgrade.asked": "Opened {agent}. Read the request there and send it. The notice goes away once the agent has upgraded the taskbag.",
+  "upgrade.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The notice goes away once the agent has upgraded the taskbag."
 }

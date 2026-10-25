@@ -307,6 +307,9 @@ export interface VersionCheck {
   move_in: { old: string; found: string; prepared: boolean } | null;
   /** Instruction files holding Allomos's section; `version` null when its heading has none. */
   sections: { file: string; version: number | null }[];
+  /** A taskbag this Allomos reads as it is but writes newer (`allomos/5`): its format, so Update
+   * the Taskbag… offers the upgrade (Task-A05-fish286); null otherwise. */
+  upgrade?: string | null;
 }
 
 /** A question an agent asks with `alm confirm` (crates/store/src/confirm.rs). */

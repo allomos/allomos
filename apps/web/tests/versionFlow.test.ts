@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { movingTasks, outdatedFiles, updateNotice, updateTaskbagLines } from "../src/versionFlow.ts";
+import { movingTasks, outdatedFiles, updateNotice, updateTaskbagLines, upgradeFrom } from "../src/versionFlow.ts";
 import type { VersionCheck } from "../src/types.ts";
 
 const check = (
@@ -74,4 +74,19 @@ test("one Update the taskbag banner lists every reason, in order (Task-A03-train
     { key: "old_handoffs.notice", params: { count: 3 } },
   ]);
   assert.deepEqual(updateTaskbagLines(null, 2, 0), [{ key: "cards.notice", params: { count: 2 } }]);
+});
+
+test("an allomos/5 taskbag is offered the upgrade, its line first (Task-A05-fish286)", () => {
+  const five = { ...check({ state: "current" }, [{ file: "AGENTS.md", version: 0 }]), format_current: "allomos/6", upgrade: "allomos/5" };
+  assert.equal(upgradeFrom(five), "allomos/5");
+  assert.equal(upgradeFrom(null), null);
+  assert.equal(upgradeFrom({ ...five, upgrade: null }), null);
+  // Moving an older taskbag's tasks in comes first.
+  assert.equal(upgradeFrom({ ...five, move_in: { old: "/x", found: "allomos/3", prepared: false } }), null);
+  const lines = updateTaskbagLines(updateNotice(five), 2, 0, upgradeFrom(five), five.format_current);
+  assert.deepEqual(
+    lines.map((l) => l.key),
+    ["upgrade.notice", "update.notice_section", "cards.notice"],
+  );
+  assert.deepEqual(lines[0].params, { found: "allomos/5", current: "allomos/6" });
 });

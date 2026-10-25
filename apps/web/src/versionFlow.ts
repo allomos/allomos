@@ -36,10 +36,18 @@ export function movingTasks(notice: UpdateNotice | null): boolean {
   return notice?.kind === "move_in" || notice?.kind === "moving_in";
 }
 
+/** The format of a taskbag Update the Taskbag… can upgrade (`allomos/5`, Task-A05-fish286), or null.
+ * Not while an older taskbag's tasks are to be moved in: that comes first. */
+export function upgradeFrom(check: VersionCheck | null): string | null {
+  return check && !check.move_in ? (check.upgrade ?? null) : null;
+}
+
 /** The lines of the one **Update the taskbag…** banner (Task-A03-train969): every reason the
- * taskbag needs updating, one after another, under a single button; empty: no banner. */
-export function updateTaskbagLines(notice: UpdateNotice | null, cards: number, handoffs: number): Message[] {
+ * taskbag needs updating, one after another, under a single button; empty: no banner. `upgrade`:
+ * the format of a taskbag to upgrade (Task-A05-fish286), its line first. */
+export function updateTaskbagLines(notice: UpdateNotice | null, cards: number, handoffs: number, upgrade: string | null = null, current = ""): Message[] {
   const lines: Message[] = [];
+  if (upgrade) lines.push({ key: "upgrade.notice", params: { found: upgrade, current } });
   if (notice?.kind === "move_in") lines.push({ key: "move.notice_old", params: { found: notice.found } });
   else if (notice?.kind === "moving_in") lines.push({ key: "move.notice_waiting", params: { old: notice.old } });
   else if (notice?.kind === "section") lines.push({ key: "update.notice_section", params: { files: notice.files } });

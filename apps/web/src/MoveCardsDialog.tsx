@@ -38,10 +38,13 @@ export function MoveCardsDialog({
   handoffs,
   moveIn,
   section,
+  upgrade,
   noTasks,
   onClose,
 }: {
   messenger: Messenger;
+  /** The format of a taskbag to upgrade to this Allomos's (Task-A05-fish286). */
+  upgrade?: string | null;
   /** The open taskbag. */
   root: string;
   /** An older taskbag's handoff files, to move into their tasks (Task-A03-polar770). */
@@ -62,7 +65,7 @@ export function MoveCardsDialog({
     <div className="overlay" role="presentation">
       <section className="dialog wizard move-cards" role="dialog" aria-modal="true" aria-labelledby="cards-title">
         <h2 id="cards-title">{t("cards.title")}</h2>
-        <MoveCardsPanel messenger={messenger} root={root} found={found} handoffs={handoffs} moveIn={moveIn} section={section} noTasks={noTasks} onClose={onClose} />
+        <MoveCardsPanel messenger={messenger} root={root} found={found} handoffs={handoffs} moveIn={moveIn} section={section} upgrade={upgrade} noTasks={noTasks} onClose={onClose} />
       </section>
     </div>
   );
@@ -77,6 +80,7 @@ export function MoveCardsPanel({
   handoffs = [],
   moveIn,
   section = null,
+  upgrade = null,
   noTasks = false,
   onClose,
   actionsIn,
@@ -92,6 +96,8 @@ export function MoveCardsPanel({
   moveIn?: MoveIn | null;
   /** The instruction files whose Allomos section is out of date: the request renews it too. */
   section?: string | null;
+  /** The format of a taskbag to upgrade: the request upgrades it first (Task-A05-fish286). */
+  upgrade?: string | null;
   /** The taskbag has no tasks yet: the request asks the agent to look for the project's own. */
   noTasks?: boolean;
   onClose: (message: string | null) => void;
@@ -135,7 +141,7 @@ export function MoveCardsPanel({
 
   /** Whether card files are part of it: some were found, or nothing else is to be done (then the
    * agent looks for card files no link names, as before). */
-  const cardsPart = found.length > 0 || (!section && !noTasks && handoffs.length === 0);
+  const cardsPart = found.length > 0 || (!section && !upgrade && !noTasks && handoffs.length === 0);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
@@ -152,7 +158,7 @@ export function MoveCardsPanel({
       saveOpened(root, agent);
       agentOpened(root, moveIn ? "move_in" : section ? "update" : "cards");
       const name = t(AGENT_KEY[agent]);
-      const kind = moveIn ? "move" : section ? "update" : cardsPart ? "cards" : handoffs.length > 0 ? "old_handoffs" : "empty";
+      const kind = moveIn ? "move" : upgrade ? "upgrade" : section ? "update" : cardsPart ? "cards" : handoffs.length > 0 ? "old_handoffs" : "empty";
       if (tool?.how === "paste") {
         onClose(t(`${kind}.asked_paste`, { agent: name, keys: PASTE_KEYS }));
       } else {
@@ -232,6 +238,12 @@ export function MoveCardsPanel({
 
   const intro = (
     <>
+      {request === null && !moveIn && upgrade && (
+        <>
+          <p>{t("upgrade.found", { found: upgrade })}</p>
+          <p className="banner update small">{t("upgrade.warning")}</p>
+        </>
+      )}
       {request === null && moveIn && (
         <>
           <p>{t("move.found", { found: moveIn.found, old: moveIn.old })}</p>

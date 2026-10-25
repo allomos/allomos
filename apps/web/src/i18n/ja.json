@@ -720,5 +720,10 @@
   "agents_section.count": "{total} 個のフォルダのうち {done} 個で設定済み",
   "agents_section.missing": "{name} では未設定",
   "agents_section.not_found": "{name} がこのコンピュータに見つかりません",
-  "agents_section.set_up_action": "設定…"
+  "agents_section.set_up_action": "設定…",
+  "upgrade.notice": "このタスクバッグは {found} です。この「肩代」は {current} で書きます。AI エージェントがアップグレードできます。",
+  "upgrade.found": "このタスクバッグは {found} です。更新ではまずアップグレードします。プロジェクトフォルダとタスクのフォルダには新しい形式が必要です。エージェントは先に「肩代」で計画を見せ、「進める」を選ぶまで何も変えません。",
+  "upgrade.warning": "アップグレード後は、古い「肩代」（アプリ、alm、それらを使うすべてのエージェントのセッション）が、最新版を入れるまでこのタスクバッグを開けなくなります。",
+  "upgrade.asked": "{agent} を開きました。そこで依頼を読んで送ってください。エージェントがタスクバッグをアップグレードすると、お知らせは消えます。",
+  "upgrade.asked_paste": "{agent} をターミナルで開きました。{keys} で依頼を貼り付け、読んでから Enter で送ってください。エージェントがタスクバッグをアップグレードすると、お知らせは消えます。"
 }

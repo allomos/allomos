@@ -12,7 +12,7 @@ import { MoveCardsDialog } from "./MoveCardsDialog";
 import { cardRows, cardsNotice, oldHandoffs, tasksInStart } from "./moveCardsFlow";
 import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
-import { outdatedFiles } from "./versionFlow";
+import { outdatedFiles, upgradeFrom } from "./versionFlow";
 import { UpdateTaskbagNotice } from "./UpdateTaskbagNotice";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
@@ -146,7 +146,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   /** Update the taskbag… is open (Task-A00-30, Task-A01-45): a notice's button or File → Update the
    * Taskbag…; `moveIn`: for an older taskbag renamed aside, otherwise for card files; `section`: the
    * instruction files whose Allomos section is out of date (Task-A03-27). */
-  const [movingCards, setMovingCards] = useState<{ moveIn: MoveIn | null; section: string | null } | null>(null);
+  const [movingCards, setMovingCards] = useState<{ moveIn: MoveIn | null; section: string | null; upgrade: string | null } | null>(null);
   // The update notice says the taskbag is from an older Allomos; the problem list then leaves it out.
   const [olderShown, setOlderShown] = useState(false);
   const [error, setError] = useState<Note | null>(null);
@@ -219,7 +219,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         start = tasksInStart(check);
       }
       const files = outdatedFiles(check);
-      setMovingCards({ moveIn: start.moveIn, section: files.length > 0 ? files.join(", ") : null });
+      setMovingCards({ moveIn: start.moveIn, section: files.length > 0 ? files.join(", ") : null, upgrade: upgradeFrom(check) });
     } catch (e) {
       setError(errorNote(e));
     }
@@ -577,6 +577,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             handoffs={oldHandoffs(opened)}
             moveIn={movingCards.moveIn}
             section={movingCards.section}
+            upgrade={movingCards.upgrade}
             noTasks={(opened.loaded.taskbag?.tasks.length ?? 1) === 0}
             onClose={(message) => {
               setMovingCards(null);

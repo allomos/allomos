@@ -17,7 +17,7 @@ import { addStep, ladderChanged, ladderProblem, moveStep, removeStep, renameStep
 import type { Messenger } from "./messenger";
 import { middleEllipsis } from "./paths";
 import { isProblem, type VersionCheck } from "./types";
-import { movingTasks, updateNotice } from "./versionFlow";
+import { movingTasks, updateNotice, upgradeFrom } from "./versionFlow";
 
 const SECTIONS = ["general", "folders", "agents", "tasks", "handoff"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -114,7 +114,7 @@ function FormatRow({ messenger, root, format, onUpdate }: { messenger: Messenger
     };
   }, [messenger, root]);
   const older = check?.move_in ?? null;
-  const needsUpdate = movingTasks(updateNotice(check));
+  const needsUpdate = movingTasks(updateNotice(check)) || upgradeFrom(check) !== null;
   return (
     <div className="settings-row">
       <code>{older?.found ?? format}</code>

@@ -129,6 +129,25 @@ mod tests {
     }
 
     #[test]
+    fn an_allomos_5_taskbag_is_upgraded_first() {
+        let p = project("upgrade");
+        let tb = p.join(DEFAULT_DIR);
+        init(&tb, "p", "P").unwrap();
+        let r = agent_update_taskbag_request_in("en", &p, &tb);
+        assert!(!r.contains("upgrade --confirm"), "{r}");
+        let file = tb.join(crate::PROJECT_FILE);
+        let text = fs::read_to_string(&file).unwrap();
+        fs::write(&file, text.replace(allomos_core::FORMAT, "allomos/5")).unwrap();
+        // The upgrade comes first, then the other jobs (here: looking for the project's tasks).
+        let r = agent_update_taskbag_request_in("en", &p, &tb);
+        assert!(r.contains("upgrade --confirm"), "{r}");
+        assert!(
+            r.find("upgrade --confirm").unwrap() < r.find("conversion request").unwrap(),
+            "{r}"
+        );
+    }
+
+    #[test]
     fn the_request_covers_what_is_due() {
         let p = project("update");
         let tb = p.join(DEFAULT_DIR);

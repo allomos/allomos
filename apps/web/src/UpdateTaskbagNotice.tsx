@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import type { VersionCheck } from "./types";
-import { updateNotice, updateTaskbagLines } from "./versionFlow";
+import { updateNotice, updateTaskbagLines, upgradeFrom } from "./versionFlow";
 
 /** How often the notice checks again: an agent's update shows without reopening. */
 const VERSION_CHECK_MS = 4000;
@@ -60,7 +60,7 @@ export function UpdateTaskbagNotice({
     onOlder(older);
     return () => onOlder(false);
   }, [older, onOlder]);
-  const lines = updateTaskbagLines(notice, cards, handoffs);
+  const lines = updateTaskbagLines(notice, cards, handoffs, upgradeFrom(check), check?.format_current);
   if (lines.length === 0) return null;
   const update = () => {
     setBusy(true);

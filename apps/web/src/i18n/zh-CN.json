@@ -720,5 +720,10 @@
   "agents_section.count": "已在 {total} 个文件夹中的 {done} 个设置",
   "agents_section.missing": "{name} 中未设置",
   "agents_section.not_found": "在这台电脑上找不到 {name}",
-  "agents_section.set_up_action": "设置…"
+  "agents_section.set_up_action": "设置…",
+  "upgrade.notice": "这个任务包是 {found}；这个版本的「换肩」写的是 {current}。AI 智能体可以升级它。",
+  "upgrade.found": "这个任务包是 {found}。更新会先升级它：项目文件夹和任务所属的文件夹需要较新的格式。智能体会先在「换肩」里给出计划，在你选择“继续”之前什么都不改。",
+  "upgrade.warning": "升级后，较旧版本的「换肩」（应用、alm，以及使用它们的每个智能体会话）都会拒绝这个任务包，直到装上最新版。",
+  "upgrade.asked": "已打开 {agent}。在那里读一下请求，然后发送。智能体升级任务包后，提示就会消失。",
+  "upgrade.asked_paste": "已在终端里打开 {agent}。用 {keys} 粘贴请求，读一下，然后按回车发送。智能体升级任务包后，提示就会消失。"
 }

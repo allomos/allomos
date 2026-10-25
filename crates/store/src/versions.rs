@@ -581,36 +581,71 @@ pub fn agent_update_request_in(
 /// `allomos/6` (Task-A05-fish286), in the request's language. The agent shows the plan first
 /// (`alm confirm`), saying what changes and that older Allomos versions will then refuse the
 /// taskbag; it upgrades only after the person chooses Go ahead (approver, 2026-10-25: option B).
-pub fn agent_upgrade_request_in(language: &str, project: &Path, taskbag: &Path, found: &str) -> String {
+pub fn agent_upgrade_request_in(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    found: &str,
+) -> String {
     let alm = format!("alm --taskbag \"{}\"", shown(taskbag));
     let (title, steps): (String, Vec<String>) = match language {
         "zh-CN" => (
-            format!("这个任务包是 {found}，请把它升级到 {FORMAT}（项目文件夹和任务所属的文件夹需要它）。"),
+            format!(
+                "这个任务包是 {found}，请把它升级到 {FORMAT}（项目文件夹和任务所属的文件夹需要它）。"
+            ),
             vec![
-                format!("先运行 `alm --version`：它必须是安装好的最新版「换肩」（能识别 `{alm} upgrade`）。否则停下，请用户先安装最新的「换肩」。"),
-                format!("`{alm} progress --title \"更新任务包\" --step \"升级到 {FORMAT}\"`，让用户看到正在做什么。"),
-                format!("运行 `{alm} upgrade`（不加 --confirm），它只说明会做什么。把这些写进计划，并写明：升级后，较旧版本的「换肩」（应用、alm，以及使用它们的每个智能体会话）都会拒绝这个任务包，直到装上最新版。用 `{alm} confirm` 给用户看这份计划。"),
-                format!("用户选择“继续”后：`{alm} upgrade --confirm`，然后按 alm 列出的文件保存并共享任务包的改动。"),
+                format!(
+                    "先运行 `alm --version`：它必须是安装好的最新版「换肩」（能识别 `{alm} upgrade`）。否则停下，请用户先安装最新的「换肩」。"
+                ),
+                format!(
+                    "`{alm} progress --title \"更新任务包\" --step \"升级到 {FORMAT}\"`，让用户看到正在做什么。"
+                ),
+                format!(
+                    "运行 `{alm} upgrade`（不加 --confirm），它只说明会做什么。把这些写进计划，并写明：升级后，较旧版本的「换肩」（应用、alm，以及使用它们的每个智能体会话）都会拒绝这个任务包，直到装上最新版。用 `{alm} confirm` 给用户看这份计划。"
+                ),
+                format!(
+                    "用户选择“继续”后：`{alm} upgrade --confirm`，然后按 alm 列出的文件保存并共享任务包的改动。"
+                ),
                 "汇报做了什么，以及 project.json 现在的格式。".to_string(),
             ],
         ),
         "ja" => (
-            format!("このタスクバッグは {found} です。{FORMAT} にアップグレードしてください（プロジェクトフォルダとタスクのフォルダに必要です）。"),
+            format!(
+                "このタスクバッグは {found} です。{FORMAT} にアップグレードしてください（プロジェクトフォルダとタスクのフォルダに必要です）。"
+            ),
             vec![
-                format!("まず `alm --version` を実行します。入っているのは最新の「肩代」（`{alm} upgrade` を知っているもの）でなければなりません。そうでなければ止まり、先に最新の「肩代」を入れるようユーザーに頼んでください。"),
-                format!("`{alm} progress --title \"タスクバッグを更新\" --step \"{FORMAT} にアップグレード\"` で、何をしているかをユーザーに見せます。"),
-                format!("`{alm} upgrade`（--confirm なし）を実行すると、何をするかだけを説明します。それを計画に書き、アップグレード後は古い「肩代」（アプリ、alm、それらを使うすべてのエージェントのセッション）が最新版を入れるまでこのタスクバッグを開けなくなることも書きます。`{alm} confirm` でこの計画をユーザーに見せます。"),
-                format!("ユーザーが「進める」を選んだら：`{alm} upgrade --confirm`。そのあと alm が挙げるファイルでタスクバッグの変更を保存・共有します。"),
+                format!(
+                    "まず `alm --version` を実行します。入っているのは最新の「肩代」（`{alm} upgrade` を知っているもの）でなければなりません。そうでなければ止まり、先に最新の「肩代」を入れるようユーザーに頼んでください。"
+                ),
+                format!(
+                    "`{alm} progress --title \"タスクバッグを更新\" --step \"{FORMAT} にアップグレード\"` で、何をしているかをユーザーに見せます。"
+                ),
+                format!(
+                    "`{alm} upgrade`（--confirm なし）を実行すると、何をするかだけを説明します。それを計画に書き、アップグレード後は古い「肩代」（アプリ、alm、それらを使うすべてのエージェントのセッション）が最新版を入れるまでこのタスクバッグを開けなくなることも書きます。`{alm} confirm` でこの計画をユーザーに見せます。"
+                ),
+                format!(
+                    "ユーザーが「進める」を選んだら：`{alm} upgrade --confirm`。そのあと alm が挙げるファイルでタスクバッグの変更を保存・共有します。"
+                ),
                 "何をしたかと、project.json の今の形式を報告してください。".to_string(),
             ],
         ),
         _ => (
-            format!("This taskbag is in {found}. Please upgrade it to {FORMAT} (project folders and task folders need it)."),
+            format!(
+                "This taskbag is in {found}. Please upgrade it to {FORMAT} (project folders and task folders need it)."
+            ),
             vec![
-                format!("First run `alm --version`: it must be the newest Allomos installed (one that knows `{alm} upgrade`). If not, stop and ask the person to install the newest Allomos first."),
-                format!("`{alm} progress --title \"Update the taskbag\" --step \"Upgrading to {FORMAT}\"`, so the person sees what is happening."),
-                format!("Run `{alm} upgrade` (without --confirm): it only says what it will do. Put that in your plan, and say that after the upgrade older Allomos versions (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Show the plan with `{alm} confirm`."),
-                format!("Once the person chooses Go ahead: `{alm} upgrade --confirm`, then save and share the taskbag's changes with the files alm lists."),
+                format!(
+                    "First run `alm --version`: it must be the newest Allomos installed (one that knows `{alm} upgrade`). If not, stop and ask the person to install the newest Allomos first."
+                ),
+                format!(
+                    "`{alm} progress --title \"Update the taskbag\" --step \"Upgrading to {FORMAT}\"`, so the person sees what is happening."
+                ),
+                format!(
+                    "Run `{alm} upgrade` (without --confirm): it only says what it will do. Put that in your plan, and say that after the upgrade older Allomos versions (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Show the plan with `{alm} confirm`."
+                ),
+                format!(
+                    "Once the person chooses Go ahead: `{alm} upgrade --confirm`, then save and share the taskbag's changes with the files alm lists."
+                ),
                 "Report what you did and the format project.json is in now.".to_string(),
             ],
         ),
@@ -952,6 +987,56 @@ mod tests {
     }
 
     #[test]
+    fn an_allomos_5_taskbag_is_offered_the_upgrade() {
+        let dir = tmp("upgradable");
+        let root = dir.join(DEFAULT_DIR);
+        crate::init(&root, "p", "P").unwrap();
+        // The current format: nothing to upgrade, and no check before an agent is connected.
+        assert_eq!(upgradable(&root), None);
+        assert_eq!(check_connected(&root), None);
+        set_project_format(&root, "allomos/5");
+        assert_eq!(upgradable(&root), Some("allomos/5".to_string()));
+        // Offered even before an agent is connected, and it is a reason to update.
+        let c = check_connected(&root).unwrap();
+        assert_eq!(c.upgrade.as_deref(), Some("allomos/5"));
+        assert!(c.needs_update());
+        // Formats too old to read as they are are moved in, not upgraded.
+        set_project_format(&root, "allomos/4");
+        assert_eq!(upgradable(&root), None);
+    }
+
+    #[test]
+    fn the_upgrade_request_confirms_first_and_warns_about_older_versions() {
+        let project = PathBuf::from("/work/bakery");
+        let taskbag = project.join(DEFAULT_DIR);
+        for (language, warning) in [
+            ("en", "older Allomos versions"),
+            ("zh-CN", "较旧版本"),
+            ("ja", "古い「肩代」"),
+        ] {
+            let r = agent_upgrade_request_in(language, &project, &taskbag, "allomos/5");
+            assert!(
+                r.contains("allomos/5") && r.contains(FORMAT),
+                "{language}: {r}"
+            );
+            assert!(
+                r.contains(&format!("{}\" confirm`", shown(&taskbag))),
+                "{language}: {r}"
+            );
+            assert!(
+                r.contains(&format!("{}\" upgrade --confirm`", shown(&taskbag))),
+                "{language}: {r}"
+            );
+            assert!(r.contains(warning), "{language}: {r}");
+            // The plan is shown before the upgrade.
+            assert!(
+                r.find(" confirm`").unwrap() < r.find("upgrade --confirm").unwrap(),
+                "{language}"
+            );
+        }
+    }
+
+    #[test]
     fn the_update_request_renews_the_section() {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(DEFAULT_DIR);
@@ -960,6 +1045,7 @@ mod tests {
             section_current: SECTION_VERSION,
             format: FormatState::Current,
             move_in: None,
+            upgrade: None,
             sections: vec![SectionState {
                 file: "AGENTS.md".into(),
                 version: None,
