@@ -17,3 +17,14 @@ test("a taskbag elsewhere is its own folder", () => {
   assert.equal(projectFolder("/p/tasks"), "/p/tasks");
   assert.equal(projectFolder("D:\\tasks"), "D:\\tasks");
 });
+
+test("a long location is shortened in the middle", async () => {
+  const { middleEllipsis } = await import("../src/paths.ts");
+  assert.equal(middleEllipsis("/a/b", 10), "/a/b");
+  const long = "/Users/someone/coding/glidepace/allomos-taskbag/.allomos/taskbag";
+  const short = middleEllipsis(long, 30);
+  assert.equal([...short].length, 30);
+  assert.ok(short.startsWith("/Users/some"), short);
+  assert.ok(short.endsWith(".allomos/taskbag"), short);
+  assert.ok(short.includes("…"));
+});

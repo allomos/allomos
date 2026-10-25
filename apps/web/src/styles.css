@@ -72,9 +72,19 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 /* The project name, the path with Show in Finder right after it (Task-A01-bubble562), then the
    agents line. A long path is cut with an ellipsis; the button never shrinks out of view. */
 .where { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
-.where-path { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.where code { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.where-path .reveal { flex: none; white-space: nowrap; }
+.where-name { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.where-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.settings-link { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+.settings-link svg { position: relative; top: 1px; }
+.settings-dialog { width: min(720px, 100%); }
+.settings-body { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; min-height: 200px; }
+.settings-sections { display: grid; align-content: start; gap: 2px; }
+.settings-sections button { text-align: left; border: none; background: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: inherit; }
+.settings-sections button.chosen { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
+.settings-section { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; }
+.settings-section h3 { margin: 0; font-size: 14px; }
+.settings-location { color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) { .settings-body { grid-template-columns: 1fr; } .settings-sections { grid-auto-flow: column; justify-content: start; } }
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 button.link { align-self: start; border: none; background: none; padding: 0; color: var(--accent); font-size: 0.85em; cursor: pointer; }
 button.link:hover { text-decoration: underline; }

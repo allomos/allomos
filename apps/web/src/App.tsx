@@ -17,6 +17,7 @@ import { UpdateTaskbagNotice } from "./UpdateTaskbagNotice";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { HandoffSettingsDialog } from "./HandoffSettings";
+import { TaskbagSettings } from "./TaskbagSettings";
 import { LanDialog } from "./LanDialog";
 import { localTime } from "./timeFlow";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
@@ -467,6 +468,7 @@ export function App({ messenger }: { messenger: Messenger }) {
   }, [messenger, changeRecent, openWizard, openTasksIn]);
 
   const [lanShown, setLanShown] = useState(false);
+  const [settingsShown, setSettingsShown] = useState(false);
 
   // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
   // afresh when it opens (another window may have changed it).
@@ -496,16 +498,18 @@ export function App({ messenger }: { messenger: Messenger }) {
         </div>
         {opened?.loaded.taskbag && (
           <div className="where">
-            <strong>{opened.loaded.taskbag.project.name}</strong>
-            {/* The path, then Show in Finder right after it on the same line (Task-A01-bubble562). */}
-            <div className="where-path">
-              <code title={opened.root}>{opened.root}</code>
-              <button
-                type="button"
-                className="link reveal"
-                onClick={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
-              >
-                {t(FILE_MANAGER_KEY)}
+            {/* The name, then Settings on the same line (Task-A05-camera758): the path and Show in
+                Finder moved into the settings' General section. */}
+            <div className="where-name">
+              <strong>{opened.loaded.taskbag.project.name}</strong>
+              <button type="button" className="link reveal settings-link" onClick={() => setSettingsShown(true)}>
+                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M9.4 1l.3 1.8c.4.1.8.3 1.2.6l1.7-.7 1.4 2.4-1.4 1.1a4.6 4.6 0 0 1 0 1.4l1.4 1.1-1.4 2.4-1.7-.7c-.4.3-.8.5-1.2.6L9.4 15H6.6l-.3-1.8a4.6 4.6 0 0 1-1.2-.6l-1.7.7L2 10.9l1.4-1.1a4.6 4.6 0 0 1 0-1.4L2 7.3l1.4-2.4 1.7.7c.4-.3.8-.5 1.2-.6L6.6 1h2.8zM8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z"
+                  />
+                </svg>
+                {t("top.settings")}
               </button>
             </div>
             {/* Whether the AI agents are told about this project (owner, 2026-10-10), on its own row. */}
@@ -578,6 +582,15 @@ export function App({ messenger }: { messenger: Messenger }) {
           />
         )}
         {lanShown && <LanDialog messenger={messenger} onClose={() => setLanShown(false)} />}
+        {settingsShown && opened?.loaded.taskbag && (
+          <TaskbagSettings
+            name={opened.loaded.taskbag.project.name}
+            root={opened.root}
+            fileManagerKey={FILE_MANAGER_KEY}
+            onShowInFileManager={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
+            onClose={() => setSettingsShown(false)}
+          />
+        )}
         {building && (
           <BuildAppDialog
             messenger={messenger}
