@@ -317,6 +317,88 @@ fn edit_task(
     )
 }
 
+/// A change sent by a paired device from the companion page (Task-A04-02-04, R77): the same
+/// changes the desktop window makes, through the same functions, rules, lock and recorded events,
+/// under `by` (the person's name and the device's, "will (iPhone)"). Only these operations; what
+/// only the computer itself can do is not here (R68). Returns the changed item as JSON.
+fn companion_change(
+    root: &Path,
+    by: &str,
+    op: &str,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, Problem> {
+    fn arg<T: serde::de::DeserializeOwned>(
+        args: &serde_json::Value,
+        name: &str,
+    ) -> Result<T, Problem> {
+        serde_json::from_value(args.get(name).cloned().unwrap_or(serde_json::Value::Null)).map_err(
+            |e| Problem::NotJson {
+                detail: format!("{name}: {e}"),
+            },
+        )
+    }
+    let name = Some(by);
+    let json = |v: serde_json::Result<serde_json::Value>| {
+        v.map_err(|e| Problem::NotJson {
+            detail: e.to_string(),
+        })
+    };
+    match op {
+        "edit_task" => {
+            let edit: allomos_core::ops::Edit = arg(&args, "edit")?;
+            let id: String = arg(&args, "id")?;
+            json(serde_json::to_value(edit_task_as(root, name, &id, &edit)?))
+        }
+        "review_ai_decisions" => {
+            review_as(root, name, &arg::<String>(&args, "id")?)?;
+            Ok(serde_json::Value::Null)
+        }
+        "add_area" => json(serde_json::to_value(add_area_as(
+            root,
+            name,
+            arg(&args, "id")?,
+            &arg::<String>(&args, "name")?,
+        )?)),
+        "add_iteration" => json(serde_json::to_value(add_iteration_as(
+            root,
+            name,
+            arg(&args, "iteration")?,
+        )?)),
+        "add_task" => json(serde_json::to_value(add_task_as(
+            root,
+            name,
+            arg(&args, "task")?,
+        )?)),
+        "add_iteration_and_plan" => json(serde_json::to_value(add_iteration_and_plan_as(
+            root,
+            name,
+            &arg::<String>(&args, "task")?,
+            arg(&args, "iteration")?,
+        )?)),
+        "rename_area" => json(serde_json::to_value(rename_area_as(
+            root,
+            name,
+            &arg::<String>(&args, "id")?,
+            &arg::<String>(&args, "name")?,
+        )?)),
+        "change_iteration" => json(serde_json::to_value(change_iteration_as(
+            root,
+            name,
+            &arg::<String>(&args, "id")?,
+            &arg(&args, "change")?,
+        )?)),
+        "delete_area" => {
+            delete_area_as(root, name, &arg::<String>(&args, "id")?)?;
+            Ok(serde_json::Value::Null)
+        }
+        "delete_iteration" => {
+            delete_iteration_as(root, name, &arg::<String>(&args, "id")?)?;
+            Ok(serde_json::Value::Null)
+        }
+        _ => Err(Problem::CompanionDesktopOnly { op: op.to_string() }),
+    }
+}
+
 /// The app's actor for a change: the person's saved name, via `app` (Task-A01-18). Refused
 /// (`holder_missing`) until the name has been given.
 fn app_actor(name: Option<&str>) -> Result<allomos_store::Actor<'_>, Problem> {
@@ -1269,6 +1351,15 @@ impl lan::Source for AppSource {
     }
     fn paired(&self, device: &pairing::Device) {
         record_pairing(&self.0, "pair", &device.name);
+    }
+    fn change(
+        &self,
+        root: &Path,
+        by: &str,
+        op: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, Problem> {
+        companion_change(root, by, op, args)
     }
 }
 
@@ -2382,6 +2473,52 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Task-A04-02-04: a companion page's change goes through the window's own functions, under
+    /// "name (device)"; what only the computer can do is refused.
+    #[test]
+    fn a_companion_change_is_made_and_recorded_like_the_windows() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-companion-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "p", "P").unwrap();
+        let by = "Will (Phone)";
+        let area = companion_change(
+            &root,
+            by,
+            "add_area",
+            serde_json::json!({ "id": null, "name": "Core" }),
+        )
+        .unwrap();
+        let task = companion_change(
+            &root,
+            by,
+            "add_task",
+            serde_json::json!({ "task": { "area": area["id"], "title": "From the phone" } }),
+        )
+        .unwrap();
+        let id = task["id"].as_str().unwrap().to_string();
+        companion_change(
+            &root,
+            by,
+            "edit_task",
+            serde_json::json!({ "id": id, "edit": { "field": "state", "state": "ready" } }),
+        )
+        .unwrap();
+        let bag = allomos_store::load(&root).taskbag.unwrap();
+        assert_eq!(bag.tasks[0].state, allomos_core::State::Ready);
+        let history = allomos_store::events::history(&root, &id);
+        assert!(
+            serde_json::to_string(&history)
+                .unwrap()
+                .contains("Will (Phone)")
+        );
+        let err =
+            companion_change(&root, by, "show_in_file_manager", serde_json::json!({})).unwrap_err();
+        assert_eq!(err.code(), "companion_desktop_only");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// The Tasks section's ladder (Task-A05-yeti951): renames reach the tasks, order and new steps
     /// are saved, and removing a step tasks carry is refused, naming them, with nothing changed.

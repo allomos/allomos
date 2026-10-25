@@ -59,6 +59,8 @@ problems! {
     FieldUnknown => "field_unknown", "This version of Allomos does not know this field: a newer version may have added it (update, then look again), or its name is mistyped. It is kept as it is.";
     /// A reminder, not an error (Task-A01-piano403): the item is shown with this value, kept as it is.
     ValueUnknown { value } => "value_unknown", "This version of Allomos does not know the value {value}: a newer version may have added it (update, then look again), or it is mistyped. It is kept as it is, and this version does not change it.";
+    /// Task-A04-02-04 (R68): something only the computer itself can do, asked from a companion page.
+    CompanionDesktopOnly { op } => "companion_desktop_only", "This can only be done on the computer itself, in the Allomos desktop app ({op}).";
     /// Task-A01-dime494 (decision 0019): a folder name that is not one of the taskbag's folders.
     FolderUnknown { folder, folders } => "folder_unknown", "{folder} is not one of this taskbag's project folders ({folders}).";
     /// A folder's short name must be lowercase letters, digits and `-`.

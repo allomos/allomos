@@ -728,7 +728,8 @@
   "companion.from": "来自 {computer}",
   "companion.other_taskbags": "其他任务包",
   "pane.back": "返回列表",
-  "problem.companion_read_only": "这件事暂时不能在这台设备上做：请在电脑上的「换肩」桌面应用里做。",
+  "problem.companion_read_only": "这只能在电脑上的「换肩」桌面应用里做。",
+  "problem.companion_desktop_only": "这只能在电脑上的「换肩」桌面应用里做（{op}）。",
   "problem.companion_no_app": "连不上「换肩」桌面应用。",
   "problem.companion_not_open": "桌面应用已不再打开这个任务包。"
 }

@@ -728,7 +728,8 @@
   "companion.from": "From {computer}",
   "companion.other_taskbags": "Other taskbags",
   "pane.back": "Back to the list",
-  "problem.companion_read_only": "This can't be done from this device yet: do it in the Allomos desktop app on the computer.",
+  "problem.companion_read_only": "This can only be done on the computer itself, in the Allomos desktop app.",
+  "problem.companion_desktop_only": "This can only be done on the computer itself, in the Allomos desktop app ({op}).",
   "problem.companion_no_app": "Can't reach the Allomos desktop app.",
   "problem.companion_not_open": "The desktop app no longer has this taskbag open."
 }

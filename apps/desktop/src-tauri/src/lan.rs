@@ -32,8 +32,9 @@ const CERT_FILE: &str = "cert.pem";
 const KEY_FILE: &str = "key.pem";
 /// The most a request's head may take; a longer one is refused.
 const MAX_HEAD: usize = 16 * 1024;
-/// The most a request's body may take: pairing sends only a name or a code.
-const MAX_BODY: usize = 4 * 1024;
+/// The most a request's body may take: pairing sends a name or a code; a change from the companion
+/// page (Task-A04-02-04) may carry a long description.
+const MAX_BODY: usize = 512 * 1024;
 
 /// The certificate the server shows, as PEM, and its SHA-256 fingerprint as people read it
 /// (`AB:CD:…`), shown beside the address so a person can compare it with what the browser shows.
@@ -205,6 +206,17 @@ pub trait Source: Send + Sync {
     fn computer(&self) -> String {
         computer_name()
     }
+    /// One change from a paired device's page (Task-A04-02-04), made as the desktop window makes
+    /// it, under `by` ("will (iPhone)"). A source that cannot change anything refuses.
+    fn change(
+        &self,
+        _root: &Path,
+        _by: &str,
+        op: &str,
+        _args: serde_json::Value,
+    ) -> Result<serde_json::Value, allomos_core::Problem> {
+        Err(allomos_core::Problem::CompanionDesktopOnly { op: op.to_string() })
+    }
 }
 
 /// This computer's name: `COMPUTERNAME` on Windows, else what `hostname` prints, without a
@@ -263,11 +275,50 @@ fn pair_route(req: &Request, source: &dyn Source) -> Response {
     }
 }
 
-/// The answer to one request. Reading only, apart from pairing; data only for this computer and
-/// paired devices.
+/// `POST /api/change` `{"root", "name", "op", "args"}` (Task-A04-02-04, R77): a paired device
+/// changes a taskbag a window shows, through the desktop app's own rules. Every other device is
+/// refused, and so is any folder a window does not show. A refusal carries the Problem, so the
+/// page words it (and shows both versions when a title or description changed meanwhile).
+fn change_route(req: &Request, source: &dyn Source) -> Response {
+    let Some(device) = req
+        .token
+        .as_deref()
+        .and_then(|t| source.pairing().device_for(t))
+    else {
+        return Response::json(
+            403,
+            &serde_json::json!({ "error": "pairing_required", "message": "Pair this device with the Allomos desktop app first." }),
+        );
+    };
+    let body = body_json(req).unwrap_or_default();
+    let text = |name: &str| body.get(name).and_then(|v| v.as_str()).unwrap_or_default();
+    let root = PathBuf::from(text("root"));
+    if !source.open_taskbags().iter().any(|o| o == &root) {
+        return Response::json(404, &serde_json::json!({ "error": "not_open" }));
+    }
+    let name = text("name").trim();
+    if name.is_empty() {
+        return Response::json(
+            400,
+            &serde_json::json!({ "problem": allomos_core::Problem::HolderMissing }),
+        );
+    }
+    let by = format!("{name} ({})", device.name);
+    let args = body.get("args").cloned().unwrap_or(serde_json::Value::Null);
+    match source.change(&root, &by, text("op"), args) {
+        Ok(v) => Response::json(200, &serde_json::json!({ "ok": v })),
+        Err(problem) => Response::json(400, &serde_json::json!({ "problem": problem })),
+    }
+}
+
+/// The answer to one request. Reading, pairing, and changes from paired devices
+/// (Task-A04-02-04); data only for this computer and paired devices.
 pub fn route(req: &Request, source: &dyn Source) -> Response {
     if req.method == "POST" && (req.path == "/api/pair" || req.path == "/api/pair/code") {
         return pair_route(req, source);
+    }
+    if req.method == "POST" && req.path == "/api/change" {
+        return change_route(req, source);
     }
     if req.method != "GET" && req.method != "HEAD" {
         return Response::json(
@@ -608,6 +659,7 @@ mod tests {
         open: Vec<PathBuf>,
         pairing: crate::pairing::Pairing,
         paired: std::sync::Mutex<Vec<String>>,
+        changes: std::sync::Mutex<Vec<(PathBuf, String, String)>>,
     }
     fn fake(index: bool, open: Vec<PathBuf>) -> Fake {
         Fake {
@@ -615,6 +667,7 @@ mod tests {
             open,
             pairing: crate::pairing::Pairing::load(None),
             paired: Default::default(),
+            changes: Default::default(),
         }
     }
     impl Source for Fake {
@@ -636,6 +689,19 @@ mod tests {
         fn pairing_changed(&self) {}
         fn paired(&self, device: &crate::pairing::Device) {
             self.paired.lock().unwrap().push(device.name.clone());
+        }
+        fn change(
+            &self,
+            root: &Path,
+            by: &str,
+            op: &str,
+            _args: serde_json::Value,
+        ) -> Result<serde_json::Value, allomos_core::Problem> {
+            self.changes
+                .lock()
+                .unwrap()
+                .push((root.to_path_buf(), by.to_string(), op.to_string()));
+            Ok(serde_json::json!({ "done": op }))
         }
         fn computer(&self) -> String {
             "studio".into()
@@ -764,6 +830,16 @@ mod tests {
             fn paired(&self, device: &crate::pairing::Device) {
                 println!("paired {}", device.name);
             }
+            // Changes from the page, as the desktop app makes them (Task-A04-02-04).
+            fn change(
+                &self,
+                root: &Path,
+                by: &str,
+                op: &str,
+                args: serde_json::Value,
+            ) -> Result<serde_json::Value, allomos_core::Problem> {
+                crate::companion_change(root, by, op, args)
+            }
         }
         let env = |k: &str| std::env::var(k).ok();
         let (Some(root), Some(dist)) = (env("ALLOMOS_LAN_LOOK_ROOT"), env("ALLOMOS_LAN_LOOK_DIST"))
@@ -846,6 +922,43 @@ mod tests {
             get("/api/hello", Some(&token)).1["device"],
             serde_json::Value::Null
         );
+    }
+
+    /// Task-A04-02-04: only a paired device changes, only a taskbag a window shows, under
+    /// "name (device)"; anything else is refused before the source is asked.
+    #[test]
+    fn only_paired_devices_change_and_their_name_is_recorded() {
+        let root = tmp("change");
+        let f = fake(true, vec![root.clone()]);
+        let id = f.pairing.ask("Phone").unwrap();
+        f.pairing.answer(&id, true);
+        let code = f.pairing.view().asking[0].code.clone().unwrap();
+        let (_, token) = f.pairing.confirm(&id, &code).unwrap();
+        let post = |token: Option<&str>, body: serde_json::Value| {
+            let mut r = req("POST", "/api/change", LAN);
+            r.token = token.map(String::from);
+            r.body = body.to_string().into_bytes();
+            let res = route(&r, &f);
+            let v: serde_json::Value = serde_json::from_slice(&res.body).unwrap();
+            (res.status, v)
+        };
+        let ok = serde_json::json!({ "root": root, "name": "Will", "op": "edit_task", "args": { "id": "A01-01" } });
+        assert_eq!(post(None, ok.clone()).0, 403);
+        assert_eq!(post(Some("wrong"), ok.clone()).0, 403);
+        let other = serde_json::json!({ "root": "/etc", "name": "Will", "op": "edit_task" });
+        assert_eq!(post(Some(&token), other).0, 404);
+        let nameless = serde_json::json!({ "root": root, "name": " ", "op": "edit_task" });
+        let (status, v) = post(Some(&token), nameless);
+        assert_eq!(
+            (status, &v["problem"]["code"]),
+            (400, &serde_json::json!("holder_missing"))
+        );
+        assert!(f.changes.lock().unwrap().is_empty());
+        let (status, v) = post(Some(&token), ok);
+        assert_eq!(status, 200, "{v}");
+        let changes = f.changes.lock().unwrap();
+        assert_eq!(changes[0].1, "Will (Phone)");
+        assert_eq!(changes[0].2, "edit_task");
     }
 
     fn percent_encode(s: &str) -> String {
@@ -994,8 +1107,19 @@ mod tests {
             let token = json(&paired)["token"].as_str().unwrap().to_string();
             let auth = format!("Authorization: Bearer {token}");
             assert!(curl(&["-H", &auth, &format!("{lan}/api/taskbags")]).ends_with("200"));
-            let big = format!(r#"{{"name":"{}"}}"#, "x".repeat(MAX_BODY));
-            assert!(post("/api/pair", &big).ends_with("413"));
+            let big = std::env::temp_dir().join(format!("allomos-big-{}", std::process::id()));
+            std::fs::write(&big, format!(r#"{{"name":"{}"}}"#, "x".repeat(MAX_BODY))).unwrap();
+            let r = curl(&[
+                "-X",
+                "POST",
+                "-H",
+                "Content-Type: application/json",
+                "--data-binary",
+                &format!("@{}", big.display()),
+                &format!("{lan}/api/pair"),
+            ]);
+            let _ = std::fs::remove_file(&big);
+            assert!(r.ends_with("413"), "{r}");
         }
         server.stop();
     }

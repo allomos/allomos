@@ -728,7 +728,8 @@
   "companion.from": "{computer} から",
   "companion.other_taskbags": "ほかのタスクバッグ",
   "pane.back": "一覧に戻る",
-  "problem.companion_read_only": "これはまだこのデバイスからはできません。コンピューターの「肩代」デスクトップアプリで行ってください。",
+  "problem.companion_read_only": "これはコンピュータ上の「肩代」デスクトップアプリでしかできません。",
+  "problem.companion_desktop_only": "これはコンピュータ上の「肩代」デスクトップアプリでしかできません（{op}）。",
   "problem.companion_no_app": "「肩代」デスクトップアプリに接続できません。",
   "problem.companion_not_open": "デスクトップアプリはこのタスクバッグをもう開いていません。"
 }
