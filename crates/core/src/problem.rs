@@ -183,7 +183,9 @@ problems! {
     /// Only an unheld backlog, waiting or blocked task can be made ready.
     CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
-    CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`), and nothing moves a task back to backlog.";
+    CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`).";
+    /// Back to backlog (Task-A01-lotus143): only an unheld ready, waiting or blocked task.
+    CannotBackToBacklog { id, state } => "cannot_back_to_backlog", "Task {id} is {state}; only a ready, waiting or blocked task that no one holds can go back to backlog. A held task is released first (`alm release`); a finished one is reopened (`alm reopen`).";
     /// `alm claim` while card files are kept outside the taskbag (Task-A03-27, approver
     /// 2026-10-18): the taskbag is updated first, then tasks are worked.
     ClaimCardsOutside { count, tasks } => "claim_cards_outside", "{count} task(s) keep their card files outside the taskbag ({tasks}), so no task can be claimed until they are moved in. First follow `alm guide move-cards`: it shows the person the plan before anything changes (in a quiet run, park that question with `alm wait` and stop). Then claim again.";

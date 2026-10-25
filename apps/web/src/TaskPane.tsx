@@ -24,6 +24,8 @@ import {
   iterationSavable,
   startDraft,
   stateChoices,
+  stateDisabled,
+  backlogBlocked,
   toEdit,
   toPaneIteration,
   toggleBlocker,
@@ -245,11 +247,19 @@ export function TaskPane({
           <>
             <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
               {stateChoices(task).map((s) => (
-                <option key={s} value={s} disabled={s === "backlog" || s === "in_progress"}>
+                <option key={s} value={s} disabled={stateDisabled(task, s)}>
                   {t(`state.${s}`)}
                 </option>
               ))}
             </select>
+            {/* Task-A01-lotus143: why backlog is greyed out. */}
+            {backlogBlocked(task) && (
+              <p className="muted small">
+                {backlogBlocked(task)!.why === "held"
+                  ? t("edit.backlog_held", { holder: (backlogBlocked(task) as { holder: string }).holder })
+                  : t("edit.backlog_finished")}
+              </p>
+            )}
             {draft.value === "waiting" && (
               <input
                 type="text"

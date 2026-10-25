@@ -3741,6 +3741,48 @@ fn list_by_iteration_shows_every_iteration_with_its_place() {
     assert!(text.starts_with("3  I02  Two\n"), "{text}");
 }
 
+/// Task-A01-lotus143: `alm backlog` sends an unheld ready, waiting or blocked task back to backlog;
+/// a held or finished one is refused, saying what to do instead.
+#[test]
+fn backlog_sends_an_unheld_task_back() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    let v = ok(&repo, &["backlog", "A01-01"]);
+    assert_eq!(v["task"]["state"], "backlog");
+    let events = ok(&repo, &["history", "A01-01"])["events"].clone();
+    assert!(
+        events
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["command"] == "backlog"),
+        "{events}"
+    );
+    // Already backlog, held, or done: refused.
+    refused(&repo, &["backlog", "A01-01"], 1, "cannot_back_to_backlog");
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = refused(
+        &repo,
+        &["--as", "a", "backlog", "A01-01"],
+        1,
+        "cannot_back_to_backlog",
+    );
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("alm release")
+    );
+    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    let v = refused(&repo, &["backlog", "A01-01"], 1, "cannot_back_to_backlog");
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("alm reopen")
+    );
+}
+
 /// The event files in a taskbag (Task-A01-17).
 fn event_count(repo: &Path) -> usize {
     fs::read_dir(repo.join(".allomos/taskbag/events"))

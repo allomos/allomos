@@ -33,6 +33,10 @@
   "branch_missing": [
     "id"
   ],
+  "cannot_back_to_backlog": [
+    "id",
+    "state"
+  ],
   "cannot_make_ready": [
     "id",
     "state"

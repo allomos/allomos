@@ -1224,7 +1224,7 @@ pub enum Edit {
 }
 
 /// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
-/// the name of that rule's command (`ready`, `wait`, `block`, `done`, `drop`, `label`, `needs`, `plan`,
+/// the name of that rule's command (`ready`, `backlog`, `wait`, `block`, `done`, `drop`, `label`, `needs`, `plan`,
 /// `title`, `checked`; `note` and `describe` for the two changes `alm` has no command of their own for), so
 /// the change is recorded the same way.
 pub fn edit(
@@ -1252,7 +1252,8 @@ pub fn edit(
             State::Blocked => block(taskbag, id, me, blocked_by).map(|o| (o, "block")),
             State::Done => finish(taskbag, id, me, None, None).map(|o| (o, "done")),
             State::Dropped => drop_task(taskbag, id, me).map(|o| (o, "drop")),
-            State::Backlog | State::InProgress => Err(Problem::CannotSetState {
+            State::Backlog => back_to_backlog(taskbag, id, me).map(|o| (o, "backlog")),
+            State::InProgress => Err(Problem::CannotSetState {
                 id: id.to_string(),
                 state: state.as_str().to_string(),
             }),
@@ -1323,6 +1324,27 @@ pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outco
         });
     }
     task.state = State::Ready;
+    clear_stop(&mut task);
+    Ok(Outcome::plain(task))
+}
+
+/// Send an unheld `ready`, `waiting` or `blocked` task back to `backlog`, to be thought over again
+/// (`alm backlog`, the app's state menu; Task-A01-lotus143, approver 2026-10-25, replacing the
+/// 2026-10-14 rule that nothing moves a task back to backlog). The same rule as [`make_ready`]:
+/// a held, in-progress, done or dropped task is refused (a held one is released first, a finished
+/// one reopened). What it waited on or was blocked by is cleared.
+pub fn back_to_backlog(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    if task.holder.is_some()
+        || !matches!(task.state, State::Ready | State::Waiting | State::Blocked)
+    {
+        return Err(Problem::CannotBackToBacklog {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
+    task.state = State::Backlog;
     clear_stop(&mut task);
     Ok(Outcome::plain(task))
 }
@@ -2075,6 +2097,32 @@ mod tests {
         assert_eq!((r.state, r.waiting_on.clone()), (State::Ready, None));
         put!(s, r);
 
+        // Back to backlog (Task-A01-lotus143): from ready, waiting or blocked, unheld, clearing
+        // what it waited on; held, in progress, done or dropped: refused.
+        put!(s, wait(&s, "A01-02", None, "owner", None).unwrap().task);
+        let r = back_to_backlog(&s, "A01-02", None).unwrap().task;
+        assert_eq!((r.state, r.waiting_on.clone()), (State::Backlog, None));
+        put!(s, r);
+        assert!(matches!(
+            back_to_backlog(&s, "A01-02", None),
+            Err(Problem::CannotBackToBacklog { .. })
+        ));
+        put!(s, make_ready(&s, "A01-02", None).unwrap().task);
+        put!(s, claim(&s, "A01-02", Some("a"), false).unwrap().task);
+        assert!(matches!(
+            back_to_backlog(&s, "A01-02", Some("b")),
+            Err(Problem::TaskHeld { .. })
+        ));
+        assert!(matches!(
+            back_to_backlog(&s, "A01-02", Some("a")),
+            Err(Problem::CannotBackToBacklog { .. })
+        ));
+        put!(s, release(&s, "A01-02", Some("a"), None).unwrap().task);
+        assert_eq!(
+            back_to_backlog(&s, "A01-02", None).unwrap().task.state,
+            State::Backlog
+        );
+
         // Drop: clears holder and waiting on; done or dropped tasks are closed.
         put!(s, claim(&s, "A02-01", Some("a"), false).unwrap().task);
         assert!(matches!(
@@ -2539,6 +2587,11 @@ mod tests {
             ed(&s, state(State::Ready, None)),
             make_ready(&s, "A01-01", me),
             "ready",
+        );
+        same(
+            ed(&s, state(State::Backlog, None)),
+            back_to_backlog(&s, "A01-01", me),
+            "backlog",
         );
         same(
             ed(&s, state(State::Waiting, Some("the owner"))),

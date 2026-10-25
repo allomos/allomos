@@ -344,6 +344,9 @@ enum Command {
     },
     /// Mark an unheld backlog, waiting or blocked task ready (for example, the approver approved it).
     Ready { id: String },
+    /// Send an unheld ready, waiting or blocked task back to backlog, to be thought over again
+    /// (write the open questions in its description's Notes).
+    Backlog { id: String },
     /// Give a task a new title.
     Title {
         id: String,
@@ -628,6 +631,7 @@ impl Command {
             | Command::Needs { id, .. }
             | Command::Plan { id, .. }
             | Command::Ready { id }
+            | Command::Backlog { id }
             | Command::Title { id, .. }
             | Command::Describe { id, .. }
             | Command::Note { id, .. }
@@ -733,6 +737,7 @@ impl Command {
             Command::Needs { .. } => "needs",
             Command::Plan { .. } => "plan",
             Command::Ready { .. } => "ready",
+            Command::Backlog { .. } => "backlog",
             Command::Title { .. } => "title",
             Command::Describe { .. } => "describe",
             Command::Note { .. } => "note",
@@ -3245,6 +3250,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             change(cli, cwd, |bag| ops::plan(bag, id, iteration.as_deref()))
         }
         Command::Ready { id } => change(cli, cwd, |bag| ops::make_ready(bag, id, me)),
+        Command::Backlog { id } => change(cli, cwd, |bag| ops::back_to_backlog(bag, id, me)),
         Command::Drop { id } => change(cli, cwd, |bag| ops::drop_task(bag, id, me)),
         Command::Reopen { id, note } => change(cli, cwd, |bag| ops::reopen(bag, id, note)),
         Command::Release { id, note } => {

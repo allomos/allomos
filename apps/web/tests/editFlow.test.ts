@@ -6,6 +6,9 @@ import {
   EMPTY_NEW_ITERATION,
   NEW_ITERATION,
   SETTABLE_STATES,
+  backlogAllowed,
+  backlogBlocked,
+  stateDisabled,
   blockerChoices,
   draftChanged,
   iterationChoices,
@@ -38,6 +41,30 @@ const task: Task = {
 test("only the states alm can set are offered, after the task's own", () => {
   assert.deepEqual(stateChoices(task), ["in_progress", ...SETTABLE_STATES]);
   assert.deepEqual(stateChoices({ ...task, state: "ready" }), SETTABLE_STATES);
+});
+
+test("back to backlog: offered for an unheld ready, waiting or blocked task, explained when greyed out (Task-A01-lotus143)", () => {
+  const unheld: Task = { ...task, state: "ready", holder: null };
+  assert.equal(backlogAllowed(unheld), true);
+  assert.equal(stateDisabled(unheld, "backlog"), false);
+  assert.equal(backlogBlocked(unheld), null);
+  for (const state of ["waiting", "blocked"] as const) assert.equal(backlogAllowed({ ...unheld, state }), true);
+  // Held: greyed out, saying who holds it.
+  const held: Task = { ...task, state: "waiting", holder: "claude/x" };
+  assert.equal(stateDisabled(held, "backlog"), true);
+  assert.deepEqual(backlogBlocked(held), { why: "held", holder: "claude/x" });
+  assert.deepEqual(backlogBlocked({ ...task, holder: "codex/y" }), { why: "held", holder: "codex/y" });
+  // Finished: greyed out, with the reopen hint.
+  for (const state of ["done", "dropped"] as const) {
+    assert.equal(stateDisabled({ ...unheld, state }, "backlog"), true);
+    assert.deepEqual(backlogBlocked({ ...unheld, state }), { why: "finished" });
+  }
+  // Already backlog: its own choice, nothing to explain; in progress is never chosen here.
+  const inBacklog: Task = { ...unheld, state: "backlog" };
+  assert.equal(stateDisabled(inBacklog, "backlog"), false);
+  assert.equal(backlogBlocked(inBacklog), null);
+  assert.equal(stateDisabled(unheld, "in_progress"), true);
+  assert.equal(SETTABLE_STATES[0], "backlog");
 });
 
 test("an editor starts from the task's value", () => {

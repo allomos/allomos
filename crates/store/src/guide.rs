@@ -147,7 +147,9 @@ Read this before you add a task, so it fits this project.
    is the person's to decide (what users will see and get used to, anything hard to undo, anything that
    changes the plan or another task, anything with a cost or an outside effect). Nothing: make it
    ready (`alm ready <id>`). Something: leave it in backlog, name each open question in the
-   description's Notes, and tell the person.
+   description's Notes, and tell the person. A ready task that turns out to need rethinking goes
+   back the same way: `alm backlog <id>` (unheld only: release a held one first), with the open
+   questions in its Notes.
 8. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
    outcome of a done or dropped task is not a new task: reopen that one
    (`alm reopen <id> --note \"<why>\"`).
@@ -233,7 +235,9 @@ Work a task:
   alm title\"`. Any task, any state; the task's files do not change, the history keeps it.
 - `alm reviewed <id>`: the person has reviewed the task's AI decisions: they leave To review; the
   history keeps them. Run it only when the person says so.
-  `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task).
+  `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task);
+  `alm backlog <id>` (back to backlog, to think it over again: an unheld ready, waiting or blocked
+  task; write the open questions in its description's Notes).
 - `alm reopen <id> --note \"<why>\"`: more work on a done or dropped task's outcome (it failed its
   check, or the person wants more): it becomes ready, held by nobody, and the history records who
   reopened it, when and why. Its label and its human-check record are cleared (the history keeps

@@ -23,15 +23,35 @@ export type EditField =
 export type Draft = { value: string; waitingOn: string; who: string; blockedBy: string[] };
 
 /**
- * The states the app can set, each by its `alm` command (ready, wait, block, done, drop). In
- * progress comes only from an agent claiming the task, and nothing moves a task back to backlog
- * (owner, 2026-10-14: no claiming or releasing from the app).
+ * The states the app can set, each by its `alm` command (backlog, ready, wait, block, done, drop).
+ * In progress comes only from an agent claiming the task (owner, 2026-10-14: no claiming or
+ * releasing from the app). Back to backlog since Task-A01-lotus143 (approver, 2026-10-25).
  */
-export const SETTABLE_STATES: State[] = ["ready", "waiting", "blocked", "done", "dropped"];
+export const SETTABLE_STATES: State[] = ["backlog", "ready", "waiting", "blocked", "done", "dropped"];
 
 /** The states offered for `task`: its own first, so the list shows where it is, then the settable ones. */
 export function stateChoices(task: Task): State[] {
   return SETTABLE_STATES.includes(task.state) ? SETTABLE_STATES : [task.state, ...SETTABLE_STATES];
+}
+
+/** Back to backlog is allowed for a ready, waiting or blocked task nobody holds, as
+ * `alm backlog` allows it (Rust decides; this only greys the choice out). */
+export function backlogAllowed(task: Task): boolean {
+  return !task.holder && (task.state === "ready" || task.state === "waiting" || task.state === "blocked");
+}
+
+/** Why backlog is greyed out for `task`, so a greyed-out choice is never unexplained: it is held
+ * (by whom), or it is finished (reopen it instead); null when it is offered, or already backlog. */
+export function backlogBlocked(task: Task): { why: "held"; holder: string } | { why: "finished" } | null {
+  if (task.state === "backlog" || backlogAllowed(task)) return null;
+  if (task.state === "done" || task.state === "dropped") return { why: "finished" };
+  return { why: "held", holder: task.holder ?? "" };
+}
+
+/** Whether a state is greyed out in `task`'s state menu. */
+export function stateDisabled(task: Task, s: State): boolean {
+  if (s === "in_progress") return true;
+  return s === "backlog" && task.state !== "backlog" && !backlogAllowed(task);
 }
 
 /** The draft a field's editor starts from: the task's value now. */
