@@ -38,6 +38,7 @@ import { canReopen, reopenEdit } from "./reopenFlow";
 import { ACTIVE_MINUTES, check, paneAgent, session } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
+import { toggleFolder, type FolderInfo } from "./folderFlow";
 import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
@@ -57,6 +58,7 @@ export function TaskPane({
   onReview,
   nextIterationId,
   onNewIteration,
+  folders,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -86,11 +88,13 @@ export function TaskPane({
   nextIterationId: string | null;
   /** "New…": adds the iteration and plans this task in it. Rejects with the Problem that refused it; then nothing changed. */
   onNewIteration: (iteration: NewIteration) => Promise<void>;
+  /** The taskbag's bound project folders (Task-A01-sketch327); empty: none bound. */
+  folders: FolderInfo[];
 }) {
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<EditField | null>(null);
-  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [] });
+  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [], folders: [] });
   const [created, setCreated] = useState<NewIterationDraft>(EMPTY_NEW_ITERATION);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -224,6 +228,28 @@ export function TaskPane({
           : (`pane.${field}` as "pane.state"),
     );
 
+  /** The Folders picker: one checkbox per bound folder, with its path, and "not found" when
+   * Allomos cannot find it (Task-A01-sketch327). Nothing to choose until a folder is bound. */
+  const folderPicker = (): ReactNode =>
+    folders.length === 0 ? (
+      <p className="muted small">{t("edit.no_folders")}</p>
+    ) : (
+      <fieldset className="folder-picker" disabled={busy}>
+        <legend className="small">{t("edit.folders_legend")}</legend>
+        {folders.map((f) => (
+          <label key={f.name} className="small">
+            <input
+              type="checkbox"
+              checked={draft.folders.includes(f.name)}
+              onChange={() => setDraft((d) => ({ ...d, folders: toggleFolder(d.folders, f.name, folders) }))}
+            />{" "}
+            {f.name} <span className="muted">{f.path}</span>
+            {!f.exists && <span className="muted"> · {t("edit.folder_missing")}</span>}
+          </label>
+        ))}
+      </fieldset>
+    );
+
   /** The "Blocked by" task picker: every other task, ticked when it blocks this one. */
   const picker = (): ReactNode => (
     <fieldset className="blocker-picker" disabled={busy}>
@@ -287,6 +313,8 @@ export function TaskPane({
         );
       case "blocked_by":
         return picker();
+      case "folders":
+        return folderPicker();
       case "label":
         return (
           <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
@@ -460,6 +488,8 @@ export function TaskPane({
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
     [t("pane.state"), stopText(task, tasks, t) ?? t(`state.${task.state}`), "state"],
+    // Always shown (approver, 2026-10-25), whatever the number of bound folders.
+    [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
     [t("pane.label"), task.label, "label"],
     [t("pane.responsible"), ownerName ?? t("task.you"), null, t("pane.responsible_title")],
     [t("pane.agent"), agentText, null],

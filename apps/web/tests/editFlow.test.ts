@@ -68,13 +68,22 @@ test("back to backlog: offered for an unheld ready, waiting or blocked task, exp
 });
 
 test("an editor starts from the task's value", () => {
-  assert.deepEqual(startDraft(task, "state"), { value: "in_progress", waitingOn: "", who: "", blockedBy: [] });
+  assert.deepEqual(startDraft(task, "state"), { value: "in_progress", waitingOn: "", who: "", blockedBy: [], folders: [] });
   assert.equal(startDraft(task, "label").value, "");
   assert.equal(startDraft(task, "next_dependency").value, "the owner");
   assert.equal(startDraft(task, "description").value, "Why.\n");
 });
 
-const e = { who: "", blockedBy: [] as string[] };
+const e = { who: "", blockedBy: [] as string[], folders: [] as string[] };
+
+test("folders: Save only for a change, sent as the list ticked (Task-A01-sketch327)", () => {
+  const inSite = { ...task, folders: ["site"] };
+  const draft = startDraft(inSite, "folders");
+  assert.deepEqual(draft.folders, ["site"]);
+  assert.equal(draftChanged(inSite, "folders", draft), false);
+  assert.equal(draftChanged(inSite, "folders", { ...draft, folders: [] }), true);
+  assert.deepEqual(toEdit("folders", { ...draft, folders: ["app", "site"] }), { field: "folders", folders: ["app", "site"] });
+});
 
 test("Save is offered only for a change", () => {
   assert.equal(draftChanged(task, "title", { value: " Do it ", waitingOn: "", ...e }), false);

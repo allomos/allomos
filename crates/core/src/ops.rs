@@ -1250,6 +1250,11 @@ pub enum Edit {
     Reopen {
         note: String,
     },
+    /// The project folders it belongs to, like `alm folders` (Task-A01-sketch327); empty: none.
+    Folders {
+        #[serde(default)]
+        folders: Vec<String>,
+    },
 }
 
 /// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
@@ -1318,6 +1323,9 @@ pub fn edit(
         }
         Edit::Checked => checked(taskbag, id).map(|o| (o, "checked")),
         Edit::Reopen { note } => reopen(taskbag, id, note).map(|o| (o, "reopen")),
+        Edit::Folders { folders } => {
+            crate::folders::set(taskbag, id, me, folders).map(|o| (o, "folders"))
+        }
     }
 }
 

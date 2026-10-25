@@ -14,13 +14,14 @@ export type EditField =
   | "handoff_note"
   | "iteration"
   | "title"
-  | "description";
+  | "description"
+  | "folders";
 
 /**
  * What the person typed or chose. `waitingOn` and `who` go with the state `waiting`; `blockedBy`
  * (task IDs) with the state `blocked` and the field "Blocked by" (decision 0016).
  */
-export type Draft = { value: string; waitingOn: string; who: string; blockedBy: string[] };
+export type Draft = { value: string; waitingOn: string; who: string; blockedBy: string[]; folders: string[] };
 
 /**
  * The states the app can set, each by its `alm` command (backlog, ready, wait, block, done, drop).
@@ -61,10 +62,10 @@ export function startDraft(task: Task, field: EditField): Draft {
       ? task.state
       : field === "description"
         ? task.description
-        : field === "blocked_by"
+        : field === "blocked_by" || field === "folders"
           ? ""
           : (task[field] ?? "");
-  return { value, waitingOn: task.waiting_on ?? "", who: task.who ?? "", blockedBy: [...(task.blocked_by ?? [])] };
+  return { value, waitingOn: task.waiting_on ?? "", who: task.who ?? "", blockedBy: [...(task.blocked_by ?? [])], folders: [...(task.folders ?? [])] };
 }
 
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -73,6 +74,7 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((
 export function draftChanged(task: Task, field: EditField, draft: Draft): boolean {
   const start = startDraft(task, field);
   if (field === "blocked_by") return draft.blockedBy.length > 0 && !sameIds(draft.blockedBy, start.blockedBy);
+  if (field === "folders") return !sameIds(draft.folders, start.folders);
   if (field === "state" && draft.value === "waiting") {
     return task.state !== "waiting" || draft.waitingOn.trim() !== start.waitingOn.trim() || draft.who.trim() !== start.who.trim();
   }
@@ -110,6 +112,8 @@ export function toEdit(field: EditField, draft: Draft, version: string | null = 
       return { field, title: text, expected_version: version };
     case "description":
       return { field, text: draft.value, expected_version: version };
+    case "folders":
+      return { field, folders: draft.folders };
   }
 }
 

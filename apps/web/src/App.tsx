@@ -52,6 +52,7 @@ import { AiDecidedBadge, HumanCheckBadge, TaskPane } from "./TaskPane";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import { baseChoice, type Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
+import { folderFilterValue, keepFolder, newTaskFolders, readFolderFilter, showFolders, type FolderInfo } from "./folderFlow";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import { iterationPlaces } from "./iterationPlace";
 import type { Messenger } from "./messenger";
@@ -1034,6 +1035,8 @@ function HopFigure() {
 type GroupBy = "area" | "iteration";
 const GROUP_BY_KEY = "allomos.groupBy";
 const STATE_FILTER_KEY = "allomos.stateFilter";
+/** The Folder filter, per taskbag (Task-A01-sketch327). */
+const FOLDER_FILTER_KEY = "allomos.folderFilter";
 const SORT_KEY = "allomos.iterationSort";
 
 function readGroupBy(): GroupBy {
@@ -1104,6 +1107,37 @@ function TaskbagView({
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
   // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
   // task that needs a person (Task-A03-18).
+  // Project folders (Task-A01-sketch327): read again whenever the taskbag is, so binding a second
+  // folder shows the chips and the Folder filter without reopening the window.
+  const [folders, setFolders] = useState<FolderInfo[]>([]);
+  useEffect(() => {
+    let live = true;
+    messenger
+      .projectFolders(opened.root)
+      .then((f) => live && setFolders(f))
+      .catch(() => live && setFolders([]));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened]);
+  const folderKey = `${FOLDER_FILTER_KEY}:${opened.root}`;
+  const [storedFolder, setStoredFolder] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(folderKey);
+    } catch {
+      return null;
+    }
+  });
+  // A chosen folder that is no longer bound, or fewer than two folders, reads as all folders.
+  const folderFilter = readFolderFilter(storedFolder, folders);
+  const chooseFolder = (value: string) => {
+    setStoredFolder(value);
+    try {
+      localStorage.setItem(folderKey, value);
+    } catch {
+      /* storage unavailable: the choice lasts until the window closes */
+    }
+  };
   const [stateFilter, setStateFilter] = useState<StateFilter>(() => {
     try {
       return readFilter(localStorage.getItem(STATE_FILTER_KEY));
@@ -1195,7 +1229,14 @@ function TaskbagView({
   // With a state filter, each group lists only the tasks in that state (its count stays whole)
   // and says how many it hides (Task-A01-42); a group with none left is not drawn, and the banner
   // under the tabs says how many were left out (Task-A01-44).
-  const filtered = filterGroups(groups, stateFilter);
+  // The Folder filter first (Task-A01-sketch327): groups then count only that folder's tasks.
+  const byFolder =
+    folderFilter.kind === "all"
+      ? groups
+      : groups
+          .map((g) => ({ ...g, tasks: g.tasks.filter((task) => keepFolder(folderFilter, task)) }))
+          .filter((g) => g.tasks.length > 0);
+  const filtered = filterGroups(byFolder, stateFilter);
   // A search keeps only the tasks that match, and groups with none are left out; each group left
   // holds a match, so it opens even if it was collapsed (the collapsed list itself is kept).
   const found = searchGroups(filtered, terms);
@@ -1324,7 +1365,8 @@ function TaskbagView({
   const add = async (request: AddRequest) => {
     let shown: string | null = null;
     if (request.kind === "task") {
-      shown = (await messenger.addTask(opened.root, request.task)).id;
+      // A task made while a folder is chosen in the Folder filter belongs to it (Task-A01-sketch327).
+      shown = (await messenger.addTask(opened.root, { ...request.task, folders: newTaskFolders(folderFilter) })).id;
     } else if (request.kind === "area") {
       await messenger.addArea(opened.root, request.id, request.name);
     } else {
@@ -1428,6 +1470,20 @@ function TaskbagView({
                   ))}
                 </select>
               </label>
+              {showFolders(folders) && (
+                <label className="state-filter small">
+                  {t("filter.folder")}{" "}
+                  <select value={folderFilterValue(folderFilter)} onChange={(e) => chooseFolder(e.target.value)}>
+                    <option value="all">{t("filter.all_folders")}</option>
+                    {folders.map((f) => (
+                      <option key={f.name} value={f.name}>
+                        {f.name}
+                      </option>
+                    ))}
+                    <option value="none">{t("filter.no_folder")}</option>
+                  </select>
+                </label>
+              )}
               <SortMenu sort={sort} onChange={chooseSort} />
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
@@ -1470,6 +1526,7 @@ function TaskbagView({
                   onShowAll={() => chooseFilter("all")}
                   stop={stop}
                   iterationName={groupBy === "area" ? iterationName : undefined}
+                  showFolders={showFolders(folders)}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
@@ -1526,6 +1583,7 @@ function TaskbagView({
                 onReview={() => reviewDecisions(selected.id)}
                 nextIterationId={nextIds?.iteration ?? null}
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
+                folders={folders}
               />
             )}
           </div>
@@ -1616,6 +1674,7 @@ function TaskGroup({
   form,
   onEdit,
   editForm,
+  showFolders: chips,
 }: {
   id: string;
   name: string;
@@ -1654,6 +1713,8 @@ function TaskGroup({
   onEdit?: () => void;
   /** The Edit form, when it is open in this group. */
   editForm?: ReactNode;
+  /** Each task's folder chips, shown while two or more folders are bound (Task-A01-sketch327). */
+  showFolders?: boolean;
 }) {
   const { t } = useI18n();
   const all = counted ?? tasks;
@@ -1723,6 +1784,16 @@ function TaskGroup({
                   <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
                 </span>
                 <span className="meta">
+                  {chips &&
+                    ((task.folders ?? []).length > 0 ? (
+                      (task.folders ?? []).map((f) => (
+                        <span key={f} className="folder-chip">
+                          {f}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="muted">{t("task.no_folder")}</span>
+                    ))}
                   {task.label && <span className="label">{task.label}</span>}
                   {iteration && <span>{t("task.iteration", { iteration })}</span>}
                   {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}

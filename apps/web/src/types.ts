@@ -9,6 +9,8 @@ export interface Project {
   labels: string[];
   /** `ui` (follow the interface), a language code such as `ja`, or missing (follow the interface). */
   task_language?: string;
+  /** `allomos/6`: the project folders, the first the main one (decision 0019). */
+  project_folders?: { name: string; path: string }[];
 }
 
 export interface Area {
@@ -35,6 +37,8 @@ export interface Task {
   id: string;
   title: string;
   area: string;
+  /** The project folders it belongs to (`allomos/6`, decision 0019); missing: none in particular. */
+  folders?: string[];
   state: State;
   label: string | null;
   holder: string | null;
@@ -86,7 +90,8 @@ export type Edit =
   | { field: "title"; title: string; expected_version?: string | null }
   | { field: "description"; text: string; expected_version?: string | null }
   | { field: "checked" }
-  | { field: "reopen"; note: string };
+  | { field: "reopen"; note: string }
+  | { field: "folders"; folders: string[] };
 
 /**
  * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID
@@ -100,6 +105,8 @@ export interface NewTask {
   iteration: string | null;
   /** The base branch the person chose, or that every open task shares (Task-A03-22). */
   base: string | null;
+  /** The project folders it belongs to: the Folder filter's, when one is chosen (Task-A01-sketch327). */
+  folders?: string[];
 }
 
 /** A new iteration from the New iteration form (Task-A01-19). No ID means the next free one. */

@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
+import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { LadderStep } from "./ladderFlow";
 import { withDecisions } from "./stopFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
@@ -119,6 +120,8 @@ export interface Messenger {
   /** The project's handoff rules (Task-A03-06). */
   /** Renames the project, as `alm project --name` (Task-A05-chalk937); resolves to the saved name. */
   renameProject(root: string, name: string): Promise<string>;
+  /** The taskbag's bound project folders, each with whether it is found (Task-A01-sketch327). */
+  projectFolders(root: string): Promise<ProjectFolderInfo[]>;
   /** Sets the language tasks are written in, as `alm task-language` (`ui`: follow the interface). */
   setTaskLanguage(root: string, value: string): Promise<void>;
   /** Changes the progress ladder as edited (Task-A05-yeti951); resolves to the saved ladder. */
@@ -346,6 +349,7 @@ export const desktopMessenger: Messenger = {
   deleteArea: (root, id) => invoke<void>("delete_area", { root, id }),
   deleteIteration: (root, id) => invoke<void>("delete_iteration", { root, id }),
   renameProject: (root, name) => invoke<string>("rename_project", { root, name }),
+  projectFolders: (root) => invoke<ProjectFolderInfo[]>("project_folders", { root }),
   setTaskLanguage: (root, value) => invoke<void>("set_task_language", { root, value }),
   changeLadder: (root, steps) => invoke<string[]>("change_ladder", { root, steps }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),

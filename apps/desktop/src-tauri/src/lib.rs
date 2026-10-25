@@ -1049,6 +1049,13 @@ fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, P
     Ok(project.labels)
 }
 
+/// The taskbag's project folders (decision 0019), each with whether it is found here and how many
+/// tasks name it, for the task pane's Folders and the task list (Task-A01-sketch327).
+#[tauri::command]
+fn project_folders(root: PathBuf) -> Result<Vec<allomos_store::folders::FolderInfo>, Problem> {
+    allomos_store::folders::list(&root)
+}
+
 /// Rename the project, as `alm project --name` does (Task-A05-camera758's settings, General;
 /// Task-A05-chalk937). The ID stays. Returns the name as saved.
 #[tauri::command]
@@ -2228,6 +2235,7 @@ pub fn run() {
             lan_status,
             set_lan_viewing,
             rename_project,
+            project_folders,
             set_task_language,
             change_ladder,
             lan_pairing,
