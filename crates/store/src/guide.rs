@@ -296,7 +296,8 @@ Project folders (decision 0019: one taskbag, several folders, each with its own 
   `alm list --folder <name>`; inside a folder `alm next` lists only its tasks (`--all-folders`).
 
 Handoffs (what a session leaves in each task so whoever continues does not start blind):
-- `alm handoff-rules`: when to write one (quota and context gates, with any override for you);
+- `alm handoff-rules`: when to write one (quota and context gates, with any override for you;
+  they apply only while you hold a task, and reaching one means handoff, then `alm release`);
   `--quota <n> --context <n> [--write-when \"<text>\"] [--agent <name>] [--clear]` change them.
 - `alm handoff <id> --as <your session name> --text \"<handoff>\"` (or `--from <file.md>`)
   `[--evidence \"<what>\"]`: hand the task off. The text replaces its handoff note (where it
@@ -457,8 +458,9 @@ const WORKFLOW: &str = "# How to work the tasks
    a person must act too, say so with `alm needs`). Blocked and waiting tasks are never in
    `alm next`'s list: they are skipped by their state. When `alm next` says all of a task's
    blockers are done, check it, then `alm unblock <id>`.
-5. Write your handoff when `alm handoff-rules` says (near the quota or context gate, and after
-   every meaningful step), into each task you worked: `alm handoff <id> --as <your session name>
+5. Write your handoff when `alm handoff-rules` says (near the quota or context gate while you
+   hold a task, then release it with `alm release <id> --note` naming the working branch, so the
+   next session continues it; and after every meaningful step), into each task you worked: `alm handoff <id> --as <your session name>
    --text \"<where it stopped, the one next step, who it waits on>\"`, in plain words first, for
    any reader: you do not know who takes over, an agent or a person. It replaces the task's
    handoff note, so write the whole of it each time. Each operation with an outside effect that

@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v26)
+## Tasks: Allomos (v27)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -119,8 +119,11 @@ the project notes (below).
   link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
   propose moving them in, following `alm guide move-cards`; the person can also start it with
   **Update the taskbag…** in the Allomos app (`alm move-in` prints that request).
-- Handoff: `alm handoff-rules` says when to write one (quota and context gates). A handoff is
-  written into each task, for any reader, agent or person: `alm handoff <id> --as <your session
+- Handoff: `alm handoff-rules` says when to write one (quota and context gates). The gates apply
+  only while you hold a task (from `alm claim` until `alm done` or `alm release`); reaching one,
+  write the handoff, then release the task (`alm release <id> --note`, naming the working branch),
+  so it is ready again for the next session or loop run, which continues on that branch. A
+  handoff is written into each task, for any reader, agent or person: `alm handoff <id> --as <your session
   name> --text "<where it stopped, the one next step, who it waits on>"` (or `--from <file.md>`)
   replaces the task's handoff note; `--evidence "<what>"` adds what was done that must not run
   twice (an outside effect) under its description's Evidence; several tasks: once for each.

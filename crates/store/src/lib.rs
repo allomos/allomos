@@ -326,8 +326,11 @@ the project notes (below).
   link to card files outside the taskbag, report them with `alm cards found <id>=<path>` and
   propose moving them in, following `alm guide move-cards`; the person can also start it with
   **Update the taskbag…** in the Allomos app (`alm move-in` prints that request).
-- Handoff: `alm handoff-rules` says when to write one (quota and context gates). A handoff is
-  written into each task, for any reader, agent or person: `alm handoff <id> --as <your session
+- Handoff: `alm handoff-rules` says when to write one (quota and context gates). The gates apply
+  only while you hold a task (from `alm claim` until `alm done` or `alm release`); reaching one,
+  write the handoff, then release the task (`alm release <id> --note`, naming the working branch),
+  so it is ready again for the next session or loop run, which continues on that branch. A
+  handoff is written into each task, for any reader, agent or person: `alm handoff <id> --as <your session
   name> --text \"<where it stopped, the one next step, who it waits on>\"` (or `--from <file.md>`)
   replaces the task's handoff note; `--evidence \"<what>\"` adds what was done that must not run
   twice (an outside effect) under its description's Evidence; several tasks: once for each.
