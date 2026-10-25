@@ -642,7 +642,7 @@
   "lan.remove": "Remove",
   "lan.close": "Close",
   "companion.connecting": "Connecting to Allomos…",
-  "companion.no_app": "Can't reach Allomos. Open the Allomos desktop app on your computer, turn on Devices on Your Network, then reload this page.",
+  "companion.no_app": "Can't reach Allomos. Open the Allomos desktop app on your computer and turn on Devices on Your Network: this page connects again by itself.",
   "companion.connected": "Connected to the Allomos desktop app ({version}).",
   "companion.wrong_code": "That code is not right. {tries} tries left.",
   "companion.new_code": "Too many wrong tries: the desktop app now shows a new code. Type the new one.",
@@ -662,7 +662,6 @@
   "companion.paired": "Paired as “{device}”. This browser remembers it.",
   "companion.open_taskbags": "Taskbags open in the desktop app:",
   "companion.none_open": "The desktop app has no taskbag open right now.",
-  "companion.view_next": "Viewing the tasks here comes next.",
   "companion.warning": "If your browser warned that the connection is not private: that is expected. The desktop app encrypts the connection with a certificate it made for itself.",
   "cards.notice": "{count} tasks keep their card files in the project folder. An AI agent can move each one into the taskbag, beside its task.",
   "cards.button": "Update the taskbag…",
@@ -725,5 +724,11 @@
   "upgrade.found": "This taskbag is in {found}. Updating upgrades it first: project folders and task folders need the newer format. The agent shows its plan in Allomos and changes nothing until you choose Go ahead.",
   "upgrade.warning": "After the upgrade, older Allomos versions (the app, alm, and every agent session using them) refuse this taskbag until the newest Allomos is installed.",
   "upgrade.asked": "Opened {agent}. Read the request there and send it. The notice goes away once the agent has upgraded the taskbag.",
-  "upgrade.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The notice goes away once the agent has upgraded the taskbag."
+  "upgrade.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The notice goes away once the agent has upgraded the taskbag.",
+  "companion.from": "From {computer}",
+  "companion.other_taskbags": "Other taskbags",
+  "pane.back": "Back to the list",
+  "problem.companion_read_only": "This can't be done from this device yet: do it in the Allomos desktop app on the computer.",
+  "problem.companion_no_app": "Can't reach the Allomos desktop app.",
+  "problem.companion_not_open": "The desktop app no longer has this taskbag open."
 }

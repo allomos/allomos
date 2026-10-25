@@ -642,7 +642,7 @@
   "lan.remove": "移除",
   "lan.close": "关闭",
   "companion.connecting": "正在连接 Allomos…",
-  "companion.no_app": "连不上 Allomos。请在电脑上打开 Allomos 桌面应用，开启“网络中的设备”，然后刷新这个页面。",
+  "companion.no_app": "连不上「换肩」。请在电脑上打开「换肩」桌面应用并开启“网络中的设备”：这个页面会自己重新连上。",
   "companion.connected": "已连接到 Allomos 桌面应用（{version}）。",
   "companion.wrong_code": "配对码不对。还可以试 {tries} 次。",
   "companion.new_code": "输错次数太多：桌面应用现在显示了一个新码。请输入新码。",
@@ -662,7 +662,6 @@
   "companion.paired": "已配对为“{device}”。这个浏览器会记住它。",
   "companion.open_taskbags": "桌面应用中打开的任务包：",
   "companion.none_open": "桌面应用现在没有打开任务包。",
-  "companion.view_next": "接下来就能在这里查看任务。",
   "companion.warning": "如果浏览器提示“连接不是私密的”：这是正常的。桌面应用用它自己生成的证书加密连接。",
   "cards.notice": "{count} 个任务的卡片文件还放在项目文件夹里。AI 智能体可以把每个卡片文件搬进任务包，放在它的任务旁边。",
   "cards.button": "更新任务包…",
@@ -725,5 +724,11 @@
   "upgrade.found": "这个任务包是 {found}。更新会先升级它：项目文件夹和任务所属的文件夹需要较新的格式。智能体会先在「换肩」里给出计划，在你选择“继续”之前什么都不改。",
   "upgrade.warning": "升级后，较旧版本的「换肩」（应用、alm，以及使用它们的每个智能体会话）都会拒绝这个任务包，直到装上最新版。",
   "upgrade.asked": "已打开 {agent}。在那里读一下请求，然后发送。智能体升级任务包后，提示就会消失。",
-  "upgrade.asked_paste": "已在终端里打开 {agent}。用 {keys} 粘贴请求，读一下，然后按回车发送。智能体升级任务包后，提示就会消失。"
+  "upgrade.asked_paste": "已在终端里打开 {agent}。用 {keys} 粘贴请求，读一下，然后按回车发送。智能体升级任务包后，提示就会消失。",
+  "companion.from": "来自 {computer}",
+  "companion.other_taskbags": "其他任务包",
+  "pane.back": "返回列表",
+  "problem.companion_read_only": "这件事暂时不能在这台设备上做：请在电脑上的「换肩」桌面应用里做。",
+  "problem.companion_no_app": "连不上「换肩」桌面应用。",
+  "problem.companion_not_open": "桌面应用已不再打开这个任务包。"
 }
