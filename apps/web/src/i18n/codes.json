@@ -130,6 +130,10 @@
   "label_exists": [
     "label"
   ],
+  "label_in_use": [
+    "label",
+    "tasks"
+  ],
   "label_name_missing": [],
   "label_not_on_ladder": [
     "label",

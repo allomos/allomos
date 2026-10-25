@@ -88,6 +88,12 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .settings-row input { min-width: 0; flex: 1 1 200px; }
 .settings-row .banner { flex-basis: 100%; margin: 0; }
 .settings-value { overflow-wrap: anywhere; }
+.settings-section select { max-width: 100%; }
+.ladder-edit { display: grid; gap: 6px; justify-items: start; width: 100%; }
+.ladder-edit ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; width: 100%; }
+.ladder-edit li { display: flex; align-items: center; gap: 6px; }
+.ladder-edit li input { flex: 1 1 auto; min-width: 0; }
+.ladder-edit li button:not(.link) { padding: 2px 8px; }
 .settings-location { color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 520px) { .settings-body { grid-template-columns: 1fr; } .settings-sections { grid-auto-flow: column; justify-content: start; } }
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }

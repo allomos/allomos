@@ -59,6 +59,8 @@ problems! {
     FieldUnknown => "field_unknown", "This version of Allomos does not know this field: a newer version may have added it (update, then look again), or its name is mistyped. It is kept as it is.";
     /// A reminder, not an error (Task-A01-piano403): the item is shown with this value, kept as it is.
     ValueUnknown { value } => "value_unknown", "This version of Allomos does not know the value {value}: a newer version may have added it (update, then look again), or it is mistyped. It is kept as it is, and this version does not change it.";
+    /// Task-A05-yeti951: a step left out of the new ladder is still some tasks' label.
+    LabelInUse { label, tasks } => "label_in_use", "The step {label} cannot be removed: these tasks still carry it: {tasks}. Change their labels first.";
     /// Task-A01-piano403: the state was written by a newer Allomos, or mistyped.
     StateUnknown { id, state } => "state_unknown", "{id} has the state {state}, which this version of Allomos does not know, so it does not change it. Update Allomos, or correct the state in its file.";
     InvalidChoice { value } => "invalid_choice", "{value} is not a valid value here: it must be a word in quotes.";

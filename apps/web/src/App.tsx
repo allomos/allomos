@@ -469,6 +469,18 @@ export function App({ messenger }: { messenger: Messenger }) {
 
   const [lanShown, setLanShown] = useState(false);
   const [settingsShown, setSettingsShown] = useState(false);
+  /** Read the taskbag again after a change made in this window, noting the stamp so the follow
+   * does not read it a second time and call it automatic (Task-A01-47). */
+  const readAgain = useCallback(
+    async (root: string) => {
+      const stamp = await messenger.taskbagStamp(root).catch(() => null);
+      const fresh = await messenger.openTaskbag(root);
+      if (openedRef.current?.root !== root) return;
+      setOpened(fresh);
+      if (stamp !== null) stampRef.current = stamp;
+    },
+    [messenger],
+  );
 
   // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
   // afresh when it opens (another window may have changed it).
@@ -590,16 +602,13 @@ export function App({ messenger }: { messenger: Messenger }) {
             root={opened.root}
             fileManagerKey={FILE_MANAGER_KEY}
             onShowInFileManager={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
+            labels={opened.loaded.taskbag.project.labels}
+            taskLanguage={opened.loaded.taskbag.project.task_language}
             onRename={async (name) => {
-              const root = opened.root;
-              await messenger.renameProject(root, name);
-              // Read again, so the header and the title show the new name now.
-              const stamp = await messenger.taskbagStamp(root).catch(() => null);
-              const fresh = await messenger.openTaskbag(root);
-              if (openedRef.current?.root !== root) return;
-              setOpened(fresh);
-              if (stamp !== null) stampRef.current = stamp;
+              await messenger.renameProject(opened.root, name);
+              await readAgain(opened.root);
             }}
+            onChanged={() => readAgain(opened.root)}
             onUpdate={() => {
               setSettingsShown(false);
               void openTasksIn();

@@ -7,6 +7,8 @@ export interface Project {
   id: string;
   name: string;
   labels: string[];
+  /** `ui` (follow the interface), a language code such as `ja`, or missing (follow the interface). */
+  task_language?: string;
 }
 
 export interface Area {

@@ -2,17 +2,19 @@
 // taskbag's name in the window header. A list of sections on the left, the chosen one on the right;
 // Close and Esc close it. General shows the taskbag's name, with Rename (Task-A05-chalk937), its
 // format and whether it is up to date, with Update the Taskbag… when it is older (the same check as
-// the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). The
-// other sections (Project folders, Tasks, Handoff, Agents) come with their own tasks.
+// the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
+// sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951). The
+// other sections (Project folders, Handoff, Agents) come with their own tasks.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useI18n, type Key } from "./i18n";
+import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
+import { addStep, ladderChanged, ladderProblem, moveStep, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
 import type { Messenger } from "./messenger";
 import { middleEllipsis } from "./paths";
 import { isProblem, type VersionCheck } from "./types";
 import { movingTasks, updateNotice } from "./versionFlow";
 
-const SECTIONS = ["general"] as const;
+const SECTIONS = ["general", "tasks"] as const;
 type Section = (typeof SECTIONS)[number];
 
 /** The location in its monospace font, shortened in the middle to the characters that fit its
@@ -126,19 +128,120 @@ function FormatRow({ messenger, root, format, onUpdate }: { messenger: Messenger
   );
 }
 
+/** The language tasks are written in: follow the interface, or one of its languages. */
+function TaskLanguage({ value, onChange }: { value: string | undefined; onChange: (value: string) => Promise<void> }) {
+  const { t, language } = useI18n();
+  const [error, setError] = useState<string | null>(null);
+  const { problem } = useI18n();
+  const current = value && value !== "ui" ? value : "ui";
+  const known = current === "ui" || (LANGUAGES as readonly string[]).includes(current);
+  return (
+    <>
+      <select
+        aria-label={t("settings.task_language")}
+        value={current}
+        onChange={(e) => {
+          setError(null);
+          onChange(e.target.value).catch((err) => setError(isProblem(err) ? problem(err) : String(err)));
+        }}
+      >
+        <option value="ui">{t("settings.follow_interface", { language: LANGUAGE_NAMES[language] })}</option>
+        {LANGUAGES.map((l) => (
+          <option key={l} value={l}>
+            {LANGUAGE_NAMES[l]}
+          </option>
+        ))}
+        {!known && <option value={current}>{current}</option>}
+      </select>
+      <p className="muted small">{t("settings.task_language_note")}</p>
+      {error && <p className="banner error">{error}</p>}
+    </>
+  );
+}
+
+/** The progress ladder, lowest step first, with Change: rename, add, remove and reorder steps. */
+function Ladder({ labels, onSave }: { labels: string[]; onSave: (steps: LadderStep[]) => Promise<void> }) {
+  const { t, problem } = useI18n();
+  const [steps, setSteps] = useState<LadderStep[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (steps === null) {
+    return (
+      <div className="settings-row">
+        <span className="settings-value">{labels.join(" → ")}</span>
+        <button type="button" className="link reveal" onClick={() => setSteps(startLadder(labels))}>
+          {t("settings.change")}
+        </button>
+      </div>
+    );
+  }
+  const why = ladderProblem(steps);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave(steps);
+      setSteps(null);
+    } catch (e) {
+      setError(isProblem(e) ? problem(e) : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="ladder-edit">
+      <ol>
+        {steps.map((s, i) => (
+          <li key={i}>
+            <input aria-label={t("settings.step", { n: i + 1 })} value={s.to} onChange={(e) => setSteps(renameStep(steps, i, e.target.value))} />
+            <button type="button" aria-label={t("settings.step_up")} title={t("settings.step_up")} disabled={i === 0} onClick={() => setSteps(moveStep(steps, i, -1))}>
+              ↑
+            </button>
+            <button type="button" aria-label={t("settings.step_down")} title={t("settings.step_down")} disabled={i === steps.length - 1} onClick={() => setSteps(moveStep(steps, i, 1))}>
+              ↓
+            </button>
+            <button type="button" className="link reveal" onClick={() => setSteps(removeStep(steps, i))}>
+              {t("settings.step_remove")}
+            </button>
+          </li>
+        ))}
+      </ol>
+      <button type="button" className="link reveal" onClick={() => setSteps(addStep(steps))}>
+        {t("settings.step_add")}
+      </button>
+      <p className="muted small">{t("settings.ladder_note")}</p>
+      {why && <p className="muted small">{t(`settings.ladder_${why}` as Key)}</p>}
+      {error && <p className="banner error">{error}</p>}
+      <div className="row">
+        <button type="button" className="primary" disabled={busy || why !== null || !ladderChanged(labels, steps)} onClick={() => void save()}>
+          {t("settings.save")}
+        </button>
+        <button type="button" disabled={busy} onClick={() => setSteps(null)}>
+          {t("settings.cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function TaskbagSettings({
   messenger,
   name,
+  labels,
+  taskLanguage,
   format,
   root,
   fileManagerKey,
   onShowInFileManager,
   onRename,
   onUpdate,
+  onChanged,
   onClose,
 }: {
   messenger: Messenger;
   name: string;
+  labels: string[];
+  taskLanguage: string | undefined;
   /** `project.json`'s format, for example `allomos/5`. */
   format: string;
   root: string;
@@ -149,6 +252,8 @@ export function TaskbagSettings({
   onRename: (name: string) => Promise<void>;
   /** Update the Taskbag…, as the notice's button. */
   onUpdate: () => void;
+  /** After a change saved here: read the taskbag again. */
+  onChanged: () => Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -188,6 +293,26 @@ export function TaskbagSettings({
                 <button type="button" className="link reveal" onClick={onShowInFileManager}>
                   {t(fileManagerKey)}
                 </button>
+              </>
+            )}
+            {section === "tasks" && (
+              <>
+                <h3>{t("settings.task_language")}</h3>
+                <TaskLanguage
+                  value={taskLanguage}
+                  onChange={async (value) => {
+                    await messenger.setTaskLanguage(root, value);
+                    await onChanged();
+                  }}
+                />
+                <h3>{t("settings.ladder")}</h3>
+                <Ladder
+                  labels={labels}
+                  onSave={async (steps) => {
+                    await messenger.changeLadder(root, steps);
+                    await onChanged();
+                  }}
+                />
               </>
             )}
           </div>

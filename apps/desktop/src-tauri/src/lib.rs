@@ -942,6 +942,113 @@ fn handoff_settings_of(root: &Path) -> Result<HandoffSettings, Problem> {
     })
 }
 
+/// Set the language tasks are written in, as `alm task-language` does (`ui` follows the interface;
+/// Task-A05-yeti951).
+#[tauri::command]
+fn set_task_language(root: PathBuf, value: String) -> Result<(), Problem> {
+    let lock = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let project = allomos_core::ops::set_task_language(&bag, &value)?;
+    let event = allomos_store::Actor::APP.event(
+        "task-language",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        allomos_core::event::changes(Some(&bag.project), &project, &[]),
+    );
+    lock.record(&event, |l| l.save_project(&project))
+}
+
+/// One step of the ladder as the Tasks section edits it: `from` is its name before (none for a new
+/// step), `to` its name now.
+#[derive(serde::Deserialize)]
+struct LadderStep {
+    from: Option<String>,
+    to: String,
+}
+
+/// Change the progress ladder as the Tasks section edited it (Task-A05-yeti951): each renamed step
+/// as `alm rename label` (on every task that carries it), then the steps in their new order, added
+/// and removed, as `alm labels`. Checked first, so nothing changes when any of it is refused:
+/// removing a step tasks still carry names those tasks.
+#[tauri::command]
+fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, Problem> {
+    let loaded = allomos_store::load(&root);
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let names: Vec<String> = steps.iter().map(|s| s.to.trim().to_string()).collect();
+    if names.iter().any(|n| n.is_empty()) {
+        return Err(Problem::LabelNameMissing);
+    }
+    if let Some(n) = names
+        .iter()
+        .enumerate()
+        .find(|(i, n)| names[..*i].contains(n))
+        .map(|(_, n)| n)
+    {
+        return Err(Problem::LabelExists { label: n.clone() });
+    }
+    let renames: Vec<(&str, &str)> = steps
+        .iter()
+        .filter_map(|s| {
+            let from = s.from.as_deref()?;
+            (from != s.to.trim()).then_some((from, s.to.trim()))
+        })
+        .collect();
+    // A rename onto a name another step still has before its own rename would collide midway.
+    if let Some((_, to)) = renames
+        .iter()
+        .find(|(_, to)| bag.project.labels.iter().any(|l| l == to))
+    {
+        return Err(Problem::LabelExists {
+            label: to.to_string(),
+        });
+    }
+    let kept: Vec<&str> = steps.iter().filter_map(|s| s.from.as_deref()).collect();
+    for label in bag
+        .project
+        .labels
+        .iter()
+        .filter(|l| !kept.contains(&l.as_str()))
+    {
+        let tasks: Vec<&str> = bag
+            .tasks
+            .iter()
+            .filter(|t| t.label.as_deref() == Some(label))
+            .map(|t| t.id.as_str())
+            .collect();
+        if !tasks.is_empty() {
+            return Err(Problem::LabelInUse {
+                label: label.clone(),
+                tasks: tasks.join(", "),
+            });
+        }
+    }
+    let wait = std::time::Duration::from_secs(5);
+    for (from, to) in renames {
+        allomos_store::rename_label(&root, allomos_store::Actor::APP, wait, from, to)?;
+    }
+    let lock = allomos_store::Lock::acquire(&root, wait)?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let project = allomos_core::ops::set_ladder(&bag, &names)?;
+    if project.labels != bag.project.labels {
+        let event = allomos_store::Actor::APP.event(
+            "labels",
+            allomos_core::event::Kind::Project,
+            Some(&project.id),
+            allomos_core::event::changes(Some(&bag.project), &project, &[]),
+        );
+        lock.record(&event, |l| l.save_project(&project))?;
+    }
+    Ok(project.labels)
+}
+
 /// Rename the project, as `alm project --name` does (Task-A05-camera758's settings, General;
 /// Task-A05-chalk937). The ID stays. Returns the name as saved.
 #[tauri::command]
@@ -2142,6 +2249,8 @@ pub fn run() {
             lan_status,
             set_lan_viewing,
             rename_project,
+            set_task_language,
+            change_ladder,
             lan_pairing,
             answer_pairing,
             remove_paired_device,
@@ -2199,6 +2308,72 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Tasks section's ladder (Task-A05-yeti951): renames reach the tasks, order and new steps
+    /// are saved, and removing a step tasks carry is refused, naming them, with nothing changed.
+    #[test]
+    fn the_ladder_changes_as_edited() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-ladder-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "p", "P").unwrap();
+        let wait = std::time::Duration::from_secs(5);
+        allomos_store::add_area(&root, allomos_store::Actor::APP, wait, None, "A").unwrap();
+        let new: allomos_store::NewTask =
+            serde_json::from_value(serde_json::json!({ "area": "A01", "title": "T" })).unwrap();
+        let task = allomos_store::add_task(&root, allomos_store::Actor::APP, wait, &new)
+            .unwrap()
+            .item;
+        let file = root.join("tasks").join(&task.id).join("task.json");
+        let mut v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        v["label"] = serde_json::json!("implemented");
+        std::fs::write(&file, v.to_string()).unwrap();
+        let step = |from: Option<&str>, to: &str| LadderStep {
+            from: from.map(String::from),
+            to: to.into(),
+        };
+        let ladder = || allomos_store::load(&root).taskbag.unwrap().project.labels;
+        let before = ladder();
+        // Removing "implemented", which the task carries: refused, naming the task.
+        let err = change_ladder(
+            root.clone(),
+            vec![step(Some("human verified"), "human verified")],
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            Problem::LabelInUse {
+                label: "implemented".into(),
+                tasks: task.id.clone()
+            }
+        );
+        assert_eq!(ladder(), before);
+        // Rename it, add a step, drop two others, and reorder.
+        let saved = change_ladder(
+            root.clone(),
+            vec![
+                step(Some("implemented"), "built"),
+                step(None, "reviewed"),
+                step(Some("human verified"), "human verified"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(saved, ["built", "reviewed", "human verified"]);
+        assert_eq!(ladder(), saved);
+        let bag = allomos_store::load(&root).taskbag.unwrap();
+        assert_eq!(bag.tasks[0].label.as_deref(), Some("built"));
+        // Two steps with one name, and an empty name, are refused.
+        assert!(change_ladder(root.clone(), vec![step(None, "x"), step(None, "x")]).is_err());
+        assert!(change_ladder(root.clone(), vec![step(Some("built"), " ")]).is_err());
+        // The task language.
+        set_task_language(root.clone(), "ja".into()).unwrap();
+        let bag = allomos_store::load(&root).taskbag.unwrap();
+        assert_eq!(bag.project.task_language.as_deref(), Some("ja"));
+        assert!(set_task_language(root.clone(), "not a language".into()).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// The folder in a new window's address (A01-deck174): everything but plain letters, digits
     /// and `-_.~` is escaped, so spaces, `&`, `#` and non-ASCII names arrive whole.
