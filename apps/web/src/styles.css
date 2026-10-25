@@ -486,10 +486,19 @@ button.link:hover { text-decoration: underline; }
 .badge.ai-decided { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); border: 1px dashed var(--ok); }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
 .pane-review .ai-decisions { padding-left: 20px; }
-@media (max-width: 720px) {
+/* Two layouts of one page (Task-A04-02-03): wider than about 900 px, the list with the task pane
+   on its right; narrower (a phone), the task pane fills the screen with a back arrow. */
+.task-pane .back { display: none; border: none; background: none; font-size: 20px; line-height: 1; padding: 2px 6px 2px 0; color: var(--accent); cursor: pointer; }
+@media (max-width: 900px) {
   .list-layout.with-pane, .list-layout.with-pane.sized { grid-template-columns: minmax(0, 1fr); }
   .pane-resizer { display: none; }
-  .task-pane { position: fixed; inset: 64px 12px 12px; max-height: none; z-index: 5; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }
+  .task-pane { position: fixed; inset: 0; max-height: none; z-index: 5; border: none; border-radius: 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); }
+  .task-pane .back { display: inline-block; }
+  .task-pane .close { display: none; }
+}
+.companion-taskbags { list-style: none; padding: 0; display: grid; gap: 8px; }
+.companion-taskbags button { width: 100%; text-align: left; }
+@media (max-width: 720px) {
   .top { flex-wrap: wrap; }
   .task { grid-template-columns: minmax(0, 1fr) auto; }
   .task .id { grid-column: 1 / -1; }
@@ -684,6 +693,14 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }
 /* Task-A01-52: when the task was last modified, in the row's bottom-right corner. */
 .task .modified { grid-column: 3; grid-row: 2; align-self: end; justify-self: end; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A phone (Task-A04-02-03): the row's two columns, the date on a line of its own under the rest. */
+@media (max-width: 720px) {
+  .task { grid-template-columns: minmax(0, 1fr); }
+  .task .id, .task .title, .task .state-cell, .task .meta, .task .modified { grid-column: 1; grid-row: auto; }
+  .task .state-cell, .task .modified { justify-self: start; justify-content: flex-start; }
+  .state-filter { min-width: 0; max-width: 100%; }
+  .state-filter select { min-width: 0; max-width: 100%; }
+}
 
 /* The progress popup's chips, in the background (Task-A05-08). */
 .progress-chips { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 6px; z-index: 5; max-width: min(420px, calc(100vw - 32px)); }

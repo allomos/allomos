@@ -201,6 +201,24 @@ pub trait Source: Send + Sync {
     fn pairing_changed(&self);
     /// A device paired: recorded in every open taskbag's history (approver, 2026-10-25).
     fn paired(&self, device: &crate::pairing::Device);
+    /// This computer's name, which the companion page shows as where the data comes from (R68).
+    fn computer(&self) -> String {
+        computer_name()
+    }
+}
+
+/// This computer's name: `COMPUTERNAME` on Windows, else what `hostname` prints, without a
+/// `.local` ending; empty when neither tells.
+pub fn computer_name() -> String {
+    if let Ok(name) = std::env::var("COMPUTERNAME") {
+        return name;
+    }
+    std::process::Command::new("hostname")
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .map(|n| n.strip_suffix(".local").map(str::to_string).unwrap_or(n))
+        .unwrap_or_default()
 }
 
 /// The JSON object in a request's body, if it is one.
@@ -269,6 +287,8 @@ pub fn route(req: &Request, source: &dyn Source) -> Response {
                 "version": env!("CARGO_PKG_VERSION"),
                 "pairing": true,
                 "device": device.as_ref().map(|d| &d.name),
+                // Which computer the data comes from (R68): the companion page names it.
+                "computer": source.computer(),
             }),
         );
     }
@@ -288,6 +308,13 @@ pub fn route(req: &Request, source: &dyn Source) -> Response {
             );
         }
         let open = source.open_taskbags();
+        // Only a taskbag a window shows: never any folder a request names.
+        let shown = || {
+            req.param("root")
+                .map(PathBuf::from)
+                .filter(|r| open.iter().any(|o| o == r))
+        };
+        let not_open = || Response::json(404, &serde_json::json!({ "error": "not_open" }));
         return match rest {
             "taskbags" => {
                 let list: Vec<_> = open
@@ -307,7 +334,32 @@ pub fn route(req: &Request, source: &dyn Source) -> Response {
                 Some(root) if open.iter().any(|r| r == &root) => {
                     Response::json(200, &allomos_store::load(&root))
                 }
-                _ => Response::json(404, &serde_json::json!({ "error": "not_open" })),
+                _ => not_open(),
+            },
+            // What the desktop window reads when it opens a taskbag, so the companion page shows
+            // the same views (Task-A04-02-03).
+            "opened" => match shown() {
+                Some(root) => Response::json(200, &crate::open_taskbag(root)),
+                None => not_open(),
+            },
+            // Changes when any of the taskbag's files change: the page reads it again only then.
+            // Text, since a 64-bit number does not fit a JavaScript number.
+            "stamp" => match shown() {
+                Some(root) => Response::json(200, &allomos_store::stamp(&root).to_string()),
+                None => not_open(),
+            },
+            "history" => match (shown(), req.param("id")) {
+                (Some(root), Some(id)) => {
+                    Response::json(200, &allomos_store::events::history(&root, &id))
+                }
+                _ => not_open(),
+            },
+            "folders" => match shown() {
+                Some(root) => Response::json(
+                    200,
+                    &allomos_store::folders::list(&root).unwrap_or_default(),
+                ),
+                None => not_open(),
             },
             _ => Response::json(404, &serde_json::json!({ "error": "not_found" })),
         };
@@ -585,6 +637,9 @@ mod tests {
         fn paired(&self, device: &crate::pairing::Device) {
             self.paired.lock().unwrap().push(device.name.clone());
         }
+        fn computer(&self) -> String {
+            "studio".into()
+        }
     }
 
     fn req(method: &str, target: &str, peer: IpAddr) -> Request {
@@ -641,6 +696,92 @@ mod tests {
             percent_encode(&root.display().to_string())
         );
         assert_eq!(route(&req("GET", &mine, HERE), &f).status, 200);
+        // What the companion page reads (Task-A04-02-03), for a shown taskbag only, and the
+        // computer's name.
+        let enc = percent_encode(&root.display().to_string());
+        for path in [
+            format!("/api/opened?root={enc}"),
+            format!("/api/stamp?root={enc}"),
+            format!("/api/history?root={enc}&id=A01-01"),
+            format!("/api/folders?root={enc}"),
+        ] {
+            assert_eq!(route(&req("GET", &path, HERE), &f).status, 200, "{path}");
+            assert_eq!(route(&req("GET", &path, LAN), &f).status, 403, "{path}");
+            let elsewhere = path.replace(&enc, &percent_encode("/etc"));
+            assert_eq!(
+                route(&req("GET", &elsewhere, HERE), &f).status,
+                404,
+                "{path}"
+            );
+        }
+        let opened = route(&req("GET", &format!("/api/opened?root={enc}"), HERE), &f);
+        assert!(String::from_utf8_lossy(&opened.body).contains("\"loaded\""));
+        assert!(String::from_utf8_lossy(&hello.body).contains("\"computer\":\"studio\""));
+    }
+
+    /// Not a test: serves a taskbag and a built web interface for a person or agent to look at,
+    /// as the desktop app would with that taskbag open (Task-A04-02-03). Pairing requests are
+    /// approved at once and their code printed. `ALLOMOS_LAN_LOOK_ROOT=<taskbag>
+    /// ALLOMOS_LAN_LOOK_DIST=apps/web/dist cargo test -p allomos-desktop serve_for_a_look --
+    /// --ignored --nocapture`, for `ALLOMOS_LAN_LOOK_SECS` seconds (default 600).
+    #[test]
+    #[ignore]
+    fn serve_for_a_look() {
+        struct Disk {
+            dist: PathBuf,
+            root: PathBuf,
+            pairing: crate::pairing::Pairing,
+        }
+        impl Source for Disk {
+            fn asset(&self, path: &str) -> Option<(Vec<u8>, String)> {
+                let bytes = std::fs::read(self.dist.join(path)).ok()?;
+                let kind = match path.rsplit('.').next() {
+                    Some("html") => "text/html",
+                    Some("js") => "text/javascript",
+                    Some("css") => "text/css",
+                    Some("svg") => "image/svg+xml",
+                    Some("png") => "image/png",
+                    _ => "application/octet-stream",
+                };
+                Some((bytes, kind.into()))
+            }
+            fn open_taskbags(&self) -> Vec<PathBuf> {
+                vec![self.root.clone()]
+            }
+            fn pairing(&self) -> &crate::pairing::Pairing {
+                &self.pairing
+            }
+            fn pairing_changed(&self) {
+                for ask in self.pairing.view().asking {
+                    if ask.code.is_none() {
+                        self.pairing.answer(&ask.id, true);
+                    }
+                }
+                for ask in self.pairing.view().asking {
+                    println!("pairing code for {}: {:?}", ask.name, ask.code);
+                }
+            }
+            fn paired(&self, device: &crate::pairing::Device) {
+                println!("paired {}", device.name);
+            }
+        }
+        let env = |k: &str| std::env::var(k).ok();
+        let (Some(root), Some(dist)) = (env("ALLOMOS_LAN_LOOK_ROOT"), env("ALLOMOS_LAN_LOOK_DIST"))
+        else {
+            return;
+        };
+        let secs = env("ALLOMOS_LAN_LOOK_SECS")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(600);
+        let id = identity(&tmp("look")).unwrap();
+        let source = Arc::new(Disk {
+            dist: dist.into(),
+            root: root.into(),
+            pairing: crate::pairing::Pairing::load(None),
+        });
+        let server = start(DEFAULT_PORT, &id, source).unwrap();
+        println!("serving on https://127.0.0.1:{}", server.port);
+        std::thread::sleep(Duration::from_secs(secs));
     }
 
     #[test]

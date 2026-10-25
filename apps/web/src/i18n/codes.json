@@ -68,6 +68,9 @@
     "count",
     "tasks"
   ],
+  "companion_no_app": [],
+  "companion_not_open": [],
+  "companion_read_only": [],
   "confirm_declined": [],
   "confirm_timeout": [
     "seconds"

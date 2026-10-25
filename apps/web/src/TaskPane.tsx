@@ -510,6 +510,11 @@ export function TaskPane({
   return (
     <aside className="task-pane" ref={ref} aria-label={t("pane.label_aria", { id: task.id })}>
       <header className="pane-head">
+        {/* The narrow layout (under about 900 px, a phone): the pane fills the screen, and this
+            arrow leads back to the list (Task-A04-02-03). */}
+        <button type="button" className="back" onClick={onClose} title={t("pane.back")} aria-label={t("pane.back")}>
+          ←
+        </button>
         {editing === "title" ? (
           editor("title")
         ) : (

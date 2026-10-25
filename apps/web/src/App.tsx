@@ -126,7 +126,16 @@ function errorNote(e: unknown): Note {
   return isProblem(e) ? { problem: e } : { key: "error.unexpected", params: { detail: String(e) } };
 }
 
-export function App({ messenger }: { messenger: Messenger }) {
+/** The companion page in a phone's or another computer's browser (Task-A04-02-03): the taskbag
+ * the desktop app shows, read through its local server, and the computer's name. */
+export interface Companion {
+  root: string;
+  computer: string;
+  /** Back to the list of the desktop app's open taskbags, when it has more than one. */
+  onOthers?: () => void;
+}
+
+export function App({ messenger, companion }: { messenger: Messenger; companion?: Companion }) {
   const { t, problem, language } = useI18n();
   const [opened, setOpened] = useState<Opened | null>(null);
   const openedRef = useRef(opened);
@@ -275,8 +284,9 @@ export function App({ messenger }: { messenger: Messenger }) {
   const root0 = opened?.root;
   const taskCount = opened?.loaded.taskbag?.tasks.length;
   useEffect(() => {
-    if (root0) void refreshSetup(root0);
-  }, [root0, taskCount, openings, refreshSetup]);
+    // The browser cannot set anything up: that is done on the computer.
+    if (root0 && !companion) void refreshSetup(root0);
+  }, [root0, taskCount, openings, refreshSetup, companion]);
   useEffect(() => {
     if (!opened || !setup || wizard) return;
     const at = directStep(setup, skipped);
@@ -356,6 +366,14 @@ export function App({ messenger }: { messenger: Messenger }) {
   // from New window… starts on the start page (Task-A01-27); one from File → Open Recent opens
   // that folder (A01-deck174).
   useEffect(() => {
+    // The companion page shows the taskbag it was given, nothing else.
+    if (companion) {
+      void messenger.openTaskbag(companion.root).then(
+        (o) => show(o, null),
+        (e) => setError(errorNote(e)),
+      );
+      return;
+    }
     if (NEW_WINDOW) return;
     if (OPEN_FOLDER) {
       // A folder that is gone shows the usual message, and leaves Open Recent.
@@ -398,7 +416,7 @@ export function App({ messenger }: { messenger: Messenger }) {
       }
       if (start) await openFolder(start);
     })();
-  }, [messenger, openFolder, changeRecent]);
+  }, [messenger, openFolder, changeRecent, companion, show]);
 
   // The menu is shared by every window: the window in front sets Connect with the Agents… and
   // Open Recent (which other windows may have changed) whenever it comes forward.
@@ -513,6 +531,13 @@ export function App({ messenger }: { messenger: Messenger }) {
                 Finder moved into the settings' General section. */}
             <div className="where-name">
               <strong>{opened.loaded.taskbag.project.name}</strong>
+              {companion ? (
+                companion.onOthers && (
+                  <button type="button" className="link reveal" onClick={companion.onOthers}>
+                    {t("companion.other_taskbags")}
+                  </button>
+                )
+              ) : (
               <button type="button" className="link reveal settings-link" onClick={() => setSettingsShown(true)}>
                 <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
                   <path
@@ -522,14 +547,20 @@ export function App({ messenger }: { messenger: Messenger }) {
                 </svg>
                 {t("top.settings")}
               </button>
+              )}
             </div>
-            {/* Whether the AI agents are told about this project (owner, 2026-10-10), on its own row. */}
+            {/* Whether the AI agents are told about this project (owner, 2026-10-10), on its own row;
+                in a browser, which computer the data comes from instead (R68). */}
             <div className="where-row">
-              <AgentLine
-                messenger={messenger}
-                root={opened.root}
-                onTell={() => openWizard({ resume: { root: opened.root, at: 4 } })}
-              />
+              {companion ? (
+                <span className="muted small">{t("companion.from", { computer: companion.computer || "—" })}</span>
+              ) : (
+                <AgentLine
+                  messenger={messenger}
+                  root={opened.root}
+                  onTell={() => openWizard({ resume: { root: opened.root, at: 4 } })}
+                />
+              )}
             </div>
           </div>
         )}
@@ -537,7 +568,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         {/* With nothing open, the welcome page's Start button is the only way in (and Build a new
             app…, Task-A03-25-02). New window… opens
             another window on the start page (owner, 2026-10-12). */}
-        {opened && (
+        {opened && !companion && (
           <button type="button" className="primary" onClick={() => void messenger.newWindow().catch((e) => setError(errorNote(e)))}>
             {t("top.new_window")}
           </button>
@@ -545,8 +576,8 @@ export function App({ messenger }: { messenger: Messenger }) {
       </header>
 
       <main className="main">
-        <UpdateOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />
-        <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />
+        {!companion && <UpdateOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
+        {!companion && <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
         {error && (
           <Banner kind="error" onClose={() => setError(null)}>
             {noteText(error)}
@@ -559,7 +590,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         ))}
         {/* Every reason the taskbag needs updating, in one banner with one Update the
             taskbag… button (Task-A03-train969). */}
-        {opened && (
+        {opened && !companion && (
           <UpdateTaskbagNotice
             messenger={messenger}
             root={opened.root}
@@ -585,7 +616,8 @@ export function App({ messenger }: { messenger: Messenger }) {
             }}
           />
         )}
-        {!opened && (
+        {!opened && companion && <p className="muted">{t("companion.connecting")}</p>}
+        {!opened && !companion && (
           <Welcome
             onOpen={() => openWizard({})}
             onBuild={() => setBuilding(true)}
@@ -689,11 +721,11 @@ export function App({ messenger }: { messenger: Messenger }) {
 
         {/* What an agent reports with `alm progress` while it works (Task-A05-08); before the
             questions, so a question shows on top. */}
-        {opened && <ProgressDialog messenger={messenger} project={projectFolder(opened.root)} root={opened.root} />}
+        {opened && !companion && <ProgressDialog messenger={messenger} project={projectFolder(opened.root)} root={opened.root} />}
 
         {/* Questions an agent asks with `alm confirm` about the folder this window shows (Task-A05-02). */}
         {/* `alm confirm` asks about the folder holding `.allomos/`, where its --taskbag points. */}
-        {opened && (
+        {opened && !companion && (
           <ConfirmDialog
             messenger={messenger}
             project={projectFolder(opened.root)}

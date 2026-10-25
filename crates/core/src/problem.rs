@@ -187,6 +187,13 @@ problems! {
     AgentNotFound { agent } => "agent_not_found", "The AI agent {agent} was not found on this computer. Look for agents again.";
     /// `alm confirm`: the person chose Cancel in the app (Task-A05-02).
     ConfirmDeclined => "confirm_declined", "The person chose Cancel in Allomos, so nothing should change.";
+    /// Task-A04-02-03: on a phone or another computer's browser, a change or something only the
+    /// computer itself can do (changes from there come with A04-02-04).
+    CompanionReadOnly => "companion_read_only", "This cannot be done from this device yet: do it in the Allomos desktop app on the computer.";
+    /// The companion page cannot reach the desktop app (closed, or Devices on Your Network off).
+    CompanionNoApp => "companion_no_app", "Cannot reach the Allomos desktop app.";
+    /// The taskbag's window was closed in the desktop app.
+    CompanionNotOpen => "companion_not_open", "The desktop app no longer has this taskbag open.";
     /// `alm confirm`: no answer came in time.
     ConfirmTimeout { seconds } => "confirm_timeout", "No answer came from the Allomos app within {seconds} seconds, so nothing should change. Open the project folder in the app and ask again.";
     /// The app was asked to answer a question that is no longer waiting.
