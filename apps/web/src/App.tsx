@@ -584,10 +584,26 @@ export function App({ messenger }: { messenger: Messenger }) {
         {lanShown && <LanDialog messenger={messenger} onClose={() => setLanShown(false)} />}
         {settingsShown && opened?.loaded.taskbag && (
           <TaskbagSettings
+            messenger={messenger}
             name={opened.loaded.taskbag.project.name}
+            format={opened.loaded.taskbag.project.format}
             root={opened.root}
             fileManagerKey={FILE_MANAGER_KEY}
             onShowInFileManager={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
+            onRename={async (name) => {
+              const root = opened.root;
+              await messenger.renameProject(root, name);
+              // Read again, so the header and the title show the new name now.
+              const stamp = await messenger.taskbagStamp(root).catch(() => null);
+              const fresh = await messenger.openTaskbag(root);
+              if (openedRef.current?.root !== root) return;
+              setOpened(fresh);
+              if (stamp !== null) stampRef.current = stamp;
+            }}
+            onUpdate={() => {
+              setSettingsShown(false);
+              void openTasksIn();
+            }}
             onClose={() => setSettingsShown(false)}
           />
         )}

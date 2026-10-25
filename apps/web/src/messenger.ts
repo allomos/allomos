@@ -118,6 +118,8 @@ export interface Messenger {
   /** The taskbag's format compared with this Allomos's, connected or not. */
   taskbagFormat(root: string): Promise<{ format: FormatState; current: string }>;
   /** The project's handoff rules (Task-A03-06). */
+  /** Renames the project, as `alm project --name` (Task-A05-chalk937); resolves to the saved name. */
+  renameProject(root: string, name: string): Promise<string>;
   handoffSettings(root: string): Promise<HandoffSettings>;
   /** Changes the project's handoff rules, or one agent's override; resolves to the settings as saved. Rejects with a Problem. */
   setHandoffRules(
@@ -342,6 +344,7 @@ export const desktopMessenger: Messenger = {
   changeIteration: (root, id, change) => invoke<Iteration>("change_iteration", { root, id, change }),
   deleteArea: (root, id) => invoke<void>("delete_area", { root, id }),
   deleteIteration: (root, id) => invoke<void>("delete_iteration", { root, id }),
+  renameProject: (root, name) => invoke<string>("rename_project", { root, name }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
   progressReports: (project) => invoke<Progress[]>("progress_reports", { project }),

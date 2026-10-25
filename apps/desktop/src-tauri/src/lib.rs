@@ -942,6 +942,26 @@ fn handoff_settings_of(root: &Path) -> Result<HandoffSettings, Problem> {
     })
 }
 
+/// Rename the project, as `alm project --name` does (Task-A05-camera758's settings, General;
+/// Task-A05-chalk937). The ID stays. Returns the name as saved.
+#[tauri::command]
+fn rename_project(root: PathBuf, name: String) -> Result<String, Problem> {
+    let lock = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let project = allomos_core::ops::rename_project(&bag, Some(&name), None)?;
+    let event = allomos_store::Actor::APP.event(
+        "project",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        allomos_core::event::changes(Some(&bag.project), &project, &[]),
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
+    Ok(project.name)
+}
+
 #[tauri::command]
 fn handoff_settings(root: PathBuf) -> Result<HandoffSettings, Problem> {
     handoff_settings_of(&root)
@@ -2121,6 +2141,7 @@ pub fn run() {
             set_handoff_rules,
             lan_status,
             set_lan_viewing,
+            rename_project,
             lan_pairing,
             answer_pairing,
             remove_paired_device,

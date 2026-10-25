@@ -83,6 +83,11 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .settings-sections button.chosen { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
 .settings-section { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; }
 .settings-section h3 { margin: 0; font-size: 14px; }
+.settings-section h3:not(:first-child) { margin-top: 8px; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; min-width: 0; max-width: 100%; }
+.settings-row input { min-width: 0; flex: 1 1 200px; }
+.settings-row .banner { flex-basis: 100%; margin: 0; }
+.settings-value { overflow-wrap: anywhere; }
 .settings-location { color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 520px) { .settings-body { grid-template-columns: 1fr; } .settings-sections { grid-auto-flow: column; justify-content: start; } }
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
