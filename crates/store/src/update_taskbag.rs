@@ -85,7 +85,10 @@ fn update_request(language: &str, project: &Path, taskbag: &Path) -> String {
     let no_tasks = crate::load(taskbag)
         .taskbag
         .is_some_and(|bag| bag.tasks.is_empty());
+    // The upgrade first (Task-A05-fish286): the other jobs then run against the newer format.
+    let upgrade = versions::upgradable(taskbag);
     let parts: Vec<String> = [
+        upgrade.map(|found| versions::agent_upgrade_request_in(language, project, taskbag, &found)),
         section.map(|c| versions::agent_update_request_in(language, project, taskbag, &c)),
         cards.then(|| cards::agent_move_cards_request_in(language, project, taskbag)),
         (!handoffs.is_empty()).then(|| {

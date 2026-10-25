@@ -141,6 +141,10 @@ pub struct VersionCheck {
     /// The instruction files that hold Allomos's section (a `CLAUDE.md` that only imports
     /// `@AGENTS.md` is not listed: it follows `AGENTS.md`).
     pub sections: Vec<SectionState>,
+    /// A taskbag this Allomos still reads as it is but could upgrade (`allomos/5` → `allomos/6`,
+    /// Task-A05-fish286): the format it is in. Upgraded only when the person asks, through
+    /// Update the Taskbag… (approver, 2026-10-25).
+    pub upgrade: Option<String>,
 }
 
 impl VersionCheck {
@@ -155,7 +159,7 @@ impl VersionCheck {
 
     /// Whether the running agent has something to do: tasks to move in, or the section to renew.
     pub fn needs_update(&self) -> bool {
-        self.move_in.is_some() || !self.outdated_files().is_empty()
+        self.move_in.is_some() || self.upgrade.is_some() || !self.outdated_files().is_empty()
     }
 
     /// The warning `alm` adds when the section is out of date.
@@ -415,7 +419,17 @@ pub fn check(root: &Path, project: &Path) -> VersionCheck {
         format: format_state(root),
         move_in: move_in(root),
         sections,
+        upgrade: upgradable(root),
     }
+}
+
+/// The format of a taskbag this Allomos reads as it is but writes newer (`allomos/5` today), so
+/// Update the Taskbag… offers the upgrade (Task-A05-fish286); `None` otherwise.
+pub fn upgradable(root: &Path) -> Option<String> {
+    let found = read_format(root)?;
+    format_version(&found)
+        .filter(|n| (allomos_core::READ_FROM..FORMAT_VERSION).contains(n))
+        .map(|_| found)
 }
 
 /// The project folder of the taskbag at `root`: the one recorded in `project.json` (read without
@@ -471,7 +485,10 @@ pub(crate) fn normalize(path: &Path) -> std::path::PathBuf {
 pub fn check_connected(root: &Path) -> Option<VersionCheck> {
     match connected_project(root) {
         Some(project) => Some(check(root, &project)),
-        None => move_in(root).map(|_| check(root, &project_folder(root))),
+        // An older taskbag to move in, or one to upgrade, is offered even before an agent is
+        // connected.
+        None => (move_in(root).is_some() || upgradable(root).is_some())
+            .then(|| check(root, &project_folder(root))),
     }
 }
 
@@ -549,6 +566,58 @@ pub fn agent_update_request_in(
     let mut out = format!(
         "{}\n\n{}: {}\n{}: {}\n\n",
         w.title,
+        w.project,
+        shown(project),
+        w.taskbag,
+        shown(taskbag)
+    );
+    for (i, s) in steps.iter().enumerate() {
+        out.push_str(&format!("{}. {s}\n", i + 1));
+    }
+    out
+}
+
+/// The part of Update the Taskbag…'s request that upgrades an `allomos/5` taskbag to
+/// `allomos/6` (Task-A05-fish286), in the request's language. The agent shows the plan first
+/// (`alm confirm`), saying what changes and that older Allomos versions will then refuse the
+/// taskbag; it upgrades only after the person chooses Go ahead (approver, 2026-10-25: option B).
+pub fn agent_upgrade_request_in(language: &str, project: &Path, taskbag: &Path, found: &str) -> String {
+    let alm = format!("alm --taskbag \"{}\"", shown(taskbag));
+    let (title, steps): (String, Vec<String>) = match language {
+        "zh-CN" => (
+            format!("这个任务包是 {found}，请把它升级到 {FORMAT}（项目文件夹和任务所属的文件夹需要它）。"),
+            vec![
+                format!("先运行 `alm --version`：它必须是安装好的最新版「换肩」（能识别 `{alm} upgrade`）。否则停下，请用户先安装最新的「换肩」。"),
+                format!("`{alm} progress --title \"更新任务包\" --step \"升级到 {FORMAT}\"`，让用户看到正在做什么。"),
+                format!("运行 `{alm} upgrade`（不加 --confirm），它只说明会做什么。把这些写进计划，并写明：升级后，较旧版本的「换肩」（应用、alm，以及使用它们的每个智能体会话）都会拒绝这个任务包，直到装上最新版。用 `{alm} confirm` 给用户看这份计划。"),
+                format!("用户选择“继续”后：`{alm} upgrade --confirm`，然后按 alm 列出的文件保存并共享任务包的改动。"),
+                "汇报做了什么，以及 project.json 现在的格式。".to_string(),
+            ],
+        ),
+        "ja" => (
+            format!("このタスクバッグは {found} です。{FORMAT} にアップグレードしてください（プロジェクトフォルダとタスクのフォルダに必要です）。"),
+            vec![
+                format!("まず `alm --version` を実行します。入っているのは最新の「肩代」（`{alm} upgrade` を知っているもの）でなければなりません。そうでなければ止まり、先に最新の「肩代」を入れるようユーザーに頼んでください。"),
+                format!("`{alm} progress --title \"タスクバッグを更新\" --step \"{FORMAT} にアップグレード\"` で、何をしているかをユーザーに見せます。"),
+                format!("`{alm} upgrade`（--confirm なし）を実行すると、何をするかだけを説明します。それを計画に書き、アップグレード後は古い「肩代」（アプリ、alm、それらを使うすべてのエージェントのセッション）が最新版を入れるまでこのタスクバッグを開けなくなることも書きます。`{alm} confirm` でこの計画をユーザーに見せます。"),
+                format!("ユーザーが「進める」を選んだら：`{alm} upgrade --confirm`。そのあと alm が挙げるファイルでタスクバッグの変更を保存・共有します。"),
+                "何をしたかと、project.json の今の形式を報告してください。".to_string(),
+            ],
+        ),
+        _ => (
+            format!("This taskbag is in {found}. Please upgrade it to {FORMAT} (project folders and task folders need it)."),
+            vec![
+                format!("First run `alm --version`: it must be the newest Allomos installed (one that knows `{alm} upgrade`). If not, stop and ask the person to install the newest Allomos first."),
+                format!("`{alm} progress --title \"Update the taskbag\" --step \"Upgrading to {FORMAT}\"`, so the person sees what is happening."),
+                format!("Run `{alm} upgrade` (without --confirm): it only says what it will do. Put that in your plan, and say that after the upgrade older Allomos versions (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Show the plan with `{alm} confirm`."),
+                format!("Once the person chooses Go ahead: `{alm} upgrade --confirm`, then save and share the taskbag's changes with the files alm lists."),
+                "Report what you did and the format project.json is in now.".to_string(),
+            ],
+        ),
+    };
+    let w = phrases(language);
+    let mut out = format!(
+        "{title}\n\n{}: {}\n{}: {}\n\n",
         w.project,
         shown(project),
         w.taskbag,
