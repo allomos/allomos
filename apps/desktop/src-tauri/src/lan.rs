@@ -561,6 +561,15 @@ fn serve(
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
     if length > MAX_BODY {
+        // Read what was sent (up to a cap) before answering, so the client is still listening
+        // and sees the 413 instead of a dropped connection.
+        let mut left = length.min(4 * MAX_BODY).saturating_sub(body.len());
+        while left > 0 {
+            match tls.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => left = left.saturating_sub(n),
+            }
+        }
         return answer(
             &mut tls,
             &Response::json(413, &serde_json::json!({ "error": "too_large" })),
