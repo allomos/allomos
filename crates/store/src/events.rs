@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use allomos_core::event::{Change, Event, Kind};
-use allomos_core::{Issue, Problem, parse_event};
+use allomos_core::{Issue, Problem, event_notes, parse_event};
 use serde::Serialize;
 
 use crate::{json_text, sorted_entries, write_atomic, write_failed};
@@ -53,6 +53,7 @@ impl<'a> Actor<'a> {
             _ => (None, None),
         };
         Event {
+            extra: Default::default(),
             at: now().0,
             by: self.by.map(String::from),
             via: self.via.to_string(),
@@ -170,11 +171,13 @@ pub fn list(root: &Path) -> (Vec<Event>, Vec<Issue>) {
 pub const PACK_EXT: &str = "events";
 
 /// One line of a packed month: an event and the name of the single file it came from.
+/// Fields it does not know are kept, as in every taskbag file (Task-A01-piano403).
 #[derive(Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 struct PackLine {
     file: String,
     event: Event,
+    #[serde(flatten)]
+    extra: allomos_core::Extra,
 }
 
 /// The events in a month's packed file, each with its original file (`events/<name>.json`), and
@@ -202,7 +205,22 @@ fn read_pack(path: &Path, issues: &mut Vec<Issue>) -> Vec<(String, Event)> {
         .filter(|(_, l)| !l.trim().is_empty())
     {
         match serde_json::from_str::<PackLine>(line) {
-            Ok(p) => out.push((format!("{EVENTS_DIR}/{}", p.file), p.event)),
+            Ok(mut p) => {
+                let at = format!("{file}:{}", n + 1);
+                if p.event.kind.is_unknown() {
+                    if let Some(v) = serde_json::from_str::<serde_json::Value>(line)
+                        .ok()
+                        .and_then(|v| v.get("event")?.get("kind").cloned())
+                    {
+                        p.event.extra.insert("kind".into(), v);
+                    }
+                }
+                issues.extend(event_notes(&at, &p.event));
+                let mut line_notes = Vec::new();
+                allomos_core::unknown_notes(&at, "", &p.extra, &[], &mut line_notes);
+                issues.extend(line_notes);
+                out.push((format!("{EVENTS_DIR}/{}", p.file), p.event))
+            }
             Err(e) => issues.push(Issue::new(
                 &format!("{file}:{}", n + 1),
                 None,
@@ -295,6 +313,7 @@ pub(crate) fn pack(root: &Path) -> Result<Vec<Packed>, Problem> {
             let line = PackLine {
                 file: file.clone(),
                 event: event.clone(),
+                extra: Default::default(),
             };
             text.push_str(&serde_json::to_string(&line).expect("events serialize"));
             text.push('\n');
@@ -342,6 +361,7 @@ pub fn list_with_files(root: &Path) -> (Vec<(String, Event)>, Vec<Issue>) {
         match crate::read_text(&path) {
             Ok(text) => match parse_event(&file, &text) {
                 Ok(e) => {
+                    issues.extend(event_notes(&file, &e));
                     seen.insert(file.clone());
                     events.push((file, e));
                 }
@@ -454,6 +474,7 @@ pub fn unshared_app_changes(root: &Path) -> AppChanges {
             Kind::Area => vec![format!("areas/{id}.json")],
             Kind::Iteration => vec![format!("iterations/{id}.json")],
             Kind::Project => vec!["project.json".to_string()],
+            Kind::Unknown => Vec::new(),
         };
         for f in item {
             // A file the app removed (a deleted area or iteration, an emptied description) is
@@ -466,7 +487,7 @@ pub fn unshared_app_changes(root: &Path) -> AppChanges {
                             .iter()
                             .any(|c| c.field == "description" && c.from.is_some() && c.to.is_none())
                 }
-                Kind::Project => false,
+                Kind::Project | Kind::Unknown => false,
             };
             if removed || root.join(&f).is_file() {
                 files.insert(f);
@@ -588,6 +609,7 @@ mod tests {
         changed: bool,
     ) -> Event {
         Event {
+            extra: Default::default(),
             at: at.into(),
             by: Some("s".into()),
             via: "alm".into(),
@@ -598,6 +620,7 @@ mod tests {
             tool: tool.map(String::from),
             changes: if changed {
                 vec![Change {
+                    extra: Default::default(),
                     field: "label".into(),
                     from: None,
                     to: Some("implemented".into()),

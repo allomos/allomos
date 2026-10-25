@@ -57,7 +57,7 @@ Allomos never creates a Git repository inside a taskbag; the surrounding reposit
 | `id` | yes | Project ID: 1–64 letters, digits, `-` or `_`. |
 | `name` | yes | Display name. |
 | `labels` | no | The progress ladder, lowest step first. Default: `implemented`, `locally verified`, `deployed and verified`, `human verified` (`owner verified` before `allomos/4`; an existing ladder is renamed only when the person agrees, with `alm rename label`). The top step is the **human check**. Changed with `alm labels`. |
-| `project_folder` | no | The project folder (code, `AGENTS.md`, `CLAUDE.md`), relative to the folder holding `.allomos/` (`"."` for that folder, `"../app"` for a sibling), or absolute when no relative path exists. Written by the app ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)). Older `alm` builds refuse a taskbag that has it (`field_unknown`): reinstall `alm`. |
+| `project_folder` | no | The project folder (code, `AGENTS.md`, `CLAUDE.md`), relative to the folder holding `.allomos/` (`"."` for that folder, `"../app"` for a sibling), or absolute when no relative path exists. Written by the app ([OPEN-FOLDER-FLOW](./OPEN-FOLDER-FLOW.md)). Older `alm` builds refuse a taskbag that has it (`field_unknown`): reinstall `alm`. (Builds since `A01-piano403` read past a field they do not know.) |
 | `task_language` | no | The language new and changed tasks are written in: `"ui"` (follow the language the Allomos app shows; the default, also when the field is missing) or a language code such as `"zh-CN"`. Read and set with `alm task-language`. The app saves its interface language in Allomos's per-user settings (`settings.json` in `~/Library/Application Support/io.allomos` on macOS), outside the taskbag (task `A01-21`). |
 
 - `handoff` (no, `allomos/2`): when a handoff must be written (task `A03-06`). Every field is optional and missing ones take their defaults: `quota_gate` (percentage of the 5-hour quota left; default 3), `context_gate` (percentage of context used; default 90), `write_when` (text; default "after every meaningful step: a task finished, a finding, a commit, a process started or stopped"), and `overrides`: an agent's or account's own `quota_gate` / `context_gate`, by name (`codex`, `claude/work`); a holder `codex/a01-03` gets the override `codex`. Gates are whole numbers from 0 to 100 (`invalid_percent`). Changed with `alm handoff-rules` or the app's Handoff settings.
@@ -119,7 +119,7 @@ Added by task `A01-17` (R7). Every change Allomos makes to a task, an area, an i
 - **Not events:** reading.
 - **One-time numbers** (task `A01-58`): a change made with `alm --request-id <id>` adds one more change to each event it writes, named `request_id`, whose `to` is `{"id": "<id>", "input": "<fingerprint of the command's words and who ran it>"}`. When the same number comes again, `alm` finds these events and returns the first result instead of changing anything; the same number with another input is refused (`request_reused`). The number is kept as long as the history; a task's history leaves it out. Like the branches it lives in the events alone, so the format stays `allomos/4` and an older Allomos reads these events like any other.
 - **Packed months** (task `A01-59`, approver 2026-10-20): so `events/` does not grow by one file per change forever, `alm` packs the history by itself during any command it runs from the 28th of a month (UTC): every earlier month whose changes are still single files gets one file, `events/<yyyy-mm>.events` (for example `events/2026-09.events`), and those single files are removed. Each line of it is one change, `{"file": "<the single file's name>", "event": {…}}`, in file-name order, so the same changes give the same file on every computer and two computers packing the same month do not conflict. A single file of an already packed month that arrives later is taken in on the next packing. Readers read the packed files and the single files together, each change under its original file name, so the history shows the same as before. The command says what it packed and prints the Git commands that share the packed file and the removed single files. An older Allomos reads only `.json` files in `events/`: it skips the packed months without an error, and until it is updated it shows only the history not packed yet.
-- **Unknown fields are ignored in events** (task `A01-55`, approver 2026-10-19), unlike in every other file. Events are written only by `alm` and the app, never by hand, so a field this Allomos does not know was added by a newer one; ignoring it keeps that change in the history. Builds before `A01-55` refuse such an event instead.
+- **Unknown fields are read past in events** (task `A01-55`, approver 2026-10-19) and, unlike in the other files, not listed: events are written only by `alm` and the app, never by hand, so a field this Allomos does not know was added by a newer one; reading past it keeps that change in the history. Since `A01-piano403` they are also kept when a month is packed, and a `kind` this Allomos does not know is read (the event belongs to no task, area or iteration it knows) and listed as `value_unknown`. Builds before `A01-55` refuse such an event instead.
 - **Checks.** An event file that is not valid JSON, misses a required field or has a value of the wrong kind is reported for that file (`alm history --json` → `issues`) and left out; other events still show.
 
 ## `areas/<id>.json`
@@ -144,7 +144,7 @@ An **iteration** is *when* tasks are planned: a time-box that ends in a release 
 | `release` | no | The release it produces, e.g. `v0.2`. |
 | `state` | no (`allomos/5`) | `planned` (the default, also when the field is missing; not written), `active` or `closed` (approver, 2026-10-22; task `A01-root343`). **At most one iteration is active**: `alm change iteration <id> --state active` (or the app's Edit form) is refused (`iteration_active_already`) while another is, and a second one written by hand is reported (`second_active_iteration`). Only a person or an agent sets it; nothing infers it from dates or progress. A new task goes into the active iteration (`alm add task`, unless `--iteration` names another); `alm next` lists the active iteration's tasks first and, once all of them are done or dropped, suggests closing it and making the next planned one active, changing nothing itself. Closing an iteration with unfinished tasks lists them and moves none. |
 
-Unknown fields in an iteration file are read past, not refused (since `allomos/5`), so a later optional field there needs no new format.
+Unknown fields in an iteration file are read past, not refused (since `allomos/5`), as in every file since `A01-piano403` ([§ Fields and values this Allomos does not know](#fields-and-values-this-allomos-does-not-know)). A `state` this Allomos does not know is kept, listed as `value_unknown`, and not changed (`state_unknown`).
 
 ## `tasks/<id>/task.json`
 
@@ -165,7 +165,17 @@ Unknown fields in an iteration file are read past, not refused (since `allomos/5
 | `without_human_check` | no (`allomos/4`) | Why the task was finished without the human check: the work is finished and only a person's hands-on check is left, in quiet and normal run mode alike (task `A03-31`). Written by `alm done <id> --without-human-check "<text>"` (the old flag `--without-owner` still works); empty text is refused (`without_human_check_missing`). While a `done` task has it, the task is **to check**: `alm human` lists it and the app shows "Not human-checked". Marking it checked (`alm checked <id>`, the app's **Checked** button, or the top label set on the done task) clears it together with `human_check_steps`; the task's history keeps both. `alm` records what the agent says; it does not check the run mode, nor whether only the human check is left (task `A03-15`, task `A03-18`, task `A03-31`). |
 | `human_check_steps` | no (`allomos/4`) | How a person checks the task, in Markdown: the test folder, what to open, what to click, what they should see. Written with `alm done <id> --without-human-check "<why>" --steps <file.md>` (an empty file is refused, `human_check_steps_empty`); without it, `alm done` warns `human_check_steps_missing` and shows how to write them, but does not refuse. Shown in the task pane and by `alm show` / `alm human --steps`. |
 
-Empty optional fields are left out rather than written as `null`. **Unknown fields are refused**, so mistyped names are caught (in every file except events, above).
+Empty optional fields are left out rather than written as `null`.
+
+### Fields and values this Allomos does not know
+
+Task `A01-piano403` (approver, 2026-10-25), so a newer Allomos can add a field or a value without breaking an older one:
+
+- **A field this Allomos does not know**, in `project.json` (also inside `handoff` and its `overrides`), an area, an iteration, a task, or a line of a packed month: the file is read as usual, and the field is listed as a reminder, not an error (`field_unknown`, with the field's name: a newer Allomos may have added it, or its name is mistyped). Events read past their unknown fields without listing them (above).
+- **Written back unchanged:** when this Allomos rewrites the file (for example to change a task's state), the unknown fields stay in it as they were.
+- **A value this Allomos does not know** for a task's or an iteration's `state`, or an event's `kind`: the item is shown with its value, listed as `value_unknown`, and this Allomos does not change that field; a command that would (`alm claim`, `ready`, `done`, the app's state menu, …) is refused with `state_unknown`. Other changes (a note, the description) keep the value. A value that is not a word in quotes at all is refused (`invalid_choice`).
+- **Missing areas, iterations and blocking tasks, and labels not on the ladder** are listed as before (below); the task still shows.
+- **The format number goes up only for a change that would make an older Allomos go wrong** ([§ Format versions](#format-versions)): a file renamed or moved, or an existing field whose meaning changes. A new optional field or a new value does not change it.
 
 ## `tasks/<id>/description.md`
 
@@ -193,7 +203,7 @@ Owner's choice A, 2026-10-06 (task `A01-03`).
 
 Each problem names the **file** and, where it can, the **field**, with a plain explanation. Valid tasks still show when other files have problems.
 
-- **Within one file:** valid JSON; required fields present; no unknown fields; valid IDs; a known `state`; the right `format`.
+- **Within one file:** valid JSON; required fields present; valid IDs; the right `format`. Unknown fields and values are listed as reminders and kept ([§ Fields and values this Allomos does not know](#fields-and-values-this-allomos-does-not-know)).
 - **Across files:**
   - area IDs and task IDs are unique;
   - iteration IDs are unique;
@@ -205,7 +215,7 @@ Each problem names the **file** and, where it can, the **field**, with a plain e
 
 ## Format versions
 
-Added by task `A01-25`. Allomos reads `format` before anything else in `project.json`, because a newer taskbag may have fields this Allomos does not know.
+Added by task `A01-25`. Allomos reads `format` before anything else in `project.json`, because a newer taskbag may have fields this Allomos does not know. Since task `A01-piano403` (approver, 2026-10-25) the number goes up **only** for a change an older Allomos would get wrong: a file renamed or moved, or an existing field whose meaning changes. New optional fields and new values do not raise it: an older Allomos reads past them and keeps them.
 
 - **Newer** than this Allomos (`allomos/6` read by an Allomos that writes `allomos/5`): nothing is read or written. `alm` stops with `taskbag_newer` (exit code 4) and tells the agent to let the person choose: update Allomos now, or let the agent go on working with the files from its own understanding of the newer format. The app shows the problem ("update Allomos now").
 - **Older**, in **any** format below this Allomos's (today `allomos/1` to `/4`; `allomos/4` taskbags are moved in once for the iteration state, approver 2026-10-22, task `A01-root343`): nothing is read or written, and no format is "too old" (owner, 2026-10-15, task `A01-45`). Every `alm` command except `init`, `brief`, `guide`, `confirm` and `move-in` stops with `taskbag_to_move_in` (exit code 1), which says the taskbag must be moved in from the app, or with the request `alm move-in` prints.
@@ -221,4 +231,4 @@ Allomos's section in a project's `AGENTS.md` / `CLAUDE.md` carries a version too
 
 ## Not yet in this version
 
-**Older Allomos versions** refuse a task with an `iteration` field (`field_unknown`), because unknown fields are refused. Update `alm` and the app before planning tasks in iterations.
+**Older Allomos versions** (before `A01-piano403`) refuse a task with an `iteration` field (`field_unknown`), because they refuse unknown fields. Update `alm` and the app before planning tasks in iterations.

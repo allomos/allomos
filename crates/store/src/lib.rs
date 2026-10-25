@@ -978,6 +978,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     fs::write(root.join(".gitignore"), GITIGNORE)?;
     fs::write(root.join(".gitattributes"), GITATTRIBUTES)?;
     let project = Project {
+        extra: Default::default(),
         format: FORMAT.to_string(),
         id: "project".to_string(),
         name: name.to_string(),
@@ -992,6 +993,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         write_json(
             &root.join("areas").join(format!("{id}.json")),
             &Area {
+                extra: Default::default(),
                 id: id.into(),
                 name: name.into(),
                 order,
@@ -1027,6 +1029,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
     for (id, title, area, state, label, description) in tasks {
         let dir = root.join("tasks").join(id);
         let task = Task {
+            extra: Default::default(),
             id: id.into(),
             title: title.into(),
             area: area.into(),
@@ -1260,6 +1263,7 @@ pub fn init_with_labels(
         });
     }
     let project = Project {
+        extra: Default::default(),
         format: FORMAT.to_string(),
         id: id.to_string(),
         name: name.to_string(),
@@ -2134,6 +2138,7 @@ pub fn record_approval(
     let (lock, bag, _) = lock_for_change(root, wait)?;
     let task = ops::find_task(&bag, id)?;
     let change = allomos_core::event::Change {
+        extra: Default::default(),
         field: APPROVAL_FIELD.to_string(),
         from: None,
         to: Some(serde_json::Value::String(format!(

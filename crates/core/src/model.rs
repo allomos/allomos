@@ -1,6 +1,15 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// Fields of a taskbag file this Allomos does not know, by name (Task-A01-piano403, approver
+/// 2026-10-25). They are read past, listed among the problems as a reminder (a newer Allomos may
+/// have added them, or the name is mistyped), and written back unchanged, so an older Allomos does
+/// not drop what a newer one wrote. A value this Allomos does not know for a fixed-choice field
+/// (a task's or iteration's `state`, an event's `kind`) is kept here too, under the field's name,
+/// while the field itself reads as `Unknown` and is not written.
+pub type Extra = BTreeMap<String, Value>;
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
@@ -22,6 +31,11 @@ pub const FORMAT: &str = "allomos/5";
 /// 5: an iteration's `state`: planned (the default, not written), active or closed; at most one
 /// active (Task-A01-root343). Iteration files no longer refuse a field they do not know, so a later
 /// optional field there needs no new format.
+///
+/// Since Task-A01-piano403 (approver, 2026-10-25) no file refuses a field or a value it does not
+/// know: they are kept and listed (see [`Extra`]). So the number goes up only for a change an older
+/// Allomos would get wrong (a file renamed or moved, an existing field's meaning changed), never for
+/// a new optional field or value.
 pub const FORMAT_VERSION: u32 = 5;
 
 /// The number in an `allomos/<n>` format identifier; `None` for anything else (for example
@@ -36,7 +50,6 @@ pub fn format_version(format: &str) -> Option<u32> {
 
 /// A project: one taskbag.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Project {
     pub format: String,
     pub id: String,
@@ -56,6 +69,9 @@ pub struct Project {
     /// When a handoff must be written (Task-A03-06). Missing: the defaults.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff: Option<HandoffRules>,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// Default quota gate: with this percentage of the 5-hour quota left, start nothing new; write the
@@ -70,7 +86,6 @@ pub const DEFAULT_WRITE_WHEN: &str = "after every meaningful step: a task finish
 /// A project's handoff rules (Task-A03-06). Every field is optional; a missing one takes its
 /// default. `overrides` give an agent or account its own gates, which win over the project's.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct HandoffRules {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quota_gate: Option<u8>,
@@ -81,16 +96,21 @@ pub struct HandoffRules {
     /// By agent or account name, for example `codex` or `claude/work`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub overrides: BTreeMap<String, Gates>,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// An agent's or account's own gates; a missing one follows the project.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Gates {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quota_gate: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_gate: Option<u8>,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// The rules that apply to one agent: the project's, with its override, and the defaults filled in.
@@ -163,18 +183,19 @@ pub fn default_labels() -> Vec<String> {
 
 /// An area: *what* part of the product a task belongs to.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Area {
     pub id: String,
     pub name: String,
     #[serde(default)]
     pub order: u32,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// An iteration: *when* tasks are planned, a time-box that ends in a release (R89).
 /// Optional for a task; a task without one is unplanned. Unknown fields are read past, not
-/// refused (approver, 2026-10-22; Task-A01-root343), so an optional field added later does not
-/// need a new format.
+/// refused (approver, 2026-10-22; Task-A01-root343), and kept in `extra` (Task-A01-piano403).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Iteration {
     pub id: String,
@@ -191,8 +212,11 @@ pub struct Iteration {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release: Option<String>,
     /// Planned, active or closed (Task-A01-root343); missing means planned.
-    #[serde(default, skip_serializing_if = "IterationState::is_planned")]
+    #[serde(default, skip_serializing_if = "IterationState::not_written")]
     pub state: IterationState,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// Where an iteration is (approver, 2026-10-22; Task-A01-root343): planned → active → closed. At
@@ -205,11 +229,20 @@ pub enum IterationState {
     Planned,
     Active,
     Closed,
+    /// A value this Allomos does not know, perhaps from a newer one; the value itself is kept in
+    /// the iteration's `extra` (Task-A01-piano403), and this Allomos does not change it.
+    #[serde(other)]
+    Unknown,
 }
 
 impl IterationState {
     pub fn is_planned(&self) -> bool {
         *self == IterationState::Planned
+    }
+
+    /// Left out of the file: planned (the default) and an unknown value, which `extra` writes.
+    pub fn not_written(&self) -> bool {
+        matches!(self, IterationState::Planned | IterationState::Unknown)
     }
 
     /// As files and commands write it: `planned`, `active`, `closed`.
@@ -218,6 +251,7 @@ impl IterationState {
             IterationState::Planned => "planned",
             IterationState::Active => "active",
             IterationState::Closed => "closed",
+            IterationState::Unknown => "unknown",
         }
     }
 
@@ -244,6 +278,10 @@ pub enum State {
     Blocked,
     Done,
     Dropped,
+    /// A value this Allomos does not know, perhaps from a newer one (Task-A01-piano403): the task
+    /// is shown with its value, kept in the task's `extra`, and this Allomos does not change it.
+    #[serde(other)]
+    Unknown,
 }
 
 impl State {
@@ -266,17 +304,22 @@ impl State {
             State::Blocked => "blocked",
             State::Done => "done",
             State::Dropped => "dropped",
+            State::Unknown => "unknown",
         }
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        *self == State::Unknown
     }
 }
 
 /// One task. `description` comes from the task's `description.md`, not from `task.json`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Task {
     pub id: String,
     pub title: String,
     pub area: String,
+    #[serde(skip_serializing_if = "State::is_unknown")]
     pub state: State,
     /// The highest step of the project's ladder this task has proven, if any.
     #[serde(default)]
@@ -314,11 +357,22 @@ pub struct Task {
     /// Cleared with the note when the task is checked.
     #[serde(default)]
     pub human_check_steps: Option<String>,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
     #[serde(default, skip_deserializing)]
     pub description: String,
 }
 
 impl Task {
+    /// The state as the file writes it: for [`State::Unknown`], the value kept in `extra`.
+    pub fn state_text(&self) -> String {
+        match (self.state, self.extra.get("state").and_then(Value::as_str)) {
+            (State::Unknown, Some(text)) => text.to_string(),
+            (state, _) => state.as_str().to_string(),
+        }
+    }
+
     /// Finished without the human check and not checked since: "To check" (Task-A03-18).
     pub fn to_check(&self) -> bool {
         self.state == State::Done && self.without_human_check.is_some()

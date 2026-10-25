@@ -95,7 +95,9 @@ export function I18nProvider({ systemLanguages, children }: { systemLanguages: (
 
   const value = useMemo<I18n>(() => {
     const words = MESSAGES[language];
-    const t = (key: Key, params?: Params) => fill(words[key] ?? en[key], params);
+    // A key no language has comes from a value this Allomos does not know, such as a task state a
+    // newer Allomos wrote (`state.parked`): show the value itself (Task-A01-piano403).
+    const t = (key: Key, params?: Params) => fill(words[key] ?? en[key] ?? key.slice(key.indexOf(".") + 1), params);
     return {
       language,
       choice,

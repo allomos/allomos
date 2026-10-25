@@ -168,6 +168,7 @@ pub fn report(
         return Ok(Vec::new());
     }
     Ok(vec![Change {
+        extra: Default::default(),
         field: OUTSIDE.to_string(),
         from: before.map(|b| Value::String(b.to_string())),
         to: to.map(Value::String),
@@ -260,12 +261,14 @@ pub fn move_in(
     let mut changes = event::changes(Some(&before), &task, event::TASK_FIELDS);
     if let Some(path) = reported {
         changes.push(Change {
+            extra: Default::default(),
             field: OUTSIDE.to_string(),
             from: Some(Value::String(path.to_string())),
             to: None,
         });
     }
     changes.push(Change {
+        extra: Default::default(),
         field: CARD.to_string(),
         from: None,
         to: Some(Value::String(FILE_NAME.to_string())),
@@ -280,6 +283,7 @@ mod tests {
 
     fn task(id: &str, state: State, holder: Option<&str>, description: &str) -> Task {
         Task {
+            extra: Default::default(),
             id: id.into(),
             title: id.into(),
             area: "A01".into(),
@@ -305,6 +309,7 @@ mod tests {
             }))
             .unwrap(),
             areas: vec![Area {
+                extra: Default::default(),
                 id: "A01".into(),
                 name: "A".into(),
                 order: 0,
@@ -316,6 +321,7 @@ mod tests {
 
     fn event(command: &str, id: &str, changes: Vec<Change>) -> Event {
         Event {
+            extra: Default::default(),
             at: "2026-10-16T10:00:00Z".into(),
             by: Some("claude/x".into()),
             via: "alm".into(),

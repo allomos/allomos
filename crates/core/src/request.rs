@@ -30,6 +30,7 @@ pub fn fingerprint(input: &str) -> String {
 /// (a [`fingerprint`]).
 pub fn change(id: &str, input: &str) -> Change {
     Change {
+        extra: Default::default(),
         field: FIELD.to_string(),
         from: None,
         to: Some(json!({ "id": id, "input": input })),
@@ -73,6 +74,7 @@ mod tests {
 
     fn event(changes: Vec<Change>) -> Event {
         Event {
+            extra: Default::default(),
             at: "2026-10-20T10:00:00Z".into(),
             by: Some("s/one".into()),
             via: "alm".into(),

@@ -212,6 +212,7 @@ pub fn other_bases(
 /// The change that sets `field` from `before` to `after`, or none when it stays the same.
 pub fn change(field: &str, before: Option<&str>, after: &str) -> Option<Change> {
     (before != Some(after)).then(|| Change {
+        extra: Default::default(),
         field: field.to_string(),
         from: before.map(|b| Value::String(b.to_string())),
         to: Some(Value::String(after.to_string())),
@@ -300,6 +301,7 @@ mod tests {
 
     fn task(id: &str, state: State, holder: Option<&str>) -> Task {
         Task {
+            extra: Default::default(),
             id: id.into(),
             title: id.into(),
             area: "A01".into(),
@@ -325,6 +327,7 @@ mod tests {
             }))
             .unwrap(),
             areas: vec![Area {
+                extra: Default::default(),
                 id: "A01".into(),
                 name: "A".into(),
                 order: 0,
@@ -336,6 +339,7 @@ mod tests {
 
     fn event(id: &str, changes: Vec<Change>) -> Event {
         Event {
+            extra: Default::default(),
             at: "2026-10-16T10:00:00Z".into(),
             by: Some("claude/x".into()),
             via: "alm".into(),
@@ -364,6 +368,7 @@ mod tests {
                 vec![
                     change(WORKING, None, "claude/a").unwrap(),
                     Change {
+                        extra: Default::default(),
                         field: "state".into(),
                         from: None,
                         to: Some("in_progress".into()),
@@ -386,6 +391,7 @@ mod tests {
         more.push(event(
             "A01-01",
             vec![Change {
+                extra: Default::default(),
                 field: WORKING.into(),
                 from: Some("claude/a".into()),
                 to: None,

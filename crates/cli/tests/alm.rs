@@ -4651,7 +4651,8 @@ fn claim_waits_until_card_files_are_moved_in() {
 }
 
 /// Approver, 2026-10-19 (Task-A01-55): a history record with fields this Allomos does not know
-/// (written by a newer one) is read, not reported and dropped; other files stay strict.
+/// (written by a newer one) is read, not reported and dropped. Other files are read too, with a
+/// reminder for each unknown field (Task-A01-piano403).
 #[test]
 fn history_records_with_unknown_fields_still_show() {
     let repo = filled();
@@ -4667,7 +4668,7 @@ fn history_records_with_unknown_fields_still_show() {
     let v = ok(&repo, &["history", "A01-01"]);
     assert_eq!(v["issues"], json!([]), "{v}");
     assert!(v.to_string().contains("newer"), "{v}");
-    // A task file with an unknown field is still refused.
+    // A task file with an unknown field is read, with a reminder.
     let task = bag.join("tasks/A01-02/task.json");
     let mut t: Value = serde_json::from_str(&fs::read_to_string(&task).unwrap()).unwrap();
     t["colour"] = json!("red");
@@ -4961,4 +4962,64 @@ fn iterations_have_a_state_and_the_active_one_leads() {
     );
     let v = ok(&repo, &["list"]);
     assert_eq!(v["issues"], json!([]));
+}
+
+/// Task-A01-piano403 (approver, 2026-10-25): a taskbag a newer Allomos wrote, with fields and
+/// values this one does not know, opens; each is listed as a reminder; changing those tasks keeps
+/// them; and a state this Allomos does not know is never changed.
+#[test]
+fn future_fields_and_values_are_read_listed_and_kept() {
+    let repo = filled();
+    let bag = repo.join(".allomos/taskbag");
+    let edit = |file: &str, f: &dyn Fn(&mut Value)| {
+        let path = bag.join(file);
+        let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        f(&mut v);
+        fs::write(&path, v.to_string()).unwrap();
+    };
+    edit("tasks/A01-01/task.json", &|t| t["colour"] = json!("red"));
+    edit("tasks/A01-02/task.json", &|t| t["state"] = json!("parked"));
+    edit("project.json", &|p| p["theme"] = json!({"dark": true}));
+    let v = ok(&repo, &["list"]);
+    let issues: Vec<(String, String)> = v["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| {
+            (
+                i["field"].as_str().unwrap().to_string(),
+                i["problem"]["code"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    for want in [
+        ("theme", "field_unknown"),
+        ("colour", "field_unknown"),
+        ("state", "value_unknown"),
+    ] {
+        assert!(
+            issues.contains(&(want.0.to_string(), want.1.to_string())),
+            "{want:?} in {issues:?}"
+        );
+    }
+    assert!(v.to_string().contains("A01-02"), "the task is listed: {v}");
+    // Changing the tasks keeps what this Allomos does not know.
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["note", "A01-02", "kept as it is"]);
+    let read = |file: &str| -> Value {
+        serde_json::from_str(&fs::read_to_string(bag.join(file)).unwrap()).unwrap()
+    };
+    let one = read("tasks/A01-01/task.json");
+    assert_eq!(
+        (&one["colour"], &one["state"]),
+        (&json!("red"), &json!("in_progress"))
+    );
+    let two = read("tasks/A01-02/task.json");
+    assert_eq!(two["state"], "parked");
+    assert_eq!(two["handoff_note"], "kept as it is");
+    // Its state is not changed.
+    let before = snapshot(&repo);
+    refused(&repo, &["--as", "a", "claim", "A01-02"], 1, "state_unknown");
+    assert_eq!(snapshot(&repo), before);
+    assert_eq!(read("project.json")["theme"], json!({"dark": true}));
 }

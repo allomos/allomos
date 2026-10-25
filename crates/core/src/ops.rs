@@ -72,6 +72,19 @@ pub fn find_task(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
         .ok_or_else(|| Problem::TaskNotFound { id: id.to_string() })
 }
 
+/// The task with this ID, for a change of its state: a state this Allomos does not know (perhaps
+/// from a newer one) is refused, so it is never overwritten (Task-A01-piano403).
+pub fn find_task_to_move(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
+    let task = find_task(taskbag, id)?;
+    if task.state.is_unknown() {
+        return Err(Problem::StateUnknown {
+            id: task.id.clone(),
+            state: task.state_text(),
+        });
+    }
+    Ok(task)
+}
+
 /// Refuse when someone other than `me` holds the task. An unheld task may be changed by anyone.
 /// A finished or dropped task counts as held by nobody: the holder it keeps is history, not a
 /// claim (approver, 2026-10-16, task A00-30).
@@ -108,6 +121,7 @@ pub fn new_area(taskbag: &Taskbag, id: &str, name: &str) -> Result<Area, Problem
     let name = non_empty(Some(name)).ok_or(Problem::AreaNameMissing)?;
     let order = taskbag.areas.iter().map(|a| a.order).max().unwrap_or(0) + 1;
     Ok(Area {
+        extra: Default::default(),
         id: id.to_string(),
         name,
         order,
@@ -344,6 +358,7 @@ pub fn new_iteration(
         .unwrap_or(0)
         + 1;
     Ok(Iteration {
+        extra: Default::default(),
         id: id.to_string(),
         name,
         order,
@@ -464,6 +479,17 @@ pub fn change_iteration(
         iteration.end = optional_date(Some(end))?;
     }
     if let Some(state) = change.state {
+        if iteration.state == IterationState::Unknown {
+            return Err(Problem::StateUnknown {
+                id: id.to_string(),
+                state: iteration
+                    .extra
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            });
+        }
         if state == IterationState::Active {
             if let Some(other) = marked_active(taskbag).filter(|a| a.id != id) {
                 return Err(Problem::IterationActiveAlready {
@@ -648,6 +674,7 @@ pub fn new_task(
         description.push('\n');
     }
     Ok(Task {
+        extra: Default::default(),
         id: id.to_string(),
         title,
         area: area.to_string(),
@@ -675,7 +702,7 @@ pub fn claim(
     take: bool,
 ) -> Result<Outcome, Problem> {
     let me = non_empty(me).ok_or(Problem::HolderMissing)?;
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     let mut warnings = Vec::new();
     if let Err(held) = check_holder(&task, Some(&me)) {
@@ -734,7 +761,7 @@ pub fn wait(
     on: &str,
     who: Option<&str>,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     let on = non_empty(Some(on)).ok_or(Problem::WaitingOnMissing)?;
@@ -794,7 +821,7 @@ pub fn block(
     me: Option<&str>,
     by: &[String],
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     let mut ids: Vec<String> = Vec::new();
@@ -832,7 +859,7 @@ pub fn block(
 /// `ready`. Its blocking tasks are cleared. `alm` does not check that they are done: the agent
 /// does (owner, 2026-10-14).
 pub fn unblock(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     if task.state != State::Blocked {
         return Err(Problem::NotBlocked {
@@ -865,7 +892,7 @@ pub fn finish(
     without_human_check: Option<&str>,
     steps: Option<&str>,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     if task.state != State::Done {
         check_holder(&task, me)?;
     }
@@ -967,7 +994,7 @@ pub fn release(
     me: Option<&str>,
     note: Option<&str>,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     task.holder = None;
     if task.state == State::InProgress {
@@ -1049,6 +1076,7 @@ pub fn hand_off(
     }
     let mut outcome = Outcome::plain(task);
     outcome.recorded.push(Change {
+        extra: Default::default(),
         field: HANDED_OFF_BY.to_string(),
         from: None,
         to: Some(serde_json::Value::String(me.to_string())),
@@ -1253,7 +1281,7 @@ pub fn edit(
             State::Done => finish(taskbag, id, me, None, None).map(|o| (o, "done")),
             State::Dropped => drop_task(taskbag, id, me).map(|o| (o, "drop")),
             State::Backlog => back_to_backlog(taskbag, id, me).map(|o| (o, "backlog")),
-            State::InProgress => Err(Problem::CannotSetState {
+            State::InProgress | State::Unknown => Err(Problem::CannotSetState {
                 id: id.to_string(),
                 state: state.as_str().to_string(),
             }),
@@ -1313,7 +1341,7 @@ pub fn rename_project(
 /// Mark an unheld `backlog`, `waiting` or `blocked` task `ready` (for example, the owner approved
 /// it). What it waited on or was blocked by is cleared.
 pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     if task.holder.is_some()
         || !matches!(task.state, State::Backlog | State::Waiting | State::Blocked)
@@ -1334,7 +1362,7 @@ pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outco
 /// a held, in-progress, done or dropped task is refused (a held one is released first, a finished
 /// one reopened). What it waited on or was blocked by is cleared.
 pub fn back_to_backlog(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     if task.holder.is_some()
         || !matches!(task.state, State::Ready | State::Waiting | State::Blocked)
@@ -1351,7 +1379,7 @@ pub fn back_to_backlog(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<
 
 /// Drop the task: it will not be done. Its holder, *waiting on* and blockers are cleared.
 pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     check_open(&task, &[State::Done, State::Dropped])?;
     task.state = State::Dropped;
@@ -1371,7 +1399,7 @@ pub const REOPEN_NOTE: &str = "reopen_note";
 /// The description, handoff note and next dependency are kept. Any other state is refused
 /// (`cannot_reopen`). The holder rule does not apply: a finished task is held by nobody (A00-30).
 pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
+    let mut task = find_task_to_move(taskbag, id)?;
     if !matches!(task.state, State::Done | State::Dropped) {
         return Err(Problem::CannotReopen {
             id: task.id.clone(),
@@ -1386,6 +1414,7 @@ pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Proble
     clear_human_check(&mut task);
     let mut outcome = Outcome::plain(task);
     outcome.recorded.push(Change {
+        extra: Default::default(),
         field: REOPEN_NOTE.to_string(),
         from: None,
         to: Some(serde_json::Value::String(note)),
@@ -1447,6 +1476,7 @@ mod tests {
     fn bag() -> Taskbag {
         let mut s = Taskbag {
             project: Project {
+                extra: Default::default(),
                 format: crate::FORMAT.into(),
                 id: "p".into(),
                 name: "P".into(),
@@ -1730,6 +1760,7 @@ mod tests {
         assert_eq!(
             o.recorded,
             vec![Change {
+                extra: Default::default(),
                 field: REOPEN_NOTE.into(),
                 from: None,
                 to: Some("failed its check".into()),

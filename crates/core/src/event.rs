@@ -17,10 +17,20 @@ pub enum Kind {
     Area,
     Iteration,
     Project,
+    /// A kind this Allomos does not know, perhaps from a newer one (Task-A01-piano403); the value
+    /// is kept in the event's `extra`.
+    #[serde(other)]
+    Unknown,
+}
+
+impl Kind {
+    pub fn is_unknown(&self) -> bool {
+        *self == Kind::Unknown
+    }
 }
 
 /// One field's change. `from` is left out when the field was empty (or the item new), `to` when
-/// it was emptied. Fields it does not know are ignored, as for [`Event`].
+/// it was emptied. Fields it does not know are kept, as for [`Event`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Change {
     pub field: String,
@@ -28,6 +38,9 @@ pub struct Change {
     pub from: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<Value>,
+    /// Kept as they are, so packing a month writes them back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: crate::model::Extra,
 }
 
 /// One change to one item, as stored in `events/<name>.json`.
@@ -35,7 +48,7 @@ pub struct Change {
 /// Fields this Allomos does not know are ignored rather than refused (Task-A01-55, approver
 /// 2026-10-19): events are written only by `alm` and the app, never by hand, so an unknown field
 /// means a newer Allomos added it, and refusing it would only drop that change from the history.
-/// The other files of the taskbag still refuse unknown fields, so mistyped names are caught.
+/// Since Task-A01-piano403 they are kept in `extra`, so packing a month writes them back.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Event {
     /// When, in UTC: `2026-10-13T14:02:05Z`.
@@ -47,6 +60,7 @@ pub struct Event {
     pub via: String,
     /// The command or action, for example `claim` or `add task`.
     pub command: String,
+    #[serde(skip_serializing_if = "Kind::is_unknown")]
     pub kind: Kind,
     /// The item's ID; for the project, the project's ID (left out when unknown).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,6 +75,9 @@ pub struct Event {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool: Option<String>,
     pub changes: Vec<Change>,
+    /// Fields this Allomos does not know (and an unknown `kind`'s value), kept as they are.
+    #[serde(flatten)]
+    pub extra: crate::model::Extra,
 }
 
 /// The agent an `alm` command runs under, judged from its environment (`var` reads one variable):
@@ -151,6 +168,7 @@ pub fn changes<T: Serialize>(before: Option<&T>, after: &T, order: &[&str]) -> V
             let from = present(old.get(field));
             let to = present(new.get(field));
             (from != to).then(|| Change {
+                extra: Default::default(),
                 field: field.to_string(),
                 from,
                 to,
@@ -176,6 +194,7 @@ pub fn removed<T: Serialize>(before: &T, order: &[&str]) -> Vec<Change> {
         .filter(|f| *f != "id")
         .filter_map(|field| {
             present(old.get(field)).map(|from| Change {
+                extra: Default::default(),
                 field: field.to_string(),
                 from: Some(from),
                 to: None,
@@ -191,6 +210,7 @@ mod tests {
 
     fn task() -> Task {
         Task {
+            extra: Default::default(),
             id: "A01-01".into(),
             title: "First".into(),
             area: "A01".into(),
@@ -220,11 +240,13 @@ mod tests {
             c,
             vec![
                 Change {
+                    extra: Default::default(),
                     field: "state".into(),
                     from: Some("ready".into()),
                     to: Some("in_progress".into()),
                 },
                 Change {
+                    extra: Default::default(),
                     field: "holder".into(),
                     from: None,
                     to: Some("claude/x".into()),
@@ -253,6 +275,7 @@ mod tests {
     #[test]
     fn stores_without_empty_parts() {
         let e = Event {
+            extra: Default::default(),
             at: "2026-10-13T14:02:05Z".into(),
             by: None,
             via: "alm".into(),
@@ -262,6 +285,7 @@ mod tests {
             agent: None,
             tool: None,
             changes: vec![Change {
+                extra: Default::default(),
                 field: "holder".into(),
                 from: Some("claude/x".into()),
                 to: None,

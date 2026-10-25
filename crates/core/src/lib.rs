@@ -16,12 +16,12 @@ pub mod request;
 mod validate;
 
 pub use model::{
-    AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN, FORMAT,
-    FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project, State,
+    AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN, Extra,
+    FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project, State,
     TASK_LANGUAGE_UI, Task, Taskbag, default_labels, format_version, valid_language,
 };
 pub use problem::Problem;
 pub use validate::{
-    Issue, Loaded, parse_area, parse_event, parse_iteration, parse_project, parse_task, valid_date,
-    validate_taskbag,
+    Issue, Loaded, event_notes, parse_area, parse_event, parse_iteration, parse_project,
+    parse_task, unknown_notes, valid_date, validate_taskbag,
 };

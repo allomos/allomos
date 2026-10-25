@@ -46,6 +46,7 @@ pub fn decide(taskbag: &Taskbag, id: &str, text: &str) -> Result<Vec<Change>, Pr
         return Err(Problem::AiDecisionMissing);
     }
     Ok(vec![Change {
+        extra: Default::default(),
         field: FIELD.to_string(),
         from: None,
         to: Some(Value::String(text.to_string())),
@@ -63,6 +64,7 @@ pub fn review(taskbag: &Taskbag, id: &str, pending: &[Decision]) -> Result<Vec<C
     Ok(pending
         .iter()
         .map(|d| Change {
+            extra: Default::default(),
             field: FIELD.to_string(),
             from: Some(Value::String(d.text.clone())),
             to: None,
@@ -110,12 +112,14 @@ mod tests {
             }))
             .unwrap(),
             areas: vec![Area {
+                extra: Default::default(),
                 id: "A01".into(),
                 name: "A".into(),
                 order: 0,
             }],
             iterations: Vec::new(),
             tasks: vec![Task {
+                extra: Default::default(),
                 id: "A01-01".into(),
                 title: "First".into(),
                 area: "A01".into(),
@@ -137,6 +141,7 @@ mod tests {
 
     fn event(command: &str, id: &str, changes: Vec<Change>) -> Event {
         Event {
+            extra: Default::default(),
             at: "2026-10-15T10:00:00Z".into(),
             by: Some("claude/x".into()),
             via: "alm".into(),

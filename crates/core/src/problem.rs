@@ -55,8 +55,13 @@ problems! {
     /// The file is not valid JSON, or a value has the wrong type. `detail` is the parser's own text.
     NotJson { detail } => "not_json", "This file could not be read as JSON for Allomos: {detail}.";
     FieldMissing => "field_missing", "This required field is missing.";
-    FieldUnknown => "field_unknown", "Allomos does not know this field. Check its spelling, or remove it.";
-    InvalidChoice { value, allowed } => "invalid_choice", "{value} is not a valid value here. Use one of: {allowed}.";
+    /// A reminder, not an error (Task-A01-piano403): the file is read and the field kept as it is.
+    FieldUnknown => "field_unknown", "This version of Allomos does not know this field: a newer version may have added it (update, then look again), or its name is mistyped. It is kept as it is.";
+    /// A reminder, not an error (Task-A01-piano403): the item is shown with this value, kept as it is.
+    ValueUnknown { value } => "value_unknown", "This version of Allomos does not know the value {value}: a newer version may have added it (update, then look again), or it is mistyped. It is kept as it is, and this version does not change it.";
+    /// Task-A01-piano403: the state was written by a newer Allomos, or mistyped.
+    StateUnknown { id, state } => "state_unknown", "{id} has the state {state}, which this version of Allomos does not know, so it does not change it. Update Allomos, or correct the state in its file.";
+    InvalidChoice { value } => "invalid_choice", "{value} is not a valid value here: it must be a word in quotes.";
     InvalidId { id } => "invalid_id", "\"{id}\" is not a valid ID. Use 1–64 letters, digits, '-' or '_'.";
     WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of Allomos reads only \"{expected}\".";
     /// The taskbag was written by a newer Allomos (Task-A01-25). The person chooses what happens.

@@ -38,66 +38,71 @@ pub struct Loaded {
     pub active_iteration: Option<String>,
 }
 
-/// Fields whose value must be one of a fixed list: (field, allowed values).
-const CHOICE_FIELDS: &[(&str, &[&str])] = &[(
-    "state",
-    &[
-        "backlog",
-        "ready",
-        "in_progress",
-        "waiting",
-        "blocked",
-        "done",
-        "dropped",
-    ],
-)];
-
-/// An iteration's fixed-choice fields (Task-A01-root343): its `state` is not a task's.
-const ITERATION_CHOICE_FIELDS: &[(&str, &[&str])] = &[("state", &["planned", "active", "closed"])];
+/// Fields whose value is one of a fixed list. A string this Allomos does not know is read as the
+/// field's `Unknown` and kept in `extra` (Task-A01-piano403); only a value that is not a string at
+/// all is refused.
+const CHOICE_FIELDS: &[&str] = &["state"];
 
 fn parse<T: DeserializeOwned>(file: &str, text: &str) -> Result<T, Issue> {
     parse_with(file, text, CHOICE_FIELDS)
 }
 
-fn parse_with<T: DeserializeOwned>(
-    file: &str,
-    text: &str,
-    choices: &[(&str, &[&str])],
-) -> Result<T, Issue> {
+fn parse_with<T: DeserializeOwned>(file: &str, text: &str, choices: &[&str]) -> Result<T, Issue> {
     // Check fixed-choice fields first, so the problem names the field (e.g. `state`)
     // rather than the bad value.
     if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(text) {
-        for (field, allowed) in choices {
-            if let Some(value) = map.get(*field) {
-                let ok = value.as_str().is_some_and(|v| allowed.contains(&v));
-                if !ok {
-                    return Err(Issue::new(
-                        file,
-                        Some(field),
-                        Problem::InvalidChoice {
-                            value: value.to_string(),
-                            allowed: allowed.join(", "),
-                        },
-                    ));
-                }
+        for field in choices {
+            if let Some(value) = map.get(*field).filter(|v| !v.is_string()) {
+                return Err(Issue::new(
+                    file,
+                    Some(field),
+                    Problem::InvalidChoice {
+                        value: value.to_string(),
+                    },
+                ));
             }
         }
     }
     serde_json::from_str(text).map_err(|e| {
         let msg = e.to_string();
-        // Only "missing field `x`" and "unknown field `x`" name a field; other messages
-        // (for example a wrong value type) do not, so no field is guessed for them.
-        let named = msg.split('`').nth(1);
-        match (
-            msg.starts_with("missing field"),
-            msg.starts_with("unknown field"),
-            named,
-        ) {
-            (true, _, Some(f)) => Issue::new(file, Some(f), Problem::FieldMissing),
-            (_, true, Some(f)) => Issue::new(file, Some(f), Problem::FieldUnknown),
+        // Only "missing field `x`" names a field; other messages (for example a wrong value type)
+        // do not, so no field is guessed for them.
+        match (msg.starts_with("missing field"), msg.split('`').nth(1)) {
+            (true, Some(f)) => Issue::new(file, Some(f), Problem::FieldMissing),
             _ => Issue::new(file, None, Problem::NotJson { detail: msg }),
         }
     })
+}
+
+/// The value of one top-level field of a JSON file, as written.
+fn raw_field(text: &str, field: &str) -> Option<serde_json::Value> {
+    serde_json::from_str::<serde_json::Value>(text)
+        .ok()?
+        .get(field)
+        .cloned()
+}
+
+/// Reminders for what an item's file holds that this Allomos does not know (Task-A01-piano403):
+/// each unknown field, and each value kept for a fixed-choice field this Allomos does not know
+/// (`kept`: the names of those fields). `prefix` names where the item sits in its file, for
+/// example `handoff.`.
+pub fn unknown_notes(
+    file: &str,
+    prefix: &str,
+    extra: &crate::model::Extra,
+    kept: &[&str],
+    issues: &mut Vec<Issue>,
+) {
+    for (name, value) in extra {
+        let field = format!("{prefix}{name}");
+        let problem = match value.as_str() {
+            Some(v) if kept.contains(&name.as_str()) => Problem::ValueUnknown {
+                value: v.to_string(),
+            },
+            _ => Problem::FieldUnknown,
+        };
+        issues.push(Issue::new(file, Some(&field), problem));
+    }
 }
 
 fn check_id(file: &str, field: &str, id: &str, issues: &mut Vec<Issue>) {
@@ -208,10 +213,27 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     }
 }
 
-/// One event file (`events/<name>.json`, Task-A01-17). Unknown fields are refused, like
-/// everywhere else, so a mistyped name is caught.
+/// One event file (`events/<name>.json`, Task-A01-17). Unknown fields, and a `kind` this Allomos
+/// does not know, are kept in `extra` (Task-A01-piano403); [`event_notes`] lists them.
 pub fn parse_event(file: &str, text: &str) -> Result<crate::event::Event, Issue> {
-    parse(file, text)
+    let mut event: crate::event::Event = parse_with(file, text, &["kind"])?;
+    if event.kind.is_unknown() {
+        if let Some(v) = raw_field(text, "kind") {
+            event.extra.insert("kind".into(), v);
+        }
+    }
+    Ok(event)
+}
+
+/// The reminder for one event: a `kind` this Allomos does not know. Its unknown fields are kept but
+/// not listed (approver, 2026-10-19; Task-A01-55): events are written only by `alm` and the app.
+pub fn event_notes(file: &str, event: &crate::event::Event) -> Vec<Issue> {
+    let mut issues = Vec::new();
+    if let Some(kind) = event.extra.get("kind").filter(|_| event.kind.is_unknown()) {
+        let kind = crate::model::Extra::from([("kind".to_string(), kind.clone())]);
+        unknown_notes(file, "", &kind, &["kind"], &mut issues);
+    }
+    issues
 }
 
 pub fn parse_area(file: &str, text: &str) -> Result<Area, Vec<Issue>> {
@@ -255,8 +277,12 @@ pub fn valid_date(text: &str) -> bool {
 }
 
 pub fn parse_iteration(file: &str, text: &str) -> Result<Iteration, Vec<Issue>> {
-    let iteration: Iteration =
-        parse_with(file, text, ITERATION_CHOICE_FIELDS).map_err(|i| vec![i])?;
+    let mut iteration: Iteration = parse(file, text).map_err(|i| vec![i])?;
+    if iteration.state == crate::IterationState::Unknown {
+        if let Some(v) = raw_field(text, "state") {
+            iteration.extra.insert("state".into(), v);
+        }
+    }
     let mut issues = Vec::new();
     check_id(file, "id", &iteration.id, &mut issues);
     if iteration.name.trim().is_empty() {
@@ -285,7 +311,12 @@ pub fn parse_iteration(file: &str, text: &str) -> Result<Iteration, Vec<Issue>> 
 }
 
 pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
-    let task: Task = parse(file, text).map_err(|i| vec![i])?;
+    let mut task: Task = parse(file, text).map_err(|i| vec![i])?;
+    if task.state.is_unknown() {
+        if let Some(v) = raw_field(text, "state") {
+            task.extra.insert("state".into(), v);
+        }
+    }
     let mut issues = Vec::new();
     check_id(file, "id", &task.id, &mut issues);
     if task.title.trim().is_empty() {
@@ -319,6 +350,34 @@ pub fn validate_taskbag(
     tasks: &[(String, Task)],
 ) -> Vec<Issue> {
     let mut issues = Vec::new();
+    // Reminders, not errors: what this Allomos does not know is shown and kept (Task-A01-piano403).
+    unknown_notes("project.json", "", &project.extra, &[], &mut issues);
+    if let Some(rules) = &project.handoff {
+        unknown_notes("project.json", "handoff.", &rules.extra, &[], &mut issues);
+        for (name, g) in &rules.overrides {
+            let prefix = format!("handoff.overrides.{name}.");
+            unknown_notes("project.json", &prefix, &g.extra, &[], &mut issues);
+        }
+    }
+    for (file, area) in areas {
+        unknown_notes(file, "", &area.extra, &[], &mut issues);
+    }
+    for (file, iteration) in iterations {
+        let kept: &[&str] = if iteration.state == crate::IterationState::Unknown {
+            &["state"]
+        } else {
+            &[]
+        };
+        unknown_notes(file, "", &iteration.extra, kept, &mut issues);
+    }
+    for (file, task) in tasks {
+        let kept: &[&str] = if task.state.is_unknown() {
+            &["state"]
+        } else {
+            &[]
+        };
+        unknown_notes(file, "", &task.extra, kept, &mut issues);
+    }
     let mut area_ids = HashSet::new();
     for (file, area) in areas {
         if !area_ids.insert(area.id.as_str()) {
@@ -553,18 +612,63 @@ mod tests {
     }
 
     #[test]
-    fn unknown_state_names_the_state_field() {
-        let err = parse_task(
-            "t.json",
-            r#"{"id":"T1","title":"x","area":"A1","state":"finished"}"#,
-        )
-        .unwrap_err();
+    fn an_unknown_state_is_kept_and_noted() {
+        let text = r#"{"id":"T1","title":"x","area":"A1","state":"finished","colour":"red"}"#;
+        let task = parse_task("t.json", text).unwrap();
+        assert_eq!(task.state, State::Unknown);
+        assert_eq!(task.state_text(), "finished");
+        let mut notes = Vec::new();
+        unknown_notes("t.json", "", &task.extra, &["state"], &mut notes);
+        let found: Vec<_> = notes
+            .iter()
+            .map(|i| (i.field.as_deref().unwrap(), i.problem.code()))
+            .collect();
+        assert_eq!(
+            found,
+            [("colour", "field_unknown"), ("state", "value_unknown")]
+        );
+        // Written back as it was read.
+        let back = serde_json::to_value(&task).unwrap();
+        assert_eq!(back["state"], "finished");
+        assert_eq!(back["colour"], "red");
+    }
+
+    #[test]
+    fn a_state_that_is_not_a_word_is_refused() {
+        let err =
+            parse_task("t.json", r#"{"id":"T1","title":"x","area":"A1","state":3}"#).unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("state"));
-        let Problem::InvalidChoice { value, allowed } = &err[0].problem else {
-            panic!("expected invalid_choice, got {:?}", err[0].problem)
-        };
-        assert_eq!(value, "\"finished\"");
-        assert!(allowed.contains("in_progress"));
+        assert_eq!(err[0].problem.code(), "invalid_choice");
+    }
+
+    #[test]
+    fn unknown_fields_are_kept_in_every_file() {
+        let p = parse_project(
+            "project.json",
+            r#"{"format":"allomos/5","id":"d","name":"D","later":1,"handoff":{"soon":true,"overrides":{"codex":{"new":2}}}}"#,
+        )
+        .unwrap();
+        let back = serde_json::to_value(&p).unwrap();
+        assert_eq!(back["later"], 1);
+        assert_eq!(back["handoff"]["soon"], true);
+        assert_eq!(back["handoff"]["overrides"]["codex"]["new"], 2);
+        let a = parse_area("a.json", r#"{"id":"A1","name":"X","icon":"star"}"#).unwrap();
+        assert_eq!(serde_json::to_value(&a).unwrap()["icon"], "star");
+        let i = parse_iteration("i.json", r#"{"id":"I1","name":"X","state":"paused"}"#).unwrap();
+        assert_eq!(i.state, crate::IterationState::Unknown);
+        assert_eq!(serde_json::to_value(&i).unwrap()["state"], "paused");
+        let issues = validate_taskbag(&p, &[("a.json".into(), a)], &[("i.json".into(), i)], &[]);
+        let fields: Vec<_> = issues.iter().filter_map(|i| i.field.as_deref()).collect();
+        assert_eq!(
+            fields,
+            [
+                "later",
+                "handoff.soon",
+                "handoff.overrides.codex.new",
+                "icon",
+                "state"
+            ]
+        );
     }
 
     #[test]
@@ -576,9 +680,11 @@ mod tests {
 
     #[test]
     fn unknown_field_names_the_field() {
-        let err = parse_area("a.json", r#"{"id":"A1","name":"X","colour":"red"}"#).unwrap_err();
-        assert_eq!(err[0].field.as_deref(), Some("colour"));
-        assert_eq!(err[0].problem, Problem::FieldUnknown);
+        let area = parse_area("a.json", r#"{"id":"A1","name":"X","colour":"red"}"#).unwrap();
+        let mut notes = Vec::new();
+        unknown_notes("a.json", "", &area.extra, &[], &mut notes);
+        assert_eq!(notes[0].field.as_deref(), Some("colour"));
+        assert_eq!(notes[0].problem, Problem::FieldUnknown);
     }
 
     #[test]
@@ -598,15 +704,15 @@ mod tests {
         .unwrap_err();
         assert_eq!(err[0].field.as_deref(), Some("without_human_check"));
         assert_eq!(err[0].problem, Problem::WithoutHumanCheckMissing);
-        // The name before allomos/4 is not read any more (Task-A01-45): an older taskbag is
-        // moved in by an agent, never read.
+        // The name before allomos/4 is not read as the note any more (Task-A01-45); since
+        // Task-A01-piano403 it is kept as a field this Allomos does not know.
         let old = parse_task(
             "t.json",
             r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
         )
-        .unwrap_err();
-        assert_eq!(old[0].field.as_deref(), Some("finished_without_owner"));
-        assert_eq!(old[0].problem, Problem::FieldUnknown);
+        .unwrap();
+        assert!(!old.to_check());
+        assert!(old.extra.contains_key("finished_without_owner"));
     }
 
     #[test]
@@ -770,7 +876,10 @@ mod tests {
             st(r#"{"id":"I1","name":"One","state":"closed","later":1}"#),
             Ok(crate::IterationState::Closed)
         );
-        assert!(st(r#"{"id":"I1","name":"One","state":"doing"}"#).is_err());
+        assert_eq!(
+            st(r#"{"id":"I1","name":"One","state":"doing"}"#),
+            Ok(crate::IterationState::Unknown)
+        );
         assert_eq!(
             serde_json::to_string(
                 &parse_iteration("i", r#"{"id":"I1","name":"One","state":"planned"}"#).unwrap()

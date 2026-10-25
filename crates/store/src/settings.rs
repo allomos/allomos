@@ -256,6 +256,7 @@ mod tests {
 
     fn project(language: Option<&str>) -> Project {
         Project {
+            extra: Default::default(),
             format: FORMAT.into(),
             id: "p".into(),
             name: "P".into(),

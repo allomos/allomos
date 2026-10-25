@@ -101,8 +101,7 @@
     "current"
   ],
   "invalid_choice": [
-    "value",
-    "allowed"
+    "value"
   ],
   "invalid_date": [
     "value"
@@ -185,6 +184,10 @@
   "startup_not_a_folder": [
     "path"
   ],
+  "state_unknown": [
+    "id",
+    "state"
+  ],
   "task_changed": [
     "id",
     "version"
@@ -235,6 +238,9 @@
   ],
   "update_failed": [
     "detail"
+  ],
+  "value_unknown": [
+    "value"
   ],
   "waiting_on_missing": [],
   "without_human_check_missing": [],
