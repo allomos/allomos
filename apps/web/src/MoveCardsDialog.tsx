@@ -20,7 +20,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useI18n } from "./i18n";
+import { LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL } from "./agentPickerFlow";
@@ -121,6 +121,10 @@ export function MoveCardsPanel({
   const only = offer && offer.kind !== "all" ? offer.group : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Translate the taskbag's contents into the interface's language (Task-A03-totem655): unchecked
+  // each time the dialog opens, never remembered; offered only when there are contents to translate.
+  const [translate, setTranslate] = useState(false);
+  const canTranslate = !!moveIn || !noTasks;
   /** Manual: the request to copy. */
   const [request, setRequest] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -141,10 +145,10 @@ export function MoveCardsPanel({
     setError(null);
     try {
       if (agent === MANUAL) {
-        setRequest(await messenger.moveTasksInRequest(root, language));
+        setRequest(await messenger.moveTasksInRequest(root, language, translate));
         return;
       }
-      await messenger.moveTasksIn(agent, root, language);
+      await messenger.moveTasksIn(agent, root, language, translate);
       saveOpened(root, agent);
       agentOpened(root, moveIn ? "move_in" : section ? "update" : "cards");
       const name = t(AGENT_KEY[agent]);
@@ -278,6 +282,16 @@ export function MoveCardsPanel({
       {/* Only the agent used last, not registered yet (Task-A03-27): say why. */}
       {request === null && offer?.kind === "only" && <p className="small">{t("cards.only_agent", { agent: offer.group })}</p>}
       {request === null && offer?.kind === "manual" && <p className="small">{t("cards.only_manual", { agent: offer.group })}</p>}
+
+      {request === null && canTranslate && (
+        <fieldset className="translate-choice">
+          <label>
+            <input type="checkbox" checked={translate} disabled={busy} onChange={(e) => setTranslate(e.target.checked)} />{" "}
+            {t("cards.translate", { language: LANGUAGE_NAMES[language] })}
+          </label>
+          <p className="muted small">{translate ? t("cards.translate_yes") : t("cards.translate_no")}</p>
+        </fieldset>
+      )}
 
       {extra}
     </>

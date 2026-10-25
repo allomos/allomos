@@ -73,9 +73,9 @@ export interface Messenger {
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
    * request for whichever applies typed in (`alm move-in` prints it; Task-A03-27: an out-of-date
    * section too). Nothing is sent. Rejects with a Problem. */
-  moveTasksIn(agent: string, taskbag: string, language: string): Promise<void>;
+  moveTasksIn(agent: string, taskbag: string, language: string, translate: boolean): Promise<void>;
   /** Update the taskbag… with Manual: the same request, to copy. */
-  moveTasksInRequest(taskbag: string, language: string): Promise<string>;
+  moveTasksInRequest(taskbag: string, language: string, translate: boolean): Promise<string>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -268,8 +268,8 @@ export const desktopMessenger: Messenger = {
   onLanMenu: (handler) => getCurrentWebviewWindow().listen("menu:lan_viewing", () => handler()),
   lanStatus: () => invoke<LanStatus>("lan_status"),
   setLanViewing: (on) => invoke<LanStatus>("set_lan_viewing", { on }),
-  moveTasksIn: (agent, taskbag, language) => invoke<void>("move_tasks_in", { agent, taskbag, language }),
-  moveTasksInRequest: (taskbag, language) => invoke<string>("move_tasks_in_request", { taskbag, language }),
+  moveTasksIn: (agent, taskbag, language, translate) => invoke<void>("move_tasks_in", { agent, taskbag, language, translate }),
+  moveTasksInRequest: (taskbag, language, translate) => invoke<string>("move_tasks_in_request", { taskbag, language, translate }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

@@ -1229,7 +1229,12 @@ fn tasks_in_job(taskbag: &Path) -> Job {
 /// ([`allomos_store::agent_update_taskbag_request_in`]). Nothing is sent: the person sends it;
 /// the agent shows its plan in the app (`alm confirm`) before anything changes.
 #[tauri::command]
-async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Result<(), Problem> {
+async fn move_tasks_in(
+    agent: String,
+    taskbag: PathBuf,
+    language: String,
+    translate: bool,
+) -> Result<(), Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -1243,7 +1248,7 @@ async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Res
     let request = with_progress_in(
         &language,
         tasks_in_job(&taskbag),
-        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag),
+        &allomos_store::agent_update_taskbag_request_with(&language, &project, &taskbag, translate),
     );
     agents::ask(chosen, &project, &request)
 }
@@ -1251,12 +1256,12 @@ async fn move_tasks_in(agent: String, taskbag: PathBuf, language: String) -> Res
 /// **Update the taskbag…** with Manual: the same request, as an agent opened through a link gets
 /// it, for the person to copy.
 #[tauri::command]
-fn move_tasks_in_request(taskbag: PathBuf, language: String) -> String {
+fn move_tasks_in_request(taskbag: PathBuf, language: String, translate: bool) -> String {
     let project = allomos_store::versions::project_folder(&taskbag);
     let request = with_progress_in(
         &language,
         tasks_in_job(&taskbag),
-        &allomos_store::agent_update_taskbag_request_in(&language, &project, &taskbag),
+        &allomos_store::agent_update_taskbag_request_with(&language, &project, &taskbag, translate),
     );
     agents::link_request(&request, alm_command::own().as_deref())
 }
@@ -2217,7 +2222,7 @@ mod tests {
         // Update the taskbag… asks for the move-in, reported as that job (Task-A01-45); once the
         // tasks are in, it is about card files (below).
         assert_eq!(tasks_in_job(&taskbag), Job::MoveIn);
-        let request = move_tasks_in_request(taskbag.clone(), "en".into());
+        let request = move_tasks_in_request(taskbag.clone(), "en".into(), false);
         assert!(request.contains("Allomos renamed the old taskbag (format allomos/2;"));
         // No agent setup in it (Task-A03-27): each agent registers itself.
         assert!(!request.contains("agent setup request"));

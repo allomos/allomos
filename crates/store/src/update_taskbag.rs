@@ -24,6 +24,58 @@ use crate::versions;
 /// - with none of them: card files no link names (the move-cards request). File → Update the
 ///   Taskbag… opens it at any time.
 pub fn agent_update_taskbag_request_in(language: &str, project: &Path, taskbag: &Path) -> String {
+    agent_update_taskbag_request_with(language, project, taskbag, false)
+}
+
+/// [`agent_update_taskbag_request_in`], with the person's choice whether the agent also translates
+/// the taskbag's contents into the interface's language `language` (Task-A03-totem655, approver
+/// 2026-10-25): every task's title, description and handoff note, the card files and the project
+/// notes, the translation replacing the old text; commands, task IDs, file paths and code stay as
+/// they are, and the task language (`alm task-language`) does not change. Unchosen, the request
+/// says not to translate.
+pub fn agent_update_taskbag_request_with(
+    language: &str,
+    project: &Path,
+    taskbag: &Path,
+    translate: bool,
+) -> String {
+    let request = update_request(language, project, taskbag);
+    format!(
+        "{}\n\n---\n\n{}",
+        request.trim_end(),
+        translation_part_in(language, translate)
+    )
+}
+
+/// The language as people who speak it name it.
+fn language_name(language: &str) -> &'static str {
+    match language {
+        "zh-CN" => "简体中文",
+        "ja" => "日本語",
+        _ => "English",
+    }
+}
+
+/// What the request says about translating, in its own language.
+fn translation_part_in(language: &str, translate: bool) -> String {
+    let name = language_name(language);
+    match (language, translate) {
+        ("zh-CN", false) => "翻译：不要翻译。任务包的内容保持原来的语言。\n".to_string(),
+        ("zh-CN", true) => format!(
+            "翻译：把任务包的内容翻译成{name}，在上面的工作完成之后做，同样先在计划里写明，用户选择“继续”后才动手。\n- 翻译：每个任务的标题、描述和交接备注（`alm title`、`alm describe`、`alm handoff`），卡片文件（`tasks/<id>/card.md`），以及任务包的 project-notes.md。\n- 保持原样：命令、任务 ID、文件路径和代码。\n- 译文取代原文，不保留原文。\n- 任务语言（`alm task-language` 打印的）不变，不要改它。\n"
+        ),
+        ("ja", false) => "翻訳：翻訳しないでください。タスクバッグの内容は書かれている言語のままにします。\n".to_string(),
+        ("ja", true) => format!(
+            "翻訳：タスクバッグの内容を{name}に翻訳してください。上の作業が終わってから行い、同じく先に計画に書き、ユーザーが「進める」を選んでから手を付けます。\n- 翻訳するもの：各タスクのタイトル、説明、引き継ぎメモ（`alm title`、`alm describe`、`alm handoff`）、カードのファイル（`tasks/<id>/card.md`）、タスクバッグの project-notes.md。\n- そのままにするもの：コマンド、タスク ID、ファイルのパス、コード。\n- 訳文で元の文を置き換え、元の文は残しません。\n- タスクの言語（`alm task-language` が表示するもの）は変えません。\n"
+        ),
+        (_, false) => "Translation: do not translate. The taskbag's contents stay in the language they are written in.\n".to_string(),
+        (_, true) => format!(
+            "Translation: translate the taskbag's contents into {name}, after the work above, as part of the same plan, and only after the person chooses Go ahead.\n- Translate: every task's title, description and handoff note (`alm title`, `alm describe`, `alm handoff`), the card files (`tasks/<id>/card.md`), and the taskbag's project-notes.md.\n- Keep as they are: commands, task IDs, file paths and code.\n- The translation replaces the old text; the originals are not kept.\n- The task language (what `alm task-language` prints) does not change: leave it.\n"
+        ),
+    }
+}
+
+fn update_request(language: &str, project: &Path, taskbag: &Path) -> String {
     if let Some(m) = versions::move_in(taskbag) {
         return agent_move_in_request_in(language, project, taskbag, &m);
     }
@@ -133,6 +185,26 @@ mod tests {
             "{r}"
         );
         assert!(r.contains("\n---\n"), "{r}");
+        // Translating is the person's choice (Task-A03-totem655): unchosen, the request says not to.
+        assert!(r.contains("Translation: do not translate."), "{r}");
+        for (language, name) in [("en", "English"), ("zh-CN", "简体中文"), ("ja", "日本語")]
+        {
+            let yes = agent_update_taskbag_request_with(language, &p, &tb, true);
+            assert!(yes.contains(name), "{language}: {yes}");
+            for kept in [
+                "alm task-language",
+                "tasks/<id>/card.md",
+                "project-notes.md",
+            ] {
+                assert!(yes.contains(kept), "{language}: {kept}");
+            }
+            let no = agent_update_taskbag_request_with(language, &p, &tb, false);
+            assert!(
+                !no.contains("tasks/<id>/card.md") || no.contains("move-cards"),
+                "{language}"
+            );
+            assert!(!no.contains(name) || language == "en", "{language}: {no}");
+        }
         // Old handoff files: their request too (Task-A03-polar770).
         assert!(!r.contains("move-handoffs request"), "{r}");
         fs::create_dir_all(tb.join("handoffs")).unwrap();

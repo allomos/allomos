@@ -695,3 +695,4 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .lan-address code, .lan-fingerprint { overflow-wrap: anywhere; }
 .companion { max-width: 560px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 10px; }
 .companion h1 { margin: 0; font-size: 22px; }
+.translate-choice { border: none; padding: 0; margin: 0; display: grid; gap: 4px; }

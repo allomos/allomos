@@ -425,6 +425,10 @@ enum Command {
         /// The language of the request (en, zh-CN, ja). Default: the Allomos app's language.
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
+        /// Also ask to translate the taskbag's contents into that language (titles, descriptions,
+        /// handoff notes, card files, project notes); without it the request says not to.
+        #[arg(long)]
+        translate: bool,
     },
     /// When to write a handoff: the quota and context gates (with any override for you, --as).
     /// With options, change them.
@@ -2093,7 +2097,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = changed.issues;
             Ok(done)
         }
-        Command::MoveIn { language } => {
+        Command::MoveIn {
+            language,
+            translate,
+        } => {
             let root = locate(cli, cwd)?;
             if let versions::FormatState::Newer { found } = versions::format_state(&root) {
                 return Err(Problem::TaskbagNewer {
@@ -2109,9 +2116,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             });
             // An older taskbag is not read: its project folder comes from its project.json as it is.
             let project = versions::project_folder(&root);
-            // One request for Update the taskbag… (Task-A01-45): the move-in request for an older
-            // taskbag, otherwise the move-cards request for card files kept outside the taskbag.
-            let request = allomos_store::agent_move_tasks_in_request_in(&language, &project, &root);
+            // The same request as the app's Update the taskbag… (Task-A01-45, A03-27): the move-in
+            // request for an older taskbag; otherwise whatever is due (an out-of-date section,
+            // card files kept outside, old handoff files), with the person's translate choice
+            // (Task-A03-totem655).
+            let request = allomos_store::agent_update_taskbag_request_with(
+                &language, &project, &root, *translate,
+            );
             let Some(move_in) = versions::move_in(&root) else {
                 let cards = allomos_store::cards::outside(&root);
                 return Ok(Done::new(

@@ -67,7 +67,7 @@ pub use setup::{
     SetupState, allomos_folder, project_folder_of, record_project_folder, relative_path,
     setup_state,
 };
-pub use update_taskbag::agent_update_taskbag_request_in;
+pub use update_taskbag::{agent_update_taskbag_request_in, agent_update_taskbag_request_with};
 
 /// Where a project's taskbag lives inside the folder the user picked.
 /// Always used for a new taskbag, also in an empty folder, so every tool looks in one place.

@@ -3783,6 +3783,27 @@ fn backlog_sends_an_unheld_task_back() {
     );
 }
 
+/// Task-A03-totem655: `alm move-in --translate` asks to translate the taskbag's contents into the
+/// request's language; without it the request says not to.
+#[test]
+fn move_in_asks_to_translate_only_when_told() {
+    let repo = filled();
+    let no = ok(&repo, &["move-in", "--language", "ja"]);
+    assert!(
+        no["request"]
+            .as_str()
+            .unwrap()
+            .contains("翻訳しないでください"),
+        "{no}"
+    );
+    let yes = ok(&repo, &["move-in", "--language", "ja", "--translate"]);
+    let r = yes["request"].as_str().unwrap();
+    assert!(
+        r.contains("日本語に翻訳してください") && r.contains("alm task-language"),
+        "{r}"
+    );
+}
+
 /// The event files in a taskbag (Task-A01-17).
 fn event_count(repo: &Path) -> usize {
     fs::read_dir(repo.join(".allomos/taskbag/events"))
