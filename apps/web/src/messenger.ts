@@ -63,6 +63,12 @@ export interface Messenger {
   onMoveTasksInMenu(handler: () => void): Promise<() => void>;
   /** Calls `handler` when File → Handoff Settings… is chosen (Task-A03-polar770). */
   onHandoffSettingsMenu(handler: () => void): Promise<() => void>;
+  /** Calls `handler` when File → Devices on Your Network… is chosen (Task-A04-02-01). */
+  onLanMenu(handler: () => void): Promise<() => void>;
+  /** "Allow devices on your network to view": whether it is on, and the address while it is. */
+  lanStatus(): Promise<LanStatus>;
+  /** Turns it on or off, remembered; resolves to the new status (with `error` when it could not start). */
+  setLanViewing(on: boolean): Promise<LanStatus>;
   /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
    * request for whichever applies typed in (`alm move-in` prints it; Task-A03-27: an out-of-date
@@ -215,6 +221,19 @@ export interface MenuTexts {
   connect: string;
   moveTasksIn: string;
   handoffSettings: string;
+  lan: string;
+}
+
+/** "Allow devices on your network to view" (apps/desktop/src-tauri/src/lan.rs, Task-A04-02-01). */
+export interface LanStatus {
+  on: boolean;
+  port: number | null;
+  /** `https://<this computer's address>:<port>`; null without a network address. */
+  url: string | null;
+  qr_svg: string | null;
+  fingerprint: string | null;
+  default_port: number;
+  error: string | null;
 }
 
 export const desktopMessenger: Messenger = {
@@ -246,6 +265,9 @@ export const desktopMessenger: Messenger = {
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
   onHandoffSettingsMenu: (handler) => getCurrentWebviewWindow().listen("menu:handoff_settings", () => handler()),
+  onLanMenu: (handler) => getCurrentWebviewWindow().listen("menu:lan_viewing", () => handler()),
+  lanStatus: () => invoke<LanStatus>("lan_status"),
+  setLanViewing: (on) => invoke<LanStatus>("set_lan_viewing", { on }),
   moveTasksIn: (agent, taskbag, language) => invoke<void>("move_tasks_in", { agent, taskbag, language }),
   moveTasksInRequest: (taskbag, language) => invoke<string>("move_tasks_in_request", { taskbag, language }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),

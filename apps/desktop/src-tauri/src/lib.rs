@@ -6,6 +6,7 @@
 
 mod agents;
 mod alm_command;
+mod lan;
 mod update;
 
 use std::ffi::OsString;
@@ -980,6 +981,103 @@ fn set_handoff_rules(
     handoff_settings_of(&root)
 }
 
+/// "Allow devices on your network to view" (Task-A04-02-01): the server while it runs.
+#[derive(Default)]
+struct Lan {
+    server: Mutex<Option<lan::Server>>,
+}
+
+/// What the web interface's server reads from the app: its built files, and the taskbags the
+/// windows show.
+struct AppSource(AppHandle);
+
+impl lan::Source for AppSource {
+    fn asset(&self, path: &str) -> Option<(Vec<u8>, String)> {
+        let asset = self.0.asset_resolver().get(path.to_string())?;
+        Some((asset.bytes().to_vec(), asset.mime_type().to_string()))
+    }
+    fn open_taskbags(&self) -> Vec<PathBuf> {
+        let windows = self.0.state::<Windows>();
+        let projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
+        let mut roots: Vec<PathBuf> = projects.values().cloned().collect();
+        roots.sort();
+        roots.dedup();
+        roots
+    }
+}
+
+/// What the "Devices on your network" dialog shows.
+#[derive(Serialize)]
+struct LanStatus {
+    on: bool,
+    /// The port in use, and the address and its QR code (SVG) while on; the address is `None`
+    /// when this computer has no network address.
+    port: Option<u16>,
+    url: Option<String>,
+    qr_svg: Option<String>,
+    /// The certificate's SHA-256 fingerprint, to compare with what the browser shows.
+    fingerprint: Option<String>,
+    default_port: u16,
+    /// Why it could not start, in plain words, when it could not.
+    error: Option<String>,
+}
+
+fn lan_status_of(lan: &Lan, error: Option<String>) -> LanStatus {
+    let server = lan.server.lock().unwrap_or_else(|e| e.into_inner());
+    let port = server.as_ref().map(|s| s.port);
+    let url = port.and_then(|p| lan::local_address().map(|ip| lan::address(ip, p)));
+    let fingerprint = server
+        .as_ref()
+        .and_then(|_| allomos_store::settings_dir())
+        .and_then(|d| lan::identity(&d).ok())
+        .map(|id| id.fingerprint);
+    LanStatus {
+        on: port.is_some(),
+        port,
+        qr_svg: url.as_deref().and_then(lan::qr_svg),
+        url,
+        fingerprint,
+        default_port: lan::DEFAULT_PORT,
+        error,
+    }
+}
+
+/// Start the server (it was off), or say why it cannot.
+fn start_lan(app: &AppHandle, lan: &Lan) -> Result<(), String> {
+    let mut server = lan.server.lock().unwrap_or_else(|e| e.into_inner());
+    if server.is_some() {
+        return Ok(());
+    }
+    let dir =
+        allomos_store::settings_dir().ok_or("This computer has no settings folder for Allomos.")?;
+    let id = lan::identity(&dir).map_err(|e| format!("The certificate could not be made: {e}"))?;
+    let source: std::sync::Arc<dyn lan::Source> = std::sync::Arc::new(AppSource(app.clone()));
+    let started = lan::start(lan::DEFAULT_PORT, &id, source)
+        .map_err(|e| format!("No port could be opened: {e}"))?;
+    *server = Some(started);
+    Ok(())
+}
+
+#[tauri::command]
+fn lan_status(lan: tauri::State<Lan>) -> LanStatus {
+    lan_status_of(&lan, None)
+}
+
+/// Turn "Allow devices on your network to view" on or off, and remember it. Off stops listening.
+#[tauri::command]
+fn set_lan_viewing(app: AppHandle, lan: tauri::State<Lan>, on: bool) -> LanStatus {
+    let _ = allomos_store::save_lan_viewing(on);
+    let error = if on {
+        start_lan(&app, &lan).err()
+    } else {
+        if let Some(server) = lan.server.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            server.stop();
+        }
+        None
+    };
+    lan_status_of(&lan, error)
+}
+
 /// One task's history, newest first, and when the taskbag started recording (Task-A01-17).
 #[tauri::command]
 fn task_history(root: PathBuf, id: String) -> allomos_store::events::History {
@@ -1438,6 +1536,9 @@ const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
 /// button on the Handoffs tab, removed).
 const HANDOFF_SETTINGS_ID: &str = "handoff_settings";
 const HANDOFF_SETTINGS_EVENT: &str = "menu:handoff_settings";
+/// File → Devices on Your Network…: "Allow devices on your network to view" (Task-A04-02-01).
+const LAN_ID: &str = "lan_viewing";
+const LAN_EVENT: &str = "menu:lan_viewing";
 const CHECK_UPDATES_ID: &str = "check_updates";
 /// The website the About window links to, and the words it shows (Task-A07-22).
 const WEBSITE: &str = "https://www.allomos.com";
@@ -1472,6 +1573,7 @@ struct MenuTexts {
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
     handoff_settings: MenuItem<Wry>,
+    lan: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
     /// **Restart to Update to Allomos <version>** (Task-A07-17).
@@ -1561,6 +1663,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         false,
         None::<&str>,
     )?;
+    // An app setting, not a project's: always enabled.
+    let lan_item = MenuItem::with_id(app, LAN_ID, "Devices on Your Network…", true, None::<&str>)?;
     fill_recent(app, &recent, &Recent::default())?;
     let existing = menu
         .items()?
@@ -1575,8 +1679,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
                 &connect_item,
                 &move_tasks_in,
                 &handoff_settings,
+                &lan_item,
             ])?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 5)?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 6)?;
             file
         }
         None => {
@@ -1590,6 +1695,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
                     &connect_item,
                     &move_tasks_in,
                     &handoff_settings,
+                    &lan_item,
                 ],
             )?;
             // After the app menu on macOS; first elsewhere.
@@ -1636,6 +1742,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         connect: connect_item,
         move_tasks_in,
         handoff_settings,
+        lan: lan_item,
         check_updates,
         update_action: Mutex::new(UpdateAction::Check),
         recent,
@@ -1743,6 +1850,7 @@ struct MenuWords {
     connect: String,
     move_tasks_in: String,
     handoff_settings: String,
+    lan: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -1755,6 +1863,7 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
     let _ = texts.handoff_settings.set_text(words.handoff_settings);
+    let _ = texts.lan.set_text(words.lan);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -1800,10 +1909,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .manage(Windows::default())
+        .manage(Lan::default())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_screen(&window);
+            }
+            // Remembered on (Task-A04-02-01): listen again from the start.
+            if allomos_store::lan_viewing() {
+                let handle = app.handle().clone();
+                let _ = start_lan(&handle, &handle.state::<Lan>());
             }
             Ok(())
         })
@@ -1832,6 +1947,8 @@ pub fn run() {
                 send(MOVE_TASKS_IN_EVENT, None);
             } else if id == HANDOFF_SETTINGS_ID {
                 send(HANDOFF_SETTINGS_EVENT, None);
+            } else if id == LAN_ID {
+                send(LAN_EVENT, None);
             } else if id == CHECK_UPDATES_ID {
                 let action = *app
                     .state::<MenuTexts>()
@@ -1878,6 +1995,8 @@ pub fn run() {
             set_update_item,
             handoff_settings,
             set_handoff_rules,
+            lan_status,
+            set_lan_viewing,
             create_taskbag,
             task_history,
             show_in_file_manager,

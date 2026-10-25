@@ -36,6 +36,10 @@ struct Settings {
     /// The version the person chose "Skip this version" for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     update_skipped: Option<String>,
+    /// "Allow devices on your network to view" is on (Task-A04-02-01, approver 2026-10-25: off by
+    /// default, remembered). Missing: off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lan_viewing: Option<bool>,
 }
 
 /// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
@@ -150,6 +154,19 @@ pub fn save_update_check(checked_at: u64, latest: &str) -> io::Result<()> {
 pub fn skip_update(version: &str) -> io::Result<()> {
     let mut settings = read_settings();
     settings.update_skipped = Some(version.to_string());
+    write_settings(&settings)
+}
+
+/// Whether "Allow devices on your network to view" is on (Task-A04-02-01); off until the person
+/// turns it on.
+pub fn lan_viewing() -> bool {
+    read_settings().lan_viewing == Some(true)
+}
+
+/// Remember "Allow devices on your network to view" on or off.
+pub fn save_lan_viewing(on: bool) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.lan_viewing = on.then_some(true);
     write_settings(&settings)
 }
 
@@ -330,6 +347,15 @@ mod tests {
                 skipped: Some("0.1.6".into()),
             }
         );
+        assert_eq!(saved_ui_language().as_deref(), Some("ja"));
+
+        // "Allow devices on your network to view": off until turned on, then remembered
+        // (Task-A04-02-01).
+        assert!(!lan_viewing());
+        save_lan_viewing(true).unwrap();
+        assert!(lan_viewing());
+        save_lan_viewing(false).unwrap();
+        assert!(!lan_viewing());
         assert_eq!(saved_ui_language().as_deref(), Some("ja"));
 
         // SAFETY: as above.

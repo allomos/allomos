@@ -687,3 +687,11 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .about-window .about-tagline { margin: 10px 0 4px; max-width: 280px; line-height: 1.4; }
 .about-window .about-website { font-size: 14px; align-self: center; }
 .about-window .about-licence { margin-top: 12px; color: var(--muted); }
+/* Devices on your network (Task-A04-02-01): the switch, the address with its QR code, and the
+   page a phone sees outside the desktop app. */
+.lan-dialog .lan-switch { font-weight: 600; }
+.lan-address { display: grid; justify-items: start; gap: 8px; }
+.lan-qr svg { width: 180px; height: 180px; background: #fff; border-radius: 6px; }
+.lan-address code, .lan-fingerprint { overflow-wrap: anywhere; }
+.companion { max-width: 560px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 10px; }
+.companion h1 { margin: 0; font-size: 22px; }

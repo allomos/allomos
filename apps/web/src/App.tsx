@@ -17,6 +17,7 @@ import { UpdateTaskbagNotice } from "./UpdateTaskbagNotice";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { HandoffSettingsDialog } from "./HandoffSettings";
+import { LanDialog } from "./LanDialog";
 import { localTime } from "./timeFlow";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
 import { groupCount } from "./groupCountFlow";
@@ -415,6 +416,7 @@ export function App({ messenger }: { messenger: Messenger }) {
         connect: t("menu.connect"),
         moveTasksIn: t("menu.move_cards"),
         handoffSettings: t("menu.handoff_settings"),
+        lan: t("menu.lan"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -443,13 +445,18 @@ export function App({ messenger }: { messenger: Messenger }) {
     });
     // File → Update the Taskbag… (enabled while a taskbag is open, Task-A00-30, Task-A01-45).
     const stopCards = messenger.onMoveTasksInMenu(() => void openTasksIn());
+    // File → Devices on Your Network… (Task-A04-02-01): an app setting, with or without a taskbag.
+    const stopLan = messenger.onLanMenu(() => setLanShown(true));
     return () => {
+      void stopLan.then((f) => f()).catch(() => undefined);
       void stopOpen.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
       void stopCards.then((f) => f()).catch(() => undefined);
     };
   }, [messenger, openRecent, changeRecent, openWizard, openTasksIn]);
+
+  const [lanShown, setLanShown] = useState(false);
 
   // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
   // afresh when it opens (another window may have changed it).
@@ -560,6 +567,7 @@ export function App({ messenger }: { messenger: Messenger }) {
             recentRef={recentButton}
           />
         )}
+        {lanShown && <LanDialog messenger={messenger} onClose={() => setLanShown(false)} />}
         {building && (
           <BuildAppDialog
             messenger={messenger}

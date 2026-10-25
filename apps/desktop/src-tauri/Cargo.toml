@@ -17,8 +17,15 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 allomos-core.workspace = true
 allomos-store.workspace = true
+# Task-A04-02-01: the "Allow devices on your network to view" server (lan.rs): self-signed HTTPS
+# (rustls with the ring crypto provider, rcgen for the certificate, sha2 for its fingerprint) and
+# the address's QR code. Pinned deliberately (AGENTS.md).
+qrcode = { version = "=0.14.1", default-features = false, features = ["svg"] }
+rcgen = { version = "=0.13.2", default-features = false, features = ["ring", "pem"] }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde.workspace = true
 serde_json.workspace = true
+sha2 = "=0.10.9"
 sys-locale = "=0.3.2"
 tauri = { version = "~2.11", features = [] }
 tauri-plugin-dialog = "2"
