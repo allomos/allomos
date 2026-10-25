@@ -16,7 +16,6 @@ import { outdatedFiles } from "./versionFlow";
 import { UpdateTaskbagNotice } from "./UpdateTaskbagNotice";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
-import { HandoffSettingsDialog } from "./HandoffSettings";
 import { TaskbagSettings } from "./TaskbagSettings";
 import { LanDialog } from "./LanDialog";
 import { localTime } from "./timeFlow";
@@ -428,7 +427,6 @@ export function App({ messenger }: { messenger: Messenger }) {
         noRecent: t("menu.no_recent"),
         connect: t("menu.connect"),
         moveTasksIn: t("menu.move_cards"),
-        handoffSettings: t("menu.handoff_settings"),
         lan: t("menu.lan"),
       })
       .catch(() => undefined);
@@ -1102,14 +1100,6 @@ function TaskbagView({
   };
   // Collapsed groups, remembered per project (Task-A01-26).
   const [collapsed, setCollapsed] = useFold(opened.root, "groups");
-  // File → Handoff Settings… (Task-A03-polar770): when agents must write a handoff.
-  const [handoffSettings, setHandoffSettings] = useState(false);
-  useEffect(() => {
-    const stop = messenger.onHandoffSettingsMenu(() => setHandoffSettings(true));
-    return () => {
-      void stop.then((f) => f()).catch(() => undefined);
-    };
-  }, [messenger]);
   const iterations = box?.iterations ?? [];
   const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
   // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
@@ -1538,7 +1528,6 @@ function TaskbagView({
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
               />
             )}
-            {handoffSettings && <HandoffSettingsDialog messenger={messenger} root={opened.root} onClose={() => setHandoffSettings(false)} />}
           </div>
         </>
       ) : (

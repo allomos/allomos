@@ -919,7 +919,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
 }
 
 /// The project's handoff rules (as written, and with the defaults filled in) (Task-A03-06), for
-/// the Handoff settings dialog (File → Handoff Settings…, Task-A03-polar770).
+/// the Handoff section of the taskbag's settings (Settings → Handoff, Task-A05-yacht960).
 #[derive(Serialize)]
 struct HandoffSettings {
     rules: allomos_core::HandoffRules,
@@ -1408,13 +1408,12 @@ fn set_project_folder(root: PathBuf, folder: PathBuf) -> Result<SetupState, Prob
     setup_state(&root)
 }
 
-/// File → Connect with the Agents…, File → Update the Taskbag… and File → Handoff Settings… are
-/// offered only while a taskbag is open.
+/// File → Connect with the Agents… and File → Update the Taskbag… are offered only while a
+/// taskbag is open.
 #[tauri::command]
 fn set_connect_enabled(texts: tauri::State<MenuTexts>, enabled: bool) {
     let _ = texts.connect.set_enabled(enabled);
     let _ = texts.move_tasks_in.set_enabled(enabled);
-    let _ = texts.handoff_settings.set_enabled(enabled);
 }
 
 /// The job **Update the taskbag…** asks an agent to do, for its progress popup (Task-A05-08):
@@ -1783,10 +1782,6 @@ const CONNECT_ID: &str = "connect";
 const CONNECT_EVENT: &str = "menu:connect";
 const MOVE_TASKS_IN_ID: &str = "move_tasks_in";
 const MOVE_TASKS_IN_EVENT: &str = "menu:move_tasks_in";
-/// File → Handoff Settings…: when agents must write a handoff (Task-A03-polar770; it was a
-/// button on the Handoffs tab, removed).
-const HANDOFF_SETTINGS_ID: &str = "handoff_settings";
-const HANDOFF_SETTINGS_EVENT: &str = "menu:handoff_settings";
 /// File → Devices on Your Network…: "Allow devices on your network to view" (Task-A04-02-01).
 const LAN_ID: &str = "lan_viewing";
 const LAN_EVENT: &str = "menu:lan_viewing";
@@ -1823,7 +1818,6 @@ struct MenuTexts {
     new_window: MenuItem<Wry>,
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
-    handoff_settings: MenuItem<Wry>,
     lan: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
@@ -1906,14 +1900,6 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         false,
         None::<&str>,
     )?;
-    let handoff_settings = MenuItem::with_id(
-        app,
-        HANDOFF_SETTINGS_ID,
-        "Handoff Settings…",
-        // Enabled by the window while a taskbag is open.
-        false,
-        None::<&str>,
-    )?;
     // An app setting, not a project's: always enabled.
     let lan_item = MenuItem::with_id(app, LAN_ID, "Devices on Your Network…", true, None::<&str>)?;
     fill_recent(app, &recent, &Recent::default())?;
@@ -1929,10 +1915,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
                 &recent,
                 &connect_item,
                 &move_tasks_in,
-                &handoff_settings,
                 &lan_item,
             ])?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 6)?;
+            file.insert(&PredefinedMenuItem::separator(app)?, 5)?;
             file
         }
         None => {
@@ -1945,7 +1930,6 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
                     &recent,
                     &connect_item,
                     &move_tasks_in,
-                    &handoff_settings,
                     &lan_item,
                 ],
             )?;
@@ -1992,7 +1976,6 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         new_window,
         connect: connect_item,
         move_tasks_in,
-        handoff_settings,
         lan: lan_item,
         check_updates,
         update_action: Mutex::new(UpdateAction::Check),
@@ -2100,7 +2083,6 @@ struct MenuWords {
     no_recent: String,
     connect: String,
     move_tasks_in: String,
-    handoff_settings: String,
     lan: String,
 }
 
@@ -2113,7 +2095,6 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
-    let _ = texts.handoff_settings.set_text(words.handoff_settings);
     let _ = texts.lan.set_text(words.lan);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
@@ -2196,8 +2177,6 @@ pub fn run() {
                 send(CONNECT_EVENT, None);
             } else if id == MOVE_TASKS_IN_ID {
                 send(MOVE_TASKS_IN_EVENT, None);
-            } else if id == HANDOFF_SETTINGS_ID {
-                send(HANDOFF_SETTINGS_EVENT, None);
             } else if id == LAN_ID {
                 send(LAN_EVENT, None);
             } else if id == CHECK_UPDATES_ID {

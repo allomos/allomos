@@ -3,10 +3,12 @@
 // Close and Esc close it. General shows the taskbag's name, with Rename (Task-A05-chalk937), its
 // format and whether it is up to date, with Update the Taskbag… when it is older (the same check as
 // the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
-// sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951). The
-// other sections (Project folders, Handoff, Agents) come with their own tasks.
+// sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951).
+// Handoff holds the handoff rules (Task-A05-yacht960). The other sections (Project folders,
+// Agents) come with their own tasks.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { HandoffSection } from "./HandoffSettings";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
 import { addStep, ladderChanged, ladderProblem, moveStep, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
 import type { Messenger } from "./messenger";
@@ -14,7 +16,7 @@ import { middleEllipsis } from "./paths";
 import { isProblem, type VersionCheck } from "./types";
 import { movingTasks, updateNotice } from "./versionFlow";
 
-const SECTIONS = ["general", "tasks"] as const;
+const SECTIONS = ["general", "tasks", "handoff"] as const;
 type Section = (typeof SECTIONS)[number];
 
 /** The location in its monospace font, shortened in the middle to the characters that fit its
@@ -315,6 +317,7 @@ export function TaskbagSettings({
                 />
               </>
             )}
+            {section === "handoff" && <HandoffSection messenger={messenger} root={root} />}
           </div>
         </div>
         <div className="row">

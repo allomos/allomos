@@ -60,8 +60,6 @@ export interface Messenger {
   onConnectMenu(handler: () => void): Promise<() => void>;
   /** Calls `handler` when File → Update the Taskbag… is chosen (Task-A00-30, Task-A01-45). */
   onMoveTasksInMenu(handler: () => void): Promise<() => void>;
-  /** Calls `handler` when File → Handoff Settings… is chosen (Task-A03-polar770). */
-  onHandoffSettingsMenu(handler: () => void): Promise<() => void>;
   /** Calls `handler` when File → Devices on Your Network… is chosen (Task-A04-02-01). */
   onLanMenu(handler: () => void): Promise<() => void>;
   /** "Allow devices on your network to view": whether it is on, and the address while it is. */
@@ -221,7 +219,7 @@ export interface Messenger {
   projectSetup(root: string): Promise<SetupState>;
   /** Records `folder` as the project folder of the taskbag at `root`. Rejects with a Problem. */
   setProjectFolder(root: string, folder: string): Promise<SetupState>;
-  /** Enables or disables File → Connect with the Agents…, File → Update the Taskbag… and File → Handoff Settings…. */
+  /** Enables or disables File → Connect with the Agents… and File → Update the Taskbag…. */
   setConnectEnabled(enabled: boolean): Promise<void>;
 }
 
@@ -233,7 +231,6 @@ export interface MenuTexts {
   noRecent: string;
   connect: string;
   moveTasksIn: string;
-  handoffSettings: string;
   lan: string;
 }
 
@@ -283,7 +280,6 @@ export const desktopMessenger: Messenger = {
   setRecentFolders: (folders) => invoke<void>("set_recent_folders", { folders }),
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
-  onHandoffSettingsMenu: (handler) => getCurrentWebviewWindow().listen("menu:handoff_settings", () => handler()),
   onLanMenu: (handler) => getCurrentWebviewWindow().listen("menu:lan_viewing", () => handler()),
   lanStatus: () => invoke<LanStatus>("lan_status"),
   setLanViewing: (on) => invoke<LanStatus>("set_lan_viewing", { on }),
