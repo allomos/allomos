@@ -35,7 +35,7 @@ import {
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
-import { ACTIVE_MINUTES, check, paneAgent, session, sessionPlace } from "./sessionFlow";
+import { ACTIVE_MINUTES, check, checkRow, paneAgent, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
@@ -111,12 +111,13 @@ export function TaskPane({
   const [conflict, setConflict] = useState<string | null>(null);
   // Reopen… (Task-A01-50): the reason being written; null while the form is closed.
   const [reason, setReason] = useState<string | null>(null);
-  // Open in Claude was pressed: the app was asked; whether it opened cannot be known.
-  const [sessionAsked, setSessionAsked] = useState(false);
+  // Open in Claude was pressed, at the top or in the Session row (Task-A03-smile488): the app was
+  // asked; whether it opened cannot be known. The note shows beside the button that was pressed.
+  const [sessionAsked, setSessionAsked] = useState<"top" | "row" | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
   useEffect(() => {
     ref.current?.scrollTo?.({ top: 0 });
-    setSessionAsked(false);
+    setSessionAsked(null);
     setEditing(null);
     setAsking(null);
     setReason(null);
@@ -495,22 +496,39 @@ export function TaskPane({
           : t("session.last_session")
         : t(sess.kind === "active" ? "session.active" : "session.last_seen", { time: localTime(sess.at) });
   const sessionText = sessionWhen && place ? t("session.where", { when: sessionWhen, where: t(`session.in_${place}`) }) : sessionWhen;
+  // One action for both buttons: the Session row's and the one at the top (Task-A03-smile488).
+  const openSession = (from: "top" | "row") => {
+    if (!onOpenSession) return;
+    setSessionAsked(null);
+    onOpenSession().then(() => setSessionAsked(place === "app" ? from : null), say);
+  };
+  const openLabel = t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal");
+  const askedNote = (from: "top" | "row") =>
+    sessionAsked === from && <span className={from === "top" ? "muted small pane-open-note" : "muted small"}> {t("session.asked_claude")}</span>;
   const sessionButton =
     place && onOpenSession ? (
       <>
-        <button
-          type="button"
-          className="link small change"
-          onClick={() => {
-            setSessionAsked(false);
-            onOpenSession().then(() => setSessionAsked(place === "app"), say);
-          }}
-        >
-          {t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
+        <button type="button" className="link small change" onClick={() => openSession("row")}>
+          {openLabel}
         </button>
-        {sessionAsked && <span className="muted small"> {t("session.asked_claude")}</span>}
+        {askedNote("row")}
       </>
     ) : null;
+  // Task-A03-smile488: the row under the title, with the check (if any) and the open button at its
+  // far right, a normal button with the "opens elsewhere" icon.
+  const top = checkRow(task, toCheck(task), !!onOpenSession);
+  const topButton = top?.open ? (
+    <>
+      <button type="button" className="with-icon pane-open" onClick={() => openSession("top")}>
+        <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11" />
+          <path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5" />
+        </svg>
+        {openLabel}
+      </button>
+      {askedNote("top")}
+    </>
+  ) : null;
   // The area, agent, check and session are not changed here: holders are agent sessions (owner,
   // 2026-10-14), and the others have no change of their own in `alm` (the Checked button below
   // clears the note). The fourth item is the label's hover text.
@@ -557,22 +575,27 @@ export function TaskPane({
           ×
         </button>
       </header>
-      {toCheck(task) && (
+      {top?.toCheck && (
         <div className="pane-check">
           <HumanCheckBadge task={task} />
           {asking === "checked" && !ownerName ? (
-            nameForm()
+            <>
+              {topButton}
+              {nameForm()}
+            </>
           ) : (
             <>
               <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
                 {t("pane.checked_button")}
               </button>
+              {topButton}
               <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
               {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
             </>
           )}
         </div>
       )}
+      {top && !top.toCheck && <div className="pane-check">{topButton}</div>}
       {toReview(task) && (
         <div className="pane-check pane-review">
           <AiDecidedBadge task={task} />

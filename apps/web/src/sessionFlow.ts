@@ -55,6 +55,16 @@ export function sessionPlace(task: Task): SessionPlace | null {
   return null;
 }
 
+/** The row under the title (Task-A03-smile488): the human check, when the task waits for one, and
+ * the session's open button at its far right, whenever the task records a session and this app
+ * can open it (the desktop app). `waitsForCheck` is stopFlow's toCheck. Null: no row, as before. */
+export type CheckRow = { toCheck: boolean; open: SessionPlace | null };
+
+export function checkRow(task: Task, waitsForCheck: boolean, canOpen: boolean): CheckRow | null {
+  const open = canOpen ? sessionPlace(task) : null;
+  return waitsForCheck || open ? { toCheck: waitsForCheck, open } : null;
+}
+
 /** The holder's session; when nobody holds the task, the last one it records; else null. */
 export function session(task: Task, history: TaskHistory | null, now: Date): Session | null {
   const holder = task.holder?.trim();
