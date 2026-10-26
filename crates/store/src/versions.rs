@@ -81,7 +81,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// (`--folder` / `--no-folder`), `alm folders`, and `alm next` inside a folder (Task-A01-dime494).
 /// 27: the handoff gates apply only while a task is held, and reaching one releases the task
 /// (Task-A03-hammer676).
-pub const SECTION_VERSION: u32 = 27;
+/// 28: at `alm claim` the agent passes what the Allomos app needs to reopen its session
+/// (`--session-agent`, `--session-id`, and e.g. `--session-kind desktop --app-session-id`)
+/// (Task-A03-hive049).
+pub const SECTION_VERSION: u32 = 28;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

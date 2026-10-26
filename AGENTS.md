@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v27)
+## Tasks: Allomos (v28)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -54,7 +54,11 @@ the project notes (below).
   control tool (it prints the Git commands as the example): until your claim is shared, other
   sessions do not see it. Every task has a base branch, by its real name: it starts from it and
   merges back into it; the claim records your working branch and prints the base to start from
-  and merge into, with the Git commands as the example.
+  and merge into, with the Git commands as the example. When you claim, pass what the Allomos
+  app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your
+  session's ID>`, and whatever else your agent needs to reopen it (for example,
+  `--session-kind desktop --app-session-id <its local_… ID>` when you run in the Claude
+  desktop app).
 - Always work a task in a worktree of its own (a separate working copy on the task's own
   branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
   prints), never in the main checkout: the main checkout stays on the base branch. Merge from

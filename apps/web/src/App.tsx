@@ -738,6 +738,7 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
             messenger={messenger}
             onError={(e) => setError(errorNote(e))}
             hideOlder={olderShown}
+            canOpenSessions={!companion}
             onReload={async () => {
               // After a change made in this window: read again, and note the stamp so the follow
               // does not read it a second time and call it automatic (Task-A01-47).
@@ -1109,6 +1110,7 @@ function TaskbagView({
   messenger,
   onError,
   hideOlder,
+  canOpenSessions,
   onReload,
   refreshed,
   onRefresh,
@@ -1118,6 +1120,8 @@ function TaskbagView({
   onError: (e: unknown) => void;
   /** The update notice already says the taskbag is from an older Allomos. */
   hideOlder: boolean;
+  /** The desktop app, where agent sessions run: the task pane can reopen them (Task-A03-hive049). */
+  canOpenSessions: boolean;
   /** Reads the taskbag again now, after a change made in this window. */
   onReload: () => Promise<void>;
   /** When the list was last read and how (Task-A01-47). */
@@ -1620,6 +1624,7 @@ function TaskbagView({
                 nextIterationId={nextIds?.iteration ?? null}
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 folders={folders}
+                onOpenSession={canOpenSessions ? () => messenger.openAgentSession(opened.root, selected.id) : undefined}
               />
             )}
           </div>

@@ -427,6 +427,11 @@ pub struct Task {
     /// particular (decision 0019, Task-A01-dime494).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub folders: Vec<String>,
+    /// The agent session that holds the task, or last held it: what the agent passed at
+    /// `alm claim` so the app can reopen it (Task-A03-hive049). Kept after release and done; a
+    /// new claim replaces it, and the history keeps the earlier ones.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<AgentSession>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
@@ -446,6 +451,44 @@ impl Task {
     /// Finished without the human check and not checked since: "To check" (Task-A03-18).
     pub fn to_check(&self) -> bool {
         self.state == State::Done && self.without_human_check.is_some()
+    }
+}
+
+/// A task's agent session, as the agent passed it at `alm claim` (Task-A03-hive049). `alm` stores
+/// what it is given and checks nothing: the agent decides what applies to it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct AgentSession {
+    /// The session's `--as` name, so the app finds when it last changed the taskbag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+    /// The AI agent it runs under (`--session-agent`, e.g. `claude-code`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// The agent's own session ID (`--session-id`; for Claude Code, what `claude --resume` takes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Where it runs (`--session-kind`, e.g. `desktop` for the Claude desktop app).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// The desktop app's ID for it (`--app-session-id`, e.g. Claude's `local_…`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_session_id: Option<String>,
+    /// The folder `alm claim` ran in, relative to the folder holding `.allomos/` (never
+    /// absolute, so no user name is written): where **Resume in terminal** opens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<String>,
+    /// Fields this Allomos does not know, kept as they are.
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+impl AgentSession {
+    /// Nothing was passed: no session to record.
+    pub fn is_empty(&self) -> bool {
+        self.agent.is_none()
+            && self.id.is_none()
+            && self.kind.is_none()
+            && self.app_session_id.is_none()
     }
 }
 

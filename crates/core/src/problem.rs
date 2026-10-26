@@ -182,6 +182,11 @@ problems! {
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
+    /// The task records no session the app can reopen (Task-A03-hive049).
+    NoSession { id } => "no_session", "Task {id} records no session to open.";
+    /// The terminal or the Claude app could not be started (Task-A03-hive049). `detail` is the
+    /// system's own text.
+    SessionOpenFailed { detail } => "session_open_failed", "Could not open the session: {detail}.";
     /// **Restart to Update** could not install the new version (Task-A07-17); this one keeps
     /// running. `detail` is the system's own text, or why the download was refused.
     UpdateFailed { detail } => "update_failed", "Allomos could not install the update: {detail}. You still have the version you had.";

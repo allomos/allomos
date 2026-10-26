@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { check, paneAgent, session } from "../src/sessionFlow.ts";
+import { check, paneAgent, session, sessionPlace } from "../src/sessionFlow.ts";
 import type { Task, TaskHistory } from "../src/types.ts";
 
 const task = (over: Partial<Task> = {}): Task => ({ id: "A01-01", title: "t", area: "A01", state: "in_progress", label: null, ...over }) as Task;
@@ -21,6 +21,22 @@ test("the session is active while its holder changed the taskbag in the last 30 
   assert.deepEqual(session(held, null, now), { kind: "unknown" });
   // Nobody holds it: no session row.
   assert.equal(session(task(), h("2026-10-22T09:59:00Z"), now), null);
+});
+
+test("a recorded session says where it runs and is kept as the last session after release", () => {
+  // Task-A03-hive049: the app session ID wins; a session ID alone resumes in a terminal.
+  assert.equal(sessionPlace(task({ session: { id: "s1", kind: "desktop", app_session_id: "local_1" } })), "app");
+  assert.equal(sessionPlace(task({ session: { id: "s1" } })), "terminal");
+  assert.equal(sessionPlace(task({ session: { agent: "claude-code" } })), null);
+  assert.equal(sessionPlace(task()), null);
+  const h = history({ seen: [{ by: "claude/x", at: "2026-10-22T08:00:00Z", agent: "claude" }] });
+  const released = task({ state: "ready", holder: null, session: { by: "claude/x", id: "s1" } });
+  assert.deepEqual(session(released, h, now), { kind: "last_session", at: "2026-10-22T08:00:00Z" });
+  assert.deepEqual(session(released, null, now), { kind: "last_session", at: null });
+  // Held: the row reads as before (active, last seen).
+  assert.deepEqual(session({ ...released, holder: "claude/x" }, h, now), { kind: "last_seen", at: "2026-10-22T08:00:00Z" });
+  // Nothing to reopen and nobody holds it: no row.
+  assert.equal(session(task({ holder: null, session: { agent: "claude-code" } }), h, now), null);
 });
 
 test("the agent is the holder, else the last session that changed the task through alm", () => {

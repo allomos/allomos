@@ -202,13 +202,15 @@ See:
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
 Work a task:
-- `alm claim <id> --branch <the branch you are on> [--working <name>]`: you hold it; state in
+- `alm claim <id> --branch <the branch you are on> [--working <name>] [--session-agent <agent>]
+  [--session-id <id>] [--session-kind <kind>] [--app-session-id <id>]`: you hold it; state in
   progress. It records the working branch (`--working`, default the branch you are on), gives a
   task without a base the branch you are on, prints the base to start from and merge into with
   the Git commands as the example (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
   you are not on the base. `--take` only when its holder has stopped. While card files are kept
   outside the taskbag it refuses (`claim_cards_outside`): move them in first (`alm guide
-  move-cards`).
+  move-cards`). The `--session-…` options record your session, so the Allomos app can reopen it
+  from the task (stored as given, never checked).
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).
@@ -427,6 +429,11 @@ const WORKFLOW: &str = "# How to work the tasks
    Git: `git branch --show-current`; alm reads no version control), and save and share the claim
    right away with your version control tool (it prints the Git commands as the example): until
    your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
+   When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
+   <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
+   reopen it (for example, `--session-kind desktop --app-session-id <its local_… ID>` when you
+   run in the Claude desktop app). alm stores what you pass and checks nothing; the task keeps
+   it after release and done, and the next claim replaces it.
    **Branches.** Every task has a base branch, by its real name (`main`, `master`,
    `storage-v2`…): it starts from it and merges back into it; merging one base branch into
    another is a task of its own. The claim records your working branch, the one you work on

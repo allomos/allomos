@@ -289,6 +289,20 @@ enum Command {
         /// new branch for its own worktree).
         #[arg(long, value_name = "NAME")]
         working: Option<String>,
+        /// What the Allomos app needs to reopen your session: the AI agent it runs under (for
+        /// example `claude-code`). alm stores it and checks nothing.
+        #[arg(long, value_name = "AGENT")]
+        session_agent: Option<String>,
+        /// Your agent's own session ID (for Claude Code, what `claude --resume` takes).
+        #[arg(long, value_name = "ID")]
+        session_id: Option<String>,
+        /// Where your session runs, when your agent needs it to reopen it (for example `desktop`
+        /// in the Claude desktop app).
+        #[arg(long, value_name = "KIND")]
+        session_kind: Option<String>,
+        /// The desktop app's ID for your session (in the Claude desktop app, its `local_…` ID).
+        #[arg(long, value_name = "ID")]
+        app_session_id: Option<String>,
     },
     /// Change the branch a task starts from and merges into (its base), by its real name.
     Base {
@@ -1589,7 +1603,7 @@ fn confirm(
 }
 
 /// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
-const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the active iteration (the one marked active, or else the first planned one) whose next dependency is met (the list shows its tasks first); with none there, from the earliest iteration, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it.";
+const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the active iteration (the one marked active, or else the first planned one) whose next dependency is met (the list shows its tasks first); with none there, from the earliest iteration, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it. When you claim, pass what the Allomos app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to reopen it (for example, `--session-kind desktop --app-session-id <its local_… ID>` when you run in the Claude desktop app).";
 
 fn task_json(t: &Task) -> Value {
     let mut v = serde_json::to_value(t).expect("tasks serialize");
@@ -3057,6 +3071,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             take,
             branch,
             working,
+            session_agent,
+            session_id,
+            session_kind,
+            app_session_id,
         } => {
             let root = locate(cli, cwd)?;
             // The taskbag is updated before any task is worked (Task-A03-27, approver
@@ -3077,11 +3095,24 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 *take,
                 branch.as_deref(),
                 working.as_deref(),
+                Some(allomos_core::AgentSession {
+                    agent: non_blank(session_agent),
+                    id: non_blank(session_id),
+                    kind: non_blank(session_kind),
+                    app_session_id: non_blank(app_session_id),
+                    folder: claim_folder(&root, cwd),
+                    ..Default::default()
+                }),
             )?;
             let at = &claimed.branches;
             let mut text = format!("{}\n", task_line(&claimed.changed.task));
             let steps = branch_steps(at);
             text.push_str(&steps.text);
+            // Task-A03-hive049: the app reopens the session from what the agent passes; alm only
+            // reminds when nothing was passed.
+            if claimed.changed.task.session.is_none() {
+                text.push_str(&format!("{SESSION_HINT}\n"));
+            }
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
@@ -3609,4 +3640,26 @@ fn next_cards_line(outside: usize) -> String {
     } else {
         String::new()
     }
+}
+
+/// An option's value with its spaces trimmed; `None` when nothing is left.
+fn non_blank(value: &Option<String>) -> Option<String> {
+    value
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+}
+
+/// What `alm claim` prints when the agent passed no session (Task-A03-hive049).
+const SESSION_HINT: &str = "When you claim, pass what the Allomos app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to reopen it (for example, `--session-kind desktop --app-session-id <its local_… ID>` when you run in the Claude desktop app). Claim it again with them to record it.";
+
+/// The folder `alm claim` runs in, relative to the folder holding `.allomos/`
+/// (Task-A03-hive049): never absolute, so no user name is written; `None` when there is no
+/// relative way.
+fn claim_folder(root: &Path, cwd: &Path) -> Option<String> {
+    let from = std::fs::canonicalize(allomos_store::allomos_folder(root)).ok()?;
+    let to = std::fs::canonicalize(cwd).ok()?;
+    let path = allomos_store::relative_path(&from, &to)?;
+    Some(path.to_string_lossy().replace('\\', "/"))
 }

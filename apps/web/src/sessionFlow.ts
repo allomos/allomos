@@ -9,6 +9,9 @@
 //   the taskbag within the last 30 minutes is "active"; otherwise "last seen <time>" (approver,
 //   2026-10-22). A holder copied from an old board has no change at all and says so, instead of
 //   reading as an agent working now (owner, 2026-10-10).
+// - Where it runs (Task-A03-hive049): what the agent passed at `alm claim`. A session in the
+//   Claude desktop app opens there, one in a terminal resumes in a new terminal. The task keeps
+//   it after release and done, so the row then reads "Last session".
 
 import type { Task, TaskHistory } from "./types";
 
@@ -37,12 +40,29 @@ export type Session =
   | { kind: "active"; at: string }
   | { kind: "last_seen"; at: string }
   /** The holder has no recorded change anywhere in the taskbag. */
-  | { kind: "unknown" };
+  | { kind: "unknown" }
+  /** Nobody holds it: the session that last held it (Task-A03-hive049); `at`, its last change. */
+  | { kind: "last_session"; at: string | null };
 
-/** The holder's session; null when nobody holds the task. */
+/** Where the recorded session runs, so the pane can reopen it. */
+export type SessionPlace = "app" | "terminal";
+
+/** Where the task's recorded session runs; null: nothing to reopen (older claims, other agents). */
+export function sessionPlace(task: Task): SessionPlace | null {
+  const s = task.session;
+  if (s?.app_session_id?.trim()) return "app";
+  if (s?.id?.trim()) return "terminal";
+  return null;
+}
+
+/** The holder's session; when nobody holds the task, the last one it records; else null. */
 export function session(task: Task, history: TaskHistory | null, now: Date): Session | null {
   const holder = task.holder?.trim();
-  if (!holder) return null;
+  if (!holder) {
+    if (!sessionPlace(task)) return null;
+    const by = task.session?.by?.trim();
+    return { kind: "last_session", at: (by && history?.seen?.find((s) => s.by === by)?.at) || null };
+  }
   const seen = history?.seen?.find((s) => s.by === holder);
   if (!seen) return { kind: "unknown" };
   const at = Date.parse(seen.at);

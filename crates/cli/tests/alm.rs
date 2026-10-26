@@ -2419,7 +2419,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v27)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v28)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2429,7 +2429,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v27)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v28)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -5257,4 +5257,56 @@ fn project_folders_are_bound_renamed_located_and_unbound() {
     assert_eq!(ok(&repo, &["folder", "list"])["folders"], json!([]));
     let v = ok(&repo, &["list"]);
     assert_eq!(v["issues"], json!([]), "{v}");
+}
+
+/// Task-A03-hive049: `alm claim` stores the session the agent passes, as given; the task keeps it
+/// after release, and a new claim replaces it (nothing passed clears it, with a reminder).
+#[test]
+fn claim_records_the_session_the_agent_passes() {
+    let repo = filled();
+    let wt = repo.join("wt");
+    fs::create_dir(&wt).unwrap();
+    let v = ok(
+        &wt,
+        &[
+            "--as",
+            "claude/x",
+            "claim",
+            "A01-01",
+            "--session-agent",
+            "claude-code",
+            "--session-id",
+            " 9ad41e08 ",
+            "--session-kind",
+            "desktop",
+            "--app-session-id",
+            "local_ec51",
+        ],
+    );
+    assert_eq!(
+        v["task"]["session"],
+        json!({
+            "by": "claude/x",
+            "agent": "claude-code",
+            "id": "9ad41e08",
+            "kind": "desktop",
+            "app_session_id": "local_ec51",
+            "folder": "wt",
+        })
+    );
+    ok(
+        &repo,
+        &["--as", "claude/x", "release", "A01-01", "--note", "n"],
+    );
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["task"]["session"]["id"], "9ad41e08", "{shown}");
+    // A claim with nothing passed replaces it with nothing, and says what to pass.
+    let out = alm(&repo, &["--as", "codex/y", "claim", "A01-01"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("--session-agent <your agent's id>"), "{text}");
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert!(shown["task"].get("session").is_none(), "{shown}");
+    // The history keeps the earlier one.
+    let h = ok(&repo, &["history", "A01-01"]);
+    assert!(h.to_string().contains("local_ec51"), "{h}");
 }

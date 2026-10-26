@@ -17,10 +17,10 @@ pub mod request;
 mod validate;
 
 pub use model::{
-    AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN, Extra,
-    FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project, ProjectFolder,
-    READ_FROM, State, TASK_LANGUAGE_UI, Task, Taskbag, default_labels, folder_name_from,
-    format_version, valid_folder_name, valid_language,
+    AgentSession, AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN,
+    Extra, FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project,
+    ProjectFolder, READ_FROM, State, TASK_LANGUAGE_UI, Task, Taskbag, default_labels,
+    folder_name_from, format_version, valid_folder_name, valid_language,
 };
 pub use problem::Problem;
 pub use validate::{

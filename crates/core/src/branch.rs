@@ -302,6 +302,7 @@ mod tests {
     fn task(id: &str, state: State, holder: Option<&str>) -> Task {
         Task {
             folders: Default::default(),
+            session: None,
             extra: Default::default(),
             id: id.into(),
             title: id.into(),

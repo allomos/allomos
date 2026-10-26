@@ -261,7 +261,11 @@ the project notes (below).
   control tool (it prints the Git commands as the example): until your claim is shared, other
   sessions do not see it. Every task has a base branch, by its real name: it starts from it and
   merges back into it; the claim records your working branch and prints the base to start from
-  and merge into, with the Git commands as the example.
+  and merge into, with the Git commands as the example. When you claim, pass what the Allomos
+  app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your
+  session's ID>`, and whatever else your agent needs to reopen it (for example,
+  `--session-kind desktop --app-session-id <its local_… ID>` when you run in the Claude
+  desktop app).
 - Always work a task in a worktree of its own (a separate working copy on the task's own
   branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
   prints), never in the main checkout: the main checkout stays on the base branch. Merge from
@@ -1040,6 +1044,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         let dir = root.join("tasks").join(id);
         let task = Task {
             folders: Default::default(),
+            session: None,
             extra: Default::default(),
             id: id.into(),
             title: title.into(),
@@ -2080,8 +2085,10 @@ pub struct Claimed {
 
 /// Claim task `id` (`alm claim`, Task-A03-22): the claim rule, plus its branches. `current` is the
 /// branch the agent is on, `working` the branch the work is done on (default `current`). A task
-/// without a base gets `current`. One `claim` event holds both the task's changes and the branch
-/// changes.
+/// without a base gets `current`. `session` is the agent's session as it passed it (Task-A03-hive049):
+/// it replaces the task's last one, and nothing passed clears it. One `claim` event holds both the
+/// task's changes and the branch changes.
+#[allow(clippy::too_many_arguments)]
 pub fn claim_task(
     root: &Path,
     actor: Actor,
@@ -2090,9 +2097,16 @@ pub fn claim_task(
     take: bool,
     current: Option<&str>,
     working: Option<&str>,
+    session: Option<allomos_core::AgentSession>,
 ) -> Result<Claimed, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let outcome = ops::claim(&bag, id, actor.by, take)?;
+    let mut outcome = ops::claim(&bag, id, actor.by, take)?;
+    outcome.task.session = session
+        .filter(|s| !s.is_empty())
+        .map(|s| allomos_core::AgentSession {
+            by: outcome.task.holder.clone(),
+            ..s
+        });
     let before = branches(root).remove(id).unwrap_or_default();
     let at = branch::at_claim(id, &before, current, working)?;
     let old = bag.tasks.iter().find(|t| t.id == outcome.task.id);

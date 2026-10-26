@@ -35,7 +35,7 @@ import {
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
-import { ACTIVE_MINUTES, check, paneAgent, session } from "./sessionFlow";
+import { ACTIVE_MINUTES, check, paneAgent, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
@@ -59,6 +59,7 @@ export function TaskPane({
   nextIterationId,
   onNewIteration,
   folders,
+  onOpenSession,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -90,6 +91,9 @@ export function TaskPane({
   onNewIteration: (iteration: NewIteration) => Promise<void>;
   /** The taskbag's bound project folders (Task-A01-sketch327); empty: none bound. */
   folders: FolderInfo[];
+  /** Reopens the session the task records (Task-A03-hive049): only on the desktop app, where the
+   * session is; the companions show the Session row's text only. Rejects with a Problem. */
+  onOpenSession?: () => Promise<void>;
 }) {
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
@@ -107,9 +111,12 @@ export function TaskPane({
   const [conflict, setConflict] = useState<string | null>(null);
   // Reopen… (Task-A01-50): the reason being written; null while the form is closed.
   const [reason, setReason] = useState<string | null>(null);
+  // Open in Claude was pressed: the app was asked; whether it opened cannot be known.
+  const [sessionAsked, setSessionAsked] = useState(false);
   // A new task starts at the top of the pane, with nothing being changed.
   useEffect(() => {
     ref.current?.scrollTo?.({ top: 0 });
+    setSessionAsked(false);
     setEditing(null);
     setAsking(null);
     setReason(null);
@@ -476,15 +483,39 @@ export function TaskPane({
         return agent.holding ? who : t("pane.agent_last", { who });
       })()
     : null;
-  const sessionText = !sess
+  // Task-A03-hive049: where the session runs, and one button to reopen it (the desktop app only).
+  const place = sessionPlace(task);
+  const sessionWhen = !sess
     ? null
     : sess.kind === "unknown"
       ? t("session.unknown")
-      : t(sess.kind === "active" ? "session.active" : "session.last_seen", { time: localTime(sess.at) });
+      : sess.kind === "last_session"
+        ? sess.at
+          ? t("session.last_session_at", { time: localTime(sess.at) })
+          : t("session.last_session")
+        : t(sess.kind === "active" ? "session.active" : "session.last_seen", { time: localTime(sess.at) });
+  const sessionText = sessionWhen && place ? t("session.where", { when: sessionWhen, where: t(`session.in_${place}`) }) : sessionWhen;
+  const sessionButton =
+    place && onOpenSession ? (
+      <>
+        <button
+          type="button"
+          className="link small change"
+          onClick={() => {
+            setSessionAsked(false);
+            onOpenSession().then(() => setSessionAsked(place === "app"), say);
+          }}
+        >
+          {t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
+        </button>
+        {sessionAsked && <span className="muted small"> {t("session.asked_claude")}</span>}
+      </>
+    ) : null;
   // The area, agent, check and session are not changed here: holders are agent sessions (owner,
   // 2026-10-14), and the others have no change of their own in `alm` (the Checked button below
   // clears the note). The fourth item is the label's hover text.
-  const rows: [string, string | null, EditField | null, string?][] = [
+  // The fifth item is a button beside the value (the Session row's, Task-A03-hive049).
+  const rows: [string, string | null, EditField | null, string?, ReactNode?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
     [t("pane.state"), stopText(task, tasks, t) ?? t(`state.${task.state}`), "state"],
@@ -494,7 +525,7 @@ export function TaskPane({
     [t("pane.responsible"), ownerName ?? t("task.you"), null, t("pane.responsible_title")],
     [t("pane.agent"), agentText, null],
     [t("pane.check"), t(`check.${check(task, labels)}`), null],
-    [t("pane.session"), sessionText, null, t("pane.session_title", { minutes: ACTIVE_MINUTES })],
+    [t("pane.session"), sessionText, null, t("pane.session_title", { minutes: ACTIVE_MINUTES }), sessionButton],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],
     [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
     [
@@ -616,7 +647,7 @@ export function TaskPane({
         </div>
       )}
       <dl className="fields">
-        {rows.map(([label, value, field, title]) => (
+        {rows.map(([label, value, field, title, button]) => (
           <div key={label}>
             <dt title={title}>{label}</dt>
             {field && editing === field ? (
@@ -624,6 +655,7 @@ export function TaskPane({
             ) : (
               <dd>
                 <span className={value ? undefined : "muted"}>{value || "—"}</span> {field && changeButton(field)}
+                {button}
               </dd>
             )}
           </div>

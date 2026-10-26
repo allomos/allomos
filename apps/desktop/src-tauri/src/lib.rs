@@ -8,6 +8,7 @@ mod agents;
 mod alm_command;
 mod lan;
 mod pairing;
+mod sessions;
 mod update;
 
 use std::ffi::OsString;
@@ -230,6 +231,22 @@ fn open_task_link(root: PathBuf, task: String, link: String) -> Result<(), Probl
         path: link,
         detail: e.to_string(),
     })
+}
+
+/// Reopen the session task `task` records (Task-A03-hive049): the Claude app's link, or
+/// `claude --resume` in a terminal. Read from the task itself, never from the window's copy.
+#[tauri::command]
+fn open_agent_session(root: PathBuf, task: String) -> Result<(), Problem> {
+    let (bag, _) = allomos_store::taskbag_of(&root, load(&root))?;
+    let found = allomos_core::ops::find_task(&bag, &task)?;
+    let how = found
+        .session
+        .as_ref()
+        .and_then(|s| sessions::reopen(s, &allomos_store::allomos_folder(&root)))
+        .ok_or(Problem::NoSession {
+            id: found.id.clone(),
+        })?;
+    sessions::open(&how)
 }
 
 /// Show the open taskbag's folder in Finder or Explorer.
@@ -2422,6 +2439,7 @@ pub fn run() {
             task_history,
             show_in_file_manager,
             open_task_link,
+            open_agent_session,
             system_languages,
             save_ui_language,
             owner_name,

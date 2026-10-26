@@ -675,6 +675,7 @@ pub fn new_task(
     }
     Ok(Task {
         folders: Default::default(),
+        session: None,
         extra: Default::default(),
         id: id.to_string(),
         title,

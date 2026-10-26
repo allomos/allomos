@@ -355,11 +355,11 @@ fn name(agent: &str) -> &'static str {
     }
 }
 
-fn shell_quote(text: &str) -> String {
+pub(crate) fn shell_quote(text: &str) -> String {
     format!("'{}'", text.replace('\'', r"'\''"))
 }
 
-fn applescript_string(text: &str) -> String {
+pub(crate) fn applescript_string(text: &str) -> String {
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
@@ -372,7 +372,7 @@ fn ask_failed(agent: &str, detail: impl ToString) -> Problem {
 
 /// PowerShell's quoting: single quotes, with each quote inside doubled (PowerShell also takes
 /// the typographic single quotes as quotes).
-fn powershell_quote(text: &str) -> String {
+pub(crate) fn powershell_quote(text: &str) -> String {
     let mut out = String::from("'");
     for c in text.chars() {
         if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}') {
@@ -508,7 +508,7 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
 }
 
 /// Open `url` with the app the system has for its scheme.
-fn open_link(url: &str) -> Result<(), String> {
+pub(crate) fn open_link(url: &str) -> Result<(), String> {
     if cfg!(windows) {
         // Windows' own handler for links; it reports no useful exit status, so starting it counts.
         return command("rundll32.exe")
@@ -528,7 +528,7 @@ fn open_link(url: &str) -> Result<(), String> {
 }
 
 /// A program started in a console window of its own, for the person to use (Windows).
-fn new_console(program: &str) -> Command {
+pub(crate) fn new_console(program: &str) -> Command {
     #[allow(unused_mut)]
     let mut command = Command::new(program);
     #[cfg(windows)]

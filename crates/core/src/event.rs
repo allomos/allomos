@@ -118,6 +118,7 @@ pub const TASK_FIELDS: &[&str] = &[
     "state",
     "label",
     "holder",
+    "session",
     "waiting_on",
     "who",
     "blocked_by",
@@ -212,6 +213,7 @@ mod tests {
     fn task() -> Task {
         Task {
             folders: Default::default(),
+            session: None,
             extra: Default::default(),
             id: "A01-01".into(),
             title: "First".into(),

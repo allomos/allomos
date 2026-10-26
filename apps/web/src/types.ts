@@ -33,6 +33,21 @@ export interface Iteration {
   state?: IterationState;
 }
 
+/** What an agent passed at `alm claim` so the app can reopen its session (Task-A03-hive049). */
+export interface AgentSession {
+  /** The session's `--as` name. */
+  by?: string;
+  agent?: string;
+  /** The agent's own session ID (`claude --resume` takes it). */
+  id?: string;
+  /** Where it runs, e.g. `desktop` for the Claude desktop app. */
+  kind?: string;
+  /** The desktop app's ID for it (Claude's `local_…`). */
+  app_session_id?: string;
+  /** The folder `alm claim` ran in, relative to the folder holding `.allomos/`. */
+  folder?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -55,6 +70,8 @@ export interface Task {
   without_human_check: string | null;
   /** How a person checks it, in Markdown (Task-A03-18). */
   human_check_steps: string | null;
+  /** The agent session that holds it or last held it, as passed at `alm claim` (Task-A03-hive049). */
+  session?: AgentSession | null;
   description: string;
   /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
    * a field of task.json: worked out from the history and added when the taskbag is opened. */

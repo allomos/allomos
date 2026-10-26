@@ -36,6 +36,11 @@ export interface Messenger {
    * (such as the task's card) in the user's editor. Rejects with a Problem for anything else.
    */
   openTaskLink(root: string, task: string, link: string): Promise<void>;
+  /**
+   * Reopens the session task `task` records (Task-A03-hive049): the Claude app's link, or
+   * `claude --resume` in a new terminal. Rejects with a Problem when there is none or it cannot start.
+   */
+  openAgentSession(root: string, task: string): Promise<void>;
   /** Show the taskbag's folder in Finder or Explorer. Rejects with a Problem on failure. */
   showInFileManager(root: string): Promise<void>;
   /**
@@ -279,6 +284,7 @@ export const desktopMessenger: Messenger = {
   taskbagStamp: (root) => invoke<string>("taskbag_stamp", { root }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
+  openAgentSession: (root, task) => invoke<void>("open_agent_session", { root, task }),
   createTaskbag: (root, name, language) => invoke<Opened>("create_taskbag", { root, name, language }),
   newWindow: () => invoke<void>("new_window"),
   setWindowProject: (root, name) => invoke<void>("set_window_project", { root, name }),
