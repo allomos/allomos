@@ -3,8 +3,20 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultSource, directStep, neverConnected, newFiles, offerConnect, resumeAt, stepFourPage, stillMissing, taskbagStep } from "../src/setupFlow.ts";
+import { addFolder, defaultSource, directStep, holdsTaskbag, neverConnected, newFiles, offerConnect, resumeAt, stepFourPage, stillMissing, taskbagStep, withMain } from "../src/setupFlow.ts";
 import type { SetupState } from "../src/types.ts";
+
+test("step 3 lists each folder once, the main one first (Task-A05-king717)", () => {
+  assert.deepEqual(addFolder("/p/app", [], "/p/site"), ["/p/site"]);
+  // The main folder, or one listed already (with or without a trailing slash), is not added again.
+  assert.deepEqual(addFolder("/p/app", ["/p/site"], "/p/app/"), ["/p/site"]);
+  assert.deepEqual(addFolder("/p/app", ["/p/site"], "/p/site/"), ["/p/site"]);
+  assert.deepEqual(addFolder("/p/app", ["/p/site"], "/p/mobile"), ["/p/site", "/p/mobile"]);
+  // Change… to a folder in the list takes it off the others.
+  assert.deepEqual(withMain("/p/site", ["/p/site", "/p/mobile"]), ["/p/mobile"]);
+  assert.equal(holdsTaskbag("/p/app", "/p/app/"), true);
+  assert.equal(holdsTaskbag("/p/other", "/p/app"), false);
+});
 
 test("a folder with .allomos goes on with Next (no Change)", () => {
   const step = taskbagStep({ kind: "found", root: "/p/.allomos/taskbag" });

@@ -523,6 +523,9 @@ button.link:hover { text-decoration: underline; }
 .move-cards { grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .wizard-body { display: grid; gap: 10px; align-content: start; }
 .wizard-body h3 { margin: 0; font-size: 16px; }
+.wizard-folders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wizard-folders li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.wizard-folders code { overflow-wrap: anywhere; }
 .wizard-body p { margin: 0; }
 .wizard .row.start { justify-content: flex-start; }
 .wizard .card { border: 0; padding: 0; background: none; }

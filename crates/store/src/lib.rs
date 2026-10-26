@@ -521,7 +521,60 @@ pub enum GitStep {
 }
 
 /// [`setup_steps_in`] with the Git step chosen.
+/// The taskbag's other project folders (`allomos/6`, decision 0019) are named after the steps, so
+/// one request sets up every folder (Task-A05-king717).
 pub(crate) fn setup_steps_with(
+    language: &str,
+    project_path: &Path,
+    taskbag_path: &Path,
+    git: GitStep,
+) -> String {
+    let steps = main_setup_steps(language, project_path, taskbag_path, git);
+    match other_folders_steps(language, &other_project_folders(project_path, taskbag_path)) {
+        Some(more) => format!("{steps}\n\n{more}"),
+        None => steps,
+    }
+}
+
+/// The taskbag's project folders other than `project_path`, in `project.json`'s order; none when
+/// it cannot be read or has no folders.
+fn other_project_folders(project_path: &Path, taskbag_path: &Path) -> Vec<PathBuf> {
+    let Some(bag) = load(taskbag_path).taskbag else {
+        return Vec::new();
+    };
+    let same = |a: &Path, b: &Path| match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    };
+    project_folder_paths(taskbag_path, &bag.project)
+        .into_iter()
+        .map(|(_, path)| tidy(&path))
+        .filter(|path| !same(path, project_path))
+        .collect()
+}
+
+/// What the agent does in the other project folders: steps 2 to 6 again in each, saving each
+/// folder's changes in that folder. `None` without other folders.
+fn other_folders_steps(language: &str, others: &[PathBuf]) -> Option<String> {
+    if others.is_empty() {
+        return None;
+    }
+    let list: String = others.iter().map(|p| ["\n- ", &shown(p)].concat()).collect();
+    Some(match language {
+        "zh-CN" => format!(
+            "这个任务包还服务于下面这些项目文件夹：{list}\n\n在每个文件夹中也做一遍第 2 到第 6 步（第 6 步保存的是那个文件夹自己的改动）。Allomos 已经在它们的 AGENTS.md 里加上了自己的一节：检查一下，再完成其余步骤。"
+        ),
+        "ja" => format!(
+            "このタスクバッグは、次のプロジェクトのフォルダーにも使われています：{list}\n\nそれぞれのフォルダーでも手順 2〜6 を行ってください（手順 6 で保存するのは、そのフォルダー自身の変更です）。Allomos はすでに各フォルダーの AGENTS.md に自分の節を加えています。確かめてから残りの手順を進めてください。"
+        ),
+        _ => format!(
+            "This taskbag also serves these project folders:{list}\n\nDo steps 2 to 6 in each of them as well (in step 6, save that folder's own changes). Allomos has already added its section to each one's AGENTS.md: check it, then do the rest."
+        ),
+    })
+}
+
+/// [`setup_steps_with`] for the main project folder alone.
+fn main_setup_steps(
     language: &str,
     project_path: &Path,
     taskbag_path: &Path,

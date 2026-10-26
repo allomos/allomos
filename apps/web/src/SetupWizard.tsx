@@ -1,7 +1,8 @@
 // The setup wizard (Task-A05-03): a dialog that sets up a taskbag in four steps.
 //   1. What a taskbag is, and choose the folder where `.allomos` goes.
 //   2. That folder has `.allomos` (or Create made it): Next. It has none: Create. Previous goes back.
-//   3. The project source folder, starting as the folder from step 1.
+//   3. The project folders: the main one, starting as the folder from step 1, and any others
+//      (Task-A05-king717), all bound on Next.
 //   4. Connect with the agents (the agents panel).
 // Opening a folder that has no `.allomos` starts at step 2 with that folder. A taskbag opened
 // directly, or File → Connect with the Agents…, starts at step 3 or 4 (owner, 2026-10-12: the
@@ -19,7 +20,7 @@ import type { CardRow, MoveIn } from "./moveCardsFlow";
 import { updateNotice } from "./versionFlow";
 import type { ConnectResult } from "./AgentsPanel";
 import type { Messenger } from "./messenger";
-import { defaultSource, resumeAt, stepFourPage, taskbagStep } from "./setupFlow";
+import { addFolder, defaultSource, holdsTaskbag, resumeAt, stepFourPage, taskbagStep, withMain } from "./setupFlow";
 import type { StepFourPage, TaskbagStep } from "./setupFlow";
 import { isProblem } from "./types";
 import type { Opened, SetupState } from "./types";
@@ -40,7 +41,16 @@ type Step =
     }
   /** `created`: the taskbag was just made in step 2, so step 3 says where it is, with the Git note
    * (approver, 2026-10-17). */
-  | { n: 3; opened: Opened; source: string; created?: boolean }
+  | {
+      n: 3;
+      opened: Opened;
+      source: string;
+      created?: boolean;
+      /** The other folders to bind on Next (Task-A05-king717). */
+      more: string[];
+      /** The folder holding `.allomos/`: the main folder is marked while it is this one. */
+      home: string;
+    }
   /** `change`: the project folder was not just chosen in step 3, so it may be changed here. */
   | { n: 4; opened: Opened; project: string; change: boolean };
 
@@ -182,7 +192,7 @@ export function SetupWizard({
         } else if (resumeAt(setup, resumeWanted) === 4 && setup.project_folder) {
           setStep({ n: 4, opened: o, project: setup.project_folder, change: true });
         } else {
-          setStep({ n: 3, opened: o, source: defaultSource(setup) });
+          setStep({ n: 3, opened: o, source: defaultSource(setup), more: [], home: setup.allomos_folder });
         }
       } catch (e) {
         if (live) setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
@@ -219,7 +229,7 @@ export function SetupWizard({
       const o = await messenger.createTaskbag(step.at.suggestedRoot, folderName(step.folder), language);
       onOpened(o, true);
       const setup = await messenger.projectSetup(o.root);
-      setStep({ n: 3, opened: o, source: defaultSource(setup), created: true });
+      setStep({ n: 3, opened: o, source: defaultSource(setup), created: true, more: [], home: setup.allomos_folder });
     });
 
   /** Step 2 → 3: open the taskbag, and offer its recorded project folder or the step-1 folder. */
@@ -229,7 +239,7 @@ export function SetupWizard({
       const o = step.created ?? (await messenger.openTaskbag(step.at.root));
       if (!step.created) onOpened(o, false);
       const setup = await messenger.projectSetup(o.root);
-      setStep({ n: 3, opened: o, source: defaultSource(setup) });
+      setStep({ n: 3, opened: o, source: defaultSource(setup), more: [], home: setup.allomos_folder });
     });
 
   /** Step 2 → 3 for an older Allomos's taskbag (Task-A01-45): rename it aside and create a new
@@ -240,21 +250,44 @@ export function SetupWizard({
       const o = await messenger.moveTaskbagAside(step.at.root);
       onOpened(o, false);
       const setup = await messenger.projectSetup(o.root);
-      setStep({ n: 3, opened: o, source: defaultSource(setup) });
+      setStep({ n: 3, opened: o, source: defaultSource(setup), more: [], home: setup.allomos_folder });
     });
 
   const pickSource = async () => {
     if (step.n !== 3) return;
     const path = await messenger.pickFolder(t("folder.pick"));
-    if (path) setStep({ ...step, source: path });
+    if (path) setStep({ ...step, source: path, more: withMain(path, step.more) });
   };
 
-  /** Step 3 → 4: record the project source folder. */
+  /** Step 3's Add Another Folder… (Task-A05-king717): nothing is bound until Next. */
+  const addMore = async () => {
+    if (step.n !== 3) return;
+    const path = await messenger.pickFolder(t("folders.bind_title"));
+    if (path) setStep({ ...step, more: addFolder(step.source, step.more, path) });
+  };
+
+  /** Step 3 → 4: record the main project folder, then bind each other folder (the same store code
+   * as `alm folder add` and Settings → Project folders). A folder that could not be bound stays
+   * listed, with the error; those bound already leave the list, so Next does not bind them twice. */
   const toConnect = () =>
     run(async () => {
       if (step.n !== 3) return;
-      const setup = await messenger.setProjectFolder(step.opened.root, step.source);
+      let setup = await messenger.setProjectFolder(step.opened.root, step.source);
       onSetup(setup);
+      const left = [...step.more];
+      while (left.length > 0) {
+        try {
+          await messenger.bindFolder(step.opened.root, left[0]);
+        } catch (e) {
+          setStep({ ...step, more: left });
+          throw e;
+        }
+        left.shift();
+      }
+      if (step.more.length > 0) {
+        setup = await messenger.projectSetup(step.opened.root);
+        onSetup(setup);
+      }
       setStep({ n: 4, opened: step.opened, project: setup.project_folder ?? step.source, change: false });
     });
 
@@ -316,16 +349,38 @@ export function SetupWizard({
                   <p className="muted">{t("wizard.git_agent")}</p>
                 </>
               )}
+              {/* Design B (approver, 2026-10-26, Task-A05-king717): a list of folders, the first
+                  the main one; more can be added now or later in Settings. */}
               <h3>{t("wizard.source_title")}</h3>
               <p>{t("wizard.source_body")}</p>
-              <p>
-                {rich("project.line", { path: <code>{step.source}</code> })}
-              </p>
+              <ul className="wizard-folders">
+                <li>
+                  <code>{step.source}</code>
+                  {holdsTaskbag(step.source, step.home) && <span className="folder-badge ok">{t("wizard.folders_holds")}</span>}
+                  <button type="button" className="link" onClick={() => void pickSource()} disabled={busy}>
+                    {t("wizard.source_other")}
+                  </button>
+                </li>
+                {step.more.map((path) => (
+                  <li key={path}>
+                    <code>{path}</code>
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => setStep({ ...step, more: step.more.filter((m) => m !== path) })}
+                      disabled={busy}
+                    >
+                      {t("wizard.folders_remove")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
               <div className="row start">
-                <button type="button" onClick={() => void pickSource()} disabled={busy}>
-                  {t("wizard.source_other")}
+                <button type="button" onClick={() => void addMore()} disabled={busy}>
+                  {t("folders.bind_another")}
                 </button>
               </div>
+              <p className="muted small">{t("wizard.folders_hint")}</p>
             </>
           )}
 

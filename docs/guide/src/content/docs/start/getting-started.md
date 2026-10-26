@@ -35,9 +35,9 @@ When Allomos opens with no project, it shows one button, **Start**. Press it to 
 
 Allomos itself never runs Git. The AI agent you connect in the last step keeps the taskbag in Git, so its history is saved: if the folder is not in a Git repository yet, the agent asks you whether to make it one, then commits only the taskbag's own files. Nothing is sent to the internet unless you say so.
 
-## 4. Choose the project folder
+## 4. Choose the project folders
 
-The project folder holds your code and the instruction files AI agents read when a session starts (`AGENTS.md` and `CLAUDE.md`). It is usually the same folder you chose in step 3. If not, press **Choose another folder…**. Then press **Next**.
+A project folder holds your code and the instruction files AI agents read when a session starts (`AGENTS.md` and `CLAUDE.md`). The first one is usually the same folder you chose in step 3; if not, press **Change…**. One taskbag can serve several folders, for example a code, a website and a mobile repository: press **Add Another Folder…** for each (you can also add them later in Settings → Project folders). Then press **Next**.
 
 ## 5. Connect with the agents
 

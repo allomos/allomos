@@ -29,6 +29,29 @@ export function defaultSource(setup: SetupState): string {
   return setup.project_folder ?? setup.allomos_folder;
 }
 
+/** A folder path compared as the same folder: without a trailing `/` or `\`. */
+function samePath(a: string, b: string): boolean {
+  const trim = (p: string) => p.replace(/[\\/]+$/, "");
+  return trim(a) === trim(b);
+}
+
+/** Step 3's Add Another Folder… (Task-A05-king717): `path` joins the other folders unless it is
+ * the main one or listed already. */
+export function addFolder(main: string, more: readonly string[], path: string): string[] {
+  if (samePath(path, main) || more.some((m) => samePath(m, path))) return [...more];
+  return [...more, path];
+}
+
+/** Changing the main folder to `path` takes it off the other folders, if it was there. */
+export function withMain(path: string, more: readonly string[]): string[] {
+  return more.filter((m) => !samePath(m, path));
+}
+
+/** Step 3 marks the main folder "holds the taskbag" only while it is that folder. */
+export function holdsTaskbag(folder: string, allomosFolder: string): boolean {
+  return samePath(folder, allomosFolder);
+}
+
 /** Whether opening a taskbag goes on to the wizard's step 4 by itself: a project folder is known,
  * and either an agent is not told about Allomos (Connect with the agents) or the taskbag has no
  * tasks yet (Update the taskbag: the project may keep tasks elsewhere, approver 2026-10-19,
