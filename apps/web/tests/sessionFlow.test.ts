@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { check, paneAgent, session, sessionPlace } from "../src/sessionFlow.ts";
+import { check, checkRow, paneAgent, session, sessionPlace } from "../src/sessionFlow.ts";
 import type { Task, TaskHistory } from "../src/types.ts";
 
 const task = (over: Partial<Task> = {}): Task => ({ id: "A01-01", title: "t", area: "A01", state: "in_progress", label: null, ...over }) as Task;
@@ -37,6 +37,23 @@ test("a recorded session says where it runs and is kept as the last session afte
   assert.deepEqual(session({ ...released, holder: "claude/x" }, h, now), { kind: "last_seen", at: "2026-10-22T08:00:00Z" });
   // Nothing to reopen and nobody holds it: no row.
   assert.equal(session(task({ holder: null, session: { agent: "claude-code" } }), h, now), null);
+});
+
+test("the row under the title shows the open button whenever a session is recorded, on the desktop app", () => {
+  // Task-A03-smile488: the button is the Session row's, whatever the task's state.
+  const app = { id: "s1", kind: "desktop", app_session_id: "local_1" };
+  // To check, with a Claude app session: the check and Open in Claude.
+  assert.deepEqual(checkRow(task({ state: "done", session: app }), true, true), { toCheck: true, open: "app" });
+  // In progress, with a terminal session: the row with only Resume in terminal.
+  assert.deepEqual(checkRow(task({ holder: "claude/x", session: { id: "s1" } }), false, true), { toCheck: false, open: "terminal" });
+  // Released or done and checked: the last session still opens.
+  assert.deepEqual(checkRow(task({ state: "ready", holder: null, session: app }), false, true), { toCheck: false, open: "app" });
+  // No session info: the row as before (the check alone, or no row).
+  assert.deepEqual(checkRow(task({ state: "done" }), true, true), { toCheck: true, open: null });
+  assert.equal(checkRow(task({ session: { agent: "claude-code" } }), false, true), null);
+  // The web and phone companions cannot open sessions: no button.
+  assert.deepEqual(checkRow(task({ state: "done", session: app }), true, false), { toCheck: true, open: null });
+  assert.equal(checkRow(task({ session: app }), false, false), null);
 });
 
 test("the agent is the holder, else the last session that changed the task through alm", () => {

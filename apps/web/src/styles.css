@@ -487,6 +487,9 @@ button.link:hover { text-decoration: underline; }
 .badge.to-check { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--warn-bg); color: var(--warn); border: 1px dashed var(--warn); }
 .pane-check { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
 .pane-check .muted { flex-basis: 100%; }
+/* Task-A03-smile488: the session's open button keeps to the far right, also when the row wraps. */
+.pane-check .pane-open { margin-left: auto; }
+.pane-check .pane-open-note { text-align: right; }
 /* Task-A03-19: "AI decisions to review" and the decisions to review. */
 .badge.ai-decided { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); border: 1px dashed var(--ok); }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
