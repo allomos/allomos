@@ -1,6 +1,7 @@
 // The setup wizard (Task-A05-03): a dialog that sets up a taskbag in four steps.
 //   1. What a taskbag is, and choose the folder where `.allomos` goes.
-//   2. That folder has `.allomos` (or Create made it): Next. It has none: Create. Previous goes back.
+//   2. That folder has `.allomos` (or Create made it): Next. It has none: Create, with the new
+//      taskbag's task language chosen first (Task-A05-bingo729). Previous goes back.
 //   3. The project folders: the main one, starting as the folder from step 1, and any others
 //      (Task-A05-king717), all bound on Next.
 //   4. Connect with the agents (the agents panel).
@@ -12,8 +13,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useI18n } from "./i18n";
+import { LANGUAGE_NAMES, useI18n } from "./i18n";
 import { AgentsPanel } from "./AgentsPanel";
+import { LanguageMenu } from "./LanguageMenu";
 import { MoveCardsPanel } from "./MoveCardsDialog";
 import { cardRows, tasksInStart } from "./moveCardsFlow";
 import type { CardRow, MoveIn } from "./moveCardsFlow";
@@ -88,6 +90,8 @@ export function SetupWizard({
   const { t, rich, problem, language } = useI18n();
   const [step, setStep] = useState<Step>(resume ? { n: 0 } : { n: 1 });
   const [busy, setBusy] = useState(false);
+  /** Step 2's Task language for a taskbag it creates: `ui` (follow the interface) or a code. */
+  const [taskLanguage, setTaskLanguage] = useState("ui");
   /** The bottom row of step 4, where the agents panel puts its buttons. */
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -222,11 +226,17 @@ export function SetupWizard({
   };
 
   /** Step 2 → 3 for a folder with no taskbag: Create taskbag (in the bottom row, where Next is on
-   * the other steps; approver, 2026-10-17) makes it and goes on to step 3. */
+   * the other steps; approver, 2026-10-17) makes it, saves the chosen task language into it (as
+   * `alm task-language` does; Follow the interface, the default, writes nothing, Task-A05-bingo729),
+   * and goes on to step 3. */
   const create = () =>
     run(async () => {
       if (step.n !== 2 || step.at.kind !== "missing") return;
-      const o = await messenger.createTaskbag(step.at.suggestedRoot, folderName(step.folder), language);
+      let o = await messenger.createTaskbag(step.at.suggestedRoot, folderName(step.folder), language);
+      if (taskLanguage !== "ui") {
+        await messenger.setTaskLanguage(o.root, taskLanguage);
+        o = await messenger.openTaskbag(o.root);
+      }
       onOpened(o, true);
       const setup = await messenger.projectSetup(o.root);
       setStep({ n: 3, opened: o, source: defaultSource(setup), created: true, more: [], home: setup.allomos_folder });
@@ -335,6 +345,16 @@ export function SetupWizard({
             <>
               <h3>{t("wizard.missing_title")}</h3>
               <p>{rich("wizard.missing_body", { dir, folder: <code>{step.folder}</code> })}</p>
+              {/* Only when the wizard creates the taskbag (approver, 2026-10-26, Task-A05-bingo729). */}
+              <h3>{t("settings.task_language")}</h3>
+              <LanguageMenu
+                value={taskLanguage}
+                label={t("settings.task_language")}
+                first={{ value: "ui", label: t("settings.follow_interface", { language: LANGUAGE_NAMES[language] }) }}
+                disabled={busy}
+                onChange={(code) => setTaskLanguage(code)}
+              />
+              <p className="muted small">{t("wizard.task_language_hint")}</p>
             </>
           )}
 

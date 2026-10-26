@@ -370,6 +370,7 @@
   "wizard.found_body": "Allomos will use the taskbag in {path}. To use another one, choose Previous and pick a different folder.",
   "wizard.missing_title": "No taskbag in this folder yet",
   "wizard.missing_body": "Allomos will create {dir} in {folder}, with an empty taskbag inside. Nothing else in the folder changes.",
+  "wizard.task_language_hint": "AI agents write tasks in this language. You can change it later in Settings → Tasks.",
   "wizard.git_agent": "In step 4, the AI agent you connect asks you whether to keep this folder under version control (for Git: `git init`, if it is not yet), then saves the taskbag there; nothing is shared.",
   "wizard.create": "Create taskbag",
   "wizard.source_title": "Connect the folders that hold your project",
