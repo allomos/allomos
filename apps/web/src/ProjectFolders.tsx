@@ -1,6 +1,6 @@
 // The Project folders section of the taskbag's settings (Task-A05-plaza078; decision 0019): one
 // row per bound folder with its path, how many tasks name it and whether its AGENTS.md is set up;
-// Bind a Folder…, Rename, Locate… for a folder not found, Show in Finder, and Unbind, which first
+// Add a Project Folder… (Add Another Folder… once one is bound, Task-A05-opal549), Rename, Locate… for a folder not found, Show in Finder, and Unbind, which first
 // only says what it will do (approver, 2026-10-25). The app calls the same store code as
 // `alm folder`.
 
@@ -67,7 +67,12 @@ export function ProjectFolders({
 
   return (
     <div className="project-folders">
-      <p className="muted small">{t("folders.body")}</p>
+      {/* Task-A05-opal549: says up front that one taskbag serves many folders (approver, 2026-10-26). */}
+      <p className="banner folders-note small">
+        <span>
+          <strong>{t("folders.note_title")}</strong> {t("folders.note")}
+        </span>
+      </p>
       {folders !== null && folders.length === 0 && <p className="muted small">{t("folders.none")}</p>}
       <ul className="folder-rows">
         {(folders ?? []).map((f) => (
@@ -142,8 +147,13 @@ export function ProjectFolders({
         ))}
       </ul>
       {error && <p className="banner error">{error}</p>}
-      <button type="button" onClick={() => void bind()} disabled={busy}>
-        {t("folders.bind")}
+      {/* Add a Project Folder… while none is bound, Add Another Folder… after (approver, 2026-10-26). */}
+      <button type="button" className="with-icon" onClick={() => void bind()} disabled={busy}>
+        <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" />
+          <path d="M10 9v5M7.5 11.5h5" />
+        </svg>
+        {t((folders ?? []).length === 0 ? "folders.bind" : "folders.bind_another")}
       </button>
     </div>
   );
