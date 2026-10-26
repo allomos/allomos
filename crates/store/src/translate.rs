@@ -8,9 +8,20 @@ use std::path::Path;
 
 use crate::shown;
 
-/// The target language as the request names it: "Tiếng Việt (`vi`)", or the code alone.
-fn target_text(code: &str, name: Option<&str>) -> String {
-    match name.map(str::trim).filter(|n| !n.is_empty() && *n != code) {
+/// The target language as the request names it: "Tiếng Việt (`vi`)", or the code alone. Without a
+/// name, the interface languages are named as people who speak them name them.
+pub(crate) fn target_text(code: &str, name: Option<&str>) -> String {
+    let known = match code {
+        "en" => Some("English"),
+        "zh-CN" => Some("简体中文"),
+        "ja" => Some("日本語"),
+        _ => None,
+    };
+    match name
+        .map(str::trim)
+        .filter(|n| !n.is_empty() && *n != code)
+        .or(known)
+    {
         Some(name) => format!("{name} (`{code}`)"),
         None => format!("`{code}`"),
     }

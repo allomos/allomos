@@ -3799,8 +3799,32 @@ fn move_in_asks_to_translate_only_when_told() {
     let yes = ok(&repo, &["move-in", "--language", "ja", "--translate"]);
     let r = yes["request"].as_str().unwrap();
     assert!(
-        r.contains("日本語に翻訳してください") && r.contains("alm task-language"),
+        r.contains("日本語 (`ja`)に翻訳してください") && r.contains("task-language ja"),
         "{r}"
+    );
+    // Any language (Task-A05-cape996), and the task language becomes it.
+    let vi = ok(
+        &repo,
+        &[
+            "move-in",
+            "--language",
+            "en",
+            "--translate",
+            "vi",
+            "--name",
+            "Tiếng Việt",
+        ],
+    );
+    let r = vi["request"].as_str().unwrap();
+    assert!(
+        r.contains("into Tiếng Việt (`vi`)") && r.contains("task-language vi"),
+        "{r}"
+    );
+    refused(
+        &repo,
+        &["move-in", "--translate", "not a code"],
+        1,
+        "invalid_language",
     );
 }
 

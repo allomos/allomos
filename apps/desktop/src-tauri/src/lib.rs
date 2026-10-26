@@ -1628,7 +1628,8 @@ async fn move_tasks_in(
     agent: String,
     taskbag: PathBuf,
     language: String,
-    translate: bool,
+    translate: Option<String>,
+    name: Option<String>,
 ) -> Result<(), Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
@@ -1640,25 +1641,51 @@ async fn move_tasks_in(
     let Some(chosen) = found.iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    let request = with_progress_in(
-        &language,
-        tasks_in_job(&taskbag),
-        &allomos_store::agent_update_taskbag_request_with(&language, &project, &taskbag, translate),
-    );
+    let request = tasks_in_plan(&taskbag, &language, translate.as_deref(), name.as_deref())?;
     agents::ask(chosen, &project, &request)
 }
 
 /// **Update the taskbag…** with Manual: the same request, as an agent opened through a link gets
 /// it, for the person to copy.
 #[tauri::command]
-fn move_tasks_in_request(taskbag: PathBuf, language: String, translate: bool) -> String {
-    let project = allomos_store::versions::project_folder(&taskbag);
-    let request = with_progress_in(
-        &language,
-        tasks_in_job(&taskbag),
-        &allomos_store::agent_update_taskbag_request_with(&language, &project, &taskbag, translate),
-    );
-    agents::link_request(&request, alm_command::own().as_deref())
+fn move_tasks_in_request(
+    taskbag: PathBuf,
+    language: String,
+    translate: Option<String>,
+    name: Option<String>,
+) -> Result<String, Problem> {
+    let request = tasks_in_plan(&taskbag, &language, translate.as_deref(), name.as_deref())?;
+    Ok(agents::link_request(
+        &request,
+        alm_command::own().as_deref(),
+    ))
+}
+
+/// Update the taskbag…'s request with its progress line; `translate`, the language code the
+/// person chose to translate into (Task-A05-cape996), none for Don't translate.
+fn tasks_in_plan(
+    taskbag: &Path,
+    language: &str,
+    translate: Option<&str>,
+    name: Option<&str>,
+) -> Result<String, Problem> {
+    let translate = translate.map(str::trim).filter(|c| !c.is_empty());
+    if let Some(code) = translate.filter(|c| !allomos_core::valid_language(c)) {
+        return Err(Problem::InvalidLanguage {
+            value: code.to_string(),
+        });
+    }
+    let project = allomos_store::versions::project_folder(taskbag);
+    Ok(with_progress_in(
+        language,
+        tasks_in_job(taskbag),
+        &allomos_store::agent_update_taskbag_request_with(
+            language,
+            &project,
+            taskbag,
+            translate.map(|code| allomos_store::TranslateTarget { code, name }),
+        ),
+    ))
 }
 
 /// **Translate the taskbag…** (Task-A05-board831): the request for translating the taskbag at
@@ -2837,7 +2864,7 @@ mod tests {
         // Update the taskbag… asks for the move-in, reported as that job (Task-A01-45); once the
         // tasks are in, it is about card files (below).
         assert_eq!(tasks_in_job(&taskbag), Job::MoveIn);
-        let request = move_tasks_in_request(taskbag.clone(), "en".into(), false);
+        let request = move_tasks_in_request(taskbag.clone(), "en".into(), None, None).unwrap();
         assert!(request.contains("Allomos renamed the old taskbag (format allomos/2;"));
         // No agent setup in it (Task-A03-27): each agent registers itself.
         assert!(!request.contains("agent setup request"));

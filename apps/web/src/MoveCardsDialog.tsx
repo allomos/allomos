@@ -20,8 +20,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { LANGUAGE_NAMES, useI18n } from "./i18n";
-import type { Messenger } from "./messenger";
+import { useI18n } from "./i18n";
+import { LanguageMenu } from "./LanguageMenu";
+import type { Messenger, TranslateTo } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL } from "./agentPickerFlow";
 import type { OfferFacts } from "./AgentPicker";
@@ -30,6 +31,9 @@ import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
 import { isProblem } from "./types";
 import type { CardRow, MoveIn } from "./moveCardsFlow";
+
+/** The language menu's first entry: nothing is translated. */
+const DONT_TRANSLATE = "none";
 
 export function MoveCardsDialog({
   messenger,
@@ -127,9 +131,10 @@ export function MoveCardsPanel({
   const only = offer && offer.kind !== "all" ? offer.group : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Translate the taskbag's contents into the interface's language (Task-A03-totem655): unchecked
-  // each time the dialog opens, never remembered; offered only when there are contents to translate.
-  const [translate, setTranslate] = useState(false);
+  // Translate the taskbag's contents into a language the person picks, which also becomes the task
+  // language (Task-A05-cape996, replacing A03-totem655's checkbox): Don't translate each time the
+  // dialog opens, never remembered; offered only when there are contents to translate.
+  const [translate, setTranslate] = useState<TranslateTo | null>(null);
   const canTranslate = !!moveIn || !noTasks;
   /** Manual: the request to copy. */
   const [request, setRequest] = useState<string | null>(null);
@@ -297,11 +302,20 @@ export function MoveCardsPanel({
 
       {request === null && canTranslate && (
         <fieldset className="translate-choice">
-          <label>
-            <input type="checkbox" checked={translate} disabled={busy} onChange={(e) => setTranslate(e.target.checked)} />{" "}
-            {t("cards.translate", { language: LANGUAGE_NAMES[language] })}
-          </label>
+          <legend>{t("cards.translate_label")}</legend>
+          <LanguageMenu
+            value={translate?.code ?? DONT_TRANSLATE}
+            first={{ value: DONT_TRANSLATE, label: t("cards.translate_none") }}
+            label={t("cards.translate_label")}
+            disabled={busy}
+            onChange={(code, name) => setTranslate(code === DONT_TRANSLATE ? null : { code, name })}
+          />
           <p className="muted small">{translate ? t("cards.translate_yes") : t("cards.translate_no")}</p>
+          {translate && (
+            <p className="small">
+              <span className="folder-badge">{t("translate.tag")}</span> {t("translate.sets_language", { language: translate.name })}
+            </p>
+          )}
         </fieldset>
       )}
 

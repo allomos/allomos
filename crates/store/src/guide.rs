@@ -353,7 +353,9 @@ About Allomos:
   (`taskbag_to_move_in`): moving its tasks, and their card files, into a new taskbag, like
   another task system; tell the person first. Otherwise: moving card files kept outside the
   taskbag in beside their tasks (`alm guide move-cards`). It changes nothing; the person confirms
-  the plan with `alm confirm`.
+  the plan with `alm confirm`. `--translate [<code>] [--name <name>]` also asks to translate the
+  taskbag's contents into that language (alone: the request's language) and make it the task
+  language, as the app's language menu there does.
 - `alm translate <code> [--name <name>] [--language <code>]`: the request the Allomos app's
   **Translate the taskbag…** types into an agent: rewrite every task's title, description and
   handoff note, the card files and the project notes in that language (any language code, such

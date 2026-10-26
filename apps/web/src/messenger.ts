@@ -12,6 +12,12 @@ import type { LadderStep } from "./ladderFlow";
 import { withDecisions } from "./stopFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
+/** A language to translate the taskbag into: its code, and its name as the menu showed it. */
+export interface TranslateTo {
+  code: string;
+  name: string;
+}
+
 /** What the About window shows of the app itself (Task-A07-28). */
 export interface AboutInfo {
   name: string;
@@ -83,10 +89,11 @@ export interface Messenger {
   /** Update the taskbag… (Task-A01-45: one button for an older taskbag and for card files kept
    * outside the taskbag): opens `agent` in the project folder of the taskbag at `taskbag` with the
    * request for whichever applies typed in (`alm move-in` prints it; Task-A03-27: an out-of-date
-   * section too). Nothing is sent. Rejects with a Problem. */
-  moveTasksIn(agent: string, taskbag: string, language: string, translate: boolean): Promise<void>;
+   * section too). `translate`: the language to translate the contents into and make the task
+   * language (Task-A05-cape996), null for Don't translate. Nothing is sent. Rejects with a Problem. */
+  moveTasksIn(agent: string, taskbag: string, language: string, translate: TranslateTo | null): Promise<void>;
   /** Update the taskbag… with Manual: the same request, to copy. */
-  moveTasksInRequest(taskbag: string, language: string, translate: boolean): Promise<string>;
+  moveTasksInRequest(taskbag: string, language: string, translate: TranslateTo | null): Promise<string>;
   /** Translate the taskbag… (Task-A05-board831): opens `agent` with the request to translate the
    * taskbag into `target` (a language code; `name` as the menu showed it). Nothing is sent. */
   translateTaskbag(agent: string, taskbag: string, language: string, target: string, name: string): Promise<void>;
@@ -311,8 +318,10 @@ export const desktopMessenger: Messenger = {
   answerPairing: (id, approve) => invoke<PairingView>("answer_pairing", { id, approve }),
   removePairedDevice: (id) => invoke<PairingView>("remove_paired_device", { id }),
   onPairingChanged: (handler) => getCurrentWebviewWindow().listen("lan:pairing", () => handler()),
-  moveTasksIn: (agent, taskbag, language, translate) => invoke<void>("move_tasks_in", { agent, taskbag, language, translate }),
-  moveTasksInRequest: (taskbag, language, translate) => invoke<string>("move_tasks_in_request", { taskbag, language, translate }),
+  moveTasksIn: (agent, taskbag, language, translate) =>
+    invoke<void>("move_tasks_in", { agent, taskbag, language, translate: translate?.code ?? null, name: translate?.name ?? null }),
+  moveTasksInRequest: (taskbag, language, translate) =>
+    invoke<string>("move_tasks_in_request", { taskbag, language, translate: translate?.code ?? null, name: translate?.name ?? null }),
   translateTaskbag: (agent, taskbag, language, target, name) => invoke<void>("translate_taskbag", { agent, taskbag, language, target, name }),
   translateRequest: (taskbag, language, target, name) => invoke<string>("translate_request", { taskbag, language, target, name }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),

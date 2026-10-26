@@ -70,7 +70,9 @@ pub use setup::{
     relative_path, setup_state,
 };
 pub use translate::{agent_translate_request_in, translation_steps_in};
-pub use update_taskbag::{agent_update_taskbag_request_in, agent_update_taskbag_request_with};
+pub use update_taskbag::{
+    Target as TranslateTarget, agent_update_taskbag_request_in, agent_update_taskbag_request_with,
+};
 
 /// Where a project's taskbag lives inside the folder the user picked.
 /// Always used for a new taskbag, also in an empty folder, so every tool looks in one place.

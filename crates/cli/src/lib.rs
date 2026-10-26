@@ -467,10 +467,14 @@ enum Command {
         /// The language of the request (en, zh-CN, ja). Default: the Allomos app's language.
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
-        /// Also ask to translate the taskbag's contents into that language (titles, descriptions,
-        /// handoff notes, card files, project notes); without it the request says not to.
-        #[arg(long)]
-        translate: bool,
+        /// Also ask to translate the taskbag's contents (titles, descriptions, handoff notes, card
+        /// files, project notes) into the language CODE, any language code (alone: the request's
+        /// language), and make it the task language; without it the request says not to.
+        #[arg(long, value_name = "CODE", num_args = 0..=1, default_missing_value = "")]
+        translate: Option<String>,
+        /// The translation language's name, as the request shows it beside the code.
+        #[arg(long, value_name = "NAME", requires = "translate")]
+        name: Option<String>,
     },
     /// Print the request the app's Translate the taskbag… gives an AI agent (Task-A05-board831):
     /// rewrite every task's title, description and handoff note, the card files and the project
@@ -2219,6 +2223,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::MoveIn {
             language,
             translate,
+            name,
         } => {
             let root = locate(cli, cwd)?;
             if let versions::FormatState::Newer { found } = versions::format_state(&root) {
@@ -2238,9 +2243,24 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             // The same request as the app's Update the taskbag… (Task-A01-45, A03-27): the move-in
             // request for an older taskbag; otherwise whatever is due (an out-of-date section,
             // card files kept outside, old handoff files), with the person's translate choice
-            // (Task-A03-totem655).
+            // (Task-A03-totem655; any language since Task-A05-cape996).
+            let code = translate.as_deref().map(|c| match c.trim() {
+                "" => language.as_str(),
+                code => code,
+            });
+            if let Some(code) = code.filter(|c| !allomos_core::valid_language(c)) {
+                return Err(Problem::InvalidLanguage {
+                    value: code.to_string(),
+                });
+            }
             let request = allomos_store::agent_update_taskbag_request_with(
-                &language, &project, &root, *translate,
+                &language,
+                &project,
+                &root,
+                code.map(|code| allomos_store::TranslateTarget {
+                    code,
+                    name: name.as_deref(),
+                }),
             );
             let Some(move_in) = versions::move_in(&root) else {
                 let cards = allomos_store::cards::outside(&root);
