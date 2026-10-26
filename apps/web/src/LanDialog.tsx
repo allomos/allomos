@@ -108,7 +108,7 @@ export function LanDialog({ messenger, onClose }: { messenger: Messenger; onClos
         <h2 id="lan-title">{t("lan.title")}</h2>
         <div className="dialog-body form">
           <label className="lan-switch">
-            <input type="checkbox" checked={!!status?.on} disabled={busy || !status} onChange={(e) => void toggle(e.target.checked)} />{" "}
+            <input type="checkbox" checked={!!status?.on} disabled={busy || !status} onChange={(e) => void toggle(e.target.checked)} />
             {t("lan.switch")}
           </label>
           <p className="muted small">{t("lan.body")}</p>

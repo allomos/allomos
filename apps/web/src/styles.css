@@ -568,6 +568,8 @@ button.link:hover { text-decoration: underline; }
 .handoff-body { border-top: 1px dashed var(--line); padding-top: 8px; }
 .dialog .form { display: grid; gap: 10px; align-content: start; }
 .dialog .form label { display: grid; gap: 4px; font-size: 13px; }
+/* A checkbox and its text on one line (Task-A01-jacket044). */
+.dialog .form label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
 .dialog .form h3 { margin: 6px 0 0; font-size: 14px; }
 .dialog .form input[type="text"], .dialog .form input[type="number"], .dialog .form textarea {
   font: 13px var(--font); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
