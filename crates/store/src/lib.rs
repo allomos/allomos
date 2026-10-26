@@ -37,6 +37,7 @@ pub mod progress;
 mod quota;
 mod settings;
 mod setup;
+mod translate;
 mod update_taskbag;
 pub mod versions;
 pub use confirm::{
@@ -68,6 +69,7 @@ pub use setup::{
     SetupState, allomos_folder, project_folder_of, project_folder_paths, record_project_folder,
     relative_path, setup_state,
 };
+pub use translate::{agent_translate_request_in, translation_steps_in};
 pub use update_taskbag::{agent_update_taskbag_request_in, agent_update_taskbag_request_with};
 
 /// Where a project's taskbag lives inside the folder the user picked.
@@ -559,7 +561,10 @@ fn other_folders_steps(language: &str, others: &[PathBuf]) -> Option<String> {
     if others.is_empty() {
         return None;
     }
-    let list: String = others.iter().map(|p| ["\n- ", &shown(p)].concat()).collect();
+    let list: String = others
+        .iter()
+        .map(|p| ["\n- ", &shown(p)].concat())
+        .collect();
     Some(match language {
         "zh-CN" => format!(
             "这个任务包还服务于下面这些项目文件夹：{list}\n\n在每个文件夹中也做一遍第 2 到第 6 步（第 6 步保存的是那个文件夹自己的改动）。Allomos 已经在它们的 AGENTS.md 里加上了自己的一节：检查一下，再完成其余步骤。"

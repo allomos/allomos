@@ -9,7 +9,7 @@
 import type { Progress } from "./types";
 
 /** The jobs the app hands to an agent; their titles match what `alm progress` is asked to say. */
-export type Job = "connect" | "update" | "move_in" | "cards" | "build_app";
+export type Job = "connect" | "update" | "move_in" | "cards" | "build_app" | "translate";
 
 /** The app just opened an agent for `job` on the taskbag at `root`, at `since` (seconds). */
 export interface Waiting {

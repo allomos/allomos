@@ -472,6 +472,21 @@ enum Command {
         #[arg(long)]
         translate: bool,
     },
+    /// Print the request the app's Translate the taskbag… gives an AI agent (Task-A05-board831):
+    /// rewrite every task's title, description and handoff note, the card files and the project
+    /// notes in the language CODE (any language code, such as vi or pt-BR), and make it the task
+    /// language. Changes nothing.
+    Translate {
+        /// The language to translate into, by its code.
+        #[arg(value_name = "CODE")]
+        code: String,
+        /// The language's name, as the request shows it beside the code (for example "Tiếng Việt").
+        #[arg(long, value_name = "NAME")]
+        name: Option<String>,
+        /// The language of the request (en, zh-CN, ja). Default: the Allomos app's language.
+        #[arg(long, value_name = "CODE")]
+        language: Option<String>,
+    },
     /// When to write a handoff: the quota and context gates (with any override for you, --as).
     /// With options, change them.
     #[command(name = "handoff-rules")]
@@ -732,6 +747,7 @@ impl Command {
             | Command::List { .. }
             | Command::Human { .. }
             | Command::MoveIn { .. }
+            | Command::Translate { .. }
             | Command::HandoffRules { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
@@ -789,6 +805,7 @@ impl Command {
                 | Command::Quota { .. }
                 | Command::Guide { .. }
                 | Command::MoveIn { .. }
+                | Command::Translate { .. }
         )
     }
 
@@ -854,6 +871,7 @@ impl Command {
             Command::Reopen { .. } => "reopen",
             Command::Next { .. } => "next",
             Command::MoveIn { .. } => "move-in",
+            Command::Translate { .. } => "translate",
             Command::HandoffRules { .. } => "handoff-rules",
             Command::Handoff { .. } => "handoff",
         }
@@ -2247,6 +2265,42 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         "old": move_in.old,
                         "prepared": move_in.prepared,
                     },
+                    "language": language,
+                    "request": request,
+                }),
+                request,
+            ))
+        }
+        Command::Translate {
+            code,
+            name,
+            language,
+        } => {
+            let root = locate(cli, cwd)?;
+            let code = code.trim();
+            if !allomos_core::valid_language(code) {
+                return Err(Problem::InvalidLanguage {
+                    value: code.to_string(),
+                });
+            }
+            let language = language.clone().unwrap_or_else(|| {
+                saved_ui_language().unwrap_or_else(|| {
+                    let system: Vec<String> = sys_locale::get_locales().collect();
+                    pick_ui_language(&system).to_string()
+                })
+            });
+            let project = versions::project_folder(&root);
+            let request = allomos_store::agent_translate_request_in(
+                &language,
+                &project,
+                &root,
+                code,
+                name.as_deref(),
+            );
+            Ok(Done::new(
+                json!({
+                    "taskbag": root,
+                    "code": code,
                     "language": language,
                     "request": request,
                 }),

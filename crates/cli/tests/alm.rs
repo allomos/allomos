@@ -5310,3 +5310,30 @@ fn claim_records_the_session_the_agent_passes() {
     let h = ok(&repo, &["history", "A01-01"]);
     assert!(h.to_string().contains("local_ec51"), "{h}");
 }
+
+/// Task-A05-board831: `alm translate <code>` prints the app's Translate the taskbag… request for
+/// any language code, and changes nothing.
+#[test]
+fn translate_prints_the_request_for_any_language() {
+    let repo = filled();
+    let v = ok(
+        &repo,
+        &[
+            "translate",
+            "vi",
+            "--name",
+            "Tiếng Việt",
+            "--language",
+            "en",
+        ],
+    );
+    let request = v["request"].as_str().unwrap();
+    assert!(request.contains("into Tiếng Việt (`vi`)"), "{request}");
+    assert!(request.contains("task-language vi"), "{request}");
+    // Nothing changed: the task language is still the default.
+    assert_eq!(
+        ok(&repo, &["task-language"])["task_language"]["setting"],
+        "ui"
+    );
+    refused(&repo, &["translate", "not a code"], 1, "invalid_language");
+}

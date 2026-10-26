@@ -3,7 +3,8 @@
 // Close and Esc close it. General shows the taskbag's name, with Rename (Task-A05-chalk937), its
 // format and whether it is up to date, with Update the Taskbag… when it is older (the same check as
 // the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
-// sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951).
+// sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951), and
+// has Translate the taskbag… (Task-A05-board831).
 // Handoff holds the handoff rules (Task-A05-yacht960). Project folders binds, renames, locates
 // and unbinds the taskbag's folders (Task-A05-plaza078). Agents shows in which folders each agent
 // is set up, with Set up… for the others (Task-A05-bag963).
@@ -12,7 +13,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AgentsSection } from "./AgentsSection";
 import { HandoffSection } from "./HandoffSettings";
 import { ProjectFolders } from "./ProjectFolders";
-import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
+import { LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
+import { LanguageMenu } from "./LanguageMenu";
+import { TranslateDialog } from "./TranslateDialog";
 import { addStep, ladderChanged, ladderProblem, moveStep, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
 import type { Messenger } from "./messenger";
 import { middleEllipsis } from "./paths";
@@ -133,33 +136,57 @@ function FormatRow({ messenger, root, format, onUpdate }: { messenger: Messenger
   );
 }
 
-/** The language tasks are written in: follow the interface, or one of its languages. */
+/** The language tasks are written in: follow the interface, or any language, from the searchable
+ * language menu (Task-A05-board831). */
 function TaskLanguage({ value, onChange }: { value: string | undefined; onChange: (value: string) => Promise<void> }) {
-  const { t, language } = useI18n();
+  const { t, language, problem } = useI18n();
   const [error, setError] = useState<string | null>(null);
-  const { problem } = useI18n();
   const current = value && value !== "ui" ? value : "ui";
-  const known = current === "ui" || (LANGUAGES as readonly string[]).includes(current);
   return (
     <>
-      <select
-        aria-label={t("settings.task_language")}
+      <LanguageMenu
         value={current}
-        onChange={(e) => {
+        label={t("settings.task_language")}
+        first={{ value: "ui", label: t("settings.follow_interface", { language: LANGUAGE_NAMES[language] }) }}
+        onChange={(code) => {
           setError(null);
-          onChange(e.target.value).catch((err) => setError(isProblem(err) ? problem(err) : String(err)));
+          onChange(code).catch((err) => setError(isProblem(err) ? problem(err) : String(err)));
         }}
-      >
-        <option value="ui">{t("settings.follow_interface", { language: LANGUAGE_NAMES[language] })}</option>
-        {LANGUAGES.map((l) => (
-          <option key={l} value={l}>
-            {LANGUAGE_NAMES[l]}
-          </option>
-        ))}
-        {!known && <option value={current}>{current}</option>}
-      </select>
+      />
       <p className="muted small">{t("settings.task_language_note")}</p>
       {error && <p className="banner error">{error}</p>}
+    </>
+  );
+}
+
+/** Translate the taskbag… (Task-A05-board831): the button, its line, and the dialog. */
+function Translate({ messenger, root }: { messenger: Messenger; root: string }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  return (
+    <>
+      <div className="settings-row">
+        <button type="button" onClick={() => setOpen(true)}>
+          {t("translate.button")}
+        </button>
+      </div>
+      <p className="muted small">{t("translate.button_note")}</p>
+      {said && (
+        <p className="banner ok small" role="status">
+          <span>{said}</span>
+        </p>
+      )}
+      {open && (
+        <TranslateDialog
+          messenger={messenger}
+          root={root}
+          onClose={(message) => {
+            setOpen(false);
+            setSaid(message);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -270,6 +297,8 @@ export function TaskbagSettings({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // An open language menu, or a dialog opened from here, takes its own Esc.
+      if ((e.target as Element | null)?.closest?.("[data-own-escape]")) return;
       e.stopPropagation();
       onClose();
     };
@@ -313,6 +342,7 @@ export function TaskbagSettings({
                     await onChanged();
                   }}
                 />
+                <Translate messenger={messenger} root={root} />
                 <h3>{t("settings.ladder")}</h3>
                 <Ladder
                   labels={labels}

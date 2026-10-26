@@ -207,6 +207,8 @@ pub enum Job {
     MoveIn,
     Cards,
     BuildApp,
+    /// Translate the taskbag… (Task-A05-board831).
+    Translate,
 }
 
 /// `job`'s title in an interface language (`en`, `zh-CN`, `ja`; English otherwise).
@@ -217,16 +219,19 @@ pub fn job_title_in(language: &str, job: Job) -> &'static str {
         ("zh-CN", Job::MoveIn) => "更新任务包",
         ("zh-CN", Job::Cards) => "更新任务包",
         ("zh-CN", Job::BuildApp) => "构建应用",
+        ("zh-CN", Job::Translate) => "翻译任务包",
         ("ja", Job::Connect) => "AI エージェントとつなぐ",
         ("ja", Job::Update) => "Allomos の説明を更新",
         ("ja", Job::MoveIn) => "タスクバッグを更新",
         ("ja", Job::Cards) => "タスクバッグを更新",
         ("ja", Job::BuildApp) => "アプリを作る",
+        ("ja", Job::Translate) => "タスクバッグを翻訳",
         (_, Job::Connect) => "Connect with the agents",
         (_, Job::Update) => "Update Allomos's instructions",
         (_, Job::MoveIn) => "Update the taskbag",
         (_, Job::Cards) => "Update the taskbag",
         (_, Job::BuildApp) => "Build the app",
+        (_, Job::Translate) => "Translate the taskbag",
     }
 }
 

@@ -354,6 +354,11 @@ About Allomos:
   another task system; tell the person first. Otherwise: moving card files kept outside the
   taskbag in beside their tasks (`alm guide move-cards`). It changes nothing; the person confirms
   the plan with `alm confirm`.
+- `alm translate <code> [--name <name>] [--language <code>]`: the request the Allomos app's
+  **Translate the taskbag…** types into an agent: rewrite every task's title, description and
+  handoff note, the card files and the project notes in that language (any language code, such
+  as `vi` or `pt-BR`), and make it the task language (`alm task-language <code>`). It changes
+  nothing; the person confirms the plan with `alm confirm`.
 ";
 
 /// `alm guide move-cards` (Task-A00-30, approver 2026-10-16): Allomos reads only the tasks'

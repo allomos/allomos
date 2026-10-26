@@ -25,6 +25,7 @@ const JOB_TITLE: Record<Job, Key> = {
   move_in: "progress.job_move_in",
   cards: "progress.job_cards",
   build_app: "progress.job_build_app",
+  translate: "progress.job_translate",
 };
 
 /** The app has opened an agent for `job` on the taskbag at `root`: the window's progress popup

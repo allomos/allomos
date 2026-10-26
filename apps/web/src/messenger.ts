@@ -87,6 +87,11 @@ export interface Messenger {
   moveTasksIn(agent: string, taskbag: string, language: string, translate: boolean): Promise<void>;
   /** Update the taskbag… with Manual: the same request, to copy. */
   moveTasksInRequest(taskbag: string, language: string, translate: boolean): Promise<string>;
+  /** Translate the taskbag… (Task-A05-board831): opens `agent` with the request to translate the
+   * taskbag into `target` (a language code; `name` as the menu showed it). Nothing is sent. */
+  translateTaskbag(agent: string, taskbag: string, language: string, target: string, name: string): Promise<void>;
+  /** Translate the taskbag… with Manual: the same request, to copy. */
+  translateRequest(taskbag: string, language: string, target: string, name: string): Promise<string>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -308,6 +313,8 @@ export const desktopMessenger: Messenger = {
   onPairingChanged: (handler) => getCurrentWebviewWindow().listen("lan:pairing", () => handler()),
   moveTasksIn: (agent, taskbag, language, translate) => invoke<void>("move_tasks_in", { agent, taskbag, language, translate }),
   moveTasksInRequest: (taskbag, language, translate) => invoke<string>("move_tasks_in_request", { taskbag, language, translate }),
+  translateTaskbag: (agent, taskbag, language, target, name) => invoke<void>("translate_taskbag", { agent, taskbag, language, target, name }),
+  translateRequest: (taskbag, language, target, name) => invoke<string>("translate_request", { taskbag, language, target, name }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

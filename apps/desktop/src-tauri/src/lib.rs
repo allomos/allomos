@@ -1661,6 +1661,63 @@ fn move_tasks_in_request(taskbag: PathBuf, language: String, translate: bool) ->
     agents::link_request(&request, alm_command::own().as_deref())
 }
 
+/// **Translate the taskbag…** (Task-A05-board831): the request for translating the taskbag at
+/// `taskbag` into `target` (a language code; `name` as the menu showed it), with the progress
+/// line, in the interface language `language`.
+fn translate_plan(taskbag: &Path, language: &str, target: &str, name: Option<&str>) -> String {
+    let project = allomos_store::versions::project_folder(taskbag);
+    with_progress_in(
+        language,
+        Job::Translate,
+        &allomos_store::agent_translate_request_in(language, &project, taskbag, target, name),
+    )
+}
+
+/// Open the chosen agent in the project folder with [`translate_plan`] typed in. Nothing is sent:
+/// the person sends it; the agent shows its plan (`alm confirm`) before anything changes.
+#[tauri::command]
+async fn translate_taskbag(
+    agent: String,
+    taskbag: PathBuf,
+    language: String,
+    target: String,
+    name: Option<String>,
+) -> Result<(), Problem> {
+    if !allomos_core::valid_language(target.trim()) {
+        return Err(Problem::InvalidLanguage { value: target });
+    }
+    let project = allomos_store::versions::project_folder(&taskbag);
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    let found = agents::find_agents();
+    let Some(chosen) = found.iter().find(|a| a.id == agent) else {
+        return Err(Problem::AgentNotFound { agent });
+    };
+    let request = translate_plan(&taskbag, &language, target.trim(), name.as_deref());
+    agents::ask(chosen, &project, &request)
+}
+
+/// **Translate the taskbag…** with Manual: the same request, for the person to copy.
+#[tauri::command]
+fn translate_request(
+    taskbag: PathBuf,
+    language: String,
+    target: String,
+    name: Option<String>,
+) -> Result<String, Problem> {
+    if !allomos_core::valid_language(target.trim()) {
+        return Err(Problem::InvalidLanguage { value: target });
+    }
+    let request = translate_plan(&taskbag, &language, target.trim(), name.as_deref());
+    Ok(agents::link_request(
+        &request,
+        alm_command::own().as_deref(),
+    ))
+}
+
 /// The agent `alm` last ran under for a task in the taskbag at `root`, from its events
 /// (Task-A03-27); none when no event records one.
 #[tauri::command]
@@ -2464,6 +2521,8 @@ pub fn run() {
             build_app_request,
             move_tasks_in,
             move_tasks_in_request,
+            translate_taskbag,
+            translate_request,
             run_modes_text,
             copy_text,
             instruction_files,
