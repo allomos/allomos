@@ -341,9 +341,10 @@ About Allomos:
   plan it into areas, iterations and ready tasks and build it release by release, recording every
   step with `alm`; same languages.
 - `alm guide github-release`: what to do when the approver writes `alm guide github release` in the
-  conversation: publish a new GitHub release with release notes, check it, and install it on this
-  computer, from the facts in the project notes' `## Releases` section. Words after the topic
-  (`minor`, `major`, `no install`) are the guide's, for you to read. English only so far.
+  conversation: publish a new GitHub release with release notes, check it, and (with `install`)
+  install it on this computer, from the facts in the project notes' `## Releases` section. Words
+  after the topic (`minor`, `major`, `install`) are the guide's, for you to read. English only so
+  far.
 - `alm guide move-cards`: how to find card files kept outside the taskbag, report them, and
   move them in beside their tasks after the person's Go ahead.
 - `alm init`: create a taskbag (only when there is none), in `.allomos/taskbag/` of the current
@@ -1326,20 +1327,25 @@ pub fn claimed_task_steps(language: &str) -> String {
 
 /// `alm guide github-release` (Task-A03-planet530): the procedure an agent follows when the
 /// approver writes `alm guide github release` in the conversation: publish a new GitHub release
-/// with release notes, check it, and install it on this computer. The same text for every project:
+/// with release notes, check it, and (only with the word `install`) install it on this computer
+/// (Task-A03-hen326). The same text for every project:
 /// it names no repository, address or file; the project's facts come from the project notes'
 /// `## Releases` section.
-const GITHUB_RELEASE_EN: &str = "# GitHub release: publish a new release and install it on this computer
+const GITHUB_RELEASE_EN: &str = "# GitHub release: publish a new release, and install it on this computer when asked
 
 The approver writes `alm guide github release` (or `alm guide github-release`) in the
 conversation; you ran it, and this is what to do. One outcome: **a new release on GitHub, with
-notes that say what changed, installed on this computer.** The command in the conversation is the
-approval for this release and for installing it here. Anything it does not cover (another version
-jump than its words say, publishing somewhere new) still goes to the approver.
+notes that say what changed** (and, when the command says `install`, installed on this computer).
+The command in the conversation is the approval for this release, and with `install` for
+installing it here too. Anything it does not cover (another version jump than its words say,
+publishing somewhere new, installing without `install`) still goes to the approver.
 
 Words after the command, which you read from the approver's line (alm does not act on them):
 - `minor` or `major`: raise that part of the version instead of the patch.
-- `no install`: stop after step 6 (released and checked); do not download or install.
+- `install`: after step 6, also download and install the release on this computer (step 7).
+  Without it, skip step 7: the release is published and checked, nothing is downloaded or
+  installed here.
+The words combine, for example `alm guide github release minor install`.
 Any other word: ask the approver what it means before you tag.
 
 This text names no repository, address or file: every fact of the project comes from the
@@ -1364,9 +1370,9 @@ Read the `## Releases` section of the project notes. It is a table with these ke
 | `NOTES_URL` | the published address of a release's page, per language |
 | `NOTES_PUBLISH` | what publishes the pages, how long it takes, and how to build them locally |
 | `GH_NOTES` | who writes the GitHub release's own notes, and whether they link to the pages |
-| `INSTALL_ASSET` | the asset to install on this computer, and its checksum file |
-| `INSTALL_COMMAND` | how it is installed, and whether a person must approve (a password, a dialog) |
-| `VERIFY_INSTALLED` | how to read the installed version afterwards |
+| `INSTALL_ASSET` | the asset to install on this computer, and its checksum file (used only with `install`) |
+| `INSTALL_COMMAND` | how it is installed, and whether a person must approve (a password, a dialog) (only with `install`) |
+| `VERIFY_INSTALLED` | how to read the installed version afterwards (only with `install`) |
 | `APPROVAL_RECORD` | where this release's approval and evidence are written |
 
 When the section is missing, or a key in it: derive what the repository settles (the last tag
@@ -1382,7 +1388,7 @@ section is the source.
 - The last release (`gh release list --limit 1`) and the last tag agree.
 - No run of `RELEASE_WORKFLOW` is still going (`gh run list --workflow <file> --limit 1`).
 - There are commits since the last tag. None: say so and stop, there is nothing to release.
-- `gh auth status` passes, and so does every tool `INSTALL_COMMAND` needs.
+- `gh auth status` passes; with `install`, so does every tool `INSTALL_COMMAND` needs.
 
 ## 2. Collect what changed
 
@@ -1431,7 +1437,9 @@ chose before you write anything: until the tag exists, everything is easy to und
   file; the release's own notes point to the pages (`GH_NOTES`); `NOTES_URL` for the new version
   answers 200 in every language, with the version in the page's title.
 
-## 7. Download and install
+## 7. Download and install (only with `install`)
+
+Without `install` in the command, skip this step and go on with step 8.
 
 - Download into a new, empty folder outside the project:
   `gh release download <tag> --pattern <INSTALL_ASSET> --pattern <its checksum file>`.
@@ -1445,8 +1453,9 @@ chose before you write anything: until the tag exists, everything is easy to und
 - Write the approval (the approver's command line, and when) and the evidence where
   `APPROVAL_RECORD` says, and in your handoff.
 - Report in plain words first: the version, the notes' headings and how many items each has, the
-  links to the release and to the notes, and the version installed. Then the evidence: the run
-  IDs, the asset list, the checksum result. Last, what was not done or not checked.
+  links to the release and to the notes, and the version installed (without `install`: that it
+  was not installed here). Then the evidence: the run IDs, the asset list, and with `install` the
+  checksum result. Last, what was not done or not checked.
 
 ## What you never do here
 
@@ -1776,13 +1785,14 @@ mod tests {
             "## 4. Write the notes",
             "## 5. Bump, commit, tag",
             "## 6. Wait and check",
-            "## 7. Download and install",
+            "## 7. Download and install (only with `install`)",
             "## 8. Record and report",
             "`git log <last tag>..HEAD --no-merges`",
             "`gh auth status`",
             "`gh run watch <run id> --exit-status`",
             "`minor` or `major`",
-            "`no install`",
+            "- `install`: after step 6",
+            "Without `install` in the command, skip this step",
             "never type a password",
             "Force-push, delete a tag or a release, or tag again.",
         ] {
@@ -1889,8 +1899,8 @@ mod tests {
             Some(("github-release", words("minor")))
         );
         assert_eq!(
-            guide_topic(&words("github release no install")),
-            Some(("github-release", words("no install")))
+            guide_topic(&words("github release minor install")),
+            Some(("github-release", words("minor install")))
         );
         assert_eq!(
             guide_topic(&words("run modes")),
