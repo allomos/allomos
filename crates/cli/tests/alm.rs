@@ -1739,7 +1739,9 @@ fn brief_and_guide_tell_agents_about_allomos() {
     assert_eq!(v["words"], json!(["minor"]));
     let text = v["guide"].as_str().unwrap();
     assert!(text.starts_with("Words after the topic, for you to read as this guide says: minor"));
-    assert!(text.contains("# GitHub release: publish a new release and install it"));
+    assert!(text.contains(
+        "# GitHub release: publish a new release, and install it on this computer when asked"
+    ));
     let v = ok(&repo, &["guide", "github-release", "--language", "ja"]);
     assert_eq!(v["written_in_language"], json!(false));
     assert!(
