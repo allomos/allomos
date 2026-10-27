@@ -35,7 +35,7 @@ import {
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
-import { ACTIVE_MINUTES, check, checkRow, paneAgent, session, sessionPlace } from "./sessionFlow";
+import { ACTIVE_MINUTES, check, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
@@ -111,7 +111,7 @@ export function TaskPane({
   const [conflict, setConflict] = useState<string | null>(null);
   // Reopen… (Task-A01-50): the reason being written; null while the form is closed.
   const [reason, setReason] = useState<string | null>(null);
-  // Open in Claude was pressed, at the top or in the Session row (Task-A03-smile488): the app was
+  // Open in Claude was pressed, in the title or in the Session row (Task-A03-smile488): the app was
   // asked; whether it opened cannot be known. The note shows beside the button that was pressed.
   const [sessionAsked, setSessionAsked] = useState<"top" | "row" | null>(null);
   // A new task starts at the top of the pane, with nothing being changed.
@@ -496,7 +496,7 @@ export function TaskPane({
           : t("session.last_session")
         : t(sess.kind === "active" ? "session.active" : "session.last_seen", { time: localTime(sess.at) });
   const sessionText = sessionWhen && place ? t("session.where", { when: sessionWhen, where: t(`session.in_${place}`) }) : sessionWhen;
-  // One action for both buttons: the Session row's and the one at the top (Task-A03-smile488).
+  // One action for both buttons: the Session row's and the one in the title (Task-A03-smile488).
   const openSession = (from: "top" | "row") => {
     if (!onOpenSession) return;
     setSessionAsked(null);
@@ -514,10 +514,9 @@ export function TaskPane({
         {askedNote("row")}
       </>
     ) : null;
-  // Task-A03-smile488: the row under the title, with the check (if any) and the open button at its
-  // far right, a normal button with the "opens elsewhere" icon.
-  const top = checkRow(task, toCheck(task), !!onOpenSession);
-  const topButton = top?.open ? (
+  // Task-A03-smile488: the open button in the title, after Change (approver, 2026-10-27), a normal
+  // button with the "opens elsewhere" icon.
+  const topButton = titleOpen(task, !!onOpenSession) ? (
     <>
       <button type="button" className="with-icon pane-open" onClick={() => openSession("top")}>
         <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
@@ -568,34 +567,29 @@ export function TaskPane({
           editor("title")
         ) : (
           <h2>
-            <span className="id">{task.id}</span> {task.title} {changeButton("title")}
+            <span className="id">{task.id}</span> {task.title} {changeButton("title")} {topButton}
           </h2>
         )}
         <button type="button" className="close" onClick={onClose} title={t("pane.close")} aria-label={t("pane.close")}>
           ×
         </button>
       </header>
-      {top?.toCheck && (
+      {toCheck(task) && (
         <div className="pane-check">
           <HumanCheckBadge task={task} />
           {asking === "checked" && !ownerName ? (
-            <>
-              {topButton}
-              {nameForm()}
-            </>
+            nameForm()
           ) : (
             <>
               <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
                 {t("pane.checked_button")}
               </button>
-              {topButton}
               <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
               {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
             </>
           )}
         </div>
       )}
-      {top && !top.toCheck && <div className="pane-check">{topButton}</div>}
       {toReview(task) && (
         <div className="pane-check pane-review">
           <AiDecidedBadge task={task} />
