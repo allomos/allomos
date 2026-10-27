@@ -312,6 +312,7 @@
   "problem.write_failed": "Could not write {path}: {detail}.",
   "problem.task_not_found": "There is no task \"{id}\".",
   "problem.holder_missing": "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.",
+  "problem.session_missing": "Say what to record: --session-agent, --session-id, --session-kind or --app-session-id.",
   "problem.task_held": "Task {id} is held by {holder}.",
   "problem.request_reused": "The one-time number {id} was already used for a different change, so nothing was done. Use a new number for a new change.",
   "problem.task_changed": "Task {id} changed after you read it, so your change was not saved. Read it again (its version is now {version}), then save.",

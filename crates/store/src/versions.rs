@@ -84,7 +84,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 28: at `alm claim` the agent passes what the Allomos app needs to reopen its session
 /// (`--session-agent`, `--session-id`, and e.g. `--session-kind desktop --app-session-id`)
 /// (Task-A03-hive049).
-pub const SECTION_VERSION: u32 = 28;
+/// 29: after a command that changes a task, `alm` lists what the task is missing with the fix,
+/// and `alm session` fills in session details later (Task-A03-ham538).
+pub const SECTION_VERSION: u32 = 29;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

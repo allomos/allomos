@@ -270,6 +270,23 @@ enum Command {
     Reviewed { id: String },
     /// Show one task in full.
     Show { id: String },
+    /// Fill in or correct the session a task records, afterwards (Task-A03-ham538): each option
+    /// given replaces that part, the others stay. Any state, by the holder or after done.
+    Session {
+        id: String,
+        /// The AI agent the session runs under (for example `claude-code`).
+        #[arg(long, value_name = "AGENT")]
+        session_agent: Option<String>,
+        /// The agent's own session ID (for Claude Code, what `claude --resume` takes).
+        #[arg(long, value_name = "ID")]
+        session_id: Option<String>,
+        /// Where the session runs (for example `desktop` in the Claude desktop app).
+        #[arg(long, value_name = "KIND")]
+        session_kind: Option<String>,
+        /// The desktop app's ID for the session (in the Claude desktop app, its `local_…` ID).
+        #[arg(long, value_name = "ID")]
+        app_session_id: Option<String>,
+    },
     /// Show a task's history: every recorded change, newest first, with who and when.
     History { id: String },
     /// Hold a task and start it. Say which branch you are on (--branch): alm records the task's
@@ -715,6 +732,7 @@ impl Command {
             Command::Show { id }
             | Command::History { id }
             | Command::Claim { id, .. }
+            | Command::Session { id, .. }
             | Command::Base { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
@@ -846,6 +864,7 @@ impl Command {
             Command::Show { .. } => "show",
             Command::History { .. } => "history",
             Command::Claim { .. } => "claim",
+            Command::Session { .. } => "session",
             Command::Base { .. } => "base",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",
@@ -1076,6 +1095,9 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                     | Command::Done { .. }
                     | Command::Handoff { .. }
             );
+            if let Some(lines) = missing_facts(&cli, cwd, &mut done) {
+                done.text.push_str(&lines);
+            }
             if moves_on {
                 if let Some(ask) =
                     quota_ask(cli.holder.as_deref(), &quota_reports(), &events::now_utc())
@@ -3182,11 +3204,6 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let mut text = format!("{}\n", task_line(&claimed.changed.task));
             let steps = branch_steps(at);
             text.push_str(&steps.text);
-            // Task-A03-hive049: the app reopens the session from what the agent passes; alm only
-            // reminds when nothing was passed.
-            if claimed.changed.task.session.is_none() {
-                text.push_str(&format!("{SESSION_HINT}\n"));
-            }
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
@@ -3227,6 +3244,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             Ok(done)
         }
         Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
+        Command::Session {
+            id,
+            session_agent,
+            session_id,
+            session_kind,
+            app_session_id,
+        } => {
+            let given = allomos_core::AgentSession {
+                agent: non_blank(session_agent),
+                id: non_blank(session_id),
+                kind: non_blank(session_kind),
+                app_session_id: non_blank(app_session_id),
+                ..Default::default()
+            };
+            change(cli, cwd, |bag| ops::set_session(bag, id, me, given.clone()))
+        }
         Command::Wait { id, on, who } => {
             change(cli, cwd, |bag| ops::wait(bag, id, me, on, who.as_deref()))
         }
@@ -3725,9 +3758,6 @@ fn non_blank(value: &Option<String>) -> Option<String> {
         .map(str::to_string)
 }
 
-/// What `alm claim` prints when the agent passed no session (Task-A03-hive049).
-const SESSION_HINT: &str = "When you claim, pass what the Allomos app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to reopen it (for example, `--session-kind desktop --app-session-id <its local_… ID>` when you run in the Claude desktop app). Claim it again with them to record it.";
-
 /// The folder `alm claim` runs in, relative to the folder holding `.allomos/`
 /// (Task-A03-hive049): never absolute, so no user name is written; `None` when there is no
 /// relative way.
@@ -3736,4 +3766,44 @@ fn claim_folder(root: &Path, cwd: &Path) -> Option<String> {
     let to = std::fs::canonicalize(cwd).ok()?;
     let path = allomos_store::relative_path(&from, &to)?;
     Some(path.to_string_lossy().replace('\\', "/"))
+}
+
+/// After a command that changes a task (Task-A03-ham538, approver 2026-10-27: a check inside
+/// `alm`): what the task is missing that the app or the next session relies on, as Fact lines with
+/// the command that fixes each, and as `missing` in `--json`. It refuses nothing.
+fn missing_facts(cli: &Cli, cwd: &Path, done: &mut Done) -> Option<String> {
+    let watched = matches!(
+        cli.command,
+        Command::Claim { .. }
+            | Command::Session { .. }
+            | Command::Label { .. }
+            | Command::Wait { .. }
+            | Command::Block { .. }
+            | Command::Release { .. }
+            | Command::Handoff { .. }
+            | Command::Done { .. }
+    );
+    if !watched {
+        return None;
+    }
+    let id = cli.command.target()?;
+    let root = locate(cli, cwd).ok()?;
+    let bag = load(&root).taskbag?;
+    let task = bag.tasks.iter().find(|t| t.id == id)?;
+    let claimed = task.holder.is_some()
+        || allomos_store::events::list(&root)
+            .0
+            .iter()
+            .any(|e| e.command == "claim" && e.id.as_deref() == Some(id));
+    let branches = allomos_store::branches(&root);
+    let found = allomos_store::missing::missing(task, branches.get(id), claimed);
+    done.fields["missing"] = json!(found);
+    if found.is_empty() {
+        return None;
+    }
+    let mut text = String::from("\n");
+    for m in &found {
+        text.push_str(&format!("Fact: {} Fix: `{}`\n", m.fact, m.fix));
+    }
+    Some(text)
 }

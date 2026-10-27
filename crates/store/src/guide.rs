@@ -211,6 +211,14 @@ Work a task:
   outside the taskbag it refuses (`claim_cards_outside`): move them in first (`alm guide
   move-cards`). The `--session-…` options record your session, so the Allomos app can reopen it
   from the task (stored as given, never checked).
+- `alm session <id> [--session-agent <agent>] [--session-id <id>] [--session-kind <kind>]
+  [--app-session-id <id>]`: fill in or correct the session a task records, afterwards: each option
+  given replaces that part, the others stay. Any state, by the holder or after done
+  (`session_missing` when nothing is given).
+- After `claim`, `session`, `label`, `wait`, `block`, `release`, `handoff` and `done`, `alm` lists
+  as Fact lines what the task is missing (`--json`: `missing`, each with `code`, `fact` and `fix`):
+  session details the app needs to reopen the session, the working branch of a task that was
+  claimed, and the handoff note of a task done to check. It refuses nothing; run the fix.
 - `alm label <id> \"<label>\"`: a step of the ladder.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).

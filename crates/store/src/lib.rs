@@ -33,6 +33,7 @@ pub mod events;
 pub mod folders;
 mod guide;
 pub mod handoff;
+pub mod missing;
 pub mod progress;
 mod quota;
 mod settings;
@@ -269,7 +270,9 @@ the project notes (below).
   app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your
   session's ID>`, and whatever else your agent needs to reopen it (for example,
   `--session-kind desktop --app-session-id <its local_… ID>` when you run in the Claude
-  desktop app).
+  desktop app). After a command that changes a task, `alm` lists what the task is still missing
+  (session details, working branch, a handoff note), each with the command that fixes it; run
+  it (session details: `alm session <id> --session-agent … --session-id …`).
 - Always work a task in a worktree of its own (a separate working copy on the task's own
   branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
   prints), never in the main checkout: the main checkout stays on the base branch. Merge from

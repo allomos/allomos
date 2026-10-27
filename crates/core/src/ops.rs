@@ -6,7 +6,7 @@
 //! taskbag's lock (see `crates/store`).
 
 use crate::event::Change;
-use crate::model::{Area, Iteration, IterationState, Project, State, Task, Taskbag};
+use crate::model::{AgentSession, Area, Iteration, IterationState, Project, State, Task, Taskbag};
 use crate::problem::Problem;
 use crate::validate::valid_date;
 use serde::Deserialize;
@@ -744,6 +744,34 @@ pub fn set_label(
     {
         clear_human_check(&mut task);
     }
+    Ok(Outcome::plain(task))
+}
+
+/// Fill in or correct the task's recorded session afterwards (`alm session`, Task-A03-ham538): each
+/// part given replaces that part, the others stay. In any state, by the holder, while nobody holds
+/// it, or after done or dropped; refused while someone else holds it. Nothing given is refused.
+pub fn set_session(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    given: AgentSession,
+) -> Result<Outcome, Problem> {
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    if given.is_empty() {
+        return Err(Problem::SessionMissing);
+    }
+    let mut session = task.session.take().unwrap_or_default();
+    let keep = |new: Option<String>, old: Option<String>| new.or(old);
+    session.agent = keep(given.agent, session.agent);
+    session.id = keep(given.id, session.id);
+    session.kind = keep(given.kind, session.kind);
+    session.app_session_id = keep(given.app_session_id, session.app_session_id);
+    session.by = session
+        .by
+        .or_else(|| task.holder.clone())
+        .or_else(|| non_empty(me));
+    task.session = Some(session);
     Ok(Outcome::plain(task))
 }
 

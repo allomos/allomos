@@ -169,6 +169,8 @@ problems! {
     WriteFailed { path, detail } => "write_failed", "Could not write {path}: {detail}.";
     TaskNotFound { id } => "task_not_found", "There is no task \"{id}\".";
     HolderMissing => "holder_missing", "Say who you are with --as <name> or the ALLOMOS_HOLDER environment variable.";
+    /// `alm session` was given nothing to record (Task-A03-ham538).
+    SessionMissing => "session_missing", "Say what to record: --session-agent, --session-id, --session-kind or --app-session-id.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
     /// The one-time number of a change (`--request-id`, Task-A01-58) was used before for a
     /// different change, so nothing was done.

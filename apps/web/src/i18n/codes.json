@@ -207,6 +207,7 @@
     "id",
     "active"
   ],
+  "session_missing": [],
   "session_open_failed": [
     "detail"
   ],
