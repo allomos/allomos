@@ -40,13 +40,13 @@ pub fn translation_steps_in(
     let bag = shown(taskbag);
     match language {
         "zh-CN" => format!(
-            "- 翻译成{target}：每个任务的标题、描述和交接备注（`alm title`、`alm describe`、`alm handoff`），卡片文件（`tasks/<id>/card.md`），以及任务包的 project-notes.md。\n- 保持原样：命令、任务 ID、文件路径和代码。\n- 译文取代原文，不保留原文。\n- 同时把任务语言改成这种语言，以后的新任务也用它来写：`alm --taskbag \"{bag}\" task-language {code}`。\n"
+            "- 翻译成{target}：每个任务的标题、描述和交接备注（`alm title`、`alm describe`、`alm handoff`），每个迭代的名称（`alm change iteration <id> --name`），卡片文件（`tasks/<id>/card.md`），以及任务包的 project-notes.md。\n- 保持原样：命令、任务 ID、迭代 ID、文件路径和代码。\n- 译文取代原文，不保留原文。\n- 同时把任务语言改成这种语言，以后的新任务也用它来写：`alm --taskbag \"{bag}\" task-language {code}`。\n"
         ),
         "ja" => format!(
-            "- {target}に翻訳するもの：各タスクのタイトル、説明、引き継ぎメモ（`alm title`、`alm describe`、`alm handoff`）、カードのファイル（`tasks/<id>/card.md`）、タスクバッグの project-notes.md。\n- そのままにするもの：コマンド、タスク ID、ファイルのパス、コード。\n- 訳文で元の文を置き換え、元の文は残しません。\n- 同時にタスクの言語をこの言語に変え、これからの新しいタスクもこの言語で書かれるようにします：`alm --taskbag \"{bag}\" task-language {code}`。\n"
+            "- {target}に翻訳するもの：各タスクのタイトル、説明、引き継ぎメモ（`alm title`、`alm describe`、`alm handoff`）、各イテレーションの名前（`alm change iteration <id> --name`）、カードのファイル（`tasks/<id>/card.md`）、タスクバッグの project-notes.md。\n- そのままにするもの：コマンド、タスク ID、イテレーション ID、ファイルのパス、コード。\n- 訳文で元の文を置き換え、元の文は残しません。\n- 同時にタスクの言語をこの言語に変え、これからの新しいタスクもこの言語で書かれるようにします：`alm --taskbag \"{bag}\" task-language {code}`。\n"
         ),
         _ => format!(
-            "- Translate into {target}: every task's title, description and handoff note (`alm title`, `alm describe`, `alm handoff`), the card files (`tasks/<id>/card.md`), and the taskbag's project-notes.md.\n- Keep as they are: commands, task IDs, file paths and code.\n- The translation replaces the old text; the originals are not kept.\n- At the same time, make it the task language, so new tasks are written in it too: `alm --taskbag \"{bag}\" task-language {code}`.\n"
+            "- Translate into {target}: every task's title, description and handoff note (`alm title`, `alm describe`, `alm handoff`), every iteration's name (`alm change iteration <id> --name`), the card files (`tasks/<id>/card.md`), and the taskbag's project-notes.md.\n- Keep as they are: commands, task IDs, iteration IDs, file paths and code.\n- The translation replaces the old text; the originals are not kept.\n- At the same time, make it the task language, so new tasks are written in it too: `alm --taskbag \"{bag}\" task-language {code}`.\n"
         ),
     }
 }
@@ -87,7 +87,8 @@ mod tests {
         let r = agent_translate_request_in("en", p, b, "vi", Some("Tiếng Việt"));
         assert!(r.contains("into Tiếng Việt (`vi`)"), "{r}");
         assert!(r.contains("task-language vi"), "{r}");
-        assert!(r.contains("Keep as they are: commands, task IDs, file paths and code."));
+        assert!(r.contains("Keep as they are: commands, task IDs, iteration IDs, file paths and code."));
+        assert!(r.contains("every iteration's name (`alm change iteration <id> --name`)"), "{r}");
         assert!(r.contains("confirm"), "{r}");
         // Without a name, the code alone; every language says the same.
         assert!(agent_translate_request_in("en", p, b, "pt-BR", None).contains("into `pt-BR`"));
@@ -95,6 +96,7 @@ mod tests {
             let r = agent_translate_request_in(language, p, b, "vi", Some("Tiếng Việt"));
             assert!(r.contains("Tiếng Việt (`vi`)"), "{language}: {r}");
             assert!(r.contains("task-language vi"), "{language}: {r}");
+            assert!(r.contains("alm change iteration <id> --name"), "{language}: {r}");
         }
     }
 }
