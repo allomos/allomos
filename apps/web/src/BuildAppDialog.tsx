@@ -248,10 +248,11 @@ export function BuildAppDialog({
                   <input type="checkbox" checked={discuss} onChange={(e) => setDiscuss(e.target.checked)} disabled={busy} />{" "}
                   <strong>{t("build.discuss_first")}</strong>
                 </label>
+                <p className="muted small">{t("build.discuss_intro")}</p>
                 <ol className="muted small">
-                  <li>{t("build.discuss_send")}</li>
-                  <li>{t("build.discuss_talk")}</li>
-                  <li>{t("build.discuss_start")}</li>
+                  <li>{t("build.discuss_wait")}</li>
+                  <li>{t("build.discuss_refine")}</li>
+                  <li>{t("build.discuss_go")}</li>
                 </ol>
               </fieldset>
             </>
