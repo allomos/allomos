@@ -891,9 +891,11 @@ pub fn agent_files(language: &str) -> Option<&'static str> {
 /// conversation alone, and continuing from `alm next` (Task-A03-25-01).
 /// 2: every finished task, the goal task too, ends done and to check
 /// (`--without-human-check`) in either run mode, not waiting (Task-A03-31).
-pub const GOAL_PROMPT_VERSION: u32 = 3;
+/// 4: "Already started?" plans from a goal task that is still the goal's only task, written first
+/// for discussion (Discuss first in Build a new app…, Task-A03-tundra474).
+pub const GOAL_PROMPT_VERSION: u32 = 4;
 
-const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v3)
+const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v4)
 
 For the agent: this is the goal prompt. A person has described an app they want (their words
 come with this prompt). You plan it into areas, iterations and tasks, make the tasks ready
@@ -932,7 +934,7 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`. Its description (`alm describe <id> --from <file.md>`) holds the spec: what the app
    does and for whom, and the acceptance criteria the finished app must meet, each one a thing a
-   person can try. End it with this line: \"Goal run (goal prompt v3): the person approved this
+   person can try. End it with this line: \"Goal run (goal prompt v4): the person approved this
    plan in advance by submitting the goal on <date>; the agent makes the areas, iterations and
    ready tasks. Outside effects still wait for the approver.\" The title's `Goal:` marks the goal
    task for every later session: keep it.
@@ -996,7 +998,7 @@ true, and print `alm list --json` to show it. Stop earlier only at the quota gat
 handoff written; given this prompt again, you continue from `alm next`.
 ";
 
-const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v3)
+const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v4)
 
 给智能体：这是目标提示。有人描述了他们想要的应用（他们的原话随这段提示一起给出）。你把它规划成
 领域、迭代和任务，自己把任务设为就绪，然后一个迭代接一个迭代地把它做出来，每一步都用 `alm`
@@ -1030,7 +1032,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。它的描述（`alm describe <id> --from <file.md>`）写规格：应用做什么、为谁做，以及完成的
    应用必须满足的验收标准，每一条都是一个人能亲手试的事。最后加上这一行：
-   “Goal run (goal prompt v3)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
+   “Goal run (goal prompt v4)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
    就绪的任务由智能体来建。对外有影响的事仍然等批准人处理。”标题里的 `Goal:` 让之后的每个会话都能认出目标任务：保留它。
 2. **领域**，按应用的组成部分划分（例如它的界面、数据、服务器）：`alm add area \"<name>\"`。
 3. **迭代**，作为一份发布路线图，每个迭代结束时都有一个对方能试用的版本：
@@ -1082,7 +1084,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 只有到了额度关口才提前停下，并写好交接；再次收到这段提示时，从 `alm next` 继续。
 ";
 
-const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v3)
+const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v4)
 
 エージェントへ：これはゴールのプロンプトです。ある人が、欲しいアプリを説明しました（その人の言葉は
 このプロンプトと一緒に渡されます）。あなたはそれをエリア、イテレーション、タスクに計画し、タスクを
@@ -1120,7 +1122,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。その説明（`alm describe <id> --from <file.md>`）に仕様を書きます。アプリが何をし、
    誰のためのものか、そして完成したアプリが満たすべき受け入れ基準。基準はどれも、人が試せることに
-   します。最後にこの一行を書きます：「Goal run (goal prompt v3)：この人は <date> にゴールを出して、
+   します。最後にこの一行を書きます：「Goal run (goal prompt v4)：この人は <date> にゴールを出して、
    この計画を前もって承認しました。エリア、イテレーション、準備完了のタスクはエージェントが作ります。
    外部への影響があることは、引き続き承認者を待ちます。」タイトルの `Goal:` は、あとのすべての
    セッションにゴールのタスクを示す印です。消さずに残します。
@@ -1248,18 +1250,17 @@ fn quoted(description: &str) -> String {
         .join("\n")
 }
 
-/// The one line the person sends to start the build after discussing the goal (Task-A03-tundra474).
-pub const DISCUSS_START: &str = "alm guide goal";
-
-/// What follows the connect request when the person chooses **Discuss** from the Start menu of
-/// **Build a new app…** (Task-A03-tundra474), in place of [`goal_request_in`]: the agent writes
-/// only the goal task (the person's description, the goal prompt as the way of working, and the
-/// run mode), builds nothing, and tells the person they can talk the goal over first and send
-/// [`DISCUSS_START`] to have it carried out. The goal prompt's "Already started?" plans from a goal
-/// task that is still the goal's only task.
+/// What follows the connect request when the person ticks **Discuss first** in **Build a new
+/// app…** (Task-A03-tundra474, approver 2026-10-28), in place of [`goal_request_in`]: the agent
+/// reads the goal prompt as its way of working without starting the goal run, writes only the goal
+/// task (the person's description word for word, what the app does and for whom, acceptance
+/// criteria as far as known, the run mode, and that it was written first for discussion), builds
+/// nothing, and asks the person to talk it over. While they discuss, it updates the spec; when the
+/// person tells it to start, in any words, it follows the goal prompt from that goal task (planning
+/// from phase 2, step 2), recording the go-ahead as the goal run's approval. The goal prompt's
+/// "Already started?" plans from a goal task that is still the goal's only task.
 pub fn discuss_request_in(language: &str, description: &str, quiet: bool) -> String {
     let words = quoted(description);
-    let start = DISCUSS_START;
     match written_in(language) {
         Some("zh-CN") => {
             let mode = if quiet {
@@ -1270,13 +1271,14 @@ pub fn discuss_request_in(language: &str, description: &str, quiet: bool) -> Str
             format!(
                 "## 然后：先写下目标任务，再一起讨论（第一、二部分完成后）
 
-这个人在 Allomos 的“构建新应用…”中选择了“讨论”：在动手构建之前，想先和你把目标讨论清楚。现在只做下面这些：
+这个人在 Allomos 的“构建新应用…”中勾选了“先讨论”：在动手构建之前，想先和你把目标谈清楚。
 
-1. **写下第一个任务：目标任务。** 先运行 `alm guide goal` 读一遍目标提示（这是之后的工作方式），但现在不要开始目标运行。按它阶段 2 第 1 步的写法添加目标任务：`alm add area \"<应用的名字>\"`，然后 `alm add task --area <id> --title \"Goal: <一句话说明这个应用>\" --branch <你所在的分支>`。用 `alm describe <id> --from <file.md>` 写它的规格，其中包括：下面这个人的描述，一字不改；就目前所知，这个应用做什么、给谁用，以及验收标准；运行模式：{mode}，这个人在 Allomos 中选择的，从构建开始时起生效；还有这一行：“工作方式：按照目标提示（`alm guide goal`）。这个目标任务是为了先讨论而先写下的；这个人发出 `{start}` 时开始构建。”目标运行的批准那一行先不要写：这个人开始运行时再补上。
-2. **别的都不要做：** 不添加其他领域、迭代或任务，也不构建任何东西。
-3. **然后告诉这个人：** 目标任务（它的 ID）已经写好，并简要列出它的规格。告诉对方：现在可以先和你讨论这个目标，比如它是做什么的、给谁用、必须能做到什么；你们每谈定一点，你就更新目标任务的规格（`alm describe`）。讨论清楚后，只要发出下面这一行，你就开始执行这个任务（规划并构建应用）：
-
-       {start}
+1. **读目标提示，但先不开始。** 运行 `alm guide goal`，把目标提示读一遍：之后你就按它工作。现在不要开始目标运行。
+2. **只写目标任务。** 按目标提示阶段 2 第 1 步的写法添加它：`alm add area \"<应用的名字>\"`，然后 `alm add task --area <id> --title \"Goal: <一句话说明这个应用>\" --branch <你所在的分支>`。用 `alm describe <id> --from <file.md>` 写它的规格，其中包括：下面这个人的描述，一字不改；就目前所知，这个应用做什么、给谁用，以及验收标准；运行模式：{mode}，这个人在 Allomos 中选的，从开始构建起生效；还有一句：这个目标任务是先写下来供讨论的。
+3. **别的都不要做：** 不添加其他领域、迭代或任务，也不构建任何东西。
+4. **告诉这个人：** 目标任务（它的 ID）已经写好，简要列出它的规格；告诉对方可以就在这段对话里和你讨论这个目标。最后用类似这样的话结束：“觉得可以了，就告诉我开始执行这个任务。”
+5. **讨论期间：** 每谈定一点，就用 `alm describe` 更新目标任务的规格。
+6. **这个人让你开始时**（怎么说都行，比如“开始吧”“可以动手了”）：从这个目标任务出发，按目标提示继续，从阶段 2 第 2 步开始规划。在目标任务上记下目标运行的批准：由这个人的这句话给出，并写上日期。
 
 这个人的描述：
 
@@ -1293,13 +1295,14 @@ pub fn discuss_request_in(language: &str, description: &str, quiet: bool) -> Str
             format!(
                 "## そのあと：ゴールのタスクを先に書き、話し合う（第一部と第二部が終わってから）
 
-この人は Allomos の「新しいアプリを作る…」で「話し合う」を選びました。作り始める前に、まずあなたとゴールをはっきりさせたいのです。いまは次のことだけをします。
+この人は Allomos の「新しいアプリを作る…」で「先に話し合う」にチェックを入れました。作り始める前に、まずあなたとゴールをはっきりさせたいのです。
 
-1. **最初のタスク、ゴールのタスクを書く。** まず `alm guide goal` を実行してゴールのプロンプト（このあとの進め方）を読みますが、ゴール実行はまだ始めません。その段階 2 の手順 1 のとおりにゴールのタスクを加えます：`alm add area \"<アプリの名前>\"`、続けて `alm add task --area <id> --title \"Goal: <アプリをひとことで>\" --branch <いまいるブランチ>`。`alm describe <id> --from <file.md>` で仕様を書き、次を入れます：下にあるこの人の説明（一字も変えずに）、いまわかる範囲で、アプリが何をし誰が使うか、そして受け入れ基準、実行モード：{mode}（この人が Allomos で選びました。作り始めたときから有効）、それにこの一行：「進め方：ゴールのプロンプト（`alm guide goal`）に従う。このゴールのタスクは話し合うために先に書かれた。この人が `{start}` を送ったら作り始める。」ゴール実行の承認の一行はまだ書きません。この人が実行を始めるときに加えます。
-2. **ほかには何もしない：** ほかのエリア、イテレーション、タスクを加えず、何も作りません。
-3. **そしてこの人に伝える：** ゴールのタスク（その ID）を書いたこと、その仕様の要点。いまならまずあなたとゴールを話し合えること（何のためのアプリか、誰が使うか、何ができなければならないか）、話が決まるたびにゴールのタスクの仕様を更新すること（`alm describe`）。話し合いが済んだら、次の一行を送るだけで、あなたがこのタスクを実行する（アプリを計画して作る）こと：
-
-       {start}
+1. **ゴールのプロンプトを読む。ただし、まだ始めない。** `alm guide goal` を実行してゴールのプロンプトを読みます。このあとはそれに従って作業します。いまはゴール実行を始めません。
+2. **ゴールのタスクだけを書く。** ゴールのプロンプトの段階 2 の手順 1 のとおりに加えます：`alm add area \"<アプリの名前>\"`、続けて `alm add task --area <id> --title \"Goal: <アプリをひとことで>\" --branch <いまいるブランチ>`。`alm describe <id> --from <file.md>` で仕様を書き、次を入れます：下にあるこの人の説明（一字も変えずに）、いまわかる範囲で、アプリが何をし誰が使うか、そして受け入れ基準、実行モード：{mode}（この人が Allomos で選びました。作り始めたときから有効）、そしてこのゴールのタスクは話し合うために先に書かれたということ。
+3. **ほかには何もしない：** ほかのエリア、イテレーション、タスクを加えず、何も作りません。
+4. **この人に伝える：** ゴールのタスク（その ID）を書いたこと、その仕様の要点、そしてこの会話のなかでゴールについてあなたと話し合えること。最後は次のような言葉で締めくくります：「準備ができたら、タスクを始めるように言ってください。」
+5. **話し合いのあいだ：** 話が決まるたびに、`alm describe` でゴールのタスクの仕様を更新します。
+6. **この人が始めるように言ったら**（言い方は何でもかまいません。「始めて」「よし、作ろう」など）：このゴールのタスクから、ゴールのプロンプトに従って続けます。計画は段階 2 の手順 2 からです。ゴール実行の承認は、この人のその言葉で与えられたものとして、日付とともにゴールのタスクに記録します。
 
 この人の説明：
 
@@ -1316,13 +1319,14 @@ pub fn discuss_request_in(language: &str, description: &str, quiet: bool) -> Str
             format!(
                 "## Then: write the goal task, and talk it over first (after parts 1 and 2)
 
-The person started this from Allomos's Build a new app… with Discuss: before anything is built, they want to talk the goal over with you. Do only this now:
+The person started this from Allomos's Build a new app… with Discuss first ticked: before anything is built, they want to talk the goal over with you.
 
-1. **Write the first task, the goal task.** Run `alm guide goal` and read the goal prompt (it is how you will work afterwards), but do not start the goal run yet. Add the goal task as its phase 2, step 1 says: `alm add area \"<the app's name>\"`, then `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you are on>`. Write its spec with `alm describe <id> --from <file.md>`, holding: the person's description below, word for word; what the app does and for whom, and the acceptance criteria, as far as you can tell now; the run mode, {mode} (the person chose it in Allomos; it applies once the build starts); and this line: \"How the agent works: by the goal prompt (`alm guide goal`). This goal task was written first, for discussion; the build starts when the person sends `{start}`.\" Leave out the goal run's approval line for now: it is added when the person starts the run.
-2. **Do nothing else:** add no other areas, iterations or tasks, and build nothing.
-3. **Then tell the person:** the goal task (its ID) is written, with its spec in short. They can now talk the goal over with you first (what the app is for, who uses it, what it must do), and you update the goal task's spec (`alm describe`) as you agree. When it is clear, they send this one line, and you carry out the task (plan and build the app):
-
-       {start}
+1. **Read the goal prompt, but do not start yet.** Run `alm guide goal` and read the goal prompt: it is how you will work afterwards. Do not start the goal run now.
+2. **Write only the goal task**, as the goal prompt's phase 2, step 1 says: `alm add area \"<the app's name>\"`, then `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you are on>`. Write its spec with `alm describe <id> --from <file.md>`, holding: the person's description below, word for word; what the app does and for whom, and the acceptance criteria, as far as you can tell now; the run mode, {mode} (the person chose it in Allomos; it applies once the build starts); and that this goal task was written first, for discussion.
+3. **Do nothing else:** add no other areas, iterations or tasks, and build nothing.
+4. **Tell the person** the goal task (its ID) is written, with its spec in short, and that they can talk the goal over with you here, in this conversation. End with words like: \"Tell me to start the task when you feel ready.\"
+5. **While you discuss,** update the goal task's spec (`alm describe`) as you agree on each point.
+6. **When the person tells you to start** (in any words: \"start the task\", \"OK, let's cook\", …), follow the goal prompt from this goal task, planning from phase 2, step 2. Record the goal run's approval on the goal task as given by their go-ahead, with its date.
 
 The person's description:
 
@@ -2052,7 +2056,7 @@ mod tests {
                 "`alm add area \"<the app's name>\"`",
                 "--title \"Goal: <the app, in one line>\"",
                 "`alm describe <id> --from <file.md>`",
-                "Goal run (goal prompt v3)",
+                "Goal run (goal prompt v4)",
                 "`alm add area \"<name>\"`",
                 "`alm add iteration \"<name>\" --release v0.1`",
                 "`alm plan <id> <iteration>`",
@@ -2178,11 +2182,16 @@ mod tests {
         );
     }
 
-    /// Discuss (Task-A03-tundra474): only the goal task, with the description, the run mode and the
-    /// line that starts the build, in every language.
+    /// Discuss first (Task-A03-tundra474): only the goal task, with the description and the run
+    /// mode; the person talks it over and says when to start, in any words, in every language.
     #[test]
-    fn discuss_request_writes_only_the_goal_task_and_names_the_line_to_send() {
-        for language in RUN_MODES_LANGUAGES {
+    fn discuss_request_writes_only_the_goal_task_and_waits_for_the_go_ahead() {
+        let endings = [
+            ("en", "Tell me to start the task when you feel ready."),
+            ("zh-CN", "觉得可以了，就告诉我开始执行这个任务。"),
+            ("ja", "準備ができたら、タスクを始めるように言ってください。"),
+        ];
+        for (language, ending) in endings {
             let quiet = discuss_request_in(language, "  A to-do list\n\nwith dates  \n", true);
             assert!(quiet.starts_with("## "), "{language}");
             assert!(
@@ -2191,11 +2200,9 @@ mod tests {
             );
             assert!(quiet.contains("Run mode: quiet"), "{language}");
             assert!(!quiet.contains("Run mode: normal"), "{language}");
-            assert!(quiet.contains("Goal: "), "{language}");
-            assert!(
-                quiet.contains(&format!("\n       {DISCUSS_START}\n")),
-                "{language}"
-            );
+            for words in ["Goal: ", "alm guide goal", "alm describe", ending] {
+                assert!(quiet.contains(words), "{language}: {words}");
+            }
             assert!(
                 !quiet.contains(goal(language).unwrap()),
                 "{language}: no goal prompt"

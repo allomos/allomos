@@ -685,24 +685,9 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }
 .build-app .run-modes { font-size: 13px; }
 .build-app .run-modes summary { cursor: pointer; }
-/* Task-A03-tundra474: Start with a drop-down (Discuss), its menu opening upwards, right-aligned. */
-.split-button { position: relative; display: inline-flex; }
-.split-button > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.split-button > .split-toggle {
-  border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgb(255 255 255 / 0.35);
-  padding-left: 8px; padding-right: 8px; display: inline-flex; align-items: center;
-}
-.split-toggle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.split-popover {
-  position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 20; width: 300px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 0;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); display: flex; flex-direction: column;
-}
-.split-popover button {
-  border: none; border-radius: 0; background: none; text-align: left; font-weight: 400; color: inherit;
-  padding: 7px 12px; display: flex; flex-direction: column; gap: 2px; white-space: normal;
-}
-.split-popover button:hover { background: var(--bg); }
+/* Task-A03-tundra474: Discuss first, a checkbox above Start, with its three-step hint. */
+.build-app .discuss-first { border: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.build-app .discuss-first ol { margin: 0; padding-left: 40px; display: grid; gap: 2px; }
 
 /* Task-A01-52: the Iterations tab's sort menu. */
 .sort-menu { position: relative; display: inline-flex; }
