@@ -54,8 +54,8 @@ pub use convert::{
 pub use events::Actor;
 pub use guide::{
     GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
-    agent_files, claimed_task_steps, github_release, goal, goal_request_in, guide, guide_topic,
-    localized, run_modes,
+    agent_files, claimed_task_steps, discuss_request_in, github_release, goal, goal_request_in,
+    guide, guide_topic, localized, run_modes,
 };
 pub use quota::{
     ASK_AFTER_MINUTES as QUOTA_ASK_AFTER_MINUTES, QuotaAsk, QuotaReport, WINDOWS as QUOTA_WINDOWS,

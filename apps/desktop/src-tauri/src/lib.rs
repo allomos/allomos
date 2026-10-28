@@ -890,6 +890,9 @@ async fn manual_request(
 /// The one request **Build a new app…** types in (Task-A03-25-02): the connect request the setup
 /// wizard's first agent gets ([`connect_plan`]), then the goal request with the person's
 /// description and run mode ([`allomos_store::goal_request_in`]). Manual shows the same text.
+/// With `discuss` (the Start menu's **Discuss**, Task-A03-tundra474) the discuss request takes the
+/// goal request's place ([`allomos_store::discuss_request_in`]): the agent writes the goal task
+/// only, and the person talks it over before sending the line that starts the build.
 fn build_app_plan(
     agent: &str,
     language: &str,
@@ -897,6 +900,7 @@ fn build_app_plan(
     taskbag: &Path,
     description: &str,
     quiet: bool,
+    discuss: bool,
 ) -> String {
     // A quiet run creates the Git repository itself, without stopping to ask (Task-A03-35,
     // approver 2026-10-19); a normal run asks, as connecting does.
@@ -904,7 +908,11 @@ fn build_app_plan(
     let connect = connect_plan_with(&[agent.to_string()], language, project, taskbag, false, git)
         .remove(0)
         .1;
-    let goal = allomos_store::goal_request_in(language, description, quiet);
+    let goal = if discuss {
+        allomos_store::discuss_request_in(language, description, quiet)
+    } else {
+        allomos_store::goal_request_in(language, description, quiet)
+    };
     // The whole job is building the app: one progress request, at the end.
     with_progress_in(
         language,
@@ -938,13 +946,22 @@ async fn build_app(
     language: String,
     description: String,
     quiet: bool,
+    discuss: bool,
 ) -> Result<(), Problem> {
     build_app_checked(&project, &description)?;
     let found = agents::find_agents();
     let Some(chosen) = found.iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    let request = build_app_plan(&agent, &language, &project, &taskbag, &description, quiet);
+    let request = build_app_plan(
+        &agent,
+        &language,
+        &project,
+        &taskbag,
+        &description,
+        quiet,
+        discuss,
+    );
     agents::ask(chosen, &project, &request)
 }
 
@@ -957,9 +974,18 @@ async fn build_app_request(
     language: String,
     description: String,
     quiet: bool,
+    discuss: bool,
 ) -> Result<String, Problem> {
     build_app_checked(&project, &description)?;
-    let request = build_app_plan(MANUAL, &language, &project, &taskbag, &description, quiet);
+    let request = build_app_plan(
+        MANUAL,
+        &language,
+        &project,
+        &taskbag,
+        &description,
+        quiet,
+        discuss,
+    );
     Ok(agents::link_request(
         &request,
         alm_command::own().as_deref(),
@@ -2943,8 +2969,15 @@ mod tests {
         let description = "A recipe box for two people.\nIt runs in the browser.";
         for language in ["en", "zh-CN", "ja"] {
             for quiet in [true, false] {
-                let auto =
-                    build_app_plan("claude_app", language, &dir, &taskbag, description, quiet);
+                let auto = build_app_plan(
+                    "claude_app",
+                    language,
+                    &dir,
+                    &taskbag,
+                    description,
+                    quiet,
+                    false,
+                );
                 // One request: the wizard's connect request first, then the goal request. A quiet
                 // run creates the Git repository itself; a normal run asks (Task-A03-35).
                 let git = if quiet { GitStep::Create } else { GitStep::Ask };
@@ -2989,13 +3022,46 @@ mod tests {
                 assert!(auto.contains(mode), "{language}");
                 // Manual shows the same request, for every agent.
                 assert_eq!(
-                    build_app_plan(MANUAL, language, &dir, &taskbag, description, quiet),
+                    build_app_plan(MANUAL, language, &dir, &taskbag, description, quiet, false),
                     auto
                 );
                 assert_eq!(
-                    build_app_plan("codex_cli", language, &dir, &taskbag, description, quiet),
+                    build_app_plan(
+                        "codex_cli",
+                        language,
+                        &dir,
+                        &taskbag,
+                        description,
+                        quiet,
+                        false
+                    ),
                     auto
                 );
+                // Discuss (Task-A03-tundra474): the same connect request, then the discuss
+                // request in place of the goal request, and one progress request.
+                let talk = build_app_plan(
+                    "claude_app",
+                    language,
+                    &dir,
+                    &taskbag,
+                    description,
+                    quiet,
+                    true,
+                );
+                let discuss = allomos_store::discuss_request_in(language, description, quiet);
+                assert_eq!(
+                    talk,
+                    with_progress_in(
+                        language,
+                        Job::BuildApp,
+                        &format!("{}\n\n{discuss}", connect.trim_end())
+                    )
+                );
+                assert!(
+                    !talk.contains(allomos_store::goal(language).unwrap()),
+                    "{language}"
+                );
+                assert!(talk.contains(mode), "{language}");
             }
         }
         // Nothing to build without a description or a folder.

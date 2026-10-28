@@ -4,7 +4,9 @@
 // folder, and opens the agent with one request typed in: the wizard's connect request, then the
 // goal prompt (`alm guide goal`) with the description and the run mode. The person presses Enter;
 // Allomos sends nothing (approver, 2026-10-16). Manual shows the same request with Copy. The new
-// project opens behind the dialog and follows the taskbag as the agent works.
+// project opens behind the dialog and follows the taskbag as the agent works. Start's menu offers
+// Discuss (Task-A03-tundra474): the agent writes only the goal task, the person talks the goal over
+// with it, then sends the one line it names to start the build.
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
@@ -59,6 +61,25 @@ export function BuildAppDialog({
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  /** Start's drop-down menu is open. */
+  const [menu, setMenu] = useState(false);
+  const menuBox = useRef<HTMLDivElement>(null);
+  // Closes on a click outside the menu or on Esc, as the sort menu does.
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (!menuBox.current?.contains(e.target as Node)) setMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
 
   const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
 
@@ -101,8 +122,10 @@ export function BuildAppDialog({
 
   const quiet = mode === "quiet";
 
-  const start = async () => {
+  /** Start, or with `discuss` the menu's Discuss: the goal task first, talked over before building. */
+  const start = async (discuss: boolean) => {
     if (folder?.kind !== "ok" || !root || !agent) return;
+    setMenu(false);
     setBusy(true);
     setError(null);
     try {
@@ -115,15 +138,16 @@ export function BuildAppDialog({
         onSetup(await messenger.setProjectFolder(o.root, folder.folder));
       }
       if (agent === MANUAL) {
-        setRequest(await messenger.buildAppRequest(folder.folder, o.root, language, description, quiet));
+        setRequest(await messenger.buildAppRequest(folder.folder, o.root, language, description, quiet, discuss));
         return;
       }
-      await messenger.buildApp(agent, folder.folder, o.root, language, description, quiet);
+      await messenger.buildApp(agent, folder.folder, o.root, language, description, quiet, discuss);
       agentOpened(o.root, "build_app");
       // The agent used last, for Update the taskbag… (Task-A03-27).
       saveOpened(o.root, agent);
       const name = t(AGENT_KEY[agent]);
-      onClose(tool?.how === "paste" ? t("build.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("build.asked", { agent: name }));
+      const asked = tool?.how === "paste" ? t("build.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("build.asked", { agent: name });
+      onClose(discuss ? `${asked} ${t("build.asked_discuss")}` : asked);
     } catch (e) {
       fail(e);
     } finally {
@@ -266,14 +290,42 @@ export function BuildAppDialog({
               <button type="button" onClick={() => onClose(created ? t("build.not_started") : null)} disabled={busy}>
                 {t("wizard.cancel")}
               </button>
-              <button
-                type="button"
-                className="primary"
-                onClick={() => void start()}
-                disabled={busy || !canStart(folder, description, agent)}
-              >
-                {t("build.start")}
-              </button>
+              <div className="split-button" ref={menuBox}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => void start(false)}
+                  disabled={busy || !canStart(folder, description, agent)}
+                >
+                  {t("build.start")}
+                </button>
+                <button
+                  type="button"
+                  className="primary split-toggle"
+                  aria-haspopup="menu"
+                  aria-expanded={menu}
+                  aria-label={t("build.start_more")}
+                  title={t("build.start_more")}
+                  onClick={() => setMenu((m) => !m)}
+                  disabled={busy || !canStart(folder, description, agent)}
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M5 8l5 5 5-5" />
+                  </svg>
+                </button>
+                {menu && (
+                  <div className="split-popover" role="menu" aria-label={t("build.start_more")}>
+                    <button type="button" role="menuitem" onClick={() => void start(false)}>
+                      <strong>{t("build.start")}</strong>
+                      <span className="muted small">{t("build.start_how")}</span>
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => void start(true)}>
+                      <strong>{t("build.discuss")}</strong>
+                      <span className="muted small">{t("build.discuss_how")}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <button type="button" className="primary" onClick={() => onClose(t("build.manual_done"))}>
