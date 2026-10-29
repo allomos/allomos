@@ -475,7 +475,8 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
           className="tab-new"
           aria-label={t("tabs.new")}
           title={t("tabs.new")}
-          style={hover && hover.gap >= shownAt ? { transform: `translateX(${hover.width + 2}px)` } : undefined}
+          // It follows the tabs, so it moves aside for the dragged tab wherever that will land.
+          style={hover ? { transform: `translateX(${hover.width + 2}px)` } : undefined}
           onClick={() => add({ how: "blank" })}
         >
           +
