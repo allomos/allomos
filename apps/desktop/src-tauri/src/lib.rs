@@ -9,6 +9,7 @@ mod alm_command;
 mod lan;
 mod pairing;
 mod sessions;
+mod tab_drag;
 mod update;
 mod window_list;
 mod windows;
@@ -2268,13 +2269,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .manage(Windows::default())
+        .manage(tab_drag::Drag::default())
         .manage(Lan::new())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
             // Reopen windows and tabs (Task-A01-marble320): the other windows open again.
             windows::restore(app.handle());
             if let Some(window) = app.get_webview_window("main") {
-                fit_to_screen(&window, None);
+                fit_to_screen(&window);
             }
             // Remembered on (Task-A04-02-01): listen again from the start.
             if allomos_store::lan_viewing() {
@@ -2357,7 +2359,9 @@ pub fn run() {
             windows::window_start,
             windows::set_window_tabs,
             windows::show_project_elsewhere,
-            windows::drop_tab,
+            tab_drag::drag_tear,
+            tab_drag::drag_end,
+            tab_drag::drag_cancel,
             windows::app_settings,
             windows::set_start_with,
             inspect_folder,

@@ -276,15 +276,28 @@ export interface TabsMessenger {
   /** This window's tabs now, in their order, and the one in front: the window is named after it,
    * and the windows and tabs are kept for the next start. */
   setWindowTabs(tabs: { root: string | null; name: string | null }[], active: number): Promise<void>;
-  /** A tab showing `root` (null: the start page) was dragged out of the tab bar and let go: it joins
-   * the Allomos window under the pointer, or becomes a window of its own. True when it left. */
-  dropTab(root: string | null): Promise<boolean>;
+  /** Dragging a tab like Chrome (Task-A01-fresco512): the tab showing `root` (null: the start page),
+   * named `name`, was pulled out of the tab bar, held at (`grabX`, `grabY`) from the window's content
+   * corner: it tears off and its window follows the pointer. False when it could not start. */
+  dragTear(root: string | null, name: string | null, grabX: number, grabY: number): Promise<boolean>;
+  /** The torn-off tab was let go: `moved`, it left this window (into another one, or a window of its
+   * own); `home`, it stays (put back into this tab bar where the gap was, or this window moved
+   * itself); `none`, no tab was being dragged. */
+  dragEnd(): Promise<"moved" | "home" | "none">;
+  /** Escape: the drag is called off, everything goes back. */
+  dragCancel(): Promise<boolean>;
+  /** A dragged tab is over this window's tab bar, at `x` from its left edge. */
+  onTabHover(handler: (hover: { x: number; root: string | null; name: string | null }) => void): Promise<() => void>;
+  /** It left this window's tab bar. */
+  onTabHoverEnd(handler: () => void): Promise<() => void>;
+  /** It was let go on this window's tab bar: it joins where the gap was shown. */
+  onTabDropHere(handler: (root: string | null) => void): Promise<() => void>;
+  /** The drag of a tab from this window was called off: the tab comes back. */
+  onDragCancelled(handler: () => void): Promise<() => void>;
   /** File → New Tab (null) or File → Open Recent (a folder no tab shows): a new tab in this window. */
   onTabOpen(handler: (folder: string | null) => void): Promise<() => void>;
   /** A tab of this window showing a taskbag asked for elsewhere comes to the front. */
   onTabSelect(handler: (index: number) => void): Promise<() => void>;
-  /** A tab dragged from another window was let go on this one. */
-  onTabReceive(handler: (root: string | null) => void): Promise<() => void>;
   /** Close this window (its last tab closed). */
   closeWindow(): Promise<void>;
 }
@@ -298,10 +311,17 @@ export interface AppSettingsMessenger {
 export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
   windowStart: () => invoke<WindowStart>("window_start"),
   setWindowTabs: (tabs, active) => invoke<void>("set_window_tabs", { tabs, active }),
-  dropTab: (root) => invoke<boolean>("drop_tab", { root }),
+  dragTear: (root, name, grabX, grabY) => invoke<boolean>("drag_tear", { root, name, grabX, grabY }),
+  dragEnd: () => invoke<"moved" | "home" | "none">("drag_end"),
+  dragCancel: () => invoke<boolean>("drag_cancel"),
+  onTabHover: (handler) =>
+    getCurrentWebviewWindow().listen<{ x: number; root: string | null; name: string | null }>("tab:hover", (e) => handler(e.payload)),
+  onTabHoverEnd: (handler) => getCurrentWebviewWindow().listen("tab:hover-end", () => handler()),
+  onTabDropHere: (handler) =>
+    getCurrentWebviewWindow().listen<{ root: string | null }>("tab:drop-here", (e) => handler(e.payload.root)),
+  onDragCancelled: (handler) => getCurrentWebviewWindow().listen("tab:drag-cancelled", () => handler()),
   onTabOpen: (handler) => getCurrentWebviewWindow().listen<string | null>("tab:open", (e) => handler(e.payload)),
   onTabSelect: (handler) => getCurrentWebviewWindow().listen<number>("tab:select", (e) => handler(e.payload)),
-  onTabReceive: (handler) => getCurrentWebviewWindow().listen<string | null>("tab:receive", (e) => handler(e.payload)),
   closeWindow: () => invoke<void>("close_window"),
   appSettings: () => invoke<{ start_with: StartWith }>("app_settings"),
   setStartWith: (choice) => invoke<void>("set_start_with", { choice }),

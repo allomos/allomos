@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { needsPerson } from "../src/stopFlow.ts";
-import { frontAfterClose, moveTab, outsideWindow, placeAt, startTabs, tabShowing, type TabEntry } from "../src/tabsFlow.ts";
+import { frontAfterClose, insertAt, moveTab, placeAt, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry } from "../src/tabsFlow.ts";
 import type { Task } from "../src/types.ts";
 
 test("a window starts with the tabs it was given, or one tab", () => {
@@ -50,11 +50,26 @@ test("closing the tab in front brings the next one forward", () => {
   assert.equal(frontAfterClose([{ id: 7 }], 7, 7), null);
 });
 
-test("a tab let go outside the window leaves it", () => {
-  assert.equal(outsideWindow(10, 10, 800, 600), false);
-  assert.equal(outsideWindow(-1, 10, 800, 600), true);
-  assert.equal(outsideWindow(10, 600, 800, 600), true);
-  assert.equal(outsideWindow(800, 10, 800, 600), true);
+test("the other tabs slide aside to open the gap where the dragged tab will land", () => {
+  // Four tabs; the first dragged to place 2: the second and third slide left by its width.
+  assert.deepEqual([0, 1, 2, 3].map((i) => shiftFor(i, 0, 2, 100)), [0, -100, -100, 0]);
+  // The last dragged to place 1: the second and third slide right.
+  assert.deepEqual([0, 1, 2, 3].map((i) => shiftFor(i, 3, 1, 100)), [0, 100, 100, 0]);
+  // Back at its own place: nothing moves.
+  assert.deepEqual([0, 1, 2].map((i) => shiftFor(i, 1, 1, 100)), [0, 0, 0]);
+  // A tab from another window over the bar at place 1: every tab from there slides right.
+  assert.deepEqual([0, 1, 2].map((i) => shiftFor(i, -1, 1, 100)), [0, 100, 100]);
+  // And it joins at that place.
+  assert.deepEqual(insertAt(["a", "b", "c"], "x", 1), ["a", "x", "b", "c"]);
+  assert.deepEqual(insertAt(["a"], "x", 9), ["a", "x"]);
+});
+
+test("a tab tears off once it is pulled well out of the bar", () => {
+  // The bar runs from 0 to 37 in an 800-wide window.
+  assert.equal(tearsOff(100, 50, 0, 37, 800), false);
+  assert.equal(tearsOff(100, 68, 0, 37, 800), true);
+  assert.equal(tearsOff(-1, 20, 0, 37, 800), true);
+  assert.equal(tearsOff(800, 20, 0, 37, 800), true);
 });
 
 const task = (over: Partial<Task>): Task => ({

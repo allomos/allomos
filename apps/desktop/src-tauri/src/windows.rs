@@ -22,7 +22,6 @@ const SESSION_FILE: &str = "windows.json";
 /// The events a window hears about its tabs.
 const TAB_OPEN_EVENT: &str = "tab:open";
 const TAB_SELECT_EVENT: &str = "tab:select";
-const TAB_RECEIVE_EVENT: &str = "tab:receive";
 
 /// One tab as its window reports it: the taskbag it shows (its root), or none for the start page,
 /// and the project's name for the window's title.
@@ -92,6 +91,16 @@ impl Windows {
 
     fn starts(&self) -> std::sync::MutexGuard<'_, HashMap<String, WindowStart>> {
         self.starts.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The project windows, by label: the windows that report tabs.
+    pub(crate) fn labels(&self) -> Vec<String> {
+        self.shown().keys().cloned().collect()
+    }
+
+    /// How many tabs window `label` has.
+    pub(crate) fn tab_count(&self, label: &str) -> usize {
+        self.shown().get(label).map_or(0, |s| s.tabs.len())
     }
 
     /// Every taskbag a tab shows, for Devices on Your Network.
@@ -241,7 +250,7 @@ pub(crate) fn restore(app: &AppHandle) {
         },
     );
     for start in rest {
-        let _ = open_window(app, start, None);
+        let _ = open_window(app, start);
     }
 }
 
@@ -272,7 +281,6 @@ pub(crate) fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
             active: 0,
             startup: None,
         },
-        None,
     )
 }
 
@@ -329,33 +337,66 @@ pub(crate) fn open_recent_in_window(app: &AppHandle, folder: &str) -> tauri::Res
             active: 0,
             startup: None,
         },
-        None,
     )
 }
 
-/// A new project window that opens with `start`; at `at` (a point on the screen, in physical
-/// pixels) for a tab dragged out, otherwise centred.
-pub(crate) fn open_window(
-    app: &AppHandle,
-    start: WindowStart,
-    at: Option<tauri::PhysicalPosition<f64>>,
-) -> tauri::Result<()> {
+/// The label for the next new window, which opens with `start`.
+fn next_label(app: &AppHandle, start: WindowStart) -> String {
     let windows = app.state::<Windows>();
     let label = format!(
         "window-{}",
         windows.next.fetch_add(1, Ordering::Relaxed) + 2
     );
     windows.starts().insert(label.clone(), start);
-    tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App("index.html".into()))
+    label
+}
+
+fn window_builder<'a>(
+    app: &'a AppHandle,
+    label: &'a str,
+) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    tauri::WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App("index.html".into()))
         .title("Allomos")
         .inner_size(1100.0, 720.0)
         .min_inner_size(720.0, 480.0)
         .visible(false)
-        .build()
-        .map(|window| {
-            fit_to_screen(&window, at);
-            window_list::refresh(app, None);
-        })
+}
+
+/// A new project window that opens with `start`, centred.
+pub(crate) fn open_window(app: &AppHandle, start: WindowStart) -> tauri::Result<()> {
+    let label = next_label(app, start);
+    window_builder(app, &label).build().map(|window| {
+        fit_to_screen(&window);
+        window_list::refresh(app, None);
+    })
+}
+
+/// The window a tab torn off its tab bar comes with (Task-A01-fresco512): it shows that taskbag
+/// (`root`, none for the start page), as large as the window it came from (`width` × `height`), at
+/// (`x`, `y`) on the screen (logical pixels), without taking the keyboard from that window, which
+/// still follows the pointer. Its label.
+pub(crate) fn open_drag_window(
+    app: &AppHandle,
+    root: Option<PathBuf>,
+    (width, height): (f64, f64),
+    (x, y): (f64, f64),
+) -> tauri::Result<String> {
+    let label = next_label(
+        app,
+        WindowStart {
+            tabs: vec![StartTab { root, how: "moved" }],
+            active: 0,
+            startup: None,
+        },
+    );
+    window_builder(app, &label)
+        .inner_size(width, height)
+        .position(x, y)
+        .focused(false)
+        .visible(true)
+        .build()?;
+    window_list::refresh(app, None);
+    Ok(label)
 }
 
 /// A window's size for a screen whose usable area is `width` × `height` (logical pixels): about
@@ -368,12 +409,9 @@ pub(crate) fn window_size(width: f64, height: f64) -> (f64, f64) {
     )
 }
 
-/// Size a hidden window to the screen it is on and show it: centred, or with its tab bar under
-/// `at` for a tab dragged out. Without a screen to measure, it keeps the size it was built with.
-pub(crate) fn fit_to_screen(
-    window: &tauri::WebviewWindow,
-    at: Option<tauri::PhysicalPosition<f64>>,
-) {
+/// Size a hidden window to the screen it is on, centre it and show it. Without a screen to measure,
+/// it keeps the size it was built with.
+pub(crate) fn fit_to_screen(window: &tauri::WebviewWindow) {
     let monitor = window
         .current_monitor()
         .ok()
@@ -386,19 +424,7 @@ pub(crate) fn fit_to_screen(
             .to_logical::<f64>(monitor.scale_factor());
         let (width, height) = window_size(area.width, area.height);
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
-        match at {
-            Some(at) => {
-                // The dragged tab lands under the pointer: a little left of it, the bar's height up.
-                let scale = monitor.scale_factor();
-                let _ = window.set_position(tauri::PhysicalPosition::new(
-                    (at.x - 80.0 * scale).max(0.0),
-                    (at.y - 20.0 * scale).max(0.0),
-                ));
-            }
-            None => {
-                let _ = window.center();
-            }
-        }
+        let _ = window.center();
     }
     let _ = window.show();
 }
@@ -478,108 +504,6 @@ pub(crate) fn show_project_elsewhere(
     match found {
         Some((label, index)) => bring_forward(&app, &label, index),
         None => false,
-    }
-}
-
-/// A window's place on the screen: its label and outer frame, in physical pixels.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Frame {
-    pub(crate) label: String,
-    pub(crate) x: f64,
-    pub(crate) y: f64,
-    pub(crate) width: f64,
-    pub(crate) height: f64,
-}
-
-impl Frame {
-    fn holds(&self, x: f64, y: f64) -> bool {
-        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
-    }
-}
-
-/// Where a tab dropped at (`x`, `y`) goes.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Drop {
-    /// Back where it was: dropped on its own window, or the window's only tab dropped on nothing.
-    Stay,
-    /// Into another window's tabs.
-    Into(String),
-    /// Into a new window of its own.
-    NewWindow,
-}
-
-/// Where a tab of window `from` (holding `tabs` tabs) dropped at (`x`, `y`) goes: into the window
-/// under the point (the window in front first, as `frames` lists them), else a window of its own.
-pub(crate) fn drop_target(frames: &[Frame], from: &str, tabs: usize, x: f64, y: f64) -> Drop {
-    if frames.iter().any(|f| f.label == from && f.holds(x, y)) {
-        return Drop::Stay;
-    }
-    match frames.iter().find(|f| f.label != from && f.holds(x, y)) {
-        Some(f) => Drop::Into(f.label.clone()),
-        None if tabs > 1 => Drop::NewWindow,
-        None => Drop::Stay,
-    }
-}
-
-/// A tab showing `root` (none: the start page) was dragged out of the calling window's tab bar and
-/// let go where the pointer is now: dropped on another Allomos window, it joins that window's tabs;
-/// dropped elsewhere, it becomes a window of its own there. True when the tab left the calling
-/// window, which then removes it (and closes when it has no tab left).
-#[tauri::command]
-pub(crate) fn drop_tab(
-    app: AppHandle,
-    window: tauri::WebviewWindow,
-    windows: tauri::State<Windows>,
-    root: Option<PathBuf>,
-) -> bool {
-    let Ok(at) = app.cursor_position() else {
-        return false;
-    };
-    let from = window.label().to_string();
-    let projects: Vec<String> = windows.shown().keys().cloned().collect();
-    let mut frames: Vec<(bool, Frame)> = projects
-        .iter()
-        .filter_map(|label| {
-            let w = app.get_webview_window(label)?;
-            if !w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false) {
-                return None;
-            }
-            let p = w.outer_position().ok()?;
-            let s = w.outer_size().ok()?;
-            Some((
-                w.is_focused().unwrap_or(false),
-                Frame {
-                    label: label.clone(),
-                    x: p.x as f64,
-                    y: p.y as f64,
-                    width: s.width as f64,
-                    height: s.height as f64,
-                },
-            ))
-        })
-        .collect();
-    frames.sort_by_key(|(front, _)| !front);
-    let frames: Vec<Frame> = frames.into_iter().map(|(_, f)| f).collect();
-    let tabs = windows.shown().get(&from).map_or(1, |s| s.tabs.len());
-    match drop_target(&frames, &from, tabs, at.x, at.y) {
-        Drop::Stay => false,
-        Drop::Into(label) => {
-            let _ = app.emit_to(label.as_str(), TAB_RECEIVE_EVENT, root);
-            if let Some(w) = app.get_webview_window(&label) {
-                let _ = w.set_focus();
-            }
-            true
-        }
-        Drop::NewWindow => open_window(
-            &app,
-            WindowStart {
-                tabs: vec![StartTab { root, how: "moved" }],
-                active: 0,
-                startup: None,
-            },
-            Some(at),
-        )
-        .is_ok(),
     }
 }
 
@@ -752,39 +676,5 @@ mod tests {
             }],
         };
         assert_eq!(restored(&odd)[0].active, 0);
-    }
-
-    #[test]
-    fn a_dropped_tab_goes_to_the_window_under_the_pointer() {
-        let frame = |label: &str, x: f64| Frame {
-            label: label.into(),
-            x,
-            y: 0.0,
-            width: 100.0,
-            height: 100.0,
-        };
-        // `main` at 0–100, `window-2` at 200–300, `window-3` overlapping it at 250–350, in front.
-        let frames = [
-            frame("window-3", 250.0),
-            frame("main", 0.0),
-            frame("window-2", 200.0),
-        ];
-        // Dropped on its own window: it stays.
-        assert_eq!(drop_target(&frames, "main", 2, 50.0, 50.0), Drop::Stay);
-        // On another window: into it; where two overlap, the one in front.
-        assert_eq!(
-            drop_target(&frames, "main", 2, 220.0, 50.0),
-            Drop::Into("window-2".into())
-        );
-        assert_eq!(
-            drop_target(&frames, "main", 1, 260.0, 50.0),
-            Drop::Into("window-3".into())
-        );
-        // On nothing: a window of its own, unless it is the window's only tab.
-        assert_eq!(
-            drop_target(&frames, "main", 2, 150.0, 50.0),
-            Drop::NewWindow
-        );
-        assert_eq!(drop_target(&frames, "main", 1, 150.0, 50.0), Drop::Stay);
     }
 }

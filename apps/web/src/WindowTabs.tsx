@@ -1,8 +1,12 @@
 // Taskbags as tabs (Task-A01-marble320, approver 2026-10-29): a project window's tab bar above the
 // taskbag view, like a browser's. Each tab is one taskbag (or the start page); + opens a new tab on
-// the start page; dragging a tab along the bar changes the order, dragging it out of the window
-// makes it a window of its own or moves it into the Allomos window it is let go on; a dot marks a
-// taskbag that needs the person. Every tab keeps its own view, so switching tabs loses nothing.
+// the start page; a dot marks a taskbag that needs the person. Every tab keeps its own view, so
+// switching tabs loses nothing.
+//
+// Dragging a tab looks like Chrome (Task-A01-fresco512): along the bar the tab follows the pointer
+// and the others slide aside to open the gap where it will land; pulled out of the bar it tears off
+// and its window follows the pointer (the app moves it, `tab_drag.rs`); over a tab bar, that bar
+// opens a gap for it, and let go there it joins at the gap. Escape puts it back.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
@@ -11,7 +15,7 @@ import { useI18n } from "./i18n";
 import type { Messenger, TabsMessenger } from "./messenger";
 import { projectFolder } from "./paths";
 import { TabActive } from "./tabActive";
-import { frontAfterClose, moveTab, outsideWindow, placeAt, startTabs, tabShowing, type TabEntry, type TabStart } from "./tabsFlow";
+import { frontAfterClose, insertAt, moveTab, placeAt, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
 
 /** What a tab's view needs from its window. */
 interface Shell {
@@ -122,7 +126,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
     if (started) void api.setWindowTabs(JSON.parse(shown), frontAt).catch(() => undefined);
   }, [api, started, shown, frontAt]);
 
-  // File → New Tab and Open Recent, a tab asked for elsewhere, and a tab dragged in.
+  // File → New Tab and Open Recent, and a tab asked for elsewhere.
   useEffect(() => {
     const stops = [
       api.onTabOpen((folder) => add(folder ? { how: "open", root: folder } : { how: "blank" })),
@@ -130,7 +134,6 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
         const tab = tabsRef.current[index];
         if (tab) setFront(tab.id);
       }),
-      api.onTabReceive((root) => add(root ? { how: "moved", root } : { how: "blank" })),
     ];
     return () => {
       for (const stop of stops) void stop.then((f) => f()).catch(() => undefined);
@@ -173,14 +176,92 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
     return view;
   };
 
-  // Dragging a tab: along the bar it changes the order; let go outside the window, it leaves.
+  // Dragging a tab (Task-A01-fresco512).
   const barRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
-  const [dragging, setDragging] = useState<{ id: number; out: boolean } | null>(null);
+  /** The pointer held on a tab: where it went down, where on the tab, and whether the tab tore off. */
+  const drag = useRef<{ id: number; x: number; y: number; grabX: number; grabY: number; moved: boolean; torn: boolean } | null>(null);
+  /** Along the bar: the dragged tab's place, how far it has moved, the place it will land, its
+   * width, and every tab's edges when the drag started. */
+  const [local, setLocal] = useState<{ id: number; from: number; dx: number; gap: number; width: number; edges: DOMRect[] } | null>(null);
+  /** A tab of this window torn off and being dragged: hidden here until it lands. */
+  const [away, setAway] = useState<{ id: number } | null>(null);
+  const awayRef = useRef(away);
+  awayRef.current = away;
+  /** A dragged tab over this bar (from another window, or this window's own torn-off tab): where
+   * it will land among the shown tabs, and its phantom's place and name. */
+  const [hover, setHover] = useState<{ gap: number; left: number; width: number; name: string | null } | null>(null);
+  const hoverRef = useRef(hover);
+  hoverRef.current = hover;
+  /** For one frame after a drop the tabs jump to their new places without sliding. */
+  const [settle, setSettle] = useState(false);
+  useEffect(() => {
+    if (!settle) return;
+    const frame = requestAnimationFrame(() => setSettle(false));
+    return () => cancelAnimationFrame(frame);
+  }, [settle]);
+
+  /** The shown tabs' edges in the bar (a torn-off tab is hidden). */
+  const shownEdges = () =>
+    barRef.current ? [...barRef.current.querySelectorAll<HTMLElement>("[data-tab]:not(.away)")].map((el) => el.getBoundingClientRect()) : [];
+  /** Bring the torn-off tab back, at `at` among the shown tabs, or where it was. */
+  const bringBack = (at: number | null) => {
+    const a = awayRef.current;
+    if (!a) return;
+    if (at !== null) {
+      setTabs((list) => {
+        const tab = list.find((x) => x.id === a.id);
+        if (!tab) return list;
+        return insertAt(
+          list.filter((x) => x.id !== a.id),
+          tab,
+          at,
+        );
+      });
+      setSettle(true);
+    }
+    setFront(a.id);
+    setAway(null);
+  };
+
+  // A dragged tab over this window's tab bar, let go on it, or called off.
+  useEffect(() => {
+    const stops = [
+      api.onTabHover(({ x, name }) => {
+        const bar = barRef.current?.getBoundingClientRect();
+        const edges = shownEdges();
+        const gap = placeAt(edges, -1, x);
+        const width = Math.min(200, edges[0]?.width ?? 200);
+        const left = (gap < edges.length ? edges[gap].left : (edges[edges.length - 1]?.right ?? 8) + 2) - (bar?.left ?? 0);
+        setHover({ gap, left, width, name });
+      }),
+      api.onTabHoverEnd(() => setHover(null)),
+      api.onTabDropHere((root) => {
+        const gap = hoverRef.current?.gap ?? tabsRef.current.length;
+        setHover(null);
+        const tab = entry(root ? { how: "moved", root } : { how: "blank" });
+        setTabs((list) => insertAt(list, tab, gap));
+        setFront(tab.id);
+        setSettle(true);
+      }),
+      api.onDragCancelled(() => {
+        drag.current = null;
+        setHover(null);
+        bringBack(null);
+      }),
+    ];
+    return () => {
+      for (const stop of stops) void stop.then((f) => f()).catch(() => undefined);
+    };
+  }, [api]);
+
   const onTabDown = (e: PointerEvent<HTMLDivElement>, id: number) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest(".tab-close")) return;
     setFront(id);
-    drag.current = { id, x: e.clientX, y: e.clientY, moved: false };
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Held at the same place in a new window's bar, whose first tab starts at the bar's padding.
+    const grabX = 8 + (e.clientX - rect.left);
+    const grabY = 6 + (e.clientY - rect.top);
+    drag.current = { id, x: e.clientX, y: e.clientY, grabX, grabY, moved: false, torn: false };
     // The bar holds the pointer: the tab itself moves in the page while it is dragged.
     try {
       barRef.current?.setPointerCapture(e.pointerId);
@@ -188,37 +269,96 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
       /* no such pointer any more: the drag ends with the next pointer event */
     }
   };
-  const onBarMove = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    if (!d.moved && Math.abs(e.clientX - d.x) < 5 && Math.abs(e.clientY - d.y) < 5) return;
-    d.moved = true;
-    const out = outsideWindow(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
-    setDragging({ id: d.id, out });
-    if (out || !barRef.current) return;
-    const edges = [...barRef.current.querySelectorAll<HTMLElement>("[data-tab]")].map((el) => el.getBoundingClientRect());
-    const from = tabsRef.current.findIndex((tab) => tab.id === d.id);
-    const to = placeAt(edges, from, e.clientX);
-    if (from >= 0 && to !== from) setTabs((list) => moveTab(list, from, to));
-  };
-  const onBarUp = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    drag.current = null;
-    setDragging(null);
-    if (!d?.moved || !outsideWindow(e.clientX, e.clientY, window.innerWidth, window.innerHeight)) return;
+  const tear = (d: NonNullable<typeof drag.current>) => {
+    d.torn = true;
+    setLocal(null);
     const tab = tabsRef.current.find((x) => x.id === d.id);
     if (!tab) return;
+    const only = tabsRef.current.length === 1;
     void api
-      .dropTab(tab.root)
-      .then((left) => {
-        if (left) close(tab.id);
+      .dragTear(tab.root, tab.name, d.grabX, d.grabY)
+      .then((started) => {
+        if (!started) {
+          drag.current = null;
+          return;
+        }
+        // Its window comes with it; here the tab is hidden until it lands (the window's only tab
+        // stays: the window itself moves).
+        if (!only) {
+          setAway({ id: tab.id });
+          setFront(frontAfterClose(tabsRef.current, tab.id, tab.id));
+        }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        drag.current = null;
+      });
+  };
+  const onBarMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.torn) return;
+    if (!d.moved && Math.abs(e.clientX - d.x) < 5 && Math.abs(e.clientY - d.y) < 5) return;
+    const bar = barRef.current?.getBoundingClientRect();
+    if (!bar) return;
+    if (tearsOff(e.clientX, e.clientY, bar.top, bar.bottom, window.innerWidth)) {
+      tear(d);
+      return;
+    }
+    d.moved = true;
+    setLocal((was) => {
+      const from = was?.from ?? tabsRef.current.findIndex((x) => x.id === d.id);
+      const edges = was?.edges ?? shownEdges();
+      const width = (edges[from]?.width ?? 0) + 2;
+      return { id: d.id, from, dx: e.clientX - d.x, gap: placeAt(edges, from, e.clientX), width, edges };
+    });
+  };
+  const onBarUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (d.torn) {
+      const at = hoverRef.current?.gap ?? null;
+      void api
+        .dragEnd()
+        .then((how) => {
+          setHover(null);
+          if (how === "moved") {
+            setAway(null);
+            close(d.id);
+          } else {
+            bringBack(at);
+          }
+        })
+        .catch(() => bringBack(null));
+      return;
+    }
+    const l = local;
+    setLocal(null);
+    if (l && l.gap !== l.from) {
+      setTabs((list) => moveTab(list, l.from, l.gap));
+      setSettle(true);
+    }
   };
   const onBarCancel = () => {
+    const d = drag.current;
     drag.current = null;
-    setDragging(null);
+    setLocal(null);
+    if (d?.torn) void api.dragCancel().catch(() => undefined);
   };
+  // Escape while dragging puts the tab back; a torn-off tab's drag may have the keyboard in another
+  // window, which calls it off too (the app ignores it when nothing is dragged).
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (drag.current && !drag.current.torn) {
+        drag.current = null;
+        setLocal(null);
+        return;
+      }
+      void api.dragCancel().catch(() => undefined);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [api]);
   // ← and → move between tabs, as in a list of tabs.
   const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -231,10 +371,17 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   };
 
   const startPage = t("tabs.start_page");
+  /** How far each shown tab slides: aside for the dragged tab's gap, or the dragged tab itself. */
+  const slide = (shownAt: number, id: number): number => {
+    if (local) return id === local.id ? local.dx : shiftFor(shownAt, local.from, local.gap, local.width);
+    if (hover) return shiftFor(shownAt, -1, hover.gap, hover.width + 2);
+    return 0;
+  };
+  let shownAt = 0;
   return (
     <div className="window">
       <div
-        className="tabbar"
+        className={`tabbar${settle ? " settle" : ""}`}
         role="tablist"
         aria-label={t("tabs.list")}
         ref={barRef}
@@ -245,7 +392,9 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
         {tabs.map((tab) => {
           const name = tabName(tab, startPage);
           const isFront = tab.id === front;
-          const drag = dragging?.id === tab.id ? (dragging.out ? " leaving" : " dragging") : "";
+          const isAway = away?.id === tab.id;
+          const dx = isAway ? 0 : slide(shownAt, tab.id);
+          if (!isAway) shownAt += 1;
           return (
             <div
               key={tab.id}
@@ -253,7 +402,8 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
               role="tab"
               aria-selected={isFront}
               tabIndex={isFront ? 0 : -1}
-              className={`tab${isFront ? " front" : ""}${drag}`}
+              className={`tab${isFront ? " front" : ""}${local?.id === tab.id ? " dragging" : ""}${isAway ? " away" : ""}`}
+              style={dx ? { transform: `translateX(${dx}px)` } : undefined}
               title={tab.root ? projectFolder(tab.root) : name}
               onPointerDown={(e) => onTabDown(e, tab.id)}
               onKeyDown={onTabKey}
@@ -266,7 +416,20 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
             </div>
           );
         })}
-        <button type="button" className="tab-new" aria-label={t("tabs.new")} title={t("tabs.new")} onClick={() => add({ how: "blank" })}>
+        {hover && (
+          // Where the dragged tab will land.
+          <div className="tab front tab-phantom" aria-hidden="true" style={{ left: hover.left, width: hover.width }}>
+            <span className="tab-name">{hover.name ?? startPage}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          className="tab-new"
+          aria-label={t("tabs.new")}
+          title={t("tabs.new")}
+          style={hover && hover.gap >= shownAt ? { transform: `translateX(${hover.width + 2}px)` } : undefined}
+          onClick={() => add({ how: "blank" })}
+        >
           +
         </button>
       </div>

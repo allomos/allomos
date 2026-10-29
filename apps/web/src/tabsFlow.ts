@@ -59,6 +59,33 @@ export function placeAt(edges: readonly { left: number; right: number }[], from:
   return edges.filter((e, i) => i !== from && x > (e.left + e.right) / 2).length;
 }
 
+/** How far tab `i` slides aside while the tab at `from` is dragged to place `gap` (`w`: the dragged
+ * tab's width), so the gap opens where it will land (Task-A01-fresco512). `from` -1: a tab from
+ * another window, not in the bar yet: every tab from `gap` on slides right. */
+export function shiftFor(i: number, from: number, gap: number, w: number): number {
+  if (i === from) return 0;
+  if (from < 0) return i >= gap ? w : 0;
+  if (from < gap && i > from && i <= gap) return -w;
+  if (from > gap && i >= gap && i < from) return w;
+  return 0;
+}
+
+/** The list with `item` put in at place `at`. */
+export function insertAt<T>(list: readonly T[], item: T, at: number): T[] {
+  const next = [...list];
+  next.splice(Math.max(0, Math.min(at, next.length)), 0, item);
+  return next;
+}
+
+/** How far the pointer goes above or below the tab bar before the tab tears off, in pixels. */
+export const TEAR_DISTANCE = 30;
+
+/** Whether a tab held at (`x`, `y`) has left the tab bar (from `top` to `bottom`) far enough to tear
+ * off: above or below it by more than TEAR_DISTANCE, or out of the window at the side. */
+export function tearsOff(x: number, y: number, top: number, bottom: number, width: number): boolean {
+  return y < top - TEAR_DISTANCE || y > bottom + TEAR_DISTANCE || x < 0 || x >= width;
+}
+
 /** The tab in front after tab `id` closes: the one after it, else the one before; null when it was
  * the last. Another tab closing leaves the front tab as it was. */
 export function frontAfterClose(list: readonly { id: number }[], id: number, front: number | null): number | null {
@@ -67,11 +94,6 @@ export function frontAfterClose(list: readonly { id: number }[], id: number, fro
   const rest = list.filter((t) => t.id !== id);
   if (rest.length === 0) return null;
   return rest[Math.min(at, rest.length - 1)].id;
-}
-
-/** A point outside the window (in the window's own coordinates): a tab let go there leaves it. */
-export function outsideWindow(x: number, y: number, width: number, height: number): boolean {
-  return x < 0 || y < 0 || x >= width || y >= height;
 }
 
 /** Another tab of the window that shows `root`, if any. */

@@ -760,6 +760,7 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .tabbar {
   flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 6px 8px 0;
   background: var(--bg); border-bottom: 1px solid var(--line); overflow-x: auto; user-select: none; -webkit-user-select: none;
+  position: relative;
 }
 .tab {
   position: relative; display: flex; align-items: center; gap: 6px; flex: 0 1 200px; min-width: 64px;
@@ -769,8 +770,14 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .tab:hover { color: var(--ink); }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .tab.front { background: var(--surface); color: var(--ink); border-color: var(--line); margin-bottom: -1px; padding-bottom: 7px; }
-.tab.dragging { box-shadow: 0 2px 8px rgba(0, 0, 0, .15); z-index: 1; }
-.tab.leaving { opacity: .45; }
+/* Dragging (Task-A01-fresco512): the other tabs slide aside to open the gap; the dragged tab follows
+   the pointer; a torn-off tab is hidden until it lands; a tab from another window shows as a
+   phantom in the gap. */
+.tab, .tab-new { transition: transform 150ms ease; }
+.tab.dragging { transition: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); z-index: 2; }
+.tabbar.settle .tab, .tabbar.settle .tab-new { transition: none; }
+.tab.away { display: none; }
+.tab-phantom { position: absolute; bottom: 0; box-sizing: border-box; pointer-events: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); z-index: 2; }
 .tab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A taskbag that needs the person: a question to answer or a task to check. */
 .tab-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
