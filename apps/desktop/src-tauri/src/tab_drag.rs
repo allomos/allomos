@@ -111,6 +111,30 @@ mod screen {
         }
     }
 
+    /// Bring the window to the top of the others without taking the keyboard, so the window the
+    /// drag started in keeps it (Task-A01-skirt821): on macOS ordered to the front without becoming
+    /// the key window; elsewhere kept on top for a moment.
+    #[cfg(target_os = "macos")]
+    pub(super) fn raise(window: &WebviewWindow) {
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let Ok(ns) = w.ns_window() else {
+                return;
+            };
+            // SAFETY: `ns` is this window's live NSWindow, used on the main thread.
+            unsafe {
+                let ns = &*(ns as *const objc2::runtime::AnyObject);
+                let none: *const objc2::runtime::AnyObject = std::ptr::null();
+                let _: () = objc2::msg_send![ns, orderFront: none];
+            }
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    pub(super) fn raise(window: &WebviewWindow) {
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_always_on_top(false);
+    }
+
     /// Put the window's outer corner at `(x, y)`.
     pub(super) fn place(window: &WebviewWindow, (x, y): (f64, f64)) {
         #[cfg(target_os = "macos")]
@@ -245,7 +269,14 @@ fn follow(app: AppHandle, run: u64) {
             return;
         };
         let moving = app.get_webview_window(&a.moving);
-        let bar = bar_under(&bars, &a.moving, at.0, at.1);
+        // The bar it is over keeps it while the pointer stays there: that window was raised, so it
+        // is on top even where the window in front overlaps it.
+        let bar = a
+            .over
+            .as_deref()
+            .and_then(|label| bars.iter().find(|b| b.label == label))
+            .filter(|b| bar_under(std::slice::from_ref(*b), &a.moving, at.0, at.1).is_some())
+            .or_else(|| bar_under(&bars, &a.moving, at.0, at.1));
         let over = bar.map(|b| b.label.clone());
         // Back from a tab bar: the window shows again once it is under the pointer.
         let back = over.is_none() && a.over.is_some();
@@ -253,9 +284,12 @@ fn follow(app: AppHandle, run: u64) {
             if let Some(prev) = &a.over {
                 let _ = app.emit_to(prev.as_str(), HOVER_END_EVENT, ());
             }
-            if over.is_some() {
+            if let Some(label) = &over {
                 if let Some(w) = &moving {
                     screen::park(w, true);
+                }
+                if let Some(w) = app.get_webview_window(label) {
+                    screen::raise(&w);
                 }
             }
             a.over = over;
