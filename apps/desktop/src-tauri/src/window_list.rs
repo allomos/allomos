@@ -39,7 +39,7 @@ fn name_of(title: &str) -> String {
 }
 
 /// The order windows opened in: the first window (`main`), then `window-<n>` by `n`.
-fn opened_at(label: &str) -> u32 {
+pub(crate) fn opened_at(label: &str) -> u32 {
     match label {
         "main" => 0,
         _ => label
@@ -82,7 +82,7 @@ pub fn refresh(app: &AppHandle, closing: Option<&str>) {
             (label, title, front)
         })
         .collect();
-    let mut skip = vec![crate::ABOUT_WINDOW];
+    let mut skip = vec![crate::ABOUT_WINDOW, crate::windows::SETTINGS_WINDOW];
     skip.extend(closing);
     // A menu that cannot be rebuilt keeps its previous list; nothing else depends on it.
     let _ = fill(app, &menu, &entries(&windows, &skip));

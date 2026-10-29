@@ -62,9 +62,10 @@ pub use quota::{
     new_report as new_quota_report, quota_ask, quota_reports, save_quota,
 };
 pub use settings::{
-    TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, lan_viewing,
-    pick_ui_language, save_lan_viewing, save_owner_name, save_ui_language, save_update_check,
-    saved_owner_name, saved_ui_language, settings_dir, skip_update, task_language, update_memory,
+    StartWith, TaskLanguage, UpdateMemory, alm_offer_dismissed_for, dismiss_alm_offer, lan_viewing,
+    pick_ui_language, save_lan_viewing, save_owner_name, save_start_with, save_ui_language,
+    save_update_check, saved_owner_name, saved_ui_language, settings_dir, skip_update, start_with,
+    task_language, update_memory,
 };
 pub use setup::{
     SetupState, allomos_folder, project_folder_of, project_folder_paths, record_project_folder,

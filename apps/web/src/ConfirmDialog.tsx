@@ -17,9 +17,12 @@ export function ConfirmDialog({
   messenger,
   project,
   onCancelled,
+  onAsking,
 }: {
   messenger: Messenger;
   project: string;
+  /** Whether a question is waiting, for the dot on the tab (Task-A01-marble320). */
+  onAsking?: (asking: boolean) => void;
   /** The person chose Cancel: the window says nothing changed and how to ask again. */
   onCancelled?: () => void;
 }) {
@@ -27,6 +30,10 @@ export function ConfirmDialog({
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const asking = request !== null;
+  useEffect(() => {
+    onAsking?.(asking);
+  }, [onAsking, asking]);
 
   useEffect(() => {
     if (!project) return;

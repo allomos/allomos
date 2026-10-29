@@ -57,14 +57,16 @@ The page has no setup cards of its own (owner, 2026-10-12): when something is mi
 - In part 2, an agent that finds no tasks says so and stops. One that finds some asks the person whether to move them: it writes its plan and runs `alm confirm`, and the app shows the plan in a popup with **Go ahead** and **Cancel** (`alm guide commands`, Ask the person). Only after **Go ahead** does it move the tasks, with `alm` commands only.
 - With no agent found, **Write the files for me** writes the section into `AGENTS.md` and `CLAUDE.md` directly.
 
-### Windows
+### Windows and tabs
 
-Added by task `A01-27` (owner, 2026-10-12). Each window shows one project.
+Added by task `A01-27` (owner, 2026-10-12); tabs by task `A01-marble320` (approver, 2026-10-29). Each window holds taskbags as tabs, like a browser's; each tab shows one taskbag or the start page.
 
-- **New window…** (the top bar's button, and **File → New Window…**, ⌘N) opens another window on the start page; the window it came from keeps its project. There is no File → Open Folder… (⌘O) any more: a new window's start page is where a folder is chosen.
-- **File → Open Recent** opens the folder in the window in front, as before. Menu commands act on the window in front only.
-- **A project already open in another window** is not opened twice: that window comes to the front instead (from Open Recent, the start page or the wizard).
-- **At start**, Allomos reopens only the last project, in one window. A window is named after the project it shows.
+- **The tab bar** is above the taskbag view. Its **+** (which replaced the top bar's **New window…**) and **File → New Tab** (⌘T / Ctrl+T) open a new tab on the start page; **File → New Window…** (⌘N / Ctrl+N) opens a new window with one tab. A tab's × closes it; the window closes with its last tab. There is no File → Open Folder… (⌘O): a start page is where a folder is chosen.
+- **Dragging a tab** along the bar changes the order; let go outside the window, it becomes a window of its own there, or, let go on another Allomos window, it joins that window's tabs.
+- **A dot on a tab** marks a taskbag that needs the person: a task to check, a task waiting on a person, or an agent's question (`alm confirm`) waiting.
+- **File → Open Recent** opens the folder in a new tab of the window in front. Menu commands act on the tab in front of the window in front only.
+- **A taskbag already open in a tab** is not opened twice: that tab comes to the front, with its window (from Open Recent, the start page or the wizard).
+- **At start**, the app's own **Settings… › General › When Allomos starts** decides (Allomos menu on macOS, File menu on Windows; ⌘, / Ctrl+,): **Reopen windows and tabs** (the default: every window with its tabs, in their order, each with its tab in front; closing a window while others stay open forgets it, quitting keeps them all), **Open the last taskbag** (one window), or **Open a blank window**. A folder given on the command line still opens, in a tab of its own. A window is named after the taskbag of the tab in front. The windows and tabs are kept in `windows.json` in the app's settings folder.
 
 ### Update notice
 

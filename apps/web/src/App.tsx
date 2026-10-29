@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
@@ -26,6 +26,7 @@ import { DescriptionHit, Highlight, ListBanners, RefreshLine, SearchBox, isSearc
 import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
   FILTER_STATES,
+  needsPerson,
   filterGroups,
   hiddenByFilter,
   hiddenText,
@@ -57,6 +58,8 @@ import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlo
 import { iterationPlaces } from "./iterationPlace";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
+import { TabActive } from "./tabActive";
+import type { TabStart } from "./tabsFlow";
 import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
@@ -67,10 +70,6 @@ const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
     : "top.show_in_files";
 
 const LAST_ROOT_KEY = "allomos.lastRoot";
-/** This window was opened with New window… (Task-A01-27): it starts on the start page. */
-const NEW_WINDOW = new URLSearchParams(window.location.search).has("new");
-/** This window was opened from File → Open Recent (A01-deck174): it opens that folder. */
-const OPEN_FOLDER = new URLSearchParams(window.location.search).get("open");
 /** Recently opened project folders, newest first, for File → Open Recent. */
 const RECENT_KEY = "allomos.recentFolders";
 const RECENT_MAX = 10;
@@ -135,8 +134,24 @@ export interface Companion {
   onOthers?: () => void;
 }
 
-export function App({ messenger, companion }: { messenger: Messenger; companion?: Companion }) {
+/** Without tabs (the companion page's App gets its taskbag instead): as at start-up. */
+const AT_STARTUP: TabStart = { how: "startup", startWith: "last" };
+
+/** One tab's view (Task-A01-marble320): `start` says what the tab opens with; `onNeeds` hears
+ * whether its taskbag needs the person, for the dot on the tab. */
+export function App({
+  messenger,
+  companion,
+  start = AT_STARTUP,
+  onNeeds,
+}: {
+  messenger: Messenger;
+  companion?: Companion;
+  start?: TabStart;
+  onNeeds?: (needs: boolean) => void;
+}) {
   const { t, problem, language } = useI18n();
+  const active = useContext(TabActive);
   const [opened, setOpened] = useState<Opened | null>(null);
   const openedRef = useRef(opened);
   openedRef.current = opened;
@@ -171,7 +186,6 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
 
   /** Back to the start page: no taskbag open, and none to reopen at the next start. */
   const closeTaskbag = () => {
-    void messenger.setWindowProject(null, null).catch(() => undefined);
     setOpened(null);
     setSetup(null);
     setNotices([]);
@@ -206,9 +220,7 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
     const folder = projectFolder(o.root);
     saveRecentInfo(noteOpened(readRecentInfo(), folder, o.loaded.taskbag?.project.name ?? null, new Date()));
     changeRecent((list) => [folder, ...list.filter((f) => f !== folder)]);
-    // The app knows which window shows which project, and the window is named after it (Task-A01-27).
-    void messenger.setWindowProject(o.root, o.loaded.taskbag?.project.name ?? null).catch(() => undefined);
-  }, [changeRecent, messenger]);
+  }, [changeRecent]);
 
   /** Update the taskbag… (Task-A01-45, approver 2026-10-16: one button for an older taskbag and
    * for card files kept outside the taskbag): an older taskbag is first renamed aside, with a new
@@ -296,8 +308,9 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
   const hasTaskbag = Boolean(opened);
   useEffect(() => {
     hasTaskbagRef.current = hasTaskbag;
-    void messenger.setConnectEnabled(hasTaskbag).catch(() => undefined);
-  }, [messenger, hasTaskbag]);
+    // The tab in front sets it, also when it comes to the front (Task-A01-marble320).
+    if (active) void messenger.setConnectEnabled(hasTaskbag).catch(() => undefined);
+  }, [messenger, hasTaskbag, active]);
 
   /** Connect with the agents closed (the wizard's last step). */
   const connected = (result: ConnectResult) => {
@@ -333,6 +346,18 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
 
   // Follow changes made outside the window (by `alm` or by hand): reload when the files change.
   const root = opened?.root;
+  // The app knows which tab shows which project, and the window is named after the tab in front
+  // (Task-A01-27, Task-A01-marble320); a rename shows at once.
+  const shownName = opened?.loaded.taskbag?.project.name ?? null;
+  useEffect(() => {
+    void messenger.setWindowProject(root ?? null, shownName).catch(() => undefined);
+  }, [messenger, root, shownName]);
+  // The dot on the tab: a task to check, a question to answer, or an agent's question waiting.
+  const [asking, setAsking] = useState(false);
+  const tasks = opened?.loaded.taskbag?.tasks;
+  useEffect(() => {
+    onNeeds?.(needsPerson(tasks ?? [], asking));
+  }, [onNeeds, tasks, asking]);
   useEffect(() => {
     if (!root) return;
     stampRef.current = null;
@@ -362,9 +387,10 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
     return () => window.clearInterval(timer);
   }, [messenger, root]);
 
-  // On start: a folder given on the command line wins; otherwise reopen the last one. A window
-  // from New window… starts on the start page (Task-A01-27); one from File → Open Recent opens
-  // that folder (A01-deck174).
+  // On start, as the tab says (Task-A01-marble320): the start page (New Tab, New Window…); a
+  // folder from File → Open Recent (A01-deck174); a tab of the last session, or one dragged from
+  // another window; or, in the first window at start-up, a folder given on the command line, else
+  // the last one.
   useEffect(() => {
     // The companion page shows the taskbag it was given, nothing else.
     if (companion) {
@@ -374,49 +400,72 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
       );
       return;
     }
-    if (NEW_WINDOW) return;
-    if (OPEN_FOLDER) {
+    if (start.how === "blank") return;
+    if (start.how === "open") {
       // A folder that is gone shows the usual message, and leaves Open Recent.
+      const folder = start.root;
       void (async () => {
-        const info = await messenger.inspectFolder(OPEN_FOLDER).catch(() => null);
-        if (info?.inspection.kind === "not_a_folder") changeRecent((list) => list.filter((f) => f !== OPEN_FOLDER));
-        await openFolder(OPEN_FOLDER);
+        const info = await messenger.inspectFolder(folder).catch(() => null);
+        if (info?.inspection.kind === "not_a_folder") changeRecent((list) => list.filter((f) => f !== folder));
+        await openFolder(folder);
       })();
       return;
     }
+    if (start.how !== "startup") {
+      // A kept tab whose folder is gone leaves quietly, on the start page (as Task-A01-28). A moved
+      // tab is still open in the window it came from until that window lets it go: no looking there.
+      const folder = start.root;
+      void (async () => {
+        const info = await messenger.inspectFolder(folder).catch(() => null);
+        const i = info?.inspection;
+        if (!i || i.kind === "not_a_folder") return;
+        if (start.how === "moved" && i.kind === "found") {
+          try {
+            show(await messenger.openTaskbag(i.root), null);
+          } catch (e) {
+            setError(errorNote(e));
+          }
+          return;
+        }
+        await openFolder(folder);
+      })();
+      return;
+    }
+    const startWith = start.startWith;
     void (async () => {
-      let start: string | null;
+      let given: string | null;
       try {
-        start = await messenger.startupFolder();
+        given = await messenger.startupFolder();
       } catch (e) {
         // A folder was given but is not one: say so instead of reopening the last folder.
         setError(errorNote(e));
         return;
       }
-      if (!start) {
+      // Open a blank window (the app's Settings…): no last taskbag.
+      if (!given && startWith !== "blank") {
         try {
-          start = localStorage.getItem(LAST_ROOT_KEY);
+          given = localStorage.getItem(LAST_ROOT_KEY);
         } catch {
-          start = null;
+          given = null;
         }
         // The remembered folder was deleted or moved: forget it quietly and show the start page
         // (Task-A01-28). Its project folder leaves Open Recent too, if that is gone as well.
-        if (start && (await messenger.inspectFolder(start).catch(() => null))?.inspection.kind === "not_a_folder") {
+        if (given && (await messenger.inspectFolder(given).catch(() => null))?.inspection.kind === "not_a_folder") {
           try {
             localStorage.removeItem(LAST_ROOT_KEY);
           } catch {
             /* storage unavailable: nothing to forget */
           }
-          const folder = projectFolder(start);
+          const folder = projectFolder(given);
           if ((await messenger.inspectFolder(folder).catch(() => null))?.inspection.kind === "not_a_folder") {
             changeRecent((list) => list.filter((f) => f !== folder));
           }
           return;
         }
       }
-      if (start) await openFolder(start);
+      if (given) await openFolder(given);
     })();
-  }, [messenger, openFolder, changeRecent, companion, show]);
+  }, [messenger, openFolder, changeRecent, companion, show, start]);
 
   // The menu is shared by every window: the window in front sets Connect with the Agents… and
   // Open Recent (which other windows may have changed) whenever it comes forward.
@@ -440,7 +489,9 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
     void messenger
       .setMenuTexts({
         file: t("menu.file"),
+        newTab: t("menu.new_tab"),
         newWindow: t("menu.new_window"),
+        settings: t("menu.settings"),
         openRecent: t("menu.open_recent"),
         clearMenu: t("menu.clear_recent"),
         noRecent: t("menu.no_recent"),
@@ -564,19 +615,13 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
           </div>
         )}
         <LanguagePicker />
-        {/* With nothing open, the welcome page's Start button is the only way in (and Build a new
-            app…, Task-A03-25-02). New window… opens
-            another window on the start page (owner, 2026-10-12). */}
-        {opened && !companion && (
-          <button type="button" className="primary" onClick={() => void messenger.newWindow().catch((e) => setError(errorNote(e)))}>
-            {t("top.new_window")}
-          </button>
-        )}
+        {/* New window… became the tab bar's + (Task-A01-marble320). */}
       </header>
 
       <main className="main">
-        {!companion && <UpdateOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
-        {!companion && <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
+        {/* The app's own offers, once per window: in the tab in front (Task-A01-marble320). */}
+        {!companion && active && <UpdateOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
+        {!companion && active && <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
         {error && (
           <Banner kind="error" onClose={() => setError(null)}>
             {noteText(error)}
@@ -728,6 +773,7 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
           <ConfirmDialog
             messenger={messenger}
             project={projectFolder(opened.root)}
+            onAsking={setAsking}
             onCancelled={() => setNotices((list) => [...list, { key: "confirm.cancelled" }])}
           />
         )}
@@ -771,10 +817,19 @@ export function App({ messenger, companion }: { messenger: Messenger; companion?
  * is not the one Terminal finds. Asked once when the window opens. Nothing is installed unless the
  * person clicks; "Don't ask again" is remembered for this mismatch only (the app asks again when
  * Terminal's `alm` changes), × hides it until the next start. */
+/** The offers show in the tab in front, so they start again when another tab comes forward: what
+ * × hid stays hidden in this window (Task-A01-marble320). */
+let almHidden = false;
+let updateHidden: string | null = null;
+
 function AlmOffer({ messenger, onError }: { messenger: Messenger; onError: (e: unknown) => void }) {
   const { t } = useI18n();
   const [status, setStatus] = useState<AlmStatus | null>(null);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHiddenNow] = useState(almHidden);
+  const setHidden = (h: boolean) => {
+    almHidden = h;
+    setHiddenNow(h);
+  };
   const [busy, setBusy] = useState(false);
   const [installed, setInstalled] = useState(false);
   useEffect(() => {
@@ -843,7 +898,11 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
   const { t } = useI18n();
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [asked, setAsked] = useState(false);
-  const [hidden, setHidden] = useState<string | null>(null);
+  const [hidden, setHiddenNow] = useState<string | null>(updateHidden);
+  const setHidden = (h: string | null) => {
+    updateHidden = h;
+    setHiddenNow(h);
+  };
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
   useEffect(() => {
@@ -1217,10 +1276,14 @@ function TaskbagView({
   const terms = searchTerms(query);
   const searching = terms.length > 0;
   const searchRef = useRef<HTMLInputElement>(null);
+  // Keys go to the tab in front only (Task-A01-marble320).
+  const active = useContext(TabActive);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   useEffect(() => setQuery(""), [opened.root]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!isSearchShortcut(e)) return;
+      if (!activeRef.current || !isSearchShortcut(e)) return;
       e.preventDefault();
       searchRef.current?.focus();
       searchRef.current?.select();
@@ -1318,7 +1381,7 @@ function TaskbagView({
     if (!selectedId) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target?.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!activeRef.current || target?.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "Escape") {
         setSelectedId(null);
         return;

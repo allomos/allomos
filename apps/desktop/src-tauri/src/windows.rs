@@ -1,30 +1,127 @@
-//! The project windows (Task-A01-27): which taskbag each one shows, opening new ones, and sizing
-//! them to their screen.
+//! The project windows (Task-A01-27) and their tabs (Task-A01-marble320, approver 2026-10-29):
+//! which taskbags each window's tabs show, opening new windows, moving a tab to another window,
+//! remembering the windows and tabs for the next start, and sizing windows to their screen.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use allomos_core::Problem;
-use allomos_store::{Inspection, inspect};
-use tauri::{AppHandle, Manager};
+use allomos_store::{Inspection, StartWith, inspect};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::window_list;
 
-/// Which project each window shows (Task-A01-27), by window label: a project already open in
-/// another window is brought forward instead of opening twice (owner, 2026-10-12).
+/// The app's own Settings window (Task-A01-marble320): not a project window, so menu commands
+/// never go to it.
+pub(crate) const SETTINGS_WINDOW: &str = "settings";
+/// The windows' and tabs' file in the settings folder, for **Reopen windows and tabs**.
+const SESSION_FILE: &str = "windows.json";
+/// The events a window hears about its tabs.
+const TAB_OPEN_EVENT: &str = "tab:open";
+const TAB_SELECT_EVENT: &str = "tab:select";
+const TAB_RECEIVE_EVENT: &str = "tab:receive";
+
+/// One tab as its window reports it: the taskbag it shows (its root), or none for the start page,
+/// and the project's name for the window's title.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub(crate) struct Tab {
+    pub(crate) root: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) name: Option<String>,
+}
+
+/// A window's tabs, in their order, and the one in front.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Shown {
+    pub(crate) tabs: Vec<Tab>,
+    pub(crate) active: usize,
+}
+
+/// How a tab starts: `open`, a folder from File → Open Recent (one that is gone is said so);
+/// `restore`, a tab of the last session (one that is gone leaves quietly); `moved`, a tab dragged
+/// from another window (already open there, so not brought forward elsewhere).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct StartTab {
+    pub(crate) root: Option<PathBuf>,
+    pub(crate) how: &'static str,
+}
+
+/// What a window opens with (`window_start`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct WindowStart {
+    pub(crate) tabs: Vec<StartTab>,
+    pub(crate) active: usize,
+    /// The first window at start-up: what Allomos opens when it starts (`reopen`, `last` or
+    /// `blank`), so it also opens a folder given on the command line, or with no tabs restored, the
+    /// last taskbag or the start page.
+    pub(crate) startup: Option<&'static str>,
+}
+
+/// The windows and tabs as kept for the next start.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Session {
+    pub(crate) windows: Vec<SavedWindow>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SavedWindow {
+    pub(crate) tabs: Vec<Option<PathBuf>>,
+    pub(crate) active: usize,
+}
+
+/// Which taskbags each window's tabs show (Task-A01-27, Task-A01-marble320), by window label: a
+/// taskbag already open in a tab is brought forward instead of opening twice (owner, 2026-10-12).
 #[derive(Default)]
 pub(crate) struct Windows {
-    pub(crate) projects: Mutex<std::collections::HashMap<String, PathBuf>>,
+    shown: Mutex<HashMap<String, Shown>>,
+    /// What each new window opens with, until it reports its own tabs.
+    starts: Mutex<HashMap<String, WindowStart>>,
     /// The number in the next new window's label (`window-<n>`).
-    pub(crate) next: std::sync::atomic::AtomicU32,
+    next: AtomicU32,
+    /// The app is quitting: its windows stay in the session for the next start.
+    quitting: AtomicBool,
 }
 
 impl Windows {
+    fn shown(&self) -> std::sync::MutexGuard<'_, HashMap<String, Shown>> {
+        self.shown.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn starts(&self) -> std::sync::MutexGuard<'_, HashMap<String, WindowStart>> {
+        self.starts.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Every taskbag a tab shows, for Devices on Your Network.
+    pub(crate) fn open_taskbags(&self) -> Vec<PathBuf> {
+        let mut roots: Vec<PathBuf> = self
+            .shown()
+            .values()
+            .flat_map(|s| s.tabs.iter().filter_map(|t| t.root.clone()))
+            .collect();
+        roots.sort();
+        roots.dedup();
+        roots
+    }
+
+    /// The app is quitting: what the windows show is kept as it is.
+    pub(crate) fn quitting(&self) {
+        self.quitting.store(true, Ordering::Relaxed);
+    }
+
+    /// A window closed. While other windows stay open it leaves the session; the last window, or
+    /// every window when the app quits, stays in it, so the next start reopens it.
     pub(crate) fn forget(&self, label: &str) {
-        self.projects
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .remove(label);
+        self.starts().remove(label);
+        let mut shown = self.shown();
+        if shown.remove(label).is_none() || self.quitting.load(Ordering::Relaxed) {
+            return;
+        }
+        if !shown.is_empty() {
+            save_session(&session_of(&shown));
+        }
     }
 }
 
@@ -33,27 +130,129 @@ pub(crate) fn same_place(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-/// The other window that shows `root`, if any.
+/// The window and tab, other than in window `not`, that shows `root`, if any.
 pub(crate) fn window_showing(
-    projects: &std::collections::HashMap<String, PathBuf>,
+    shown: &HashMap<String, Shown>,
     root: &Path,
     not: &str,
-) -> Option<String> {
+) -> Option<(String, usize)> {
     let root = same_place(root);
-    projects
-        .iter()
-        .find(|(label, shown)| label.as_str() != not && **shown == root)
-        .map(|(label, _)| label.clone())
+    let mut labels: Vec<&String> = shown.keys().filter(|l| l.as_str() != not).collect();
+    labels.sort_by_key(|l| (window_list::opened_at(l), l.to_string()));
+    labels.into_iter().find_map(|label| {
+        shown[label]
+            .tabs
+            .iter()
+            .position(|t| t.root.as_deref() == Some(root.as_path()))
+            .map(|i| (label.clone(), i))
+    })
 }
 
-/// The label of the window in front, else the first one.
-/// The About window is not a project window: menu commands skip it (Task-A07-28).
+/// The windows and tabs to keep, in the order the windows opened. A window with no tabs is left
+/// out.
+pub(crate) fn session_of(shown: &HashMap<String, Shown>) -> Session {
+    let mut labels: Vec<&String> = shown.keys().collect();
+    labels.sort_by_key(|l| (window_list::opened_at(l), l.to_string()));
+    Session {
+        windows: labels
+            .into_iter()
+            .map(|l| &shown[l])
+            .filter(|s| !s.tabs.is_empty())
+            .map(|s| SavedWindow {
+                tabs: s.tabs.iter().map(|t| t.root.clone()).collect(),
+                active: s.active.min(s.tabs.len() - 1),
+            })
+            .collect(),
+    }
+}
+
+fn session_path() -> Option<PathBuf> {
+    allomos_store::settings_dir().map(|d| d.join(SESSION_FILE))
+}
+
+/// The windows and tabs kept at the last change; none when there is no file or it cannot be read.
+pub(crate) fn read_session() -> Session {
+    session_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+/// Keep the windows and tabs for the next start. A file that cannot be written leaves the last one:
+/// nothing else depends on it.
+fn save_session(session: &Session) {
+    let Some(path) = session_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(session) {
+        let _ = std::fs::write(path, text);
+    }
+}
+
+/// What each window of a kept session opens with; the first is the window Allomos starts with.
+pub(crate) fn restored(session: &Session) -> Vec<WindowStart> {
+    session
+        .windows
+        .iter()
+        .filter(|w| !w.tabs.is_empty())
+        .map(|w| WindowStart {
+            tabs: w
+                .tabs
+                .iter()
+                .map(|root| StartTab {
+                    root: root.clone(),
+                    how: "restore",
+                })
+                .collect(),
+            active: w.active.min(w.tabs.len() - 1),
+            startup: None,
+        })
+        .collect()
+}
+
+/// At start, with **Reopen windows and tabs**: the first window gets the first kept window's tabs
+/// and every other kept window opens again. With the other choices, or nothing kept, the first
+/// window decides by itself (`window_start`).
+pub(crate) fn restore(app: &AppHandle) {
+    let start_with = allomos_store::start_with();
+    let mut windows = if start_with == StartWith::Reopen {
+        restored(&read_session())
+    } else {
+        Vec::new()
+    };
+    let rest = if windows.is_empty() {
+        Vec::new()
+    } else {
+        windows.split_off(1)
+    };
+    let first = windows.pop().unwrap_or(WindowStart {
+        tabs: Vec::new(),
+        active: 0,
+        startup: None,
+    });
+    app.state::<Windows>().starts().insert(
+        "main".to_string(),
+        WindowStart {
+            startup: Some(start_with.as_str()),
+            ..first
+        },
+    );
+    for start in rest {
+        let _ = open_window(app, start, None);
+    }
+}
+
+/// The label of the project window in front, else the first one.
+/// The About and Settings windows are not project windows: menu commands skip them (Task-A07-28).
 pub(crate) fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
     let projects = || {
-        windows
-            .iter()
-            .filter(|(label, _)| label.as_str() != crate::ABOUT_WINDOW)
+        windows.iter().filter(|(label, _)| {
+            label.as_str() != crate::ABOUT_WINDOW && label.as_str() != SETTINGS_WINDOW
+        })
     };
     projects()
         .find(|(_, w)| w.is_focused().unwrap_or(false))
@@ -61,67 +260,102 @@ pub(crate) fn focused_window(app: &AppHandle) -> Option<String> {
         .map(|(label, _)| label.clone())
 }
 
-/// Open another window on the start page. `?new` tells it not to reopen the last folder.
+/// File → New Window… (⌘N): another window with one tab on the start page.
 pub(crate) fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
-    open_window_at(app, "index.html?new")
+    open_window(
+        app,
+        WindowStart {
+            tabs: vec![StartTab {
+                root: None,
+                how: "open",
+            }],
+            active: 0,
+            startup: None,
+        },
+        None,
+    )
 }
 
-/// File → Open Recent › a folder (Task-A01-deck174, approver 2026-10-25,
-/// replacing "in the current window", 2026-10-12): the window already showing its taskbag comes to
-/// the front; otherwise a new window opens it, and the window the menu was used from keeps what it
-/// showed.
+/// File → New Tab (⌘T): a new tab on the start page in the window in front, or a new window when
+/// none is open.
+pub(crate) fn new_tab(app: &AppHandle) {
+    match focused_window(app) {
+        Some(label) => {
+            let _ = app.emit_to(label.as_str(), TAB_OPEN_EVENT, None::<String>);
+        }
+        None => {
+            let _ = open_new_window(app);
+        }
+    }
+}
+
+/// Bring window `label` to the front with its tab `index` in front.
+fn bring_forward(app: &AppHandle, label: &str, index: usize) -> bool {
+    let Some(window) = app.get_webview_window(label) else {
+        return false;
+    };
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = app.emit_to(label, TAB_SELECT_EVENT, index);
+    true
+}
+
+/// File → Open Recent › a folder (Task-A01-marble320, replacing A01-deck174's new window): a tab
+/// already showing its taskbag comes to the front, with its window; otherwise it opens in a new tab
+/// of the window in front, or in a new window when none is open.
 pub(crate) fn open_recent_in_window(app: &AppHandle, folder: &str) -> tauri::Result<()> {
     let path = PathBuf::from(folder);
     let root = match inspect(&path) {
         Inspection::Found { root } => root,
         _ => path.clone(),
     };
-    let label = {
-        let windows = app.state::<Windows>();
-        let projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
-        window_showing(&projects, &root, "")
-    };
-    if let Some(window) = label.and_then(|l| app.get_webview_window(&l)) {
-        let _ = window.unminimize();
-        let _ = window.show();
-        return window.set_focus();
+    let found = window_showing(&app.state::<Windows>().shown(), &root, "");
+    if let Some((label, index)) = found {
+        if bring_forward(app, &label, index) {
+            return Ok(());
+        }
     }
-    open_window_at(app, &format!("index.html?open={}", url_encode(folder)))
-}
-
-/// `text` for a URL's query: letters, digits and `-_.~` as they are, every other byte as `%XX`.
-pub(crate) fn url_encode(text: &str) -> String {
-    text.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                (b as char).to_string()
-            }
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
-}
-
-/// A new project window at `url` (the interface's page and its query).
-pub(crate) fn open_window_at(app: &AppHandle, url: &str) -> tauri::Result<()> {
-    let n = app
-        .state::<Windows>()
-        .next
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        + 2;
-    tauri::WebviewWindowBuilder::new(
+    if let Some(label) = focused_window(app) {
+        return app.emit_to(label.as_str(), TAB_OPEN_EVENT, Some(folder));
+    }
+    open_window(
         app,
-        format!("window-{n}"),
-        tauri::WebviewUrl::App(url.into()),
+        WindowStart {
+            tabs: vec![StartTab {
+                root: Some(path),
+                how: "open",
+            }],
+            active: 0,
+            startup: None,
+        },
+        None,
     )
-    .title("Allomos")
-    .inner_size(1100.0, 720.0)
-    .min_inner_size(720.0, 480.0)
-    .visible(false)
-    .build()
-    .map(|window| {
-        fit_to_screen(&window);
-        window_list::refresh(app, None);
-    })
+}
+
+/// A new project window that opens with `start`; at `at` (a point on the screen, in physical
+/// pixels) for a tab dragged out, otherwise centred.
+pub(crate) fn open_window(
+    app: &AppHandle,
+    start: WindowStart,
+    at: Option<tauri::PhysicalPosition<f64>>,
+) -> tauri::Result<()> {
+    let windows = app.state::<Windows>();
+    let label = format!(
+        "window-{}",
+        windows.next.fetch_add(1, Ordering::Relaxed) + 2
+    );
+    windows.starts().insert(label.clone(), start);
+    tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App("index.html".into()))
+        .title("Allomos")
+        .inner_size(1100.0, 720.0)
+        .min_inner_size(720.0, 480.0)
+        .visible(false)
+        .build()
+        .map(|window| {
+            fit_to_screen(&window, at);
+            window_list::refresh(app, None);
+        })
 }
 
 /// A window's size for a screen whose usable area is `width` × `height` (logical pixels): about
@@ -134,9 +368,12 @@ pub(crate) fn window_size(width: f64, height: f64) -> (f64, f64) {
     )
 }
 
-/// Size a hidden window to the screen it is on, centre it and show it. Without a screen to measure,
-/// it keeps the size it was built with.
-pub(crate) fn fit_to_screen(window: &tauri::WebviewWindow) {
+/// Size a hidden window to the screen it is on and show it: centred, or with its tab bar under
+/// `at` for a tab dragged out. Without a screen to measure, it keeps the size it was built with.
+pub(crate) fn fit_to_screen(
+    window: &tauri::WebviewWindow,
+    at: Option<tauri::PhysicalPosition<f64>>,
+) {
     let monitor = window
         .current_monitor()
         .ok()
@@ -149,36 +386,76 @@ pub(crate) fn fit_to_screen(window: &tauri::WebviewWindow) {
             .to_logical::<f64>(monitor.scale_factor());
         let (width, height) = window_size(area.width, area.height);
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
-        let _ = window.center();
+        match at {
+            Some(at) => {
+                // The dragged tab lands under the pointer: a little left of it, the bar's height up.
+                let scale = monitor.scale_factor();
+                let _ = window.set_position(tauri::PhysicalPosition::new(
+                    (at.x - 80.0 * scale).max(0.0),
+                    (at.y - 20.0 * scale).max(0.0),
+                ));
+            }
+            None => {
+                let _ = window.center();
+            }
+        }
     }
     let _ = window.show();
 }
 
-/// The top bar's **New window…** (Task-A01-27).
+/// What the calling window opens with: its own tabs again when it reloads; the tabs it was opened
+/// with; for the first window, what Allomos opens at start.
 #[tauri::command]
-pub(crate) fn new_window(app: AppHandle) -> Result<(), Problem> {
-    open_new_window(&app).map_err(|e| Problem::OpenFailed {
-        path: "New window".into(),
-        detail: e.to_string(),
-    })
-}
-
-/// The calling window now shows `root` (or nothing); its title names the project.
-#[tauri::command]
-pub(crate) fn set_window_project(
+pub(crate) fn window_start(
     window: tauri::WebviewWindow,
     windows: tauri::State<Windows>,
-    root: Option<PathBuf>,
-    name: Option<String>,
+) -> WindowStart {
+    if let Some(shown) = windows.shown().get(window.label()) {
+        return WindowStart {
+            tabs: shown
+                .tabs
+                .iter()
+                .map(|t| StartTab {
+                    root: t.root.clone(),
+                    how: "moved",
+                })
+                .collect(),
+            active: shown.active,
+            startup: None,
+        };
+    }
+    windows
+        .starts()
+        .get(window.label())
+        .cloned()
+        .unwrap_or(WindowStart {
+            tabs: Vec::new(),
+            active: 0,
+            startup: None,
+        })
+}
+
+/// The calling window's tabs now, in their order, and the one in front: the window is named after
+/// that tab's project, and the windows and tabs are kept for the next start.
+#[tauri::command]
+pub(crate) fn set_window_tabs(
+    window: tauri::WebviewWindow,
+    windows: tauri::State<Windows>,
+    tabs: Vec<Tab>,
+    active: usize,
 ) {
-    let mut projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
-    match root {
-        Some(root) => {
-            projects.insert(window.label().to_string(), same_place(&root));
-        }
-        None => {
-            projects.remove(window.label());
-        }
+    let name = tabs.get(active).and_then(|t| t.name.clone());
+    let tabs = tabs
+        .into_iter()
+        .map(|t| Tab {
+            root: t.root.as_deref().map(same_place),
+            name: t.name,
+        })
+        .collect();
+    {
+        let mut shown = windows.shown();
+        shown.insert(window.label().to_string(), Shown { tabs, active });
+        save_session(&session_of(&shown));
     }
     let title = match name {
         Some(name) if !name.trim().is_empty() => format!("{name} — Allomos"),
@@ -188,8 +465,8 @@ pub(crate) fn set_window_project(
     window_list::refresh(window.app_handle(), None);
 }
 
-/// Another window already shows `root`: bring it forward and say so, so the calling window does
-/// not open the project a second time.
+/// Another window's tab already shows `root`: bring it forward and say so, so the calling window
+/// does not open the taskbag a second time. (The calling window looks in its own tabs itself.)
 #[tauri::command]
 pub(crate) fn show_project_elsewhere(
     app: AppHandle,
@@ -197,34 +474,166 @@ pub(crate) fn show_project_elsewhere(
     windows: tauri::State<Windows>,
     root: PathBuf,
 ) -> bool {
-    let projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
-    let Some(label) = window_showing(&projects, &root, window.label()) else {
-        return false;
-    };
-    drop(projects);
-    match app.get_webview_window(&label) {
-        Some(other) => {
-            let _ = other.unminimize();
-            let _ = other.show();
-            let _ = other.set_focus();
-            true
-        }
+    let found = window_showing(&windows.shown(), &root, window.label());
+    match found {
+        Some((label, index)) => bring_forward(&app, &label, index),
         None => false,
     }
+}
+
+/// A window's place on the screen: its label and outer frame, in physical pixels.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Frame {
+    pub(crate) label: String,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+}
+
+impl Frame {
+    fn holds(&self, x: f64, y: f64) -> bool {
+        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
+    }
+}
+
+/// Where a tab dropped at (`x`, `y`) goes.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Drop {
+    /// Back where it was: dropped on its own window, or the window's only tab dropped on nothing.
+    Stay,
+    /// Into another window's tabs.
+    Into(String),
+    /// Into a new window of its own.
+    NewWindow,
+}
+
+/// Where a tab of window `from` (holding `tabs` tabs) dropped at (`x`, `y`) goes: into the window
+/// under the point (the window in front first, as `frames` lists them), else a window of its own.
+pub(crate) fn drop_target(frames: &[Frame], from: &str, tabs: usize, x: f64, y: f64) -> Drop {
+    if frames.iter().any(|f| f.label == from && f.holds(x, y)) {
+        return Drop::Stay;
+    }
+    match frames.iter().find(|f| f.label != from && f.holds(x, y)) {
+        Some(f) => Drop::Into(f.label.clone()),
+        None if tabs > 1 => Drop::NewWindow,
+        None => Drop::Stay,
+    }
+}
+
+/// A tab showing `root` (none: the start page) was dragged out of the calling window's tab bar and
+/// let go where the pointer is now: dropped on another Allomos window, it joins that window's tabs;
+/// dropped elsewhere, it becomes a window of its own there. True when the tab left the calling
+/// window, which then removes it (and closes when it has no tab left).
+#[tauri::command]
+pub(crate) fn drop_tab(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    windows: tauri::State<Windows>,
+    root: Option<PathBuf>,
+) -> bool {
+    let Ok(at) = app.cursor_position() else {
+        return false;
+    };
+    let from = window.label().to_string();
+    let projects: Vec<String> = windows.shown().keys().cloned().collect();
+    let mut frames: Vec<(bool, Frame)> = projects
+        .iter()
+        .filter_map(|label| {
+            let w = app.get_webview_window(label)?;
+            if !w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false) {
+                return None;
+            }
+            let p = w.outer_position().ok()?;
+            let s = w.outer_size().ok()?;
+            Some((
+                w.is_focused().unwrap_or(false),
+                Frame {
+                    label: label.clone(),
+                    x: p.x as f64,
+                    y: p.y as f64,
+                    width: s.width as f64,
+                    height: s.height as f64,
+                },
+            ))
+        })
+        .collect();
+    frames.sort_by_key(|(front, _)| !front);
+    let frames: Vec<Frame> = frames.into_iter().map(|(_, f)| f).collect();
+    let tabs = windows.shown().get(&from).map_or(1, |s| s.tabs.len());
+    match drop_target(&frames, &from, tabs, at.x, at.y) {
+        Drop::Stay => false,
+        Drop::Into(label) => {
+            let _ = app.emit_to(label.as_str(), TAB_RECEIVE_EVENT, root);
+            if let Some(w) = app.get_webview_window(&label) {
+                let _ = w.set_focus();
+            }
+            true
+        }
+        Drop::NewWindow => open_window(
+            &app,
+            WindowStart {
+                tabs: vec![StartTab { root, how: "moved" }],
+                active: 0,
+                startup: None,
+            },
+            Some(at),
+        )
+        .is_ok(),
+    }
+}
+
+/// The app's own **Settings…** window (Task-A01-marble320): settings for the whole app, apart from
+/// each taskbag's own. One at a time: choosing it again brings it forward.
+pub(crate) fn open_settings_window(app: &AppHandle, title: &str) -> tauri::Result<()> {
+    if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
+        let _ = window.unminimize();
+        window.show()?;
+        return window.set_focus();
+    }
+    tauri::WebviewWindowBuilder::new(
+        app,
+        SETTINGS_WINDOW,
+        tauri::WebviewUrl::App("index.html?settings".into()),
+    )
+    .title(title)
+    .inner_size(560.0, 380.0)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .center()
+    .build()
+    .map(drop)
+}
+
+/// The app's settings the Settings window shows.
+#[derive(Serialize)]
+pub(crate) struct AppSettings {
+    start_with: &'static str,
+}
+
+#[tauri::command]
+pub(crate) fn app_settings() -> AppSettings {
+    AppSettings {
+        start_with: allomos_store::start_with().as_str(),
+    }
+}
+
+/// **When Allomos starts**: `reopen`, `last` or `blank`.
+#[tauri::command]
+pub(crate) fn set_start_with(choice: String) -> Result<(), Problem> {
+    let Some(choice) = StartWith::parse(&choice) else {
+        return Err(Problem::InvalidChoice { value: choice });
+    };
+    allomos_store::save_start_with(choice).map_err(|e| Problem::WriteFailed {
+        path: "settings.json".into(),
+        detail: e.to_string(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The folder in a new window's address (A01-deck174): everything but plain letters, digits
-    /// and `-_.~` is escaped, so spaces, `&`, `#` and non-ASCII names arrive whole.
-    #[test]
-    fn a_recent_folder_goes_whole_into_the_address() {
-        assert_eq!(url_encode("/Users/a b/proj"), "%2FUsers%2Fa%20b%2Fproj");
-        assert_eq!(url_encode("x&y#z"), "x%26y%23z");
-        assert_eq!(url_encode("项目"), "%E9%A1%B9%E7%9B%AE");
-    }
 
     #[test]
     fn window_size_follows_the_screen() {
@@ -236,21 +645,146 @@ mod tests {
         assert_eq!(window_size(700.0, 450.0), (700.0, 450.0));
     }
 
+    fn tab(root: Option<&Path>) -> Tab {
+        Tab {
+            root: root.map(same_place),
+            name: None,
+        }
+    }
+
     #[test]
-    fn a_project_shown_in_another_window_is_found() {
+    fn a_taskbag_shown_in_another_window_is_found_with_its_tab() {
         let dir = std::env::temp_dir().join(format!("allomos-windows-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("a")).unwrap();
-        let mut projects = std::collections::HashMap::new();
-        projects.insert("main".to_string(), same_place(&dir.join("a")));
-        // The same folder written another way is the same project.
+        let mut shown = HashMap::new();
+        shown.insert(
+            "main".to_string(),
+            Shown {
+                tabs: vec![tab(None), tab(Some(&dir.join("a")))],
+                active: 0,
+            },
+        );
+        // The same folder written another way is the same project; the tab is the second.
         let other = dir.join("a").join(".").join("..").join("a");
         assert_eq!(
-            window_showing(&projects, &other, "window-2"),
-            Some("main".to_string())
+            window_showing(&shown, &other, "window-2"),
+            Some(("main".to_string(), 1))
         );
         // A window does not count itself, and another folder is not shown anywhere.
-        assert_eq!(window_showing(&projects, &dir.join("a"), "main"), None);
-        assert_eq!(window_showing(&projects, &dir.join("b"), "window-2"), None);
+        assert_eq!(window_showing(&shown, &dir.join("a"), "main"), None);
+        assert_eq!(window_showing(&shown, &dir.join("b"), "window-2"), None);
+        // Open Recent looks in every window.
+        assert_eq!(
+            window_showing(&shown, &dir.join("a"), ""),
+            Some(("main".to_string(), 1))
+        );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_session_keeps_windows_in_the_order_they_opened() {
+        let mut shown = HashMap::new();
+        let bag = |p: &str| Tab {
+            root: Some(PathBuf::from(p)),
+            name: Some("x".into()),
+        };
+        shown.insert(
+            "window-10".to_string(),
+            Shown {
+                tabs: vec![bag("/c")],
+                active: 0,
+            },
+        );
+        shown.insert(
+            "main".to_string(),
+            Shown {
+                tabs: vec![bag("/a"), tab(None)],
+                active: 1,
+            },
+        );
+        shown.insert(
+            "window-2".to_string(),
+            Shown {
+                tabs: vec![],
+                active: 0,
+            },
+        );
+        let session = session_of(&shown);
+        assert_eq!(
+            session,
+            Session {
+                windows: vec![
+                    SavedWindow {
+                        tabs: vec![Some(PathBuf::from("/a")), None],
+                        active: 1
+                    },
+                    SavedWindow {
+                        tabs: vec![Some(PathBuf::from("/c"))],
+                        active: 0
+                    },
+                ]
+            }
+        );
+        // Read back, each window opens again with its tabs, the one in front still in front.
+        let text = serde_json::to_string(&session).unwrap();
+        let back: Session = serde_json::from_str(&text).unwrap();
+        let starts = restored(&back);
+        assert_eq!(starts.len(), 2);
+        assert_eq!(starts[0].active, 1);
+        assert_eq!(
+            starts[0].tabs,
+            vec![
+                StartTab {
+                    root: Some(PathBuf::from("/a")),
+                    how: "restore"
+                },
+                StartTab {
+                    root: None,
+                    how: "restore"
+                }
+            ]
+        );
+        // A front tab past the end (an edited file) falls back to the last tab.
+        let odd = Session {
+            windows: vec![SavedWindow {
+                tabs: vec![None],
+                active: 5,
+            }],
+        };
+        assert_eq!(restored(&odd)[0].active, 0);
+    }
+
+    #[test]
+    fn a_dropped_tab_goes_to_the_window_under_the_pointer() {
+        let frame = |label: &str, x: f64| Frame {
+            label: label.into(),
+            x,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        // `main` at 0–100, `window-2` at 200–300, `window-3` overlapping it at 250–350, in front.
+        let frames = [
+            frame("window-3", 250.0),
+            frame("main", 0.0),
+            frame("window-2", 200.0),
+        ];
+        // Dropped on its own window: it stays.
+        assert_eq!(drop_target(&frames, "main", 2, 50.0, 50.0), Drop::Stay);
+        // On another window: into it; where two overlap, the one in front.
+        assert_eq!(
+            drop_target(&frames, "main", 2, 220.0, 50.0),
+            Drop::Into("window-2".into())
+        );
+        assert_eq!(
+            drop_target(&frames, "main", 1, 260.0, 50.0),
+            Drop::Into("window-3".into())
+        );
+        // On nothing: a window of its own, unless it is the window's only tab.
+        assert_eq!(
+            drop_target(&frames, "main", 2, 150.0, 50.0),
+            Drop::NewWindow
+        );
+        assert_eq!(drop_target(&frames, "main", 1, 150.0, 50.0), Drop::Stay);
     }
 }

@@ -1383,12 +1383,7 @@ impl lan::Source for AppSource {
         Some((asset.bytes().to_vec(), asset.mime_type().to_string()))
     }
     fn open_taskbags(&self) -> Vec<PathBuf> {
-        let windows = self.0.state::<Windows>();
-        let projects = windows.projects.lock().unwrap_or_else(|e| e.into_inner());
-        let mut roots: Vec<PathBuf> = projects.values().cloned().collect();
-        roots.sort();
-        roots.dedup();
-        roots
+        self.0.state::<Windows>().open_taskbags()
     }
     fn pairing(&self) -> &pairing::Pairing {
         &self.0.state::<Lan>().inner().pairing
@@ -1884,6 +1879,11 @@ fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem> {
 /// File → New Window… (⌘N): another window on the start page (Task-A01-27). It replaces
 /// File → Open Folder… (⌘O, removed; owner 2026-10-12).
 const NEW_WINDOW_ID: &str = "new_window";
+/// File → New Tab (⌘T / Ctrl+T): a new tab on the start page (Task-A01-marble320).
+const NEW_TAB_ID: &str = "new_tab";
+/// **Settings…** (⌘, / Ctrl+,): the app's own settings window (Task-A01-marble320); in the
+/// Allomos menu on macOS, in the File menu elsewhere.
+const SETTINGS_ID: &str = "app_settings";
 /// A recent folder's item is `recent:<position in the list>`.
 const RECENT_PREFIX: &str = "recent:";
 const CLEAR_RECENT_ID: &str = "recent_clear";
@@ -1925,7 +1925,9 @@ enum UpdateAction {
 /// The menu items whose words follow the interface's language, and the Open Recent list.
 struct MenuTexts {
     file: Submenu<Wry>,
+    new_tab: MenuItem<Wry>,
     new_window: MenuItem<Wry>,
+    settings: MenuItem<Wry>,
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
     lan: MenuItem<Wry>,
@@ -1988,8 +1990,10 @@ fn fill_recent(app: &AppHandle, submenu: &Submenu<Wry>, recent: &Recent) -> taur
 /// Words start in English; the interface sends its own with `set_menu_texts`.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let menu = Menu::default(app)?;
+    let new_tab = MenuItem::with_id(app, NEW_TAB_ID, "New Tab", true, Some("CmdOrCtrl+T"))?;
     let new_window =
         MenuItem::with_id(app, NEW_WINDOW_ID, "New Window…", true, Some("CmdOrCtrl+N"))?;
+    let settings = MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
     let recent = Submenu::new(app, "Open Recent", true)?;
     // One item for telling agents about Allomos and moving existing tasks in (owner, 2026-10-11).
     let connect_item = MenuItem::with_id(
@@ -2018,31 +2022,26 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .into_iter()
         .filter_map(|item| item.as_submenu().cloned())
         .find(|s| s.text().is_ok_and(|t| t == "File"));
+    let mut items: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = vec![
+        &new_tab,
+        &new_window,
+        &recent,
+        &connect_item,
+        &move_tasks_in,
+        &lan_item,
+    ];
+    // Settings… is in the Allomos menu on macOS (below), in the File menu elsewhere.
+    if !cfg!(target_os = "macos") {
+        items.push(&settings);
+    }
     let file = match existing {
         Some(file) => {
-            file.prepend_items(&[
-                &new_window,
-                &recent,
-                &connect_item,
-                &move_tasks_in,
-                &lan_item,
-            ])?;
-            file.insert(&PredefinedMenuItem::separator(app)?, 5)?;
+            file.prepend_items(&items)?;
+            file.insert(&PredefinedMenuItem::separator(app)?, items.len())?;
             file
         }
         None => {
-            let file = Submenu::with_items(
-                app,
-                "File",
-                true,
-                &[
-                    &new_window,
-                    &recent,
-                    &connect_item,
-                    &move_tasks_in,
-                    &lan_item,
-                ],
-            )?;
+            let file = Submenu::with_items(app, "File", true, &items)?;
             // After the app menu on macOS; first elsewhere.
             menu.insert(&file, usize::from(cfg!(target_os = "macos")))?;
             file
@@ -2070,6 +2069,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             app_menu.remove_at(0)?;
             app_menu.insert(&about, 0)?;
             app_menu.insert(&check_updates, 1)?;
+            app_menu.insert(&PredefinedMenuItem::separator(app)?, 2)?;
+            app_menu.insert(&settings, 3)?;
         }
     } else if let Some(help) = submenus
         .iter()
@@ -2093,7 +2094,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     }
     app.manage(MenuTexts {
         file,
+        new_tab,
         new_window,
+        settings,
         connect: connect_item,
         move_tasks_in,
         lan: lan_item,
@@ -2197,7 +2200,9 @@ fn close_window(window: tauri::WebviewWindow) {
 #[serde(rename_all = "camelCase")]
 struct MenuWords {
     file: String,
+    new_tab: String,
     new_window: String,
+    settings: String,
     open_recent: String,
     clear_menu: String,
     no_recent: String,
@@ -2211,7 +2216,9 @@ struct MenuWords {
 fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWords) {
     // A menu that cannot be renamed keeps its previous words; nothing else depends on them.
     let _ = texts.file.set_text(words.file);
+    let _ = texts.new_tab.set_text(words.new_tab);
     let _ = texts.new_window.set_text(words.new_window);
+    let _ = texts.settings.set_text(words.settings);
     let _ = texts.recent.set_text(words.open_recent);
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
@@ -2264,8 +2271,10 @@ pub fn run() {
         .manage(Lan::new())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
+            // Reopen windows and tabs (Task-A01-marble320): the other windows open again.
+            windows::restore(app.handle());
             if let Some(window) = app.get_webview_window("main") {
-                fit_to_screen(&window);
+                fit_to_screen(&window, None);
             }
             // Remembered on (Task-A04-02-01): listen again from the start.
             if allomos_store::lan_viewing() {
@@ -2296,6 +2305,16 @@ pub fn run() {
             }
             if id == NEW_WINDOW_ID {
                 let _ = open_new_window(app);
+            } else if id == NEW_TAB_ID {
+                windows::new_tab(app);
+            } else if id == SETTINGS_ID {
+                let title = app
+                    .state::<MenuTexts>()
+                    .settings
+                    .text()
+                    .unwrap_or_else(|_| "Settings".into());
+                let title = title.trim_end_matches('…').trim_end_matches("...");
+                let _ = windows::open_settings_window(app, title);
             } else if id == CONNECT_ID {
                 send(CONNECT_EVENT, None);
             } else if id == MOVE_TASKS_IN_ID {
@@ -2335,9 +2354,12 @@ pub fn run() {
             about_info,
             open_website,
             close_window,
-            windows::new_window,
-            windows::set_window_project,
+            windows::window_start,
+            windows::set_window_tabs,
             windows::show_project_elsewhere,
+            windows::drop_tab,
+            windows::app_settings,
+            windows::set_start_with,
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
@@ -2416,8 +2438,17 @@ pub fn run() {
             install_alm_command,
             dismiss_alm_offer
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Allomos");
+        .build(tauri::generate_context!())
+        .expect("error while running Allomos")
+        .run(|app, event| {
+            // Quitting keeps every window and tab for the next start (Task-A01-marble320).
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
+                app.state::<Windows>().quitting();
+            }
+        });
 }
 
 #[cfg(test)]

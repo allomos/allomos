@@ -10,6 +10,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { LadderStep } from "./ladderFlow";
 import { withDecisions } from "./stopFlow";
+import type { StartWith, WindowStart } from "./tabsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
@@ -54,11 +55,10 @@ export interface Messenger {
    * looks empty it also writes README-allomos.md in `language` (`readme_added` says so).
    */
   createTaskbag(root: string, name: string, language: string): Promise<Opened>;
-  /** Opens another window on the start page (Task-A01-27). */
-  newWindow(): Promise<void>;
-  /** Tells the app which project this window shows (null: none), and names the window after it. */
+  /** Tells the window which project this tab shows (null: none), so the window is named after it
+   * (Task-A01-27; each tab's own messenger, Task-A01-marble320). */
   setWindowProject(root: string | null, name: string | null): Promise<void>;
-  /** When another window already shows `root`, brings it forward and resolves to true. */
+  /** When another tab or window already shows `root`, brings it forward and resolves to true. */
   showProjectElsewhere(root: string): Promise<boolean>;
   /** Calls `handler` when this window comes to the front. */
   onWindowFocus(handler: () => void): Promise<() => void>;
@@ -257,7 +257,9 @@ export interface Messenger {
 
 export interface MenuTexts {
   file: string;
+  newTab: string;
   newWindow: string;
+  settings: string;
   openRecent: string;
   clearMenu: string;
   noRecent: string;
@@ -265,6 +267,45 @@ export interface MenuTexts {
   moveTasksIn: string;
   lan: string;
 }
+
+/** A window's tabs (Task-A01-marble320): what only the desktop app's windows do. */
+export interface TabsMessenger {
+  /** What this window opens with: its tabs, the one in front, and for the first window at start-up
+   * what Allomos opens when it starts. */
+  windowStart(): Promise<WindowStart>;
+  /** This window's tabs now, in their order, and the one in front: the window is named after it,
+   * and the windows and tabs are kept for the next start. */
+  setWindowTabs(tabs: { root: string | null; name: string | null }[], active: number): Promise<void>;
+  /** A tab showing `root` (null: the start page) was dragged out of the tab bar and let go: it joins
+   * the Allomos window under the pointer, or becomes a window of its own. True when it left. */
+  dropTab(root: string | null): Promise<boolean>;
+  /** File → New Tab (null) or File → Open Recent (a folder no tab shows): a new tab in this window. */
+  onTabOpen(handler: (folder: string | null) => void): Promise<() => void>;
+  /** A tab of this window showing a taskbag asked for elsewhere comes to the front. */
+  onTabSelect(handler: (index: number) => void): Promise<() => void>;
+  /** A tab dragged from another window was let go on this one. */
+  onTabReceive(handler: (root: string | null) => void): Promise<() => void>;
+  /** Close this window (its last tab closed). */
+  closeWindow(): Promise<void>;
+}
+
+/** The app's own Settings window (Task-A01-marble320). */
+export interface AppSettingsMessenger {
+  appSettings(): Promise<{ start_with: StartWith }>;
+  setStartWith(choice: StartWith): Promise<void>;
+}
+
+export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
+  windowStart: () => invoke<WindowStart>("window_start"),
+  setWindowTabs: (tabs, active) => invoke<void>("set_window_tabs", { tabs, active }),
+  dropTab: (root) => invoke<boolean>("drop_tab", { root }),
+  onTabOpen: (handler) => getCurrentWebviewWindow().listen<string | null>("tab:open", (e) => handler(e.payload)),
+  onTabSelect: (handler) => getCurrentWebviewWindow().listen<number>("tab:select", (e) => handler(e.payload)),
+  onTabReceive: (handler) => getCurrentWebviewWindow().listen<string | null>("tab:receive", (e) => handler(e.payload)),
+  closeWindow: () => invoke<void>("close_window"),
+  appSettings: () => invoke<{ start_with: StartWith }>("app_settings"),
+  setStartWith: (choice) => invoke<void>("set_start_with", { choice }),
+};
 
 /** Pairing (apps/desktop/src-tauri/src/pairing.rs, Task-A04-02-02): what the dialog shows. */
 export interface PairingView {
@@ -300,8 +341,8 @@ export const desktopMessenger: Messenger = {
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
   openAgentSession: (root, task) => invoke<void>("open_agent_session", { root, task }),
   createTaskbag: (root, name, language) => invoke<Opened>("create_taskbag", { root, name, language }),
-  newWindow: () => invoke<void>("new_window"),
-  setWindowProject: (root, name) => invoke<void>("set_window_project", { root, name }),
+  // Each tab's messenger reports it to its window, which tells the app (`WindowTabs`).
+  setWindowProject: () => Promise.resolve(),
   showProjectElsewhere: (root) => invoke<boolean>("show_project_elsewhere", { root }),
   onWindowFocus: (handler) =>
     getCurrentWebviewWindow().onFocusChanged(({ payload }) => {

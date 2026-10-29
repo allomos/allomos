@@ -51,6 +51,12 @@ export function toCheck(task: Task): boolean {
   return task.state === "done" && !!task.without_human_check;
 }
 
+/** Whether a taskbag needs the person, for the dot on its tab (Task-A01-marble320): a task to check, a question to
+ * answer (a task waiting on a person), or an agent's question waiting in the window. */
+export function needsPerson(tasks: readonly Task[], asking: boolean): boolean {
+  return asking || tasks.some((t) => t.state === "waiting" || toCheck(t));
+}
+
 /** Why it was finished without the human check (the note). */
 export function humanCheckNote(task: Task): string {
   return task.without_human_check ?? "";

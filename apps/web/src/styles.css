@@ -755,6 +755,41 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .about-window .about-tagline { margin: 10px 0 4px; max-width: 280px; line-height: 1.4; }
 .about-window .about-website { font-size: 14px; align-self: center; }
 .about-window .about-licence { margin-top: 12px; color: var(--muted); }
+/* Taskbags as tabs (Task-A01-marble320): the tab bar above the taskbag view, like a browser's. */
+.window { display: flex; flex-direction: column; height: 100%; }
+.tabbar {
+  flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 6px 8px 0;
+  background: var(--bg); border-bottom: 1px solid var(--line); overflow-x: auto; user-select: none; -webkit-user-select: none;
+}
+.tab {
+  position: relative; display: flex; align-items: center; gap: 6px; flex: 0 1 200px; min-width: 64px;
+  padding: 6px 6px 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
+  color: var(--muted); font-size: 13px; cursor: default;
+}
+.tab:hover { color: var(--ink); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tab.front { background: var(--surface); color: var(--ink); border-color: var(--line); margin-bottom: -1px; padding-bottom: 7px; }
+.tab.dragging { box-shadow: 0 2px 8px rgba(0, 0, 0, .15); z-index: 1; }
+.tab.leaving { opacity: .45; }
+.tab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A taskbag that needs the person: a question to answer or a task to check. */
+.tab-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.tab-close {
+  flex: none; border: none; background: none; color: inherit; padding: 0 4px; border-radius: 4px;
+  font-size: 15px; line-height: 18px; opacity: 0;
+}
+.tab:hover .tab-close, .tab.front .tab-close, .tab-close:focus-visible { opacity: .7; }
+.tab-close:hover { opacity: 1; background: var(--line); }
+.tab-new { flex: none; border: none; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 4px 10px; margin: 0 0 3px 2px; }
+.tab-new:hover { color: var(--ink); background: var(--line); }
+.tab-view { flex: 1; min-height: 0; }
+.tab-view[hidden] { display: none; }
+/* The app's own Settings window (Task-A01-marble320). */
+.settings-window { box-sizing: border-box; min-height: 100vh; padding: 24px 28px; background: var(--bg); color: var(--ink); }
+.settings-window h1 { margin: 0 0 16px; font-size: 18px; }
+.settings-choice { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px 14px; margin: 0 0 12px; background: var(--surface); display: grid; gap: 8px; }
+.settings-choice legend { font-weight: 600; padding: 0 4px; }
+.settings-choice label { display: flex; align-items: center; gap: 8px; }
 /* Devices on your network (Task-A04-02-01): the switch, the address with its QR code, and the
    page a phone sees outside the desktop app. */
 .lan-dialog .lan-switch { font-weight: 600; }

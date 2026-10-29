@@ -40,6 +40,42 @@ struct Settings {
     /// default, remembered). Missing: off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     lan_viewing: Option<bool>,
+    /// What the app opens when it starts again (Task-A01-marble320): `reopen`, `last` or `blank`.
+    /// Missing or unknown: `reopen`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    start_with: Option<String>,
+}
+
+/// What Allomos opens when it starts again (Task-A01-marble320, approver 2026-10-29), the app's
+/// **Settings… › General › When Allomos starts**.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartWith {
+    /// **Reopen windows and tabs** (the default): every window with the tabs it had.
+    #[default]
+    Reopen,
+    /// **Open the last taskbag**: one window on the last taskbag.
+    Last,
+    /// **Open a blank window**: one window on the start page.
+    Blank,
+}
+
+impl StartWith {
+    /// The word kept in the settings file and sent to the interface.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            StartWith::Reopen => "reopen",
+            StartWith::Last => "last",
+            StartWith::Blank => "blank",
+        }
+    }
+
+    /// The choice a word names; `None` for any other word.
+    pub fn parse(word: &str) -> Option<StartWith> {
+        [StartWith::Reopen, StartWith::Last, StartWith::Blank]
+            .into_iter()
+            .find(|s| s.as_str() == word)
+    }
 }
 
 /// Allomos's settings folder for this user: `ALLOMOS_SETTINGS_DIR` when set (tests), else
@@ -167,6 +203,22 @@ pub fn lan_viewing() -> bool {
 pub fn save_lan_viewing(on: bool) -> io::Result<()> {
     let mut settings = read_settings();
     settings.lan_viewing = on.then_some(true);
+    write_settings(&settings)
+}
+
+/// What the app opens when it starts again; **Reopen windows and tabs** until the person chooses.
+pub fn start_with() -> StartWith {
+    read_settings()
+        .start_with
+        .as_deref()
+        .and_then(StartWith::parse)
+        .unwrap_or_default()
+}
+
+/// Remember what the app opens when it starts again.
+pub fn save_start_with(choice: StartWith) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.start_with = (choice != StartWith::Reopen).then(|| choice.as_str().to_string());
     write_settings(&settings)
 }
 
@@ -358,6 +410,17 @@ mod tests {
         assert!(lan_viewing());
         save_lan_viewing(false).unwrap();
         assert!(!lan_viewing());
+        assert_eq!(saved_ui_language().as_deref(), Some("ja"));
+
+        // When Allomos starts (Task-A01-marble320): reopen until chosen, then remembered.
+        assert_eq!(start_with(), StartWith::Reopen);
+        save_start_with(StartWith::Blank).unwrap();
+        assert_eq!(start_with(), StartWith::Blank);
+        save_start_with(StartWith::Last).unwrap();
+        assert_eq!(start_with(), StartWith::Last);
+        save_start_with(StartWith::Reopen).unwrap();
+        assert_eq!(start_with(), StartWith::Reopen);
+        assert_eq!(StartWith::parse("tabs"), None);
         assert_eq!(saved_ui_language().as_deref(), Some("ja"));
 
         // SAFETY: as above.
