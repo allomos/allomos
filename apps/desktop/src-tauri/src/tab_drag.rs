@@ -14,7 +14,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::windows::{self, Windows};
 
@@ -33,10 +33,68 @@ const BAR_HEIGHT: f64 = 48.0;
 const TICK: Duration = Duration::from_millis(12);
 /// Where the moving window waits while the tab is over a tab bar: off every screen. It stays open
 /// and shown, so the window the drag started in keeps the pointer, and nothing takes the keyboard.
-const PARKED: PhysicalPosition<f64> = PhysicalPosition {
-    x: -100_000.0,
-    y: -100_000.0,
-};
+const PARKED: (f64, f64) = (-100_000.0, -100_000.0);
+
+/// Places on the screen in one unit for every display (Task-A01-jackal747). On macOS, Tauri's
+/// physical pixels are not one unit: the pointer's use the main display's scale, a window's its own
+/// display's, so with a Retina and a standard display they disagree and the moving window jumped.
+/// There the system's points are shared by every display; on Windows, physical pixels are.
+mod screen {
+    use tauri::{AppHandle, WebviewWindow};
+
+    /// How many units one of the window's logical (CSS) pixels is.
+    #[cfg(target_os = "macos")]
+    pub(super) fn per_logical(_window: &WebviewWindow) -> Option<f64> {
+        Some(1.0)
+    }
+    #[cfg(not(target_os = "macos"))]
+    pub(super) fn per_logical(window: &WebviewWindow) -> Option<f64> {
+        window.scale_factor().ok()
+    }
+
+    /// The pointer's place.
+    pub(super) fn cursor(app: &AppHandle) -> Option<(f64, f64)> {
+        let at = app.cursor_position().ok()?;
+        #[cfg(target_os = "macos")]
+        let scale = app.primary_monitor().ok().flatten()?.scale_factor();
+        #[cfg(not(target_os = "macos"))]
+        let scale = 1.0;
+        Some((at.x / scale, at.y / scale))
+    }
+
+    /// The units for `window`'s physical pixels.
+    fn of(window: &WebviewWindow) -> Option<f64> {
+        Some(window.scale_factor().ok()? / per_logical(window)?)
+    }
+
+    /// The window's content: its corner and size.
+    pub(super) fn inner(window: &WebviewWindow) -> Option<(f64, f64, f64, f64)> {
+        let k = of(window)?;
+        let p = window.inner_position().ok()?;
+        let s = window.inner_size().ok()?;
+        Some((
+            p.x as f64 / k,
+            p.y as f64 / k,
+            s.width as f64 / k,
+            s.height as f64 / k,
+        ))
+    }
+
+    /// The window's outer corner.
+    pub(super) fn outer(window: &WebviewWindow) -> Option<(f64, f64)> {
+        let k = of(window)?;
+        let p = window.outer_position().ok()?;
+        Some((p.x as f64 / k, p.y as f64 / k))
+    }
+
+    /// Put the window's outer corner at `(x, y)`.
+    pub(super) fn place(window: &WebviewWindow, (x, y): (f64, f64)) {
+        #[cfg(target_os = "macos")]
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+        #[cfg(not(target_os = "macos"))]
+        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+}
 
 /// The tab being dragged after it tore off its tab bar, if any.
 #[derive(Default)]
@@ -54,10 +112,10 @@ struct Active {
     /// The window that moves with the pointer: a new one (`created`), or the source itself.
     moving: String,
     created: bool,
-    /// The pointer's place in the moving window (from its outer corner), physical pixels.
+    /// The pointer's place in the moving window (from its outer corner), in `screen` units.
     offset: (f64, f64),
     /// Where the source window was, when it moves itself (to put it back on Escape).
-    home: Option<PhysicalPosition<i32>>,
+    home: Option<(f64, f64)>,
     /// The window whose tab bar the tab is over.
     over: Option<String>,
     last_x: Option<f64>,
@@ -87,7 +145,8 @@ struct DropHere {
     root: Option<PathBuf>,
 }
 
-/// A window's tab bar on the screen, in physical pixels, with the window's scale.
+/// A window's tab bar on the screen, in `screen` units, with how many of them one of the window's
+/// logical pixels is.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Bar {
     pub(crate) label: String,
@@ -106,8 +165,8 @@ pub(crate) fn bar_under<'a>(bars: &'a [Bar], not: &str, x: f64, y: f64) -> Optio
 }
 
 /// Where the moving window goes for the pointer at `at`: under it, as grabbed.
-pub(crate) fn follow_at(at: PhysicalPosition<f64>, offset: (f64, f64)) -> PhysicalPosition<f64> {
-    PhysicalPosition::new(at.x - offset.0, at.y - offset.1)
+pub(crate) fn follow_at(at: (f64, f64), offset: (f64, f64)) -> (f64, f64) {
+    (at.0 - offset.0, at.1 - offset.1)
 }
 
 /// The project windows' tab bars on the screen, the window in front first.
@@ -121,16 +180,15 @@ fn bars(app: &AppHandle) -> Vec<Bar> {
             if !w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false) {
                 return None;
             }
-            let p = w.inner_position().ok()?;
-            let s = w.inner_size().ok()?;
-            let scale = w.scale_factor().ok()?;
+            let (x, y, width, _) = screen::inner(&w)?;
+            let scale = screen::per_logical(&w)?;
             Some((
                 w.is_focused().unwrap_or(false),
                 Bar {
                     label,
-                    x: p.x as f64,
-                    y: p.y as f64,
-                    width: s.width as f64,
+                    x,
+                    y,
+                    width,
                     height: BAR_HEIGHT * scale,
                     scale,
                 },
@@ -150,7 +208,7 @@ fn follow(app: AppHandle, run: u64) {
         if drag.run.load(Ordering::Relaxed) != run {
             return;
         }
-        let Ok(at) = app.cursor_position() else {
+        let Some(at) = screen::cursor(&app) else {
             continue;
         };
         let bars = bars(&app);
@@ -163,7 +221,7 @@ fn follow(app: AppHandle, run: u64) {
             return;
         };
         let moving = app.get_webview_window(&a.moving);
-        let bar = bar_under(&bars, &a.moving, at.x, at.y);
+        let bar = bar_under(&bars, &a.moving, at.0, at.1);
         let over = bar.map(|b| b.label.clone());
         if over != a.over {
             if let Some(prev) = &a.over {
@@ -171,7 +229,7 @@ fn follow(app: AppHandle, run: u64) {
             }
             if over.is_some() {
                 if let Some(w) = &moving {
-                    let _ = w.set_position(PARKED);
+                    screen::place(w, PARKED);
                 }
             }
             a.over = over;
@@ -179,7 +237,7 @@ fn follow(app: AppHandle, run: u64) {
         }
         match bar {
             Some(bar) => {
-                let x = ((at.x - bar.x) / bar.scale).round();
+                let x = ((at.0 - bar.x) / bar.scale).round();
                 if a.last_x != Some(x) {
                     a.last_x = Some(x);
                     let hover = Hover {
@@ -192,7 +250,7 @@ fn follow(app: AppHandle, run: u64) {
             }
             None => {
                 if let Some(w) = &moving {
-                    let _ = w.set_position(follow_at(at, a.offset));
+                    screen::place(w, follow_at(at, a.offset));
                 }
             }
         }
@@ -212,16 +270,15 @@ pub(crate) async fn drag_tear(
     grab_x: f64,
     grab_y: f64,
 ) -> bool {
-    let Ok(at) = app.cursor_position() else {
+    let Some(at) = screen::cursor(&app) else {
         return false;
     };
     let source = window.label().to_string();
     let only = app.state::<Windows>().tab_count(&source) <= 1;
-    let (Ok(outer), Ok(inner), Ok(size), Ok(scale)) = (
-        window.outer_position(),
-        window.inner_position(),
-        window.inner_size(),
-        window.scale_factor(),
+    let (Some(outer), Some(inner), Some(k)) = (
+        screen::outer(&window),
+        screen::inner(&window),
+        screen::per_logical(&window),
     ) else {
         return false;
     };
@@ -229,21 +286,21 @@ pub(crate) async fn drag_tear(
         (
             source.clone(),
             false,
-            (at.x - outer.x as f64, at.y - outer.y as f64),
+            (at.0 - outer.0, at.1 - outer.1),
             Some(outer),
         )
     } else {
         // The tab sits in the new window's bar where it was grabbed, under the pointer.
         let offset = (
-            grab_x * scale + (inner.x - outer.x) as f64,
-            grab_y * scale + (inner.y - outer.y) as f64,
+            grab_x * k + inner.0 - outer.0,
+            grab_y * k + inner.1 - outer.1,
         );
         let corner = follow_at(at, offset);
         let opened = windows::open_drag_window(
             &app,
             root.clone(),
-            (size.width as f64 / scale, size.height as f64 / scale),
-            (corner.x / scale, corner.y / scale),
+            (inner.2 / k, inner.3 / k),
+            (corner.0 / k, corner.1 / k),
         );
         match opened {
             Ok(label) => (label, true, offset, None),
@@ -329,7 +386,7 @@ pub(crate) async fn drag_cancel(app: AppHandle) -> bool {
         if a.created {
             let _ = w.close();
         } else if let Some(home) = a.home {
-            let _ = w.set_position(home);
+            screen::place(&w, home);
         }
     }
     let _ = app.emit_to(a.source.as_str(), CANCELLED_EVENT, ());
@@ -370,7 +427,6 @@ mod tests {
 
     #[test]
     fn the_moving_window_keeps_the_tab_under_the_pointer() {
-        let at = follow_at(PhysicalPosition::new(500.0, 300.0), (60.0, 40.0));
-        assert_eq!((at.x, at.y), (440.0, 260.0));
+        assert_eq!(follow_at((500.0, 300.0), (60.0, 40.0)), (440.0, 260.0));
     }
 }
