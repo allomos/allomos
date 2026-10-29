@@ -56,6 +56,9 @@ function tabName(tab: TabEntry, startPage: string): string {
   return startPage;
 }
 
+/** A tab's left and right edges and width in the window, in CSS pixels. */
+type TabEdge = { left: number; right: number; width: number };
+
 export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tabs: TabsMessenger }) {
   const { t } = useI18n();
   const [tabs, setTabs] = useState<TabEntry[]>([]);
@@ -193,7 +196,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   const drag = useRef<{ id: number; x: number; y: number; grabX: number; grabY: number; moved: boolean; torn: boolean } | null>(null);
   /** Along the bar: the dragged tab's place, how far it has moved, the place it will land, its
    * width, and every tab's edges when the drag started. */
-  const [local, setLocal] = useState<{ id: number; from: number; dx: number; gap: number; width: number; edges: DOMRect[] } | null>(null);
+  const [local, setLocal] = useState<{ id: number; from: number; dx: number; gap: number; width: number; edges: TabEdge[] } | null>(null);
   /** A tab of this window torn off and being dragged: hidden here until it lands. */
   const [away, setAway] = useState<{ id: number } | null>(null);
   const awayRef = useRef(away);
@@ -206,9 +209,17 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
     return () => cancelAnimationFrame(frame);
   }, [settle]);
 
-  /** The shown tabs' edges in the bar (a torn-off tab is hidden). */
-  const shownEdges = () =>
-    barRef.current ? [...barRef.current.querySelectorAll<HTMLElement>("[data-tab]:not(.away)")].map((el) => el.getBoundingClientRect()) : [];
+  /** The shown tabs' edges in the window (a torn-off tab is hidden), where they sit in the bar: not
+   * where they are drawn, since they may have slid aside for a dragged tab (Task-A01-sonnet876). */
+  const shownEdges = (): TabEdge[] => {
+    const bar = barRef.current;
+    if (!bar) return [];
+    const origin = bar.getBoundingClientRect().left + bar.clientLeft - bar.scrollLeft;
+    return [...bar.querySelectorAll<HTMLElement>("[data-tab]:not(.away)")].map((el) => {
+      const left = origin + el.offsetLeft;
+      return { left, right: left + el.offsetWidth, width: el.offsetWidth };
+    });
+  };
   /** Bring the torn-off tab back, at `at` among the shown tabs, or where it was. */
   const bringBack = (at: number | null) => {
     const a = awayRef.current;
