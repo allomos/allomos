@@ -31,9 +31,6 @@ const CANCELLED_EVENT: &str = "tab:drag-cancelled";
 const BAR_HEIGHT: f64 = 48.0;
 /// How often the moving window follows the pointer: about once a screen refresh.
 const TICK: Duration = Duration::from_millis(12);
-/// Where the moving window waits while the tab is over a tab bar: off every screen. It stays open
-/// and shown, so the window the drag started in keeps the pointer, and nothing takes the keyboard.
-const PARKED: (f64, f64) = (-100_000.0, -100_000.0);
 
 /// Places on the screen in one unit for every display (Task-A01-jackal747). On macOS, Tauri's
 /// physical pixels are not one unit: the pointer's use the main display's scale, a window's its own
@@ -85,6 +82,33 @@ mod screen {
         let k = of(window)?;
         let p = window.outer_position().ok()?;
         Some((p.x as f64 / k, p.y as f64 / k))
+    }
+
+    /// Get the moving window out of the way while the tab is over a tab bar (`parked`), or bring it
+    /// back. It stays open and shown, so the window the drag started in keeps the pointer, and
+    /// nothing takes the keyboard. macOS does not let a window leave every screen (it put it back in
+    /// the top-left corner, Task-A01-jungle176), so there it turns see-through where it is;
+    /// elsewhere it moves off every screen, and following the pointer brings it back.
+    #[cfg(target_os = "macos")]
+    pub(super) fn park(window: &WebviewWindow, parked: bool) {
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let Ok(ns) = w.ns_window() else {
+                return;
+            };
+            let alpha: f64 = if parked { 0.0 } else { 1.0 };
+            // SAFETY: `ns` is this window's live NSWindow, used on the main thread.
+            unsafe {
+                let ns = &*(ns as *const objc2::runtime::AnyObject);
+                let _: () = objc2::msg_send![ns, setAlphaValue: alpha];
+            }
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    pub(super) fn park(window: &WebviewWindow, parked: bool) {
+        if parked {
+            place(window, (-100_000.0, -100_000.0));
+        }
     }
 
     /// Put the window's outer corner at `(x, y)`.
@@ -223,13 +247,15 @@ fn follow(app: AppHandle, run: u64) {
         let moving = app.get_webview_window(&a.moving);
         let bar = bar_under(&bars, &a.moving, at.0, at.1);
         let over = bar.map(|b| b.label.clone());
+        // Back from a tab bar: the window shows again once it is under the pointer.
+        let back = over.is_none() && a.over.is_some();
         if over != a.over {
             if let Some(prev) = &a.over {
                 let _ = app.emit_to(prev.as_str(), HOVER_END_EVENT, ());
             }
             if over.is_some() {
                 if let Some(w) = &moving {
-                    screen::place(w, PARKED);
+                    screen::park(w, true);
                 }
             }
             a.over = over;
@@ -251,6 +277,9 @@ fn follow(app: AppHandle, run: u64) {
             None => {
                 if let Some(w) = &moving {
                     screen::place(w, follow_at(at, a.offset));
+                    if back {
+                        screen::park(w, false);
+                    }
                 }
             }
         }
@@ -387,6 +416,7 @@ pub(crate) async fn drag_cancel(app: AppHandle) -> bool {
             let _ = w.close();
         } else if let Some(home) = a.home {
             screen::place(&w, home);
+            screen::park(&w, false);
         }
     }
     let _ = app.emit_to(a.source.as_str(), CANCELLED_EVENT, ());

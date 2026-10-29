@@ -29,3 +29,8 @@ sha2 = "=0.10.9"
 sys-locale = "=0.3.2"
 tauri = { version = "~2.11", features = [] }
 tauri-plugin-dialog = "2"
+
+# Task-A01-jungle176: a dragged tab's window turns see-through on macOS (`setAlphaValue:`), since
+# it cannot move off every screen there. Already in Cargo.lock through Tauri; pinned deliberately.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.4"
