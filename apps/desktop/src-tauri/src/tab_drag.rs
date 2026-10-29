@@ -1,9 +1,10 @@
 //! Dragging a tab like Chrome (Task-A01-fresco512, approver 2026-10-29). Along its own tab bar the
 //! window moves the tab itself; once the tab is pulled out of the bar it tears off, and from then
 //! on the app follows the pointer: the tab's window moves with it (a new window showing that
-//! taskbag, or the window itself when it was its only tab). Over an Allomos window's tab bar the
-//! moving window gets out of the way and that window shows where the tab will land; let go there,
-//! the tab joins it; let go elsewhere, the new window stays. Escape puts everything back.
+//! taskbag, or the window itself when it was its only tab). Anywhere over another Allomos window
+//! (Task-A01-twig481), or over its own window's tab bar, the moving window gets out of the way and
+//! that window shows where the tab will land; let go there, the tab joins it; let go elsewhere, the
+//! new window stays. Escape puts everything back.
 //!
 //! The window the drag started in keeps the pointer until it is let go (the system sends it every
 //! move and the release), so it says when the drag ends; the app reads the pointer's place itself.
@@ -18,9 +19,9 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::windows::{self, Windows};
 
-/// The tab is over this window's tab bar, at `x` (logical pixels from the window's left edge).
+/// The tab is over this window, at `x` (logical pixels from the window's left edge).
 const HOVER_EVENT: &str = "tab:hover";
-/// It left this window's tab bar.
+/// It left this window.
 const HOVER_END_EVENT: &str = "tab:hover-end";
 /// It was let go on this window's tab bar: the window adds it where it showed the gap.
 const DROP_EVENT: &str = "tab:drop-here";
@@ -77,11 +78,17 @@ mod screen {
         ))
     }
 
-    /// The window's outer corner.
-    pub(super) fn outer(window: &WebviewWindow) -> Option<(f64, f64)> {
+    /// The whole window, title bar included: its outer corner and size.
+    pub(super) fn outer(window: &WebviewWindow) -> Option<(f64, f64, f64, f64)> {
         let k = of(window)?;
         let p = window.outer_position().ok()?;
-        Some((p.x as f64 / k, p.y as f64 / k))
+        let s = window.outer_size().ok()?;
+        Some((
+            p.x as f64 / k,
+            p.y as f64 / k,
+            s.width as f64 / k,
+            s.height as f64 / k,
+        ))
     }
 
     /// Get the moving window out of the way while the tab is over a tab bar (`parked`), or bring it
@@ -164,7 +171,7 @@ struct Active {
     offset: (f64, f64),
     /// Where the source window was, when it moves itself (to put it back on Escape).
     home: Option<(f64, f64)>,
-    /// The window whose tab bar the tab is over.
+    /// The window the tab is over.
     over: Option<String>,
     last_x: Option<f64>,
 }
@@ -193,8 +200,9 @@ struct DropHere {
     root: Option<PathBuf>,
 }
 
-/// A window's tab bar on the screen, in `screen` units, with how many of them one of the window's
-/// logical pixels is.
+/// A window that takes a dragged tab, on the screen in `screen` units: the whole window (`x`, `y`,
+/// `width`, `height`, title bar included), its content's left edge, the bottom of its tab bar, and
+/// how many units one of the window's logical pixels is.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Bar {
     pub(crate) label: String,
@@ -202,14 +210,30 @@ pub(crate) struct Bar {
     pub(crate) y: f64,
     pub(crate) width: f64,
     pub(crate) height: f64,
+    pub(crate) left: f64,
+    pub(crate) bar_bottom: f64,
     pub(crate) scale: f64,
 }
 
-/// The tab bar under the point (`x`, `y`), not window `not`'s: the first in `bars`, which lists the
-/// window in front first.
-pub(crate) fn bar_under<'a>(bars: &'a [Bar], not: &str, x: f64, y: f64) -> Option<&'a Bar> {
-    bars.iter()
-        .find(|b| b.label != not && x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height)
+/// The window under the point (`x`, `y`) that takes the tab, not window `not`'s: the first in
+/// `bars`, which lists the window in front first. Any window takes it anywhere over it
+/// (Task-A01-twig481), but the window it came from, `home`, only over its tab bar, so a tab can
+/// still be pulled down out of its own window.
+pub(crate) fn bar_under<'a>(
+    bars: &'a [Bar],
+    not: &str,
+    home: &str,
+    x: f64,
+    y: f64,
+) -> Option<&'a Bar> {
+    bars.iter().find(|b| {
+        b.label != not
+            && x >= b.x
+            && x < b.x + b.width
+            && y >= b.y
+            && y < b.y + b.height
+            && (b.label != home || y < b.bar_bottom)
+    })
 }
 
 /// Where the moving window goes for the pointer at `at`: under it, as grabbed.
@@ -217,7 +241,7 @@ pub(crate) fn follow_at(at: (f64, f64), offset: (f64, f64)) -> (f64, f64) {
     (at.0 - offset.0, at.1 - offset.1)
 }
 
-/// The project windows' tab bars on the screen, the window in front first.
+/// The project windows on the screen, the window in front first.
 fn bars(app: &AppHandle) -> Vec<Bar> {
     let mut list: Vec<(bool, Bar)> = app
         .state::<Windows>()
@@ -228,7 +252,8 @@ fn bars(app: &AppHandle) -> Vec<Bar> {
             if !w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false) {
                 return None;
             }
-            let (x, y, width, _) = screen::inner(&w)?;
+            let (x, y, width, height) = screen::outer(&w)?;
+            let (left, top, _, _) = screen::inner(&w)?;
             let scale = screen::per_logical(&w)?;
             Some((
                 w.is_focused().unwrap_or(false),
@@ -237,7 +262,9 @@ fn bars(app: &AppHandle) -> Vec<Bar> {
                     x,
                     y,
                     width,
-                    height: BAR_HEIGHT * scale,
+                    height,
+                    left,
+                    bar_bottom: top + BAR_HEIGHT * scale,
                     scale,
                 },
             ))
@@ -247,8 +274,8 @@ fn bars(app: &AppHandle) -> Vec<Bar> {
     list.into_iter().map(|(_, b)| b).collect()
 }
 
-/// Follow the pointer until drag `run` ends: move the window under it, or, over a tab bar, park
-/// the window and tell that bar's window where the tab is.
+/// Follow the pointer until drag `run` ends: move the window under it, or, over a window that takes
+/// the tab, park the moving window and tell that window where the tab is.
 fn follow(app: AppHandle, run: u64) {
     loop {
         std::thread::sleep(TICK);
@@ -269,14 +296,16 @@ fn follow(app: AppHandle, run: u64) {
             return;
         };
         let moving = app.get_webview_window(&a.moving);
-        // The bar it is over keeps it while the pointer stays there: that window was raised, so it
+        // The window it is over keeps it while the pointer stays there: that window was raised, so it
         // is on top even where the window in front overlaps it.
         let bar = a
             .over
             .as_deref()
             .and_then(|label| bars.iter().find(|b| b.label == label))
-            .filter(|b| bar_under(std::slice::from_ref(*b), &a.moving, at.0, at.1).is_some())
-            .or_else(|| bar_under(&bars, &a.moving, at.0, at.1));
+            .filter(|b| {
+                bar_under(std::slice::from_ref(*b), &a.moving, &a.source, at.0, at.1).is_some()
+            })
+            .or_else(|| bar_under(&bars, &a.moving, &a.source, at.0, at.1));
         let over = bar.map(|b| b.label.clone());
         // Back from a tab bar: the window shows again once it is under the pointer.
         let back = over.is_none() && a.over.is_some();
@@ -297,7 +326,7 @@ fn follow(app: AppHandle, run: u64) {
         }
         match bar {
             Some(bar) => {
-                let x = ((at.0 - bar.x) / bar.scale).round();
+                let x = ((at.0 - bar.left) / bar.scale).round();
                 if a.last_x != Some(x) {
                     a.last_x = Some(x);
                     let hover = Hover {
@@ -350,7 +379,7 @@ pub(crate) async fn drag_tear(
             source.clone(),
             false,
             (at.0 - outer.0, at.1 - outer.1),
-            Some(outer),
+            Some((outer.0, outer.1)),
         )
     } else {
         // The tab sits in the new window's bar where it was grabbed, under the pointer.
@@ -462,13 +491,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_tab_bar_under_the_pointer_is_found() {
+    fn the_window_under_the_pointer_takes_the_tab() {
+        // Windows 100 tall from y = 100, their tab bars ending at y = 160.
         let bar = |label: &str, x: f64| Bar {
             label: label.into(),
             x,
             y: 100.0,
             width: 100.0,
-            height: 48.0,
+            height: 100.0,
+            left: x,
+            bar_bottom: 160.0,
             scale: 1.0,
         };
         // `main` at 0–100, `window-2` at 200–300, `window-3` in front overlapping it at 250–350.
@@ -477,16 +509,24 @@ mod tests {
             bar("main", 0.0),
             bar("window-2", 200.0),
         ];
-        let at = |x: f64, y: f64| bar_under(&bars, "window-9", x, y).map(|b| b.label.as_str());
+        let at = |x: f64, y: f64| {
+            bar_under(&bars, "window-9", "window-8", x, y).map(|b| b.label.as_str())
+        };
         assert_eq!(at(50.0, 120.0), Some("main"));
         assert_eq!(at(220.0, 120.0), Some("window-2"));
+        // Anywhere over a window, below its tab bar too.
+        assert_eq!(at(50.0, 190.0), Some("main"));
         // Where two overlap, the window in front.
         assert_eq!(at(260.0, 120.0), Some("window-3"));
-        // Below a bar (over the window's content) and between windows: none.
-        assert_eq!(at(50.0, 160.0), None);
+        // Between and below windows: none.
         assert_eq!(at(150.0, 120.0), None);
-        // The moving window's own bar never counts.
-        assert_eq!(bar_under(&bars, "main", 50.0, 120.0), None);
+        assert_eq!(at(50.0, 210.0), None);
+        // The moving window never counts.
+        assert_eq!(bar_under(&bars, "main", "window-8", 50.0, 120.0), None);
+        // The window it came from takes it back only over its tab bar.
+        let home = |y: f64| bar_under(&bars, "window-9", "main", 50.0, y).map(|b| b.label.as_str());
+        assert_eq!(home(120.0), Some("main"));
+        assert_eq!(home(190.0), None);
     }
 
     #[test]
