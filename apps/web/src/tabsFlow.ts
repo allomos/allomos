@@ -53,10 +53,42 @@ export function moveTab<T>(list: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
-/** Where the tab at `from`, dragged along the bar with the pointer at `x`, goes: after every other
- * tab (each given by its left and right edge) whose middle the pointer has passed. */
-export function placeAt(edges: readonly { left: number; right: number }[], from: number, x: number): number {
-  return edges.filter((e, i) => i !== from && x > (e.left + e.right) / 2).length;
+/** A tab's left and right edges in the bar. */
+export interface Edge {
+  left: number;
+  right: number;
+}
+
+/** The other tabs' edges with the dragged tab at `from` taken out of the bar: the tabs after it
+ * close up by `space`, its width and the gap between tabs. */
+export function othersOf(edges: readonly Edge[], from: number, space: number): Edge[] {
+  return edges
+    .filter((_, i) => i !== from)
+    .map((e, i) => (i < from ? e : { left: e.left - space, right: e.right - space }));
+}
+
+/** Where a dragged tab lands among the `others` (their edges with no gap open), drawn from `left`
+ * and `width` wide, while it is now to land at `gap` (the tabs from there slid right by `space`). It
+ * trades places with a neighbour once it covers more than half of it, or of itself when it is the
+ * narrower one (Task-A01-bell953): measured where that neighbour is shown, so it does not flip back. */
+export function landAt(others: readonly Edge[], left: number, width: number, space: number, gap: number): number {
+  const right = left + width;
+  const half = (e: Edge) => Math.min(width, e.right - e.left) / 2;
+  let at = Math.max(0, Math.min(gap, others.length));
+  for (let step = 0; step <= 2 * others.length; step++) {
+    const before = others[at - 1];
+    if (before && left < before.right - half(before)) {
+      at -= 1;
+      continue;
+    }
+    const after = others[at];
+    if (after && right > after.left + space + half(after)) {
+      at += 1;
+      continue;
+    }
+    break;
+  }
+  return at;
 }
 
 /** How far tab `i` slides aside while the tab at `from` is dragged to place `gap` (`w`: the dragged

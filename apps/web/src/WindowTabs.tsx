@@ -15,7 +15,7 @@ import { useI18n } from "./i18n";
 import type { Messenger, TabsMessenger } from "./messenger";
 import { projectFolder } from "./paths";
 import { TabActive } from "./tabActive";
-import { frontAfterClose, insertAt, moveTab, placeAt, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
+import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
 
 /** What a tab's view needs from its window. */
 interface Shell {
@@ -58,6 +58,8 @@ function tabName(tab: TabEntry, startPage: string): string {
 
 /** A tab's left and right edges and width in the window, in CSS pixels. */
 type TabEdge = { left: number; right: number; width: number };
+/** Where a tab bar's first tab starts: its padding (`.tabbar` in styles.css). */
+const BAR_INSET = { x: 8, y: 6 };
 
 export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tabs: TabsMessenger }) {
   const { t } = useI18n();
@@ -211,10 +213,15 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
 
   /** The shown tabs' edges in the window (a torn-off tab is hidden), where they sit in the bar: not
    * where they are drawn, since they may have slid aside for a dragged tab (Task-A01-sonnet876). */
+  /** Where the bar's inside starts, in the window. */
+  const barOrigin = () => {
+    const bar = barRef.current;
+    return bar ? bar.getBoundingClientRect().left + bar.clientLeft - bar.scrollLeft : 0;
+  };
   const shownEdges = (): TabEdge[] => {
     const bar = barRef.current;
     if (!bar) return [];
-    const origin = bar.getBoundingClientRect().left + bar.clientLeft - bar.scrollLeft;
+    const origin = barOrigin();
     return [...bar.querySelectorAll<HTMLElement>("[data-tab]:not(.away)")].map((el) => {
       const left = origin + el.offsetLeft;
       return { left, right: left + el.offsetWidth, width: el.offsetWidth };
@@ -243,8 +250,9 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   // A dragged tab over this window's tab bar, let go on it, or called off.
   useEffect(() => {
     const stops = [
-      api.onTabHover(({ x, root, name }) => {
+      api.onTabHover(({ x, grab, root, name }) => {
         let h = hoverTab.current;
+        const first = !h;
         if (!h) {
           // It shows in front: this window's own torn-off tab, or a tab made here for it.
           const own = awayRef.current;
@@ -258,12 +266,14 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
           hoverTab.current = h;
           setFront(h.id);
         }
-        const bar = barRef.current?.getBoundingClientRect();
+        // The tab is drawn under the pointer, held where it was grabbed, and lands by what it covers.
+        const origin = barOrigin();
         const edges = shownEdges();
-        const gap = placeAt(edges, -1, x);
         const width = Math.min(200, edges[0]?.width ?? 200);
-        const left = (gap < edges.length ? edges[gap].left : (edges[edges.length - 1]?.right ?? 8) + 2) - (bar?.left ?? 0);
-        setHover({ gap, left, width, name, id: h.id, made: h.made });
+        const room = (barRef.current?.clientWidth ?? width) - width;
+        const left = origin + Math.max(0, Math.min(room, x - (grab - BAR_INSET.x) - origin));
+        const gap = landAt(edges, left, width, width + 2, first ? 0 : (hoverRef.current?.gap ?? 0));
+        setHover({ gap, left: left - origin, width, name, id: h.id, made: h.made });
       }),
       api.onTabHoverEnd(() => {
         const h = hoverTab.current;
@@ -305,8 +315,8 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
     setFront(id);
     const rect = e.currentTarget.getBoundingClientRect();
     // Held at the same place in a new window's bar, whose first tab starts at the bar's padding.
-    const grabX = 8 + (e.clientX - rect.left);
-    const grabY = 6 + (e.clientY - rect.top);
+    const grabX = BAR_INSET.x + (e.clientX - rect.left);
+    const grabY = BAR_INSET.y + (e.clientY - rect.top);
     drag.current = { id, x: e.clientX, y: e.clientY, grabX, grabY, moved: false, torn: false };
     // The bar holds the pointer: the tab itself moves in the page while it is dragged.
     try {
@@ -354,7 +364,11 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
       const from = was?.from ?? tabsRef.current.findIndex((x) => x.id === d.id);
       const edges = was?.edges ?? shownEdges();
       const width = (edges[from]?.width ?? 0) + 2;
-      return { id: d.id, from, dx: e.clientX - d.x, gap: placeAt(edges, from, e.clientX), width, edges };
+      const dx = e.clientX - d.x;
+      const tab = edges[from];
+      // It lands by what it covers, wherever on it the pointer is (Task-A01-bell953).
+      const gap = tab ? landAt(othersOf(edges, from, width), tab.left + dx, tab.width, width, was?.gap ?? from) : from;
+      return { id: d.id, from, dx, gap, width, edges };
     });
   };
   const onBarUp = () => {
@@ -465,7 +479,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
           );
         })}
         {hover && (
-          // Where the dragged tab will land.
+          // The dragged tab, under the pointer.
           <div className="tab front tab-phantom" aria-hidden="true" style={{ left: hover.left, width: hover.width }}>
             <span className="tab-name">{hover.name ?? startPage}</span>
           </div>

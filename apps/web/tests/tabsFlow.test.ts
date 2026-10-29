@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { needsPerson } from "../src/stopFlow.ts";
-import { frontAfterClose, insertAt, moveTab, placeAt, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry } from "../src/tabsFlow.ts";
+import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry } from "../src/tabsFlow.ts";
 import type { Task } from "../src/types.ts";
 
 test("a window starts with the tabs it was given, or one tab", () => {
@@ -27,18 +27,39 @@ test("dragging a tab along the bar changes the tabs' order", () => {
   assert.deepEqual(moveTab(["a", "b", "c"], 2, 0), ["c", "a", "b"]);
   assert.deepEqual(moveTab(["a", "b", "c"], 1, 1), ["a", "b", "c"]);
   assert.deepEqual(moveTab(["a", "b", "c"], 1, 9), ["a", "c", "b"]);
-  // Three tabs 100 wide; the first one dragged: past the second's middle, then past the third's.
+});
+
+test("a dragged tab trades places once it covers more than half of its neighbour", () => {
+  // Three tabs 100 wide with no space between; the first one dragged right.
   const edges = [
     { left: 0, right: 100 },
     { left: 100, right: 200 },
     { left: 200, right: 300 },
   ];
-  assert.equal(placeAt(edges, 0, 120), 0);
-  assert.equal(placeAt(edges, 0, 160), 1);
-  assert.equal(placeAt(edges, 0, 290), 2);
-  // The last one dragged back to the front.
-  assert.equal(placeAt(edges, 2, 10), 0);
-  assert.equal(placeAt(edges, 2, 140), 1);
+  const others = othersOf(edges, 0, 100);
+  assert.deepEqual(others, [
+    { left: 0, right: 100 },
+    { left: 100, right: 200 },
+  ]);
+  // Covering 40 of the second: it stays; 60: they trade places.
+  assert.equal(landAt(others, 40, 100, 100, 0), 0);
+  assert.equal(landAt(others, 60, 100, 100, 0), 1);
+  // Wherever on the tab the pointer is: only where the tab is drawn counts.
+  assert.equal(landAt(others, 160, 100, 100, 1), 2);
+  // Covering exactly half, it stays where it is, on either side.
+  assert.equal(landAt(others, 50, 100, 100, 0), 0);
+  assert.equal(landAt(others, 50, 100, 100, 1), 1);
+  // Back over more than half of the first one: they trade places again.
+  assert.equal(landAt(others, 30, 100, 100, 1), 0);
+  // The last one dragged to the front at once.
+  assert.equal(landAt(othersOf(edges, 2, 100), 0, 100, 100, 2), 0);
+  // A tab 40 wide trades places with a wider one once more than half of itself is over it (the
+  // neighbour, slid right for it, starts at 40).
+  assert.equal(landAt(others, 10, 40, 40, 0), 0);
+  assert.equal(landAt(others, 25, 40, 40, 0), 1);
+  // A tab from another window, first over the bar: placed by what it covers.
+  assert.equal(landAt(edges, 230, 100, 100, 0), 2);
+  assert.equal(landAt(edges, 5, 100, 100, 0), 0);
 });
 
 test("closing the tab in front brings the next one forward", () => {

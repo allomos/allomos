@@ -287,7 +287,7 @@ export interface TabsMessenger {
   /** Escape: the drag is called off, everything goes back. */
   dragCancel(): Promise<boolean>;
   /** A dragged tab is over this window's tab bar, at `x` from its left edge. */
-  onTabHover(handler: (hover: { x: number; root: string | null; name: string | null }) => void): Promise<() => void>;
+  onTabHover(handler: (hover: { x: number; grab: number; root: string | null; name: string | null }) => void): Promise<() => void>;
   /** It left this window's tab bar. */
   onTabHoverEnd(handler: () => void): Promise<() => void>;
   /** It was let go on this window's tab bar: it joins where the gap was shown. */
@@ -315,7 +315,7 @@ export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
   dragEnd: () => invoke<"moved" | "home" | "none">("drag_end"),
   dragCancel: () => invoke<boolean>("drag_cancel"),
   onTabHover: (handler) =>
-    getCurrentWebviewWindow().listen<{ x: number; root: string | null; name: string | null }>("tab:hover", (e) => handler(e.payload)),
+    getCurrentWebviewWindow().listen<{ x: number; grab: number; root: string | null; name: string | null }>("tab:hover", (e) => handler(e.payload)),
   onTabHoverEnd: (handler) => getCurrentWebviewWindow().listen("tab:hover-end", () => handler()),
   onTabDropHere: (handler) =>
     getCurrentWebviewWindow().listen<{ root: string | null }>("tab:drop-here", (e) => handler(e.payload.root)),

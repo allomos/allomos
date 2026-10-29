@@ -19,7 +19,8 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::windows::{self, Windows};
 
-/// The tab is over this window, at `x` (logical pixels from the window's left edge).
+/// The tab is over this window, at `x` (logical pixels from the window's left edge), held `grab`
+/// logical pixels from a tab bar's left edge when its tab is first (Task-A01-bell953).
 const HOVER_EVENT: &str = "tab:hover";
 /// It left this window.
 const HOVER_END_EVENT: &str = "tab:hover-end";
@@ -167,6 +168,8 @@ struct Active {
     /// The window that moves with the pointer: a new one (`created`), or the source itself.
     moving: String,
     created: bool,
+    /// Where the tab was grabbed: logical pixels from a tab bar's left edge when it is first.
+    grab_x: f64,
     /// The pointer's place in the moving window (from its outer corner), in `screen` units.
     offset: (f64, f64),
     /// Where the source window was, when it moves itself (to put it back on Escape).
@@ -191,6 +194,7 @@ impl Drag {
 #[derive(Clone, Serialize)]
 struct Hover {
     x: f64,
+    grab: f64,
     root: Option<PathBuf>,
     name: Option<String>,
 }
@@ -331,6 +335,7 @@ fn follow(app: AppHandle, run: u64) {
                     a.last_x = Some(x);
                     let hover = Hover {
                         x,
+                        grab: a.grab_x,
                         root: a.root.clone(),
                         name: a.name.clone(),
                     };
@@ -407,6 +412,7 @@ pub(crate) async fn drag_tear(
         name,
         moving,
         created,
+        grab_x,
         offset,
         home,
         over: None,
