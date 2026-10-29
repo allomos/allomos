@@ -66,6 +66,10 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   const frontRef = useRef(front);
   frontRef.current = front;
   const nextId = useRef(1);
+  /** A dragged tab over this bar (from another window, or this window's own torn-off tab) is shown
+   * in front (Task-A01-desk708): that tab (one made here for it, `made`, or the torn-off tab), and
+   * the tab in front before, which comes back when it leaves. Set at once, before React renders. */
+  const hoverTab = useRef<{ id: number; made: boolean; prev: number | null } | null>(null);
   const views = useRef(new Map<number, { messenger: Messenger; onNeeds: (needs: boolean) => void }>());
 
   const entry = (start: TabStart): TabEntry => ({ id: nextId.current++, start, root: null, name: null, needs: false });
@@ -120,8 +124,15 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
 
   // The app hears the tabs, in their order, and the one in front: the window is named after it,
   // and the windows and tabs are kept for the next start.
-  const frontAt = Math.max(0, tabs.findIndex((tab) => tab.id === front));
-  const shown = useMemo(() => JSON.stringify(tabs.map((tab) => ({ root: tab.root, name: tab.name }))), [tabs]);
+  // A tab dragged over the bar from another window is not the window's until it is let go.
+  const [hover, setHover] = useState<{ gap: number; left: number; width: number; name: string | null; id: number; made: boolean } | null>(null);
+  const hoverRef = useRef(hover);
+  hoverRef.current = hover;
+  const madeId = hover?.made ? hover.id : null;
+  const kept = useMemo(() => tabs.filter((tab) => tab.id !== madeId), [tabs, madeId]);
+  const keptFront = madeId === null ? front : hoverTab.current?.prev ?? front;
+  const frontAt = Math.max(0, kept.findIndex((tab) => tab.id === keptFront));
+  const shown = useMemo(() => JSON.stringify(kept.map((tab) => ({ root: tab.root, name: tab.name }))), [kept]);
   useEffect(() => {
     if (started) void api.setWindowTabs(JSON.parse(shown), frontAt).catch(() => undefined);
   }, [api, started, shown, frontAt]);
@@ -187,11 +198,6 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   const [away, setAway] = useState<{ id: number } | null>(null);
   const awayRef = useRef(away);
   awayRef.current = away;
-  /** A dragged tab over this bar (from another window, or this window's own torn-off tab): where
-   * it will land among the shown tabs, and its phantom's place and name. */
-  const [hover, setHover] = useState<{ gap: number; left: number; width: number; name: string | null } | null>(null);
-  const hoverRef = useRef(hover);
-  hoverRef.current = hover;
   /** For one frame after a drop the tabs jump to their new places without sliding. */
   const [settle, setSettle] = useState(false);
   useEffect(() => {
@@ -226,25 +232,54 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   // A dragged tab over this window's tab bar, let go on it, or called off.
   useEffect(() => {
     const stops = [
-      api.onTabHover(({ x, name }) => {
+      api.onTabHover(({ x, root, name }) => {
+        let h = hoverTab.current;
+        if (!h) {
+          // It shows in front: this window's own torn-off tab, or a tab made here for it.
+          const own = awayRef.current;
+          if (own) {
+            h = { id: own.id, made: false, prev: frontRef.current };
+          } else {
+            const tab = entry(root ? { how: "moved", root } : { how: "blank" });
+            setTabs((list) => [...list, tab]);
+            h = { id: tab.id, made: true, prev: frontRef.current };
+          }
+          hoverTab.current = h;
+          setFront(h.id);
+        }
         const bar = barRef.current?.getBoundingClientRect();
         const edges = shownEdges();
         const gap = placeAt(edges, -1, x);
         const width = Math.min(200, edges[0]?.width ?? 200);
         const left = (gap < edges.length ? edges[gap].left : (edges[edges.length - 1]?.right ?? 8) + 2) - (bar?.left ?? 0);
-        setHover({ gap, left, width, name });
+        setHover({ gap, left, width, name, id: h.id, made: h.made });
       }),
-      api.onTabHoverEnd(() => setHover(null)),
+      api.onTabHoverEnd(() => {
+        const h = hoverTab.current;
+        hoverTab.current = null;
+        setHover(null);
+        if (!h) return;
+        if (h.made) {
+          views.current.delete(h.id);
+          setTabs((list) => list.filter((tab) => tab.id !== h.id));
+        }
+        setFront(h.prev);
+      }),
       api.onTabDropHere((root) => {
         const gap = hoverRef.current?.gap ?? tabsRef.current.length;
+        const h = hoverTab.current;
+        hoverTab.current = null;
         setHover(null);
-        const tab = entry(root ? { how: "moved", root } : { how: "blank" });
-        setTabs((list) => insertAt(list, tab, gap));
+        // The tab shown while it was over the bar stays, where the gap was, without loading again.
+        const made = h?.made ? tabsRef.current.find((tab) => tab.id === h.id) : undefined;
+        const tab = made ?? entry(root ? { how: "moved", root } : { how: "blank" });
+        setTabs((list) => insertAt(list.filter((x) => x.id !== tab.id), tab, gap));
         setFront(tab.id);
         setSettle(true);
       }),
       api.onDragCancelled(() => {
         drag.current = null;
+        hoverTab.current = null;
         setHover(null);
         bringBack(null);
       }),
@@ -320,6 +355,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
       void api
         .dragEnd()
         .then((how) => {
+          hoverTab.current = null;
           setHover(null);
           if (how === "moved") {
             setAway(null);
@@ -392,7 +428,8 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
         {tabs.map((tab) => {
           const name = tabName(tab, startPage);
           const isFront = tab.id === front;
-          const isAway = away?.id === tab.id;
+          // Hidden in the bar: a torn-off tab, and a tab made for one over the bar (drawn where it lands).
+          const isAway = away?.id === tab.id || madeId === tab.id;
           const dx = isAway ? 0 : slide(shownAt, tab.id);
           if (!isAway) shownAt += 1;
           return (
