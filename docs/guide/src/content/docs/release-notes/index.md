@@ -7,6 +7,7 @@ sidebar:
 
 Each release has a page here that says what is new and what was fixed. The newest is first in the sidebar.
 
+- [0.1.32](/allomos/release-notes/v0-1-32/)
 - [0.1.31](/allomos/release-notes/v0-1-31/)
 - [0.1.30](/allomos/release-notes/v0-1-30/)
 - [0.1.29](/allomos/release-notes/v0-1-29/)
