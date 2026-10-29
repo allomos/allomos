@@ -10,6 +10,7 @@ mod lan;
 mod pairing;
 mod sessions;
 mod update;
+mod window_list;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -1985,7 +1986,10 @@ fn open_window_at(app: &AppHandle, url: &str) -> tauri::Result<()> {
     .min_inner_size(720.0, 480.0)
     .visible(false)
     .build()
-    .map(|window| fit_to_screen(&window))
+    .map(|window| {
+        fit_to_screen(&window);
+        window_list::refresh(app, None);
+    })
 }
 
 /// A window's size for a screen whose usable area is `width` × `height` (logical pixels): about
@@ -2049,6 +2053,7 @@ fn set_window_project(
         _ => "Allomos".to_string(),
     };
     let _ = window.set_title(&title);
+    window_list::refresh(window.app_handle(), None);
 }
 
 /// Another window already shows `root`: bring it forward and say so, so the calling window does
@@ -2277,6 +2282,16 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     } else {
         menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
     }
+    // Task-A07-mitten556: on Windows the app lists the open windows in the Window menu itself.
+    if !cfg!(target_os = "macos") {
+        if let Some(submenu) = menu
+            .get(tauri::menu::WINDOW_SUBMENU_ID)
+            .and_then(|item| item.as_submenu().cloned())
+        {
+            let fixed = submenu.items()?.len();
+            app.manage(window_list::WindowMenu { submenu, fixed });
+        }
+    }
     app.manage(MenuTexts {
         file,
         new_window,
@@ -2477,6 +2492,9 @@ pub fn run() {
                 let _ = open_about_window(app);
                 return;
             }
+            if window_list::choose(app, id) {
+                return;
+            }
             if id == NEW_WINDOW_ID {
                 let _ = open_new_window(app);
             } else if id == CONNECT_ID {
@@ -2505,10 +2523,13 @@ pub fn run() {
                 let _ = open_recent_in_window(app, &folder);
             }
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::Destroyed => {
                 window.state::<Windows>().forget(window.label());
+                window_list::refresh(window.app_handle(), Some(window.label()));
             }
+            tauri::WindowEvent::Focused(_) => window_list::refresh(window.app_handle(), None),
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             startup_folder,
