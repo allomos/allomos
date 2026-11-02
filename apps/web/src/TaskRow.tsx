@@ -13,9 +13,6 @@ import { humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import type { Task } from "./types";
 
-/** States whose word is coloured in the row: the rest are plain. */
-const COLOURED = new Set(["in_progress", "waiting", "blocked"]);
-
 /** Keeps a key on a control inside the row from selecting the task (its click stops itself). */
 const ownKeys = (e: KeyboardEvent) => e.stopPropagation();
 
@@ -47,11 +44,12 @@ export function TaskRow({
   const facts: [string, ReactNode, string?][] = [
     [
       t("pane.state"),
-      <span className={COLOURED.has(task.state) ? `fact-state s-${task.state}-text` : "fact-state"}>{t(`state.${task.state}`)}</span>,
+      <span className={`fact-state s-${task.state}-text`}>{t(`state.${task.state}`)}</span>,
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
-    [t("pane.label"), task.label ? <span className="label">{task.label}</span> : <span className="muted">—</span>],
   ];
+  // Label only when the task has one (Task-A01-cell542); the details pane always shows it.
+  if (task.label) facts.push([t("pane.label"), <span className="label">{task.label}</span>]);
   if (toReview(task)) facts.push([t("row.ai_decided"), t("row.ai_decided_value", { count: decisions }), t("task.ai_decided_title", { count: decisions })]);
   if (toCheck(task)) facts.push([t("pane.check"), t("task.not_human_checked"), t("task.not_human_checked_title", { why: humanCheckNote(task) })]);
   if (task.holder) facts.push([t("row.held_by"), <Holder task={task} onOpenSession={onOpenSession} onError={onError} />]);

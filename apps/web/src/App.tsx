@@ -1558,14 +1558,18 @@ function TaskbagView({
               </div>
               <label className="state-filter small">
                 {t("filter.label")}{" "}
-                <select value={stateFilter} onChange={(e) => chooseFilter(e.target.value as StateFilter)}>
+                <select
+                  value={stateFilter}
+                  className={(FILTER_STATES as readonly string[]).includes(stateFilter) ? `s-${stateFilter}-text` : undefined}
+                  onChange={(e) => chooseFilter(e.target.value as StateFilter)}
+                >
                   <option value="all">{t("filter.all")}</option>
                   {/* Task-A01-party987: every task not done yet, neither done nor dropped. */}
                   <option value="open">{t("filter.open")}</option>
                   {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
                   <option value="human">{t("filter.human")}</option>
                   {FILTER_STATES.map((s) => (
-                    <option key={s} value={s}>
+                    <option key={s} value={s} className={`s-${s}-text`}>
                       {t(`state.${s}`)}
                     </option>
                   ))}
