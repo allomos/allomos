@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>先聊清楚再开工：做一个自己的股票行情网站 · 换肩 Allomos 博客</title>
+<meta name="description" content="第四次实验：用「换肩」新加的“先讨论”选项，先和 Claude 把需求聊清楚、把服务账号准备好，再放它自动构建。从开始构建到 ticker.allomos.com 上线，大约 35 分钟，3 个版本、13 个任务。">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/blog/ticker-discuss-first/">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/blog/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/blog/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="先聊清楚再开工：做一个自己的股票行情网站 · 换肩 Allomos 博客">
+<meta property="og:description" content="第四次实验：用「换肩」新加的“先讨论”选项，先和 Claude 把需求聊清楚、把服务账号准备好，再放它自动构建。从开始构建到 ticker.allomos.com 上线，大约 35 分钟，3 个版本、13 个任务。">
+<meta property="og:url" content="https://www.allomos.com/zh/blog/ticker-discuss-first/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap narrow">
+  <header>
+    <a class="brand" href="/zh/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a class="sec" href="/zh/products/">产品</a>
+      <a class="sec" href="/zh/blog/" aria-current="true">博客</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/blog/" lang="en">EN</a><a href="/zh/blog/ticker-discuss-first/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/blog/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <article class="post">
+    <p class="kicker k1"><a href="/zh/blog/">博客</a> · Allomos 换肩 · 实验记录</p>
+    <h1>先聊清楚再开工：做一个自己的股票行情网站</h1>
+    <p class="meta"><time datetime="2026-10-31">2026-10-31</time> · <a href="https://x.com/wang3an">@wang3an</a> · <a href="https://x.com/wang3an/status/2116456051231035718">X 上的原帖 ↗</a></p>
+    <p class="lead">第四次实验，还是让「换肩」（Allomos）指挥 Claude 自己做一个应用，这次是一个类似 Google Finance 的股票行情网站。和<a href="/zh/blog/tosstoss-in-23-minutes/">投桃</a>、<a href="/zh/blog/tatakikun-in-29-minutes/">Tatakikun</a> 不同的是，这次用上了刚加进“构建新应用…”的“先讨论”选项：AI 先不动手，在对话里把需求聊清楚，再开始构建。</p>
+    <figure><img src="/zh/blog/ticker-discuss-first/img/15.jpg" width="843" height="842" loading="lazy" alt="Ticker 的股票详情页：Alphabet（GOOG）现价 278.22，当日跌 1.45%，MAX 范围的价格走势图，下面是开盘价、前收盘价、当日区间、52 周区间和成交量。"><figcaption>做出来的 Ticker：股票详情页有现价、当日涨跌、可切换时间范围的走势图和主要数据。</figcaption></figure>
+    <p class="note">根据 @wang3an 2026 年 10 月 31 日的串贴整理 · 时间均为日本时间</p>
+    <ul class="stats"><li><strong>5 个问题</strong>开工前 AI 列出的未定事项：谁用、存在哪里、行情数据、部署、市场</li><li><strong>3 个版本、13 个任务</strong>聊定之后 Claude 拆出的计划</li><li><strong>约 35 分钟</strong>从开始构建（19:00 左右）到网站上线（19:35）</li><li><strong>免费套餐</strong>Cloudflare Workers 和 D1、Twelve Data 行情、Resend 邮件</li></ul>
+<h2>一个几年没人改的返回键</h2>
+<p class="when"><strong>18:03　串贴第 1 条</strong></p>
+<blockquote>我要继续做实验，用 allomos 指挥 claude 自动构建 app。<br>这次我要做一个类似于 Google finance 的股票价格跟踪网站。<br>其实我对它就一个用户体验非常不满意：查看自定义列表中的股票之后，按返回键会回到首页，而不是上一级（列表中）。<br>我不知道是哪个笨蛋写了这样的代码，一定是个 bug。<br>但是几年了一直没人改它。<br>现在有了 AI，我可以自己弄一个。<br>这次我给 allomos 创建 app 的功能中增加了一个“讨论”选项。<br>在 allomos 的界面中输入产品要求之后，ai 这边可以先不执行，我在对话中和它讨论完成之后再开始。<br>这个功能刚刚加进去，不知道有没有 bug。</blockquote>
+<p>“先讨论”是 10 月 29 日随「换肩」0.1.31 发布的：在“构建新应用…”里勾上它，智能体收到请求后只把描述写成目标任务，然后停下来等人；在同一个对话里把目标聊清楚，再用随便什么话告诉它开工。</p>
+<h2>先讨论</h2>
+<p class="when"><strong>18:06　串贴第 2 条</strong></p>
+<blockquote>开始。选择“先讨论”</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/01.jpg" width="642" height="562" loading="lazy" alt="「换肩」的“构建新应用”窗口：选择空文件夹，需求写着“我要做一个类似股票价格查看的网站程序，可以通过关键字和代号搜索股票，可以把股票加入到列表中，也可以移出列表。可以查看股票的详情。我想用免费的 api，所以股价不及时刷新也能接受。”智能体选 Claude（应用）。"><figcaption>需求只有四行：按关键字和代号搜股票、加入和移出列表、看详情，用免费的行情接口，股价不及时也能接受。智能体选的是 Claude 应用。</figcaption></figure>
+<figure><img src="/zh/blog/ticker-discuss-first/img/02.jpg" width="642" height="585" loading="lazy" alt="同一窗口的下半部分：选了安静模式，“先讨论”已勾选，下面是三步说明，然后是“开始”按钮。"><figcaption>运行方式选“安静模式”，勾上“先讨论”。说明分三步：发出请求后智能体把描述写成目标任务并等你；在对话里一起完善；觉得可以了，用随便什么话告诉它开工。</figcaption></figure>
+<p class="when"><strong>18:12　串贴第 3 条</strong></p>
+<blockquote>按照设计预期，ai 向我提出问题。我要和它讨论一下，决定一些没有提到的事情。比如网站运行在哪里。我这个这次准备使用 cloudflare 的免费全家桶。supabase 是很强大，但是免费版只能运行两个 project，对我这种个人玩家太麻烦了。cloudflare D1 看起来就慷慨多了。感谢 cloudflare 神。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/03.jpg" width="848" height="447" loading="lazy" alt="Claude 列出五个未定事项：谁用、列表存在哪里、行情数据、部署、市场范围；最后说“觉得可以了，用随便什么话告诉我开工，我就规划并构建这个应用”。"><figcaption>Claude 没有开工，而是列出五个还没定的事：谁用（只有自己，还是每人一份列表）、列表存在浏览器还是服务器、行情数据要不要 API key、部署在哪里、只要美股还是也要别的市场。</figcaption></figure>
+<p class="when"><strong>18:21　串贴第 4 条</strong></p>
+<blockquote>我说我有 cloudflare 帐户了。它果然自动选择了使用 Cloudflare D1 服务。很好，Go ahead！</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/04.jpg" width="848" height="565" loading="lazy" alt="作者问“will you use cloudflare db service?”，Claude 回答会用 Cloudflare D1 存用户、登录会话和列表，并把这一点写进了目标任务 A01-teapot655 的说明，下面是“Go ahead”按钮。"><figcaption>问它用不用 Cloudflare 的数据库，它答会用 D1 存账号、登录会话和每个人的列表，并把这一条写进目标任务（A01-teapot655）的说明里。讨论中定下的事，都落在任务里，而不只留在对话中。</figcaption></figure>
+<h2>临时叫停，把账号先备好</h2>
+<p class="when"><strong>18:28　串贴第 5 条</strong></p>
+<blockquote>临时叫停。因为我回顾讨论，发现它可能会中途向我提问。我想事先解决这些问题。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/05.jpg" width="848" height="392" loading="lazy" alt="作者发“wait”，Claude 说已暂停，除了一条“正在规划”的进度说明，还没写批准、任务或代码。作者引用邮件服务、Google 登录、部署三项，问能不能先讨论，由他先提供信息，让它做完全部工作不用再问。"><figcaption>按下开工后，作者回头一看：发登录邮件要邮件服务、部署要发布到 Cloudflare，这些都得用他的账号，构建到一半准会停下来问。于是喊停，问能不能先把这些信息给它，让它一口气做完。Claude 确认停下时还没写任务、没写代码。</figcaption></figure>
+<p class="when"><strong>19:03　串贴第 6 条</strong></p>
+<blockquote>配置好了获取股票价格（<a href="https://twelvedata.com">twelvedata.com</a>）和发送邮件（<a href="https://resend.com">resend.com</a>）的服务。大公司的羊毛，少少薅一点。继续构建。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/06.jpg" width="740" height="284" loading="lazy" alt="作者告诉 Claude 已添加 TWELVE_DATA_API_KEY；Claude 用几次 API 调用测试，价格、走势、搜索、加密货币和汇率都有响应，标普 500 这类指数要付费，免费版每分钟 8 次。"><figcaption>行情用 Twelve Data。key 放好后 Claude 先试了几次调用：价格、走势、搜索、加密货币、汇率都通；标普 500 这样的指数要付费套餐，免费版每分钟限 8 次。</figcaption></figure>
+<figure><img src="/zh/blog/ticker-discuss-first/img/07.jpg" width="740" height="161" loading="lazy" alt="Claude：把 key 粘贴到 RESEND_API_KEY= 后面并保存，然后发出批准和“go ahead”；作者回复“saved”。"><figcaption>邮件用 Resend。key 由作者自己粘贴进本地的密钥文件，不经过对话。</figcaption></figure>
+<figure><img src="/zh/blog/ticker-discuss-first/img/08.jpg" width="740" height="172" loading="lazy" alt="Claude：计划已就绪，3 个版本、13 个任务，从应用骨架开始构建。"><figcaption>再说开工：计划是 3 个版本、13 个任务，从应用骨架开始。</figcaption></figure>
+<h2>自动驾驶</h2>
+<p class="when"><strong>19:05　串贴第 7 条</strong></p>
+<blockquote>应该已经在自动驾驶了。按照设计，allomos 里面应该有界面反映的。现在停在超时状态（因为讨论时间长）。这是个 bug。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/09.jpg" width="1278" height="828" loading="lazy" alt="「换肩」的任务列表，迭代 I-build 下有五个任务；“构建应用”对话框显示“已暂停：行情数据来源需要人来选”，红字提示智能体 10 分钟没有报告，可能已经停了。"><figcaption>「换肩」这边，“构建应用”的进度框还停在讨论时的状态：“已暂停：行情数据来源需要人来选”，并提示智能体已经 10 分钟没有报告。其实它早就开工了，第一个任务正在做。讨论拖得长，这个“超时”就误报了，是要改的地方。</figcaption></figure>
+<p class="when"><strong>19:07　串贴第 8 条</strong></p>
+<blockquote>咦，居然接到 ai 的通知了。看来只是因为 ai 这边刚刚没有发消息过来而已。那就等着它完成吧。好期待。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/10.jpg" width="1278" height="828" loading="lazy" alt="两分钟后，进度框显示“v0.1：行情数据服务器（Twelve Data）（13 个中的第 1 个）”和进度条；应用骨架任务已完成，标着“本地验证”。"><figcaption>两分钟后，智能体报告了进度，框里换成“v0.1：行情数据服务器（第 1 / 13 个）”。应用骨架那个任务已经做完、合并，交接说明写着用了什么、下一步做哪个。</figcaption></figure>
+<p class="when"><strong>19:43　串贴第 9 条</strong></p>
+<blockquote>7 分钟前完成。待会儿看看效果。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/12.jpg" width="1270" height="754" loading="lazy" alt="19:35，进度框显示 AI 智能体已完成：Ticker 已上线 ticker.allomos.com，有搜索、带走势图的详情、邮件登录和个人列表，13 个任务都做完了。"><figcaption>19:35，“构建应用”显示完成：Ticker 已经上线 ticker.allomos.com，搜索、详情和走势图、邮件登录、个人列表都有，13 个任务全部做完，请人试用并审阅 AI 自己做的决定。</figcaption></figure>
+<figure><img src="/zh/blog/ticker-discuss-first/img/11.jpg" width="756" height="596" loading="lazy" alt="Claude 的收尾报告：在作者账号里创建了什么（Cloudflare 的 D1 数据库、Worker、密钥和每日清理任务；Resend 只发了一封测试邮件到它的测试地址；两个临时测试账号已删除），构建中发现并修好的问题，以及留给作者的两件事。"><figcaption>收尾报告写清了在作者账号里建了什么、删了什么，构建中发现并修好的三个问题，以及留给人的两件事：用自己的邮箱登录一次，在「换肩」里检查 13 个任务、审阅 AI 的决定。</figcaption></figure>
+<h2>上线了</h2>
+<p class="when"><strong>22:12　串贴第 10、11 条</strong></p>
+<blockquote><a href="https://ticker.allomos.com/">ticker.allomos.com</a><br>首页过于简陋。待会儿添加一个任务，美化一下。<br>还要添加中文版。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/13.jpg" width="1528" height="960" loading="lazy" alt="Ticker 未登录时的首页：顶部搜索框和登录按钮，中间一句“Keep an eye on the markets”、一段说明和“登录以创建你的列表”按钮。"><figcaption>未登录时的首页：一个搜索框、一句标题、一个登录按钮。能用，但确实简陋。</figcaption></figure>
+<p class="when"><strong>22:29　串贴第 12 条</strong></p>
+<blockquote>在日本和中国上市的股票信息，Twelve API 免费版不提供。残念です。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/14.jpg" width="729" height="541" loading="lazy" alt="登录后的列表页：US、Japan、China 三个列表，US 里有 GOOG、SPCX、MSFT、NVDA、TSLA、AMZN 的价格、当日涨跌和时间，Japan 和 China 都是 0 个。"><figcaption>建了 US、Japan、China 三个列表，只有美股那个装得进东西。日本和中国上市的股票，免费套餐不提供。</figcaption></figure>
+<p class="when"><strong>22:43　串贴第 13 条</strong></p>
+<blockquote>看得到的部分，像模像样的，还行。</blockquote>
+<p>就是本文开头那张详情页。</p>
+<h2>Fork 出子会话，loop 去做</h2>
+<p class="when"><strong>22:44　串贴第 14 条</strong></p>
+<blockquote>最近发现了 Claude Code 的会话 fork 的一个用法，非常方便。先生成一个基础的会话：</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/16.jpg" width="775" height="535" loading="lazy" alt="基础会话：作者说“添加任务，在我批准之前不要执行。”Claude 回答消息里没说任务是什么，所以还没添加；Ticker 任务包里 14 个任务都已完成，新任务会用英文写、放进对应领域并留在待办，不经批准不会设为就绪。"><figcaption>基础会话只交代一件事：“添加任务，在我批准之前不要执行。”Claude 读了 Ticker 的任务包，说明新任务会留在待办（backlog），不经批准不设为就绪，然后问任务是什么。</figcaption></figure>
+<p class="when"><strong>22:47　串贴第 15 条</strong></p>
+<blockquote>然后在这基础会话的基础上 fork 出一个个的子会话。这样既可以避免在一个会话里面说太多，导致内容混乱，上下文变长，又能进行简单的分类管理。非常方便。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/17.jpg" width="775" height="876" loading="lazy" alt="一个 fork 出来的子会话：作者说“支持中日英3种语言”，Claude 添加了任务 A01-pearl420，留在待办、不放进任何迭代，并写明完成标准。"><figcaption>每个子会话只说一个任务。比如“支持中日英3种语言”：Claude 加了任务 A01-pearl420，留在待办，写明做到什么算完成。</figcaption></figure>
+<figure><img src="/zh/blog/ticker-discuss-first/img/18.jpg" width="408" height="239" loading="lazy" alt="Claude 应用侧栏：“添加任务”下有五个子会话：支持中日英3种语言；在查看股票详情的页面，增加导航路径；设计产品logo，美化登录之前的页面；支持手机上的添加为桌面APP功能；添加到github的allomos组织里面。"><figcaption>侧栏里，“添加任务”下面挂着五个子会话：三种语言、详情页加导航路径、logo 和登录前的页面、手机上添加到桌面、放进 GitHub 的 allomos 组织。那个让人不满了几年的返回键，就在第二条里。</figcaption></figure>
+<p class="when"><strong>22:54　串贴第 16 条</strong></p>
+<blockquote>然后利用 loop 去执行这些任务。因为我用了 allomos，这 loop 将只会执行我审核通过，标记为“就绪”的任务。这样，我这边审批任务，Loop 在那边就一个个地捡起来做掉。自动驾驶的感觉，走十里山路都不会累，非常舒适。</blockquote>
+<figure><img src="/zh/blog/ticker-discuss-first/img/19.jpg" width="789" height="194" loading="lazy" alt="Claude 应用里输入“/loop 60m process the ready tasks one by one in the active iteration”。"><figcaption>另开一个会话，用 <code>/loop 60m</code> 让它每小时处理一次当前迭代里就绪的任务。</figcaption></figure>
+<figure><img src="/zh/blog/ticker-discuss-first/img/20.jpg" width="789" height="321" loading="lazy" alt="loop 会话的待办：选择时间表和运行模式、安排循环已完成；挑下一个就绪任务、在独立工作树里做、合并收尾交接三步待做。"><figcaption>loop 的每一轮：挑下一个就绪任务，在它自己的工作树里做，合并、收尾、写交接。</figcaption></figure>
+<h2>这次学到的</h2>
+<ul><li><strong>先讨论，问题提前问。</strong>前两次实验，需求里没写的事要么由 AI 自己定，要么留到做完再问。这次 AI 在动手前就列出了五个问题，答案直接写进目标任务；作者又顺着这些问题想到了账号和密钥，在开工前就交给它，不让构建停在半路等人。</li><li><strong>分工更清楚了。</strong>人在一边加任务、批准，loop 在另一边只做批准过的、标成“就绪”的任务。子会话各管一件事，基础会话里那句“批准之前不要执行”，每个子会话都继承了。</li><li><strong>也发现了「换肩」自己的问题。</strong>讨论时间一长，“构建应用”的进度框会误报智能体超时。这是“先讨论”刚上线就碰到的，要修。</li></ul>
+<p>Ticker 的介绍和源代码在<a href="/zh/products/ticker/">产品页</a>；网站本身在 <a href="https://ticker.allomos.com/">ticker.allomos.com</a>，谁都可以用邮箱登录试试。</p>
+    <hr>
+    <p class="note">另外三篇：</p><ul><li><a href="/zh/blog/tatakichian-without-allomos/">同一个输入法，不用「换肩」再做一遍</a></li><li><a href="/zh/blog/tatakikun-in-29-minutes/">二十九分钟，做出一个英中日输入法</a></li><li><a href="/zh/blog/tosstoss-in-23-minutes/">二十三分钟，做出一个投桃</a></li></ul>
+  </article>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
