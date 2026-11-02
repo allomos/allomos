@@ -18,11 +18,10 @@ import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { TaskbagSettings } from "./TaskbagSettings";
 import { LanDialog } from "./LanDialog";
-import { localTime } from "./timeFlow";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
 import { groupCount } from "./groupCountFlow";
 import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from "./searchFlow";
-import { DescriptionHit, Highlight, ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
+import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
   FILTER_STATES,
@@ -33,8 +32,6 @@ import {
   readFilter,
   stopText,
   taskListBanners,
-  toCheck,
-  toReview,
   type Hidden,
   type StateFilter,
 } from "./stopFlow";
@@ -49,7 +46,8 @@ import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
 import { keepListed, noteOpened, parseRecentInfo, type RecentInfoMap } from "./recentFlow";
-import { AiDecidedBadge, HumanCheckBadge, TaskPane } from "./TaskPane";
+import { TaskPane } from "./TaskPane";
+import { TaskRow } from "./TaskRow";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import { baseChoice, type Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
@@ -1859,60 +1857,19 @@ function TaskGroup({
         !hidden?.count && <p className="muted small">{empty}</p>
       ) : (
         <ul className="tasks">
-          {tasks.map((task) => {
-            const iteration = iterationName?.(task.iteration);
-            return (
-              <li
-                key={task.id}
-                id={`task-${task.id}`}
-                className={task.id === selectedId ? "task selected" : "task"}
-                tabIndex={0}
-                aria-current={task.id === selectedId ? "true" : undefined}
-                onClick={() => onSelect(task.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelect(task.id);
-                  }
-                }}
-              >
-                <span className="id">
-                  <Highlight text={task.id} terms={terms} />
-                </span>
-                <span className="title">
-                  <Highlight text={task.title} terms={terms} />
-                </span>
-                <span className="state-cell">
-                  {toCheck(task) && <HumanCheckBadge task={task} />}
-                  {toReview(task) && <AiDecidedBadge task={task} />}
-                  <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
-                </span>
-                <span className="meta">
-                  {chips &&
-                    ((task.folders ?? []).length > 0 ? (
-                      (task.folders ?? []).map((f) => (
-                        <span key={f} className="folder-chip">
-                          {f}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="muted">{t("task.no_folder")}</span>
-                    ))}
-                  {task.label && <span className="label">{task.label}</span>}
-                  {iteration && <span>{t("task.iteration", { iteration })}</span>}
-                  {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
-                  {stop?.(task) && <span className={`stop s-${task.state}-text`}>{stop(task)}</span>}
-                  {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
-                  <DescriptionHit text={task.description ?? ""} terms={terms} />
-                </span>
-                {modified?.[task.id] && (
-                  <time className="modified" dateTime={modified[task.id]} title={t("task.modified", { time: localTime(modified[task.id]) })}>
-                    {localTime(modified[task.id])}
-                  </time>
-                )}
-              </li>
-            );
-          })}
+          {tasks.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              selected={task.id === selectedId}
+              onSelect={onSelect}
+              terms={terms}
+              stop={stop?.(task) ?? null}
+              modified={modified?.[task.id]}
+              iteration={iterationName?.(task.iteration)}
+              showFolders={chips}
+            />
+          ))}
         </ul>
       )}
       {!collapsed && hidden && hidden.count > 0 && (
