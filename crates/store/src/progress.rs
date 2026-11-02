@@ -164,6 +164,22 @@ pub fn report(project: &Path, from: Option<&str>, report: &Report) -> Result<Pro
     Ok(p)
 }
 
+/// `from` changed a task with `alm` (Task-A03-elixir705, approved by the approver 2026-11-02): it
+/// is still at work, so its open job counts as just reported; the step and counts stay as they
+/// were. Nothing happens without an open job, or to a finished one. Returns whether a job was
+/// refreshed; a file that cannot be written is left as it was.
+pub fn touch(project: &Path, from: Option<&str>) -> bool {
+    let path = progress_dir(project).join(format!("{}.json", key(from)));
+    let Some(mut p) = read(&path).filter(|p| p.finished.is_none()) else {
+        return false;
+    };
+    p.updated = now();
+    match serde_json::to_string_pretty(&p) {
+        Ok(text) => write_file_whole(&path, &text).is_ok(),
+        Err(_) => false,
+    }
+}
+
 /// Every agent's progress in `project`, the earliest started first. Reports not updated for a
 /// day are removed.
 pub fn reports(project: &Path) -> Vec<Progress> {
@@ -425,6 +441,52 @@ mod tests {
         .unwrap();
         assert!(reports(&dir).is_empty());
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn changing_a_task_refreshes_only_the_same_agents_open_job() {
+        let dir = tmp("touch");
+        let me = Some("claude/x");
+        // No open job: nothing to refresh, nothing written.
+        assert!(!touch(&dir, me));
+        assert!(reports(&dir).is_empty());
+        report(
+            &dir,
+            me,
+            &Report {
+                title: Some("Build the app"),
+                step: Some("Planning"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let path = progress_dir(&dir).join("claude-x.json");
+        let mut old = read(&path).unwrap();
+        old.updated = 5;
+        fs::write(&path, serde_json::to_string(&old).unwrap()).unwrap();
+        // Another agent's change does not count.
+        assert!(!touch(&dir, Some("codex/y")));
+        assert_eq!(read(&path).unwrap().updated, 5);
+        // The same agent's does; the step stays.
+        assert!(touch(&dir, me));
+        let p = read(&path).unwrap();
+        assert!(p.updated > 5);
+        assert_eq!(p.step.as_deref(), Some("Planning"));
+        // A finished job is left alone.
+        report(
+            &dir,
+            me,
+            &Report {
+                finished: Some("Built"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut done = read(&path).unwrap();
+        done.updated = 5;
+        fs::write(&path, serde_json::to_string(&done).unwrap()).unwrap();
+        assert!(!touch(&dir, me));
+        assert_eq!(read(&path).unwrap().updated, 5);
     }
 
     #[test]

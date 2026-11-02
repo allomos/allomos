@@ -1095,6 +1095,11 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                     | Command::Done { .. }
                     | Command::Handoff { .. }
             );
+            // An agent that changes the taskbag is still at work: its open progress report counts
+            // as fresh, so the app does not say it went quiet (Task-A03-elixir705, approved).
+            if cli.command.changes() {
+                allomos_store::progress::touch(&confirm_project(&cli, cwd), cli.holder.as_deref());
+            }
             if let Some(lines) = missing_facts(&cli, cwd, &mut done) {
                 done.text.push_str(&lines);
             }
