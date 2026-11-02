@@ -102,28 +102,39 @@ export function withDecisions(opened: Opened): Opened {
  * reached that label (its own label is that one or a higher one), No when it has not (no label, or
  * one off the ladder). Everything ticked is no filter at all. Kept as what is unticked, so a state
  * or label new to the list starts ticked; `ladder` is the project's, filled in when the list draws.
+ * Labeled (Task-A01-teacup726) comes first: its Yes keeps tasks that carry a label, its No those
+ * that carry none; a task with no label is decided by Labeled's No alone, and the ladder's sides
+ * apply only to labelled tasks.
  */
-export type StateFilter = { states: State[]; yes: string[]; no: string[]; ladder: string[] };
+export type StateFilter = { states: State[]; labeled: Side[]; yes: string[]; no: string[]; ladder: string[] };
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
 /** Everything ticked: every task listed. */
 export function allTicked(ladder: readonly string[] = []): StateFilter {
-  return { states: [], yes: [], no: [], ladder: [...ladder] };
+  return { states: [], labeled: [], yes: [], no: [], ladder: [...ladder] };
 }
 
 /** One side of a label's tick. */
 export type Side = "yes" | "no";
 
+const SIDES: Side[] = ["yes", "no"];
+
 /** The filter for this ladder: unticked labels no longer on it are let go. */
 export function onLadder(filter: StateFilter, ladder: readonly string[]): StateFilter {
   const keep = (labels: string[]) => labels.filter((l) => ladder.includes(l));
-  return { states: filter.states.filter((s) => FILTER_STATES.includes(s)), yes: keep(filter.yes), no: keep(filter.no), ladder: [...ladder] };
+  return {
+    states: filter.states.filter((s) => FILTER_STATES.includes(s)),
+    labeled: SIDES.filter((s) => filter.labeled.includes(s)),
+    yes: keep(filter.yes),
+    no: keep(filter.no),
+    ladder: [...ladder],
+  };
 }
 
 /** Whether nothing is unticked. */
 export function isAll(filter: StateFilter): boolean {
-  return filter.states.length === 0 && filter.yes.length === 0 && filter.no.length === 0;
+  return filter.states.length === 0 && filter.labeled.length === 0 && filter.yes.length === 0 && filter.no.length === 0;
 }
 
 /** Whether a task has reached `label`: its own label is that one or a higher one on the ladder. */
@@ -135,6 +146,8 @@ export function reached(task: Task, label: string, ladder: readonly string[]): b
 /** The tasks the filter keeps. */
 export function keepState(filter: StateFilter, task: Task): boolean {
   if (filter.states.includes(task.state)) return false;
+  if (!task.label) return !filter.labeled.includes("no");
+  if (filter.labeled.includes("yes")) return false;
   return filter.ladder.every((label) => !(reached(task, label, filter.ladder) ? filter.yes : filter.no).includes(label));
 }
 
@@ -142,6 +155,17 @@ export function keepState(filter: StateFilter, task: Task): boolean {
 export function tickState(filter: StateFilter, state: State, on: boolean): StateFilter {
   const states = filter.states.filter((s) => s !== state);
   return { ...filter, states: on ? states : FILTER_STATES.filter((s) => s === state || states.includes(s)) };
+}
+
+/** One side of Labeled ticked or unticked; the ladder's ticks stay as they were. */
+export function tickLabeled(filter: StateFilter, side: Side, on: boolean): StateFilter {
+  const list = filter.labeled.filter((s) => s !== side);
+  return { ...filter, labeled: on ? list : SIDES.filter((s) => s === side || list.includes(s)) };
+}
+
+/** Whether the ladder's rows are greyed out: Labeled's Yes is unticked, so no labelled task is shown. */
+export function ladderOff(filter: StateFilter): boolean {
+  return filter.labeled.includes("yes");
 }
 
 /** One side of a label ticked or unticked. */
@@ -153,20 +177,22 @@ export function tickLabel(filter: StateFilter, label: string, side: Side, on: bo
 /** A whole group ticked (Select all) or unticked (Clear all). */
 export function tickGroup(filter: StateFilter, group: "states" | "labels", on: boolean): StateFilter {
   if (group === "states") return { ...filter, states: on ? [] : [...FILTER_STATES] };
-  return { ...filter, yes: on ? [] : [...filter.ladder], no: on ? [] : [...filter.ladder] };
+  return { ...filter, labeled: on ? [] : [...SIDES], yes: on ? [] : [...filter.ladder], no: on ? [] : [...filter.ladder] };
 }
 
 /** Whether a group is all ticked, or all unticked: the grey Select all, the grey Clear all. */
 export function groupTicks(filter: StateFilter, group: "states" | "labels"): { all: boolean; none: boolean } {
   if (group === "states") return { all: filter.states.length === 0, none: filter.states.length === FILTER_STATES.length };
-  const off = filter.yes.length + filter.no.length;
-  return { all: off === 0, none: off === filter.ladder.length * 2 };
+  const off = filter.labeled.length + filter.yes.length + filter.no.length;
+  return { all: off === 0, none: off === (filter.ladder.length + 1) * 2 };
 }
 
-/** Why the filter lists no task at all, whatever the tasks: no state ticked, or a label with
- * neither side ticked; `null` when it can list some. */
-export function emptyBy(filter: StateFilter): { kind: "states" } | { kind: "label"; label: string } | null {
+/** Why the filter lists no task at all, whatever the tasks: no state ticked, Labeled with neither
+ * side ticked, or, with Labeled's No unticked, a label with neither side; `null` when it can list some. */
+export function emptyBy(filter: StateFilter): { kind: "states" } | { kind: "labeled" } | { kind: "label"; label: string } | null {
   if (filter.states.length === FILTER_STATES.length) return { kind: "states" };
+  if (filter.labeled.length === SIDES.length) return { kind: "labeled" };
+  if (!filter.labeled.includes("no")) return null;
   const label = filter.ladder.find((l) => filter.yes.includes(l) && filter.no.includes(l));
   return label === undefined ? null : { kind: "label", label };
 }
@@ -188,7 +214,7 @@ export function labelText(label: string, t: T): string {
 
 /** The filter as stored: what is unticked. */
 export function storeFilter(filter: StateFilter): string {
-  return JSON.stringify({ states: filter.states, yes: filter.yes, no: filter.no });
+  return JSON.stringify({ states: filter.states, labeled: filter.labeled, yes: filter.yes, no: filter.no });
 }
 
 /**
@@ -202,7 +228,8 @@ export function readFilter(value: string | null, old: string | null = null): Sta
     try {
       const v = JSON.parse(value) as Record<string, unknown>;
       const states = words(v.states).filter((s): s is State => (FILTER_STATES as string[]).includes(s));
-      return { states, yes: words(v.yes), no: words(v.no), ladder: [] };
+      const labeled = SIDES.filter((s) => words(v.labeled).includes(s));
+      return { states, labeled, yes: words(v.yes), no: words(v.no), ladder: [] };
     } catch {
       return allTicked();
     }
@@ -229,12 +256,14 @@ export function hiddenText(hidden: Hidden, t: T): string {
   return t("filter.hidden", { count: hidden.count, states });
 }
 
-/** The unticked boxes by name, in the panel's order: states, then each label's Yes and No. */
+/** The unticked boxes by name, in the panel's order: states, Labeled's Yes and No, then each
+ * label's Yes and No, unless the ladder is greyed out (its ticks then hide nothing). */
 export function untickedNames(filter: StateFilter, t: T): string[] {
   const side = (label: string, s: Side) => t(`filter.side_${s}`, { label: labelText(label, t) });
   return [
     ...FILTER_STATES.filter((s) => filter.states.includes(s)).map((s) => t(`state.${s}` as Key)),
-    ...filter.ladder.flatMap((l) => [
+    ...SIDES.filter((s) => filter.labeled.includes(s)).map((s) => t(`filter.side_${s}`, { label: t("filter.labeled") })),
+    ...(ladderOff(filter) ? [] : filter.ladder).flatMap((l) => [
       ...(filter.yes.includes(l) ? [side(l, "yes")] : []),
       ...(filter.no.includes(l) ? [side(l, "no")] : []),
     ]),

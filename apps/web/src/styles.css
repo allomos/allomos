@@ -776,6 +776,11 @@ label.filter-row { cursor: pointer; }
 label.filter-row:hover, .filter-side:hover { background: var(--bg); }
 .filter-label-name { flex: 1; margin-right: 8px; }
 .filter-side { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); padding: 1px 6px; border-radius: 6px; cursor: pointer; }
+/* Task-A01-teacup726: the ladder's labels under Labeled, greyed out while its Yes is unticked. */
+.filter-child { padding-left: 22px; }
+.filter-child.off { opacity: 0.45; }
+.filter-child.off .filter-side { cursor: default; }
+.filter-child.off .filter-side:hover { background: none; }
 .filter-empty { color: var(--warn); margin: 6px 8px 2px; }
 /* A phone (Task-A04-02-03): one column, the ID before the title on the first line. */
 @media (max-width: 720px) {
