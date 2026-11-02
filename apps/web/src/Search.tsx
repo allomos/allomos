@@ -65,14 +65,15 @@ export function Highlight({ text, terms }: { text: string; terms: string[] }) {
   return terms.length === 0 ? <>{text}</> : <Marked parts={pieces(text, terms)} />;
 }
 
-/** The line under a task found by its description: the words around the first match. */
-export function DescriptionHit({ text, terms }: { text: string; terms: string[] }) {
+/** The line under a task found by its description (or, with `where`, its handoff note,
+ * Task-A01-cactus586): the words around the first match. */
+export function DescriptionHit({ text, terms, where = "search.in_description" }: { text: string; terms: string[]; where?: "search.in_description" | "search.in_handoff" }) {
   const { t } = useI18n();
   const parts = terms.length > 0 ? snippet(text, terms) : null;
   if (!parts) return null;
   return (
     <span className="search-snippet">
-      <span className="search-where">{t("search.in_description")}</span> <Marked parts={parts} />
+      <span className="search-where">{t(where)}</span> <Marked parts={parts} />
     </span>
   );
 }

@@ -108,9 +108,10 @@ function allIn(texts: string[], terms: string[]): boolean {
   return terms.every((term) => texts.some((text) => holds(text, term)));
 }
 
-/** A task matches when each word is in its ID, title or description (Task-A01-36). */
-export function taskMatches(task: Pick<Task, "id" | "title" | "description">, terms: string[]): boolean {
-  return terms.length === 0 || allIn([task.id, task.title, task.description ?? ""], terms);
+/** A task matches when each word is in its ID, title, description (Task-A01-36) or handoff note
+ * (Task-A01-cactus586: the note left the row, so a snippet shows where it matched). */
+export function taskMatches(task: Pick<Task, "id" | "title" | "description" | "handoff_note">, terms: string[]): boolean {
+  return terms.length === 0 || allIn([task.id, task.title, task.description ?? "", task.handoff_note ?? ""], terms);
 }
 
 /**

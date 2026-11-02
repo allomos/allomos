@@ -47,6 +47,8 @@ test("a task is found by its ID, title or description, in any case", () => {
   // Every word must be found, each in any of the three.
   assert.ok(taskMatches(t, searchTerms("a01 type")));
   assert.ok(!taskMatches(t, searchTerms("search burndown")));
+  // Task-A01-cactus586: the handoff note counts too.
+  assert.ok(taskMatches({ ...t, handoff_note: "Stopped at the burndown chart." }, searchTerms("search burndown")));
 });
 
 test("Chinese and Japanese text is found, also across full-width and half-width forms", () => {

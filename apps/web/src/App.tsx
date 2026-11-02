@@ -30,7 +30,8 @@ import {
   hiddenByFilter,
   hiddenText,
   readFilter,
-  stopText,
+  stopFact,
+  type StopFact,
   taskListBanners,
   type Hidden,
   type StateFilter,
@@ -1201,7 +1202,6 @@ function TaskbagView({
   // Collapsed groups, remembered per project (Task-A01-26).
   const [collapsed, setCollapsed] = useFold(opened.root, "groups");
   const iterations = box?.iterations ?? [];
-  const iterationName = (id: string | null) => (id ? (iterations.find((i) => i.id === id)?.name ?? id) : null);
   // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
   // task that needs a person (Task-A03-18).
   // Project folders (Task-A01-sketch327): read again whenever the taskbag is, so binding a second
@@ -1268,7 +1268,7 @@ function TaskbagView({
     }
   };
   const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
-  const stop = (task: Task) => stopText(task, box?.tasks ?? [], t);
+  const stop = (task: Task) => stopFact(task, box?.tasks ?? [], t);
   // The search box (Task-A01-36): the task list's search, emptied when another project opens. Cmd/Ctrl+F focuses it.
   const [query, setQuery] = useState("");
   const terms = searchTerms(query);
@@ -1626,8 +1626,8 @@ function TaskbagView({
                   hidden={!searching && stateFilter !== "all" ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
                   onShowAll={() => chooseFilter("all")}
                   stop={stop}
-                  iterationName={groupBy === "area" ? iterationName : undefined}
-                  showFolders={showFolders(folders)}
+                  onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
+                  onError={onError}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
@@ -1765,7 +1765,6 @@ function TaskGroup({
   hidden,
   onShowAll,
   stop,
-  iterationName,
   selectedId,
   onSelect,
   terms,
@@ -1776,7 +1775,8 @@ function TaskGroup({
   form,
   onEdit,
   editForm,
-  showFolders: chips,
+  onOpenSession,
+  onError,
 }: {
   id: string;
   name: string;
@@ -1793,12 +1793,10 @@ function TaskGroup({
   hidden?: Hidden;
   /** Turns the state filter off. */
   onShowAll?: () => void;
-  /** Why a stopped task is stopped: "Waiting for you: …", "Blocked by A01-17 (in progress)". */
-  stop?: (task: Task) => string | null;
-  /** When each task last changed (UTC), by task ID (Task-A01-52), shown at the row's right. */
+  /** Why a stopped task is stopped: its Waiting on or Blocked by fact (Task-A01-cactus586). */
+  stop?: (task: Task) => StopFact | null;
+  /** When each task last changed (UTC), by task ID (Task-A01-52), one of each row's facts. */
   modified?: Record<string, string>;
-  /** Given in the by-area view, so each task says which iteration it is planned in. */
-  iterationName?: (id: string | null) => string | null;
   selectedId: string | null;
   /** Clicking a task opens it in the task pane; clicking it again closes the pane. */
   onSelect: (id: string) => void;
@@ -1815,8 +1813,9 @@ function TaskGroup({
   onEdit?: () => void;
   /** The Edit form, when it is open in this group. */
   editForm?: ReactNode;
-  /** Each task's folder chips, shown while two or more folders are bound (Task-A01-sketch327). */
-  showFolders?: boolean;
+  /** Reopens a task's recorded session from its holder's name (Task-A01-cactus586); the desktop app only. */
+  onOpenSession?: (id: string) => Promise<void>;
+  onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
   const all = counted ?? tasks;
@@ -1866,8 +1865,8 @@ function TaskGroup({
               terms={terms}
               stop={stop?.(task) ?? null}
               modified={modified?.[task.id]}
-              iteration={iterationName?.(task.iteration)}
-              showFolders={chips}
+              onOpenSession={onOpenSession}
+              onError={onError}
             />
           ))}
         </ul>

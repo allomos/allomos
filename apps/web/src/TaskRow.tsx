@@ -1,12 +1,23 @@
-// One task in the task list: its ID and title, and what the list says about it. Clicking the row
-// (or Enter / Space on it) opens the task pane; clicking it again closes it.
+// One task in the task list (Task-A01-cactus586): its ID and title on the first line, then its facts
+// the way the task pane shows them, a small grey name before each value, two to a line (one on a
+// narrow list). A stopped task's Waiting on or Blocked by gets a full-width row of its own, cut at
+// three lines with Show all. Clicking the row (or Enter / Space on it) opens the task pane; clicking
+// it again closes it. The holder's link and Show all do not select the task.
 
+import { useLayoutEffect, useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useI18n } from "./i18n";
 import { DescriptionHit, Highlight } from "./Search";
-import { AiDecidedBadge, HumanCheckBadge } from "./TaskPane";
-import { toCheck, toReview } from "./stopFlow";
+import { sessionPlace } from "./sessionFlow";
+import { humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import type { Task } from "./types";
+
+/** States whose word is coloured in the row: the rest are plain. */
+const COLOURED = new Set(["in_progress", "waiting", "blocked"]);
+
+/** Keeps a key on a control inside the row from selecting the task (its click stops itself). */
+const ownKeys = (e: KeyboardEvent) => e.stopPropagation();
 
 export function TaskRow({
   task,
@@ -15,24 +26,35 @@ export function TaskRow({
   terms,
   stop,
   modified,
-  iteration,
-  showFolders: chips,
+  onOpenSession,
+  onError,
 }: {
   task: Task;
   selected: boolean;
   onSelect: (id: string) => void;
   /** The search's words, marked in the row (Task-A01-36); empty when not searching. */
   terms: string[];
-  /** Why the task is stopped: "Waiting for you: …", "Blocked by A01-17 (in progress)". */
-  stop: string | null;
-  /** When the task last changed (UTC), shown at the row's right (Task-A01-52). */
+  /** Why the task is stopped: its Waiting on or Blocked by fact; null when it is not stopped. */
+  stop: StopFact | null;
+  /** When the task last changed (UTC) (Task-A01-52). */
   modified?: string;
-  /** The iteration it is planned in, in the by-area view. */
-  iteration?: string | null;
-  /** The task's folder chips, shown while two or more folders are bound (Task-A01-sketch327). */
-  showFolders?: boolean;
+  /** Reopens the session the task records, as the task pane's button does (the desktop app only). */
+  onOpenSession?: (id: string) => Promise<void>;
+  onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
+  const decisions = task.ai_decisions?.length ?? 0;
+  const facts: [string, ReactNode, string?][] = [
+    [
+      t("pane.state"),
+      <span className={COLOURED.has(task.state) ? `fact-state s-${task.state}-text` : "fact-state"}>{t(`state.${task.state}`)}</span>,
+    ],
+    [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
+    [t("pane.label"), task.label ? <span className="label">{task.label}</span> : <span className="muted">—</span>],
+  ];
+  if (toReview(task)) facts.push([t("row.ai_decided"), t("row.ai_decided_value", { count: decisions }), t("task.ai_decided_title", { count: decisions })]);
+  if (toCheck(task)) facts.push([t("pane.check"), t("task.not_human_checked"), t("task.not_human_checked_title", { why: humanCheckNote(task) })]);
+  if (task.holder) facts.push([t("row.held_by"), <Holder task={task} onOpenSession={onOpenSession} onError={onError} />]);
   return (
     <li
       id={`task-${task.id}`}
@@ -50,37 +72,95 @@ export function TaskRow({
       <span className="id">
         <Highlight text={task.id} terms={terms} />
       </span>
-      <span className="title">
-        <Highlight text={task.title} terms={terms} />
-      </span>
-      <span className="state-cell">
-        {toCheck(task) && <HumanCheckBadge task={task} />}
-        {toReview(task) && <AiDecidedBadge task={task} />}
-        <span className={`state s-${task.state}`}>{t(`state.${task.state}`)}</span>
-      </span>
-      <span className="meta">
-        {chips &&
-          ((task.folders ?? []).length > 0 ? (
-            (task.folders ?? []).map((f) => (
-              <span key={f} className="folder-chip">
-                {f}
-              </span>
-            ))
-          ) : (
-            <span className="muted">{t("task.no_folder")}</span>
+      <div className="task-body">
+        <span className="title">
+          <Highlight text={task.title} terms={terms} />
+        </span>
+        <dl className="row-facts">
+          {facts.map(([name, value, title]) => (
+            <div key={name} title={title}>
+              <dt>{name}</dt>
+              <dd>{value}</dd>
+            </div>
           ))}
-        {task.label && <span className="label">{task.label}</span>}
-        {iteration && <span>{t("task.iteration", { iteration })}</span>}
-        {task.holder && <span>{t("task.held_by", { holder: task.holder })}</span>}
-        {stop && <span className={`stop s-${task.state}-text`}>{stop}</span>}
-        {task.handoff_note && <span>{t("task.handoff_note", { note: task.handoff_note })}</span>}
+        </dl>
+        {stop && <StopRow fact={stop} state={task.state} />}
         <DescriptionHit text={task.description ?? ""} terms={terms} />
-      </span>
-      {modified && (
-        <time className="modified" dateTime={modified} title={t("task.modified", { time: localTime(modified) })}>
-          {localTime(modified)}
-        </time>
-      )}
+        <DescriptionHit text={task.handoff_note ?? ""} terms={terms} where="search.in_handoff" />
+      </div>
     </li>
+  );
+}
+
+/** Who holds the task. Where the pane would offer to open the holder's session, the name is that
+ * button (Open in Claude, or Resume in terminal: its tooltip says which); otherwise plain text. */
+function Holder({ task, onOpenSession, onError }: { task: Task; onOpenSession?: (id: string) => Promise<void>; onError: (e: unknown) => void }) {
+  const { t } = useI18n();
+  const [asked, setAsked] = useState(false);
+  const place = onOpenSession ? sessionPlace(task) : null;
+  if (!place || !onOpenSession) return <>{task.holder}</>;
+  const open = () => {
+    setAsked(false);
+    onOpenSession(task.id).then(
+      () => setAsked(place === "app"),
+      onError,
+    );
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className="link with-icon holder-open"
+        title={t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
+        onKeyDown={ownKeys}
+        onClick={(e) => {
+          e.stopPropagation();
+          open();
+        }}
+      >
+        {task.holder}
+        <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11" />
+          <path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5" />
+        </svg>
+      </button>
+      {asked && <span className="muted"> {t("session.asked_claude")}</span>}
+    </>
+  );
+}
+
+/** Waiting on or Blocked by: the name on a line of its own, the text under it in the state's
+ * colour, at most three lines; Show all opens it in place and Show less folds it back. The link
+ * shows only when the text is cut, and the choice is not remembered. */
+function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
+  const { t } = useI18n();
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || open) return;
+    const look = () => setCut(el.scrollHeight > el.clientHeight + 1);
+    look();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(look);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fact.text, open]);
+  return (
+    <div className="row-stop">
+      <div className="row-stop-name">{t(fact.name)}</div>
+      <div ref={ref} className={`row-stop-text s-${state}-text${open ? "" : " clamped"}`}>
+        {fact.text}
+      </div>
+      {cut && (
+        <button type="button" className="link small" onKeyDown={ownKeys} onClick={(e) => {
+            e.stopPropagation();
+            setOpen(!open);
+          }}>
+          {t(open ? "row.show_less" : "row.show_all")}
+        </button>
+      )}
+    </div>
   );
 }
