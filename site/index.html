@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Allomos</title>
-<meta name="description" content="Switch AI agents and teammates without losing the project, and keep every task, step and handoff of your vibe coding on the record. A free local app for macOS and Windows.">
+<meta name="description" content="Whoever takes over — another AI agent, another account or a teammate — the work picks up where it stopped, and every task, step and handoff of your vibe coding stays on the record. A free local app for macOS and Windows.">
 <link rel="alternate" hreflang="en" href="https://www.allomos.com/">
 <link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/">
 <link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/">
 <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
-<meta property="og:title" content="Allomos — switch agents and teammates, keep the whole project on the record">
-<meta property="og:description" content="When one AI agent or account runs out, another picks up where it stopped, and every task and its history stay in your repository.">
+<meta property="og:title" content="Allomos — the work always carries on">
+<meta property="og:description" content="Your agent hits its usage limit, or a teammate hands a task to you: whoever takes over picks up where it stopped, and every task and its history stay in your repository.">
 <meta property="og:url" content="https://www.allomos.com/">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -29,14 +29,14 @@
   </header>
 
   <div class="hero">
-    <h1>Switch agents and teammates.<br>Keep the whole project on the record.</h1>
-    <p>When one AI agent or account runs out, another picks up exactly where it stopped. Every task, its status and its handoff notes are written down in one place — your own repository — instead of scattered across chats.</p>
+    <h1>The work always carries on.</h1>
+    <p>Your AI agent or account hits its usage limit, and you have to switch. A teammate gets stuck on a hard problem and hands the task to you. Whoever takes over picks up exactly where it stopped. The whole project stays on the record — every task, its status and its handoff notes, in one place in your own repository instead of scattered across chats.</p>
     <div class="btns">
       <a class="btn primary" href="https://github.com/allomos/allomos/releases/latest">Download for macOS</a>
       <a class="btn primary" href="https://github.com/allomos/allomos/releases/latest">Download for Windows</a>
       <a class="btn secondary" href="https://github.com/allomos/allomos">View on GitHub</a>
     </div>
-    <div class="tags">Local app · free &nbsp;·&nbsp; macOS · Windows &nbsp;·&nbsp; Claude Code · Codex &nbsp;·&nbsp; Cloud · optional</div>
+    <div class="tags">Local app · free &nbsp;·&nbsp; macOS · Windows &nbsp;·&nbsp; Claude Code · Codex &nbsp;·&nbsp; Team cloud · optional</div>
   </div>
 
   <div class="figure">
@@ -48,7 +48,7 @@
     <h2>Vibe coding leaves its history in a hundred chats</h2>
     <p class="lead">A project moves through many sessions: Claude Code, Codex, several accounts, several people. A quota can end a session without warning; the next one starts cold, and what was decided lives only in an old conversation. In one real multi-agent project:</p>
     <ul class="facts">
-      <li><strong>185 KB</strong> of handoff notes that each new session re-read to resume;</li>
+      <li><strong>185 KB</strong> of handoff files that each new session re-read to resume;</li>
       <li><strong>6</strong> places where one task's status was copied by hand;</li>
       <li><strong>3</strong> sessions claiming tasks at once, settled by merge conflict;</li>
       <li><strong>0</strong> answers to “when will it be done?”</li>
@@ -58,7 +58,7 @@
   <section id="what">
     <h2>Four things Allomos does</h2>
     <div class="cards four">
-      <div class="card"><div class="kicker k1">Switching</div><h3>Agents and teammates</h3><p>Hand the project from one AI agent or account to another, or to a teammate, and pick up exactly where it stopped. Nothing is lost at the switch.</p></div>
+      <div class="card"><div class="kicker k1">Carrying on</div><h3>Handoffs that lose nothing</h3><p>Move to another AI agent or account, or hand over to a teammate: you choose who. The tasks, their progress and handoff notes stay in the taskbag, so whoever takes over picks up exactly where it stopped. Nothing is lost at the switch.</p></div>
       <div class="card"><div class="kicker k2">Task management</div><h3>The whole process, on the record</h3><p>Every task, its status, handoff notes and decisions are recorded in one place, not spread across chats — easy to review, and easy to maintain for years.</p></div>
       <div class="card"><div class="kicker k3">AI skills <span class="badge">In development</span></div><h3>Get better with your agents</h3><p>Work with your agents in a way that improves over time: what each one does well, what to hand over, and a process that keeps you in control.</p></div>
       <div class="card"><div class="kicker k1">Progress <span class="badge">In development</span></div><h3>Where it stands, when it lands</h3><p>Progress by area, what waits on you, and a forecast finish date drawn from your real pace.</p></div>
@@ -66,16 +66,9 @@
   </section>
 
   <section id="switch">
-    <h2>Switching: Claude runs out, Codex picks up</h2>
-    <p class="lead">Every agent uses the same <code>alm</code> commands. One step to hand over, one step to take over — between agents, between accounts, between people. The next session reads the task and its note, not a 185 KB history.</p>
-<pre><code># Claude Code · account 1 · quota nearly used
-alm label A01-03 "implemented"
-alm release A01-03 --note "form done; tests next"
-
-# Codex · account 2 · a minute later
-alm next
-A01-03  Sign-in page  ready · note: tests next
-alm claim A01-03</code></pre>
+    <h2>Carrying on: limits run out, tasks change hands, the work goes on</h2>
+    <p class="lead">Claude, Codex or a teammate: handing over takes one step, and so does taking over, whoever it is. The next session reads the task and its note, not a trawl through old chats.</p>
+<div class="cards"><div class="card"><div class="kicker k1">Hand over</div><h3 style="font-size:16px">Claude Code · account 1 · quota nearly used</h3><p>Marks task A01-03 “Sign-in page” as implemented and leaves a note: “form done; tests next.”</p></div><div class="card"><div class="kicker k2">Take over</div><h3 style="font-size:16px">Codex · account 2 · a minute later</h3><p>Sees A01-03 “Sign-in page” ready with the note “tests next”, claims it and starts on the tests.</p></div></div>
   </section>
 
   <section id="tasks">
@@ -116,7 +109,7 @@ alm claim A01-03</code></pre>
     <h2>Free on your machine. Pay only for the cloud.</h2>
     <div class="cards">
       <div class="card"><div class="kicker k1">Local app</div><h3>Free</h3><p>No account, no card, no trial clock. Your tasks stay on your machine and in your repository.</p></div>
-      <div class="card"><div class="kicker k2">Cloud</div><h3>Optional</h3><p>Live sharing, email invitations and roles for teams. Pricing to be announced.</p></div>
+      <div class="card"><div class="kicker k2">Team cloud</div><h3>Optional</h3><p>Live sharing, email invitations and roles for teams. Pricing to be announced.</p></div>
     </div>
   </section>
 
