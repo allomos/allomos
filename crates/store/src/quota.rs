@@ -177,7 +177,8 @@ pub const ASK_AFTER_MINUTES: i64 = 30;
 /// The ask a command that moves a task on prints when the agent's quota report is missing or old.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct QuotaAsk {
-    /// The agent's id, from the session name (`claude/…` is `claude-code`); `None` without one.
+    /// The agent's id, from the task's session agent or the session name (`claude/…` is
+    /// `claude-code`); `None` when neither names one.
     pub agent: Option<String>,
     /// How old the agent's newest 5-hour report is, in minutes; `None` when there is none.
     pub minutes: Option<i64>,
@@ -224,12 +225,30 @@ fn utc_seconds(text: &str) -> Option<i64> {
     Some(days * 86_400 + hh * 3600 + mm * 60 + ss)
 }
 
-/// What a command that moves a task on asks of the agent `holder` (its session name, as `--as`
-/// gives it), given every report and the time now (UTC): `None` when the agent's newest 5-hour
-/// report is younger than [`ASK_AFTER_MINUTES`], otherwise the ask. `alm` only tells; the
-/// command it asks after has already succeeded (AGENTS.md: "alm tells; the agent checks").
-pub fn quota_ask(holder: Option<&str>, reports: &[QuotaReport], now: &str) -> Option<QuotaAsk> {
-    let agent = holder.map(agent_id).filter(|a| !a.is_empty());
+/// The agent's id a session name gives for certain: `claude/…` and `codex/…` only. Any other
+/// session name (`loop-hourly`) names no agent; printed as the id, agents copied it into
+/// `alm quota --agent` and the app showed a chip per session (Task-A03-possum352).
+fn known_agent(holder: &str) -> Option<String> {
+    let id = agent_id(holder);
+    (id == "claude-code" || id == "codex").then_some(id)
+}
+
+/// What a command that moves a task on asks of the agent, given every report and the time now
+/// (UTC): `None` when the agent's newest 5-hour report is younger than [`ASK_AFTER_MINUTES`],
+/// otherwise the ask. The agent is the task's session agent (`--session-agent`), else what the
+/// session name `holder` (`--as`) names for certain ([`known_agent`]); without either, the
+/// command shows a placeholder. `alm` only tells; the command it asks after has already
+/// succeeded (AGENTS.md: "alm tells; the agent checks").
+pub fn quota_ask(
+    session_agent: Option<&str>,
+    holder: Option<&str>,
+    reports: &[QuotaReport],
+    now: &str,
+) -> Option<QuotaAsk> {
+    let agent = session_agent
+        .map(agent_id)
+        .filter(|a| !a.is_empty())
+        .or_else(|| holder.and_then(known_agent));
     let newest = reports
         .iter()
         .filter(|r| r.window == "5h")
@@ -245,7 +264,7 @@ pub fn quota_ask(holder: Option<&str>, reports: &[QuotaReport], now: &str) -> Op
     }
     let id = agent
         .clone()
-        .unwrap_or_else(|| "<your agent's id>".to_string());
+        .unwrap_or_else(|| "<your agent's id, e.g. claude-code or codex>".to_string());
     Some(QuotaAsk {
         command: format!(
             "alm quota --agent {id} --left <percent> [--resets <local date and time>]"
@@ -274,7 +293,7 @@ mod tests {
     fn a_missing_or_old_report_is_asked_for_and_a_recent_one_is_not() {
         let now = "2026-10-21T16:00:00Z";
         // Never reported: asked, with the agent's id from the session name.
-        let ask = quota_ask(Some("claude/a03-flour054"), &[], now).unwrap();
+        let ask = quota_ask(None, Some("claude/a03-flour054"), &[], now).unwrap();
         assert_eq!(ask.agent.as_deref(), Some("claude-code"));
         assert_eq!(ask.minutes, None);
         assert!(
@@ -287,15 +306,17 @@ mod tests {
         );
         // An old report, saved under a session name before Task-A03-39: still this agent's.
         let old = [report("claude/i03-loop", "5h", "2026-10-21T05:23:45Z")];
-        let ask = quota_ask(Some("claude/x"), &old, now).unwrap();
+        let ask = quota_ask(None, Some("claude/x"), &old, now).unwrap();
         assert_eq!(ask.minutes, Some(636));
         assert!(ask.text().contains("last reported its quota 636 min ago"));
         // Recent enough: nothing asked. 29 minutes is recent; 30 is not.
         let recent = [report("claude-code", "5h", "2026-10-21T15:31:00Z")];
-        assert_eq!(quota_ask(Some("claude/x"), &recent, now), None);
+        assert_eq!(quota_ask(None, Some("claude/x"), &recent, now), None);
         let edge = [report("claude-code", "5h", "2026-10-21T15:30:00Z")];
         assert_eq!(
-            quota_ask(Some("claude/x"), &edge, now).unwrap().minutes,
+            quota_ask(None, Some("claude/x"), &edge, now)
+                .unwrap()
+                .minutes,
             Some(30)
         );
         // Another agent's or another window's report does not count.
@@ -304,15 +325,52 @@ mod tests {
             report("claude-code", "week", "2026-10-21T15:59:00Z"),
         ];
         assert_eq!(
-            quota_ask(Some("claude/x"), &others, now).unwrap().minutes,
+            quota_ask(None, Some("claude/x"), &others, now)
+                .unwrap()
+                .minutes,
             None
         );
-        assert_eq!(quota_ask(Some("codex/run"), &others, now), None);
+        assert_eq!(quota_ask(None, Some("codex/run"), &others, now), None);
         // Without a session name: any agent's recent report will do; otherwise a placeholder.
-        assert_eq!(quota_ask(None, &others, now), None);
-        let ask = quota_ask(None, &[], now).unwrap();
+        assert_eq!(quota_ask(None, None, &others, now), None);
+        let ask = quota_ask(None, None, &[], now).unwrap();
         assert_eq!(ask.agent, None);
-        assert!(ask.command.contains("--agent <your agent's id>"));
+        assert!(
+            ask.command
+                .contains("--agent <your agent's id, e.g. claude-code or codex>")
+        );
+    }
+
+    /// Task-A03-possum352: a session name that names no agent (`loop-hourly`) is never printed as
+    /// the agent's id; the task's session agent is, when recorded.
+    #[test]
+    fn the_ask_names_the_session_agent_never_a_plain_session_name() {
+        let now = "2026-10-21T16:00:00Z";
+        let ask = quota_ask(None, Some("loop-hourly"), &[], now).unwrap();
+        assert_eq!(ask.agent, None);
+        assert!(
+            ask.command.starts_with(
+                "alm quota --agent <your agent's id, e.g. claude-code or codex> --left"
+            ),
+            "{}",
+            ask.command
+        );
+        assert!(!ask.text().contains("loop-hourly"));
+        let ask = quota_ask(Some("claude-code"), Some("loop-hourly"), &[], now).unwrap();
+        assert_eq!(ask.agent.as_deref(), Some("claude-code"));
+        assert!(
+            ask.command
+                .starts_with("alm quota --agent claude-code --left")
+        );
+        // The session agent wins over the session name, and its recent report silences the ask.
+        let recent = [report("codex", "5h", "2026-10-21T15:59:00Z")];
+        assert_eq!(
+            quota_ask(Some("codex"), Some("claude/x"), &recent, now),
+            None
+        );
+        // Another agent's id given as the session agent is kept as given.
+        let ask = quota_ask(Some("gemini"), Some("run-3"), &[], now).unwrap();
+        assert_eq!(ask.agent.as_deref(), Some("gemini"));
     }
 
     #[test]

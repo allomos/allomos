@@ -1108,9 +1108,19 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 done.text.push_str(&lines);
             }
             if moves_on {
-                if let Some(ask) =
-                    quota_ask(cli.holder.as_deref(), &quota_reports(), &events::now_utc())
-                {
+                // The agent's id comes from the task's session (`--session-agent`), not from the
+                // session name alone (Task-A03-possum352).
+                let session_agent = cli.command.target().and_then(|id| {
+                    let bag = load(&locate(&cli, cwd).ok()?).taskbag?;
+                    let task = bag.tasks.into_iter().find(|t| t.id == id)?;
+                    task.session?.agent
+                });
+                if let Some(ask) = quota_ask(
+                    session_agent.as_deref(),
+                    cli.holder.as_deref(),
+                    &quota_reports(),
+                    &events::now_utc(),
+                ) {
                     done.text.push('\n');
                     done.text.push_str(&ask.text());
                     done.fields["quota_ask"] = json!(ask);

@@ -1014,6 +1014,48 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
     );
 }
 
+/// Task-A03-possum352: a loop session claims under a name that names no agent (`loop-hourly`).
+/// The quota ask names the agent the claim recorded (`--session-agent`), or else shows a
+/// placeholder; it never prints the session name as the agent's id.
+#[test]
+fn the_quota_ask_never_names_a_plain_session_name_as_the_agent() {
+    let repo = filled();
+    let settings = tmp("quota-ask-session-settings");
+    let run = |args: &[&str]| {
+        let out = Command::new(ALM)
+            .current_dir(&repo)
+            .args(args)
+            .env("ALLOMOS_SETTINGS_DIR", &settings)
+            .env_remove("ALLOMOS_TASKBAG")
+            .env_remove("ALLOMOS_HOLDER")
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(0), "{args:?}: {out:?}");
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let text = run(&["--as", "loop-hourly", "claim", "A01-01", "--branch", "main"]);
+    assert!(
+        text.contains("\n  alm quota --agent <your agent's id, e.g. claude-code or codex> --left")
+            && !text.contains("--agent loop-hourly"),
+        "{text}"
+    );
+    let text = run(&[
+        "--as",
+        "loop-hourly",
+        "session",
+        "A01-01",
+        "--session-agent",
+        "claude-code",
+    ]);
+    assert!(!text.contains("Quota:"), "{text}");
+    let text = run(&["--as", "loop-hourly", "label", "A01-01", "implemented"]);
+    assert!(
+        text.contains("Quota: Your agent (claude-code) has not reported its quota")
+            && text.contains("\n  alm quota --agent claude-code --left <percent>"),
+        "{text}"
+    );
+}
+
 /// `alm` never runs Git: every command works with no `git` program at all, in a folder outside
 /// any repository; and the removed options are refused as unknown.
 #[test]
