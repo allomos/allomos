@@ -1579,6 +1579,16 @@ function TaskbagView({
               </span>
             </div>
           )}
+          {/* Task-A01-egg896: one band across the top of both the list and the task pane, so the pane
+              starts level with the list. */}
+          <div className="list-notices">
+            {refreshLine}
+            {!searching && !nothingShown && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
+              <p className="muted small">
+                {rich("box.no_iterations", { add: <code>alm add iteration</code>, plan: <code>alm plan</code> })}
+              </p>
+            )}
+          </div>
           {/* The list scrolls on its own, so its scroll bar stays beside the list, not beside the pane. */}
           <div
             ref={layoutRef}
@@ -1587,12 +1597,6 @@ function TaskbagView({
           >
             <div className="areas">
               <ListBanners search={banners.search} filter={banners.filter} onShowAll={() => chooseFilter(allTicked(ladder))} />
-              {refreshLine}
-              {!searching && !nothingShown && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
-                <p className="muted small">
-                  {rich("box.no_iterations", { add: <code>alm add iteration</code>, plan: <code>alm plan</code> })}
-                </p>
-              )}
               {found.map((g) => (
                 <TaskGroup
                   key={g.key}

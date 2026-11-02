@@ -387,6 +387,9 @@ button.link:hover { text-decoration: underline; }
 
 .areas { display: grid; gap: 14px; }
 .areas > .muted { margin: 0; }
+/* Task-A01-egg896: the refresh line, the saved name and the no-iterations hint, across the list and the pane. */
+.list-notices { display: grid; gap: 14px; }
+.list-notices > .muted { margin: 0; }
 /* By area · By iteration: two buttons joined into one control. */
 .group-by { display: flex; align-self: start; }
 /* Task-A01-26: the grouping buttons, then Collapse all · Expand all at the far right. */
