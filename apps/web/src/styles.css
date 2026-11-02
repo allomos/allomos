@@ -729,6 +729,32 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 }
 .sort-popover button:hover { background: var(--bg); }
 .sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }
+/* Task-A01-lens781: the Show filter, ticks in two groups (states, labels with Yes and No). */
+.filter-menu { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+.filter-button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border-radius: 6px; max-width: 280px; }
+.filter-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-button svg, .filter-restore svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.filter-button.on { border-color: var(--accent); color: var(--accent-ink); }
+.filter-restore { display: inline-flex; padding: 4px 6px; border-radius: 6px; }
+.filter-menu button:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
+.filter-popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: max-content; max-width: min(620px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 4px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+}
+.filter-columns { display: flex; gap: 4px; }
+.filter-column { min-width: 0; padding: 0 4px; }
+.filter-column + .filter-column { border-left: 1px solid var(--line); }
+.filter-heading { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; padding: 4px 6px 6px; }
+.filter-heading > span:first-child { flex: 1; margin-right: 8px; }
+.filter-group-buttons { display: inline-flex; gap: 4px; }
+.filter-group-buttons button { font-size: 12px; padding: 1px 8px; font-weight: 400; white-space: nowrap; }
+.filter-row { display: flex; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13px; border-radius: 6px; white-space: nowrap; }
+label.filter-row { cursor: pointer; }
+label.filter-row:hover, .filter-side:hover { background: var(--bg); }
+.filter-label-name { flex: 1; margin-right: 8px; }
+.filter-side { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); padding: 1px 6px; border-radius: 6px; cursor: pointer; }
+.filter-empty { color: var(--warn); margin: 6px 8px 2px; }
 /* A phone (Task-A04-02-03): one column, the ID before the title on the first line. */
 @media (max-width: 720px) {
   .task { display: block; }

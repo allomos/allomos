@@ -96,29 +96,123 @@ export function withDecisions(opened: Opened): Opened {
   return { ...opened, loaded: { ...opened.loaded, taskbag: { ...box, tasks } } };
 }
 
-/** The list's state filter: every state, one, every task not done yet (`open`: neither done nor
- * dropped, Task-A01-party987), or every task that needs a person: to check, to answer (waiting) or
- * to review (AI decisions), as `alm human` lists them (Task-A03-18, A03-19). */
-export type StateFilter = "all" | "open" | "human" | State;
+/**
+ * The list's filter (Task-A01-lens781): ticks in two groups, states and labels; a task is listed
+ * when its state is ticked and, for each label of the ladder, its side is ticked: Yes when it has
+ * reached that label (its own label is that one or a higher one), No when it has not (no label, or
+ * one off the ladder). Everything ticked is no filter at all. Kept as what is unticked, so a state
+ * or label new to the list starts ticked; `ladder` is the project's, filled in when the list draws.
+ */
+export type StateFilter = { states: State[]; yes: string[]; no: string[]; ladder: string[] };
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
-/** The tasks the filter keeps. */
-export function keepState(filter: StateFilter, task: Task): boolean {
-  if (filter === "human") return toCheck(task) || task.state === "waiting" || toReview(task);
-  // A dropped task will never be done, so "not done" leaves it out as well (as A01-timber110).
-  if (filter === "open") return task.state !== "done" && task.state !== "dropped";
-  return filter === "all" || task.state === filter;
+/** Everything ticked: every task listed. */
+export function allTicked(ladder: readonly string[] = []): StateFilter {
+  return { states: [], yes: [], no: [], ladder: [...ladder] };
 }
 
-/** A stored filter read back; anything else is "all". */
-export function readFilter(value: string | null): StateFilter {
-  if (value === "human" || value === "open") return value;
-  return value && (FILTER_STATES as string[]).includes(value) ? (value as State) : "all";
+/** One side of a label's tick. */
+export type Side = "yes" | "no";
+
+/** The filter for this ladder: unticked labels no longer on it are let go. */
+export function onLadder(filter: StateFilter, ladder: readonly string[]): StateFilter {
+  const keep = (labels: string[]) => labels.filter((l) => ladder.includes(l));
+  return { states: filter.states.filter((s) => FILTER_STATES.includes(s)), yes: keep(filter.yes), no: keep(filter.no), ladder: [...ladder] };
+}
+
+/** Whether nothing is unticked. */
+export function isAll(filter: StateFilter): boolean {
+  return filter.states.length === 0 && filter.yes.length === 0 && filter.no.length === 0;
+}
+
+/** Whether a task has reached `label`: its own label is that one or a higher one on the ladder. */
+export function reached(task: Task, label: string, ladder: readonly string[]): boolean {
+  const own = task.label ? ladder.indexOf(task.label) : -1;
+  return own >= 0 && own >= ladder.indexOf(label);
+}
+
+/** The tasks the filter keeps. */
+export function keepState(filter: StateFilter, task: Task): boolean {
+  if (filter.states.includes(task.state)) return false;
+  return filter.ladder.every((label) => !(reached(task, label, filter.ladder) ? filter.yes : filter.no).includes(label));
+}
+
+/** A state ticked or unticked. */
+export function tickState(filter: StateFilter, state: State, on: boolean): StateFilter {
+  const states = filter.states.filter((s) => s !== state);
+  return { ...filter, states: on ? states : FILTER_STATES.filter((s) => s === state || states.includes(s)) };
+}
+
+/** One side of a label ticked or unticked. */
+export function tickLabel(filter: StateFilter, label: string, side: Side, on: boolean): StateFilter {
+  const list = filter[side].filter((l) => l !== label);
+  return { ...filter, [side]: on ? list : filter.ladder.filter((l) => l === label || list.includes(l)) };
+}
+
+/** A whole group ticked (Select all) or unticked (Clear all). */
+export function tickGroup(filter: StateFilter, group: "states" | "labels", on: boolean): StateFilter {
+  if (group === "states") return { ...filter, states: on ? [] : [...FILTER_STATES] };
+  return { ...filter, yes: on ? [] : [...filter.ladder], no: on ? [] : [...filter.ladder] };
+}
+
+/** Whether a group is all ticked, or all unticked: the grey Select all, the grey Clear all. */
+export function groupTicks(filter: StateFilter, group: "states" | "labels"): { all: boolean; none: boolean } {
+  if (group === "states") return { all: filter.states.length === 0, none: filter.states.length === FILTER_STATES.length };
+  const off = filter.yes.length + filter.no.length;
+  return { all: off === 0, none: off === filter.ladder.length * 2 };
+}
+
+/** Why the filter lists no task at all, whatever the tasks: no state ticked, or a label with
+ * neither side ticked; `null` when it can list some. */
+export function emptyBy(filter: StateFilter): { kind: "states" } | { kind: "label"; label: string } | null {
+  if (filter.states.length === FILTER_STATES.length) return { kind: "states" };
+  const label = filter.ladder.find((l) => filter.yes.includes(l) && filter.no.includes(l));
+  return label === undefined ? null : { kind: "label", label };
+}
+
+/** The ladder's own labels, which the filter shows in the interface language; others as written. */
+const LADDER_KEYS: Record<string, Key> = {
+  drafted: "filter.ladder.drafted",
+  implemented: "filter.ladder.implemented",
+  "locally verified": "filter.ladder.locally_verified",
+  "deployed and verified": "filter.ladder.deployed_and_verified",
+  "human verified": "filter.ladder.human_verified",
+};
+
+/** A label as the filter shows it. */
+export function labelText(label: string, t: T): string {
+  const key = LADDER_KEYS[label];
+  return key ? t(key) : label;
+}
+
+/** The filter as stored: what is unticked. */
+export function storeFilter(filter: StateFilter): string {
+  return JSON.stringify({ states: filter.states, yes: filter.yes, no: filter.no });
+}
+
+/**
+ * A stored filter read back; anything else is everything ticked. Before Task-A01-lens781 the filter
+ * was one choice (`old`): a state comes back as that state alone, the rest (all, open, human) as
+ * everything ticked.
+ */
+export function readFilter(value: string | null, old: string | null = null): StateFilter {
+  const words = (x: unknown) => (Array.isArray(x) ? x.filter((w): w is string => typeof w === "string") : []);
+  if (value) {
+    try {
+      const v = JSON.parse(value) as Record<string, unknown>;
+      const states = words(v.states).filter((s): s is State => (FILTER_STATES as string[]).includes(s));
+      return { states, yes: words(v.yes), no: words(v.no), ladder: [] };
+    } catch {
+      return allTicked();
+    }
+  }
+  if (old && (FILTER_STATES as string[]).includes(old)) return { ...allTicked(), states: FILTER_STATES.filter((s) => s !== old) };
+  return allTicked();
 }
 
 /** What the filter leaves out of a list of tasks: how many, and how many in each state, in the
- * filter's order of states (Task-A01-42). Nothing is left out when the filter is "all". */
+ * filter's order of states (Task-A01-42). Nothing is left out when everything is ticked. */
 export type Hidden = { count: number; states: { state: State; count: number }[] };
 
 export function hiddenByFilter(filter: StateFilter, tasks: readonly Task[]): Hidden {
@@ -135,12 +229,24 @@ export function hiddenText(hidden: Hidden, t: T): string {
   return t("filter.hidden", { count: hidden.count, states });
 }
 
-/** The filter's name as the Show box words it. */
+/** The unticked boxes by name, in the panel's order: states, then each label's Yes and No. */
+export function untickedNames(filter: StateFilter, t: T): string[] {
+  const side = (label: string, s: Side) => t(`filter.side_${s}`, { label: labelText(label, t) });
+  return [
+    ...FILTER_STATES.filter((s) => filter.states.includes(s)).map((s) => t(`state.${s}` as Key)),
+    ...filter.ladder.flatMap((l) => [
+      ...(filter.yes.includes(l) ? [side(l, "yes")] : []),
+      ...(filter.no.includes(l) ? [side(l, "no")] : []),
+    ]),
+  ];
+}
+
+/** The filter's name as the Show button words it: "All tasks", "Hide Backlog, Dropped", "Filtered (3 hidden)". */
 export function filterName(filter: StateFilter, t: T): string {
-  if (filter === "all") return t("filter.all");
-  if (filter === "human") return t("filter.human");
-  if (filter === "open") return t("filter.open");
-  return t(`state.${filter}` as Key);
+  const off = untickedNames(filter, t);
+  if (off.length === 0) return t("filter.all_tasks");
+  if (off.length <= 2) return t("filter.hide", { names: off.join(t("filter.list_sep")) });
+  return t("filter.filtered", { count: off.length });
 }
 
 /** What a filtered list is grouped by: areas or iterations (Task-A01-44). */
@@ -152,7 +258,7 @@ export type GroupKind = "area" | "iteration";
  * the filter off every group stays as it was.
  */
 export function filterGroups<G extends { tasks: Task[]; counted?: Task[] }>(groups: G[], filter: StateFilter): G[] {
-  if (filter === "all") return groups;
+  if (isAll(filter)) return groups;
   return groups
     .map((g) => ({ ...g, counted: g.counted ?? g.tasks, tasks: g.tasks.filter((task) => keepState(filter, task)) }))
     .filter((g) => g.tasks.length > 0);
@@ -200,13 +306,13 @@ function sentences(...parts: Words[]): Words {
 }
 
 /**
- * The filter banner's words (Task-A01-44): "**3 tasks** need a human (…), in 2 of 7 areas. The 5
- * areas with none are left out."; with nothing to show "No task is blocked. All 12 iterations are
- * left out." Empty for the filter "all". While a search is on, the task list uses `bothBanner`.
+ * The filter banner's words (Task-A01-44): "**3 tasks** match the filter, in 2 of 7 areas. The 5
+ * areas with none are left out."; with nothing to show "No task matches the filter. All 12 iterations are
+ * left out." Empty with everything ticked. While a search is on, the task list uses `bothBanner`.
  */
 export function filterBanner(filter: StateFilter, c: FilterBannerCount, t: T): Words {
-  if (filter === "all") return [];
-  const verb = t(`filter.verb.${filter}_${one(c.tasks === 0 ? 1 : c.tasks)}` as Key);
+  if (isAll(filter)) return [];
+  const verb = t(`filter.verb.match_${one(c.tasks === 0 ? 1 : c.tasks)}` as Key);
   if (c.tasks === 0) {
     return sentences(
       [{ text: t("filter.banner.none", { verb }) }],
@@ -240,21 +346,21 @@ export type BothCount = {
 
 /**
  * The filter banner while a search is on (Task-A01-48): the list is the filter and the search
- * together. "Filter and search together: only tasks that are waiting and hold “alm” are listed, in
+ * together. "Filter and search together: only tasks that match the filter and hold “alm” are listed, in
  * 1 area. 3 more matches are hidden by the filter."; with none left "None of the tasks found for
- * “alm” is waiting. All 3 matches are hidden by the filter." Empty for the filter "all", or when
+ * “alm” matches the filter. All 3 matches are hidden by the filter." Empty with everything ticked, or when
  * the search finds nothing at all ("Nothing found" says so).
  */
 export function bothBanner(filter: StateFilter, c: BothCount, t: T): Words {
-  if (filter === "all" || c.matches === 0) return [];
+  if (isAll(filter) || c.matches === 0) return [];
   const hidden = c.matches - c.tasks;
   const hiddenWords: Words =
     hidden > 0 ? [{ text: t(`filter.matches_hidden.${c.tasks === 0 ? "all" : "more"}_${one(hidden)}` as Key, { count: hidden }) }] : [];
   if (c.tasks === 0) {
-    const verb = t(`filter.verb.${filter}_one` as Key);
+    const verb = t("filter.verb.match_one");
     return sentences([{ text: t("filter.banner.none_both", { query: c.query, verb }) }], hiddenWords);
   }
-  const verb = t(`filter.verb.${filter}_other` as Key);
+  const verb = t("filter.verb.match_other");
   const where = t(`filter.where.${c.kind}_${one(c.groups)}` as Key, { count: c.groups });
   return sentences([{ text: t("filter.banner.both", { query: c.query, verb, where }) }], hiddenWords);
 }
@@ -290,7 +396,7 @@ export function taskListBanners(
   if (!query) {
     return { search: [], filter: filterBanner(o.filter, { kind: o.kind, tasks: taskCount(o.filtered), groups: o.filtered.length, total: o.groups.length }, t) };
   }
-  if (o.filter === "all") return { search: o.matches > 0 ? searchBanner("task", o.matches, query, t) : [], filter: [] };
+  if (isAll(o.filter)) return { search: o.matches > 0 ? searchBanner("task", o.matches, query, t) : [], filter: [] };
   const shown = taskCount(o.found);
   return {
     search: shown > 0 ? searchBanner("task", shown, query, t, filterName(o.filter, t)) : [],

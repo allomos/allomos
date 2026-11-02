@@ -24,12 +24,15 @@ import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from 
 import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
-  FILTER_STATES,
+  allTicked,
   needsPerson,
   filterGroups,
   hiddenByFilter,
   hiddenText,
+  isAll,
+  onLadder,
   readFilter,
+  storeFilter,
   stopFact,
   type StopFact,
   taskListBanners,
@@ -39,6 +42,7 @@ import {
 import { useFold } from "./useFold";
 import { parseSort, sortTasks, type Sort } from "./sortFlow";
 import { SortMenu } from "./SortMenu";
+import { FilterMenu } from "./FilterMenu";
 import { BrandMark } from "./BrandMark";
 import { PaneResizer } from "./PaneResizer";
 import { PANE_WIDTH_KEY, parsePaneRatio } from "./paneWidthFlow";
@@ -1127,6 +1131,8 @@ function HopFigure() {
  * as by area. */
 type GroupBy = "area" | "iteration";
 const GROUP_BY_KEY = "allomos.groupBy";
+/** The Show filter's ticks (Task-A01-lens781); before it, one choice under the older key. */
+const LIST_FILTER_KEY = "allomos.listFilter";
 const STATE_FILTER_KEY = "allomos.stateFilter";
 /** The Folder filter, per taskbag (Task-A01-sketch327). */
 const FOLDER_FILTER_KEY = "allomos.folderFilter";
@@ -1200,8 +1206,6 @@ function TaskbagView({
   // Collapsed groups, remembered per project (Task-A01-26).
   const [collapsed, setCollapsed] = useFold(opened.root, "groups");
   const iterations = box?.iterations ?? [];
-  // The state filter (decision 0016): waiting and blocked tasks apart, or any one state; or every
-  // task that needs a person (Task-A03-18).
   // Project folders (Task-A01-sketch327): read again whenever the taskbag is, so binding a second
   // folder shows the chips and the Folder filter without reopening the window.
   const [folders, setFolders] = useState<FolderInfo[]>([]);
@@ -1233,17 +1237,21 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  const [stateFilter, setStateFilter] = useState<StateFilter>(() => {
+  // The Show filter (Task-A01-lens781): ticked states and, for each label of the ladder, its Yes
+  // and No; everything ticked lists every task.
+  const [storedFilter, setStoredFilter] = useState<StateFilter>(() => {
     try {
-      return readFilter(localStorage.getItem(STATE_FILTER_KEY));
+      return readFilter(localStorage.getItem(LIST_FILTER_KEY), localStorage.getItem(STATE_FILTER_KEY));
     } catch {
-      return "all";
+      return allTicked();
     }
   });
+  const ladder = box?.project.labels ?? [];
+  const stateFilter = onLadder(storedFilter, ladder);
   const chooseFilter = (f: StateFilter) => {
-    setStateFilter(f);
+    setStoredFilter(f);
     try {
-      localStorage.setItem(STATE_FILTER_KEY, f);
+      localStorage.setItem(LIST_FILTER_KEY, storeFilter(f));
     } catch {
       /* storage unavailable: the choice lasts until the window closes */
     }
@@ -1348,7 +1356,7 @@ function TaskbagView({
     ? taskListBanners({ kind: groupBy === "iteration" ? "iteration" : "area", filter: stateFilter, query: searching ? query : "", groups, filtered, found, matches }, t)
     : { search: [], filter: [] };
   // Nothing matches the filter: only the banner shows (Task-A01-44).
-  const nothingShown = !searching && stateFilter !== "all" && filtered.length === 0;
+  const nothingShown = !searching && !isAll(stateFilter) && filtered.length === 0;
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(found, folded);
   const foldAll = (on: boolean) => setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
@@ -1554,25 +1562,7 @@ function TaskbagView({
                   </button>
                 ))}
               </div>
-              <label className="state-filter small">
-                {t("filter.label")}{" "}
-                <select
-                  value={stateFilter}
-                  className={(FILTER_STATES as readonly string[]).includes(stateFilter) ? `s-${stateFilter}-text` : undefined}
-                  onChange={(e) => chooseFilter(e.target.value as StateFilter)}
-                >
-                  <option value="all">{t("filter.all")}</option>
-                  {/* Task-A01-party987: every task not done yet, neither done nor dropped. */}
-                  <option value="open">{t("filter.open")}</option>
-                  {/* Task-A03-18: what `alm human` lists, to check and to answer. */}
-                  <option value="human">{t("filter.human")}</option>
-                  {FILTER_STATES.map((s) => (
-                    <option key={s} value={s} className={`s-${s}-text`}>
-                      {t(`state.${s}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <FilterMenu filter={stateFilter} onChange={chooseFilter} />
               {showFolders(folders) && (
                 <label className="state-filter small">
                   {t("filter.folder")}{" "}
@@ -1607,7 +1597,7 @@ function TaskbagView({
             style={paneRatio !== null ? ({ "--pane-width": `${paneRatio * 100}%` } as CSSProperties) : undefined}
           >
             <div className="areas">
-              <ListBanners search={banners.search} filter={banners.filter} onShowAll={() => chooseFilter("all")} />
+              <ListBanners search={banners.search} filter={banners.filter} onShowAll={() => chooseFilter(allTicked(ladder))} />
               {refreshLine}
               {!searching && !nothingShown && groupBy === "iteration" && iterations.length === 0 && box.tasks.length > 0 && (
                 <p className="muted small">
@@ -1625,8 +1615,8 @@ function TaskbagView({
                   empty={g.empty}
                   tasks={g.tasks}
                   counted={g.counted}
-                  hidden={!searching && stateFilter !== "all" ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
-                  onShowAll={() => chooseFilter("all")}
+                  hidden={!searching && !isAll(stateFilter) ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
+                  onShowAll={() => chooseFilter(allTicked(ladder))}
                   stop={stop}
                   onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
                   onError={onError}
