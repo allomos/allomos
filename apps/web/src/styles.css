@@ -15,6 +15,7 @@
   --err-bg: #fbe7e5;
   --info: #1f5fa8;
   --info-bg: #e6effa;
+  --progress: #6b46c1;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
@@ -40,6 +41,7 @@
     --err-bg: #3a1716;
     --info: #8cbcf0;
     --info-bg: #142a45;
+    --progress: #b39df2;
     color-scheme: dark;
   }
 }
@@ -438,9 +440,14 @@ button.link:hover { text-decoration: underline; }
 .row-stop-name { color: var(--muted); font-size: 12px; }
 .row-stop-text { overflow-wrap: anywhere; white-space: pre-line; }
 .row-stop-text.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
-.s-in_progress-text { color: var(--accent-ink); }
+/* Task-A01-cell542: every state its own colour, wherever a state is shown. */
+.s-backlog-text { color: var(--muted); }
+.s-ready-text { color: var(--info); }
+.s-in_progress-text { color: var(--progress); }
 .s-waiting-text { color: var(--warn); }
 .s-blocked-text { color: var(--err); }
+.s-done-text { color: var(--ok); }
+.s-dropped-text { color: var(--muted); text-decoration: line-through; }
 @container (max-width: 520px) {
   .row-facts { grid-template-columns: minmax(0, 1fr); }
 }
@@ -495,10 +502,14 @@ button.link:hover { text-decoration: underline; }
 .markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; text-align: left; }
 .markdown th { background: var(--bg); font-weight: 600; }
 .state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
-.s-in_progress { border-color: var(--accent); color: var(--accent-ink); }
+.s-backlog { color: var(--muted); }
+.s-ready { border-color: var(--info); color: var(--info); }
+.s-in_progress { border-color: var(--progress); color: var(--progress); }
 .s-waiting { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
 .s-blocked { background: var(--err-bg); color: var(--err); border-color: transparent; }
 .state-filter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+/* The filter shows the chosen state in its colour (Task-A01-cell542); the options that are not a state stay plain. */
+.state-filter option:not([class]) { color: var(--ink); }
 .blocker-picker { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 6px 0; max-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
 .blocker-picker legend { color: var(--muted); padding: 0 4px; }
 .s-done { background: var(--ok-bg); color: var(--ok); border-color: transparent; }

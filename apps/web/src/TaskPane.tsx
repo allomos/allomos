@@ -671,7 +671,7 @@ export function TaskPane({
               <dd>{editor(field)}</dd>
             ) : (
               <dd>
-                <span className={value ? undefined : "muted"}>{value || "—"}</span> {field && changeButton(field)}
+                <span className={!value ? "muted" : field === "state" ? `s-${task.state}-text` : undefined}>{value || "—"}</span> {field && changeButton(field)}
                 {button}
               </dd>
             )}
