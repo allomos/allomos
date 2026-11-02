@@ -106,7 +106,7 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
                     checked={!filter.states.includes(s)}
                     onChange={(e) => onChange(tickState(filter, s, e.target.checked))}
                   />
-                  <span className={`s-${s}-text`}>{t(`state.${s}`)}</span>
+                  <span className={`state-word s-${s}-text`}>{t(`state.${s}`)}</span>
                 </label>
               ))}
             </div>

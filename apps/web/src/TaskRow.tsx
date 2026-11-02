@@ -44,7 +44,7 @@ export function TaskRow({
   const facts: [string, ReactNode, string?][] = [
     [
       t("pane.state"),
-      <span className={`fact-state s-${task.state}-text`}>{t(`state.${task.state}`)}</span>,
+      <span className={`fact-state state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>,
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
   ];

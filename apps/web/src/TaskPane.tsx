@@ -528,6 +528,9 @@ export function TaskPane({
       {askedNote("top")}
     </>
   ) : null;
+  // Task-A01-yard163: the state word on its tint; a waiting or blocked task's text takes the colour only.
+  const stop = stopText(task, tasks, t);
+  const stateClass = stop ? `s-${task.state}-text` : `state-word tint s-${task.state}-text`;
   // The area, agent, check and session are not changed here: holders are agent sessions (owner,
   // 2026-10-14), and the others have no change of their own in `alm` (the Checked button below
   // clears the note). The fourth item is the label's hover text.
@@ -535,7 +538,7 @@ export function TaskPane({
   const rows: [string, string | null, EditField | null, string?, ReactNode?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
-    [t("pane.state"), stopText(task, tasks, t) ?? t(`state.${task.state}`), "state"],
+    [t("pane.state"), stop ?? t(`state.${task.state}`), "state"],
     // Always shown (approver, 2026-10-25), whatever the number of bound folders.
     [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
     [t("pane.label"), task.label, "label"],
@@ -671,7 +674,7 @@ export function TaskPane({
               <dd>{editor(field)}</dd>
             ) : (
               <dd>
-                <span className={!value ? "muted" : field === "state" ? `s-${task.state}-text` : undefined}>{value || "—"}</span> {field && changeButton(field)}
+                <span className={!value ? "muted" : field === "state" ? stateClass : undefined}>{value || "—"}</span> {field && changeButton(field)}
                 {button}
               </dd>
             )}
