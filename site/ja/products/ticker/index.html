@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticker · 肩代 Allomos</title>
+<meta name="description" content="ブラウザで使う株のウォッチリスト：株・ETF・為替・暗号資産を検索し、複数の非公開リストに入れ、銘柄を開いて価格とチャートを見る。">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/products/ticker/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/products/ticker/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/products/ticker/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Ticker · 肩代 Allomos">
+<meta property="og:description" content="ブラウザで使う株のウォッチリスト：株・ETF・為替・暗号資産を検索し、複数の非公開リストに入れ、銘柄を開いて価格とチャートを見る。">
+<meta property="og:url" content="https://www.allomos.com/ja/products/ticker/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/ja/"><img src="/images/logo.svg" alt="">肩代 Allomos</a>
+    <nav>
+      <a class="sec" href="/ja/products/" aria-current="true">製品</a>
+      <a class="sec" href="/ja/blog/">ブログ</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/products/ticker/" lang="en">EN</a><a href="/zh/products/ticker/" lang="zh-CN">中文</a><a href="/ja/products/ticker/" aria-current="page" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero product-hero">
+    <img class="picon big" src="/images/products/ticker-icon.svg" alt="">
+    <h1>Ticker</h1>
+    <p>Ticker はブラウザで使う株のウォッチリストです。株、ETF、為替、暗号資産を検索して、自分だけのリストにいくつでも入れられ、どの銘柄も開けば価格、チャート、主な指標が見られます。ログインはメールで届くリンクから。覚えるパスワードはありません。</p>
+    <div class="btns">
+      <a class="btn primary" href="https://ticker.allomos.com/">Ticker を開く</a>
+      <a class="btn secondary" href="https://github.com/allomos/ticker">GitHub のソース</a>
+    </div>
+    <div class="tags">プラットフォーム：Web · どのブラウザでも &nbsp;·&nbsp; ライセンス：MIT</div>
+  </div>
+  <section><div class="cards"><div class="card"><h3>なんでも検索</h3><p>株、ETF、通貨ペア、暗号資産を名前かシンボルで探し、そのままリストに追加できます。</p></div><div class="card"><h3>複数の非公開リスト</h3><p>保有銘柄、気になる銘柄など、リストをいくつでも作り、名前や順番を変えられます。見えるのは自分だけです。</p></div><div class="card"><h3>銘柄ごとのページ</h3><p>最新の価格と騰落、1 日から全期間までのチャート、主な指標。</p></div><div class="card"><h3>メールでログイン</h3><p>リンクを頼み、開いて、ボタンを押すだけ。リンクは 15 分以内に一度だけ使え、ログインは 30 日続きます。</p></div><div class="card"><h3>自分で動かす</h3><p>Cloudflare Workers と D1 データベースで動きます。ソースとデプロイ方法は GitHub にあります。</p></div></div></section>
+  <section>
+    <h2>価格について</h2>
+    <p class="lead">Ticker は市場データサービス <a href="https://twelvedata.com/">Twelve Data</a> の無料プランを使っています。このプランの対象は米国株と米国 ETF、為替、暗号資産で、価格は遅延しておりリアルタイムではありません。1 分あたり数回のリクエストを Ticker の利用者全員で分け合うため、価格はしばらく保存して使い回します。上限に達したときは手元の最新の価格を表示し、古い可能性があることを示します。ウォッチリストであって、売買のためのツールではありません。</p>
+  </section>
+  <section>
+    <h2>作られた経緯</h2>
+    <p class="lead">投桃（Tosstoss）や Tatakikun と同じく、Ticker も AI エージェントが「肩代」を通してタスクを一つずつ進めて作りました。その一歩一歩はリポジトリに記録されています。</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT ライセンス</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>

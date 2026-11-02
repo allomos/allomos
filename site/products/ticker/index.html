@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticker · Allomos</title>
+<meta name="description" content="A stock watchlist in the browser: search stocks, ETFs, currencies and crypto, keep several private lists, open a ticker for its price and chart.">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/products/ticker/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/products/ticker/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/products/ticker/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Ticker · Allomos">
+<meta property="og:description" content="A stock watchlist in the browser: search stocks, ETFs, currencies and crypto, keep several private lists, open a ticker for its price and chart.">
+<meta property="og:url" content="https://www.allomos.com/products/ticker/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/"><img src="/images/logo.svg" alt="">Allomos</a>
+    <nav>
+      <a class="sec" href="/products/" aria-current="true">Products</a>
+      <a class="sec" href="/blog/">Blog</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/products/ticker/" aria-current="page" lang="en">EN</a><a href="/zh/products/ticker/" lang="zh-CN">中文</a><a href="/ja/products/ticker/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero product-hero">
+    <img class="picon big" src="/images/products/ticker-icon.svg" alt="">
+    <h1>Ticker</h1>
+    <p>Ticker is a stock watchlist that runs in the browser. Search stocks, ETFs, currencies and crypto, keep them in as many private lists as you like, and open any ticker for its price, chart and key figures. You sign in with a link sent by email; there is no password to remember.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://ticker.allomos.com/">Open Ticker</a>
+      <a class="btn secondary" href="https://github.com/allomos/ticker">Source on GitHub</a>
+    </div>
+    <div class="tags">Platform: Web · any browser &nbsp;·&nbsp; Licence: MIT</div>
+  </div>
+  <section><div class="cards"><div class="card"><h3>Search everything</h3><p>Find a stock, an ETF, a currency pair or a coin by its name or symbol, and add it to a list in one step.</p></div><div class="card"><h3>Several private lists</h3><p>Make lists for what you hold, what you watch or anything else; rename and reorder them. Only you see them.</p></div><div class="card"><h3>A page for each ticker</h3><p>Its latest price and change, a chart from one day to its whole history, and the key figures.</p></div><div class="card"><h3>Sign in by email</h3><p>Ask for a link, open it, press the button. The link works once, for 15 minutes; sessions last 30 days.</p></div><div class="card"><h3>Run your own</h3><p>It runs on Cloudflare Workers with a D1 database; the source and how to deploy it are on GitHub.</p></div></div></section>
+  <section>
+    <h2>About the prices</h2>
+    <p class="lead">Ticker uses the free plan of the market-data service <a href="https://twelvedata.com/">Twelve Data</a>. That plan covers US stocks and ETFs, currencies and crypto, and its prices are delayed, not live. Its few requests a minute are shared by everyone using Ticker, so prices are kept and reused for a while; when the budget runs out, Ticker shows the latest price it has and says it may be out of date. It is a watchlist, not a trading tool.</p>
+  </section>
+  <section>
+    <h2>How it was built</h2>
+    <p class="lead">Like Tosstoss and Tatakikun, Ticker was built by AI agents working through Allomos, task by task, with every step on the record in its repository.</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT licence</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
