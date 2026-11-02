@@ -3,7 +3,7 @@ title: Allomos Guide
 description: How to use Allomos, the app that lets a project switch between AI agents and teammates without losing its tasks.
 template: splash
 hero:
-  tagline: Switch agents and teammates. Keep the whole project on the record.
+  tagline: The work always carries on
   actions:
     - text: Get started
       link: /allomos/start/getting-started/

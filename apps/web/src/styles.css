@@ -297,9 +297,6 @@ button.link:hover { text-decoration: underline; }
 .welcome-grid > * { min-width: 0; }
 .welcome-text { display: grid; gap: clamp(10px, 2.2vh, 16px); }
 .welcome p { margin: 0; }
-.welcome .eyebrow {
-  font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink);
-}
 .welcome h1 {
   margin: 0; font-family: var(--display); font-weight: 800; font-stretch: condensed;
   font-size: clamp(32px, min(5vw, 7vh), 66px); line-height: .95; letter-spacing: .005em;
@@ -309,7 +306,6 @@ button.link:hover { text-decoration: underline; }
 :root:lang(zh-CN) .welcome h1, :root:lang(ja) .welcome h1 {
   font-weight: 900; line-height: 1.18; letter-spacing: .01em; font-size: clamp(28px, min(4.4vw, 6.2vh), 58px);
 }
-:root:lang(zh-CN) .welcome .eyebrow, :root:lang(ja) .welcome .eyebrow { font-family: var(--font); letter-spacing: .08em; font-size: 13px; }
 .welcome .lede { font-size: clamp(15px, min(1.6vw, 2.4vh), 19px); color: var(--muted); max-width: 60ch; }
 .welcome-start { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 8px; }
 .welcome .start { font-size: 15px; padding: 11px 28px; border-radius: 999px; }
@@ -557,7 +553,7 @@ button.link:hover { text-decoration: underline; }
 .wizard-body p { margin: 0; }
 .wizard .row.start { justify-content: flex-start; }
 .wizard .card { border: 0; padding: 0; background: none; }
-/* Chinese and Japanese have no spaces: each phrase of the slogan stays whole, and lines break
+/* Chinese and Japanese have no spaces: each phrase of the headline stays whole, and lines break
    only between phrases (inside one only when it is wider than the column). */
 :root:lang(zh-CN) .welcome h1 .phrase, :root:lang(ja) .welcome h1 .phrase { display: inline-block; max-width: 100%; }
 :root:lang(ja) .hop .stencil { font-size: 11px; }
