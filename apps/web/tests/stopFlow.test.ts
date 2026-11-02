@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allBlockersDone, blockers, bothBanner, filterBanner, filterGroups, filterName, hiddenByFilter, searchBanner, taskCount, taskListBanners, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { allBlockersDone, blockers, bothBanner, filterBanner, filterGroups, filterName, hiddenByFilter, searchBanner, taskCount, taskListBanners, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
 import type { Opened, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -36,6 +36,18 @@ test("waiting says who must act: you when no one is named", () => {
     "Waiting for Ann: reply on licence",
   );
   assert.equal(stopText(task({ state: "in_progress" }), all, t), null);
+});
+
+test("the list's stop fact: its name, then its text; a named person leads the text (Task-A01-cactus586)", () => {
+  assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "approve the card" }), [], t), { name: "pane.waiting_on", text: "approve the card" });
+  assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "reply on licence", who: "Ann" }), [], t), {
+    name: "pane.waiting_on",
+    text: "Waiting for Ann: reply on licence",
+  });
+  const blocker = task({ id: "A01-17", state: "done" });
+  const me = task({ state: "blocked", blocked_by: ["A01-17"] });
+  assert.deepEqual(stopFact(me, [blocker, me], t), { name: "pane.blocked_by", text: "A01-17 (Done) — all done; unblock it?" });
+  assert.equal(stopFact(task({ state: "in_progress" }), [], t), null);
 });
 
 test("blocked names each blocker with its state now; a dropped one is flagged, never done", () => {

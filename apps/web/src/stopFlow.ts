@@ -46,6 +46,25 @@ export function stopText(task: Task, tasks: readonly Task[], t: T): string | nul
   return null;
 }
 
+/** A stopped task's fact in the task list (Task-A01-cactus586): its name ("Waiting on", "Blocked by")
+ * on a line of its own, its text under it. A person named to act leads the text ("Waiting for Ann: …");
+ * `null` when the task is not stopped. */
+export type StopFact = { name: Key; text: string };
+
+export function stopFact(task: Task, tasks: readonly Task[], t: T): StopFact | null {
+  if (task.state === "waiting") {
+    const what = task.waiting_on ?? "";
+    return { name: "pane.waiting_on", text: task.who ? t("task.waiting_for", { who: task.who, what }) : what };
+  }
+  if (task.state === "blocked") {
+    const list = blockers(task, tasks)
+      .map((b) => blockerText(b, t))
+      .join(", ");
+    return { name: "pane.blocked_by", text: allBlockersDone(task, tasks) ? `${list} — ${t("task.blockers_done")}` : list };
+  }
+  return null;
+}
+
 /** Finished without the human check and not checked since: "Not human-checked" (Task-A03-18). */
 export function toCheck(task: Task): boolean {
   return task.state === "done" && !!task.without_human_check;
