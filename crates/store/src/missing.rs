@@ -11,7 +11,7 @@ use allomos_core::branch::Branches;
 /// One thing the task is missing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Missing {
-    /// `session`, `working_branch` or `handoff_note`.
+    /// `session`, `session_kind`, `working_branch` or `handoff_note`.
     pub code: &'static str,
     /// What is missing and what goes wrong without it, in plain words.
     pub fact: String,
@@ -20,7 +20,8 @@ pub struct Missing {
 }
 
 /// What `task` is missing, in that order: the session details the app needs to reopen the
-/// session, the working branch of a task that was claimed, and the handoff note of a task
+/// session, where a Claude Code session runs (the Claude desktop app or a terminal), the working
+/// branch of a task that was claimed, and the handoff note of a task
 /// finished without the human check. `claimed`: the task was claimed at some point (a claim in
 /// its history, or a holder now).
 pub fn missing(task: &Task, branches: Option<&Branches>, claimed: bool) -> Vec<Missing> {
@@ -46,6 +47,28 @@ pub fn missing(task: &Task, branches: Option<&Branches>, claimed: bool) -> Vec<M
                 ),
                 fix: format!(
                     "alm session {id} --session-agent <your agent's id> --session-id <your session's ID> [--session-kind desktop --app-session-id <its local_… ID>]"
+                ),
+            });
+        }
+        // A Claude Code session with an ID but no kind or app session ID (Task-A03-sugar117): the
+        // app takes it for a terminal one, so a session in the Claude desktop app would resume in
+        // a terminal. Any recorded kind (`--session-kind terminal`) says where it runs.
+        if gap.is_none()
+            && session.is_some_and(|s| {
+                s.agent
+                    .as_deref()
+                    .is_some_and(|a| a.trim().to_ascii_lowercase().starts_with("claude"))
+                    && !has(s.kind.as_ref())
+                    && !has(s.app_session_id.as_ref())
+            })
+        {
+            out.push(Missing {
+                code: "session_kind",
+                fact: format!(
+                    "Task {id}: its Claude Code session does not say where it runs, so the Allomos app resumes it in a terminal (claude --resume). If it runs in the Claude desktop app, record its desktop details so the app opens it there; if it runs in a terminal, record --session-kind terminal."
+                ),
+                fix: format!(
+                    "alm session {id} --session-kind desktop --app-session-id <its local_… ID>"
                 ),
             });
         }
@@ -156,5 +179,45 @@ mod tests {
         );
         t.handoff_note = Some("Merged; check steps attached.".into());
         assert_eq!(missing(&t, Some(&branch("b")), true), vec![]);
+    }
+
+    #[test]
+    fn a_claude_code_session_without_its_place_is_told_to_add_the_desktop_details() {
+        let mut t = task();
+        let b = branch("claude/x");
+        // Only the agent and the session ID: named, with the desktop fix.
+        t.session = Some(AgentSession {
+            agent: Some("claude-code".into()),
+            id: Some("s1".into()),
+            ..Default::default()
+        });
+        let m = missing(&t, Some(&b), true);
+        assert_eq!(m.len(), 1, "{m:?}");
+        assert_eq!(m[0].code, "session_kind");
+        assert!(
+            m[0].fact.contains("Claude desktop app")
+                && m[0].fact.contains("--session-kind terminal"),
+            "{}",
+            m[0].fact
+        );
+        assert_eq!(
+            m[0].fix,
+            "alm session A01-01 --session-kind desktop --app-session-id <its local_… ID>"
+        );
+        // A terminal session says so, and is asked nothing more.
+        t.session.as_mut().unwrap().kind = Some("terminal".into());
+        assert_eq!(missing(&t, Some(&b), true), vec![]);
+        // The desktop details recorded: nothing missing.
+        let s = t.session.as_mut().unwrap();
+        s.kind = Some("desktop".into());
+        s.app_session_id = Some("local_1".into());
+        assert_eq!(missing(&t, Some(&b), true), vec![]);
+        // Another agent (no Claude desktop app) is not asked.
+        t.session = Some(AgentSession {
+            agent: Some("codex".into()),
+            id: Some("s1".into()),
+            ..Default::default()
+        });
+        assert_eq!(missing(&t, Some(&b), true), vec![]);
     }
 }

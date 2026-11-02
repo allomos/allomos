@@ -447,8 +447,10 @@ const WORKFLOW: &str = "# How to work the tasks
    your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
    When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
    <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
-   reopen it (for example, `--session-kind desktop --app-session-id <its local_… ID>` when you
-   run in the Claude desktop app). alm stores what you pass and checks nothing; the task keeps
+   reopen it. In the Claude desktop app you must also pass `--session-kind desktop
+   --app-session-id <its local_… ID>`: without them the Allomos app resumes your session in a
+   terminal instead of opening it in the Claude app (in a terminal, pass `--session-kind
+   terminal`). alm stores what you pass and checks nothing; the task keeps
    it after release and done, and the next claim replaces it.
    **Branches.** Every task has a base branch, by its real name (`main`, `master`,
    `storage-v2`…): it starts from it and merges back into it; merging one base branch into

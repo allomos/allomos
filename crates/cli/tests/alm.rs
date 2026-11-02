@@ -2463,7 +2463,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v29)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v30)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2473,7 +2473,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v29)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v30)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -5449,8 +5449,14 @@ fn task_commands_list_what_the_task_is_missing() {
             "s1",
         ],
     );
-    assert_eq!(v["missing"], json!([]), "{v}");
     assert_eq!(v["task"]["session"]["id"], "s1");
+    // A Claude Code session that does not say where it runs (Task-A03-sugar117): told to add the
+    // desktop details; `--session-kind terminal` says it runs in a terminal.
+    assert_eq!(v["missing"][0]["code"], "session_kind", "{v}");
+    assert_eq!(
+        v["missing"][0]["fix"],
+        "alm session A01-01 --session-kind desktop --app-session-id <its local_… ID>"
+    );
     let v = ok(
         &repo,
         &[
@@ -5460,8 +5466,11 @@ fn task_commands_list_what_the_task_is_missing() {
             "A01-01",
             "--session-id",
             "s2",
+            "--session-kind",
+            "terminal",
         ],
     );
+    assert_eq!(v["missing"], json!([]), "{v}");
     assert_eq!(v["task"]["session"]["agent"], "claude-code", "{v}");
     assert_eq!(v["task"]["session"]["id"], "s2");
     // Someone else's task, or nothing to record: refused.

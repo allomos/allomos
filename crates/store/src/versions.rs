@@ -86,7 +86,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// (Task-A03-hive049).
 /// 29: after a command that changes a task, `alm` lists what the task is missing with the fix,
 /// and `alm session` fills in session details later (Task-A03-ham538).
-pub const SECTION_VERSION: u32 = 29;
+/// 30: an agent in the Claude desktop app must pass `--session-kind desktop --app-session-id`
+/// at the claim; `--session-kind terminal` in a terminal (Task-A03-sugar117).
+pub const SECTION_VERSION: u32 = 30;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
