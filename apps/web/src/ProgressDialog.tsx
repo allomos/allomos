@@ -11,8 +11,8 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
-import type { Progress } from "./types";
-import { WAITING_ID, arrange, fraction, progressState, stillWaiting } from "./progressFlow";
+import type { Progress, Task } from "./types";
+import { WAITING_ID, agentTask, arrange, fraction, progressState, stillWaiting } from "./progressFlow";
 import type { Job, Waiting } from "./progressFlow";
 import type { Key } from "./i18n";
 import { IconLoader } from "./IconLoader";
@@ -37,8 +37,10 @@ export function agentOpened(root: string, job: Job) {
 
 const LOOK_MS = 1000;
 
-export function ProgressDialog({ messenger, project, root }: { messenger: Messenger; project: string; root: string }) {
+export function ProgressDialog({ messenger, project, root, tasks }: { messenger: Messenger; project: string; root: string; tasks: readonly Task[] }) {
   const { t } = useI18n();
+  /** The report whose agent's window the person asked the app to open (Task-A03-aster771). */
+  const [asked, setAsked] = useState<string | null>(null);
   const [reports, setReports] = useState<Progress[]>([]);
   const [waiting, setWaiting] = useState<Waiting | null>(null);
   useEffect(() => {
@@ -117,6 +119,34 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
     : reports;
   const { popup, chips } = arrange(shown, background, closed);
   const count = (p: Progress) => (p.done !== undefined && p.of ? ` (${t("progress.count", { done: p.done, of: p.of })})` : "");
+  // Waiting for the person or quiet: a button that opens the agent's window, when the app can
+  // tell which session is the agent's (Task-A03-aster771).
+  const openAgent = (p: Progress) => {
+    const found = agentTask(p, tasks);
+    if (!found) return null;
+    return (
+      <>
+        <button
+          type="button"
+          className="with-icon"
+          onClick={() => {
+            setAsked(null);
+            void messenger
+              .openAgentSession(root, found.id)
+              .then(() => setAsked(found.place === "app" ? p.id : null))
+              .catch(() => undefined);
+          }}
+        >
+          <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11" />
+            <path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5" />
+          </svg>
+          {t(found.place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
+        </button>
+        {asked === p.id && <span className="muted small">{t("session.asked_claude")}</span>}
+      </>
+    );
+  };
 
   return (
     <>
@@ -127,7 +157,9 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
               {progressState(p, now) === "working" && <IconLoader />}
               {progressState(p, now) === "finished"
                 ? t("progress.chip_finished", { title: p.title })
-                : `${p.title}: ${p.step ?? t("progress.starting")}${count(p)}`}
+                : progressState(p, now) === "waiting"
+                  ? t("progress.chip_waiting", { title: p.title })
+                  : `${p.title}: ${p.step ?? t("progress.starting")}${count(p)}`}
             </button>
           ))}
         </div>
@@ -152,6 +184,11 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
               <blockquote className="progress-finished" role="status">
                 <span aria-hidden="true">✓</span> <span>{popup.finished}</span>
               </blockquote>
+            ) : progressState(popup, now) === "waiting" ? (
+              // The agent's question (`alm progress --waiting`): it waits for the person, so it is never quiet.
+              <p className="progress-waiting" role="status">
+                {t("progress.waiting_reply", { question: popup.waiting ?? "" })}
+              </p>
             ) : (
               <>
                 <p className="searching" role="status">
@@ -171,13 +208,19 @@ export function ProgressDialog({ messenger, project, root }: { messenger: Messen
                   {t("progress.close")}
                 </button>
               ) : progressState(popup, now) === "quiet" ? (
-                <button type="button" onClick={() => hideQuiet(popup)}>
-                  {t("progress.close")}
-                </button>
+                <>
+                  {openAgent(popup)}
+                  <button type="button" onClick={() => hideQuiet(popup)}>
+                    {t("progress.close")}
+                  </button>
+                </>
               ) : (
-                <button type="button" onClick={() => toBackground(popup.id)}>
-                  {t("progress.background")}
-                </button>
+                <>
+                  {progressState(popup, now) === "waiting" && openAgent(popup)}
+                  <button type="button" onClick={() => toBackground(popup.id)}>
+                    {t("progress.background")}
+                  </button>
+                </>
               )}
             </div>
           </section>

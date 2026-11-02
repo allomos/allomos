@@ -1276,9 +1276,9 @@ pub fn discuss_request_in(language: &str, description: &str, quiet: bool) -> Str
 1. **读目标提示，但先不开始。** 运行 `alm guide goal`，把目标提示读一遍：之后你就按它工作。现在不要开始目标运行。
 2. **只写目标任务。** 按目标提示阶段 2 第 1 步的写法添加它：`alm add area \"<应用的名字>\"`，然后 `alm add task --area <id> --title \"Goal: <一句话说明这个应用>\" --branch <你所在的分支>`。用 `alm describe <id> --from <file.md>` 写它的规格，其中包括：下面这个人的描述，一字不改；就目前所知，这个应用做什么、给谁用，以及验收标准；运行模式：{mode}，这个人在 Allomos 中选的，从开始构建起生效；还有一句：这个目标任务是先写下来供讨论的。
 3. **别的都不要做：** 不添加其他领域、迭代或任务，也不构建任何东西。
-4. **告诉这个人：** 目标任务（它的 ID）已经写好，简要列出它的规格；请对方就在这段对话里和你一起完善目标。最后用类似这样的话结束：“目标没问题了，就告诉我开始，怎么说都行，我会规划并构建这个应用。”
+4. **告诉这个人：** 目标任务（它的 ID）已经写好，简要列出它的规格；请对方就在这段对话里和你一起完善目标。最后用类似这样的话结束：“目标没问题了，就告诉我开始，怎么说都行，我会规划并构建这个应用。”停下来等对方回复前，运行 `alm progress --waiting \"<你在等对方回答什么>\"`，Allomos 的进度框就显示“等你回复”，而不会以为你停了。
 5. **讨论期间：** 每谈定一点，就用 `alm describe` 更新目标任务的规格。
-6. **这个人让你开始时**（怎么说都行）：从这个目标任务出发，按目标提示继续，从阶段 2 第 2 步开始规划。在目标任务上记下目标运行的批准：由这个人的这句话给出，并写上日期。
+6. **这个人让你开始时**（怎么说都行）：第一件事是运行 `alm progress --step \"<正在做什么>\"`，让进度框马上显示你开工了；然后从这个目标任务出发，按目标提示继续，从阶段 2 第 2 步开始规划。在目标任务上记下目标运行的批准：由这个人的这句话给出，并写上日期。
 
 这个人的描述：
 
@@ -1300,9 +1300,9 @@ pub fn discuss_request_in(language: &str, description: &str, quiet: bool) -> Str
 1. **ゴールのプロンプトを読む。ただし、まだ始めない。** `alm guide goal` を実行してゴールのプロンプトを読みます。このあとはそれに従って作業します。いまはゴール実行を始めません。
 2. **ゴールのタスクだけを書く。** ゴールのプロンプトの段階 2 の手順 1 のとおりに加えます：`alm add area \"<アプリの名前>\"`、続けて `alm add task --area <id> --title \"Goal: <アプリをひとことで>\" --branch <いまいるブランチ>`。`alm describe <id> --from <file.md>` で仕様を書き、次を入れます：下にあるこの人の説明（一字も変えずに）、いまわかる範囲で、アプリが何をし誰が使うか、そして受け入れ基準、実行モード：{mode}（この人が Allomos で選びました。作り始めたときから有効）、そしてこのゴールのタスクは話し合うために先に書かれたということ。
 3. **ほかには何もしない：** ほかのエリア、イテレーション、タスクを加えず、何も作りません。
-4. **この人に伝える：** ゴールのタスク（その ID）を書いたこと、その仕様の要点を伝え、この会話のなかで一緒にゴールを練り上げようと誘います。最後は次のような言葉で締めくくります：「これでよければ、進めるように言ってください。言い方は自由です。アプリを計画して作ります。」
+4. **この人に伝える：** ゴールのタスク（その ID）を書いたこと、その仕様の要点を伝え、この会話のなかで一緒にゴールを練り上げようと誘います。最後は次のような言葉で締めくくります：「これでよければ、進めるように言ってください。言い方は自由です。アプリを計画して作ります。」返事を待って止まる前に `alm progress --waiting \"<相手に何を答えてほしいか>\"` を実行します。Allomos の進捗の枠に「返事待ち」と出て、止まったとは見なされません。
 5. **話し合いのあいだ：** 話が決まるたびに、`alm describe` でゴールのタスクの仕様を更新します。
-6. **この人が進めるように言ったら**（言い方は自由です）：このゴールのタスクから、ゴールのプロンプトに従って続けます。計画は段階 2 の手順 2 からです。ゴール実行の承認は、この人のその言葉で与えられたものとして、日付とともにゴールのタスクに記録します。
+6. **この人が進めるように言ったら**（言い方は自由です）：まず `alm progress --step \"<いましていること>\"` を実行して、作業が始まったことを進捗の枠にすぐ出します。それから、このゴールのタスクから、ゴールのプロンプトに従って続けます。計画は段階 2 の手順 2 からです。ゴール実行の承認は、この人のその言葉で与えられたものとして、日付とともにゴールのタスクに記録します。
 
 この人の説明：
 
@@ -1324,9 +1324,9 @@ The person started this from Allomos's Build a new app… with Discuss first tic
 1. **Read the goal prompt, but do not start yet.** Run `alm guide goal` and read the goal prompt: it is how you will work afterwards. Do not start the goal run now.
 2. **Write only the goal task**, as the goal prompt's phase 2, step 1 says: `alm add area \"<the app's name>\"`, then `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you are on>`. Write its spec with `alm describe <id> --from <file.md>`, holding: the person's description below, word for word; what the app does and for whom, and the acceptance criteria, as far as you can tell now; the run mode, {mode} (the person chose it in Allomos; it applies once the build starts); and that this goal task was written first, for discussion.
 3. **Do nothing else:** add no other areas, iterations or tasks, and build nothing.
-4. **Tell the person** the goal task (its ID) is written, with its spec in short, and invite them to refine the goal with you here, in this conversation. End with words like: \"When it's right, tell me to go ahead, in any words, and I'll plan and build the app.\"
+4. **Tell the person** the goal task (its ID) is written, with its spec in short, and invite them to refine the goal with you here, in this conversation. End with words like: \"When it's right, tell me to go ahead, in any words, and I'll plan and build the app.\" Before you stop to wait for their answer, run `alm progress --waiting \"<what you are waiting for them to answer>\"`, so Allomos's progress box shows it waits for them, not that you stopped.
 5. **While you discuss,** update the goal task's spec (`alm describe`) as you agree on each point.
-6. **When the person tells you to go ahead** (in any words), follow the goal prompt from this goal task, planning from phase 2, step 2. Record the goal run's approval on the goal task as given by their go-ahead, with its date.
+6. **When the person tells you to go ahead** (in any words), first run `alm progress --step \"<what you are doing>\"`, so the progress box shows at once that you started; then follow the goal prompt from this goal task, planning from phase 2, step 2. Record the goal run's approval on the goal task as given by their go-ahead, with its date.
 
 The person's description:
 

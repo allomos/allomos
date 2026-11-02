@@ -2,8 +2,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { QUIET_AFTER_S, arrange, fraction, progressState, stillWaiting } from "../src/progressFlow.ts";
-import type { Progress } from "../src/types.ts";
+import { QUIET_AFTER_S, agentTask, arrange, fraction, progressState, stillWaiting } from "../src/progressFlow.ts";
+import type { Progress, Task } from "../src/types.ts";
 
 const report = (id: string, more: Partial<Progress> = {}): Progress => ({ id, title: "Update the taskbag", started: 100, updated: 1000, ...more });
 
@@ -11,6 +11,26 @@ test("a report is working, finished, or quiet after 10 minutes without word", ()
   assert.equal(progressState(report("a"), 1000 + 5), "working");
   assert.equal(progressState(report("a"), 1000 + QUIET_AFTER_S), "quiet");
   assert.equal(progressState(report("a", { finished: "3 cards moved in" }), 1000 + QUIET_AFTER_S * 9), "finished");
+});
+
+test("an agent waiting for the person's answer is never quiet; finished still wins (Task-A03-aster771)", () => {
+  const asking = report("a", { waiting: "Which data source?", step: "Planning" });
+  assert.equal(progressState(asking, 1000 + 5), "waiting");
+  assert.equal(progressState(asking, 1000 + QUIET_AFTER_S * 6), "waiting");
+  assert.equal(progressState({ ...asking, finished: "Built" }, 1000 + QUIET_AFTER_S), "finished");
+});
+
+test("the popup finds the agent's window from the task it holds with a recorded session", () => {
+  const task = (id: string, more: Partial<Task>): Task => ({ id, title: id, area: "A01", state: "in_progress", label: null, holder: null, waiting_on: null, next_dependency: null, iteration: null, handoff_note: null, without_human_check: null, human_check_steps: null, description: "", ...more }) as Task;
+  const tasks = [
+    task("A01-1", { holder: "codex/other", session: { agent: "codex", id: "s1" } as Task["session"] }),
+    task("A01-2", { holder: "claude/x" }),
+    task("A01-3", { holder: "claude/x", session: { agent: "claude-code", id: "s2", kind: "desktop", app_session_id: "local_1" } as Task["session"] }),
+  ];
+  assert.deepEqual(agentTask(report("a", { from: "claude/x" }), tasks), { id: "A01-3", place: "app" });
+  assert.deepEqual(agentTask(report("a", { from: "codex/other" }), tasks), { id: "A01-1", place: "terminal" });
+  assert.equal(agentTask(report("a", { from: "nobody" }), tasks), null);
+  assert.equal(agentTask(report("a"), tasks), null);
 });
 
 test("the bar shows only when the agent counts its steps", () => {

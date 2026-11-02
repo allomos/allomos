@@ -6,7 +6,7 @@
 // (a chip that brings it back). Finished, it says what happened; silent for 10 minutes, it says
 // so, so the window is never stuck.
 
-import type { Progress } from "./types";
+import type { Progress, Task } from "./types";
 
 /** The jobs the app hands to an agent; their titles match what `alm progress` is asked to say. */
 export type Job = "connect" | "update" | "move_in" | "cards" | "build_app" | "translate";
@@ -30,12 +30,26 @@ export function stillWaiting(waiting: Waiting | null, reports: Progress[]): bool
 /** An agent that has not reported for this long may have stopped. */
 export const QUIET_AFTER_S = 10 * 60;
 
-export type ProgressState = "working" | "finished" | "quiet";
+export type ProgressState = "working" | "waiting" | "finished" | "quiet";
 
-/** Where a report stands at `now` (seconds since 1970). */
+/** Where a report stands at `now` (seconds since 1970). An agent waiting for the person's answer
+ * (`alm progress --waiting`) is never quiet, however long they talk (Task-A03-aster771). */
 export function progressState(p: Progress, now: number): ProgressState {
   if (p.finished !== undefined) return "finished";
+  if (p.waiting !== undefined) return "waiting";
   return now - p.updated >= QUIET_AFTER_S ? "quiet" : "working";
+}
+
+/** The task whose recorded session is the reporting agent's (it holds the task, by the same name
+ * as `--as`), so the popup can open that agent's window; null when the app cannot tell. */
+export function agentTask(p: Progress, tasks: readonly Task[]): { id: string; place: "app" | "terminal" } | null {
+  if (!p.from) return null;
+  for (const task of tasks) {
+    if (task.holder !== p.from) continue;
+    if (task.session?.app_session_id?.trim()) return { id: task.id, place: "app" };
+    if (task.session?.id?.trim()) return { id: task.id, place: "terminal" };
+  }
+  return null;
 }
 
 /** How far along, from 0 to 1, when the agent counts its steps; otherwise null. */

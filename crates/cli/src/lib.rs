@@ -203,6 +203,10 @@ enum Command {
         /// The job is over: what happened.
         #[arg(long, value_name = "TEXT")]
         finished: Option<String>,
+        /// You asked the person something and wait for the answer: the app shows the question
+        /// and does not say you went quiet. Your next report ends it.
+        #[arg(long, value_name = "QUESTION")]
+        waiting: Option<String>,
     },
     /// List tasks, grouped by area (or by iteration with --by iteration).
     List {
@@ -2066,6 +2070,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done,
             of,
             finished,
+            waiting,
         } => {
             // Passed on to the app as it is (Task-A05-08); alm checks nothing.
             let project = confirm_project(cli, cwd);
@@ -2078,15 +2083,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     done: *done,
                     of: *of,
                     finished: finished.as_deref(),
+                    waiting: waiting.as_deref(),
                 },
             )?;
             let count = match (p.done, p.of) {
                 (Some(d), Some(o)) => format!(" ({d} of {o})"),
                 _ => String::new(),
             };
-            let text = match &p.finished {
-                Some(f) => format!("Shown in the Allomos app: {}: finished: {f}\n", p.title),
-                None => format!(
+            let text = match (&p.finished, &p.waiting) {
+                (Some(f), _) => format!("Shown in the Allomos app: {}: finished: {f}\n", p.title),
+                (None, Some(q)) => format!(
+                    "Shown in the Allomos app: {}: waiting for the person's reply: {q}\n",
+                    p.title
+                ),
+                (None, None) => format!(
                     "Shown in the Allomos app: {}: {}{count}\n",
                     p.title,
                     p.step.as_deref().unwrap_or("…")
