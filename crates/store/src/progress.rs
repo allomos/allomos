@@ -36,6 +36,10 @@ pub struct Progress {
     /// The job is over: what happened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished: Option<String>,
+    /// The agent asked the person something and waits for the answer (Task-A03-aster771): the
+    /// app shows the question and never says the agent went quiet. The next report ends it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<String>,
     /// Who reports (`--as`), when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
@@ -52,6 +56,7 @@ pub struct Report<'a> {
     pub done: Option<u32>,
     pub of: Option<u32>,
     pub finished: Option<&'a str>,
+    pub waiting: Option<&'a str>,
 }
 
 fn now() -> u64 {
@@ -103,14 +108,20 @@ pub fn report(project: &Path, from: Option<&str>, report: &Report) -> Result<Pro
         detail: detail.to_string(),
     };
     let clean = |s: Option<&str>| s.map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-    let (title, step, finished) = (
+    let (title, step, finished, waiting) = (
         clean(report.title),
         clean(report.step),
         clean(report.finished),
+        clean(report.waiting),
     );
-    if title.is_none() && step.is_none() && finished.is_none() && report.done.is_none() {
+    if title.is_none()
+        && step.is_none()
+        && finished.is_none()
+        && waiting.is_none()
+        && report.done.is_none()
+    {
         return Err(usage(
-            "say what the agent is doing: --step, --done/--of or --finished (and --title for a new job)",
+            "say what the agent is doing: --step, --done/--of, --waiting or --finished (and --title for a new job)",
         ));
     }
     let dir = progress_dir(project);
@@ -129,6 +140,7 @@ pub fn report(project: &Path, from: Option<&str>, report: &Report) -> Result<Pro
             done: None,
             of: None,
             finished: None,
+            waiting: None,
             from: from.map(String::from),
             started: at,
             updated: at,
@@ -152,6 +164,8 @@ pub fn report(project: &Path, from: Option<&str>, report: &Report) -> Result<Pro
         }
     }
     p.finished = finished;
+    // Any report without --waiting means the agent is at work again.
+    p.waiting = waiting;
     p.updated = at;
     let write = |e: std::io::Error| Problem::WriteFailed {
         path: path.display().to_string(),
@@ -257,13 +271,13 @@ pub fn request_line_in(language: &str, job: Job) -> String {
     let title = job_title_in(language, job);
     match language {
         "zh-CN" => format!(
-            "工作期间，请让用户在 Allomos 应用里看到进度：开始时运行 `alm progress --title \"{title}\" --step \"<正在做什么>\"`，之后每一步都运行 `alm progress --step \"<正在做什么>\" --done <已完成数> --of <总数>`（知道总数时），结束时运行 `alm progress --finished \"<做了什么>\"`。"
+            "工作期间，请让用户在 Allomos 应用里看到进度：开始时运行 `alm progress --title \"{title}\" --step \"<正在做什么>\"`，之后每一步都运行 `alm progress --step \"<正在做什么>\" --done <已完成数> --of <总数>`（知道总数时），结束时运行 `alm progress --finished \"<做了什么>\"`。问了用户问题、停下来等回复时，运行 `alm progress --waiting \"<你的问题>\"`；收到回复、接着干活时，第一件事是再报告一次 `--step`。"
         ),
         "ja" => format!(
-            "作業中は、Allomos アプリでユーザーに進み具合を見せてください：始めに `alm progress --title \"{title}\" --step \"<いましていること>\"`、その後は一歩ごとに `alm progress --step \"<いましていること>\" --done <済んだ数> --of <全体の数>`（全体の数が分かるとき）、終わったら `alm progress --finished \"<したこと>\"` を実行します。"
+            "作業中は、Allomos アプリでユーザーに進み具合を見せてください：始めに `alm progress --title \"{title}\" --step \"<いましていること>\"`、その後は一歩ごとに `alm progress --step \"<いましていること>\" --done <済んだ数> --of <全体の数>`（全体の数が分かるとき）、終わったら `alm progress --finished \"<したこと>\"` を実行します。ユーザーに質問して返事を待つときは `alm progress --waiting \"<あなたの質問>\"` を実行し、返事を受けて作業に戻ったら、まず `--step` をもう一度報告します。"
         ),
         _ => format!(
-            "While you work, keep the person informed in the Allomos app: start with `alm progress --title \"{title}\" --step \"<what you are doing>\"`, then at each step run `alm progress --step \"<what you are doing>\" --done <steps done> --of <all steps>` (when you know the count), and at the end `alm progress --finished \"<what happened>\"`."
+            "While you work, keep the person informed in the Allomos app: start with `alm progress --title \"{title}\" --step \"<what you are doing>\"`, then at each step run `alm progress --step \"<what you are doing>\" --done <steps done> --of <all steps>` (when you know the count), and at the end `alm progress --finished \"<what happened>\"`. When you ask the person something and stop to wait for the answer, run `alm progress --waiting \"<your question>\"`; when the answer comes and you go on, report a `--step` again first."
         ),
     }
 }
@@ -487,6 +501,52 @@ mod tests {
         fs::write(&path, serde_json::to_string(&done).unwrap()).unwrap();
         assert!(!touch(&dir, me));
         assert_eq!(read(&path).unwrap().updated, 5);
+    }
+
+    #[test]
+    fn waiting_for_the_person_lasts_until_the_next_report() {
+        let dir = tmp("waiting");
+        let me = Some("claude/w");
+        let start = Report {
+            title: Some("Build the app"),
+            waiting: Some("Which data source?"),
+            ..Default::default()
+        };
+        let p = report(&dir, me, &start).unwrap();
+        assert_eq!(p.waiting.as_deref(), Some("Which data source?"));
+        assert_eq!(p.step, None);
+        let p = report(
+            &dir,
+            me,
+            &Report {
+                step: Some("Planning"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(p.waiting, None);
+        assert_eq!(p.step.as_deref(), Some("Planning"));
+        // A count alone is a report too: it ends the waiting.
+        report(
+            &dir,
+            me,
+            &Report {
+                waiting: Some("OK to go on?"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let p = report(
+            &dir,
+            me,
+            &Report {
+                done: Some(1),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(p.waiting, None);
+        assert_eq!(p.step.as_deref(), Some("Planning"));
     }
 
     #[test]

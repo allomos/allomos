@@ -357,6 +357,8 @@ export interface Progress {
   of?: number;
   /** The job is over: what happened. */
   finished?: string;
+  /** The agent asked the person something and waits for the answer (Task-A03-aster771). */
+  waiting?: string;
   from?: string;
   /** Seconds since 1970. */
   started: number;

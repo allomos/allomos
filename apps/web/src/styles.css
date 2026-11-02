@@ -749,6 +749,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .progress-chip { display: flex; align-items: center; gap: 6px; text-align: left; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); overflow-wrap: anywhere; }
 .progress-finished { display: flex; gap: 8px; margin: 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--line); overflow-wrap: anywhere; }
 .progress-finished > span:first-child { color: var(--ok); font-weight: 600; }
+/* Task-A03-aster771: the agent's question while it waits for the person. */
+.progress-waiting { margin: 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--warn); color: var(--warn); overflow-wrap: anywhere; white-space: pre-line; }
 .progress-bar { width: 100%; height: 8px; accent-color: var(--accent); }
 
 /* The one-time "who are you" step (Task-A01-40): a box of its own, apart from the field being changed. */
