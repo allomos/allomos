@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FILTER_STATES, allTicked, allBlockersDone, blockers, bothBanner, emptyBy, filterBanner, filterGroups, filterName, groupTicks, hiddenByFilter, isAll, labelText, onLadder, reached, searchBanner, storeFilter, taskCount, taskListBanners, tickGroup, tickLabel, tickState, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { FILTER_STATES, allTicked, allBlockersDone, blockers, bothBanner, emptyBy, filterBanner, filterGroups, filterName, groupTicks, hiddenByFilter, isAll, labelText, ladderOff, onLadder, reached, searchBanner, storeFilter, taskCount, taskListBanners, tickGroup, tickLabel, tickLabeled, tickState, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
 import type { Opened, State, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -101,7 +101,7 @@ test("a label's Yes is reached it or a higher one; No is not reached, or no labe
   const verified = tickLabel(all, "locally verified", "no", false);
   assert.equal(keepState(verified, local), true);
   assert.equal(keepState(verified, task({ label: "implemented" })), false);
-  assert.equal(keepState(verified, task({ label: null })), false);
+  assert.equal(keepState(verified, task({ label: null })), true, "no label: Labeled's No alone decides (Task-A01-teacup726)");
   // State and label together: done and not human verified.
   const toCheckToo = { ...noHuman, states: only("done").states };
   assert.equal(keepState(toCheckToo, task({ state: "done", label: "locally verified" })), true);
@@ -132,9 +132,55 @@ test("the list is empty whatever the tasks: no state ticked, or a label with nei
   assert.equal(emptyBy(all), null);
   assert.deepEqual(emptyBy(tickGroup(all, "states", false)), { kind: "states" });
   const neither = tickLabel(tickLabel(all, "implemented", "yes", false), "implemented", "no", false);
-  assert.deepEqual(emptyBy(neither), { kind: "label", label: "implemented" });
+  assert.equal(emptyBy(neither), null, "tasks with no label are still listed");
   assert.equal(keepState(neither, task({ label: "implemented" })), false);
-  assert.equal(keepState(neither, task({ label: null })), false);
+  assert.equal(keepState(neither, task({ label: null })), true);
+  const labelledOnly = tickLabeled(neither, "no", false);
+  assert.deepEqual(emptyBy(labelledOnly), { kind: "label", label: "implemented" });
+  assert.deepEqual(emptyBy(tickLabeled(tickLabeled(all, "yes", false), "no", false)), { kind: "labeled" });
+  assert.equal(emptyBy(tickLabeled(all, "yes", false)), null);
+});
+
+// Task-A01-teacup726: Labeled (Yes / No) first in the Labels column.
+test("Labeled's No hides exactly the tasks with no label; its Yes hides every labelled task", () => {
+  const none = task({ label: null });
+  const local = task({ label: "locally verified" });
+  const off = task({ label: "off the ladder" });
+  const noNo = tickLabeled(all, "no", false);
+  assert.equal(keepState(noNo, none), false);
+  assert.equal(keepState(noNo, local), true);
+  assert.equal(keepState(noNo, off), true, "a label off the ladder is still a label");
+  const noYes = tickLabeled(all, "yes", false);
+  assert.equal(keepState(noYes, none), true);
+  assert.equal(keepState(noYes, local), false);
+  assert.equal(keepState(noYes, off), false);
+  assert.equal(isAll(noYes), false);
+  // The ladder greys out with its ticks kept; ticking Yes again brings them back.
+  const ticks = tickLabel(all, "human verified", "yes", false);
+  const greyed = tickLabeled(ticks, "yes", false);
+  assert.equal(ladderOff(greyed), true);
+  assert.deepEqual(greyed.yes, ["human verified"]);
+  const back = tickLabeled(greyed, "yes", true);
+  assert.deepEqual(back, ticks);
+  assert.equal(ladderOff(back), false);
+  assert.equal(keepState(back, task({ label: "human verified" })), false);
+});
+
+test("Select all, Clear all and the restore include Labeled; the button names it", () => {
+  const cleared = tickGroup(all, "labels", false);
+  assert.deepEqual(cleared.labeled, ["yes", "no"]);
+  assert.deepEqual(groupTicks(cleared, "labels"), { all: false, none: true });
+  assert.deepEqual(groupTicks(tickLabeled(all, "no", false), "labels"), { all: false, none: false });
+  assert.deepEqual(tickGroup(cleared, "labels", true), all);
+  assert.deepEqual(allTicked(LADDER), all);
+  assert.equal(filterName(tickLabeled(all, "no", false), t), "Hide Labeled: no");
+  assert.equal(filterName(tickLabeled(tickState(all, "done", false), "yes", false), t), "Hide Done, Labeled: yes");
+  // While greyed out, the ladder's ticks hide nothing, so the button leaves them out.
+  const greyed = tickLabeled(tickLabel(tickLabel(all, "drafted", "no", false), "implemented", "no", false), "yes", false);
+  assert.equal(filterName(greyed, t), "Hide Labeled: yes");
+  // Stored and read back; an older stored filter has Labeled all ticked.
+  assert.deepEqual(onLadder(readFilter(storeFilter(greyed)), LADDER), greyed);
+  assert.deepEqual(onLadder(readFilter(JSON.stringify({ states: [], yes: [], no: ["drafted"] })), LADDER).labeled, []);
 });
 
 test("the filter is remembered as what is unticked; the older single choice comes back as that state", () => {

@@ -1,7 +1,9 @@
 // The task list's Show filter (Task-A01-lens781): a button saying what is hidden, which opens a
 // panel of ticks in two groups, states and labels, each label with a Yes and a No; each group has
 // Select all and Clear all, grey when there is nothing for them to do, and a ↻ beside the button
-// ticks everything again. What the ticks keep is decided in stopFlow.ts.
+// ticks everything again. The Labels column starts with Labeled (Task-A01-teacup726), the ladder's
+// labels indented under it and greyed out while its Yes is unticked. What the ticks keep is
+// decided in stopFlow.ts.
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
@@ -12,9 +14,11 @@ import {
   filterName,
   groupTicks,
   isAll,
+  ladderOff,
   labelText,
   tickGroup,
   tickLabel,
+  tickLabeled,
   tickState,
   type Side,
   type StateFilter,
@@ -54,13 +58,21 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
       </span>
     );
   };
+  const greyed = ladderOff(filter);
   const side = (label: string, s: Side) => (
     <label className="filter-side">
       <input
         type="checkbox"
         checked={!filter[s].includes(label)}
+        disabled={greyed}
         onChange={(e) => onChange(tickLabel(filter, label, s, e.target.checked))}
       />
+      {t(s === "yes" ? "filter.yes" : "filter.no")}
+    </label>
+  );
+  const labeledSide = (s: Side) => (
+    <label className="filter-side">
+      <input type="checkbox" checked={!filter.labeled.includes(s)} onChange={(e) => onChange(tickLabeled(filter, s, e.target.checked))} />
       {t(s === "yes" ? "filter.yes" : "filter.no")}
     </label>
   );
@@ -116,8 +128,15 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
                   <span title={t("filter.labels_hint")}>{t("filter.labels")}</span>
                   {groupButtons("labels")}
                 </div>
+                <div className="filter-row filter-label-row">
+                  <span className="filter-label-name" title={t("filter.labeled_hint")}>
+                    {t("filter.labeled")}
+                  </span>
+                  {labeledSide("yes")}
+                  {labeledSide("no")}
+                </div>
                 {filter.ladder.map((label) => (
-                  <div key={label} className="filter-row filter-label-row">
+                  <div key={label} className={greyed ? "filter-row filter-label-row filter-child off" : "filter-row filter-label-row filter-child"}>
                     <span className="filter-label-name">{labelText(label, t)}</span>
                     {side(label, "yes")}
                     {side(label, "no")}
@@ -128,7 +147,11 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
           </div>
           {empty && (
             <p className="filter-empty small">
-              {empty.kind === "states" ? t("filter.empty_states") : t("filter.empty_label", { label: labelText(empty.label, t) })}
+              {empty.kind === "states"
+                ? t("filter.empty_states")
+                : empty.kind === "labeled"
+                  ? t("filter.empty_labeled")
+                  : t("filter.empty_label", { label: labelText(empty.label, t) })}
             </p>
           )}
         </div>
