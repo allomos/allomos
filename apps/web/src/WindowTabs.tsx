@@ -1,7 +1,6 @@
 // Taskbags as tabs (Task-A01-marble320, approver 2026-10-29): a project window's tab bar above the
 // taskbag view, like a browser's. Each tab is one taskbag (or the start page); + opens a new tab on
-// the start page; a dot marks a taskbag that needs the person. Every tab keeps its own view, so
-// switching tabs loses nothing.
+// the start page. Every tab keeps its own view, so switching tabs loses nothing.
 //
 // Dragging a tab looks like Chrome (Task-A01-fresco512): along the bar the tab follows the pointer
 // and the others slide aside to open the gap where it will land; pulled out of the bar it tears off
@@ -75,9 +74,9 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
    * in front (Task-A01-desk708): that tab (one made here for it, `made`, or the torn-off tab), and
    * the tab in front before, which comes back when it leaves. Set at once, before React renders. */
   const hoverTab = useRef<{ id: number; made: boolean; prev: number | null } | null>(null);
-  const views = useRef(new Map<number, { messenger: Messenger; onNeeds: (needs: boolean) => void }>());
+  const views = useRef(new Map<number, { messenger: Messenger }>());
 
-  const entry = (start: TabStart): TabEntry => ({ id: nextId.current++, start, root: null, name: null, needs: false });
+  const entry = (start: TabStart): TabEntry => ({ id: nextId.current++, start, root: null, name: null });
   const add = useCallback((start: TabStart) => {
     const tab = entry(start);
     setTabs((list) => [...list, tab]);
@@ -156,7 +155,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
     };
   }, [api, add]);
 
-  // Each tab's messenger and dot callback, made once so its view's effects do not start again.
+  // Each tab's messenger, made once so its view's effects do not start again.
   const shell = useMemo<Shell>(
     () => ({
       isFront: (id) => frontRef.current === id,
@@ -183,10 +182,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   const viewOf = (id: number) => {
     let view = views.current.get(id);
     if (!view) {
-      view = {
-        messenger: tabMessenger(messenger, id, shell),
-        onNeeds: (needs) => setTabs((list) => list.map((tab) => (tab.id === id && tab.needs !== needs ? { ...tab, needs } : tab))),
-      };
+      view = { messenger: tabMessenger(messenger, id, shell) };
       views.current.set(id, view);
     }
     return view;
@@ -470,7 +466,6 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
               onPointerDown={(e) => onTabDown(e, tab.id)}
               onKeyDown={onTabKey}
             >
-              {tab.needs && <span className="tab-dot" role="img" aria-label={t("tabs.needs_you")} title={t("tabs.needs_you")} />}
               <span className="tab-name">{name}</span>
               <button type="button" className="tab-close" aria-label={t("tabs.close")} title={t("tabs.close")} onClick={() => close(tab.id)}>
                 ×
@@ -502,7 +497,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
         .map((tab) => (
           <div key={tab.id} className="tab-view" role="tabpanel" hidden={tab.id !== front}>
             <TabActive.Provider value={tab.id === front}>
-              <App messenger={viewOf(tab.id).messenger} start={tab.start} onNeeds={viewOf(tab.id).onNeeds} />
+              <App messenger={viewOf(tab.id).messenger} start={tab.start} />
             </TabActive.Provider>
           </div>
         ))}

@@ -1,12 +1,9 @@
-// Tests for taskbags as tabs (Task-A01-marble320): how a window's tabs start, move and close, and
-// the dot for a taskbag that needs the person.
+// Tests for taskbags as tabs (Task-A01-marble320): how a window's tabs start, move and close.
 // Run: npm --prefix apps/web test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { needsPerson } from "../src/stopFlow.ts";
 import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry } from "../src/tabsFlow.ts";
-import type { Task } from "../src/types.ts";
 
 test("a window starts with the tabs it was given, or one tab", () => {
   // Restored tabs, the start page among them.
@@ -93,33 +90,8 @@ test("a tab tears off once it is pulled well out of the bar", () => {
   assert.equal(tearsOff(800, 20, 0, 37, 800), true);
 });
 
-const task = (over: Partial<Task>): Task => ({
-  id: "A01-1",
-  title: "x",
-  area: "A01",
-  state: "ready",
-  label: null,
-  holder: null,
-  waiting_on: null,
-  next_dependency: null,
-  iteration: null,
-  handoff_note: null,
-  without_human_check: null,
-  human_check_steps: null,
-  description: "",
-  ...over,
-});
-
-test("the dot marks a taskbag with a question to answer or a check", () => {
-  assert.equal(needsPerson([task({}), task({ state: "done" })], false), false);
-  assert.equal(needsPerson([task({ state: "waiting", waiting_on: "the approver" })], false), true);
-  assert.equal(needsPerson([task({ state: "done", without_human_check: "try it by hand" })], false), true);
-  // An agent's question (`alm confirm`) waiting in the window.
-  assert.equal(needsPerson([], true), true);
-});
-
 test("a taskbag already open in another tab is found", () => {
-  const tab = (id: number, root: string | null): TabEntry => ({ id, start: { how: "blank" }, root, name: null, needs: false });
+  const tab = (id: number, root: string | null): TabEntry => ({ id, start: { how: "blank" }, root, name: null });
   const tabs = [tab(1, "/a/.allomos/taskbag"), tab(2, null)];
   assert.equal(tabShowing(tabs, "/a/.allomos/taskbag/", 2)?.id, 1);
   // A tab does not count itself; a taskbag no tab shows is not found.

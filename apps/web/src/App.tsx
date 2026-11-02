@@ -25,7 +25,6 @@ import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search"
 import { whatChanged, type Refreshed } from "./refreshFlow";
 import {
   allTicked,
-  needsPerson,
   filterGroups,
   hiddenByFilter,
   hiddenText,
@@ -140,18 +139,15 @@ export interface Companion {
 /** Without tabs (the companion page's App gets its taskbag instead): as at start-up. */
 const AT_STARTUP: TabStart = { how: "startup", startWith: "last" };
 
-/** One tab's view (Task-A01-marble320): `start` says what the tab opens with; `onNeeds` hears
- * whether its taskbag needs the person, for the dot on the tab. */
+/** One tab's view (Task-A01-marble320): `start` says what the tab opens with. */
 export function App({
   messenger,
   companion,
   start = AT_STARTUP,
-  onNeeds,
 }: {
   messenger: Messenger;
   companion?: Companion;
   start?: TabStart;
-  onNeeds?: (needs: boolean) => void;
 }) {
   const { t, problem, language } = useI18n();
   const active = useContext(TabActive);
@@ -355,12 +351,6 @@ export function App({
   useEffect(() => {
     void messenger.setWindowProject(root ?? null, shownName).catch(() => undefined);
   }, [messenger, root, shownName]);
-  // The dot on the tab: a task to check, a question to answer, or an agent's question waiting.
-  const [asking, setAsking] = useState(false);
-  const tasks = opened?.loaded.taskbag?.tasks;
-  useEffect(() => {
-    onNeeds?.(needsPerson(tasks ?? [], asking));
-  }, [onNeeds, tasks, asking]);
   useEffect(() => {
     if (!root) return;
     stampRef.current = null;
@@ -776,7 +766,6 @@ export function App({
           <ConfirmDialog
             messenger={messenger}
             project={projectFolder(opened.root)}
-            onAsking={setAsking}
             onCancelled={() => setNotices((list) => [...list, { key: "confirm.cancelled" }])}
           />
         )}

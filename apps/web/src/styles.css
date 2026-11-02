@@ -851,8 +851,6 @@ label.filter-row:hover, .filter-side:hover { background: var(--bg); }
 .tab.away { display: none; }
 .tab-phantom { position: absolute; bottom: 0; box-sizing: border-box; pointer-events: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); z-index: 2; }
 .tab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* A taskbag that needs the person: a question to answer or a task to check. */
-.tab-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .tab-close {
   flex: none; border: none; background: none; color: inherit; padding: 0 4px; border-radius: 4px;
   font-size: 15px; line-height: 18px; opacity: 0;

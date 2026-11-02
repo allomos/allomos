@@ -28,13 +28,12 @@ export interface WindowStart {
 }
 
 /** One tab of the window: what it started with, the taskbag it shows now (none: the start page),
- * its project's name, and whether it needs the person. */
+ * and its project's name. */
 export interface TabEntry {
   id: number;
   start: TabStart;
   root: string | null;
   name: string | null;
-  needs: boolean;
 }
 
 /** How each tab of a window that just opened starts. */
