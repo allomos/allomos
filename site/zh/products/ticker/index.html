@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticker · 换肩 Allomos</title>
+<meta name="description" content="浏览器里的股票自选列表：搜索股票、ETF、外汇和加密货币，建多个私人列表，点开一个代码看价格和走势图。">
+<link rel="alternate" hreflang="en" href="https://www.allomos.com/products/ticker/">
+<link rel="alternate" hreflang="zh-CN" href="https://www.allomos.com/zh/products/ticker/">
+<link rel="alternate" hreflang="ja" href="https://www.allomos.com/ja/products/ticker/">
+<link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Ticker · 换肩 Allomos">
+<meta property="og:description" content="浏览器里的股票自选列表：搜索股票、ETF、外汇和加密货币，建多个私人列表，点开一个代码看价格和走势图。">
+<meta property="og:url" content="https://www.allomos.com/zh/products/ticker/">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/zh/"><img src="/images/logo.svg" alt="">换肩 Allomos</a>
+    <nav>
+      <a class="sec" href="/zh/products/" aria-current="true">产品</a>
+      <a class="sec" href="/zh/blog/">博客</a>
+      <a href="https://github.com/allomos">GitHub</a>
+      <span class="lang"><a href="/products/ticker/" lang="en">EN</a><a href="/zh/products/ticker/" aria-current="page" lang="zh-CN">中文</a><a href="/ja/products/ticker/" lang="ja">日本語</a></span>
+    </nav>
+  </header>
+
+  <div class="hero product-hero">
+    <img class="picon big" src="/images/products/ticker-icon.svg" alt="">
+    <h1>Ticker</h1>
+    <p>Ticker 是在浏览器里用的股票自选列表。搜索股票、ETF、外汇和加密货币，放进任意多个只有你能看到的列表，点开任何一个代码看价格、走势图和关键数据。登录用邮件里的链接，不用记密码。</p>
+    <div class="btns">
+      <a class="btn primary" href="https://ticker.allomos.com/">打开 Ticker</a>
+      <a class="btn secondary" href="https://github.com/allomos/ticker">GitHub 上的源码</a>
+    </div>
+    <div class="tags">平台：网页 · 任何浏览器 &nbsp;·&nbsp; 许可证：MIT</div>
+  </div>
+  <section><div class="cards"><div class="card"><h3>什么都能搜</h3><p>按名称或代码找股票、ETF、货币对或币种，一步加进列表。</p></div><div class="card"><h3>多个私人列表</h3><p>持仓、关注，或者别的什么，各建一个列表；可以改名、调整顺序。只有你自己能看到。</p></div><div class="card"><h3>每个代码一页</h3><p>最新价格和涨跌，从一天到全部历史的走势图，还有关键数据。</p></div><div class="card"><h3>邮件登录</h3><p>要一个链接，打开它，按一下按钮。链接只能用一次，15 分钟内有效；登录状态保持 30 天。</p></div><div class="card"><h3>自己部署</h3><p>运行在 Cloudflare Workers 和 D1 数据库上；源码和部署方法都在 GitHub 上。</p></div></div></section>
+  <section>
+    <h2>关于价格</h2>
+    <p class="lead">Ticker 用的是行情数据服务 <a href="https://twelvedata.com/">Twelve Data</a> 的免费套餐。这个套餐覆盖美股和美国 ETF、外汇和加密货币，价格有延迟，不是实时的。每分钟只有几次请求，由所有 Ticker 用户共用，所以价格会保存一段时间重复使用；额度用完时，Ticker 显示手上最新的价格，并提示它可能不是最新。它是自选列表，不是交易工具。</p>
+  </section>
+  <section>
+    <h2>它是怎么做出来的</h2>
+    <p class="lead">和投桃、Tatakikun 一样，Ticker 是 AI 智能体通过「换肩」一个任务一个任务做出来的，每一步都记录在它的代码仓库里。</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Allomos · MIT 许可证</span>
+    <span><a href="https://github.com/allomos">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
