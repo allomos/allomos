@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop button mockups</title>
+<style>
+:root {
+  --bg: #f3f6f9; --surface: #ffffff; --ink: #12223a; --muted: #5a6a7e; --line: #d6dee7;
+  --accent: #c97d14; --accent-ink: #8f5306; --ok: #1c7479; --ok-bg: #e3f2f2;
+  --warn: #9a5b07; --warn-bg: #fdf1df; --info: #1f5fa8; --info-bg: #e6effa;
+  --s-backlog: #b5651d; --s-ready: #0a66ff; --s-done: #8b2cf5;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
+main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lead { color: var(--muted); margin: 0 0 28px; }
+section { margin-bottom: 40px; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+h2 .tag { font: 600 11px var(--font); background: var(--info-bg); color: var(--info); padding: 2px 8px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; }
+.why { color: var(--muted); margin: 0 0 12px; max-width: 760px; }
+.win { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgb(18 34 58 / 6%); }
+.bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.bar .proj { font-weight: 650; }
+.bar .tabs { display: flex; gap: 2px; margin-left: 8px; }
+.bar .tabs span { padding: 4px 10px; border-radius: 6px; color: var(--muted); }
+.bar .tabs span.on { background: var(--bg); color: var(--ink); font-weight: 600; }
+.spacer { flex: 1; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 5px 12px; border-radius: 7px; font: 500 13px var(--font); white-space: nowrap; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.stop { border-color: #e2b9b5; color: #a1302a; }
+.btn.small { padding: 2px 9px; font-size: 12px; }
+.btn.ghost { border-color: transparent; color: var(--accent-ink); }
+.count { background: rgb(255 255 255 / 25%); border-radius: 99px; padding: 0 7px; font-size: 12px; }
+.body { padding: 14px; }
+.row { display: grid; grid-template-columns: 110px 1fr 80px; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.id { font: 12px var(--mono); color: var(--muted); }
+.st { font-size: 12px; font-weight: 600; }
+.st.ready { color: var(--s-ready); } .st.backlog { color: var(--s-backlog); } .st.prog { color: var(--ok); } .st.done { color: var(--s-done); }
+.group { margin-bottom: 14px; }
+.ghead { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-weight: 650; flex-wrap: wrap; }
+.ghead .n { color: var(--muted); font-weight: 400; font-size: 12px; }
+.ghead .active { font: 600 11px var(--font); color: var(--ok); background: var(--ok-bg); padding: 1px 7px; border-radius: 99px; }
+.dim { opacity: .45; }
+/* dialog */
+.stage { position: relative; background: rgb(18 34 58 / 35%); padding: 28px 16px; display: flex; justify-content: center; }
+.dlg { background: var(--surface); border-radius: 12px; width: 100%; max-width: 520px; padding: 18px 20px; box-shadow: 0 10px 40px rgb(0 0 0 / 25%); }
+.dlg h3 { margin: 0 0 12px; font-size: 16px; }
+.field { margin-bottom: 14px; }
+.field > label { display: block; font-weight: 600; margin-bottom: 6px; }
+.opt { display: flex; gap: 8px; align-items: flex-start; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+.opt.on { border-color: var(--accent); background: #fdf6ec; }
+.opt input { margin-top: 3px; }
+.opt .muted, .muted { color: var(--muted); font-size: 13px; }
+select { font: 13px var(--font); padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.note { background: var(--info-bg); color: var(--info); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 14px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* running pill */
+.run { display: inline-flex; align-items: center; gap: 8px; background: var(--ok-bg); color: var(--ok); border-radius: 99px; padding: 4px 6px 4px 12px; font-size: 13px; flex-wrap: wrap; }
+.run.stopping { background: var(--warn-bg); color: var(--warn); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+/* same as the task list's holder link (TaskRow Holder: button.link.with-icon.holder-open) */
+.sess { display: inline-flex; align-items: center; gap: 3px; border: none; background: none; padding: 0; color: var(--accent); font-size: inherit; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.sess:hover { text-decoration: underline; }
+.sess svg { width: 13px; height: 13px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.every { display: inline-flex; align-items: center; gap: 3px; border: none; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; white-space: nowrap; }
+.num { width: 56px; font: 13px var(--font); padding: 4px 6px; border: 1px solid var(--line); border-radius: 7px; }
+.pop { position: absolute; right: 90px; top: 44px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgb(0 0 0 / 15%); padding: 12px 14px; width: 270px; font-size: 13px; z-index: 2; }
+.pop .actions { margin-top: 10px; }
+.menu span { display: block; padding: 4px 8px 4px 22px; border-radius: 6px; }
+.menu span.on { padding-left: 8px; font-weight: 600; background: var(--bg); }
+.menu span:hover { background: var(--info-bg); }
+.agent-list, .agent-tools { list-style: none; margin: 0; padding: 0; }
+.agent-list > li { margin-bottom: 6px; }
+.agent-tools { padding-left: 22px; margin-top: 2px; }
+.agent-tools label { display: block; font-size: 13px; }
+.small { font-size: 12px; } .hint { display: block; margin: 2px 0 2px 20px; }
+.anno { font-size: 12px; color: var(--accent-ink); background: #fdf1df; border-left: 3px solid var(--accent); padding: 6px 10px; margin-top: 10px; border-radius: 0 6px 6px 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } .row { grid-template-columns: 90px 1fr; } .row .st { grid-column: 2; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Start/stop loop button — mockups</h1>
+  <p class="anno" style="margin:0 0 20px">Mockup for task A03-moth285, as of 2026-11-04. The written specification in the task's description is the authority; this page only shows it. Open question at the time of saving: the approver asked for each task to run in a new session, which may move the monitoring from an agent session into the app (see the task).</p>
+  <p class="lead">Recommendation: <b>one project-level button</b> in the top bar, with a <b>which-tasks choice</b> in its dialog (the Iterations tab is always there), plus the <b>same button on the active iteration's card</b> (the Iterations tab has no top-bar button). Both open the same dialog. Task A03-moth285 (backlog).</p>
+
+  <!-- 1 -->
+  <section>
+    <h2>1 · The button and its dialog <span class="tag">every project</span></h2>
+    <p class="why">The Iterations tab is always there, so the dialog always has the same “处理哪些任务” field. It starts on the active iteration when there is one and on “全部就绪任务” when there isn't. Someone who never uses iterations only ever sees “全部” chosen; someone whose iterations came from “构建新应用…” gets a one-line explanation.</p>
+    <div class="grid2">
+      <div class="win">
+        <div class="bar">
+          <span class="proj">recipe-app</span>
+          <div class="tabs"><span class="on">任务</span><span>迭代</span><span>进度</span></div>
+          <span class="spacer"></span>
+          <span class="btn">▶ 自动监测就绪任务</span>
+        </div>
+        <div class="stage">
+          <div class="dlg">
+            <h3>自动监测就绪任务</h3>
+            <div class="field">
+              <label>处理哪些任务</label>
+              <div class="opt on"><input type="radio" checked><div><b>当前迭代 I-knit</b>（3 个就绪）<br><span class="muted">正在进行的迭代。“构建新应用…”会把工作分成几个迭代。</span></div></div>
+              <div class="opt"><input type="radio"><div><b>全部就绪任务</b>（7 个）</div></div>
+              <div class="opt"><input type="radio"><div><b>其他迭代…</b> <select><option>I-haul（4 个就绪）</option></select></div></div>
+            </div>
+            <div class="field">
+              <label>没有就绪任务时，每隔多久检查一次</label>
+              每 <select><option>1 分钟</option><option>5 分钟</option><option>10 分钟</option><option selected>30 分钟</option><option>60 分钟</option><option>1.5 小时</option><option>2 小时</option></select>
+              <div class="muted" style="margin-top:4px">有就绪任务时一个接一个地做，不等待。</div>
+            </div>
+            <div class="field">
+              <label>智能体</label>
+              <ul class="agent-list">
+                <li><label><input type="radio" checked> <strong>Claude</strong></label>
+                  <ul class="agent-tools">
+                    <li><label><input type="radio" checked> Claude（应用） <span class="muted">— 打开时将填好请求 (/Applications/Claude.app)</span><span class="muted small hint">Claude 应用可能会先请你信任这个文件夹：请选择“Trust workspace”，否则会话会在没有项目的情况下开始。</span></label></li>
+                    <li><label><input type="radio"> Claude Code（终端）</label></li>
+                  </ul></li>
+                <li><label><input type="radio"> <strong>Codex</strong></label>
+                  <ul class="agent-tools">
+                    <li><label class="muted"><input type="radio" disabled checked> Codex（应用）</label></li>
+                    <li><label class="muted"><input type="radio" disabled> Codex（终端）</label></li>
+                  </ul></li>
+                <li><label><input type="radio"> <strong>手动</strong> <span class="muted">— 复制请求，自己粘贴到任意 AI 智能体</span></label></li>
+              </ul>
+            </div>
+            <div class="field">
+              <label>运行模式</label>
+              <div class="opt on"><input type="radio" checked><div><b>安静模式</b> <span class="muted">— 自己决定常规选择，把真正的问题搁置，继续做下一个</span></div></div>
+              <div class="opt"><input type="radio"><div><b>普通模式</b> <span class="muted">— 照常向你提问</span></div></div>
+            </div>
+            <p class="muted">新添加的任务会留在待办，等你批准；批准并设为就绪后，下一次检查就会取到它。</p>
+            <div class="actions"><span class="btn">取消</span><span class="btn primary">开始</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="win">
+        <div class="bar">
+          <span class="proj">my-shop</span>
+          <div class="tabs"><span class="on">任务</span><span>迭代</span><span>进度</span></div>
+          <span class="spacer"></span>
+          <span class="btn">▶ 自动监测就绪任务</span>
+        </div>
+        <div class="stage">
+          <div class="dlg">
+            <h3>自动监测就绪任务</h3>
+            <div class="field">
+              <label>处理哪些任务</label>
+              <div class="opt on"><input type="radio" checked><div><b>全部就绪任务</b>（5 个）</div></div>
+              <div class="opt dim"><input type="radio" disabled><div><b>一个迭代…</b><br><span class="muted">还没有迭代。在“迭代”标签页建一个，就能只运行其中的任务。</span></div></div>
+            </div>
+            <div class="field">
+              <label>没有就绪任务时，每隔多久检查一次</label>
+              每 <select><option>1 分钟</option><option>5 分钟</option><option>10 分钟</option><option selected>30 分钟</option><option>60 分钟</option><option>1.5 小时</option><option>2 小时</option></select>
+              <div class="muted" style="margin-top:4px">有就绪任务时一个接一个地做，不等待。</div>
+            </div>
+            <div class="field">
+              <label>智能体</label>
+              <ul class="agent-list">
+                <li><label><input type="radio" checked> <strong>Claude</strong></label>
+                  <ul class="agent-tools">
+                    <li><label><input type="radio" checked> Claude（应用） <span class="muted">— 打开时将填好请求 (/Applications/Claude.app)</span><span class="muted small hint">Claude 应用可能会先请你信任这个文件夹：请选择“Trust workspace”，否则会话会在没有项目的情况下开始。</span></label></li>
+                    <li><label><input type="radio"> Claude Code（终端）</label></li>
+                  </ul></li>
+                <li><label><input type="radio"> <strong>Codex</strong></label>
+                  <ul class="agent-tools">
+                    <li><label class="muted"><input type="radio" disabled checked> Codex（应用）</label></li>
+                    <li><label class="muted"><input type="radio" disabled> Codex（终端）</label></li>
+                  </ul></li>
+                <li><label><input type="radio"> <strong>手动</strong> <span class="muted">— 复制请求，自己粘贴到任意 AI 智能体</span></label></li>
+              </ul>
+            </div>
+            <div class="field">
+              <label>运行模式</label>
+              <div class="opt on"><input type="radio" checked><div><b>安静模式</b> <span class="muted">— 自己决定常规选择，把真正的问题搁置，继续做下一个</span></div></div>
+              <div class="opt"><input type="radio"><div><b>普通模式</b> <span class="muted">— 照常向你提问</span></div></div>
+            </div>
+            <div class="actions"><span class="btn">取消</span><span class="btn primary">开始</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="anno">Left: a project with iterations (active one chosen). Right: the same dialog in a project with no iterations yet; only “全部” can be chosen.</div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <h2>2 · Iterations tab <span class="tag">user who plans by iteration</span></h2>
+    <p class="why">No top-bar button on this tab. Only the active iteration's card has the button, with the same words “▶ 自动监测就绪任务”; it opens the dialog from mockup 1 with “当前迭代” picked. Other iterations have no button (they can still be chosen in the dialog from the other tabs). With no active iteration, this tab shows no monitor button at all. While a run is going, its status bar takes the button's place in the active card.</p>
+    <div class="win">
+      <div class="bar">
+        <span class="proj">allomos</span>
+        <div class="tabs"><span>任务</span><span class="on">迭代</span><span>进度</span></div>
+      </div>
+      <div class="body">
+        <div class="group">
+          <div class="ghead">1 · I-haul <span class="active">进行中</span> <span class="n">4 就绪 · 2 待办 · 11 完成</span> <span class="btn small ghost">编辑</span><span class="spacer"></span><span class="btn small">▶ 自动监测就绪任务</span></div>
+          <div class="row"><span class="id">A01-gate411</span><span>任务面板显示每个任务的最后交接时间</span><span class="st ready">就绪</span></div>
+          <div class="row"><span class="id">A02-kite330</span><span>燃尽图在没有估算时也给出预测完成日期</span><span class="st ready">就绪</span></div>
+          <div class="row"><span class="id">A03-moth285</span><span>应用里一个按钮开始或停止自动监测就绪任务</span><span class="st backlog">待办</span></div>
+        </div>
+        <div class="group">
+          <div class="ghead">2 · I-knit <span class="n">5 就绪 · 3 待办</span> <span class="btn small ghost">编辑</span></div>
+          <div class="row"><span class="id">A04-reef102</span><span>伴侣网页显示各智能体的额度</span><span class="st ready">就绪</span></div>
+        </div>
+        <div class="group">
+          <div class="ghead">3 · I-moss <span class="n">0 就绪 · 6 待办</span> <span class="btn small ghost">编辑</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- idle -->
+  <section>
+    <h2>3 · No loop running</h2>
+    <p class="why">The top-bar button is the only sign. With ready tasks it is a normal button, “▶ 自动监测就绪任务”, with no count. With none it still works, because a run waits and checks again. After a loop has ended, a quiet line beside it says how the last run went and links to what needs you (<code>alm human</code>).</p>
+    <div class="win" style="margin-bottom:12px">
+      <div class="bar">
+        <span class="proj">allomos</span>
+        <div class="tabs"><span class="on">任务</span><span>迭代</span><span>进度</span></div>
+        <span class="spacer"></span>
+        <span class="btn">▶ 自动监测就绪任务</span>
+      </div>
+      <div class="body muted">a · Never run, or nothing to report: just the button (normal style, no count).</div>
+    </div>
+    <div class="win" style="margin-bottom:12px">
+      <div class="bar">
+        <span class="proj">allomos</span>
+        <div class="tabs"><span class="on">任务</span><span>迭代</span><span>进度</span></div>
+        <span class="spacer"></span>
+        <span class="muted">上次运行 14:20 结束 · I-haul · 完成 4 个 · <a href="#" style="color:var(--warn)">2 个需要你</a></span>
+        <span class="btn">▶ 自动监测就绪任务</span>
+      </div>
+      <div class="body muted">b · A loop ended: last run summary, the count links to the “需要人处理” filter.</div>
+    </div>
+    <div class="win">
+      <div class="bar">
+        <span class="proj">allomos</span>
+        <div class="tabs"><span class="on">任务</span><span>迭代</span><span>进度</span></div>
+        <span class="spacer"></span>
+        <span class="btn" title="现在没有就绪任务；开始后会按设定的频率检查">▶ 自动监测就绪任务</span>
+      </div>
+      <div class="body muted">c · No ready tasks: the button still works (it will wait and check at the chosen interval); tooltip “现在没有就绪任务；开始后会按设定的频率检查”.</div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <h2>4 · Starting, running, waiting, stopping</h2>
+    <p class="why">The button turns into a status bar: “监测中” and what the agent is doing, then the check interval (click to change it), then the “Claude Code · I-haul” session link (drawn like the task list's holder link), then “停止”. When nothing is ready the agent waits and checks again at the interval; the bar shows the next check time and “↻ 立即检查”. The agent waits inside <code>alm run wait</code>, which returns at once when the person presses 立即检查, changes the interval or presses 停止, so all three take effect immediately. “停止” is graceful while a task is being worked. “↺ 撤销停止” withdraws it. On the Iterations tab the bar sits in the active iteration's card.</p>
+    <div class="win" style="margin-bottom:12px">
+      <div class="bar">
+        <span class="proj">allomos</span><span class="spacer"></span>
+        <span class="run stopping">已在 Claude（应用）里打好请求，按回车开始<a class="sess" href="#" title="在 Claude 中打开">打开会话<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11"/><path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5"/></svg></a><span class="btn small">取消</span></span>
+      </div>
+      <div class="body muted">0 · Right after “开始”: the request is typed into a new session but not sent. Once the agent runs <code>alm run start</code> this becomes “监测中”. For a terminal agent it reads “请求已复制到剪贴板：粘贴到终端并按回车开始”.</div>
+    </div>
+    <div class="win" style="margin-bottom:12px">
+      <div class="bar">
+        <span class="proj">allomos</span><span class="spacer"></span>
+        <span class="run"><span class="dot"></span>监测中 · 正在做 A01-gate411（第 2 个）<button class="every" title="改检查频率">每 30 分钟 ✎</button><a class="sess" href="#" title="在 Claude 中打开">Claude Code · I-haul<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11"/><path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5"/></svg></a><span class="btn small stop">■ 停止</span></span>
+      </div>
+      <div class="body muted">a · Working: tasks are taken one after another; the interval only matters when nothing is ready.</div>
+    </div>
+    <div class="win" style="margin-bottom:12px; position:relative">
+      <div class="bar">
+        <span class="proj">allomos</span><span class="spacer"></span>
+        <span class="run"><span class="dot"></span>监测中 · 没有就绪任务，下次检查 14:40<span class="btn small">↻ 立即检查</span><button class="every" title="改检查频率">每 30 分钟 ✎</button><a class="sess" href="#" title="在 Claude 中打开">Claude Code · I-haul<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11"/><path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5"/></svg></a><span class="btn small stop">■ 停止</span></span>
+      </div>
+      <div class="pop" style="width:200px;padding:6px">
+        <div class="muted" style="padding:4px 8px">检查频率（立即生效）</div>
+        <div class="menu"><span>1 分钟</span><span>5 分钟</span><span>10 分钟</span><span class="on">✓ 30 分钟</span><span>60 分钟</span><span>1.5 小时</span><span>2 小时</span></div>
+      </div>
+      <div class="body muted" style="padding-top:240px">b · Waiting: “↻ 立即检查” checks right away (shown only while waiting); clicking “每 30 分钟 ✎” opens a menu of the seven intervals; picking one applies at once.</div>
+    </div>
+    <div class="win">
+      <div class="bar">
+        <span class="proj">allomos</span><span class="spacer"></span>
+        <span class="run stopping"><span class="dot"></span>正在停止 · 做完 A01-gate411 后结束<a class="sess" href="#" title="在 Claude 中打开">Claude Code · I-haul<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11"/><path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5"/></svg></a><span class="btn small">↺ 撤销停止</span></span>
+      </div>
+      <div class="body muted">c · Stopping while working. If the agent was waiting, it ends right away, so this state is brief.</div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
