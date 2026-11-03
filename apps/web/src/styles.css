@@ -463,8 +463,9 @@ button.link:hover { text-decoration: underline; }
 .row-stop-text { overflow-wrap: anywhere; white-space: pre-line; }
 .row-stop-text.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 /* Task-A01-cell542: every state its own colour, wherever a state is shown; Task-A01-yard163: brighter,
-   and the state word itself (.state-word, semibold) on a light tint of its colour (.tint). The filter
-   and the "Waiting on" / "Blocked by" text take the colour only. */
+   and the state word itself (.state-word) on a light tint of its colour (.tint). The filter
+   and the "Waiting on" / "Blocked by" text take the colour only. Task-A01-bird655: every state word,
+   the pill's too, in normal weight (approver, 2026-11-03). */
 .s-backlog-text { color: var(--s-backlog); --s-tint: color-mix(in srgb, var(--s-backlog) var(--s-share), transparent); }
 .s-ready-text { color: var(--s-ready); --s-tint: color-mix(in srgb, var(--s-ready) var(--s-share), transparent); }
 .s-in_progress-text { color: var(--s-in_progress); --s-tint: color-mix(in srgb, var(--s-in_progress) var(--s-share), transparent); }
@@ -472,7 +473,7 @@ button.link:hover { text-decoration: underline; }
 .s-blocked-text { color: var(--s-blocked); --s-tint: color-mix(in srgb, var(--s-blocked) var(--s-share), transparent); }
 .s-done-text { color: var(--s-done); --s-tint: color-mix(in srgb, var(--s-done) var(--s-share), transparent); }
 .s-dropped-text { color: var(--muted); text-decoration: line-through; --s-tint: color-mix(in srgb, var(--muted) 12%, transparent); }
-.state-word { font-weight: 600; }
+.state-word { font-weight: normal; }
 .state-word.tint { background: var(--s-tint); padding: 1px 6px; border-radius: 5px; }
 @container (max-width: 520px) {
   .row-facts { grid-template-columns: minmax(0, 1fr); }
@@ -527,7 +528,7 @@ button.link:hover { text-decoration: underline; }
 .markdown table { border-collapse: collapse; font-size: 13px; }
 .markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; text-align: left; }
 .markdown th { background: var(--bg); font-weight: 600; }
-.state { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; background: var(--s-tint); white-space: nowrap; }
+.state { font-size: 12px; font-weight: normal; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; background: var(--s-tint); white-space: nowrap; }
 .s-backlog { color: var(--s-backlog); --s-tint: color-mix(in srgb, var(--s-backlog) var(--s-share), transparent); }
 .s-ready { color: var(--s-ready); --s-tint: color-mix(in srgb, var(--s-ready) var(--s-share), transparent); }
 .s-in_progress { color: var(--s-in_progress); --s-tint: color-mix(in srgb, var(--s-in_progress) var(--s-share), transparent); }
