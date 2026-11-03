@@ -1808,30 +1808,32 @@ function TaskGroup({
   return (
     <section className={["area", collapsed ? "collapsed" : "", iterationState ? `${iterationState}-iteration` : ""].filter(Boolean).join(" ")}>
       <header className="area-head">
-        <h2>
-          <button type="button" className="fold" aria-expanded={!collapsed} onClick={onToggle}>
-            {place !== undefined && <span className="place">{place}</span>}
-            {id && <span className="id">{id}</span>} {name}
-          </button>
-          {iterationState && <span className={`badge iteration-${iterationState}`}>{t(`iteration.state_${iterationState}`)}</span>}
-        </h2>
+        {/* Edit sits on the title line, after the name and badge, beside the fold button and
+            outside the heading, so it never folds the group (Task-A01-sorbet602). */}
+        <div className="title-line">
+          <h2>
+            <button type="button" className="fold" aria-expanded={!collapsed} onClick={onToggle}>
+              {place !== undefined && <span className="place">{place}</span>}
+              {id && <span className="id">{id}</span>} {name}
+            </button>
+            {iterationState && <span className={`badge iteration-${iterationState}`}>{t(`iteration.state_${iterationState}`)}</span>}
+          </h2>
+          {onEdit && !editForm && (
+            <button type="button" className="link small group-edit" onClick={onEdit} aria-label={t("group_edit.edit_aria", { group: name })}>
+              {t("group_edit.edit_button")}
+            </button>
+          )}
+        </div>
         <span className="count">{t("area.count", { done, total })}</span>
         {sub && <span className="sub">{sub}</span>}
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
-        {((onNewTask && !form) || (onEdit && !editForm)) && (
+        {onNewTask && !form && (
           <span className="group-actions">
-            {onNewTask && !form && (
-              <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
-                {t("create.new_task_button")}
-              </button>
-            )}
-            {onEdit && !editForm && (
-              <button type="button" className="link small" onClick={onEdit} aria-label={t("group_edit.edit_aria", { group: name })}>
-                {t("group_edit.edit_button")}
-              </button>
-            )}
+            <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
+              {t("create.new_task_button")}
+            </button>
           </span>
         )}
       </header>
