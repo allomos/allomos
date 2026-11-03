@@ -1771,6 +1771,50 @@ fn translate_request(
     ))
 }
 
+/// **Proceed…** (Task-A03-galley051): the taskbag at `taskbag` as an agent working in its project
+/// folder passes it to `--taskbag`: relative to that folder, written with `/` (absolute when there
+/// is no relative way).
+fn taskbag_arg(project: &Path, taskbag: &Path) -> String {
+    let (project, taskbag) = (allomos_store::tidy(project), allomos_store::tidy(taskbag));
+    allomos_store::relative_path(&project, &taskbag)
+        .map(|p| allomos_store::portable_path(&p))
+        .unwrap_or_else(|| taskbag.display().to_string())
+}
+
+/// **Proceed…**: the taskbag's path for the request the interface writes ([`taskbag_arg`]).
+#[tauri::command]
+fn proceed_taskbag(taskbag: PathBuf) -> String {
+    taskbag_arg(&allomos_store::versions::project_folder(&taskbag), &taskbag)
+}
+
+/// **Proceed…**: open the chosen agent in the project folder with `request` (written by the
+/// interface, perhaps edited by the person) typed in. Nothing is sent: the person sends it.
+#[tauri::command]
+async fn proceed_with_agent(
+    agent: String,
+    taskbag: PathBuf,
+    request: String,
+) -> Result<(), Problem> {
+    let project = allomos_store::versions::project_folder(&taskbag);
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    let found = agents::find_agents();
+    let Some(chosen) = found.iter().find(|a| a.id == agent) else {
+        return Err(Problem::AgentNotFound { agent });
+    };
+    agents::ask(chosen, &project, &request)
+}
+
+/// **Proceed…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
+/// the other Manual requests are).
+#[tauri::command]
+fn proceed_manual_request(request: String) -> String {
+    agents::link_request(&request, alm_command::own().as_deref())
+}
+
 /// The agent `alm` last ran under for a task in the taskbag at `root`, from its events
 /// (Task-A03-27); none when no event records one.
 #[tauri::command]
@@ -2422,6 +2466,9 @@ pub fn run() {
             move_tasks_in_request,
             translate_taskbag,
             translate_request,
+            proceed_taskbag,
+            proceed_with_agent,
+            proceed_manual_request,
             run_modes_text,
             copy_text,
             instruction_files,
@@ -2458,6 +2505,26 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Task-A03-galley051: Proceed…'s request names the taskbag as the agent in the project folder
+    /// passes it, beside the project or inside it.
+    #[test]
+    fn proceed_names_the_taskbag_from_the_project_folder() {
+        assert_eq!(
+            taskbag_arg(
+                Path::new("/work/app"),
+                Path::new("/work/app-taskbag/.allomos/taskbag")
+            ),
+            "../app-taskbag/.allomos/taskbag"
+        );
+        assert_eq!(
+            taskbag_arg(
+                Path::new("/work/app"),
+                Path::new("/work/app/.allomos/taskbag")
+            ),
+            ".allomos/taskbag"
+        );
+    }
 
     /// Task-A04-02-04: a companion page's change goes through the window's own functions, under
     /// "name (device)"; what only the computer can do is refused.

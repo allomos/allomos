@@ -9,6 +9,7 @@ import { ProgressDialog } from "./ProgressDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
 import { MoveCardsDialog } from "./MoveCardsDialog";
+import { ProceedDialog } from "./ProceedDialog";
 import { cardRows, cardsNotice, oldHandoffs, tasksInStart } from "./moveCardsFlow";
 import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
@@ -775,6 +776,7 @@ export function App({
             opened={opened}
             messenger={messenger}
             onError={(e) => setError(errorNote(e))}
+            onNotice={(message) => setNotices((list) => [...list, { text: message }])}
             hideOlder={olderShown}
             canOpenSessions={!companion}
             onReload={async () => {
@@ -1160,6 +1162,7 @@ function TaskbagView({
   opened,
   messenger,
   onError,
+  onNotice,
   hideOlder,
   canOpenSessions,
   onReload,
@@ -1169,6 +1172,8 @@ function TaskbagView({
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
+  /** Shows what an action did, in the window's notices (Proceed…, Task-A03-galley051). */
+  onNotice: (message: string) => void;
   /** The update notice already says the taskbag is from an older Allomos. */
   hideOlder: boolean;
   /** The desktop app, where agent sessions run: the task pane can reopen them (Task-A03-hive049). */
@@ -1535,6 +1540,8 @@ function TaskbagView({
   const openLink = (href: string) => {
     if (selected) messenger.openTaskLink(opened.root, selected.id, href).catch(onError);
   };
+  /** The task Proceed… is open for (Task-A03-galley051). */
+  const [proceeding, setProceeding] = useState<Task | null>(null);
 
   return (
     <>
@@ -1612,6 +1619,7 @@ function TaskbagView({
                   onShowAll={() => chooseFilter(allTicked(ladder))}
                   stop={stop}
                   onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
+                  onProceed={canOpenSessions ? setProceeding : undefined}
                   onError={onError}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
@@ -1685,6 +1693,17 @@ function TaskbagView({
                 : "box.no_project",
           )}
         </p>
+      )}
+      {proceeding && (
+        <ProceedDialog
+          messenger={messenger}
+          root={opened.root}
+          task={proceeding}
+          onClose={(message) => {
+            setProceeding(null);
+            if (message) onNotice(message);
+          }}
+        />
       )}
     </>
   );
@@ -1761,6 +1780,7 @@ function TaskGroup({
   onEdit,
   editForm,
   onOpenSession,
+  onProceed,
   onError,
 }: {
   id: string;
@@ -1800,6 +1820,8 @@ function TaskGroup({
   editForm?: ReactNode;
   /** Reopens a task's recorded session from its holder's name (Task-A01-cactus586); the desktop app only. */
   onOpenSession?: (id: string) => Promise<void>;
+  /** Opens Proceed… for a task nobody holds (Task-A03-galley051); the desktop app only. */
+  onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
@@ -1853,6 +1875,7 @@ function TaskGroup({
               stop={stop?.(task) ?? null}
               modified={modified?.[task.id]}
               onOpenSession={onOpenSession}
+              onProceed={onProceed}
               onError={onError}
             />
           ))}

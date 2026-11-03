@@ -99,6 +99,12 @@ export interface Messenger {
   translateTaskbag(agent: string, taskbag: string, language: string, target: string, name: string): Promise<void>;
   /** Translate the taskbag… with Manual: the same request, to copy. */
   translateRequest(taskbag: string, language: string, target: string, name: string): Promise<string>;
+  /** Proceed… (Task-A03-galley051): the taskbag's path as an agent in its project folder passes it to `--taskbag`. */
+  proceedTaskbag(taskbag: string): Promise<string>;
+  /** Proceed…: opens `agent` in the project folder of the taskbag at `taskbag` with `request` typed in. Rejects with a Problem. */
+  proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
+  /** Proceed… with Manual: `request` as the person copies it. */
+  proceedManualRequest(request: string): Promise<string>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -387,6 +393,9 @@ export const desktopMessenger: Messenger = {
     invoke<string>("move_tasks_in_request", { taskbag, language, translate: translate?.code ?? null, name: translate?.name ?? null }),
   translateTaskbag: (agent, taskbag, language, target, name) => invoke<void>("translate_taskbag", { agent, taskbag, language, target, name }),
   translateRequest: (taskbag, language, target, name) => invoke<string>("translate_request", { taskbag, language, target, name }),
+  proceedTaskbag: (taskbag) => invoke<string>("proceed_taskbag", { taskbag }),
+  proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
+  proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

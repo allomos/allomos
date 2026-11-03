@@ -1,0 +1,239 @@
+// Proceed… (Task-A03-galley051, approver 2026-11-03): from a row no session holds, hand the task to
+// an AI agent. The dialog has the frame of Update the taskbag… (`MoveCardsDialog`): what Allomos
+// found (the task and its state), Edit the request…, what proceeding does, the shared agent
+// picker, then Cancel and Open. Open opens the agent in the project folder with the request typed
+// in and sends nothing; Manual shows the request to copy instead. A blocked or waiting task cannot
+// start now, so its request asks the agent to tell the person why and ask what to do. The edited
+// request is kept for this dialog only.
+
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useI18n } from "./i18n";
+import type { Messenger } from "./messenger";
+import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
+import { MANUAL } from "./agentPickerFlow";
+import { edited, proceedRequest, stopped } from "./proceedFlow";
+import { isProblem } from "./types";
+import type { Task } from "./types";
+
+/** How long "Copied" shows beside Copy (approver, 2026-11-03: about four seconds). */
+const COPIED_MS = 4000;
+
+export function ProceedDialog({
+  messenger,
+  root,
+  task,
+  onClose,
+}: {
+  messenger: Messenger;
+  /** The open taskbag. */
+  root: string;
+  task: Task;
+  /** The dialog closes; `message` says what happened (null: Cancel or Done). */
+  onClose: (message: string | null) => void;
+}) {
+  const { t, rich, problem, language } = useI18n();
+  const ask = stopped(task);
+  const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
+  /** The taskbag as the agent passes it to `--taskbag`; null while it is read. */
+  const [taskbag, setTaskbag] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    messenger.proceedTaskbag(root).then(
+      (arg) => live && setTaskbag(arg),
+      () => live && setTaskbag(root),
+    );
+    return () => {
+      live = false;
+    };
+  }, [messenger, root]);
+  const original = taskbag === null ? null : proceedRequest(task, taskbag, language);
+  /** The person's own request, for this dialog only (null: Allomos's). */
+  const [mine, setMine] = useState<string | null>(null);
+  const request = mine ?? original;
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  /** Manual: the request to copy. */
+  const [manual, setManual] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+
+  const fail = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
+
+  const open = async () => {
+    if (!agent || request === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (agent === MANUAL) {
+        setManual(await messenger.proceedManualRequest(request));
+        return;
+      }
+      await messenger.proceedWithAgent(agent, root, request);
+      const name = t(AGENT_KEY[agent]);
+      if (tool?.how === "paste") {
+        onClose(t(ask ? "proceed.asked_stopped_paste" : "proceed.asked_paste", { agent: name, keys: PASTE_KEYS, id: task.id }));
+      } else {
+        onClose(t(ask ? "proceed.asked_stopped" : "proceed.asked", { agent: name, id: task.id }));
+      }
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (manual === null) return;
+    setError(null);
+    try {
+      await messenger.copyText(manual);
+      setCopied(true);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS);
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const stateWord = <span className={`state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>;
+  const named = <strong>{task.id}</strong>;
+  const found =
+    task.state === "blocked"
+      ? rich("proceed.found_blocked", { id: named, title: task.title, state: stateWord, by: (task.blocked_by ?? []).join(", ") })
+      : task.state === "waiting"
+        ? rich("proceed.found_waiting", { id: named, title: task.title, state: stateWord, on: task.waiting_on ?? "" })
+        : rich("proceed.found", { id: named, title: task.title, state: stateWord });
+
+  return (
+    <div className="overlay" role="presentation">
+      <section className="dialog wizard move-cards proceed" role="dialog" aria-modal="true" aria-labelledby="proceed-title">
+        <h2 id="proceed-title">{t(ask ? "proceed.title_ask" : "proceed.title")}</h2>
+        <div className="dialog-body wizard-body">
+          {manual === null ? (
+            <>
+              <p>{found}</p>
+              <p className="request-line">
+                <button type="button" onClick={() => setEditing(true)} disabled={request === null || busy}>
+                  {t("proceed.edit_request")}
+                </button>
+                {mine !== null && <span className="muted small">{t("proceed.edited")}</span>}
+              </p>
+              {task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
+              <p>
+                {t(task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
+              </p>
+              <p className="muted small">{t("proceed.how")}</p>
+              <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />
+            </>
+          ) : (
+            <div className="manual">
+              <p className="small">{t("cards.manual_intro")}</p>
+              <textarea
+                className="manual-request"
+                readOnly
+                rows={12}
+                aria-label={t("manual.request")}
+                value={manual}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </div>
+          )}
+        </div>
+
+        {error && <p className="banner error">{error}</p>}
+
+        <div className="row">
+          {manual === null ? (
+            <>
+              <button type="button" onClick={() => onClose(null)} disabled={busy}>
+                {t("wizard.cancel")}
+              </button>
+              <button type="button" className="primary" onClick={() => void open()} disabled={busy || !agent || request === null}>
+                {t("cards.open")}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="copied-hint" role="status">
+                {copied ? t("proceed.copied") : ""}
+              </span>
+              <button type="button" onClick={() => void copy()}>
+                {t("manual.copy")}
+              </button>
+              <button type="button" className="primary" onClick={() => onClose(null)}>
+                {t("manual.done")}
+              </button>
+            </>
+          )}
+        </div>
+
+        {editing &&
+          original !== null &&
+          createPortal(
+            <EditRequest
+              id={task.id}
+              text={request ?? original}
+              original={original}
+              onCancel={() => setEditing(false)}
+              onSave={(text) => {
+                setMine(edited(text, original));
+                setEditing(false);
+              }}
+            />,
+            document.body,
+          )}
+      </section>
+    </div>
+  );
+}
+
+/** Edit the request…: the request in a popup of its own, editable. Use Allomos's request puts the
+ * original back (greyed while the text is the original); Save keeps it for this dialog only. */
+function EditRequest({
+  id,
+  text,
+  original,
+  onCancel,
+  onSave,
+}: {
+  id: string;
+  text: string;
+  original: string;
+  onCancel: () => void;
+  onSave: (text: string) => void;
+}) {
+  const { t } = useI18n();
+  const [value, setValue] = useState(text);
+  return (
+    <div className="overlay above" role="presentation">
+      <section className="dialog card-list-dialog edit-request" role="dialog" aria-modal="true" aria-labelledby="edit-request-title">
+        <h2 id="edit-request-title">{t("proceed.edit_title", { id })}</h2>
+        <div className="dialog-body wizard-body">
+          <p className="muted small">{t("proceed.edit_note")}</p>
+          <textarea
+            className="manual-request"
+            rows={14}
+            aria-label={t("manual.request")}
+            value={value}
+            autoFocus
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </div>
+        <div className="row">
+          <button type="button" className="link reset" disabled={value === original} onClick={() => setValue(original)}>
+            {t("proceed.use_original")}
+          </button>
+          <button type="button" onClick={onCancel}>
+            {t("wizard.cancel")}
+          </button>
+          <button type="button" className="primary" onClick={() => onSave(value)}>
+            {t("proceed.save")}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -2,12 +2,15 @@
 // the way the task pane shows them, a small grey name before each value, two to a line (one on a
 // narrow list). A stopped task's Waiting on or Blocked by gets a full-width row of its own, cut at
 // three lines with Show all. Clicking the row (or Enter / Space on it) opens the task pane; clicking
-// it again closes it. The holder's link and Show all do not select the task.
+// it again closes it. The holder's link and Show all do not select the task. Held by always shows
+// (Nobody when no session holds the task), and a task nobody holds that is not finished gets
+// Proceed… after it (Task-A03-galley051).
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useI18n } from "./i18n";
 import { DescriptionHit, Highlight } from "./Search";
+import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
 import { humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
@@ -24,6 +27,7 @@ export function TaskRow({
   stop,
   modified,
   onOpenSession,
+  onProceed,
   onError,
 }: {
   task: Task;
@@ -37,6 +41,8 @@ export function TaskRow({
   modified?: string;
   /** Reopens the session the task records, as the task pane's button does (the desktop app only). */
   onOpenSession?: (id: string) => Promise<void>;
+  /** Opens Proceed… for the task (the desktop app only, where agents run). */
+  onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
@@ -52,7 +58,29 @@ export function TaskRow({
   if (task.label) facts.push([t("pane.label"), <span className="label">{task.label}</span>]);
   if (toReview(task)) facts.push([t("row.ai_decided"), t("row.ai_decided_value", { count: decisions }), t("task.ai_decided_title", { count: decisions })]);
   if (toCheck(task)) facts.push([t("pane.check"), t("task.not_human_checked"), t("task.not_human_checked_title", { why: humanCheckNote(task) })]);
-  if (task.holder) facts.push([t("row.held_by"), <Holder task={task} onOpenSession={onOpenSession} onError={onError} />]);
+  facts.push([
+    t("row.held_by"),
+    <span className="held-by">
+      {task.holder ? <Holder task={task} onOpenSession={onOpenSession} onError={onError} /> : <span className="muted">{t("row.nobody")}</span>}
+      {onProceed && canProceed(task) && (
+        <button
+          type="button"
+          className="link with-icon proceed"
+          title={t("proceed.button_title")}
+          onKeyDown={ownKeys}
+          onClick={(e) => {
+            e.stopPropagation();
+            onProceed(task);
+          }}
+        >
+          <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M6.5 4.5v11l9-5.5z" />
+          </svg>
+          {t("proceed.button")}
+        </button>
+      )}
+    </span>,
+  ]);
   return (
     <li
       id={`task-${task.id}`}

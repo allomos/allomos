@@ -458,6 +458,18 @@ button.link:hover { text-decoration: underline; }
 .task .search-snippet { font-size: 12.5px; }
 .holder-open { font-size: inherit; gap: 3px; }
 .holder-open .button-icon { width: 13px; height: 13px; }
+/* Task-A03-galley051: Held by always shows (Nobody when empty); Proceed… right after its value,
+   a link button like the holder's session link. */
+.held-by { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.held-by button.proceed { font-size: inherit; gap: 3px; white-space: nowrap; }
+.held-by .proceed .button-icon { width: 13px; height: 13px; }
+/* Proceed…'s dialog: Edit the request… and its "Edited" note on one line; Manual's "Copied" hint
+   right beside Copy and Done; the edit popup's Use Allomos's request on the left. */
+.proceed .request-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.proceed .row .copied-hint { align-self: center; font-size: 13px; color: var(--ok); }
+.edit-request .row .reset { align-self: center; margin-right: auto; font-size: 13px; }
+.edit-request .row .reset:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+.edit-request textarea { resize: vertical; min-height: 220px; width: 100%; box-sizing: border-box; }
 .row-stop { display: grid; gap: 1px; justify-items: start; font-size: 13px; }
 .row-stop-name { color: var(--muted); font-size: 12px; }
 .row-stop-text { overflow-wrap: anywhere; white-space: pre-line; }
