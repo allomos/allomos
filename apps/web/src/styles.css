@@ -458,12 +458,12 @@ button.link:hover { text-decoration: underline; }
 .task .search-snippet { font-size: 12.5px; }
 .holder-open { font-size: inherit; gap: 3px; }
 .holder-open .button-icon { width: 13px; height: 13px; }
-/* Task-A03-galley051: Held by always shows (Nobody when empty); Proceed… right after its value,
+/* Task-A03-galley051: Held by always shows (Nobody when empty); Work on it… right after its value,
    a link button like the holder's session link. */
 .held-by { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .held-by button.proceed { font-size: inherit; gap: 3px; white-space: nowrap; }
 .held-by .proceed .button-icon { width: 13px; height: 13px; }
-/* Proceed…'s dialog: Edit the request… and its "Edited" note on one line; Manual's "Copied" hint
+/* Work on it…'s dialog: Edit the request… and its "Edited" note on one line; Manual's "Copied" hint
    right beside Copy and Done; the edit popup's Use Allomos's request on the left. */
 .proceed .request-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .proceed .row .copied-hint { align-self: center; font-size: 13px; color: var(--ok); }

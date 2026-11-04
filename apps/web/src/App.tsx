@@ -1179,7 +1179,7 @@ function TaskbagView({
   onError: (e: unknown) => void;
   /** Shows what went wrong, in words already written (Monitor ready tasks, Task-A03-moth285). */
   onFailure: (message: string) => void;
-  /** Shows what an action did, in the window's notices (Proceed…, Task-A03-galley051). */
+  /** Shows what an action did, in the window's notices (Work on it…, Task-A03-galley051). */
   onNotice: (message: string) => void;
   /** The update notice already says the taskbag is from an older Allomos. */
   hideOlder: boolean;
@@ -1547,7 +1547,7 @@ function TaskbagView({
   const openLink = (href: string) => {
     if (selected) messenger.openTaskLink(opened.root, selected.id, href).catch(onError);
   };
-  /** The task Proceed… is open for (Task-A03-galley051). */
+  /** The task Work on it… is open for (Task-A03-galley051). */
   const [proceeding, setProceeding] = useState<Task | null>(null);
   // Monitor ready tasks (Task-A03-moth285): the desktop app only, where agent sessions run. The
   // dialog opens from the top bar or the active iteration's card.
@@ -1860,7 +1860,7 @@ function TaskGroup({
   editForm?: ReactNode;
   /** Reopens a task's recorded session from its holder's name (Task-A01-cactus586); the desktop app only. */
   onOpenSession?: (id: string) => Promise<void>;
-  /** Opens Proceed… for a task nobody holds (Task-A03-galley051); the desktop app only. */
+  /** Opens Work on it… for a task nobody holds (Task-A03-galley051); the desktop app only. */
   onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
   /** The active iteration's Monitor ready tasks button, or its status bar (Task-A03-moth285). */

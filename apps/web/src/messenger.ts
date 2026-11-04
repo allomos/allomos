@@ -99,11 +99,11 @@ export interface Messenger {
   translateTaskbag(agent: string, taskbag: string, language: string, target: string, name: string): Promise<void>;
   /** Translate the taskbag… with Manual: the same request, to copy. */
   translateRequest(taskbag: string, language: string, target: string, name: string): Promise<string>;
-  /** Proceed… (Task-A03-galley051): the taskbag's path as an agent in its project folder passes it to `--taskbag`. */
+  /** Work on it… (Task-A03-galley051): the taskbag's path as an agent in its project folder passes it to `--taskbag`. */
   proceedTaskbag(taskbag: string): Promise<string>;
-  /** Proceed…: opens `agent` in the project folder of the taskbag at `taskbag` with `request` typed in. Rejects with a Problem. */
+  /** Work on it…: opens `agent` in the project folder of the taskbag at `taskbag` with `request` typed in. Rejects with a Problem. */
   proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
-  /** Proceed… with Manual: `request` as the person copies it. */
+  /** Work on it… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
   /** Monitor ready tasks (Task-A03-moth285): starts a new session of a terminal agent (`claude_cli`,
    * `codex_cli`) in the project folder of the taskbag at `taskbag`, in a terminal window of its

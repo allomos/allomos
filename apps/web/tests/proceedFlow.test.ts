@@ -1,4 +1,4 @@
-// Tests for Proceed… (Task-A03-galley051): when a row offers it, and the request Allomos types in.
+// Tests for Work on it… (Task-A03-galley051): when a row offers it, and the request Allomos types in.
 // Run: npm --prefix apps/web test
 
 import { test } from "node:test";
@@ -23,7 +23,7 @@ const task = (over: Partial<Task>): Task => ({
   ...over,
 } as Task);
 
-test("Proceed shows for unheld tasks that are not finished", () => {
+test("Work on it… shows for unheld tasks that are not finished", () => {
   for (const state of ["backlog", "ready", "blocked", "waiting"] as const) assert.equal(canProceed(task({ state })), true, state);
   for (const state of ["done", "dropped"] as const) assert.equal(canProceed(task({ state })), false, state);
   assert.equal(canProceed(task({ holder: "claude/x" })), false);
@@ -50,7 +50,7 @@ test("a backlog task's request makes it ready first", () => {
     `Work on task A01-44 ("A task row offers to proceed with an AI agent") in this project's taskbag. Run every alm command with --taskbag "../allomos-taskbag/.allomos/taskbag".
 
 1. Read it: alm show A01-44 (its description and latest handoff note).
-2. It is in backlog. I chose Proceed in Allomos, which approves it: make it ready (alm ready A01-44).
+2. It is in backlog. I chose Work on it in Allomos, which approves it: make it ready (alm ready A01-44).
 3. Claim it as AGENTS.md says (alm claim A01-44 --as <your session name> --branch <your branch> ...), and share the claim.
 4. Work it in a worktree of its own, cut from the base branch the claim prints.
 5. Report progress with alm label; finish with alm done, or stop with alm release --note.`,

@@ -1771,7 +1771,7 @@ fn translate_request(
     ))
 }
 
-/// **Proceed…** (Task-A03-galley051): the taskbag at `taskbag` as an agent working in its project
+/// **Work on it…** (Task-A03-galley051): the taskbag at `taskbag` as an agent working in its project
 /// folder passes it to `--taskbag`: relative to that folder, written with `/` (absolute when there
 /// is no relative way).
 fn taskbag_arg(project: &Path, taskbag: &Path) -> String {
@@ -1781,13 +1781,13 @@ fn taskbag_arg(project: &Path, taskbag: &Path) -> String {
         .unwrap_or_else(|| taskbag.display().to_string())
 }
 
-/// **Proceed…**: the taskbag's path for the request the interface writes ([`taskbag_arg`]).
+/// **Work on it…**: the taskbag's path for the request the interface writes ([`taskbag_arg`]).
 #[tauri::command]
 fn proceed_taskbag(taskbag: PathBuf) -> String {
     taskbag_arg(&allomos_store::versions::project_folder(&taskbag), &taskbag)
 }
 
-/// **Proceed…**: open the chosen agent in the project folder with `request` (written by the
+/// **Work on it…**: open the chosen agent in the project folder with `request` (written by the
 /// interface, perhaps edited by the person) typed in. Nothing is sent: the person sends it.
 #[tauri::command]
 async fn proceed_with_agent(
@@ -1834,7 +1834,7 @@ async fn monitor_start_session(
     agents::start_session(chosen, &project, &request, session_id.as_deref())
 }
 
-/// **Proceed…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
+/// **Work on it…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
 /// the other Manual requests are).
 #[tauri::command]
 fn proceed_manual_request(request: String) -> String {
@@ -2533,7 +2533,7 @@ pub fn run() {
 mod tests {
     use super::*;
 
-    /// Task-A03-galley051: Proceed…'s request names the taskbag as the agent in the project folder
+    /// Task-A03-galley051: Work on it…'s request names the taskbag as the agent in the project folder
     /// passes it, beside the project or inside it.
     #[test]
     fn proceed_names_the_taskbag_from_the_project_folder() {

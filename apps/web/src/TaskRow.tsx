@@ -4,7 +4,7 @@
 // three lines with Show all. Clicking the row (or Enter / Space on it) opens the task pane; clicking
 // it again closes it. The holder's link and Show all do not select the task. Held by always shows
 // (Nobody when no session holds the task), and a task nobody holds that is not finished gets
-// Proceed… after it (Task-A03-galley051).
+// Work on it… after it (Task-A03-galley051).
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
@@ -41,7 +41,7 @@ export function TaskRow({
   modified?: string;
   /** Reopens the session the task records, as the task pane's button does (the desktop app only). */
   onOpenSession?: (id: string) => Promise<void>;
-  /** Opens Proceed… for the task (the desktop app only, where agents run). */
+  /** Opens Work on it… for the task (the desktop app only, where agents run). */
   onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
 }) {

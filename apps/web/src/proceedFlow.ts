@@ -1,4 +1,5 @@
-// Proceed… (Task-A03-galley051, approver 2026-11-03): a task no session holds can be handed to an
+// Work on it… (Task-A03-galley051, approver 2026-11-03; named Proceed… until the approver renamed it,
+// 2026-11-04): a task no session holds can be handed to an
 // AI agent from its row. Allomos opens the agent with a request typed in: claim the task and work
 // it, or, when it cannot start now (blocked, waiting), tell the person why and ask what to do. A
 // backlog task is approved by choosing Open, so its request makes it ready first. The request is
@@ -7,7 +8,7 @@
 import type { Language } from "./i18n";
 import type { Task } from "./types";
 
-/** Whether the row offers Proceed…: no session holds the task, and it is not finished. */
+/** Whether the row offers Work on it…: no session holds the task, and it is not finished. */
 export function canProceed(task: Task): boolean {
   return !task.holder && task.state !== "done" && task.state !== "dropped";
 }
@@ -53,10 +54,10 @@ export function proceedRequest(task: Task, taskbag: string, language: Language):
     }
     const backlog = task.state === "backlog";
     const n = backlog ? 3 : 2;
-    return `请接着做这个项目任务袋里的任务 ${id}（“${task.title}”）。每条 alm 命令都加上 ${tb}。
+    return `请执行这个项目任务袋里的任务 ${id}（“${task.title}”）。每条 alm 命令都加上 ${tb}。
 
 1. 阅读：alm show ${id}（它的说明和最新的交接）。
-${backlog ? `2. 它在储备中。我在「换肩」里选了「接着做」，这就是批准：先把它设为就绪（alm ready ${id}）。\n` : ""}${n}. 按 AGENTS.md 的说法认领它（alm claim ${id} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
+${backlog ? `2. 它在储备中。我在「换肩」里选了「执行」，这就是批准：先把它设为就绪（alm ready ${id}）。\n` : ""}${n}. 按 AGENTS.md 的说法认领它（alm claim ${id} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
 ${n + 1}. 在它自己的工作树里做，工作树从认领时列出的基础分支切出。
 ${n + 2}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
@@ -85,7 +86,7 @@ ${n + 2}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm 
     return `このプロジェクトのタスクバッグにあるタスク ${id}（「${task.title}」）を進めてください。alm コマンドはすべて ${tb} を付けて実行してください。
 
 1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
-${backlog ? `2. このタスクはバックログにあります。私が「肩代」で「続ける」を選んだので、これは承認です：まず準備完了にしてください（alm ready ${id}）。\n` : ""}${n}. AGENTS.md のとおりに引き受け（alm claim ${id} --as <あなたのセッション名> --branch <あなたのブランチ> ...）、その引き受けを共有してください。
+${backlog ? `2. このタスクはバックログにあります。私が「肩代」で「取りかかる」を選んだので、これは承認です：まず準備完了にしてください（alm ready ${id}）。\n` : ""}${n}. AGENTS.md のとおりに引き受け（alm claim ${id} --as <あなたのセッション名> --branch <あなたのブランチ> ...）、その引き受けを共有してください。
 ${n + 1}. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
 ${n + 2}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
@@ -113,7 +114,7 @@ It cannot start now: it is waiting on: ${task.waiting_on ?? ""}. Do not claim it
   return `Work on task ${id} ("${task.title}") in this project's taskbag. Run every alm command with ${tb}.
 
 1. Read it: alm show ${id} (its description and latest handoff note).
-${backlog ? `2. It is in backlog. I chose Proceed in Allomos, which approves it: make it ready (alm ready ${id}).\n` : ""}${n}. Claim it as AGENTS.md says (alm claim ${id} --as <your session name> --branch <your branch> ...), and share the claim.
+${backlog ? `2. It is in backlog. I chose Work on it in Allomos, which approves it: make it ready (alm ready ${id}).\n` : ""}${n}. Claim it as AGENTS.md says (alm claim ${id} --as <your session name> --branch <your branch> ...), and share the claim.
 ${n + 1}. Work it in a worktree of its own, cut from the base branch the claim prints.
 ${n + 2}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
 }

@@ -1,4 +1,4 @@
-// Proceed… (Task-A03-galley051, approver 2026-11-03): from a row no session holds, hand the task to
+// Work on it… (Task-A03-galley051, approver 2026-11-03): from a row no session holds, hand the task to
 // an AI agent. The dialog has the frame of Update the taskbag… (`MoveCardsDialog`): what Allomos
 // found (the task and its state), Edit the request…, what proceeding does, the shared agent
 // picker, then Cancel and Open. Open opens the agent in the project folder with the request typed
