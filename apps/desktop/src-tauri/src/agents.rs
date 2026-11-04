@@ -507,6 +507,107 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
         })
 }
 
+/// The command line that starts a terminal agent with the request read from `file` (and the file
+/// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
+/// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
+/// its own. The request goes through a file because a long, many-line request typed into a
+/// terminal window breaks at its first line end.
+fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
+    let file = shell_quote(&file.display().to_string());
+    let request = format!("\"$(cat {file}; rm -f {file})\"");
+    match (id, session_id) {
+        ("claude_cli", Some(s)) => {
+            Some(format!("claude --session-id {} {request}", shell_quote(s)))
+        }
+        ("claude_cli", None) => Some(format!("claude {request}")),
+        ("codex_cli", _) => Some(format!("codex {request}")),
+        _ => None,
+    }
+}
+
+/// The same on Windows: PowerShell reads the file into a variable, removes it, and passes it.
+fn powershell_session(
+    id: &str,
+    project: &Path,
+    found: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    alm_dir: Option<&Path>,
+) -> String {
+    let file = powershell_quote(&file.display().to_string());
+    let session = match (id, session_id) {
+        ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
+        _ => String::new(),
+    };
+    let start = format!(
+        "Set-Location -LiteralPath {}; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath {file}; Remove-Item -LiteralPath {file}; & {} {session}$request",
+        powershell_quote(&project.display().to_string()),
+        powershell_quote(found)
+    );
+    match alm_dir {
+        Some(dir) => format!(
+            "$env:PATH = {} + $env:PATH; {start}",
+            powershell_quote(&format!("{};", dir.display()))
+        ),
+        None => start,
+    }
+}
+
+/// A session ID only ever has letters, digits and `-` (a UUID): anything else is refused.
+fn plain_session_id(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// **Monitor ready tasks** (Task-A03-moth285): start a new session of a terminal agent in
+/// `project` with `request` already sent, in a terminal window of its own, so nobody has to press
+/// Return. The agent's own permission settings stay as they are (Allomos never changes them).
+pub fn start_session(
+    agent: &Agent,
+    project: &Path,
+    request: &str,
+    session_id: Option<&str>,
+) -> Result<(), Problem> {
+    let id = agent.id.as_str();
+    if !cfg!(any(target_os = "macos", windows)) {
+        return Err(ask_failed(id, "not available on this system yet"));
+    }
+    if session_id.is_some_and(|s| !plain_session_id(s)) {
+        return Err(ask_failed(id, "the session ID is not a plain ID"));
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
+    let Some(program) = session_command(id, &file, session_id) else {
+        return Err(ask_failed(id, "no way to start it"));
+    };
+    std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
+    let own_alm = crate::alm_command::own();
+    let alm_dir = own_alm.as_deref().and_then(Path::parent);
+    if cfg!(windows) {
+        let script = powershell_session(id, project, &agent.found, &file, session_id, alm_dir);
+        return new_console("powershell.exe")
+            .args(["-NoExit", "-NoLogo", "-Command", &script])
+            .spawn()
+            .map(drop)
+            .map_err(|e| ask_failed(id, e));
+    }
+    let script = format!(
+        "tell application \"Terminal\"\ndo script {}\nend tell",
+        applescript_string(&terminal_script(project, &program, alm_dir))
+    );
+    command("/usr/bin/osascript")
+        .args(["-e", &script])
+        .status()
+        .map_err(|e| ask_failed(id, e))
+        .and_then(|s| {
+            s.success()
+                .then_some(())
+                .ok_or_else(|| ask_failed(id, "Terminal did not open"))
+        })
+}
+
 /// Open `url` with the app the system has for its scheme.
 pub(crate) fn open_link(url: &str) -> Result<(), String> {
     if cfg!(windows) {
@@ -619,6 +720,43 @@ mod tests {
             r"'C:\Users\O''Neil\my proj'"
         );
         assert_eq!(powershell_quote("a\u{2019}b"), "'a\u{2019}\u{2019}b'");
+    }
+
+    /// Task-A03-moth285: a monitored session starts with the request read from its file, and
+    /// Claude Code with the session ID Allomos made.
+    #[test]
+    fn monitored_sessions_start_with_the_request_sent() {
+        let file = Path::new("/tmp/allomos-request-1.txt");
+        assert_eq!(
+            session_command("claude_cli", file, Some("0b1c-2d")).as_deref(),
+            Some(
+                "claude --session-id '0b1c-2d' \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
+            )
+        );
+        assert_eq!(
+            session_command("codex_cli", file, Some("ignored")).as_deref(),
+            Some(
+                "codex \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
+            )
+        );
+        assert_eq!(session_command("claude_app", file, None), None);
+        assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));
+        assert!(!plain_session_id("x; rm -rf ~"));
+        assert!(!plain_session_id(""));
+        let found = r"C:\npm\claude.cmd";
+        assert_eq!(
+            powershell_session(
+                "claude_cli",
+                Path::new(r"C:\p"),
+                found,
+                Path::new(r"C:\t\r.txt"),
+                Some("ab-12"),
+                None
+            ),
+            format!(
+                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
+            )
+        );
     }
 
     #[test]

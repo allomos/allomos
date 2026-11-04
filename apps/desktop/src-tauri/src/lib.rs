@@ -1808,6 +1808,32 @@ async fn proceed_with_agent(
     agents::ask(chosen, &project, &request)
 }
 
+/// **Monitor ready tasks** (Task-A03-moth285): start a new session of a terminal agent (Claude
+/// Code or Codex) in the project folder for one task, with `request` (written by the interface)
+/// already sent; `session_id` is the ID Allomos made for Claude Code's `--session-id`.
+#[tauri::command]
+async fn monitor_start_session(
+    agent: String,
+    taskbag: PathBuf,
+    request: String,
+    session_id: Option<String>,
+) -> Result<(), Problem> {
+    let project = allomos_store::versions::project_folder(&taskbag);
+    if !project.is_dir() {
+        return Err(Problem::StartupNotAFolder {
+            path: project.display().to_string(),
+        });
+    }
+    let found = agents::find_agents();
+    let Some(chosen) = found
+        .iter()
+        .find(|a| a.id == agent && matches!(a.id.as_str(), "claude_cli" | "codex_cli"))
+    else {
+        return Err(Problem::AgentNotFound { agent });
+    };
+    agents::start_session(chosen, &project, &request, session_id.as_deref())
+}
+
 /// **Proceed…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
 /// the other Manual requests are).
 #[tauri::command]
@@ -2469,6 +2495,7 @@ pub fn run() {
             proceed_taskbag,
             proceed_with_agent,
             proceed_manual_request,
+            monitor_start_session,
             run_modes_text,
             copy_text,
             instruction_files,

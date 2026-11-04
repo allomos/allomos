@@ -35,10 +35,14 @@ export interface OfferFacts {
   entries: string[] | null;
 }
 
+/** Choices a feature cannot offer, each with the reason shown beside it (Task-A03-moth285). */
+export type Unavailable = Partial<Record<Choice, string>>;
+
 /** The agents on this computer and the person's choice; Manual alone when finding them fails.
  * `facts` narrows them by the rule of Update the taskbag… (Task-A03-27); null while they are still
- * being read (shown as looking); left out: every agent found. */
-export function useAgents(messenger: Messenger, facts?: OfferFacts | null) {
+ * being read (shown as looking); left out: every agent found. The first choice is never one of
+ * `unavailable` (none at all when everything is). */
+export function useAgents(messenger: Messenger, facts?: OfferFacts | null, unavailable?: Unavailable) {
   const [found, setFound] = useState<Agent[] | null>(null);
   const [slow, setSlow] = useState(false);
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -61,7 +65,10 @@ export function useAgents(messenger: Messenger, facts?: OfferFacts | null) {
   );
   const agents = useMemo(() => (found === null || offer === null ? null : offered(found, offer)), [found, offer]);
   useEffect(() => {
-    if (agents) setChoice(firstChoice(agents));
+    if (!agents) return;
+    const first = firstChoice(agents.filter((a) => !unavailable?.[a.id]));
+    setChoice(unavailable?.[first] ? null : first);
+    // `unavailable` is fixed for a dialog: the first choice follows the agents found.
   }, [agents]);
   /** The chosen tool as found (null for Manual or while looking). */
   const tool = agents?.find((a) => a.id === choice) ?? null;
@@ -77,6 +84,8 @@ export function AgentPicker({
   name,
   manual,
   manualTo,
+  unavailable,
+  how,
 }: {
   /** The agents found; null while looking. */
   agents: Agent[] | null;
@@ -92,6 +101,10 @@ export function AgentPicker({
   /** The one agent the request is for (Update the taskbag…, Task-A03-27): Manual says to paste
    * it into that agent rather than any. */
   manualTo?: string;
+  /** Choices shown but not offered, each with why (Task-A03-moth285). */
+  unavailable?: Unavailable;
+  /** What choosing it does, in the feature's own words, in place of how it opens. */
+  how?: Partial<Record<Choice, string>>;
 }) {
   const { t } = useI18n();
   /** The tool last chosen in each group, so choosing the group again keeps it. */
@@ -109,36 +122,39 @@ export function AgentPicker({
     ) : null;
   }
   const chosenGroup = groupOf(choice);
+  const usable = agents.filter((a) => !unavailable?.[a.id]);
   return (
     <ul className="agent-list">
       {foundGroups(agents).map((g) => {
         const on = chosenGroup === g.name;
+        const none = g.tools.every((a) => unavailable?.[a.id]);
         return (
           <li key={g.name}>
-            <label>
+            <label className={none ? "muted" : undefined}>
               <input
                 type="radio"
                 name={`${name}-group`}
                 checked={on}
-                onChange={() => onChoose(chooseGroup(agents, g.name, last))}
-                disabled={disabled}
+                onChange={() => onChoose(chooseGroup(usable, g.name, last))}
+                disabled={disabled || none}
               />{" "}
               <strong>{g.name}</strong>
             </label>
             <ul className="agent-tools">
               {g.tools.map((a) => {
                 const picked = on && choice === a.id;
+                const why = unavailable?.[a.id];
                 return (
                   <li key={a.id}>
-                    <label className={on ? undefined : "muted"}>
+                    <label className={on && !why ? undefined : "muted"}>
                       {g.tools.length > 1 && (
                         <>
                           <input
                             type="radio"
                             name={`${name}-tool-${g.name}`}
-                            checked={on ? choice === a.id : (last[g.name] ?? g.tools[0].id) === a.id}
+                            checked={on ? choice === a.id : (last[g.name] ?? (g.tools.find((x) => !unavailable?.[x.id]) ?? g.tools[0]).id) === a.id}
                             onChange={() => onChoose(a.id)}
-                            disabled={disabled || !on}
+                            disabled={disabled || !on || Boolean(why)}
                           />{" "}
                         </>
                       )}
@@ -146,13 +162,14 @@ export function AgentPicker({
                       {/* How it will open: only for the chosen tool (owner, 2026-10-12). */}
                       {picked && (
                         <span className="muted">
-                          — {t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
+                          — {how?.[a.id] ?? t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
                         </span>
                       )}
+                      {why && <span className="muted small hint">{why}</span>}
                       {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
-                      {a.id === "claude_app" && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
+                      {a.id === "claude_app" && !why && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
                       {/* The chosen tool takes the request from the clipboard: say how, right here. */}
-                      {picked && a.how === "paste" && (
+                      {picked && a.how === "paste" && !how?.[a.id] && (
                         <span className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</span>
                       )}
                     </label>
@@ -165,10 +182,17 @@ export function AgentPicker({
       })}
       {/* Manual (Task-A05-06): any AI, even when none is found; the person pastes the request. */}
       <li>
-        <label>
-          <input type="radio" name={`${name}-group`} checked={choice === MANUAL} onChange={() => onChoose(MANUAL)} disabled={disabled} />{" "}
+        <label className={unavailable?.[MANUAL] ? "muted" : undefined}>
+          <input
+            type="radio"
+            name={`${name}-group`}
+            checked={choice === MANUAL}
+            onChange={() => onChoose(MANUAL)}
+            disabled={disabled || Boolean(unavailable?.[MANUAL])}
+          />{" "}
           <strong>{t("agents.manual")}</strong>{" "}
-          <span className="muted">— {manualTo ? t("agents.manual_how_to", { agent: manualTo }) : t("agents.manual_how")}</span>
+          <span className="muted">— {how?.[MANUAL] ?? (manualTo ? t("agents.manual_how_to", { agent: manualTo }) : t("agents.manual_how"))}</span>
+          {unavailable?.[MANUAL] && <span className="muted small hint own-line">{unavailable[MANUAL]}</span>}
         </label>
         {choice === MANUAL && manual}
       </li>
