@@ -923,3 +923,36 @@ label.filter-row:hover, .filter-side:hover { background: var(--bg); }
 .language-drop li[aria-selected="true"] { font-weight: 600; }
 .language-drop li.none { cursor: default; }
 .language-drop .hint { margin: 0; padding: 0 4px; }
+
+/* Monitor ready tasks (Task-A03-moth285): the plain button with the last run's line beside it,
+   the status bar that takes its place while monitoring, and the dialog's Which tasks field. */
+.monitor { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.monitor-button { font-size: 13px; padding: 4px 12px; }
+.monitor-bar { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--ok-bg); color: var(--ok); border-radius: 14px; padding: 3px 6px 3px 12px; font-size: 13px; }
+.monitor-bar.stopping { background: var(--warn-bg); color: var(--warn); }
+.monitor-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: monitor-pulse 1.6s infinite; }
+@keyframes monitor-pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .monitor-bar .dot { animation: none; } }
+.monitor-bar .every { border: none; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; }
+.monitor-bar button.small { padding: 2px 9px; font-size: 12px; }
+.monitor-bar button.stop { border-color: color-mix(in srgb, var(--err) 35%, var(--line)); color: var(--err); }
+.monitor-every-wrap { position: relative; }
+.monitor-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: flex; flex-direction: column; gap: 2px; width: 240px; padding: 10px 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgb(0 0 0 / 15%); }
+.monitor-menu p { margin: 0 0 6px; }
+.monitor-menu button { border: none; background: none; text-align: left; padding: 4px 8px 4px 22px; border-radius: 6px; font-size: 13px; color: inherit; }
+.monitor-menu button.on { padding-left: 8px; font-weight: 600; background: var(--bg); }
+.monitor-menu button:hover { background: var(--info-bg); }
+.monitor-stalled { color: var(--warn); font-weight: 600; }
+.group-monitor { margin-left: auto; font-weight: normal; }
+.monitor-scopes { list-style: none; margin: 0 0 4px; padding: 0; }
+.monitor-scopes li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+.monitor-scopes li.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.monitor-scopes li.dim { opacity: 0.55; }
+.monitor-scopes label { display: flex; gap: 6px; align-items: flex-start; }
+.monitor-scopes select.idle { opacity: 0.6; }
+.monitor-scopes .scope-note { flex-basis: 100%; padding-left: 22px; }
+.monitor-dialog .mode-effect { margin: 4px 0 0 22px; }
+.monitor-dialog select { width: auto; max-width: 100%; justify-self: start; }
+.agent-list .hint.own-line { display: block; margin-top: 2px; }
+.area:has(.monitor-menu) { overflow: visible; }
+.group-monitor .monitor-bar { border-radius: 12px; }

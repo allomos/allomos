@@ -105,6 +105,10 @@ export interface Messenger {
   proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
   /** Proceed… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
+  /** Monitor ready tasks (Task-A03-moth285): starts a new session of a terminal agent (`claude_cli`,
+   * `codex_cli`) in the project folder of the taskbag at `taskbag`, in a terminal window of its
+   * own, with `request` already sent; `sessionId` is Claude Code's `--session-id`. Rejects with a Problem. */
+  monitorStartSession(agent: string, taskbag: string, request: string, sessionId: string | null): Promise<void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -396,6 +400,8 @@ export const desktopMessenger: Messenger = {
   proceedTaskbag: (taskbag) => invoke<string>("proceed_taskbag", { taskbag }),
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
+  monitorStartSession: (agent, taskbag, request, sessionId) =>
+    invoke<void>("monitor_start_session", { agent, taskbag, request, sessionId }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

@@ -59,6 +59,9 @@ import { GroupEditForm } from "./GroupEditForm";
 import { folderFilterValue, keepFolder, newTaskFolders, readFolderFilter, showFolders, type FolderInfo } from "./folderFlow";
 import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlow";
 import { iterationPlaces } from "./iterationPlace";
+import { MonitorControl, useMonitor } from "./Monitor";
+import { MonitorDialog } from "./MonitorDialog";
+import { readyTasks, scopeOptions, type OpenedFrom } from "./monitorFlow";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import { TabActive } from "./tabActive";
@@ -776,6 +779,7 @@ export function App({
             opened={opened}
             messenger={messenger}
             onError={(e) => setError(errorNote(e))}
+            onFailure={(message) => setError({ text: message })}
             onNotice={(message) => setNotices((list) => [...list, { text: message }])}
             hideOlder={olderShown}
             canOpenSessions={!companion}
@@ -1162,6 +1166,7 @@ function TaskbagView({
   opened,
   messenger,
   onError,
+  onFailure,
   onNotice,
   hideOlder,
   canOpenSessions,
@@ -1172,6 +1177,8 @@ function TaskbagView({
   opened: Opened;
   messenger: Messenger;
   onError: (e: unknown) => void;
+  /** Shows what went wrong, in words already written (Monitor ready tasks, Task-A03-moth285). */
+  onFailure: (message: string) => void;
   /** Shows what an action did, in the window's notices (Proceed…, Task-A03-galley051). */
   onNotice: (message: string) => void;
   /** The update notice already says the taskbag is from an older Allomos. */
@@ -1542,6 +1549,22 @@ function TaskbagView({
   };
   /** The task Proceed… is open for (Task-A03-galley051). */
   const [proceeding, setProceeding] = useState<Task | null>(null);
+  // Monitor ready tasks (Task-A03-moth285): the desktop app only, where agent sessions run. The
+  // dialog opens from the top bar or the active iteration's card.
+  const monitor = useMonitor({ messenger, root: opened.root, box, active: activeIteration, onError: onFailure });
+  const [monitorFrom, setMonitorFrom] = useState<OpenedFrom | null>(null);
+  const monitorControl = (from: OpenedFrom) =>
+    box && (
+      <MonitorControl
+        monitor={monitor}
+        tasks={box.tasks}
+        ready={readyTasks(box.tasks, box.areas, iterations, activeIteration).length}
+        showScope={from === "iteration"}
+        onOpen={() => setMonitorFrom(from)}
+        onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
+        onError={onError}
+      />
+    );
 
   return (
     <>
@@ -1584,6 +1607,9 @@ function TaskbagView({
                   {t("fold.expand_all")}
                 </button>
               </span>
+              {/* Task-A03-moth285: the top bar's button; the Iterations tab has it on the active
+                  iteration's card instead, and its status bar here only when there is none. */}
+              {canOpenSessions && (groupBy === "area" || (!activeIteration && monitor.run)) && monitorControl("top")}
             </div>
           )}
           {/* Task-A01-egg896: one band across the top of both the list and the task pane, so the pane
@@ -1635,6 +1661,7 @@ function TaskbagView({
                   form={creatingIn(g.key) && createForm(creatingIn(g.key)!)}
                   onEdit={g.edit && (() => startEditing(g.edit!))}
                   editForm={editingIn(g) && editForm(editingIn(g)!)}
+                  monitor={canOpenSessions && g.iterationState === "active" ? monitorControl("iteration") : undefined}
                 />
               ))}
               {!searching && groupBy === "area" && box.areas.length === 0 && box.tasks.length === 0 && (
@@ -1693,6 +1720,18 @@ function TaskbagView({
                 : "box.no_project",
           )}
         </p>
+      )}
+      {monitorFrom && box && (
+        <MonitorDialog
+          messenger={messenger}
+          options={scopeOptions(box.tasks, box.areas, iterations, activeIteration)}
+          from={monitorFrom}
+          onStart={(scope, agent, quiet, every) => {
+            setMonitorFrom(null);
+            monitor.start(scope, agent, quiet, every);
+          }}
+          onClose={() => setMonitorFrom(null)}
+        />
       )}
       {proceeding && (
         <ProceedDialog
@@ -1782,6 +1821,7 @@ function TaskGroup({
   onOpenSession,
   onProceed,
   onError,
+  monitor,
 }: {
   id: string;
   name: string;
@@ -1823,6 +1863,8 @@ function TaskGroup({
   /** Opens Proceed… for a task nobody holds (Task-A03-galley051); the desktop app only. */
   onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
+  /** The active iteration's Monitor ready tasks button, or its status bar (Task-A03-moth285). */
+  monitor?: ReactNode;
 }) {
   const { t } = useI18n();
   const all = counted ?? tasks;
@@ -1845,6 +1887,7 @@ function TaskGroup({
               {t("group_edit.edit_button")}
             </button>
           )}
+          {monitor && <span className="group-monitor">{monitor}</span>}
         </div>
         <span className="count">{t("area.count", { done, total })}</span>
         {sub && <span className="sub">{sub}</span>}
