@@ -30,7 +30,8 @@ export function MonitorDialog({
   onClose: () => void;
 }) {
   const { t, language } = useI18n();
-  // This step runs only the agents Allomos starts itself; the others are shown with why not.
+  // Every choice must run unattended (approver, 2026-11-04): this step runs only the agents
+  // Allomos starts itself; the others are shown with why not.
   const unavailable = useMemo<Unavailable>(
     () => ({ claude_app: t("monitor.later_app"), codex_app: t("monitor.later_codex_app"), [MANUAL]: t("monitor.later_manual") }),
     [t],

@@ -1,9 +1,10 @@
 // Monitor ready tasks (Task-A03-moth285, approver 2026-11-03/04): one button starts unattended
 // monitoring of the project's ready tasks, or one iteration's. Each ready task is worked in a new
 // agent session, one at a time; with none ready, the monitor waits and checks again at the chosen
-// frequency. This first slice is the route Allomos runs itself: Claude Code or Codex in a
-// terminal, started with the request. Kept apart from React so it can be tested with Node alone
-// (`npm --prefix apps/web test`). Only type imports here: Node strips them.
+// frequency. Every route must run unattended (approver, 2026-11-04); this first slice is the
+// route Allomos runs itself: Claude Code or Codex in a terminal, started with the request. Kept
+// apart from React so it can be tested with Node alone (`npm --prefix apps/web test`). Only type
+// imports here: Node strips them.
 
 import type { Language } from "./i18n";
 import type { Iteration, Task } from "./types";
