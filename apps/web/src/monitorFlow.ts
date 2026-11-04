@@ -148,15 +148,16 @@ function seenOf(task: Task | undefined): string {
 }
 
 /** The run with its current task followed in the taskbag as it is now. The task is finished when
- * no one holds it any more after being claimed, or when it has left `ready` without being held
- * (done, dropped, waiting, blocked), or when it is gone. */
+ * it is done, dropped, waiting or blocked (alm keeps the last holder on those), when no one holds
+ * it any more after being claimed or without ever leaving `ready` unheld, or when it is gone. */
 export function follow(run: Run, tasks: Task[], now: number): { run: Run; finished: string | null } {
   const cur = run.current;
   if (!cur) return { run, finished: null };
   const task = tasks.find((t) => t.id === cur.id);
   const seen = seenOf(task);
   const seenHeld = cur.seenHeld || Boolean(task?.holder);
-  const finished = !task || (!task.holder && (seenHeld || task.state !== "ready"));
+  const stopped = task !== undefined && ["done", "dropped", "waiting", "blocked"].includes(task.state);
+  const finished = !task || stopped || (!task.holder && (seenHeld || task.state !== "ready"));
   if (finished) return { run: { ...run, current: null }, finished: cur.id };
   const next = seen === cur.seen && seenHeld === cur.seenHeld ? cur : { ...cur, seen, seenHeld, changed: seen === cur.seen ? cur.changed : now };
   return { run: next === cur ? run : { ...run, current: next }, finished: null };

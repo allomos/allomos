@@ -149,6 +149,9 @@ test("the current task is finished once claimed and no longer held, or when it l
   assert.equal(released.run.current, null);
   // Waiting without ever being seen held (claimed and parked between two reads).
   assert.equal(follow(start, [task("A01-05", { state: "waiting", waiting_on: "a question" })], 5).finished, "A01-05");
+  // Done, or parked, by its session: alm keeps the last holder (trial run, 2026-11-04).
+  assert.equal(follow(r.run, [task("A01-05", { holder: "moth", state: "done" })], 40).finished, "A01-05");
+  assert.equal(follow(r.run, [task("A01-05", { holder: "moth", state: "waiting", waiting_on: "a question" })], 40).finished, "A01-05");
   // Gone from the taskbag.
   assert.equal(follow(start, [], 5).finished, "A01-05");
 });
