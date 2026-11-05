@@ -156,6 +156,9 @@ export function App({
   const { t, problem, language } = useI18n();
   const active = useContext(TabActive);
   const [opened, setOpened] = useState<Opened | null>(null);
+  /** A kept or moved tab's taskbag is still opening: until then the tab keeps the label it came
+   * with, instead of showing the start page's for a moment (Task-A01-banjo884). */
+  const [opening, setOpening] = useState(start.how === "restore" || start.how === "moved");
   const openedRef = useRef(opened);
   openedRef.current = opened;
   /** The setup wizard (Task-A05-03): at step 1, at step 2 for a folder without `.allomos`, or at
@@ -353,8 +356,9 @@ export function App({
   // (Task-A01-27, Task-A01-marble320); a rename shows at once.
   const shownName = opened?.loaded.taskbag?.project.name ?? null;
   useEffect(() => {
+    if (opening) return;
     void messenger.setWindowProject(root ?? null, shownName).catch(() => undefined);
-  }, [messenger, root, shownName]);
+  }, [messenger, root, shownName, opening]);
   useEffect(() => {
     if (!root) return;
     stampRef.current = null;
@@ -425,7 +429,7 @@ export function App({
           return;
         }
         await openFolder(folder);
-      })();
+      })().finally(() => setOpening(false));
       return;
     }
     const startWith = start.startWith;

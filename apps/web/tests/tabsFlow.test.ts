@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry } from "../src/tabsFlow.ts";
+import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startEntries, startTabs, tabShowing, tearsOff, type TabEntry } from "../src/tabsFlow.ts";
 
 test("a window starts with the tabs it was given, or one tab", () => {
   // Restored tabs, the start page among them.
@@ -17,6 +17,41 @@ test("a window starts with the tabs it was given, or one tab", () => {
   // A tab dragged in from another window, and Open Recent's folder.
   assert.deepEqual(startTabs({ tabs: [{ root: "/b", how: "moved" }], active: 0, startup: null }), [{ how: "moved", root: "/b" }]);
   assert.deepEqual(startTabs({ tabs: [{ root: "/c", how: "open" }], active: 0, startup: null }), [{ how: "open", root: "/c" }]);
+});
+
+test("only the tab in front loads when a window opens; the others show their label", () => {
+  const entries = startEntries({
+    tabs: [
+      { root: "/a/.allomos/taskbag", how: "restore", name: "Alpha" },
+      { root: "/b/.allomos/taskbag", how: "restore", name: "Beta" },
+      { root: null, how: "restore" },
+      { root: "/c/.allomos/taskbag", how: "restore" },
+    ],
+    active: 1,
+    startup: "reopen",
+  });
+  assert.deepEqual(
+    entries.map((e) => [e.root, e.name, e.loaded]),
+    [
+      ["/a/.allomos/taskbag", "Alpha", false],
+      ["/b/.allomos/taskbag", "Beta", true],
+      [null, null, false],
+      // Kept by an older version, without a name: the tab bar shows its folder's.
+      ["/c/.allomos/taskbag", null, false],
+    ],
+  );
+  // A front tab past the end (an edited file) is the last one.
+  assert.deepEqual(
+    startEntries({ tabs: [{ root: "/a", how: "moved", name: "A" }, { root: "/b", how: "moved" }], active: 9, startup: null }).map((e) => e.loaded),
+    [false, true],
+  );
+  // A folder from Open Recent shows nothing until it opens; the first window's start-up tab loads.
+  assert.deepEqual(startEntries({ tabs: [{ root: "/c", how: "open" }], active: 0, startup: null }), [
+    { start: { how: "open", root: "/c" }, root: null, name: null, loaded: true },
+  ]);
+  assert.deepEqual(startEntries({ tabs: [], active: 0, startup: "last" }), [
+    { start: { how: "startup", startWith: "last" }, root: null, name: null, loaded: true },
+  ]);
 });
 
 test("dragging a tab along the bar changes the tabs' order", () => {

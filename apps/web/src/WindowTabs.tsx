@@ -6,6 +6,9 @@
 // and the others slide aside to open the gap where it will land; pulled out of the bar it tears off
 // and its window follows the pointer (the app moves it, `tab_drag.rs`); over a tab bar, that bar
 // opens a gap for it, and let go there it joins at the gap. Escape puts it back.
+//
+// Restored tabs load one at a time (Task-A01-banjo884): only the tab in front loads when the window
+// opens; the others show their label and load the first time they come to the front.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
@@ -14,7 +17,7 @@ import { useI18n } from "./i18n";
 import type { Messenger, TabsMessenger } from "./messenger";
 import { projectFolder } from "./paths";
 import { TabActive } from "./tabActive";
-import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startTabs, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
+import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startEntries, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
 
 /** What a tab's view needs from its window. */
 interface Shell {
@@ -76,7 +79,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   const hoverTab = useRef<{ id: number; made: boolean; prev: number | null } | null>(null);
   const views = useRef(new Map<number, { messenger: Messenger }>());
 
-  const entry = (start: TabStart): TabEntry => ({ id: nextId.current++, start, root: null, name: null });
+  const entry = (start: TabStart): TabEntry => ({ id: nextId.current++, start, root: null, name: null, loaded: true });
   const add = useCallback((start: TabStart) => {
     const tab = entry(start);
     setTabs((list) => [...list, tab]);
@@ -107,7 +110,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
       .windowStart()
       .then(async (start) => {
         if (!live) return;
-        const list = startTabs(start).map(entry);
+        const list = startEntries(start).map((tab) => ({ ...tab, id: nextId.current++ }));
         setTabs(list);
         setFront(list[Math.min(start.active, list.length - 1)].id);
         setStarted(true);
@@ -140,6 +143,11 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
   useEffect(() => {
     if (started) void api.setWindowTabs(JSON.parse(shown), frontAt).catch(() => undefined);
   }, [api, started, shown, frontAt]);
+
+  // A tab that waited loads when it first comes to the front, and stays loaded.
+  useEffect(() => {
+    setTabs((list) => (list.some((tab) => tab.id === front && !tab.loaded) ? list.map((tab) => (tab.id === front ? { ...tab, loaded: true } : tab)) : list));
+  }, [front]);
 
   // File → New Tab and Open Recent, and a tab asked for elsewhere.
   useEffect(() => {
@@ -491,9 +499,11 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
           +
         </button>
       </div>
-      {/* The views in the order the tabs opened, so reordering the tabs moves nothing on the page. */}
+      {/* The views in the order the tabs opened, so reordering the tabs moves nothing on the page; a
+          tab that has not been in front yet has none. */}
       {[...tabs]
         .sort((a, b) => a.id - b.id)
+        .filter((tab) => tab.loaded || tab.id === front)
         .map((tab) => (
           <div key={tab.id} className="tab-view" role="tabpanel" hidden={tab.id !== front}>
             <TabActive.Provider value={tab.id === front}>

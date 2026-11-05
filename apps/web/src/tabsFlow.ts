@@ -14,10 +14,12 @@ export type TabStart =
   | { how: "open" | "restore" | "moved"; root: string }
   | { how: "startup"; startWith: StartWith };
 
-/** A tab as the app sends it when a window opens (`window_start`). */
+/** A tab as the app sends it when a window opens (`window_start`), with the project's name it
+ * last showed, if the app kept one. */
 export interface StartTab {
   root: string | null;
   how: "open" | "restore" | "moved";
+  name?: string | null;
 }
 
 export interface WindowStart {
@@ -28,12 +30,14 @@ export interface WindowStart {
 }
 
 /** One tab of the window: what it started with, the taskbag it shows now (none: the start page),
- * and its project's name. */
+ * its project's name, and whether its view has loaded (a tab waits until it first comes to the
+ * front, Task-A01-banjo884). */
 export interface TabEntry {
   id: number;
   start: TabStart;
   root: string | null;
   name: string | null;
+  loaded: boolean;
 }
 
 /** How each tab of a window that just opened starts. */
@@ -41,6 +45,20 @@ export function startTabs(start: WindowStart): TabStart[] {
   const tabs: TabStart[] = start.tabs.map((t) => (t.root ? { how: t.how, root: t.root } : { how: "blank" }));
   if (tabs.length === 0) tabs.push(start.startup ? { how: "startup", startWith: start.startup } : { how: "blank" });
   return tabs;
+}
+
+/** The tabs a window opens with, without their ids: only the one in front loads now; the others
+ * show the taskbag and name they were kept with and load when they first come to the front
+ * (Task-A01-banjo884). A tab opened for a folder shows nothing yet: it may close again if another
+ * tab already shows that folder. */
+export function startEntries(start: WindowStart): Omit<TabEntry, "id">[] {
+  const tabs = startTabs(start);
+  const front = Math.max(0, Math.min(start.active, tabs.length - 1));
+  return tabs.map((tab, i) => {
+    const kept = start.tabs[i];
+    const known = tab.how === "restore" || tab.how === "moved";
+    return { start: tab, root: known ? tab.root : null, name: (known && kept?.name) || null, loaded: i === front };
+  });
 }
 
 /** The tabs with the one at `from` moved to `to`. */

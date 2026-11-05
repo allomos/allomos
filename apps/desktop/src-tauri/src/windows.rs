@@ -41,11 +41,13 @@ pub(crate) struct Shown {
 
 /// How a tab starts: `open`, a folder from File → Open Recent (one that is gone is said so);
 /// `restore`, a tab of the last session (one that is gone leaves quietly); `moved`, a tab dragged
-/// from another window (already open there, so not brought forward elsewhere).
+/// from another window (already open there, so not brought forward elsewhere). `name`: the
+/// project's name the tab last showed, its label until it loads (Task-A01-banjo884).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct StartTab {
     pub(crate) root: Option<PathBuf>,
     pub(crate) how: &'static str,
+    pub(crate) name: Option<String>,
 }
 
 /// What a window opens with (`window_start`).
@@ -69,6 +71,10 @@ pub(crate) struct Session {
 pub(crate) struct SavedWindow {
     pub(crate) tabs: Vec<Option<PathBuf>>,
     pub(crate) active: usize,
+    /// Each tab's project name, in the tabs' order, so a tab shows its label before it loads
+    /// (Task-A01-banjo884). Left out by older versions: the tabs then show their folder's name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) names: Vec<Option<String>>,
 }
 
 /// Which taskbags each window's tabs show (Task-A01-27, Task-A01-marble320), by window label: a
@@ -170,6 +176,7 @@ pub(crate) fn session_of(shown: &HashMap<String, Shown>) -> Session {
             .map(|s| SavedWindow {
                 tabs: s.tabs.iter().map(|t| t.root.clone()).collect(),
                 active: s.active.min(s.tabs.len() - 1),
+                names: s.tabs.iter().map(|t| t.name.clone()).collect(),
             })
             .collect(),
     }
@@ -211,9 +218,11 @@ pub(crate) fn restored(session: &Session) -> Vec<WindowStart> {
             tabs: w
                 .tabs
                 .iter()
-                .map(|root| StartTab {
+                .enumerate()
+                .map(|(i, root)| StartTab {
                     root: root.clone(),
                     how: "restore",
+                    name: w.names.get(i).cloned().flatten(),
                 })
                 .collect(),
             active: w.active.min(w.tabs.len() - 1),
@@ -277,6 +286,7 @@ pub(crate) fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
             tabs: vec![StartTab {
                 root: None,
                 how: "open",
+                name: None,
             }],
             active: 0,
             startup: None,
@@ -333,6 +343,7 @@ pub(crate) fn open_recent_in_window(app: &AppHandle, folder: &str) -> tauri::Res
             tabs: vec![StartTab {
                 root: Some(path),
                 how: "open",
+                name: None,
             }],
             active: 0,
             startup: None,
@@ -384,7 +395,11 @@ pub(crate) fn open_drag_window(
     let label = next_label(
         app,
         WindowStart {
-            tabs: vec![StartTab { root, how: "moved" }],
+            tabs: vec![StartTab {
+                root,
+                how: "moved",
+                name: None,
+            }],
             active: 0,
             startup: None,
         },
@@ -444,6 +459,7 @@ pub(crate) fn window_start(
                 .map(|t| StartTab {
                     root: t.root.clone(),
                     how: "moved",
+                    name: t.name.clone(),
                 })
                 .collect(),
             active: shown.active,
@@ -640,11 +656,13 @@ mod tests {
                 windows: vec![
                     SavedWindow {
                         tabs: vec![Some(PathBuf::from("/a")), None],
-                        active: 1
+                        active: 1,
+                        names: vec![Some("x".into()), None],
                     },
                     SavedWindow {
                         tabs: vec![Some(PathBuf::from("/c"))],
-                        active: 0
+                        active: 0,
+                        names: vec![Some("x".into())],
                     },
                 ]
             }
@@ -660,11 +678,13 @@ mod tests {
             vec![
                 StartTab {
                     root: Some(PathBuf::from("/a")),
-                    how: "restore"
+                    how: "restore",
+                    name: Some("x".into()),
                 },
                 StartTab {
                     root: None,
-                    how: "restore"
+                    how: "restore",
+                    name: None,
                 }
             ]
         );
@@ -673,8 +693,13 @@ mod tests {
             windows: vec![SavedWindow {
                 tabs: vec![None],
                 active: 5,
+                names: Vec::new(),
             }],
         };
         assert_eq!(restored(&odd)[0].active, 0);
+        // A file an older version wrote has no names: its tabs have none.
+        let old: Session =
+            serde_json::from_str(r#"{"windows":[{"tabs":["/a"],"active":0}]}"#).unwrap();
+        assert_eq!(restored(&old)[0].tabs[0].name, None);
     }
 }
