@@ -173,7 +173,9 @@ export function MonitorDialog({
               <Markdown source={modes} onLink={() => undefined} />
             </details>
           )}
-          <p className="banner update">{t("build.auto_mode")}</p>
+          <p className="banner update">
+            {t(agent === "claude_cli" || agent === "codex_cli" ? `monitor.permissions_${agent}` : "build.auto_mode")}
+          </p>
           <p className="muted small">{t("monitor.backlog_note")}</p>
         </div>
 

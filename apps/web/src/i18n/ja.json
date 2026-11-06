@@ -841,6 +841,8 @@
   "monitor.every_hours": "{n} 時間ごと",
   "monitor.agent": "エージェント",
   "monitor.how_terminal": "「肩代」がタスクごとにターミナルのセッションを開きます。最後まで人の操作はいりません",
+  "monitor.permissions_claude_cli": "タスクごとに新しい Claude Code のセッションを開くため、1 つのセッションで auto mode をオンにしても（Shift+Tab）次のセッションには引き継がれません。始める前に、Claude Code 自身の設定で auto mode を既定にしてください。そうしないと、セッションごとに許可を求めて止まります。「肩代」がエージェントの権限を変えることはありません。",
+  "monitor.permissions_codex_cli": "タスクごとに新しい Codex のセッションを開くため、1 つのセッションでフルアクセスに切り替えても（/permissions）次のセッションには引き継がれません。始める前に、Codex 自身の設定でフルアクセスを与えてください（~/.codex/config.toml：approval_policy = \"never\"、sandbox_mode = \"danger-full-access\"）。そうしないと、セッションごとに最初のコマンドの前で許可を求めて止まります。この設定はこのコンピューター上のすべての Codex セッションに効きます。「肩代」がエージェントの権限を変えることはありません。",
   "monitor.later_app": "選べません：ここから Claude アプリを人の操作なしで動かす方法がありません。アプリが開いたセッションは自分で新しいセッションを開けず、「肩代」はアプリの定期タスクも作れません。",
   "monitor.later_codex_app": "選べません：まだ試していません。",
   "monitor.later_manual": "選べません：自分で貼り付ける依頼は、人の操作なしでは進みません。",
