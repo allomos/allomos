@@ -841,6 +841,8 @@
   "monitor.every_hours": "every {n} hours",
   "monitor.agent": "Agent",
   "monitor.how_terminal": "Allomos opens a terminal session for each task; unattended throughout",
+  "monitor.permissions_claude_cli": "Each task gets a new Claude Code session, so turning on auto mode in one session (Shift+Tab) does not carry over to the next. Before you start, make auto mode Claude Code's default in its own settings; otherwise every session stops to ask for permission. Allomos never changes an agent's permissions.",
+  "monitor.permissions_codex_cli": "Each task gets a new Codex session, so switching to full access in one session (/permissions) does not carry over to the next. Before you start, give Codex full access in its own settings (~/.codex/config.toml: approval_policy = \"never\" and sandbox_mode = \"danger-full-access\"); otherwise every session stops to ask before its first command. These settings apply to every Codex session on this computer. Allomos never changes an agent's permissions.",
   "monitor.later_app": "Not available: there is no way to run the Claude app unattended from here. A session it opens cannot start new sessions on its own, and Allomos cannot set up its scheduled tasks.",
   "monitor.later_codex_app": "Not available: not tried yet.",
   "monitor.later_manual": "Not available: a request you paste yourself cannot run unattended.",

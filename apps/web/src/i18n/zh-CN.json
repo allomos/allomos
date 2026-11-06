@@ -841,6 +841,8 @@
   "monitor.every_hours": "每 {n} 小时",
   "monitor.agent": "智能体",
   "monitor.how_terminal": "由「换肩」为每个任务开终端会话，全程无人值守",
+  "monitor.permissions_claude_cli": "每个任务都开一个新的 Claude Code 会话，所以在一个会话里打开 auto mode（Shift+Tab）不会带到下一个。开始前，请在 Claude Code 自己的设置里把 auto mode 设为默认；否则每个会话都会停下来请求许可。「换肩」从不更改智能体的权限。",
+  "monitor.permissions_codex_cli": "每个任务都开一个新的 Codex 会话，所以在一个会话里切换到完全访问（/permissions）不会带到下一个。开始前，请在 Codex 自己的设置里给它完全访问（~/.codex/config.toml：approval_policy = \"never\"、sandbox_mode = \"danger-full-access\"）；否则每个会话都会在第一条命令前停下来请求许可。这些设置对这台电脑上所有 Codex 会话都生效。「换肩」从不更改智能体的权限。",
   "monitor.later_app": "不可选：从这里没有办法让 Claude 应用无人值守。它打开的会话不能自己开新会话，「换肩」也没法替它建定时任务。",
   "monitor.later_codex_app": "不可选：还没有试过。",
   "monitor.later_manual": "不可选：自己粘贴的请求不能无人值守。",
