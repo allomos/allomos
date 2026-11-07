@@ -332,6 +332,9 @@ mod tests {
             id: Some(id.into()),
             agent: None,
             tool: None,
+            actor: None,
+            on_behalf_of: None,
+            approval: None,
             changes,
         }
     }

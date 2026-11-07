@@ -74,10 +74,64 @@ pub struct Event {
     /// or `claude_app` (the Claude app), as the app names its agent tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool: Option<String>,
+    /// Who ran it, beyond `agent` and `tool` (Task-A01-black004, decision 0021 § 1.1): for an
+    /// agent, its session ID and model; for a person, their pseudonym ID. Left out in events
+    /// recorded before, and when nothing about it was known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<EventActor>,
+    /// On whose behalf an agent made the change: the pseudonym ID of the person it works for
+    /// (decision 0021 § 2). Left out for a person's own change and in events recorded before.
+    #[serde(default, rename = "for", skip_serializing_if = "Option::is_none")]
+    pub on_behalf_of: Option<String>,
+    /// The approval ID the change relies on, when it needed one and the writer named it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<String>,
     pub changes: Vec<Change>,
     /// Fields this Allomos does not know (and an unknown `kind`'s value), kept as they are.
     #[serde(flatten)]
     pub extra: crate::model::Extra,
+}
+
+/// Who ran a change, beyond the event's `agent` and `tool` (Task-A01-black004, decision 0021
+/// § 1.1). Every field is optional: what the writer could not learn is left out, never guessed.
+/// Fields this Allomos does not know (later tasks add more, such as the effort) are kept.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct EventActor {
+    /// The agent's own session ID (Claude Code's `CLAUDE_CODE_SESSION_ID`, Codex's
+    /// `CODEX_THREAD_ID`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
+    /// The exact model ID the agent ran on, as the agent named it (`--model`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// A person's pseudonym ID (`p-7k3q2f`), for a change a person made: in the app, or with
+    /// `alm` where no AI agent was seen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person: Option<String>,
+    #[serde(flatten)]
+    pub extra: crate::model::Extra,
+}
+
+impl EventActor {
+    pub fn is_empty(&self) -> bool {
+        self.session.is_none()
+            && self.model.is_none()
+            && self.person.is_none()
+            && self.extra.is_empty()
+    }
+}
+
+/// The session ID of the agent `agent_from_env` found, from the same environment: Claude Code's
+/// `CLAUDE_CODE_SESSION_ID`, Codex's `CODEX_THREAD_ID`.
+pub fn session_from_env(agent: &str, var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    let name = match agent {
+        "claude" => "CLAUDE_CODE_SESSION_ID",
+        "codex" => "CODEX_THREAD_ID",
+        _ => return None,
+    };
+    var(name)
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 /// The agent an `alm` command runs under, judged from its environment (`var` reads one variable):
@@ -288,6 +342,9 @@ mod tests {
             id: Some("A01-01".into()),
             agent: None,
             tool: None,
+            actor: None,
+            on_behalf_of: None,
+            approval: None,
             changes: vec![Change {
                 extra: Default::default(),
                 field: "holder".into(),
@@ -388,5 +445,44 @@ mod tests {
             seen(&[("CLAUDECODE", "1"), ("CODEX_THREAD_ID", "t1")]),
             None
         );
+    }
+
+    /// Task-A01-black004: the new fields are optional; an event without them reads as before,
+    /// and one with them keeps them (with `for` under that name) when written back.
+    #[test]
+    fn who_fields_are_optional_and_round_trip() {
+        let old: Event = serde_json::from_str(
+            r#"{"at":"2026-10-13T14:02:05Z","via":"alm","command":"claim","kind":"task","id":"A01-01","changes":[]}"#,
+        )
+        .unwrap();
+        assert!(old.actor.is_none() && old.on_behalf_of.is_none() && old.approval.is_none());
+        assert!(!serde_json::to_string(&old).unwrap().contains("actor"));
+        let text = r#"{"at":"2026-11-08T10:00:00Z","via":"alm","command":"label","kind":"task","id":"A01-01","agent":"claude","actor":{"session":"s","model":"m","effort":"high"},"for":"p-abc123","approval":"ap-1","changes":[]}"#;
+        let new: Event = serde_json::from_str(text).unwrap();
+        let actor = new.actor.clone().unwrap();
+        assert_eq!(
+            (actor.session.as_deref(), actor.model.as_deref()),
+            (Some("s"), Some("m"))
+        );
+        assert_eq!(
+            actor.extra.get("effort"),
+            Some(&Value::from("high")),
+            "kept"
+        );
+        assert_eq!(new.on_behalf_of.as_deref(), Some("p-abc123"));
+        let back: Value = serde_json::to_value(&new).unwrap();
+        assert_eq!(back, serde_json::from_str::<Value>(text).unwrap());
+    }
+
+    #[test]
+    fn the_session_comes_from_the_agents_own_variable() {
+        let env = |name: &str| match name {
+            "CLAUDE_CODE_SESSION_ID" => Some("c1".to_string()),
+            "CODEX_THREAD_ID" => Some(" ".to_string()),
+            _ => None,
+        };
+        assert_eq!(session_from_env("claude", env).as_deref(), Some("c1"));
+        assert_eq!(session_from_env("codex", env), None);
+        assert_eq!(session_from_env("other", env), None);
     }
 }

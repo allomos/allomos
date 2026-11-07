@@ -34,3 +34,7 @@ tauri-plugin-dialog = "2"
 # it cannot move off every screen there. Already in Cargo.lock through Tauri; pinned deliberately.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "=0.6.4"
+
+# Task-A01-black004: the app's tests never write pseudonyms into the person's real settings folder.
+[dev-dependencies]
+allomos-store = { workspace = true, features = ["test-settings"] }

@@ -33,6 +33,7 @@ pub mod events;
 pub mod folders;
 mod guide;
 pub mod handoff;
+pub mod identity;
 pub mod missing;
 pub mod progress;
 mod quota;

@@ -26,15 +26,26 @@ fn tmp(name: &str) -> PathBuf {
     p
 }
 
+/// The test run's own settings folder, so no test reads or writes the person's real settings (their
+/// quota reports, their pseudonyms: Task-A01-black004).
+fn test_settings() -> PathBuf {
+    std::env::temp_dir().join(format!("alm-test-settings-{}", std::process::id()))
+}
+
+/// `alm`, with the test run's own settings folder.
+fn alm_command() -> Command {
+    let mut c = Command::new(ALM);
+    c.env("ALLOMOS_SETTINGS_DIR", test_settings());
+    c
+}
+
 /// `alm` in `dir`, with no Allomos settings inherited from the test's own environment. Its
 /// settings folder is an empty one of the test run's own, so the person's real settings and quota
 /// reports never change a result (Task-A03-flour054).
 fn alm(dir: &Path, args: &[&str]) -> Output {
-    let settings = std::env::temp_dir().join(format!("alm-test-settings-{}", std::process::id()));
-    Command::new(ALM)
+    alm_command()
         .current_dir(dir)
         .args(args)
-        .env("ALLOMOS_SETTINGS_DIR", settings)
         .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
@@ -43,6 +54,10 @@ fn alm(dir: &Path, args: &[&str]) -> Output {
         .env_remove("CODEX_THREAD_ID")
         .env_remove("CODEX_SANDBOX")
         .env_remove("CODEX_SANDBOX_NETWORK_DISABLED")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("ALLOMOS_MODEL")
+        .env_remove("ALLOMOS_FOR")
+        .env_remove("ALLOMOS_APPROVAL")
         .output()
         .unwrap()
 }
@@ -442,7 +457,7 @@ fn a_busy_taskbag_exits_3() {
     let repo = filled();
     let root = repo.join(".allomos/taskbag");
     let lock = allomos_store::Lock::acquire(&root, Duration::ZERO).unwrap();
-    let out = Command::new(ALM)
+    let out = alm_command()
         .current_dir(&repo)
         .args(["--json", "--as", "a", "claim", "A01-01"])
         .env("ALLOMOS_LOCK_WAIT_MS", "50")
@@ -471,7 +486,7 @@ fn taskbag_found_by_option_variable_or_search() {
         &elsewhere,
         &["--taskbag", root.to_str().unwrap(), "show", "A01-01"],
     );
-    let out = Command::new(ALM)
+    let out = alm_command()
         .current_dir(&elsewhere)
         .args(["--json", "claim", "A01-01"])
         .env("ALLOMOS_TASKBAG", &repo)
@@ -520,7 +535,7 @@ fn racing_claims_have_exactly_one_winner() {
             let id = format!("R-{i:02}");
             let children: Vec<_> = (0..AGENTS)
                 .map(|a| {
-                    Command::new(ALM)
+                    alm_command()
                         .current_dir(&repo)
                         .args(["--json", "--as", &format!("agent-{a}"), "claim", &id])
                         .env_remove("ALLOMOS_LOCK_WAIT_MS")
@@ -1006,7 +1021,7 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
     let repo = filled();
     let settings = tmp("quota-ask-settings");
     let run = |args: &[&str], now: Option<&str>| {
-        let mut c = Command::new(ALM);
+        let mut c = alm_command();
         c.current_dir(&repo)
             .args(args)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
@@ -1085,7 +1100,7 @@ fn the_quota_ask_never_names_a_plain_session_name_as_the_agent() {
     let repo = filled();
     let settings = tmp("quota-ask-session-settings");
     let run = |args: &[&str]| {
-        let out = Command::new(ALM)
+        let out = alm_command()
             .current_dir(&repo)
             .args(args)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
@@ -1134,7 +1149,7 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
     let run = |args: &[&str]| {
         let mut all = vec!["--json"];
         all.extend_from_slice(args);
-        let out = Command::new(ALM)
+        let out = alm_command()
             .current_dir(&dir)
             .args(&all)
             .env("PATH", &empty)
@@ -1688,7 +1703,7 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
     let plan = project.join("plan.md");
     fs::write(&plan, "## Plan\n\n- 3 areas\n- 5 tasks\n").unwrap();
     let taskbag = project.join(".allomos/taskbag");
-    let child = Command::new(ALM)
+    let child = alm_command()
         .current_dir(project)
         .args(["--json", "--as", "claude/test", "--taskbag"])
         .arg(&taskbag)
@@ -1740,7 +1755,7 @@ fn a_go_ahead_counts_only_for_the_plan_shown_and_is_recorded() {
     fs::write(repo.join("plan.md"), "- Rename the field\n").unwrap();
     fs::write(repo.join("evidence.md"), "- 58 tests pass\n").unwrap();
     let ask = |shown: Option<&str>| {
-        let child = Command::new(ALM)
+        let child = alm_command()
             .current_dir(&repo)
             .args([
                 "--json",
@@ -2298,7 +2313,7 @@ fn areas_and_iterations_are_renamed_changed_and_deleted() {
 
 /// `alm --json …` with its own settings folder, so the person's real app settings are never read.
 fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
-    let out = Command::new(ALM)
+    let out = alm_command()
         .current_dir(dir)
         .arg("--json")
         .args(args)
@@ -3021,7 +3036,7 @@ fn a_repeated_command_with_the_same_number_runs_once() {
 
 /// `alm` at a given time (`ALLOMOS_NOW`), for the packing of old history (Task-A01-59).
 fn alm_at(dir: &Path, now: &str, args: &[&str]) -> Output {
-    Command::new(ALM)
+    alm_command()
         .current_dir(dir)
         .args(args)
         .env_remove("ALLOMOS_TASKBAG")
@@ -4834,6 +4849,140 @@ fn newest_event(repo: &Path) -> Value {
     serde_json::from_str(&text).unwrap()
 }
 
+/// Decision 0021 § 1.1 (Task-A01-black004): every new event says who ran it (an agent's session
+/// and model, or a person's pseudonym), whom an agent works for, and the approval it relies on;
+/// what `alm` could not learn is listed, and events recorded before still read.
+#[test]
+fn events_record_who_ran_them_for_whom_and_under_which_approval() {
+    let repo = filled();
+    // An event recorded before, without the new fields, among them.
+    fs::write(
+        repo.join(".allomos/taskbag/events/2026-01-02-030405-000-old001.json"),
+        r#"{"at":"2026-01-02T03:04:05Z","by":"old","via":"alm","command":"note","kind":"task","id":"A01-01","changes":[{"field":"handoff_note","to":"before"}]}"#,
+    )
+    .unwrap();
+    let settings = repo.join("settings-of-this-computer");
+    let run = |vars: &[(&str, &str)], args: &[&str]| {
+        let mut c = alm_command();
+        c.current_dir(&repo).arg("--json").args(args);
+        for name in [
+            "ALLOMOS_TASKBAG",
+            "ALLOMOS_HOLDER",
+            "CLAUDECODE",
+            "CLAUDE_CODE_ENTRYPOINT",
+            "CLAUDE_CODE_SESSION_ID",
+            "CODEX_THREAD_ID",
+            "CODEX_SANDBOX",
+            "CODEX_SANDBOX_NETWORK_DISABLED",
+            "ALLOMOS_MODEL",
+            "ALLOMOS_FOR",
+            "ALLOMOS_APPROVAL",
+        ] {
+            c.env_remove(name);
+        }
+        c.env("ALLOMOS_SETTINGS_DIR", &settings);
+        for (k, v) in vars {
+            c.env(k, v);
+        }
+        let out = c.output().unwrap();
+        assert!(out.status.success(), "{args:?}: {out:?}");
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (v, newest_event(&repo))
+    };
+    let claude = [
+        ("CLAUDECODE", "1"),
+        ("CLAUDE_CODE_ENTRYPOINT", "cli"),
+        ("CLAUDE_CODE_SESSION_ID", "sess-1"),
+    ];
+    // An agent without --model: the session and whom it works for are recorded; the model is
+    // listed as missing.
+    let (v, e) = run(&claude, &["--as", "s1", "claim", "A01-01"]);
+    assert_eq!(e["actor"], json!({ "session": "sess-1" }), "{e}");
+    let person = e["for"].as_str().unwrap().to_string();
+    assert!(person.starts_with("p-") && person.len() == 8, "{e}");
+    let codes: Vec<&Value> = v["event_missing"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| &m["code"])
+        .collect();
+    assert_eq!(codes, [&json!("model")], "{v}");
+    // With --model and --approval: both recorded, nothing missing.
+    let (v, e) = run(
+        &claude,
+        &[
+            "--as",
+            "s1",
+            "--model",
+            "claude-opus-5-5",
+            "--approval",
+            "ap-1",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
+    );
+    assert_eq!(
+        e["actor"],
+        json!({ "session": "sess-1", "model": "claude-opus-5-5" }),
+        "{e}"
+    );
+    assert_eq!(
+        (&e["for"], &e["approval"]),
+        (&json!(person), &json!("ap-1")),
+        "{e}"
+    );
+    assert!(v.get("event_missing").is_none(), "{v}");
+    // The same session again without --model: this computer remembers its model.
+    let (_, e) = run(&claude, &["--as", "s1", "note", "A01-01", "half way"]);
+    assert_eq!(e["actor"]["model"], "claude-opus-5-5", "{e}");
+    assert!(
+        e.get("approval").is_none(),
+        "an approval is for one command: {e}"
+    );
+    // --for names another person.
+    let (_, e) = run(
+        &claude,
+        &["--as", "s1", "--for", "p-other1", "note", "A01-01", "x"],
+    );
+    assert_eq!(e["for"], "p-other1", "{e}");
+    // A person at this computer (no agent seen): their pseudonym, the same one, as the actor.
+    let (v, e) = run(&[], &["note", "A01-02", "by hand"]);
+    assert_eq!(e["actor"], json!({ "person": person }), "{e}");
+    assert!(
+        e.get("for").is_none() && v.get("event_missing").is_none(),
+        "{e} {v}"
+    );
+    // Codex: its thread ID is the session.
+    let (_, e) = run(
+        &[("CODEX_THREAD_ID", "t-9")],
+        &["--as", "s2", "claim", "A01-02"],
+    );
+    assert_eq!(e["actor"]["session"], "t-9", "{e}");
+    // The text says what is missing and how to give it.
+    let mut c = alm_command();
+    c.current_dir(&repo).args(["--as", "s3", "claim", "A02-01"]);
+    c.env("ALLOMOS_SETTINGS_DIR", &settings)
+        .env("CLAUDECODE", "1")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("ALLOMOS_MODEL");
+    let text = String::from_utf8(c.output().unwrap().stdout).unwrap();
+    assert!(
+        text.contains("which model ran it") && text.contains("alm --model"),
+        "{text}"
+    );
+    assert!(text.contains("which agent session ran it"), "{text}");
+    // Old and new events read together without issues.
+    let v = ok(&repo, &["list"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+    let v = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
+    assert!(
+        v.to_string().contains("before"),
+        "the old event still shows: {v}"
+    );
+}
+
 /// Approver, 2026-10-18 (Task-A03-27): every event `alm` writes names the agent it runs under,
 /// judged from the environment; unsure, it names none.
 #[test]
@@ -4843,7 +4992,7 @@ fn events_record_the_agent_alm_runs_under() {
     let e = newest_event(&repo);
     assert!(e.get("agent").is_none() && e.get("tool").is_none(), "{e}");
     let run = |vars: &[(&str, &str)], args: &[&str]| {
-        let mut c = Command::new(ALM);
+        let mut c = alm_command();
         c.current_dir(&repo).args(args);
         for name in [
             "ALLOMOS_TASKBAG",
@@ -4966,7 +5115,7 @@ fn quota_reports_are_kept_on_this_computer() {
     let dir = tmp("quota");
     let settings = dir.join("settings");
     let run = |args: &[&str]| {
-        let out = Command::new(ALM)
+        let out = alm_command()
             .current_dir(&dir)
             .arg("--json")
             .args(args)

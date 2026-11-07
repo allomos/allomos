@@ -69,6 +69,23 @@ struct Cli {
     /// doing it twice; the same number with a different command is refused.
     #[arg(long, global = true, value_name = "ID")]
     request_id: Option<String>,
+    /// The exact model ID you, the agent, run on (for example claude-opus-5-5), recorded in each
+    /// event this command writes (Task-A01-black004). Once is enough per session on this computer:
+    /// alm remembers it for your session ID.
+    #[arg(long, global = true, env = "ALLOMOS_MODEL", value_name = "ID")]
+    model: Option<String>,
+    /// The pseudonym ID of the person you work for, when it is not this computer's person
+    /// (whose pseudonym alm records by itself).
+    #[arg(
+        long = "for",
+        global = true,
+        env = "ALLOMOS_FOR",
+        value_name = "PSEUDONYM"
+    )]
+    on_behalf_of: Option<String>,
+    /// The approval ID this change relies on, when it needs one.
+    #[arg(long, global = true, env = "ALLOMOS_APPROVAL", value_name = "ID")]
+    approval: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -1111,8 +1128,15 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 }
                 allomos_store::events::set_request(Some((id, input)));
             }
+            allomos_store::events::set_who(Some(allomos_store::events::Who {
+                model: cli.model.clone(),
+                on_behalf_of: cli.on_behalf_of.clone(),
+                approval: cli.approval.clone(),
+            }));
+            let _ = allomos_store::events::take_gaps();
             let done = execute(&cli, cwd);
             allomos_store::events::set_request(None);
+            allomos_store::events::set_who(None);
             let mut done = done?;
             done.warnings.extend(outdated);
             pack_history(&cli, cwd, &mut done);
@@ -1138,6 +1162,9 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 allomos_store::progress::touch(&confirm_project(&cli, cwd), cli.holder.as_deref());
             }
             if let Some(lines) = missing_facts(&cli, cwd, &mut done) {
+                done.text.push_str(&lines);
+            }
+            if let Some(lines) = who_facts(&mut done) {
                 done.text.push_str(&lines);
             }
             if moves_on {
@@ -3887,6 +3914,46 @@ fn claim_folder(root: &Path, cwd: &Path) -> Option<String> {
     let to = std::fs::canonicalize(cwd).ok()?;
     let path = allomos_store::relative_path(&from, &to)?;
     Some(path.to_string_lossy().replace('\\', "/"))
+}
+
+/// What the events this command wrote could not say about who made them (Task-A01-black004,
+/// decision 0021 § 1.1): Fact lines with what to pass, and `event_missing` in `--json`. It
+/// refuses nothing: `alm` tells, the agent passes it next time.
+fn who_facts(done: &mut Done) -> Option<String> {
+    let gaps = allomos_store::events::take_gaps();
+    if gaps.is_empty() {
+        return None;
+    }
+    let found: Vec<Value> = gaps
+        .iter()
+        .map(|gap| {
+            let (fact, fix) = match *gap {
+                "model" => (
+                    "This change's history does not say which model ran it: alm cannot learn it from the environment.",
+                    "alm --model <your exact model ID> … (once per session on this computer; alm remembers it)",
+                ),
+                "session" => (
+                    "This change's history does not say which agent session ran it: the environment gave no session ID.",
+                    "run alm from inside the agent's session (Claude Code sets CLAUDE_CODE_SESSION_ID; Codex sets CODEX_THREAD_ID)",
+                ),
+                _ => (
+                    "This change's history does not say whom the agent works for: there is no settings folder to keep this computer's pseudonym in.",
+                    "alm --for <the person's pseudonym ID> …",
+                ),
+            };
+            json!({ "code": gap, "fact": fact, "fix": fix })
+        })
+        .collect();
+    let mut text = String::from("\n");
+    for m in &found {
+        text.push_str(&format!(
+            "Fact: {} Fix: `{}`\n",
+            m["fact"].as_str().unwrap_or(""),
+            m["fix"].as_str().unwrap_or("")
+        ));
+    }
+    done.fields["event_missing"] = json!(found);
+    Some(text)
 }
 
 /// After a command that changes a task (Task-A03-ham538, approver 2026-10-27: a check inside
