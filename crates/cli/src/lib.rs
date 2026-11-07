@@ -408,6 +408,23 @@ enum Command {
         #[arg(value_name = "BRANCH")]
         branch: String,
     },
+    /// Record which requirements (their REQUIREMENTS.md IDs, such as R77) and decisions (their
+    /// numbers, such as 0021) a task serves (decision 0021). --remove takes them off. `alm
+    /// traces <ref>` finds the tasks of a requirement or decision.
+    Trace {
+        id: String,
+        #[arg(value_name = "REF", required = true)]
+        refs: Vec<String>,
+        /// Take these off the task instead.
+        #[arg(long)]
+        remove: bool,
+    },
+    /// The tasks that serve a requirement (R77) or a decision (0021); with none given, every
+    /// requirement and decision some task serves, with its tasks.
+    Traces {
+        #[arg(value_name = "REF")]
+        reference: Option<String>,
+    },
     /// Add a label to a task, keeping its others (decision 0020). A label the label table does
     /// not list yet is added to it, and alm says so. --remove takes it off the task.
     Label {
@@ -837,6 +854,7 @@ impl Command {
             | Command::Claim { id, .. }
             | Command::Session { id, .. }
             | Command::Base { id, .. }
+            | Command::Trace { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
             | Command::Block { id, .. }
@@ -879,7 +897,8 @@ impl Command {
             | Command::Cards { .. }
             | Command::Upgrade { .. }
             | Command::Folder { .. }
-            | Command::Next { .. } => None,
+            | Command::Next { .. }
+            | Command::Traces { .. } => None,
         }
     }
 
@@ -971,6 +990,8 @@ impl Command {
             Command::Claim { .. } => "claim",
             Command::Session { .. } => "session",
             Command::Base { .. } => "base",
+            Command::Trace { .. } => "trace",
+            Command::Traces { .. } => "traces",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",
             Command::Block { .. } => "block",
@@ -2110,6 +2131,15 @@ fn decision_lines(decisions: &[Decision]) -> String {
 mod approve;
 mod folders;
 
+/// A task's traces in one line (Task-A01-fennel617): "R77, 0021", or "none".
+fn traces_text(traces: &[String]) -> String {
+    if traces.is_empty() {
+        "none".to_string()
+    } else {
+        traces.join(", ")
+    }
+}
+
 fn task_line(t: &Task) -> String {
     format!(
         "{}  {}  {}  {}  {}",
@@ -3123,6 +3153,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     text.push_str(&format!("{name}: {v}\n"));
                 }
             }
+            let traces = allomos_store::traces(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            if !traces.is_empty() {
+                text.push_str(&format!("traces: {}\n", traces_text(&traces)));
+            }
             let decisions = allomos_store::ai_decisions(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
@@ -3151,7 +3187,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "approvals": approvals, "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3425,6 +3461,76 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 json!({ "taskbag": root, "task": task_json(&task), "branches": after }),
                 text,
             );
+            done.issues = issues;
+            Ok(done)
+        }
+        Command::Trace { id, refs, remove } => {
+            let root = locate(cli, cwd)?;
+            let (add, take) = if *remove {
+                (&[][..], &refs[..])
+            } else {
+                (&refs[..], &[][..])
+            };
+            let (task, after, issues) =
+                allomos_store::set_traces(&root, Actor::alm(me), lock_wait(), id, add, take)?;
+            let mut text = format!("{}\n", task_line(&task));
+            text.push_str(&format!("  traces: {}\n", traces_text(&after)));
+            text.push_str(
+                "Fact: alm checks only how each is written; check that the requirement or decision exists (REQUIREMENTS.md, docs/decisions/).\n",
+            );
+            let mut done = Done::new(
+                json!({ "taskbag": root, "task": task_json(&task), "traces": after }),
+                text,
+            );
+            done.issues = issues;
+            Ok(done)
+        }
+        Command::Traces { reference } => {
+            let root = locate(cli, cwd)?;
+            let (bag, issues) = taskbag_of(&root, load(&root))?;
+            let recorded = allomos_store::traces(&root);
+            let line = |id: &str| match bag.tasks.iter().find(|t| t.id == id) {
+                Some(t) => task_line(t),
+                None => id.to_string(),
+            };
+            let mut done = match reference {
+                Some(given) => {
+                    let reference = allomos_core::traces::trace_ref(given)?;
+                    let ids = allomos_core::traces::tasks_for(&recorded, &reference);
+                    let mut text = if ids.is_empty() {
+                        format!("No task records {reference}.\n")
+                    } else {
+                        format!("Tasks that serve {reference}:\n")
+                    };
+                    for id in &ids {
+                        text.push_str(&format!("  {}\n", line(id)));
+                    }
+                    Done::new(
+                        json!({ "taskbag": root, "reference": reference, "tasks": ids }),
+                        text,
+                    )
+                }
+                None => {
+                    let index = allomos_core::traces::index(&recorded);
+                    let mut text = if index.is_empty() {
+                        "No task records a requirement or a decision yet (`alm trace <id> <ref>…`).\n"
+                            .to_string()
+                    } else {
+                        String::new()
+                    };
+                    for (reference, ids) in &index {
+                        text.push_str(&format!("{reference}:\n"));
+                        for id in ids {
+                            text.push_str(&format!("  {}\n", line(id)));
+                        }
+                    }
+                    let json_index: serde_json::Map<String, serde_json::Value> = index
+                        .iter()
+                        .map(|(r, ids)| (r.clone(), json!(ids)))
+                        .collect();
+                    Done::new(json!({ "taskbag": root, "traces": json_index }), text)
+                }
+            };
             done.issues = issues;
             Ok(done)
         }

@@ -287,6 +287,9 @@
     "id",
     "previous"
   ],
+  "trace_invalid": [
+    "reference"
+  ],
   "unknown_area": [
     "area"
   ],

@@ -25,6 +25,7 @@ const FIELD_KEYS: Record<string, Key> = {
   human_check: "pane.human_check",
   reopen_note: "pane.reopen_note",
   reason: "pane.reason",
+  traces: "pane.traces",
   card: "pane.card",
   card_outside: "pane.card_outside",
   description: "pane.description",
@@ -48,7 +49,7 @@ export function valueText(field: string, value: unknown, t: T): string {
   if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
-  if ((field === "blocked_by" || field === "labels") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
+  if ((field === "blocked_by" || field === "labels" || field === "traces") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const first = text.split("\n")[0];
   return first.length > SHORT || first.length < text.trimEnd().length ? `${first.slice(0, SHORT)}…` : first;

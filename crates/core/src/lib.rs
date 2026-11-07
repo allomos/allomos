@@ -16,6 +16,7 @@ mod model;
 pub mod ops;
 mod problem;
 pub mod request;
+pub mod traces;
 mod validate;
 
 pub use model::{
