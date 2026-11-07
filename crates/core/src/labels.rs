@@ -67,7 +67,8 @@ pub fn upgraded_label(old: &str, deployed_first: bool) -> Option<String> {
 }
 
 /// The table with every built-in label in it, first and in their own order, then the others as
-/// they were. A built-in entry keeps a meaning the project wrote for it.
+/// they were. A built-in entry keeps a meaning the project wrote for it; one without a meaning
+/// (for example an old ladder step the upgrade renamed into it) gets the built-in meaning.
 pub fn with_built_ins(table: Vec<LabelEntry>) -> Vec<LabelEntry> {
     let mut out: Vec<LabelEntry> = BUILT_IN
         .iter()
@@ -78,6 +79,9 @@ pub fn with_built_ins(table: Vec<LabelEntry>) -> Vec<LabelEntry> {
                 .cloned()
                 .unwrap_or_else(|| LabelEntry::built_in(name, meaning));
             e.built_in = true;
+            if e.meaning.as_deref().is_none_or(|m| m.trim().is_empty()) {
+                e.meaning = Some(meaning.to_string());
+            }
             e
         })
         .collect();
@@ -361,6 +365,26 @@ pub fn checked(taskbag: &Taskbag, id: &str, which: Option<&str>) -> Result<Outco
 
 #[cfg(test)]
 mod tests {
+    /// A built-in entry without a meaning (an old ladder step renamed by the upgrade) gets the
+    /// built-in meaning; a meaning the project wrote stays.
+    #[test]
+    fn built_in_entries_get_their_meaning_unless_the_project_wrote_one() {
+        let table = with_built_ins(vec![
+            LabelEntry::custom(LOCALLY_BY_AGENT, None),
+            LabelEntry::custom(LOCALLY_BY_HUMAN, Some("Our own words")),
+        ]);
+        for e in table.iter().filter(|e| e.built_in) {
+            assert!(e.meaning.is_some(), "{}", e.name);
+        }
+        let find = |n: &str| table.iter().find(|e| e.name == n).unwrap();
+        let built: Vec<&str> = BUILT_IN.iter().map(|(_, m)| *m).collect();
+        assert_eq!(find(LOCALLY_BY_AGENT).meaning.as_deref(), Some(built[0]));
+        assert_eq!(
+            find(LOCALLY_BY_HUMAN).meaning.as_deref(),
+            Some("Our own words")
+        );
+    }
+
     use super::*;
 
     #[test]
