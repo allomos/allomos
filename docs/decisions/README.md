@@ -23,4 +23,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0017](./0017-agents-run-git-not-alm.md) | `alm` and the app never run Git; each change tells the agent the exact Git commands to share it | **Accepted** 2026-10-14 |
 | [0018](./0018-mcp-deferred-agents-use-alm.md) | MCP is deferred: agents use the `alm` command; Iteration 3 is closed | **Accepted** 2026-10-24 |
 | [0019](./0019-several-project-folders.md) | One taskbag tracks several project folders, each with a short name; each task names its folders (`allomos/6`) | **Accepted** 2026-10-25 |
-| [0020](./0020-built-in-labels-and-label-table.md) | Five built-in labels (locally verified, deployed and verified, human verified, to check, AI decided), all plain; several labels per task; a label table per project (`allomos/7`) | **Accepted** 2026-11-07 |
+| [0020](./0020-built-in-labels-and-label-table.md) | Five built-in labels (locally verified by agent, deployed and verified, human verified, to check, AI decided), all plain; `implemented` dropped; several labels per task; a label table per project (`allomos/7`) | **Accepted** 2026-11-07 |
