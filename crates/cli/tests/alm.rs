@@ -6279,3 +6279,131 @@ fn audit_settings_keep_a_local_project_on_the_pseudonym() {
     assert!(person.starts_with("p-") && person.len() == 8, "{e}");
     assert_eq!(e["actor"].as_object().unwrap().len(), 1, "{e}");
 }
+
+/// Task-A01-grotto036 (decision 0021 § 1.2, Question 6): separation of duties is a switch, off by
+/// default. Off, whoever did a task may check it; on, `alm` refuses that and says why, and the
+/// switch is turned off only with a reason.
+#[test]
+fn separation_of_duties_refuses_checking_your_own_work_only_when_on() {
+    let repo = filled();
+    let v = ok(&repo, &["audit-settings"]);
+    assert_eq!(v["separation_of_duties"], false);
+    // Off: the person who did A01-01 checks it themselves, as before.
+    ok(&repo, &["--as", "w", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "w",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "run",
+        ],
+    );
+    ok(&repo, &["--as", "w", "checked", "A01-01"]);
+
+    let v = ok(&repo, &["audit-settings", "--separation-of-duties", "on"]);
+    assert_eq!(v["separation_of_duties"], true);
+    assert_eq!(v["changed"], true);
+    let project = fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(
+        project.contains("\"separation_of_duties\": true"),
+        "{project}"
+    );
+    let out = alm(&repo, &["audit-settings"]);
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("Separation of duties: on."),
+        "{out:?}"
+    );
+
+    ok(&repo, &["--as", "w", "claim", "A01-02"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "w",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "run",
+        ],
+    );
+    let before = fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .unwrap()
+        .count();
+    // The same person (this computer's pseudonym) may not check what they did.
+    let v = refused(&repo, &["--as", "w", "checked", "A01-02"], 1, "self_check");
+    let message = v["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("A01-02") && message.contains("p-"),
+        "{message}"
+    );
+    assert_eq!(
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count(),
+        before,
+        "a refused check records nothing"
+    );
+    assert!(
+        task_file(&repo, "A01-02")["labels"]
+            .as_array()
+            .is_none_or(|l| !l.iter().any(|l| l == "locally verified by human"))
+    );
+    // Someone else may; their check is recorded.
+    ok(
+        &repo,
+        &["--as", "w", "checked", "A01-02", "--checker", "p-other1"],
+    );
+    // Nor may the doer approve it; another person may, and then may not work on it.
+    refused(
+        &repo,
+        &["approve", "A01-02", "--words", "go"],
+        1,
+        "self_approve",
+    );
+    ok(
+        &repo,
+        &[
+            "approve",
+            "A02-01",
+            "--words",
+            "go",
+            "--approver",
+            "p-boss01",
+        ],
+    );
+    ok(&repo, &["--as", "w", "claim", "A02-01"]);
+
+    // Turning it off needs a reason, which the history keeps.
+    refused(
+        &repo,
+        &["audit-settings", "--separation-of-duties", "off"],
+        1,
+        "audit_reason_missing",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "audit-settings",
+            "--separation-of-duties",
+            "off",
+            "--reason",
+            "one person for now",
+        ],
+    );
+    assert_eq!(v["separation_of_duties"], false);
+    let e = newest_event(&repo);
+    assert_eq!(e["command"], "audit-settings");
+    assert!(
+        e["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["field"] == "reason" && c["to"] == "one person for now"),
+        "{e}"
+    );
+    let project = fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(!project.contains("audit"), "{project}");
+}

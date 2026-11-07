@@ -11,3 +11,9 @@ export const LEVELS: IdentityLevel[] = ["pseudonym", "account", "sso"];
 export function needsReason(now: { level: IdentityLevel; reauthenticate: boolean }, level: IdentityLevel, reauthenticate: boolean): boolean {
   return LEVELS.indexOf(level) < LEVELS.indexOf(now.level) || (now.reauthenticate && !reauthenticate);
 }
+
+/** Turning separation of duties off needs a reason (Task-A01-grotto036, decision 0021 § 6);
+ * turning it on does not. */
+export function separationNeedsReason(now: boolean, wanted: boolean): boolean {
+  return now && !wanted;
+}

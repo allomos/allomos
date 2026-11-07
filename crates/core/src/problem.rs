@@ -261,6 +261,16 @@ problems! {
     ReauthenticateNeedsSignIn => "reauthenticate_needs_sign_in", "Signing in again to approve or check needs the Allomos account or company sign-in (SSO) identity level; with a pseudonym there is nothing to sign in to.";
     /// Turning an audit control off or down needs a reason (decision 0021 § 6).
     AuditReasonMissing { setting } => "audit_reason_missing", "Turning {setting} off or down needs a reason: add --reason \"<why>\".";
+    /// Separation of duties is on and the person who worked on the task would also check it
+    /// (Task-A01-grotto036, decision 0021 § 1.2).
+    SelfCheck { id, who } => "self_check", "Separation of duties is on in this project: {who} worked on task {id}, so they may not also check it. Someone else checks it, or the switch is turned off with a reason (`alm audit-settings --separation-of-duties off --reason \"<why>\"`).";
+    /// Separation of duties is on and the person who worked on the task would also approve it.
+    SelfApprove { id, who } => "self_approve", "Separation of duties is on in this project: {who} worked on task {id}, so they may not also approve it. Someone else approves it, or the switch is turned off with a reason (`alm audit-settings --separation-of-duties off --reason \"<why>\"`).";
+    /// Separation of duties is on and the person who checked or approved the task would work on it.
+    WorkAfterSigning { id, who } => "work_after_signing", "Separation of duties is on in this project: {who} approved or checked task {id}, so they may not also work on it. Someone else works on it, or the switch is turned off with a reason (`alm audit-settings --separation-of-duties off --reason \"<why>\"`).";
+    /// Separation of duties is on and a human check names no checker, so nothing shows it is
+    /// someone other than who did the work.
+    CheckerUnknown { id } => "checker_unknown", "Separation of duties is on in this project, and the check of task {id} names no checker, so Allomos cannot tell it is someone other than who did the work. Name them: --checker <their pseudonym ID>.";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

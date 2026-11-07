@@ -340,7 +340,7 @@ export interface HandoffRules extends Gates {
 /** Where identities come from (decision 0021 § 2, Task-A01-frolic587). */
 export type IdentityLevel = "pseudonym" | "account" | "sso";
 
-/** Project settings → Audit (decision 0021 § 6): so far the identity level. */
+/** Project settings → Audit (decision 0021 § 6): the identity level and separation of duties. */
 export interface AuditSettings {
   identity: {
     level: IdentityLevel;
@@ -350,6 +350,9 @@ export interface AuditSettings {
     /** Only a cloud project can choose the sign-in levels; this Allomos has none yet. */
     sign_in_available: boolean;
   };
+  /** Separation of duties (Task-A01-grotto036): the same person or agent may not both do and
+   * check (or do and approve) a task. Off by default. */
+  separation_of_duties: boolean;
   /** Where this computer keeps who is behind its pseudonyms; null without a settings folder. */
   identities_file: string | null;
 }

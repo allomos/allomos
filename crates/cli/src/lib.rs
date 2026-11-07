@@ -634,8 +634,8 @@ enum Command {
         #[arg(long)]
         clear: bool,
     },
-    /// The project's audit settings (decision 0021 § 6): so far the identity level. Without
-    /// options, show them. The history only ever holds a pseudonym ID at every level; who is
+    /// The project's audit settings (decision 0021 § 6): the identity level and separation of
+    /// duties. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
     /// behind it is kept on this computer (local project) or in the cloud (cloud project).
     #[command(name = "audit-settings")]
     AuditSettings {
@@ -646,6 +646,11 @@ enum Command {
         /// Sign in again to approve or check: on or off (only with account or sso).
         #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
         reauthenticate: Option<String>,
+        /// Separation of duties: on, the same person or agent may not both do and check (or do
+        /// and approve) a task, and `alm` refuses it; off (the default) changes nothing. A
+        /// project with one person cannot finish its checks while it is on.
+        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        separation_of_duties: Option<String>,
         /// Why, recorded in the history (needed when turning a control off or down).
         #[arg(long, value_name = "TEXT")]
         reason: Option<String>,
@@ -1693,6 +1698,16 @@ fn identity_lines(id: &allomos_core::audit::Identity) -> String {
     text
 }
 
+/// Separation of duties in plain words (`alm audit-settings`, Task-A01-grotto036).
+fn separation_lines(on: bool) -> String {
+    if on {
+        "Separation of duties: on. The same person or agent may not both do and check (or do and approve) a task; alm refuses it and says why. A project with one person cannot finish its checks while this is on.\n".into()
+    } else {
+        "Separation of duties: off. Anyone may check or approve a task, including who did it.\n"
+            .into()
+    }
+}
+
 /// One line saying which language to write tasks in, and why.
 fn language_line(l: &allomos_store::TaskLanguage) -> String {
     let why = match l.source {
@@ -2444,19 +2459,36 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::AuditSettings {
             identity,
             reauthenticate,
+            separation_of_duties,
             reason,
         } => {
             let root = locate(cli, cwd)?;
-            let changing = identity.is_some() || reauthenticate.is_some();
+            let changing =
+                identity.is_some() || reauthenticate.is_some() || separation_of_duties.is_some();
             let (bag, issues, changed) = if changing {
                 let lock = Lock::acquire(&root, lock_wait())?;
                 let (bag, issues) = taskbag_of(&root, lock.load())?;
+                let reason = reason.as_deref().or(cli.why.as_deref());
                 let change = allomos_core::audit::IdentityChange {
                     level: identity.as_deref(),
                     reauthenticate: reauthenticate.as_deref().map(|v| v == "on"),
-                    reason: reason.as_deref().or(cli.why.as_deref()),
+                    reason,
                 };
-                let (project, changes) = allomos_core::audit::set_identity(&bag, &change)?;
+                let (mut project, mut changes) = allomos_core::audit::set_identity(&bag, &change)?;
+                if let Some(v) = separation_of_duties.as_deref() {
+                    let (after, _) = allomos_core::duties::set(&project, v == "on", reason)?;
+                    // One `audit` change from the first value to the last, one reason.
+                    let before = bag.project.clone();
+                    project = after;
+                    changes = allomos_core::event::changes(Some(&before), &project, &[])
+                        .into_iter()
+                        .filter(|c| c.field == "audit")
+                        .collect();
+                    let why = reason.map(str::trim).filter(|r| !r.is_empty());
+                    if let (false, Some(why)) = (changes.is_empty(), why) {
+                        changes.push(allomos_core::event::reason_change(why));
+                    }
+                }
                 let changed = !changes.is_empty();
                 let event = Actor::alm(me).event(
                     "audit-settings",
@@ -2471,13 +2503,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 (bag, issues, None)
             };
             let id = allomos_core::audit::identity(&bag.project);
+            let separated = allomos_core::duties::on(&bag.project);
             let mut text = String::new();
             if changed == Some(false) {
                 text.push_str("Nothing changed: the audit settings already say that.\n");
             }
             text.push_str(&identity_lines(&id));
+            text.push_str(&separation_lines(separated));
             let mut done = Done::new(
-                json!({ "taskbag": root, "identity": id, "changed": changed }),
+                json!({
+                    "taskbag": root,
+                    "identity": id,
+                    "separation_of_duties": separated,
+                    "changed": changed
+                }),
                 text,
             );
             done.issues = issues;

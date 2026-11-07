@@ -323,6 +323,31 @@ fn fill_reason(event: &mut Event) {
     }
 }
 
+/// Refuse `event` when the project has separation of duties on and it would make one person or
+/// agent both do and check, or do and approve, its task (Task-A01-grotto036; the rule is
+/// [`allomos_core::duties::refuse`]). Run once who made it is filled in, so `alm` and the app are
+/// held to the same rule. While the switch is off, nothing is read.
+pub(crate) fn separate_duties(root: &Path, event: &Event) -> Result<(), Problem> {
+    let Some(project) = crate::read_text(&root.join("project.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<allomos_core::Project>(&t).ok())
+    else {
+        return Ok(());
+    };
+    if !allomos_core::duties::on(&project) || event.kind != Kind::Task {
+        return Ok(());
+    }
+    allomos_core::duties::refuse(&project, &list(root).0, event)
+}
+
+/// The event as [`write`] would record it, who made it filled in, for checking it beforehand.
+pub(crate) fn as_written(root: &Path, event: &Event) -> Event {
+    let mut event = event.clone();
+    fill_who(root, &mut event);
+    fill_checker(&mut event);
+    event
+}
+
 /// Write one event. Returns its file, so a change that then fails can take it back.
 /// Callers hold the taskbag's lock.
 pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
@@ -332,6 +357,7 @@ pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     let mut event = event.clone();
     fill_who(root, &mut event);
     fill_checker(&mut event);
+    separate_duties(root, &event)?;
     fill_reason(&mut event);
     if let Some(change) = REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
         event.changes.push(change.clone());

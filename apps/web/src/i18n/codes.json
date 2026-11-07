@@ -74,6 +74,9 @@
   "card_path_invalid": [
     "path"
   ],
+  "checker_unknown": [
+    "id"
+  ],
   "claim_cards_outside": [
     "count",
     "tasks"
@@ -240,6 +243,14 @@
     "id",
     "active"
   ],
+  "self_approve": [
+    "id",
+    "who"
+  ],
+  "self_check": [
+    "id",
+    "who"
+  ],
   "session_missing": [],
   "session_open_failed": [
     "detail"
@@ -318,6 +329,10 @@
   ],
   "waiting_on_missing": [],
   "without_human_check_missing": [],
+  "work_after_signing": [
+    "id",
+    "who"
+  ],
   "write_failed": [
     "path",
     "detail"

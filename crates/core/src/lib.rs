@@ -9,6 +9,7 @@ pub mod audit;
 pub mod branch;
 pub mod card;
 pub mod decision;
+pub mod duties;
 pub mod event;
 pub mod folders;
 pub mod ids;

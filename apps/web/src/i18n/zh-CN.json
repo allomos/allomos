@@ -928,5 +928,12 @@
   "problem.identity_level_unknown": "“{value}”不是身份级别。请用 pseudonym、account 或 sso。",
   "problem.identity_needs_cloud": "身份级别“{level}”需要云端项目；这个项目只在本地，所以仍用化名。",
   "problem.reauthenticate_needs_sign_in": "批准或验证时重新登录，需要“Allomos 账号”或“企业登录（SSO）”级别；用化名时没有可以登录的地方。",
-  "problem.audit_reason_missing": "关掉或调低{setting}需要写原因。"
+  "problem.audit_reason_missing": "关掉或调低{setting}需要写原因。",
+  "audit.separation": "职责分离",
+  "audit.separation_switch": "同一个人或 agent 不能既做又验（或既做又批准）同一个任务",
+  "audit.separation_help": "公司要求第二个人把关时打开。打开后，只有一个人的项目无法完成任务。",
+  "problem.self_check": "这个项目打开了职责分离：{who} 做过任务 {id}，所以不能再验证它。请换别人验证，或写明原因后关掉这个开关。",
+  "problem.self_approve": "这个项目打开了职责分离：{who} 做过任务 {id}，所以不能再批准它。请换别人批准，或写明原因后关掉这个开关。",
+  "problem.work_after_signing": "这个项目打开了职责分离：{who} 批准或验证过任务 {id}，所以不能再做它。请换别人来做，或写明原因后关掉这个开关。",
+  "problem.checker_unknown": "这个项目打开了职责分离，而任务 {id} 的这次验证没写验证人，「换肩」无法判断验证的人和做事的人不是同一个。"
 }

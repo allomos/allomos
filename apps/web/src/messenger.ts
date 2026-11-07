@@ -173,6 +173,8 @@ export interface Messenger {
   auditSettings(root: string): Promise<AuditSettings>;
   /** Changes the identity level, as `alm audit-settings`; resolves to the settings as saved. Rejects with a Problem. */
   setIdentity(root: string, change: { level?: IdentityLevel; reauthenticate?: boolean; reason?: string }): Promise<AuditSettings>;
+  /** Turns separation of duties on or off, as `alm audit-settings --separation-of-duties`; off needs a reason. Rejects with a Problem. */
+  setSeparation(root: string, on: boolean, reason?: string): Promise<AuditSettings>;
   /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
   showIdentitiesFile(): Promise<void>;
   /** One task's recorded changes, newest first (Task-A01-17). */
@@ -459,6 +461,7 @@ export const desktopMessenger: Messenger = {
       reauthenticate: c.reauthenticate ?? null,
       reason: c.reason ?? null,
     }),
+  setSeparation: (root, on, reason) => invoke<AuditSettings>("set_separation", { root, on, reason: reason ?? null }),
   showIdentitiesFile: () => invoke<void>("show_identities_file"),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   ownerName: () => invoke<string | null>("owner_name"),
