@@ -199,6 +199,11 @@ fn project_id(root: &Path, event: &Event) -> Option<String> {
             return Some(id);
         }
     }
+    project_json_id(root)
+}
+
+/// `project.json`'s `id`, read on its own (without loading the taskbag).
+fn project_json_id(root: &Path) -> Option<String> {
     let text = crate::read_text(&root.join("project.json")).ok()?;
     let v: serde_json::Value = serde_json::from_str(&text).ok()?;
     clean(v.get("id")?.as_str().map(String::from))
@@ -255,6 +260,12 @@ fn fill_who(root: &Path, event: &mut Event) {
             }
             _ => {
                 actor.person = pseudonym();
+                // Events only ever hold the pseudonym ID (decision 0021 § 2, Task-A01-frolic587):
+                // the name the person gave the app stays on this computer, so the app's change
+                // is recorded under the pseudonym, or under nobody when there is none.
+                if event.via == "app" {
+                    event.by = actor.person.clone();
+                }
                 if event.on_behalf_of.is_none() {
                     event.on_behalf_of = given_for;
                 }
@@ -679,6 +690,11 @@ pub struct History {
     /// Everyone named in the task's events, with their newest change anywhere in the taskbag
     /// (Task-A03-37): the task pane says whether its holder's session is still active from it.
     pub seen: Vec<Seen>,
+    /// This computer's person's pseudonym ID in the project, when one was made
+    /// (Task-A01-frolic587): the task pane shows the person's own name beside it, on this
+    /// computer only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub you: Option<String>,
 }
 
 /// When someone (an `--as` name) last changed anything in the taskbag, and the agent they ran
@@ -744,6 +760,9 @@ pub fn history(root: &Path, id: &str) -> History {
         seen: seen_of(&all, &names),
         events,
         issues,
+        you: project_json_id(root)
+            .as_deref()
+            .and_then(crate::identity::known_pseudonym),
     }
 }
 

@@ -221,6 +221,8 @@ export interface TaskHistory {
   events: TaskEvent[];
   /** Everyone named in the task's events, with their newest change anywhere in the taskbag. */
   seen?: Seen[];
+  /** This computer's person's pseudonym in the project (Task-A01-frolic587): shown with their own name. */
+  you?: string;
 }
 
 /** A problem from Rust: a code the interface words in the chosen language (see i18n/codes.json). */
@@ -335,6 +337,23 @@ export interface HandoffRules extends Gates {
 }
 
 /** The handoff settings as the dialog shows them. */
+/** Where identities come from (decision 0021 § 2, Task-A01-frolic587). */
+export type IdentityLevel = "pseudonym" | "account" | "sso";
+
+/** Project settings → Audit (decision 0021 § 6): so far the identity level. */
+export interface AuditSettings {
+  identity: {
+    level: IdentityLevel;
+    /** As `project.json` writes it, when this Allomos does not know it (read as the pseudonym). */
+    written?: string;
+    reauthenticate: boolean;
+    /** Only a cloud project can choose the sign-in levels; this Allomos has none yet. */
+    sign_in_available: boolean;
+  };
+  /** Where this computer keeps who is behind its pseudonyms; null without a settings folder. */
+  identities_file: string | null;
+}
+
 export interface HandoffSettings {
   rules: HandoffRules;
   /** With the defaults filled in. */

@@ -1074,6 +1074,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         project_folder: None,
         task_language: None,
         handoff: None,
+        audit: None,
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -1369,6 +1370,7 @@ pub fn init_with_labels(
         // New taskbags follow the app's language until someone sets another (Task-A01-21).
         task_language: Some(allomos_core::TASK_LANGUAGE_UI.to_string()),
         handoff: None,
+        audit: None,
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);

@@ -56,7 +56,10 @@ fn events_since(root: &Path, from: usize) -> Vec<(String, String, String, String
                 e.command.clone(),
                 format!("{:?}", e.kind).to_lowercase(),
                 e.id.clone().unwrap_or_default(),
-                e.by.clone().unwrap_or_default(),
+                // The person's pseudonym, when there is one, is shown as "".
+                e.by.clone()
+                    .filter(|b| Some(b) != e.actor.as_ref().and_then(|a| a.person.as_ref()))
+                    .unwrap_or_default(),
                 e.via.clone(),
             )
         })
@@ -68,7 +71,9 @@ fn ev(command: &str, kind: &str, id: &str) -> (String, String, String, String, S
         command.into(),
         kind.into(),
         id.into(),
-        "Will".into(),
+        // Not the person's name (decision 0021 § 2, Task-A01-frolic587): the app records its
+        // changes under the person's pseudonym (or nobody), which `events_since` shows as "".
+        String::new(),
         "app".into(),
     )
 }

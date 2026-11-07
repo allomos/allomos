@@ -1327,6 +1327,94 @@ fn set_handoff_rules(
     handoff_settings_of(&root)
 }
 
+/// The project's audit settings for Project settings → Audit (decision 0021 § 6): so far the
+/// identity level (Task-A01-frolic587), with where this computer keeps who is behind its
+/// pseudonyms.
+#[derive(Serialize)]
+struct AuditSettings {
+    identity: allomos_core::audit::Identity,
+    /// `identities.json` in the settings folder; null without one.
+    identities_file: Option<String>,
+}
+
+fn audit_settings_of(root: &Path) -> Result<AuditSettings, Problem> {
+    let loaded = load(root);
+    let Some(bag) = loaded.taskbag else {
+        return Err(loaded.issues.first().map(|i| i.problem.clone()).unwrap_or(
+            Problem::NotATaskbag {
+                path: root.display().to_string(),
+            },
+        ));
+    };
+    Ok(AuditSettings {
+        identity: allomos_core::audit::identity(&bag.project),
+        identities_file: allomos_store::identity::identities_file()
+            .map(|p| p.display().to_string()),
+    })
+}
+
+#[tauri::command]
+fn audit_settings(root: PathBuf) -> Result<AuditSettings, Problem> {
+    audit_settings_of(&root)
+}
+
+/// Change the identity level, as `alm audit-settings` does, recorded as an `audit-settings`
+/// event with the reason. Returns the settings as saved.
+#[tauri::command]
+fn set_identity(
+    root: PathBuf,
+    level: Option<String>,
+    reauthenticate: Option<bool>,
+    reason: Option<String>,
+) -> Result<AuditSettings, Problem> {
+    set_identity_at(&root, level.as_deref(), reauthenticate, reason.as_deref())
+}
+
+fn set_identity_at(
+    root: &Path,
+    level: Option<&str>,
+    reauthenticate: Option<bool>,
+    reason: Option<&str>,
+) -> Result<AuditSettings, Problem> {
+    let lock = allomos_store::Lock::acquire(root, LOCK_WAIT)?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let change = allomos_core::audit::IdentityChange {
+        level,
+        reauthenticate,
+        reason,
+    };
+    let (project, changes) = allomos_core::audit::set_identity(&bag, &change)?;
+    let event = allomos_store::Actor::APP.event(
+        "audit-settings",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        changes,
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
+    drop(lock);
+    audit_settings_of(root)
+}
+
+/// Show `identities.json` (who is behind this computer's pseudonyms) in Finder or Explorer:
+/// its folder, which is made if missing.
+#[tauri::command]
+fn show_identities_file() -> Result<(), Problem> {
+    let dir = allomos_store::settings_dir().ok_or_else(|| Problem::OpenFailed {
+        path: String::new(),
+        detail: "This computer has no settings folder for Allomos.".into(),
+    })?;
+    let _ = std::fs::create_dir_all(&dir);
+    let mut command = opener();
+    command.arg(allomos_store::plain_path(&dir));
+    command.spawn().map(drop).map_err(|e| Problem::OpenFailed {
+        path: dir.display().to_string(),
+        detail: e.to_string(),
+    })
+}
+
 /// "Allow devices on your network to view" (Task-A04-02-01): the server while it runs, and the
 /// paired devices (Task-A04-02-02).
 struct Lan {
@@ -2454,6 +2542,9 @@ pub fn run() {
             set_update_item,
             handoff_settings,
             set_handoff_rules,
+            audit_settings,
+            set_identity,
+            show_identities_file,
             lan_status,
             set_lan_viewing,
             rename_project,
@@ -2560,8 +2651,8 @@ mod tests {
         );
     }
 
-    /// Task-A04-02-04: a companion page's change goes through the window's own functions, under
-    /// "name (device)"; what only the computer can do is refused.
+    /// Task-A04-02-04: a companion page's change goes through the window's own functions, given
+    /// "name (device)" for the holder rule; what only the computer can do is refused.
     #[test]
     fn a_companion_change_is_made_and_recorded_like_the_windows() {
         let dir =
@@ -2595,11 +2686,11 @@ mod tests {
         let bag = allomos_store::load(&root).taskbag.unwrap();
         assert_eq!(bag.tasks[0].state, allomos_core::State::Ready);
         let history = allomos_store::events::history(&root, &id);
-        assert!(
-            serde_json::to_string(&history)
-                .unwrap()
-                .contains("Will (Phone)")
-        );
+        // Recorded through the app, under the person's pseudonym and never their name
+        // (decision 0021 § 2, Task-A01-frolic587).
+        assert_eq!(history.events.len(), 2);
+        assert!(history.events.iter().all(|e| e.via == "app"));
+        assert!(!serde_json::to_string(&history).unwrap().contains("Will"));
         let err =
             companion_change(&root, by, "show_in_file_manager", serde_json::json!({})).unwrap_err();
         assert_eq!(err.code(), "companion_desktop_only");
@@ -3099,6 +3190,40 @@ mod tests {
         std::fs::remove_dir_all(&base).unwrap();
     }
 
+    /// Project settings → Audit → Identity (Task-A01-frolic587): a local-only project shows the
+    /// pseudonym, refuses the sign-in levels, and records nothing when nothing changes.
+    #[test]
+    fn a_local_project_keeps_the_pseudonym_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-identity-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let s = audit_settings_of(&root).unwrap();
+        assert_eq!(s.identity.level, "pseudonym");
+        assert!(!s.identity.sign_in_available && !s.identity.reauthenticate);
+        assert_eq!(
+            set_identity_at(&root, Some("sso"), None, None).err(),
+            Some(Problem::IdentityNeedsCloud {
+                level: "sso".into()
+            })
+        );
+        assert_eq!(
+            set_identity_at(&root, None, Some(true), None).err(),
+            Some(Problem::ReauthenticateNeedsSignIn)
+        );
+        let count = || std::fs::read_dir(root.join("events")).unwrap().count();
+        let before = count();
+        set_identity_at(&root, Some("pseudonym"), Some(false), None).unwrap();
+        assert_eq!(count(), before);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// The task pane's change command (Task-A01-18): the edit arrives as the interface sends it,
     /// is refused without the person's name or by the holder rule, and is otherwise recorded
     /// under that name, through the app.
@@ -3143,9 +3268,11 @@ mod tests {
         assert_eq!(task.labels, ["implemented"]);
         let h = allomos_store::events::history(&root, "A01-01");
         let e = &h.events[0];
+        // Under the person's pseudonym, never their name (decision 0021 § 2, Task-A01-frolic587);
+        // these tests have no settings folder for one, so under nobody.
         assert_eq!(
             (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
-            (Some("Will"), "app", "label")
+            (None, "app", "label")
         );
 
         // A task an agent holds is refused with the same problem `alm` gives.
@@ -3193,7 +3320,7 @@ mod tests {
         let e = &allomos_store::events::history(&root, "A01-01").events[0];
         assert_eq!(
             (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
-            (Some("Will"), "app", "reviewed")
+            (None, "app", "reviewed")
         );
 
         // Task-A01-50: Reopen… on a finished task, as the interface sends it; the reason goes in
@@ -3226,7 +3353,7 @@ mod tests {
         let e = &allomos_store::events::history(&root, "A01-01").events[0];
         assert_eq!(
             (e.by.as_deref(), e.via.as_str(), e.command.as_str()),
-            (Some("Will"), "app", "reopen")
+            (None, "app", "reopen")
         );
         assert!(e.changes.iter().any(
             |c| c.field == "reopen_note" && c.to == Some(serde_json::json!("The check failed"))
@@ -3316,13 +3443,7 @@ mod tests {
             Some(&h.events[0].at)
         );
         // Newest first.
-        assert_eq!(
-            seen,
-            [
-                ("plan", Some("Will"), "app"),
-                ("add task", Some("Will"), "app")
-            ]
-        );
+        assert_eq!(seen, [("plan", None, "app"), ("add task", None, "app")]);
         // The task pane's "New…" iteration, as `messenger.addIterationAndPlan` sends it: added
         // with the next free ID, then the task planned in it (two events, newest first).
         assert_eq!(
@@ -3406,7 +3527,8 @@ mod tests {
             (
                 c.to_string(),
                 id.to_string(),
-                Some("Will".to_string()),
+                // The pseudonym, never the name (Task-A01-frolic587); no settings folder here.
+                None,
                 "app".to_string(),
             )
         };

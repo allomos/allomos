@@ -1528,7 +1528,19 @@ fn app_changes_not_shared_yet_come_with_the_next_change() {
     let v = ok(&repo, &["--as", "a", "claim", "A01-01"]);
     let app_changes = &v["app_changes"];
     assert_eq!(app_changes["count"], 1, "{v}");
-    assert_eq!(app_changes["by"], json!(["Ann"]));
+    // The person's pseudonym, never the name the app was given (Task-A01-frolic587). This test
+    // process may have no settings folder for one (then nobody is named).
+    assert!(!v.to_string().contains("Ann"), "{v}");
+    let by: Vec<&str> = app_changes["by"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b.as_str().unwrap())
+        .collect();
+    assert!(
+        by.len() <= 1 && by.iter().all(|b| b.starts_with("p-")),
+        "{v}"
+    );
     let files: Vec<&str> = app_changes["files"]
         .as_array()
         .unwrap()
@@ -1540,9 +1552,7 @@ fn app_changes_not_shared_yet_come_with_the_next_change() {
     assert_eq!(files[1], "tasks/A01-02/task.json");
     let commit = app_changes["git_commands"][1].as_str().unwrap();
     assert!(
-        commit.contains(
-            "commit -m \"app: changes made in the Allomos app\" -m \"By: Ann (Allomos app)\""
-        ),
+        commit.contains("commit -m \"app: changes made in the Allomos app\" -m \"By: "),
         "{commit}"
     );
     // The claim's own commands name only the claim's files.
@@ -6204,4 +6214,68 @@ fn a_task_traces_to_requirements_and_decisions_and_back() {
         json!({ "R77": ["A01-01"], "0021": ["A01-01", "A01-02"] })
     );
     refused(&repo, &["traces", "nope"], 1, "trace_invalid");
+}
+
+/// Task-A01-frolic587 (decision 0021 § 2, § 6): the identity level is shown and set with
+/// `alm audit-settings`; a local-only project keeps the pseudonym, and the events of a person's
+/// changes hold only their pseudonym.
+#[test]
+fn audit_settings_keep_a_local_project_on_the_pseudonym() {
+    let repo = filled();
+    let v = ok(&repo, &["audit-settings"]);
+    assert_eq!(
+        v["identity"],
+        json!({ "level": "pseudonym", "reauthenticate": false, "sign_in_available": false })
+    );
+    assert_eq!(v["changed"], Value::Null);
+    refused(
+        &repo,
+        &["audit-settings", "--identity", "account"],
+        1,
+        "identity_needs_cloud",
+    );
+    refused(
+        &repo,
+        &["audit-settings", "--identity", "sso"],
+        1,
+        "identity_needs_cloud",
+    );
+    refused(
+        &repo,
+        &["audit-settings", "--identity", "passport"],
+        1,
+        "identity_level_unknown",
+    );
+    refused(
+        &repo,
+        &["audit-settings", "--reauthenticate", "on"],
+        1,
+        "reauthenticate_needs_sign_in",
+    );
+    let events = || {
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count()
+    };
+    let before = events();
+    let v = ok(&repo, &["audit-settings", "--identity", "pseudonym"]);
+    assert_eq!(v["changed"], false);
+    assert_eq!(events(), before, "nothing changed, nothing recorded");
+    let project = fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(
+        !project.contains("audit"),
+        "the default is not written: {project}"
+    );
+
+    // A person's change at the default level: the pseudonym, nothing else about them.
+    ok(&repo, &["note", "A01-01", "mine"]);
+    let newest = fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .max()
+        .unwrap();
+    let e: Value = serde_json::from_str(&fs::read_to_string(newest).unwrap()).unwrap();
+    let person = e["actor"]["person"].as_str().unwrap();
+    assert!(person.starts_with("p-") && person.len() == 8, "{e}");
+    assert_eq!(e["actor"].as_object().unwrap().len(), 1, "{e}");
 }

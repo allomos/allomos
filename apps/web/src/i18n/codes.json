@@ -15,6 +15,9 @@
     "id",
     "count"
   ],
+  "audit_reason_missing": [
+    "setting"
+  ],
   "bad_usage": [
     "detail"
   ],
@@ -125,6 +128,12 @@
   "human_check_steps_missing": [
     "id"
   ],
+  "identity_level_unknown": [
+    "value"
+  ],
+  "identity_needs_cloud": [
+    "level"
+  ],
   "instructions_outdated": [
     "files",
     "current"
@@ -219,6 +228,7 @@
   "read_failed": [
     "detail"
   ],
+  "reauthenticate_needs_sign_in": [],
   "reopen_note_missing": [],
   "request_not_found": [
     "id"
