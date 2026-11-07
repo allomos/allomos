@@ -6,7 +6,9 @@
 // grey when there is nothing for them to do, and a ↻ beside the button ticks everything again.
 // The panel has two tabs (Task-A01-wigwam308): Presets, each only setting the grid's ticks, with
 // what it ticks and how many tasks it lists now (✓ when the ticks are exactly its), and Custom,
-// the grid. What the ticks keep is decided in stopFlow.ts.
+// the grid. A × at the right of the tabs (Task-A01-bread766) closes the panel and leaves the ticks
+// as they are, as clicking the button again, a click outside and Esc do. What the ticks keep is
+// decided in stopFlow.ts.
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
@@ -52,6 +54,7 @@ export function FilterMenu({
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("presets");
   const box = useRef<HTMLSpanElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   // Closes on a click outside the panel or on Esc.
   useEffect(() => {
     if (!open) return;
@@ -84,6 +87,7 @@ export function FilterMenu({
         className={isAll(filter) ? "filter-button" : "filter-button on"}
         aria-haspopup="dialog"
         aria-expanded={open}
+        ref={button}
         onClick={toggle}
       >
         <span>{filterName(filter, t)}</span>
@@ -118,6 +122,18 @@ export function FilterMenu({
                 {t(`filter.tab_${k}`)}
               </button>
             ))}
+            <button
+              type="button"
+              className="filter-close"
+              aria-label={t("filter.close")}
+              title={t("filter.close")}
+              onClick={() => {
+                setOpen(false);
+                button.current?.focus();
+              }}
+            >
+              ×
+            </button>
           </div>
           {tab === "presets" ? (
             <div className="filter-presets" role="tabpanel">

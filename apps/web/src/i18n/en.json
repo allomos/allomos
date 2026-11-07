@@ -568,6 +568,7 @@
   "filter.preset.finished": "Finished",
   "filter.preset_ticks.all": "Every state, everything ticked",
   "filter.preset_ticks.needs_you": "Done but not checked by a human, every Waiting task, and any task with AI decisions to review",
+  "filter.close": "Close: the filter stays as it is",
   "filter.restore": "Restore all: show every task",
   "filter.verb.match_one": "matches the filter",
   "filter.verb.match_other": "match the filter",

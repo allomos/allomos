@@ -568,6 +568,7 @@
   "filter.preset.finished": "終わったもの",
   "filter.preset_ticks.all": "すべての状態、すべてチェック",
   "filter.preset_ticks.needs_you": "完了したが人が確認していないもの、待機中のすべて、確認待ちの AI の判断があるタスク",
+  "filter.close": "閉じる：絞り込みはそのまま",
   "filter.restore": "すべて戻す：すべてのタスクを表示",
   "filter.verb.match_one": "フィルターに合う",
   "filter.verb.match_other": "フィルターに合う",
