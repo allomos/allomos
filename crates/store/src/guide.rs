@@ -178,7 +178,11 @@ is refused). An agent also passes `--model <its exact model ID>` (or ALLOMOS_MOD
 session on this computer is enough, alm remembers it), and when it applies `--for <pseudonym>` (the
 person it works for, when not this computer's person) and `--approval <id>` (the approval the
 change relies on): each event records them, with the agent's session ID and this computer's
-person's pseudonym, which alm finds by itself. What alm could not learn is listed after the change.
+person's pseudonym, which alm finds by itself. A state change (drop, release, ready, backlog,
+wait, block, unblock…), a label taken off or a change of plan (plan, block, base) also takes
+`--why \"<why, in one line>\"`, recorded as the change's reason; reopen --note, recheck --reason,
+wait --on and done --without-human-check already say why. What alm could not learn, or a reason
+not given, is listed after the change; nothing is refused for it.
 Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not writable.
 
 `alm` never runs or reads your version control tool. After a change it prints \"Save this change

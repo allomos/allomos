@@ -86,6 +86,13 @@ struct Cli {
     /// The approval ID this change relies on, when it needs one.
     #[arg(long, global = true, env = "ALLOMOS_APPROVAL", value_name = "ID")]
     approval: Option<String>,
+    /// Why you make this change, in one line (Task-A01-air289), recorded as a `reason` in its
+    /// history. State changes (drop, release, backlog, ready, wait, block, unblock…), taking a
+    /// label off and plan changes (plan, block, base) ask for one; alm records it and refuses
+    /// nothing without it. reopen --note, recheck --reason, wait --on and done
+    /// --without-human-check already say why.
+    #[arg(long, global = true, value_name = "TEXT")]
+    why: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -1132,6 +1139,7 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 model: cli.model.clone(),
                 on_behalf_of: cli.on_behalf_of.clone(),
                 approval: cli.approval.clone(),
+                reason: command_reason(&cli),
             }));
             let _ = allomos_store::events::take_gaps();
             let done = execute(&cli, cwd);
@@ -3916,6 +3924,22 @@ fn claim_folder(root: &Path, cwd: &Path) -> Option<String> {
     Some(path.to_string_lossy().replace('\\', "/"))
 }
 
+/// Why this command makes its change (Task-A01-air289): `--why`, else what the command itself
+/// says why with (`reopen --note`, `recheck --reason`, `wait --on`, `done
+/// --without-human-check`).
+fn command_reason(cli: &Cli) -> Option<String> {
+    non_blank(&cli.why).or_else(|| match &cli.command {
+        Command::Reopen { note, .. } => non_blank(&Some(note.clone())),
+        Command::Recheck { reason, .. } => non_blank(&Some(reason.clone())),
+        Command::Wait { on, .. } => non_blank(&Some(on.clone())),
+        Command::Done {
+            without_human_check,
+            ..
+        } => non_blank(without_human_check),
+        _ => None,
+    })
+}
+
 /// What the events this command wrote could not say about who made them (Task-A01-black004,
 /// decision 0021 § 1.1): Fact lines with what to pass, and `event_missing` in `--json`. It
 /// refuses nothing: `alm` tells, the agent passes it next time.
@@ -3928,6 +3952,10 @@ fn who_facts(done: &mut Done) -> Option<String> {
         .iter()
         .map(|gap| {
             let (fact, fix) = match *gap {
+                "reason" => (
+                    "This change's history does not say why: a state change, a label taken off or a change of plan asks for a reason.",
+                    "alm --why \"<why, in one line>\" … (next time; the change itself is made)",
+                ),
                 "model" => (
                     "This change's history does not say which model ran it: alm cannot learn it from the environment.",
                     "alm --model <your exact model ID> … (once per session on this computer; alm remembers it)",

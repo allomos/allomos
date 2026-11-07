@@ -520,6 +520,7 @@
   "pane.reopen_button": "Reopen…",
   "pane.reopen_hint": "More work on this task's outcome: it becomes ready again, held by nobody, with your reason in its history. Its label and human-check record are cleared (the history keeps them); the description and handoff note stay.",
   "pane.reopen_note": "Why reopened",
+  "pane.reason": "Reason",
   "pane.reopen_placeholder": "Why it is reopened, for example what failed in the check",
   "pane.reopen_save": "Reopen",
   "problem.cannot_reopen": "Task {id} is {state}: only a done or dropped task can be reopened. It is still open, so carry on with it as it is.",

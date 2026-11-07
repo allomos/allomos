@@ -5880,3 +5880,97 @@ fn task_commands_list_what_the_task_is_missing() {
         ],
     );
 }
+
+/// Decision 0021 § 1.1 "Reasons" (Task-A01-air289): state changes, labels taken off and plan
+/// changes record why as a `reason` change; without one `alm` asks (`event_missing`: `reason`)
+/// and refuses nothing; the commands that already say why record that; older events still read.
+#[test]
+fn state_and_plan_changes_record_why() {
+    let repo = filled();
+    fs::write(
+        repo.join(".allomos/taskbag/events/2026-01-02-030405-000-old002.json"),
+        r#"{"at":"2026-01-02T03:04:05Z","via":"alm","command":"drop","kind":"task","id":"A01-01","changes":[{"field":"state","from":"ready","to":"dropped"}]}"#,
+    )
+    .unwrap();
+    let reason = |e: &Value| -> Option<String> {
+        e["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["field"] == "reason")
+            .map(|c| c["to"].as_str().unwrap().to_string())
+    };
+    let asked = |v: &Value| {
+        v["event_missing"]
+            .as_array()
+            .is_some_and(|a| a.iter().any(|m| m["code"] == "reason"))
+    };
+    // Made ready with --why: recorded, nothing asked.
+    let v = ok(
+        &repo,
+        &["--why", "the approver approved it", "ready", "A01-01"],
+    );
+    let e = newest_event(&repo);
+    assert_eq!(
+        reason(&e).as_deref(),
+        Some("the approver approved it"),
+        "{e}"
+    );
+    assert!(!asked(&v), "{v}");
+    // Claiming is a step forward: no reason asked for.
+    let v = ok(&repo, &["--as", "s1", "claim", "A01-01"]);
+    assert!(!asked(&v) && reason(&newest_event(&repo)).is_none(), "{v}");
+    // Releasing without --why: made all the same, and alm asks for a reason.
+    let v = ok(&repo, &["--as", "s1", "release", "A01-01"]);
+    assert_eq!(task_file(&repo, "A01-01")["state"], "ready");
+    assert!(asked(&v) && reason(&newest_event(&repo)).is_none(), "{v}");
+    let text = String::from_utf8(alm(&repo, &["--as", "s1", "claim", "A01-01"]).stdout).unwrap();
+    assert!(!text.contains("--why"), "{text}");
+    let text = String::from_utf8(alm(&repo, &["--as", "s1", "release", "A01-01"]).stdout).unwrap();
+    assert!(
+        text.contains("Fact:") && text.contains("alm --why"),
+        "{text}"
+    );
+    // wait --on is its own why.
+    let v = ok(&repo, &["wait", "A01-02", "--on", "the approver's answer"]);
+    assert_eq!(
+        reason(&newest_event(&repo)).as_deref(),
+        Some("the approver's answer")
+    );
+    assert!(!asked(&v), "{v}");
+    // A label taken off asks; one added does not.
+    let v = ok(&repo, &["label", "A02-01", "locally verified by agent"]);
+    assert!(!asked(&v), "{v}");
+    let v = ok(
+        &repo,
+        &["label", "A02-01", "locally verified by agent", "--remove"],
+    );
+    assert!(asked(&v), "{v}");
+    // Dropping with --why.
+    ok(&repo, &["drop", "A02-01", "--why", "a duplicate of A01-02"]);
+    assert_eq!(
+        reason(&newest_event(&repo)).as_deref(),
+        Some("a duplicate of A01-02")
+    );
+    // A plan change: blocked by another task.
+    let v = ok(&repo, &["block", "A01-01", "--by", "A01-02"]);
+    assert!(asked(&v), "{v}");
+    // Reopening says why with its --note.
+    let v = ok(&repo, &["reopen", "A02-01", "--note", "more work on it"]);
+    assert_eq!(
+        reason(&newest_event(&repo)).as_deref(),
+        Some("more work on it")
+    );
+    assert!(!asked(&v), "{v}");
+    // A change that is neither a state nor a plan change asks for nothing.
+    let v = ok(&repo, &["title", "A01-02", "List them"]);
+    assert!(!asked(&v), "{v}");
+    // The history still reads, the older event among the new ones.
+    let v = ok(&repo, &["history", "A01-01"]);
+    let text = v.to_string();
+    assert!(
+        text.contains("2026-01-02T03:04:05Z") && text.contains("the approver approved it"),
+        "{v}"
+    );
+    assert!(v["issues"].as_array().is_none_or(|a| a.is_empty()), "{v}");
+}

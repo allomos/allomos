@@ -259,6 +259,69 @@ pub fn removed<T: Serialize>(before: &T, order: &[&str]) -> Vec<Change> {
         .collect()
 }
 
+/// The change that says why (Task-A01-air289, decision 0021 § 1.1 "Reasons"): `{"field":
+/// "reason", "to": "<why>"}`, added to an event beside the changes it explains. Like
+/// `reopen_note` it lives only in the history, so no file gains a field.
+pub const REASON: &str = "reason";
+
+/// The change [`REASON`] with `why` as its `to`.
+pub fn reason_change(why: &str) -> Change {
+    Change {
+        extra: Default::default(),
+        field: REASON.to_string(),
+        from: None,
+        to: Some(Value::String(why.to_string())),
+    }
+}
+
+/// Whether an event is a state change or a plan change that asks for a reason (Task-A01-air289,
+/// decision 0021 § 1.1): a task's `state` moving (dropping, reopening, releasing, waiting,
+/// blocking, back to backlog, made ready…), its holder let go, a label taken off, or its plan
+/// changed (`iteration`, `blocked_by`, or a `base_branch` it already had). Not asked for: a new
+/// item (`add …`), the ordinary steps forward whose command is their own why (`claim`, `done`,
+/// `checked`), and the taskbag's own upgrades (`init`, `upgrade`, `migrate`). `alm` asks for a
+/// reason; it refuses nothing (`alm` tells).
+pub fn needs_reason(event: &Event) -> bool {
+    if event.kind != Kind::Task {
+        return false;
+    }
+    let c = event.command.as_str();
+    if c.starts_with("add ") || matches!(c, "init" | "upgrade" | "migrate") {
+        return false;
+    }
+    let forward = matches!(c, "claim" | "done" | "checked");
+    event.changes.iter().any(|ch| match ch.field.as_str() {
+        "state" => !forward && ch.from.is_some(),
+        "holder" => !forward && ch.from.is_some() && ch.to.is_none(),
+        "labels" if !forward => labels_removed(ch),
+        "iteration" | "blocked_by" => true,
+        "base_branch" => ch.from.is_some(),
+        _ => false,
+    })
+}
+
+/// Whether a `labels` change takes a label off: one in `from` is not in `to`.
+fn labels_removed(change: &Change) -> bool {
+    let list = |v: &Option<Value>| -> Vec<Value> {
+        match v {
+            Some(Value::Array(a)) => a.clone(),
+            Some(other) => vec![other.clone()],
+            None => Vec::new(),
+        }
+    };
+    let to = list(&change.to);
+    list(&change.from).iter().any(|l| !to.contains(l))
+}
+
+/// The reason an event gives, if any: its [`REASON`] change's text.
+pub fn reason(event: &Event) -> Option<&str> {
+    event
+        .changes
+        .iter()
+        .find(|c| c.field == REASON)
+        .and_then(|c| c.to.as_ref()?.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -484,5 +547,86 @@ mod tests {
         assert_eq!(session_from_env("claude", env).as_deref(), Some("c1"));
         assert_eq!(session_from_env("codex", env), None);
         assert_eq!(session_from_env("other", env), None);
+    }
+    fn ev(command: &str, changes: Value) -> Event {
+        serde_json::from_value(serde_json::json!({
+            "at": "2026-11-08T10:00:00Z", "via": "alm", "command": command,
+            "kind": "task", "id": "A01-01", "changes": changes
+        }))
+        .unwrap()
+    }
+
+    /// Task-A01-air289: which changes ask for a reason (decision 0021 § 1.1).
+    #[test]
+    fn state_and_plan_changes_ask_for_a_reason() {
+        let asks = |command: &str, changes: Value| needs_reason(&ev(command, changes));
+        let state =
+            |from: &str, to: &str| serde_json::json!([{"field":"state","from":from,"to":to}]);
+        assert!(asks("drop", state("ready", "dropped")));
+        assert!(asks("reopen", state("done", "ready")));
+        assert!(asks("release", state("in_progress", "ready")));
+        assert!(asks("backlog", state("ready", "backlog")));
+        assert!(asks(
+            "release",
+            serde_json::json!([{"field":"holder","from":"x"}])
+        ));
+        assert!(asks(
+            "plan",
+            serde_json::json!([{"field":"iteration","to":"I-2"}])
+        ));
+        assert!(asks(
+            "block",
+            serde_json::json!([{"field":"blocked_by","to":["A01-02"]}])
+        ));
+        assert!(asks(
+            "base",
+            serde_json::json!([{"field":"base_branch","from":"main","to":"dev"}])
+        ));
+        assert!(asks(
+            "label",
+            serde_json::json!([{"field":"labels","from":["a","b"],"to":["a"]}])
+        ));
+        assert!(asks(
+            "recheck",
+            serde_json::json!([{"field":"labels","from":["a"]}])
+        ));
+        // Not asked for: forward steps, a new item, a first base, a label added, other fields.
+        assert!(!asks("claim", state("ready", "in_progress")));
+        assert!(!asks(
+            "done",
+            serde_json::json!([{"field":"state","from":"in_progress","to":"done"},{"field":"holder","from":"x"}])
+        ));
+        assert!(!asks(
+            "add task",
+            serde_json::json!([{"field":"state","to":"backlog"},{"field":"iteration","to":"I-1"}])
+        ));
+        assert!(!asks(
+            "claim",
+            serde_json::json!([{"field":"base_branch","to":"main"}])
+        ));
+        assert!(!asks(
+            "label",
+            serde_json::json!([{"field":"labels","from":["a"],"to":["a","b"]}])
+        ));
+        assert!(!asks(
+            "title",
+            serde_json::json!([{"field":"title","from":"a","to":"b"}])
+        ));
+        let mut area = ev("drop", state("ready", "dropped"));
+        area.kind = Kind::Area;
+        assert!(!needs_reason(&area));
+    }
+
+    #[test]
+    fn the_reason_is_a_change_of_its_own() {
+        let mut e = ev(
+            "drop",
+            serde_json::json!([{"field":"state","from":"ready","to":"dropped"}]),
+        );
+        assert_eq!(reason(&e), None);
+        e.changes.push(reason_change("duplicate of A01-02"));
+        assert_eq!(reason(&e), Some("duplicate of A01-02"));
+        let text = serde_json::to_string(&e).unwrap();
+        assert!(text.contains(r#"{"field":"reason","to":"duplicate of A01-02"}"#));
     }
 }

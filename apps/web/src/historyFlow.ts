@@ -23,6 +23,7 @@ const FIELD_KEYS: Record<string, Key> = {
   ai_decision: "pane.ai_decision",
   approval: "pane.approval",
   reopen_note: "pane.reopen_note",
+  reason: "pane.reason",
   card: "pane.card",
   card_outside: "pane.card_outside",
   description: "pane.description",
