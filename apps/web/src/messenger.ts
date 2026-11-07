@@ -194,6 +194,14 @@ export interface Messenger {
    * `reviewed` event under the lock. Rejects with a Problem (`nothing_to_review`, `holder_missing`).
    */
   reviewAiDecisions(root: string, id: string): Promise<void>;
+  /**
+   * Approve task `id`'s plan from the task pane (Task-A01-baker800), like `alm approve`, channel
+   * app: `shown` is the description the person read; a plan changed since is refused
+   * (`task_changed`). `ready`: then make the backlog task ready, as `alm ready`. Desktop only.
+   */
+  approveTask(root: string, id: string, shown: string, expires: string | null, ready: boolean): Promise<void>;
+  /** Withdraw approval `id`, with why (Task-A01-baker800), like `alm withdraw --why`. Desktop only. */
+  withdrawApproval(root: string, id: string, reason: string): Promise<void>;
   /** The IDs the New forms suggest: the next free area, iteration, and task in each area (Task-A01-19). */
   nextIds(root: string): Promise<NextIds>;
   /**
@@ -468,6 +476,8 @@ export const desktopMessenger: Messenger = {
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
   editTask: (root, id, edit) => invoke<Task>("edit_task", { root, id, edit }),
   reviewAiDecisions: (root, id) => invoke<void>("review_ai_decisions", { root, id }),
+  approveTask: (root, id, shown, expires, ready) => invoke<void>("approve_task", { root, id, shown, expires, ready }),
+  withdrawApproval: (root, id, reason) => invoke<void>("withdraw_approval", { root, id, reason }),
   nextIds: (root) => invoke<NextIds>("next_ids", { root }),
   addArea: (root, id, name) => invoke<Area>("add_area", { root, id, name }),
   addIteration: (root, iteration) => invoke<Iteration>("add_iteration", { root, iteration }),

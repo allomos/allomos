@@ -9,7 +9,10 @@
 // carrying "AI decisions to review" shows that badge, the decisions and a Reviewed button,
 // like `alm reviewed` (Task-A03-19). A done or dropped task has Reopen…, which asks why and works
 // like `alm reopen` (Task-A01-50). Responsible person, agent, check and session are separate
-// rows (Task-A03-37), and History names the agent behind each change.
+// rows (Task-A03-37), and History names the agent behind each change. On the desktop app the
+// Approvals section has Approve… (and, on a backlog task, Approve and make ready), which shows
+// the description being approved first, and Withdraw… beside each approval that applies, which
+// asks why (Task-A01-baker800); neither changes the state.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n, type Key } from "./i18n";
@@ -38,6 +41,7 @@ import {
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
+import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
@@ -65,6 +69,8 @@ export function TaskPane({
   onNewIteration,
   folders,
   onOpenSession,
+  onApprove,
+  onWithdraw,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -99,6 +105,12 @@ export function TaskPane({
   /** Reopens the session the task records (Task-A03-hive049): only on the desktop app, where the
    * session is; the companions show the Session row's text only. Rejects with a Problem. */
   onOpenSession?: () => Promise<void>;
+  /** Approves the task's plan, as `alm approve` (channel app): `shown` is the description the
+   * person read; `ready` also makes a backlog task ready (Task-A01-baker800). Desktop only.
+   * Rejects with a Problem. */
+  onApprove?: (shown: string, expires: string | null, ready: boolean) => Promise<void>;
+  /** Withdraws approval `id`, with why (Task-A01-baker800). Desktop only. Rejects with a Problem. */
+  onWithdraw?: (id: string, reason: string) => Promise<void>;
 }) {
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
@@ -109,6 +121,10 @@ export function TaskPane({
   const [busy, setBusy] = useState(false);
   // The Checked or Reviewed button asked for the person's name first (asked once, like a change).
   const [asking, setAsking] = useState<"checked" | "reviewed" | null>(null);
+  // Approve… (Task-A01-baker800): the description it was opened on (what is shown and approved),
+  // and the optional expiry; null while closed. Withdraw…: the approval and the reason written.
+  const [approving, setApproving] = useState<{ shown: string; expires: string } | null>(null);
+  const [withdrawing, setWithdrawing] = useState<{ id: string; reason: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Task-A01-57: the task's version when the change began, and, when a save was refused because
   // the task changed since, the version it has now.
@@ -125,6 +141,8 @@ export function TaskPane({
     setSessionAsked(null);
     setEditing(null);
     setAsking(null);
+    setApproving(null);
+    setWithdrawing(null);
     setReason(null);
     setError(null);
     setConflict(null);
@@ -144,6 +162,8 @@ export function TaskPane({
     setConflict(null);
     setEditing(null);
     setAsking(null);
+    setApproving(null);
+    setWithdrawing(null);
     setReason(null);
     setError(null);
   };
@@ -162,6 +182,35 @@ export function TaskPane({
       setBusy(false);
     }
   };
+  /** Approve (Task-A01-baker800): the description shown when Approve… was opened is the plan
+   * approved; Rust refuses it (task_changed) if the task's description is no longer that. */
+  const approve = async (ready: boolean) => {
+    if (!approving || !onApprove || busy) return;
+    setBusy(true);
+    try {
+      await onApprove(approving.shown, expiresValue(approving.expires), ready);
+      setApproving(null);
+      setError(null);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const withdraw = async () => {
+    if (!withdrawing || !onWithdraw || busy || !withdrawing.reason.trim()) return;
+    setBusy(true);
+    try {
+      await onWithdraw(withdrawing.id, withdrawing.reason.trim());
+      setWithdrawing(null);
+      setError(null);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const withdrawnNow = withdrawnNotice(task);
   /** Checked (Task-A03-18): top label, off To check. Reviewed (Task-A03-19): the AI decisions
    * leave To review. Refused in Rust's words like any change. */
   const mark = (which: "checked" | "reviewed") => (which === "checked" ? onEdit({ field: "checked" }) : onReview());
@@ -622,26 +671,131 @@ export function TaskPane({
           )}
         </div>
       )}
-      {(task.approvals ?? []).length > 0 && (
+      {((task.approvals ?? []).length > 0 || onApprove) && (
         <div className="pane-check pane-approvals">
           <h3>{t("pane.approvals")}</h3>
-          <ul className="approvals">
-            {(task.approvals ?? []).map((a) => (
-              <li key={a.id} className={a.status === "applies" ? "" : "muted"}>
-                {a.words ? `“${a.words}”` : a.id}{" "}
-                <span className="muted small">
-                  {t("pane.approval_by", {
-                    by: a.approver || t("pane.history_someone"),
-                    channel: t(`pane.approval_channel.${a.channel}` as Key),
-                    at: localTime(a.at),
-                  })}
-                </span>{" "}
-                <span className="badge small">
-                  {t(`pane.approval_status.${a.status}` as Key, { at: a.withdrawn_at ? localTime(a.withdrawn_at) : "", expires: a.expires ?? "" })}
-                </span>
-              </li>
+          {withdrawnNow && (
+            <p className="banner error small" role="status">
+              {t("pane.approval_withdrawn_notice", { at: localTime(withdrawnNow.withdrawn_at ?? "") })}
+            </p>
+          )}
+          {(task.approvals ?? []).length > 0 && (
+            <ul className="approvals">
+              {(task.approvals ?? []).map((a) => (
+                <li key={a.id} className={a.status === "applies" ? "" : "muted"}>
+                  {a.words ? `“${a.words}”` : a.id}{" "}
+                  <span className="muted small">
+                    {t("pane.approval_by", {
+                      by: a.approver || t("pane.history_someone"),
+                      channel: t(`pane.approval_channel.${a.channel}` as Key),
+                      at: localTime(a.at),
+                    })}
+                  </span>{" "}
+                  <span className="badge small">
+                    {t(`pane.approval_status.${a.status}` as Key, { at: a.withdrawn_at ? localTime(a.withdrawn_at) : "", expires: a.expires ?? "" })}
+                  </span>
+                  {onWithdraw && canWithdraw(a) && withdrawing?.id !== a.id && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className="link small"
+                        onClick={() => {
+                          cancel();
+                          setWithdrawing({ id: a.id, reason: "" });
+                        }}
+                        disabled={busy}
+                      >
+                        {t("pane.withdraw_button")}
+                      </button>
+                    </>
+                  )}
+                  {withdrawing?.id === a.id &&
+                    (!ownerName ? (
+                      nameForm()
+                    ) : (
+                      <div className="editor">
+                        <textarea
+                          value={withdrawing.reason}
+                          rows={2}
+                          placeholder={t("pane.withdraw_placeholder")}
+                          aria-label={t("pane.withdraw_reason")}
+                          onChange={(e) => setWithdrawing({ id: a.id, reason: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancel();
+                            }
+                          }}
+                          disabled={busy}
+                          autoFocus
+                        />
+                        <div className="editor-buttons">
+                          <button type="button" className="primary" onClick={() => void withdraw()} disabled={busy || !withdrawing.reason.trim()}>
+                            {busy ? t("edit.saving") : t("pane.withdraw_save")}
+                          </button>
+                          <button type="button" onClick={cancel} disabled={busy}>
+                            {t("edit.cancel")}
+                          </button>
+                        </div>
+                        <p className="muted small">{t("pane.withdraw_hint")}</p>
+                        {error && <p className="banner error small">{error}</p>}
+                      </div>
+                    ))}
+                </li>
+              ))}
+            </ul>
+          )}
+          {onApprove &&
+            (approving === null ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancel();
+                    setApproving({ shown: task.description, expires: "" });
+                  }}
+                  disabled={busy || !hasPlan(task)}
+                >
+                  {t("pane.approve_button")}
+                </button>
+                <p className="muted small">{t(hasPlan(task) ? "pane.approve_hint" : "pane.approve_no_plan")}</p>
+              </>
+            ) : !ownerName ? (
+              nameForm()
+            ) : (
+              <div className="editor approve-confirm">
+                <p className="small">{t("pane.approve_shown")}</p>
+                <pre className="approve-plan" tabIndex={0} aria-label={t("pane.approve_shown")}>
+                  {approving.shown}
+                </pre>
+                {approving.shown !== task.description && <p className="banner error small">{t("pane.approve_plan_changed")}</p>}
+                <label className="small">
+                  {t("pane.approve_expires")}{" "}
+                  <input
+                    type="date"
+                    value={approving.expires}
+                    onChange={(e) => setApproving({ ...approving, expires: e.target.value })}
+                    disabled={busy}
+                  />
+                </label>
+                <div className="editor-buttons">
+                  <button type="button" className="primary" onClick={() => void approve(false)} disabled={busy}>
+                    {busy ? t("edit.saving") : t("pane.approve_save")}
+                  </button>
+                  {canMakeReady(task) && (
+                    <button type="button" onClick={() => void approve(true)} disabled={busy}>
+                      {t("pane.approve_and_ready")}
+                    </button>
+                  )}
+                  <button type="button" onClick={cancel} disabled={busy}>
+                    {t("edit.cancel")}
+                  </button>
+                </div>
+                <p className="muted small">{t("pane.approve_state_hint")}</p>
+                {error && <p className="banner error small">{error}</p>}
+              </div>
             ))}
-          </ul>
         </div>
       )}
       {canReopen(task) && (

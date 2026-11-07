@@ -153,6 +153,8 @@ problems! {
     ApprovalNotFound { id } => "approval_not_found", "No task records approval {id}. `alm show <task>` lists a task's approvals.";
     /// `alm withdraw` on an approval already withdrawn (Task-A01-coach782).
     ApprovalAlreadyWithdrawn { id } => "approval_already_withdrawn", "Approval {id} is already withdrawn.";
+    /// The app's Withdraw without saying why (Task-A01-baker800).
+    WithdrawReasonMissing => "withdraw_reason_missing", "Say why the approval is withdrawn: `alm withdraw <approval ID> --why \"<why>\"`.";
     /// `alm trace` with something that is neither a requirement ID nor a decision number
     /// (Task-A01-fennel617).
     TraceInvalid { reference } => "trace_invalid", "\"{reference}\" is neither a requirement ID nor a decision number. Give a requirement as REQUIREMENTS.md numbers it (for example R77) or a decision by its number (for example 0021).";

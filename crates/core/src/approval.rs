@@ -20,7 +20,7 @@ use serde_json::Value;
 
 use crate::event::{Change, Event, Kind};
 use crate::ops::find_task;
-use crate::{Problem, Taskbag};
+use crate::{Problem, State, Task, Taskbag};
 
 /// The field an `approve` or `withdraw` event changes.
 pub const FIELD: &str = "approval";
@@ -295,6 +295,17 @@ fn status(r: &Recorded, taskbag: &Taskbag, today: &str) -> Status {
         }
     }
     Status::Applies
+}
+
+/// The withdrawn approval to point out on `task` (approver, 2026-11-08, Task-A01-baker800): while
+/// the task is in progress, its latest approval (of `approvals`, oldest first), when that one was
+/// withdrawn. Withdrawing stops nothing: `alm` and the app say so, and the task's holder decides
+/// whether to stop.
+pub fn withdrawn_notice<'a>(task: &Task, approvals: &'a [Recorded]) -> Option<&'a Recorded> {
+    if task.state != State::InProgress {
+        return None;
+    }
+    approvals.last().filter(|r| r.status == Status::Withdrawn)
 }
 
 /// [`all`], by task ID: each approval under every task it covers. Tasks with none are left out.

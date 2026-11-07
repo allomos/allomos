@@ -268,6 +268,9 @@ Work a task:
   the changes that rely on it. Once a task's description changes, `alm show` lists the approval
   as no longer applying: ask again. Go ahead on `alm confirm --task` records one by itself.
   `alm withdraw <approval ID>` (with `--why`) when the person takes it back.
+  The person can also approve or withdraw in the app's task pane (channel `app`). An approval
+  withdrawn while a task is in progress shows as \"Approval withdrawn\" in `alm next` and
+  `alm show`: it stops nothing; whoever holds the task decides whether to stop.
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
   `--reason \"<why>\"` change it; account and sso need a cloud project.

@@ -330,6 +330,93 @@ fn review_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Problem> {
     allomos_store::review_ai_decisions(root, actor, LOCK_WAIT, id).map(|_| ())
 }
 
+/// The task pane's Approve (Task-A01-baker800, decision 0021 § 1.1): the same record as
+/// `alm approve <id>`, channel `app`, approver this computer's person's pseudonym, made as the
+/// person's saved name. `shown` is the description the confirmation showed: if the task's plan is
+/// no longer exactly that, nothing is recorded (`task_changed`). Approving changes no state;
+/// `ready` (Approve and make ready, only offered on a backlog task) then makes the change
+/// `alm ready` makes, as a second step the person chose. The approver chose to record, not block,
+/// an approval clicked by an agent operating the app (2026-11-08): the event shows it.
+#[tauri::command]
+fn approve_task(
+    root: PathBuf,
+    id: String,
+    shown: String,
+    expires: Option<String>,
+    ready: bool,
+) -> Result<(), Problem> {
+    approve_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &id,
+        &shown,
+        expires.as_deref(),
+        ready,
+    )
+}
+
+fn approve_as(
+    root: &Path,
+    name: Option<&str>,
+    id: &str,
+    shown: &str,
+    expires: Option<&str>,
+    ready: bool,
+) -> Result<(), Problem> {
+    let actor = app_actor(name)?;
+    let tasks = [id.to_string()];
+    allomos_store::approvals::approve(
+        root,
+        actor,
+        LOCK_WAIT,
+        &allomos_store::approvals::Input {
+            tasks: &tasks,
+            approver: None,
+            channel: "app",
+            words: None,
+            expires,
+            plan: None,
+            shown: Some(shown),
+        },
+    )?;
+    if ready {
+        edit_task_as(
+            root,
+            name,
+            id,
+            &allomos_core::ops::Edit::State {
+                state: allomos_core::State::Ready,
+                waiting_on: None,
+                who: None,
+                blocked_by: Vec::new(),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+/// The task pane's Withdraw (Task-A01-baker800): the same change as `alm withdraw <approval ID>
+/// --why "<reason>"`, made as the person's saved name. The reason is required here
+/// (`withdraw_reason_missing`). Withdrawing stops nothing (approver, 2026-11-08).
+#[tauri::command]
+fn withdraw_approval(root: PathBuf, id: String, reason: String) -> Result<(), Problem> {
+    withdraw_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &id,
+        &reason,
+    )
+}
+
+fn withdraw_as(root: &Path, name: Option<&str>, id: &str, reason: &str) -> Result<(), Problem> {
+    let actor = app_actor(name)?;
+    let reason = reason.trim();
+    if reason.is_empty() {
+        return Err(Problem::WithdrawReasonMissing);
+    }
+    allomos_store::approvals::withdraw(root, actor, LOCK_WAIT, id, Some(reason)).map(|_| ())
+}
+
 #[tauri::command]
 fn edit_task(
     root: PathBuf,
@@ -2608,6 +2695,8 @@ pub fn run() {
             save_owner_name,
             edit_task,
             review_ai_decisions,
+            approve_task,
+            withdraw_approval,
             next_ids,
             add_area,
             add_iteration,
@@ -3297,6 +3386,93 @@ mod tests {
         let before = count();
         set_identity_at(&root, Some("pseudonym"), Some(false), None).unwrap();
         assert_eq!(count(), before);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The task pane's Approve and Withdraw (Task-A01-baker800): an approval of the description
+    /// shown, channel app, changing no state; Approve and make ready also makes it ready; a plan
+    /// changed since it was shown is refused; Withdraw needs a reason and records it.
+    #[test]
+    fn the_task_pane_approves_and_withdraws() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-approve-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let lock = allomos_store::Lock::acquire(&root, std::time::Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&allomos_core::ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        let mut task = allomos_core::ops::new_task(&bag, "A01-01", "A01", "Do it", None).unwrap();
+        task.description = "## Outcome\n\nThe plan.".into();
+        lock.create_task(&task).unwrap();
+        drop(lock);
+        let state =
+            |root: &Path| allomos_store::taskbag_of(root, load(root)).unwrap().0.tasks[0].state;
+        assert_eq!(state(&root), allomos_core::State::Backlog);
+
+        assert_eq!(
+            approve_as(&root, None, "A01-01", &task.description, None, false),
+            Err(Problem::HolderMissing)
+        );
+        // Shown an older plan: nothing recorded.
+        assert!(matches!(
+            approve_as(&root, Some("Will"), "A01-01", "## Outcome", None, false),
+            Err(Problem::TaskChanged { .. })
+        ));
+        assert!(open_taskbag(root.clone()).approvals.is_empty());
+
+        approve_as(
+            &root,
+            Some("Will"),
+            "A01-01",
+            &task.description,
+            Some("2099-01-01"),
+            false,
+        )
+        .unwrap();
+        assert_eq!(state(&root), allomos_core::State::Backlog);
+        let opened = open_taskbag(root.clone());
+        let a = &opened.approvals["A01-01"][0];
+        assert_eq!(a.approval.channel, "app");
+        assert_eq!(a.approval.expires.as_deref(), Some("2099-01-01"));
+        assert_eq!(a.status, allomos_core::approval::Status::Applies);
+        let id = a.approval.id.clone();
+
+        // Approve and make ready: a second approval, then ready.
+        approve_as(&root, Some("Will"), "A01-01", &task.description, None, true).unwrap();
+        assert_eq!(state(&root), allomos_core::State::Ready);
+        assert_eq!(open_taskbag(root.clone()).approvals["A01-01"].len(), 2);
+
+        assert_eq!(
+            withdraw_as(&root, Some("Will"), &id, "  "),
+            Err(Problem::WithdrawReasonMissing)
+        );
+        withdraw_as(&root, Some("Will"), &id, "Plan is wrong").unwrap();
+        let opened = open_taskbag(root.clone());
+        assert_eq!(
+            opened.approvals["A01-01"][0].status,
+            allomos_core::approval::Status::Withdrawn
+        );
+        assert_eq!(state(&root), allomos_core::State::Ready);
+        let history = allomos_store::events::history(&root, "A01-01");
+        let e = history
+            .events
+            .iter()
+            .find(|e| e.command == "withdraw")
+            .unwrap();
+        assert_eq!(e.via, "app");
+        assert_eq!(allomos_core::event::reason(e), Some("Plan is wrong"));
+        assert_eq!(
+            withdraw_as(&root, Some("Will"), &id, "again"),
+            Err(Problem::ApprovalAlreadyWithdrawn { id })
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

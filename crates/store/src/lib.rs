@@ -2450,6 +2450,7 @@ pub fn record_approval(
             words: Some(&format!("Go ahead: {title}")),
             expires: None,
             plan: Some((plan_file, plan)),
+            shown: None,
         },
     )
 }

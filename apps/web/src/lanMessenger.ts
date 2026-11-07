@@ -98,6 +98,9 @@ export function lanMessenger(
     },
     editTask: (root, id, edit) => change<Task>(root, "edit_task", { id, edit }),
     reviewAiDecisions: (root, id) => change<void>(root, "review_ai_decisions", { id }),
+    // Desktop only for now (approver, 2026-11-08): the computer refuses these (companion_desktop_only).
+    approveTask: (root, id, shown, expires, ready) => change<void>(root, "approve_task", { id, shown, expires, ready }),
+    withdrawApproval: (root, id, reason) => change<void>(root, "withdraw_approval", { id, reason }),
     addArea: (root, id, name) => change<Area>(root, "add_area", { id, name }),
     addIteration: (root, iteration) => change<Iteration>(root, "add_iteration", { iteration }),
     addTask: (root, task) => change<Task>(root, "add_task", { task }),
