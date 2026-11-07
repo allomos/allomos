@@ -1130,9 +1130,8 @@ function HopFigure() {
  * as by area. */
 type GroupBy = "area" | "iteration";
 const GROUP_BY_KEY = "allomos.groupBy";
-/** The Show filter's ticks (Task-A01-lens781); before it, one choice under the older key. */
+/** The Show filter's unticked cells (Task-A01-lens781, Task-A01-rock075). */
 const LIST_FILTER_KEY = "allomos.listFilter";
-const STATE_FILTER_KEY = "allomos.stateFilter";
 /** The Folder filter, per taskbag (Task-A01-sketch327). */
 const FOLDER_FILTER_KEY = "allomos.folderFilter";
 const SORT_KEY = "allomos.iterationSort";
@@ -1242,11 +1241,12 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  // The Show filter (Task-A01-lens781): ticked states and, for each label of the label table
-  // (built-in first, decision 0020), its Yes and No; everything ticked lists every task.
+  // The Show filter (Task-A01-lens781, Task-A01-rock075): a grid, one row per state, a Yes and a No
+  // for "Checked by a human" and each other label of the label table (built-in first, decision
+  // 0020); everything ticked lists every task.
   const [storedFilter, setStoredFilter] = useState<StateFilter>(() => {
     try {
-      return readFilter(localStorage.getItem(LIST_FILTER_KEY), localStorage.getItem(STATE_FILTER_KEY));
+      return readFilter(localStorage.getItem(LIST_FILTER_KEY));
     } catch {
       return allTicked();
     }

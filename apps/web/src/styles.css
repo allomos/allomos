@@ -791,28 +791,37 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .filter-restore { display: inline-flex; padding: 4px 6px; border-radius: 6px; }
 .filter-menu button:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
 .filter-popover {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: max-content; max-width: min(620px, calc(100vw - 32px));
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: max-content; max-width: min(920px, calc(100vw - 32px));
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 4px;
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
 }
-.filter-columns { display: flex; gap: 4px; }
-.filter-column { min-width: 0; padding: 0 4px; }
-.filter-column + .filter-column { border-left: 1px solid var(--line); }
 .filter-heading { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; padding: 4px 6px 6px; }
 .filter-heading > span:first-child { flex: 1; margin-right: 8px; }
 .filter-group-buttons { display: inline-flex; gap: 4px; }
 .filter-group-buttons button { font-size: 12px; padding: 1px 8px; font-weight: 400; white-space: nowrap; }
-.filter-row { display: flex; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13px; border-radius: 6px; white-space: nowrap; }
-label.filter-row { cursor: pointer; }
-label.filter-row:hover, .filter-side:hover { background: var(--bg); }
-.filter-label-name { flex: 1; min-width: 0; margin-right: 8px; white-space: normal; }
-.filter-label-row .filter-side { flex: none; }
-.filter-side { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); padding: 1px 6px; border-radius: 6px; cursor: pointer; }
-/* Task-A01-teacup726: the table's labels under Labeled, greyed out while its Yes is unticked. */
-.filter-child { padding-left: 22px; }
-.filter-child.off { opacity: 0.45; }
-.filter-child.off .filter-side { cursor: default; }
-.filter-child.off .filter-side:hover { background: none; }
+/* Task-A01-rock075: the grid, one row per state tinted with its colour, a Yes and a No per column. */
+.filter-grid-scroll { overflow-x: auto; padding: 0 4px; }
+.filter-grid { border-collapse: collapse; font-size: 13px; --row-share: 11%; }
+.filter-grid th { font-weight: 400; color: var(--muted); font-size: 12px; padding: 2px 4px; }
+.filter-grid th.lab { border-left: 1px solid var(--line); padding: 4px 6px 0; max-width: 112px; white-space: normal; text-wrap: balance; line-height: 1.25; vertical-align: bottom; }
+.filter-grid th.yn { font-size: 11px; }
+.filter-grid th.yn:nth-child(odd) { border-left: 1px solid var(--line); }
+.filter-grid td { text-align: center; padding: 3px 6px; }
+.filter-grid td.yes { border-left: 1px solid var(--line); }
+.filter-grid td.st, .filter-grid th.st { text-align: left; white-space: nowrap; padding-right: 12px; }
+.filter-grid th.st { vertical-align: bottom; }
+.filter-grid td.st label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.filter-grid input { margin: 0; cursor: pointer; }
+.filter-grid tr.r-backlog td { background: color-mix(in srgb, var(--s-backlog) var(--row-share), transparent); }
+.filter-grid tr.r-ready td { background: color-mix(in srgb, var(--s-ready) var(--row-share), transparent); }
+.filter-grid tr.r-in_progress td { background: color-mix(in srgb, var(--s-in_progress) var(--row-share), transparent); }
+.filter-grid tr.r-waiting td { background: color-mix(in srgb, var(--s-waiting) calc(var(--row-share) + 4%), transparent); }
+.filter-grid tr.r-blocked td { background: color-mix(in srgb, var(--s-blocked) var(--row-share), transparent); }
+.filter-grid tr.r-done td { background: color-mix(in srgb, var(--s-done) var(--row-share), transparent); }
+.filter-grid tr.r-dropped td { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+.filter-grid tbody tr + tr td { border-top: 2px solid var(--surface); }
+.filter-grid tbody tr td:first-child { border-radius: 6px 0 0 6px; }
+.filter-grid tbody tr td:last-child { border-radius: 0 6px 6px 0; }
 .filter-empty { color: var(--warn); margin: 6px 8px 2px; }
 /* A phone (Task-A04-02-03): one column, the ID before the title on the first line. */
 @media (max-width: 720px) {
