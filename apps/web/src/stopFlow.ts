@@ -177,12 +177,18 @@ export function humanCheckNote(task: Task): string {
   return task.without_human_check ?? "";
 }
 
-/** The opened taskbag with each task's AI decisions to review put on the task (Task-A03-19). */
+/** The opened taskbag with each task's AI decisions to review (Task-A03-19) and its approvals
+ * (Task-A01-coach782) put on the task. */
 export function withDecisions(opened: Opened): Opened {
   const box = opened.loaded.taskbag;
   const all = opened.ai_decisions ?? {};
+  const approvals = opened.approvals ?? {};
   if (!box) return opened;
-  const tasks = box.tasks.map((task) => (all[task.id] ? { ...task, ai_decisions: all[task.id] } : task));
+  const tasks = box.tasks.map((task) => {
+    let out = all[task.id] ? { ...task, ai_decisions: all[task.id] } : task;
+    if (approvals[task.id]) out = { ...out, approvals: approvals[task.id] };
+    return out;
+  });
   return { ...opened, loaded: { ...opened.loaded, taskbag: { ...box, tasks } } };
 }
 

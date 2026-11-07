@@ -1790,11 +1790,15 @@ fn a_go_ahead_counts_only_for_the_plan_shown_and_is_recorded() {
     let (code, v, fingerprint) = ask(None);
     assert_eq!((code, &v["answer"]), (0, &json!("yes")), "{v}");
     assert_eq!(v["fingerprint"], json!(fingerprint));
-    let history = ok(&repo, &["history", "A01-01"]).to_string();
-    assert!(
-        history.contains(&format!("Rename (plan {fingerprint})")),
-        "{history}"
-    );
+    // Since Task-A01-coach782 the Go ahead is an approval record, channel confirm, fixing the
+    // exact plan text shown by its SHA-256.
+    let approval = &v["approval"];
+    assert_eq!(approval["channel"], "confirm", "{v}");
+    assert_eq!(approval["words"], "Go ahead: Rename");
+    assert_eq!(approval["scope"]["plan"], "plan.md");
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["approvals"][0]["id"], approval["id"], "{shown}");
+    assert_eq!(shown["approvals"][0]["status"], "applies");
     // Shown another version of the plan: not a Go ahead for this one.
     let (code, v, _) = ask(Some("0123456789abcdef"));
     assert_eq!((code, &v["error"]["code"]), (1, &json!("confirm_declined")));
@@ -5973,4 +5977,114 @@ fn state_and_plan_changes_record_why() {
         "{v}"
     );
     assert!(v["issues"].as_array().is_none_or(|a| a.is_empty()), "{v}");
+}
+
+/// Task-A01-coach782 (decision 0021 § 1.1): an approval is a record in each task it covers;
+/// withdrawing it, a changed description and an expiry each make it no longer apply; older
+/// approval texts and older events still read.
+#[test]
+fn an_approval_is_recorded_withdrawn_and_ends_when_the_plan_changes() {
+    let repo = filled();
+    // An older `approved` event (Task-A03-37), written before records: still reads, not listed.
+    fs::write(
+        repo.join(".allomos/taskbag/events/2026-10-01-000000-000-old001.json"),
+        r#"{"at":"2026-10-01T00:00:00Z","via":"alm","command":"approved","kind":"task","id":"A01-01","changes":[{"field":"approval","to":"Deploy (plan 0123abcd)"}]}"#,
+    )
+    .unwrap();
+    refused(&repo, &["approve", "A01-01"], 1, "approval_words_missing");
+    refused(
+        &repo,
+        &["approve", "A09-09", "--words", "ok"],
+        1,
+        "task_not_found",
+    );
+    refused(
+        &repo,
+        &["approve", "A01-01", "--words", "ok", "--expires", "soon"],
+        1,
+        "invalid_date",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "approve",
+            "A01-01",
+            "A01-02",
+            "--words",
+            "go ahead",
+            "--approver",
+            "p-abc123",
+            "--expires",
+            "2999-12-31",
+        ],
+    );
+    let ap = &v["approval"];
+    let id = ap["id"].as_str().unwrap().to_string();
+    assert!(id.starts_with("ap-"), "{v}");
+    assert_eq!(ap["approver"], "p-abc123");
+    assert_eq!(ap["channel"], "chat");
+    assert_eq!(ap["words"], "go ahead");
+    assert_eq!(ap["scope"]["tasks"], json!(["A01-01", "A01-02"]));
+    assert_eq!(ap["scope"]["plan_sha256"].as_str().unwrap().len(), 64);
+
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["approvals"].as_array().unwrap().len(), 1, "{shown}");
+    assert_eq!(shown["approvals"][0]["status"], "applies");
+    let text = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
+    assert!(
+        text.contains(&format!("{id} by p-abc123")) && text.contains("applies"),
+        "{text}"
+    );
+
+    // A changed plan: the approval no longer applies to it.
+    ok(&repo, &["describe", "A01-01", "--text", "A new plan."]);
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["approvals"][0]["status"], "plan_changed");
+
+    // A new approval of the new plan, for one task, from a file plan; then withdrawn.
+    fs::write(repo.join("plan.md"), "Deploy it.").unwrap();
+    let v = ok(
+        &repo,
+        &["approve", "A01-01", "--words", "yes", "--plan", "plan.md"],
+    );
+    let second = v["approval"]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["approval"]["scope"]["plan"], "plan.md");
+    ok(
+        &repo,
+        &["--why", "the person took it back", "withdraw", &id],
+    );
+    refused(&repo, &["withdraw", &id], 1, "approval_already_withdrawn");
+    refused(&repo, &["withdraw", "ap-none00"], 1, "approval_not_found");
+    let shown = ok(&repo, &["show", "A01-01"]);
+    let statuses: Vec<&str> = shown["approvals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["status"].as_str().unwrap())
+        .collect();
+    assert_eq!(statuses, ["withdrawn", "applies"], "{shown}");
+    assert_eq!(shown["approvals"][1]["id"], second.as_str());
+
+    // An expired approval.
+    ok(
+        &repo,
+        &[
+            "approve",
+            "A02-01",
+            "--words",
+            "ok",
+            "--expires",
+            "2000-01-01",
+        ],
+    );
+    let shown = ok(&repo, &["show", "A02-01"]);
+    assert_eq!(shown["approvals"][0]["status"], "expired");
+    // Every event still reads: no issues.
+    let list = ok(&repo, &["list"]);
+    assert!(
+        list["issues"].as_array().is_none_or(|a| a.is_empty()),
+        "{list}"
+    );
 }

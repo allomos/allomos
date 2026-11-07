@@ -257,6 +257,13 @@ Work a task:
   alm title\"`. Any task, any state; the task's files do not change, the history keeps it.
 - `alm reviewed <id>`: the person has reviewed the task's AI decisions: they leave To review; the
   history keeps them. Run it only when the person says so.
+- `alm approve <id>… --words \"<the person's exact words>\"`: record the person's approval in
+  the conversation as a record: who (this computer's person's pseudonym, or `--approver`), of
+  exactly which plan (the SHA-256 of the tasks' descriptions, or of `--plan <file>`), when, and
+  until when (`--expires YYYY-MM-DD`). It prints the approval ID: pass `--approval <that ID>` on
+  the changes that rely on it. Once a task's description changes, `alm show` lists the approval
+  as no longer applying: ask again. Go ahead on `alm confirm --task` records one by itself.
+  `alm withdraw <approval ID>` (with `--why`) when the person takes it back.
   `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task);
   `alm backlog <id>` (back to backlog, to think it over again: an unheld ready, waiting or blocked
   task; write the open questions in its description's Notes).

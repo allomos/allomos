@@ -43,6 +43,8 @@ const SHORT = 60;
 export function valueText(field: string, value: unknown, t: T): string {
   if (value === undefined || value === null || value === "") return "—";
   if (field === "state" && typeof value === "string") return t(`state.${value}` as Key);
+  // An approval record (Task-A01-coach782) by its ID; older approvals were a text.
+  if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
   if ((field === "blocked_by" || field === "labels") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const first = text.split("\n")[0];

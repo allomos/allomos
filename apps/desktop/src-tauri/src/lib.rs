@@ -49,6 +49,9 @@ struct Opened {
     readme_added: bool,
     /// Each task's AI decisions not reviewed yet, by task ID (Task-A03-19), from the history.
     ai_decisions: std::collections::BTreeMap<String, Vec<allomos_core::decision::Decision>>,
+    /// Each task's approvals, by task ID, with where each stands now (Task-A01-coach782), from
+    /// the history.
+    approvals: std::collections::BTreeMap<String, Vec<allomos_core::approval::Recorded>>,
     /// Each task's base and working branch, by task ID (Task-A03-22), from the history: the New
     /// task form chooses the new task's base from the open tasks' bases.
     branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
@@ -139,6 +142,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
         loaded,
         versions,
         ai_decisions: allomos_store::ai_decisions(&root),
+        approvals: allomos_store::approvals::approvals(&root),
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
         cards_outside,
@@ -175,6 +179,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
     Ok(Opened {
         loaded: load(&root),
         ai_decisions: Default::default(),
+        approvals: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
@@ -1038,6 +1043,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
     Ok(Opened {
         loaded: load(&root),
         ai_decisions: Default::default(),
+        approvals: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),

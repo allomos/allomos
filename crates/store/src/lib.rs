@@ -26,6 +26,7 @@ use allomos_core::{
 };
 use serde::Serialize;
 
+pub mod approvals;
 pub mod cards;
 mod confirm;
 mod convert;
@@ -2389,34 +2390,33 @@ pub fn record_ai_decision(
     })
 }
 
-/// The field of the event that records a Go ahead in a task's history (Task-A03-37).
-pub const APPROVAL_FIELD: &str = "approval";
-
 /// Record in task `id`'s history that the person chose Go ahead on a plan shown through
-/// `alm confirm --task` (Task-A03-37): one `approved` event whose `approval` change holds the
-/// popup's title and the fingerprint of exactly what was shown, under the lock. The task's files
-/// do not change. A changed plan is a new question, so this counts only for that fingerprint.
+/// `alm confirm --task` (Task-A03-37): since Task-A01-coach782 an approval record
+/// ([`approvals::approve`], channel `confirm`) whose scope holds the SHA-256 of exactly the plan
+/// text shown (`plan`, from the file `plan_file`). A changed plan is a new question.
 pub fn record_approval(
     root: &Path,
     actor: Actor,
     wait: Duration,
     id: &str,
     title: &str,
-    fingerprint: &str,
-) -> Result<Task, Problem> {
-    let (lock, bag, _) = lock_for_change(root, wait)?;
-    let task = ops::find_task(&bag, id)?;
-    let change = allomos_core::event::Change {
-        extra: Default::default(),
-        field: APPROVAL_FIELD.to_string(),
-        from: None,
-        to: Some(serde_json::Value::String(format!(
-            "{title} (plan {fingerprint})"
-        ))),
-    };
-    let event = actor.event("approved", Kind::Task, Some(&task.id), vec![change]);
-    lock.record(&event, |_| Ok(()))?;
-    Ok(task)
+    plan_file: &str,
+    plan: &str,
+) -> Result<approvals::Approved, Problem> {
+    let tasks = [id.to_string()];
+    approvals::approve(
+        root,
+        actor,
+        wait,
+        &approvals::Input {
+            tasks: &tasks,
+            approver: None,
+            channel: "confirm",
+            words: Some(&format!("Go ahead: {title}")),
+            expires: None,
+            plan: Some((plan_file, plan)),
+        },
+    )
 }
 
 /// Mark task `id`'s AI decisions reviewed (`alm reviewed`, the app's Reviewed button,

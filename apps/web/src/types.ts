@@ -90,6 +90,25 @@ export interface Task {
   /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
    * a field of task.json: worked out from the history and added when the taskbag is opened. */
   ai_decisions?: AiDecision[];
+  /** Its approvals, with where each stands now (Task-A01-coach782). Not a field of task.json:
+   * worked out from the history and added when the taskbag is opened. */
+  approvals?: ApprovalRecord[];
+}
+
+/** A person's approval as recorded (crates/core/src/approval.rs, decision 0021 § 1.1). */
+export interface ApprovalRecord {
+  id: string;
+  /** The approver's pseudonym ID. */
+  approver?: string;
+  scope: { tasks: string[]; plan_sha256: string; plan: string };
+  at: string;
+  channel: "chat" | "app" | "confirm" | string;
+  words?: string;
+  expires?: string;
+  recorded_by?: string;
+  withdrawn_at?: string;
+  withdrawn_by?: string;
+  status: "applies" | "plan_changed" | "expired" | "withdrawn";
 }
 
 /** A task's branches (crates/core/src/branch.rs, Task-A03-22): the base it starts from and
@@ -244,6 +263,8 @@ export interface Opened {
   readme_added: boolean;
   /** Each task's AI decisions not reviewed yet, by task ID (Task-A03-19). */
   ai_decisions?: Record<string, AiDecision[]>;
+  /** Each task's approvals, by task ID (Task-A01-coach782). */
+  approvals?: Record<string, ApprovalRecord[]>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
   /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */

@@ -51,3 +51,8 @@ test("event times with seconds read as local times", () => {
   assert.match(localTime("2026-10-12T11:30Z"), /^2026-10-1[23] \d\d:\d\d$/);
   assert.equal(localTime("soon"), "soon");
 });
+
+test("an approval record shows as its ID; an older approval text as it is (Task-A01-coach782)", () => {
+  assert.equal(valueText("approval", { id: "ap-abc123", channel: "chat" }, t), "ap-abc123");
+  assert.equal(valueText("approval", "Deploy (plan 0123)", t), "Deploy (plan 0123)");
+});

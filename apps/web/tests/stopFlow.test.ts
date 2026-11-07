@@ -327,6 +327,12 @@ test("AI decisions to review: the badge reads the label; the decisions from the 
   assert.equal(toReview(task({ labels: [AI_DECISIONS] })), true, "the label alone, before the history is read");
   assert.equal(withDecisions({ ...opened, ai_decisions: undefined }).loaded.taskbag!.tasks[0].ai_decisions, undefined);
   assert.equal(t("task.ai_decided"), "AI decisions to review");
+  // Task-A01-coach782: a task's approvals come along too.
+  const approval = { id: "ap-abc123", scope: { tasks: ["A01-02"], plan_sha256: "x", plan: "description" }, at: "2026-11-08T10:00:00Z", channel: "chat", status: "applies" as const };
+  const withApprovals = withDecisions({ ...opened, approvals: { "A01-02": [approval] } }).loaded.taskbag!.tasks;
+  assert.deepEqual(withApprovals[1].approvals, [approval]);
+  assert.deepEqual(withApprovals[0].ai_decisions, [decision], "decisions stay");
+  assert.equal(withApprovals[0].approvals, undefined);
 });
 
 // Task-A01-44: groups with nothing left after the filter are not drawn; the banner says what it shows.
