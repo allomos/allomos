@@ -158,6 +158,10 @@ pub struct Who {
     pub on_behalf_of: Option<String>,
     /// The approval ID the change relies on.
     pub approval: Option<String>,
+    /// Why (Task-A01-air289, decision 0021 § 1.1): `alm --why`, or the command's own why
+    /// (`reopen --note`, `recheck --reason`, `wait --on`, `done --without-human-check`). Recorded
+    /// as a `reason` change in each task event the command writes.
+    pub reason: Option<String>,
 }
 
 static WHO: std::sync::Mutex<Option<Who>> = std::sync::Mutex::new(None);
@@ -168,13 +172,14 @@ pub fn set_who(who: Option<Who>) {
 }
 
 /// What the events written since the last [`take_gaps`] could not say about who made them
-/// (Task-A01-black004): `model`, `session` or `for`, each once, in that order.
+/// (Task-A01-black004): `reason` (Task-A01-air289), `model`, `session` or `for`, each once, in
+/// that order.
 static GAPS: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
 
 /// The gaps of the events written since the last call ([`GAPS`]), and forget them.
 pub fn take_gaps() -> Vec<&'static str> {
     let mut gaps = std::mem::take(&mut *GAPS.lock().unwrap_or_else(|e| e.into_inner()));
-    let order = ["model", "session", "for"];
+    let order = ["reason", "model", "session", "for"];
     gaps.sort_by_key(|g| order.iter().position(|o| o == g));
     gaps.dedup();
     gaps
@@ -262,6 +267,29 @@ fn fill_who(root: &Path, event: &mut Event) {
     GAPS.lock().unwrap_or_else(|e| e.into_inner()).extend(gaps);
 }
 
+/// Add why to a task `event` (Task-A01-air289, decision 0021 § 1.1), unless its writer already
+/// did: a `reason` change with what [`Who::reason`] says. A state or plan change `alm` writes
+/// without one is noted in [`GAPS`] (`reason`), so `alm` asks for it; nothing is refused.
+fn fill_reason(event: &mut Event) {
+    use allomos_core::event::{needs_reason, reason, reason_change};
+    if event.kind != Kind::Task || reason(event).is_some() {
+        return;
+    }
+    let why = WHO
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .and_then(|w| clean(w.reason.clone()));
+    match why {
+        Some(why) => event.changes.push(reason_change(&why)),
+        None if event.via == "alm" && needs_reason(event) => GAPS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push("reason"),
+        None => {}
+    }
+}
+
 /// Write one event. Returns its file, so a change that then fails can take it back.
 /// Callers hold the taskbag's lock.
 pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
@@ -270,6 +298,7 @@ pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     let path = root.join(new_file(root));
     let mut event = event.clone();
     fill_who(root, &mut event);
+    fill_reason(&mut event);
     if let Some(change) = REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
         event.changes.push(change.clone());
     }
