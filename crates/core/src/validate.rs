@@ -168,9 +168,6 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
     if project.name.trim().is_empty() {
         issues.push(Issue::new(file, Some("name"), Problem::ProjectNameMissing));
     }
-    if project.labels.is_empty() {
-        issues.push(Issue::new(file, Some("labels"), Problem::LadderEmpty));
-    }
     if let Some(rules) = &project.handoff {
         let mut gates = vec![
             ("handoff.quota_gate".to_string(), rules.quota_gate),
@@ -312,6 +309,8 @@ pub fn parse_iteration(file: &str, text: &str) -> Result<Iteration, Vec<Issue>> 
 
 pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
     let mut task: Task = parse(file, text).map_err(|i| vec![i])?;
+    // An older taskbag's single `label`, read as the upgrade writes it (decision 0020).
+    crate::labels::read_old_label(&mut task);
     if task.state.is_unknown() {
         if let Some(v) = raw_field(text, "state") {
             task.extra.insert("state".into(), v);
@@ -341,7 +340,7 @@ pub fn parse_task(file: &str, text: &str) -> Result<Task, Vec<Issue>> {
 }
 
 /// Cross-file checks: unique IDs, every task's area (and iteration, when it has one) exists,
-/// labels are on the project's ladder, a waiting task says what it waits on, and a blocked task
+/// a waiting task says what it waits on, and a blocked task
 /// names at least one other task of this taskbag that blocks it (decision 0016).
 pub fn validate_taskbag(
     project: &Project,
@@ -483,18 +482,6 @@ pub fn validate_taskbag(
                 ));
             }
         }
-        if let Some(label) = &task.label {
-            if !project.labels.contains(label) {
-                issues.push(Issue::new(
-                    file,
-                    Some("label"),
-                    Problem::LabelNotOnLadder {
-                        label: label.clone(),
-                        ladder: project.labels.join(" → "),
-                    },
-                ));
-            }
-        }
         if task.state == State::Waiting
             && task
                 .waiting_on
@@ -539,15 +526,33 @@ mod tests {
     }
 
     #[test]
-    fn project_gets_default_ladder() {
-        assert_eq!(project().labels.len(), 4);
+    fn project_gets_the_built_in_labels() {
+        assert_eq!(project().labels.len(), 5);
+        assert!(project().labels.iter().all(|e| e.built_in));
+    }
+
+    #[test]
+    fn an_old_task_label_is_read_as_the_upgrade_writes_it() {
+        let t = parse_task(
+            "t",
+            r#"{"id":"T1","title":"x","area":"A1","state":"done","label":"human verified"}"#,
+        )
+        .unwrap();
+        assert_eq!(t.labels, [crate::labels::LOCALLY_BY_HUMAN]);
+        assert!(!t.extra.contains_key("label") && !t.to_check());
+        let t = parse_task(
+            "t",
+            r#"{"id":"T1","title":"x","area":"A1","state":"done","label":"implemented"}"#,
+        )
+        .unwrap();
+        assert!(t.labels.is_empty() && t.to_check());
     }
 
     #[test]
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/7","id":"d","name":"D","later":{"context":90}}"#,
+            r#"{"format":"allomos/8","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);
@@ -747,7 +752,8 @@ mod tests {
             r#"{"id":"T1","title":"x","area":"A1","state":"done","finished_without_owner":"card run"}"#,
         )
         .unwrap();
-        assert!(!old.to_check());
+        // Since decision 0020 a done task without a "by human" label is to check, note or not.
+        assert!(old.to_check());
         assert!(old.extra.contains_key("finished_without_owner"));
     }
 
@@ -788,7 +794,8 @@ mod tests {
             .collect();
         assert!(fields.contains(&("tasks/T1/task.json", "area")));
         assert!(fields.contains(&("tasks/T2/task.json", "id")));
-        assert!(fields.contains(&("tasks/T2/task.json", "label")));
+        // A label the table does not list is not a problem: it is added to the table.
+        assert!(!fields.contains(&("tasks/T2/task.json", "label")));
         assert!(fields.contains(&("tasks/T2/task.json", "waiting_on")));
     }
 

@@ -126,7 +126,7 @@ mod tests {
                 title: "First".into(),
                 area: "A01".into(),
                 state: State::InProgress,
-                label: None,
+                labels: Vec::new(),
                 holder: Some("claude/x".into()),
                 waiting_on: None,
                 who: None,

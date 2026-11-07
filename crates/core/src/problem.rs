@@ -70,8 +70,20 @@ problems! {
     FolderChoiceMissing { folders } => "folder_choice_missing", "Say which project folder this task belongs to: --folder <name> (repeatable) or --no-folder. This taskbag's folders: {folders}.";
     /// Task folders need `allomos/6`; this taskbag is still in an older format.
     UpgradeFirst { found, current } => "upgrade_first", "This taskbag is in {found}; task folders need {current}. Install the newest Allomos, then run alm upgrade (older Allomos versions refuse an upgraded taskbag).";
-    /// Task-A05-yeti951: a step left out of the new ladder is still some tasks' label.
-    LabelInUse { label, tasks } => "label_in_use", "The step {label} cannot be removed: these tasks still carry it: {tasks}. Change their labels first.";
+    /// Task-A05-yeti951, decision 0020: a label removed from the table is still on some tasks.
+    LabelInUse { label, tasks } => "label_in_use", "The label {label} cannot be removed from the label table: these tasks still carry it: {tasks}. Remove it from them first.";
+    /// Decision 0020, 5: a label not yet in the table was added to it (a warning: `alm` tells).
+    LabelAddedToTable { id, label } => "label_added_to_table", "Added the label {label} to this project's label table (it was not in it yet). If that was a typo, remove it from the task (`alm label {id} --remove \"{label}\"`) and from the table (`alm labels remove \"{label}\"`).";
+    /// Decision 0020: the built-in labels cannot be removed or renamed.
+    LabelBuiltIn { label } => "label_built_in", "{label} is a built-in label: it cannot be removed or renamed.";
+    /// Decision 0020: `alm label --remove` for a label the task does not carry.
+    LabelNotOnTask { id, label } => "label_not_on_task", "{id} does not carry the label {label}.";
+    /// Decision 0020: `alm checked --as-label` with a label that is not a "by human" one.
+    LabelNotByHuman { label } => "label_not_by_human", "{label} is not a human-check label: use locally verified by human or deployed and verified by human.";
+    /// Decision 0020: `alm done` without `--without-human-check` on a task with no "by human" label.
+    HumanCheckLabelMissing { id } => "human_check_label_missing", "{id} has no human-check label yet. If a person checked it, add one first (`alm checked {id}`, or `alm label {id} \"locally verified by human\"` / `\"deployed and verified by human\"`); otherwise finish it with `alm done {id} --without-human-check \"<why>\" --steps <file.md>`.";
+    /// Decision 0020: an `allomos/5` or `allomos/6` taskbag is read, but not written, until upgraded.
+    TaskbagToUpgrade { found, current } => "taskbag_to_upgrade", "This taskbag is in {found}; this Allomos reads it but writes only {current}, whose labels have a new shape. Nothing was changed. Run `alm upgrade` (or Update the taskbag… in the Allomos app) first; older Allomos versions refuse an upgraded taskbag.";
     /// Task-A01-piano403: the state was written by a newer Allomos, or mistyped.
     StateUnknown { id, state } => "state_unknown", "{id} has the state {state}, which this version of Allomos does not know, so it does not change it. Update Allomos, or correct the state in its file.";
     InvalidChoice { value } => "invalid_choice", "{value} is not a valid value here: it must be a word in quotes.";
@@ -94,11 +106,10 @@ problems! {
     /// `alm handoff` with no words for the task's handoff note (Task-A03-polar770).
     HandoffEmpty => "handoff_empty", "Say where the work stopped and the one next step: `alm handoff <id> --as <session> --text \"<handoff>\"` (or `--from <file.md>`).";
     ProjectNameMissing => "project_name_missing", "The project needs a name.";
-    LadderEmpty => "ladder_empty", "The label ladder needs at least one step.";
     /// `alm rename label` with an empty new name (Task-A01-32).
     LabelNameMissing => "label_name_missing", "The label needs a name.";
-    /// `alm rename label` to a name the ladder already has (Task-A01-32).
-    LabelExists { label } => "label_exists", "\"{label}\" is already a step of this project's ladder.";
+    /// `alm rename label` to a name the label table already has (Task-A01-32).
+    LabelExists { label } => "label_exists", "\"{label}\" is already in this project's label table.";
     /// `task_language` is neither `ui` nor a language code (Task-A01-21).
     InvalidLanguage { value } => "invalid_language", "\"{value}\" is not a language. Use a language code such as en, zh-CN or ja, or ui to follow the Allomos app's language.";
     AreaNameMissing => "area_name_missing", "The area needs a name.";
@@ -106,7 +117,7 @@ problems! {
     DuplicateAreaId { id } => "duplicate_area_id", "Another area already uses the ID \"{id}\".";
     DuplicateTaskId { id } => "duplicate_task_id", "Another task already uses the ID \"{id}\".";
     UnknownArea { area } => "unknown_area", "The area \"{area}\" does not exist. Add areas/{area}.json or use an existing area ID.";
-    LabelNotOnLadder { label, ladder } => "label_not_on_ladder", "\"{label}\" is not a step of this project's ladder ({ladder}).";
+    LabelNotInTable { label, labels } => "label_not_in_table", "\"{label}\" is not in this project's label table ({labels}).";
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
     /// A `blocked` task names no blocking task (decision 0016, Task-A01-31).
     BlockedByMissing => "blocked_by_missing", "A blocked task must name the task(s) that must finish first: `alm block <id> --by <task-id>`.";

@@ -238,6 +238,21 @@ pub fn write_allowed(root: &Path) -> Result<(), Problem> {
     }
 }
 
+/// Before a change other than the upgrade itself: an `allomos/5` or `allomos/6` taskbag is read
+/// (its labels translated as the upgrade writes them) but not written until a person upgrades it,
+/// since its labels have a new shape in `allomos/7` (decision 0020, Task-A01-moth111).
+pub fn upgraded_for_writing(root: &Path) -> Result<(), Problem> {
+    match read_format(root) {
+        Some(found) if format_version(&found).is_some_and(|n| n < FORMAT_VERSION) => {
+            Err(Problem::TaskbagToUpgrade {
+                found,
+                current: FORMAT.to_string(),
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Moving an older taskbag in (Task-A01-45)
 // ---------------------------------------------------------------------------------------------

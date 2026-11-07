@@ -111,6 +111,9 @@
   ],
   "handoff_empty": [],
   "holder_missing": [],
+  "human_check_label_missing": [
+    "id"
+  ],
   "human_check_steps_empty": [],
   "human_check_steps_missing": [
     "id"
@@ -146,6 +149,13 @@
     "id",
     "count"
   ],
+  "label_added_to_table": [
+    "id",
+    "label"
+  ],
+  "label_built_in": [
+    "label"
+  ],
   "label_exists": [
     "label"
   ],
@@ -154,11 +164,17 @@
     "tasks"
   ],
   "label_name_missing": [],
-  "label_not_on_ladder": [
-    "label",
-    "ladder"
+  "label_not_by_human": [
+    "label"
   ],
-  "ladder_empty": [],
+  "label_not_in_table": [
+    "label",
+    "labels"
+  ],
+  "label_not_on_task": [
+    "id",
+    "label"
+  ],
   "link_not_found": [
     "link"
   ],
@@ -249,6 +265,10 @@
     "path"
   ],
   "taskbag_to_move_in": [
+    "found",
+    "current"
+  ],
+  "taskbag_to_upgrade": [
     "found",
     "current"
   ],

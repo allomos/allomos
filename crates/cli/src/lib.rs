@@ -158,11 +158,12 @@ enum Command {
         #[arg(value_name = "CODE|ui")]
         value: Option<String>,
     },
-    /// Set the project's label ladder, lowest step first, separated by commas. Refused when a
-    /// task's label would no longer be on it.
+    /// The project's label table (decision 0020): every label it knows, the built-in ones first,
+    /// with how many tasks carry each. `alm labels add` adds one (or sets its meaning);
+    /// `alm labels remove` removes one no task carries. Built-in labels cannot be removed.
     Labels {
-        #[arg(value_name = "A,B,…")]
-        ladder: String,
+        #[command(subcommand)]
+        what: Option<LabelsWhat>,
     },
     /// Show a plan to the person in the Allomos app and wait for their answer: exit 0 means
     /// go ahead; exit 1 (confirm_declined, confirm_timeout) means change nothing.
@@ -223,16 +224,17 @@ enum Command {
         /// Only tasks you hold.
         #[arg(long)]
         mine: bool,
-        /// Only tasks finished without the human check and not checked since
-        /// (`alm done --without-human-check`). `--without-owner` is its old name.
+        /// Only tasks to check: done, with neither "by human" label (decision 0020).
+        /// `--without-owner` is its old name.
         #[arg(long, alias = "without-owner")]
         without_human_check: bool,
         /// Only tasks that belong to this project folder (its short name).
         #[arg(long, value_name = "NAME")]
         folder: Option<String>,
     },
-    /// What needs a person: To check (tasks finished without the human check, each with why)
-    /// and To answer (tasks waiting on a person, each with what). Backlog tasks are not listed.
+    /// What needs a person: To check (done tasks with neither "by human" label, each with why),
+    /// To answer (tasks waiting on a person, each with what) and To review (tasks with the label
+    /// AI decisions to review). Backlog tasks are not listed.
     Human {
         /// Only tasks planned in this iteration.
         #[arg(long)]
@@ -244,9 +246,18 @@ enum Command {
         #[arg(long)]
         steps: bool,
     },
-    /// A person has checked a finished task: it gets the top label and leaves To check; the note
-    /// and the steps stay in its history. Run it only when the person says so.
-    Checked { id: String },
+    /// A person has checked a finished task: it gets "deployed and verified by human" when it
+    /// carries "deployed and verified by agent", else "locally verified by human", and leaves To
+    /// check; the note and the steps stay in its history. Run it only when the person says so.
+    Checked {
+        id: String,
+        /// The person checked it in the deployed app: "deployed and verified by human".
+        #[arg(long, conflicts_with = "locally")]
+        deployed: bool,
+        /// The person checked it on their own computer: "locally verified by human".
+        #[arg(long)]
+        locally: bool,
+    },
     /// Send a finished task back to To check: its work changed after a person checked it, so
     /// the check no longer covers it. You decide when; say what changed. A task at the top label
     /// goes one step down.
@@ -331,8 +342,15 @@ enum Command {
         #[arg(value_name = "BRANCH")]
         branch: String,
     },
-    /// Set a task's label (a step of the project's ladder).
-    Label { id: String, label: String },
+    /// Add a label to a task, keeping its others (decision 0020). A label the label table does
+    /// not list yet is added to it, and alm says so. --remove takes it off the task.
+    Label {
+        id: String,
+        label: String,
+        /// Remove the label from the task instead.
+        #[arg(long)]
+        remove: bool,
+    },
     /// Park a task as waiting: a person (or an outside event) must act. Say what, and who when it
     /// is not the approver.
     Wait {
@@ -428,8 +446,9 @@ enum Command {
         #[command(subcommand)]
         what: FolderWhat,
     },
-    /// Upgrade this taskbag to the newest format (allomos/6: project folders and task folders;
-    /// decision 0019). Without --confirm it only says what it will do. Older Allomos versions
+    /// Upgrade this taskbag to the newest format (allomos/7: the label table and several labels per
+    /// task, decision 0020; from allomos/5 also project folders, decision 0019). Without --confirm
+    /// it only says what it will do. Older Allomos versions
     /// refuse an upgraded taskbag: install the newest Allomos first.
     Upgrade {
         #[arg(long)]
@@ -652,6 +671,20 @@ pub(crate) enum FolderWhat {
     },
 }
 
+/// `alm labels …`: the project's label table (decision 0020).
+#[derive(Subcommand, Debug)]
+enum LabelsWhat {
+    /// Add a label to the table, or set the meaning of one it has.
+    Add {
+        name: String,
+        /// A one-line meaning.
+        #[arg(long)]
+        meaning: Option<String>,
+    },
+    /// Remove a label from the table: refused for a built-in label and while a task carries it.
+    Remove { name: String },
+}
+
 #[derive(Subcommand)]
 enum Rename {
     /// Give an area a new name; its ID stays.
@@ -743,7 +776,7 @@ impl Command {
             | Command::Block { id, .. }
             | Command::Unblock { id }
             | Command::Done { id, .. }
-            | Command::Checked { id }
+            | Command::Checked { id, .. }
             | Command::Recheck { id, .. }
             | Command::AiDecided { id, .. }
             | Command::Reviewed { id }
@@ -1893,11 +1926,14 @@ fn human(
         .copied()
         .filter(|t| t.state == State::Waiting)
         .collect();
-    // Task-A03-19: tasks with AI decisions not reviewed yet, in any state.
+    // Task-A03-19, decision 0020: tasks carrying `AI decisions to review`, in any state, each
+    // with its decisions from the history.
     let decisions = allomos_store::ai_decisions(root);
+    let none = Vec::new();
     let to_review: Vec<(&Task, &Vec<Decision>)> = tasks
         .iter()
-        .filter_map(|t| decisions.get(&t.id).map(|d| (*t, d)))
+        .filter(|t| t.has_label(allomos_core::labels::AI_DECISIONS))
+        .map(|t| (*t, decisions.get(&t.id).unwrap_or(&none)))
         .collect();
     let mut text = String::new();
     text.push_str(&format!("To check ({})\n", to_check.len()));
@@ -1906,7 +1942,10 @@ fn human(
     }
     for t in &to_check {
         text.push_str(&format!("  {}\n", task_line(t)));
-        let why = t.without_human_check.as_deref().unwrap_or("-");
+        let why = t
+            .without_human_check
+            .as_deref()
+            .unwrap_or("no reason recorded (finished before alm done --without-human-check)");
         text.push_str(&format!("      not human-checked: {why}\n"));
         if steps {
             match &t.human_check_steps {
@@ -1988,7 +2027,11 @@ fn task_line(t: &Task) -> String {
         "{}  {}  {}  {}  {}",
         t.id,
         t.state.as_str(),
-        t.label.as_deref().unwrap_or("-"),
+        if t.labels.is_empty() {
+            "-".to_string()
+        } else {
+            t.labels.join(", ")
+        },
         t.holder.as_deref().unwrap_or("-"),
         t.title
     )
@@ -2023,7 +2066,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .filter(|l| !l.is_empty())
                     .map(String::from)
                     .collect(),
-                None => allomos_core::default_labels(),
+                None => Vec::new(),
             };
             let root = init_with_labels(&root, &id, &name, labels, Actor::alm(me))?;
             let mut text = format!("Created an empty taskbag at {}\n", root.display());
@@ -2487,17 +2530,41 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Labels { ladder } => {
+        Command::Labels { what } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;
             let (bag, issues) = taskbag_of(&root, lock.load())?;
-            let labels: Vec<String> = ladder.split(',').map(String::from).collect();
-            let project = ops::set_ladder(&bag, &labels)?;
-            save_project(&lock, me, "labels", &bag.project, &project)?;
-            let mut done = Done::new(
-                json!({ "taskbag": root, "labels": project.labels }),
-                format!("Label ladder: {}\n", project.labels.join(" → ")),
-            );
+            let project = match what {
+                None => bag.project.clone(),
+                Some(LabelsWhat::Add { name, meaning }) => {
+                    allomos_store::versions::upgraded_for_writing(&root)?;
+                    allomos_core::labels::table_add(&bag, name, meaning.as_deref())?
+                }
+                Some(LabelsWhat::Remove { name }) => {
+                    allomos_store::versions::upgraded_for_writing(&root)?;
+                    allomos_core::labels::table_remove(&bag, name)?
+                }
+            };
+            if what.is_some() {
+                save_project(&lock, me, "labels", &bag.project, &project)?;
+            }
+            let mut text = String::from("Label table (built-in first):\n");
+            let mut rows = Vec::new();
+            for e in &project.labels {
+                let n = bag.tasks.iter().filter(|t| t.has_label(&e.name)).count();
+                text.push_str(&format!(
+                    "  {}{}  ({n} task{}){}\n",
+                    e.name,
+                    if e.built_in { "  [built in]" } else { "" },
+                    if n == 1 { "" } else { "s" },
+                    e.meaning
+                        .as_deref()
+                        .map(|m| format!(": {m}"))
+                        .unwrap_or_default()
+                ));
+                rows.push(json!({ "name": e.name, "meaning": e.meaning, "built_in": e.built_in, "tasks": n }));
+            }
+            let mut done = Done::new(json!({ "taskbag": root, "labels": rows }), text);
             done.issues = issues;
             Ok(done)
         }
@@ -2929,6 +2996,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .join(", ")
             });
             let folders_text = (!task.folders.is_empty()).then(|| task.folders.join(", "));
+            let labels_text = (!task.labels.is_empty()).then(|| task.labels.join(", "));
             let fields = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
@@ -2936,7 +3004,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("iteration", task.iteration.as_deref()),
                 ("folders", folders_text.as_deref()),
                 ("state", Some(task.state.as_str())),
-                ("label", task.label.as_deref()),
+                ("labels", labels_text.as_deref()),
                 ("holder", task.holder.as_deref()),
                 ("waiting on", task.waiting_on.as_deref()),
                 ("waiting for", task.who.as_deref()),
@@ -3268,7 +3336,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Label { id, label } => change(cli, cwd, |bag| ops::set_label(bag, id, me, label)),
+        Command::Label { id, label, remove } => change(cli, cwd, |bag| {
+            if *remove {
+                allomos_core::labels::remove(bag, id, me, label)
+            } else {
+                ops::set_label(bag, id, me, label)
+            }
+        }),
         Command::Session {
             id,
             session_agent,
@@ -3319,6 +3393,13 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 None => None,
             };
             change(cli, cwd, |bag| {
+                // Decision 0020: finishing without --without-human-check needs a "by human" label.
+                if without_human_check.is_none() {
+                    let task = ops::find_task(bag, id)?;
+                    if task.state != State::Done && !task.human_checked() {
+                        return Err(Problem::HumanCheckLabelMissing { id: task.id });
+                    }
+                }
                 ops::finish(
                     bag,
                     id,
@@ -3328,7 +3409,22 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 )
             })
         }
-        Command::Checked { id } => change(cli, cwd, |bag| ops::checked(bag, id)),
+        Command::Checked {
+            id,
+            deployed,
+            locally,
+        } => {
+            let which = if *deployed {
+                Some(allomos_core::labels::DEPLOYED_BY_HUMAN)
+            } else if *locally {
+                Some(allomos_core::labels::LOCALLY_BY_HUMAN)
+            } else {
+                None
+            };
+            change(cli, cwd, |bag| {
+                allomos_core::labels::checked(bag, id, which)
+            })
+        }
         Command::Recheck { id, reason, steps } => {
             let steps = match steps {
                 Some(file) => {

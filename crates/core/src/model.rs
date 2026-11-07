@@ -13,7 +13,7 @@ pub type Extra = BTreeMap<String, Value>;
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/6";
+pub const FORMAT: &str = "allomos/7";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape. An older Allomos
 /// refuses a newer taskbag (Task-A01-25); this one reads only its own format. A taskbag in any
@@ -40,7 +40,12 @@ pub const FORMAT: &str = "allomos/6";
 /// `project_folder`), and the folders each task belongs to (`folders`; decision 0019,
 /// Task-A01-dime494). An `allomos/5` taskbag is still read and written as it is; it becomes
 /// `allomos/6` only when a person asks (`alm upgrade`; approver, 2026-10-25).
-pub const FORMAT_VERSION: u32 = 6;
+/// 7: labels (decision 0020, Task-A01-moth111): five built-in plain labels, a label table in
+/// `project.json` (`labels`, each entry a name, an optional meaning and whether it is built in,
+/// replacing the ladder of names), and several labels per task (`labels`, replacing `label`).
+/// An `allomos/5` or `allomos/6` taskbag is still read (its ladder and labels translated as the
+/// upgrade does), but not written until a person upgrades it (`alm upgrade`): the shape changed.
+pub const FORMAT_VERSION: u32 = 7;
 
 /// The oldest format this Allomos reads and writes as it is ([`READ_FROM`]..=[`FORMAT_VERSION`]):
 /// `allomos/5` stays readable after `allomos/6`, so nothing changes a taskbag until a person
@@ -63,9 +68,13 @@ pub struct Project {
     pub format: String,
     pub id: String,
     pub name: String,
-    /// The progress ladder for this project, lowest step first.
-    #[serde(default = "default_labels")]
-    pub labels: Vec<String>,
+    /// The label table (`allomos/7`, decision 0020): every label the project knows, the built-in
+    /// ones first. An older taskbag's ladder of names is read into it as the upgrade does.
+    #[serde(
+        default = "default_labels",
+        deserialize_with = "crate::labels::deserialize_table"
+    )]
+    pub labels: Vec<LabelEntry>,
     /// The folder with the project's code and its AGENTS.md / CLAUDE.md, relative to the folder
     /// holding `.allomos/` (`.` when it is that folder), or absolute. Unset until the app
     /// records it (docs/product/OPEN-FOLDER-FLOW.md).
@@ -102,6 +111,20 @@ impl Project {
     /// Written in `allomos/6` or later: task folders may be used.
     pub fn upgraded(&self) -> bool {
         format_version(&self.format).is_some_and(|n| n >= 6)
+    }
+
+    /// Written in the current format (`allomos/7`): labels are a table and a list per task.
+    pub fn current(&self) -> bool {
+        format_version(&self.format).is_some_and(|n| n >= FORMAT_VERSION)
+    }
+
+    /// The table's entry for `label`, if it has one.
+    pub fn label(&self, label: &str) -> Option<&LabelEntry> {
+        self.labels.iter().find(|e| e.name == label)
+    }
+
+    pub fn label_names(&self) -> Vec<String> {
+        self.labels.iter().map(|e| e.name.clone()).collect()
     }
 
     /// The main project folder as recorded: the first of `project_folders`, else `project_folder`.
@@ -235,16 +258,50 @@ pub fn valid_language(code: &str) -> bool {
         && parts.all(|p| (1..=8).contains(&p.len()) && p.chars().all(|c| c.is_ascii_alphanumeric()))
 }
 
-pub fn default_labels() -> Vec<String> {
-    [
-        "implemented",
-        "locally verified",
-        "deployed and verified",
-        "human verified",
-    ]
-    .into_iter()
-    .map(String::from)
-    .collect()
+/// The label table of a new project: the built-in labels (decision 0020).
+pub fn default_labels() -> Vec<LabelEntry> {
+    crate::labels::BUILT_IN
+        .iter()
+        .map(|(name, meaning)| LabelEntry::built_in(name, meaning))
+        .collect()
+}
+
+/// One entry of a project's label table (decision 0020): a label's name, an optional one-line
+/// meaning, and whether Allomos has it built in. Nothing else about a label is saved: labels are
+/// plain (no kinds, no order).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LabelEntry {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub built_in: bool,
+    /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+impl LabelEntry {
+    pub fn built_in(name: &str, meaning: &str) -> Self {
+        LabelEntry {
+            name: name.to_string(),
+            meaning: Some(meaning.to_string()),
+            built_in: true,
+            extra: Extra::new(),
+        }
+    }
+
+    pub fn custom(name: &str, meaning: Option<&str>) -> Self {
+        LabelEntry {
+            name: name.to_string(),
+            meaning: meaning
+                .map(str::trim)
+                .filter(|m| !m.is_empty())
+                .map(String::from),
+            built_in: false,
+            extra: Extra::new(),
+        }
+    }
 }
 
 /// An area: *what* part of the product a task belongs to.
@@ -387,9 +444,11 @@ pub struct Task {
     pub area: String,
     #[serde(skip_serializing_if = "State::is_unknown")]
     pub state: State,
-    /// The highest step of the project's ladder this task has proven, if any.
-    #[serde(default)]
-    pub label: Option<String>,
+    /// The labels the task carries (`allomos/7`, decision 0020), in the order they were added;
+    /// each one at most once. An older taskbag's single `label` is read into it as the upgrade
+    /// does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<String>,
     /// Who holds the task: a person or an agent session.
     #[serde(default)]
     pub holder: Option<String>,
@@ -413,9 +472,9 @@ pub struct Task {
     #[serde(default)]
     pub handoff_note: Option<String>,
     /// Why the task was finished without the human check: set by
-    /// `alm done --without-human-check` (Task-A03-15, renamed in Task-A03-18). While a done task
-    /// has it, the task waits for a person to check it ("To check", `alm human`). Marking it
-    /// checked (`alm checked`, or the top label on a done task) clears it; its history keeps it.
+    /// `alm done --without-human-check` (Task-A03-15, renamed in Task-A03-18). Text for the person
+    /// who checks; since `allomos/7` it no longer decides whether the task is to check (decision
+    /// 0020: a done task with no "by human" label is). `alm checked` clears it; its history keeps it.
     #[serde(default)]
     pub without_human_check: Option<String>,
     /// How a person checks the task, in Markdown (test folder, what to open, what to click, what
@@ -448,9 +507,36 @@ impl Task {
         }
     }
 
-    /// Finished without the human check and not checked since: "To check" (Task-A03-18).
+    /// Done and carrying neither "by human" label: "To check" (decision 0020).
     pub fn to_check(&self) -> bool {
-        self.state == State::Done && self.without_human_check.is_some()
+        self.state == State::Done && !self.human_checked()
+    }
+
+    /// It carries a "by human" label: a person has checked it (decision 0020).
+    pub fn human_checked(&self) -> bool {
+        self.labels
+            .iter()
+            .any(|l| crate::labels::BY_HUMAN.contains(&l.as_str()))
+    }
+
+    pub fn has_label(&self, label: &str) -> bool {
+        self.labels.iter().any(|l| l == label)
+    }
+
+    /// Add `label` unless the task has it already; true when it was added.
+    pub fn add_label(&mut self, label: &str) -> bool {
+        if self.has_label(label) {
+            return false;
+        }
+        self.labels.push(label.to_string());
+        true
+    }
+
+    /// Remove `label`; true when the task had it.
+    pub fn remove_label(&mut self, label: &str) -> bool {
+        let before = self.labels.len();
+        self.labels.retain(|l| l != label);
+        self.labels.len() != before
     }
 }
 
