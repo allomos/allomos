@@ -2,7 +2,9 @@
 // where the identity behind a pseudonym comes from, and whether approving and checking ask for a
 // fresh sign-in. The history only ever holds a pseudonym ID; who is behind it stays on this
 // computer (local project) or in the cloud. A local-only project keeps the pseudonym: the
-// sign-in levels are shown greyed out, with why. Task A01-tail719 adds the section's other parts.
+// sign-in levels are shown greyed out, with why. Below it, Separation of duties
+// (Task-A01-grotto036): a checkbox, off by default; turning it off asks why. Task A01-tail719 adds
+// the section's other parts.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -10,7 +12,7 @@ import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { AuditSettings, IdentityLevel } from "./types";
-import { LEVELS, needsReason } from "./auditFlow";
+import { LEVELS, needsReason, separationNeedsReason } from "./auditFlow";
 
 
 export function AuditSection({ messenger, root, fileManagerKey }: { messenger: Messenger; root: string; fileManagerKey: Key }) {
@@ -22,12 +24,17 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [separate, setSeparate] = useState(false);
+  const [sepReason, setSepReason] = useState("");
+  const [sepSaved, setSepSaved] = useState(false);
 
   const fill = (s: AuditSettings) => {
     setSettings(s);
     setLevel(s.identity.level);
     setReauth(s.identity.reauthenticate);
     setReason("");
+    setSeparate(s.separation_of_duties);
+    setSepReason("");
   };
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
   useEffect(() => {
@@ -48,6 +55,22 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
     try {
       fill(await messenger.setIdentity(root, { level, reauthenticate: signIn ? reauth : false, reason: reason.trim() || undefined }));
       setSaved(true);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sepChanged = separate !== settings.separation_of_duties;
+  const sepAsksReason = separationNeedsReason(settings.separation_of_duties, separate);
+  const saveSeparation = async () => {
+    setBusy(true);
+    setError(null);
+    setSepSaved(false);
+    try {
+      fill(await messenger.setSeparation(root, separate, sepReason.trim() || undefined));
+      setSepSaved(true);
     } catch (e) {
       say(e);
     } finally {
@@ -90,7 +113,6 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
           </button>
         </p>
       )}
-      {error && <p className="banner error">{error}</p>}
       {saved && <p className="muted small">{t("handoff_settings.saved")}</p>}
       {changed && (
         <div className="row start">
@@ -99,6 +121,29 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
           </button>
         </div>
       )}
+      <h3>{t("audit.separation")}</h3>
+      <p className="muted small">{t("audit.separation_help")}</p>
+      <div className="form">
+        <label className="choice">
+          <input type="checkbox" checked={separate} disabled={busy} onChange={(e) => setSeparate(e.target.checked)} />
+          {t("audit.separation_switch")}
+        </label>
+        {sepAsksReason && (
+          <label className="warning">
+            {t("audit.reason")}
+            <input type="text" value={sepReason} onChange={(e) => setSepReason(e.target.value)} disabled={busy} />
+          </label>
+        )}
+      </div>
+      {sepSaved && <p className="muted small">{t("handoff_settings.saved")}</p>}
+      {sepChanged && (
+        <div className="row start">
+          <button type="button" onClick={() => void saveSeparation()} disabled={busy || (sepAsksReason && !sepReason.trim())}>
+            {t("handoff_settings.save")}
+          </button>
+        </div>
+      )}
+      {error && <p className="banner error">{error}</p>}
     </div>
   );
 }

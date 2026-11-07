@@ -4,8 +4,9 @@
 //! So far it holds the identity level (Task-A01-frolic587, decision 0021 § 2): where the identity
 //! behind a pseudonym comes from, and whether approving and checking ask for a fresh sign-in.
 //! Whatever the level, the history only ever holds a pseudonym ID; who is behind it is kept
-//! outside the taskbag. Later tasks add the other switches (separation of duties, the outside
-//! witness, retention) beside it; until then a newer Allomos's fields are kept as they are.
+//! outside the taskbag. Separation of duties (Task-A01-grotto036) sits beside it, with its rule in
+//! [`crate::duties`]. Later tasks add the other switches (the outside witness, retention); until
+//! then a newer Allomos's fields are kept as they are.
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +32,10 @@ pub struct Audit {
     /// "Sign in again to approve or check": only with [`ACCOUNT`] or [`SSO`].
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reauthenticate: bool,
+    /// Separation of duties (Task-A01-grotto036): the same person or agent may not both do and
+    /// check, or do and approve, a task. Off by default; see [`crate::duties`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub separation_of_duties: bool,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
@@ -235,6 +240,7 @@ mod tests {
         let b = bag(Some(Audit {
             identity: Some(SSO.into()),
             reauthenticate: true,
+            separation_of_duties: false,
             extra: Default::default(),
         }));
         assert_eq!(identity(&b.project).level, SSO);
@@ -287,10 +293,11 @@ mod tests {
     #[test]
     fn unknown_values_are_kept() {
         let mut extra = Extra::new();
-        extra.insert("separation_of_duties".into(), serde_json::json!(true));
+        extra.insert("witness".into(), serde_json::json!({ "service": "x" }));
         let b = bag(Some(Audit {
             identity: Some("passkey".into()),
             reauthenticate: false,
+            separation_of_duties: false,
             extra,
         }));
         let id = identity(&b.project);

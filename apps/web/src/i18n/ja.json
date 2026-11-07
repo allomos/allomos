@@ -928,5 +928,12 @@
   "problem.identity_level_unknown": "「{value}」は本人確認のレベルではありません。pseudonym、account、sso のどれかを使ってください。",
   "problem.identity_needs_cloud": "本人確認のレベル「{level}」にはクラウドのプロジェクトが必要です。このプロジェクトはローカルだけなので、仮名のままです。",
   "problem.reauthenticate_needs_sign_in": "承認や確認のたびにサインインし直すには、「Allomos アカウント」か「会社のサインイン（SSO）」のレベルが必要です。仮名ではサインインする先がありません。",
-  "problem.audit_reason_missing": "{setting} をオフにしたり下げたりするには理由が必要です。"
+  "problem.audit_reason_missing": "{setting} をオフにしたり下げたりするには理由が必要です。",
+  "audit.separation": "職務の分離",
+  "audit.separation_switch": "同じ人や agent が、同じタスクを作業して確認する（または作業して承認する）ことはできない",
+  "audit.separation_help": "会社が別の人の確認を求めるときにオンにします。オンの間、一人だけのプロジェクトではタスクを終えられません。",
+  "problem.self_check": "このプロジェクトでは職務の分離がオンです。{who} はタスク {id} を作業したので、確認はできません。別の人が確認するか、理由を書いてこのスイッチをオフにしてください。",
+  "problem.self_approve": "このプロジェクトでは職務の分離がオンです。{who} はタスク {id} を作業したので、承認はできません。別の人が承認するか、理由を書いてこのスイッチをオフにしてください。",
+  "problem.work_after_signing": "このプロジェクトでは職務の分離がオンです。{who} はタスク {id} を承認または確認したので、作業はできません。別の人が作業するか、理由を書いてこのスイッチをオフにしてください。",
+  "problem.checker_unknown": "このプロジェクトでは職務の分離がオンですが、タスク {id} の確認に確認者の名前がないため、「肩代」は作業した人と別の人かどうか判断できません。"
 }

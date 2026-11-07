@@ -928,5 +928,12 @@
   "problem.identity_level_unknown": "\"{value}\" is not an identity level. Use pseudonym, account or sso.",
   "problem.identity_needs_cloud": "The identity level \"{level}\" needs a cloud project; this project is local-only, so it keeps the pseudonym.",
   "problem.reauthenticate_needs_sign_in": "Signing in again to approve or check needs the Allomos account or company sign-in (SSO) identity level; with a pseudonym there is nothing to sign in to.",
-  "problem.audit_reason_missing": "Turning {setting} off or down needs a reason."
+  "problem.audit_reason_missing": "Turning {setting} off or down needs a reason.",
+  "audit.separation": "Separation of duties",
+  "audit.separation_switch": "The same person or agent may not both do and check (or do and approve) a task",
+  "audit.separation_help": "Turn on when your company requires a second person. A project with one person cannot finish tasks while this is on.",
+  "problem.self_check": "Separation of duties is on in this project: {who} worked on task {id}, so they may not also check it. Someone else checks it, or the switch is turned off with a reason.",
+  "problem.self_approve": "Separation of duties is on in this project: {who} worked on task {id}, so they may not also approve it. Someone else approves it, or the switch is turned off with a reason.",
+  "problem.work_after_signing": "Separation of duties is on in this project: {who} approved or checked task {id}, so they may not also work on it. Someone else works on it, or the switch is turned off with a reason.",
+  "problem.checker_unknown": "Separation of duties is on in this project, and the check of task {id} names no checker, so Allomos cannot tell it is someone other than who did the work."
 }

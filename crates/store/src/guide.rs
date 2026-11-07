@@ -270,8 +270,11 @@ Work a task:
   `alm withdraw <approval ID>` (with `--why`) when the person takes it back.
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
-  `--reason \"<why>\"` change it; account and sso need a cloud project. A setting the person
-  decides: change it only when they ask.
+  `--reason \"<why>\"` change it; account and sso need a cloud project.
+  `--separation-of-duties on|off`: on, the same person or agent may not both do and check (or do
+  and approve) a task, and alm refuses it (`self_check`, `self_approve`, `work_after_signing`;
+  `checker_unknown`: name the checker with `alm checked --checker <pseudonym>`); off needs
+  `--reason`. Settings the person decides: change them only when they ask.
   `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task);
   `alm backlog <id>` (back to backlog, to think it over again: an unheld ready, waiting or blocked
   task; write the open questions in its description's Notes).

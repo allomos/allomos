@@ -16,3 +16,11 @@ test("lowering the identity level or turning signing in again off asks for a rea
   assert.equal(needsReason(sso, "account", true), true);
   assert.equal(needsReason(sso, "pseudonym", false), true);
 });
+
+test("turning separation of duties off asks for a reason; turning it on does not", async () => {
+  const { separationNeedsReason } = await import("../src/auditFlow.ts");
+  assert.equal(separationNeedsReason(false, true), false);
+  assert.equal(separationNeedsReason(true, true), false);
+  assert.equal(separationNeedsReason(true, false), true);
+  assert.equal(separationNeedsReason(false, false), false);
+});

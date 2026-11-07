@@ -1333,6 +1333,8 @@ fn set_handoff_rules(
 #[derive(Serialize)]
 struct AuditSettings {
     identity: allomos_core::audit::Identity,
+    /// Separation of duties (Task-A01-grotto036): off by default.
+    separation_of_duties: bool,
     /// `identities.json` in the settings folder; null without one.
     identities_file: Option<String>,
 }
@@ -1348,6 +1350,7 @@ fn audit_settings_of(root: &Path) -> Result<AuditSettings, Problem> {
     };
     Ok(AuditSettings {
         identity: allomos_core::audit::identity(&bag.project),
+        separation_of_duties: allomos_core::duties::on(&bag.project),
         identities_file: allomos_store::identity::identities_file()
             .map(|p| p.display().to_string()),
     })
@@ -1356,6 +1359,40 @@ fn audit_settings_of(root: &Path) -> Result<AuditSettings, Problem> {
 #[tauri::command]
 fn audit_settings(root: PathBuf) -> Result<AuditSettings, Problem> {
     audit_settings_of(&root)
+}
+
+/// Turn separation of duties on or off (Task-A01-grotto036), as `alm audit-settings
+/// --separation-of-duties` does: recorded as an `audit-settings` event; turning it off needs a
+/// reason. Returns the settings as saved.
+#[tauri::command]
+fn set_separation(
+    root: PathBuf,
+    on: bool,
+    reason: Option<String>,
+) -> Result<AuditSettings, Problem> {
+    set_separation_at(&root, on, reason.as_deref())
+}
+
+fn set_separation_at(
+    root: &Path,
+    on: bool,
+    reason: Option<&str>,
+) -> Result<AuditSettings, Problem> {
+    let lock = allomos_store::Lock::acquire(root, LOCK_WAIT)?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let (project, changes) = allomos_core::duties::set(&bag.project, on, reason)?;
+    let event = allomos_store::Actor::APP.event(
+        "audit-settings",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        changes,
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
+    drop(lock);
+    audit_settings_of(root)
 }
 
 /// Change the identity level, as `alm audit-settings` does, recorded as an `audit-settings`
@@ -2543,6 +2580,7 @@ pub fn run() {
             handoff_settings,
             set_handoff_rules,
             audit_settings,
+            set_separation,
             set_identity,
             show_identities_file,
             lan_status,
@@ -3188,6 +3226,44 @@ mod tests {
         assert_eq!(allomos_store::events::last_agent_use(&root), None);
         assert_eq!(allomos_store::events::unshared_app_changes(&root).count, 2);
         std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    /// Project settings → Audit → Separation of duties (Task-A01-grotto036): off by default; on
+    /// and off are recorded, and off needs a reason.
+    #[test]
+    fn separation_of_duties_is_off_until_turned_on() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-duties-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        assert!(!audit_settings_of(&root).unwrap().separation_of_duties);
+        let count = || std::fs::read_dir(root.join("events")).unwrap().count();
+        let before = count();
+        assert!(
+            set_separation_at(&root, true, None)
+                .unwrap()
+                .separation_of_duties
+        );
+        assert_eq!(count(), before + 1);
+        assert_eq!(
+            set_separation_at(&root, false, None).err(),
+            Some(Problem::AuditReasonMissing {
+                setting: "separation_of_duties".into()
+            })
+        );
+        assert!(
+            !set_separation_at(&root, false, Some("one person"))
+                .unwrap()
+                .separation_of_duties
+        );
+        assert_eq!(count(), before + 2);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// Project settings → Audit → Identity (Task-A01-frolic587): a local-only project shows the

@@ -87,18 +87,34 @@ pub fn approve(
             at: &at,
         },
     )?;
+    let events: Vec<_> = approval
+        .scope
+        .tasks
+        .iter()
+        .map(|task_id| {
+            let mut event = actor.event(
+                approval::APPROVE,
+                Kind::Task,
+                Some(task_id),
+                vec![change.clone()],
+            );
+            // The event relies on the approval it records.
+            event.approval = Some(approval.id.clone());
+            event
+        })
+        .collect();
+    // Separation of duties (Task-A01-grotto036) is checked for every task first, so a refusal
+    // for one leaves none of them approved.
+    for event in &events {
+        events::separate_duties(root, &events::as_written(root, event))?;
+    }
     let mut tasks = Vec::new();
-    for task_id in &approval.scope.tasks {
-        let mut event = actor.event(
-            approval::APPROVE,
-            Kind::Task,
-            Some(task_id),
-            vec![change.clone()],
-        );
-        // The event relies on the approval it records.
-        event.approval = Some(approval.id.clone());
-        lock.record(&event, |_| Ok(()))?;
-        tasks.push(ops::find_task(&bag, task_id)?);
+    for event in &events {
+        lock.record(event, |_| Ok(()))?;
+        tasks.push(ops::find_task(
+            &bag,
+            event.id.as_deref().unwrap_or_default(),
+        )?);
     }
     Ok(Approved {
         approval,
