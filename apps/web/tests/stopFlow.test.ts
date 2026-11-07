@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FILTER_STATES, allTicked, allBlockersDone, blockers, bothBanner, emptyBy, filterBanner, filterGroups, filterName, groupTicks, hiddenByFilter, isAll, labelText, labelsOff, onTable, searchBanner, storeFilter, taskCount, taskListBanners, tickGroup, tickLabel, tickLabeled, tickState, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { FILTER_STATES, allTicked, allBlockersDone, blockers, bothBanner, emptyBy, filterBanner, filterGroups, filterName, groupTicks, hiddenByFilter, isAll, labelText, labelsOff, onTable, searchBanner, storeFilter, tableFilter, taskCount, taskListBanners, tickGroup, tickLabel, tickLabeled, tickState, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
 import { AI_DECISIONS, DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN } from "../src/stopFlow.ts";
 import type { Opened, State, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
@@ -214,6 +214,40 @@ test("the filter is remembered as what is unticked; the older single choice come
   // A label no longer in the table is let go, such as an older build's ladder step; a new one starts ticked.
   const old = onTable(readFilter(JSON.stringify({ states: [], yes: ["human verified"], no: ["locally verified"] })), LABELS);
   assert.equal(isAll(old), true);
+});
+
+// Task-A01-key755: in 0.1.41 just opening the Show filter blanked the window. The desktop app sends
+// the label table as entries (`allomos/7`); the filter took them as they came, and drawing an entry
+// as a row's text threw in React, which left the whole window blank and unresponsive.
+test("the Show filter reads an allomos/7 label table as names, so opening it draws text only (Task-A01-key755)", () => {
+  // The project as the desktop app sends it for this project's taskbag: entries, built-in first.
+  const project = {
+    labels: [
+      { name: LOCALLY_BY_AGENT, meaning: "The agent built it and its checks passed.", built_in: true },
+      { name: DEPLOYED_BY_AGENT, meaning: "The agent deployed it.", built_in: true },
+      { name: LOCALLY_BY_HUMAN, meaning: "A person checked it.", built_in: true },
+      { name: DEPLOYED_BY_HUMAN, meaning: "A person checked it live.", built_in: true },
+      { name: AI_DECISIONS, meaning: "Decisions wait for review.", built_in: true },
+      { name: "shipped", built_in: false },
+    ],
+  };
+  const tasks = [task({ id: "A", labels: ["shipped", "found on a task"] }), task({ id: "B", labels: [LOCALLY_BY_AGENT] }), task({ id: "C" })];
+  // A filter 0.1.41 may have stored: its Clear all put the entries themselves in the lists.
+  const stored = readFilter(JSON.stringify({ states: ["done"], labeled: [], yes: project.labels, no: [project.labels[0], "shipped"] }));
+  const f = tableFilter(stored, project, tasks);
+  const names = [...LABELS, "found on a task"];
+  assert.deepEqual(f.labels, names);
+  assert.deepEqual(f.yes, []);
+  assert.deepEqual(f.no, ["shipped"]);
+  // Everything the open panel draws, after every kind of tick, is text.
+  const drawn = (x: StateFilter) => [filterName(x, t), ...x.labels.map((l) => labelText(l, t)), ...x.yes, ...x.no];
+  const after = [f, tickGroup(f, "labels", false), tickGroup(f, "labels", true), tickLabel(f, "found on a task", "yes", false), tickLabeled(f, "no", false), allTicked(f.labels)];
+  for (const x of after) for (const word of drawn(x)) assert.equal(typeof word, "string", JSON.stringify(word));
+  assert.equal(new Set(f.labels).size, f.labels.length, "each row's key once");
+  assert.deepEqual(tickGroup(f, "labels", false).yes, names);
+  // An older taskbag that still sends plain names reads the same.
+  assert.deepEqual(tableFilter(allTicked(), { labels: names as never }, tasks).labels, names);
+  assert.deepEqual(tableFilter(allTicked(), undefined).labels, LABELS.slice(0, 5));
 });
 
 test("to check: a done task with no 'by human' label, whatever its note (decision 0020)", () => {

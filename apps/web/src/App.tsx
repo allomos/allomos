@@ -30,12 +30,11 @@ import {
   hiddenByFilter,
   hiddenText,
   isAll,
-  labelNames,
-  onTable,
   readFilter,
   storeFilter,
   stopFact,
   type StopFact,
+  tableFilter,
   taskListBanners,
   type Hidden,
   type StateFilter,
@@ -1252,8 +1251,8 @@ function TaskbagView({
       return allTicked();
     }
   });
-  const ladder = labelNames(box?.project, box?.tasks);
-  const stateFilter = onTable(storedFilter, ladder);
+  const stateFilter = tableFilter(storedFilter, box?.project, box?.tasks);
+  const ladder = stateFilter.labels;
   const chooseFilter = (f: StateFilter) => {
     setStoredFilter(f);
     try {
