@@ -161,13 +161,15 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
         "A new *why*.\n"
     );
 
-    // One event per change, by the person, through the app, named after the alm command.
+    // One event per change, through the app, named after the alm command; never under the
+    // person's name (decision 0021 § 2): under their pseudonym, or nobody
+    // without a settings folder.
     let h = events::history(&root, "A01-01");
     assert_eq!(h.events.len(), count);
     assert!(
         h.events
             .iter()
-            .all(|e| e.by.as_deref() == Some("Will") && e.via == "app")
+            .all(|e| e.by == e.actor.as_ref().and_then(|a| a.person.clone()) && e.via == "app")
     );
     let commands: Vec<&str> = h.events.iter().rev().map(|e| e.command.as_str()).collect();
     assert_eq!(
@@ -177,6 +179,11 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
             "block", "ready", "block", "done"
         ]
     );
+    // At the default identity level the person's name is in no event file (Task-A01-frolic587).
+    for e in fs::read_dir(root.join("events")).unwrap() {
+        let text = fs::read_to_string(e.unwrap().path()).unwrap();
+        assert!(!text.contains("Will"), "{text}");
+    }
 
     // An empty description removes the file.
     edit(

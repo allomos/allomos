@@ -94,6 +94,22 @@ pub fn pseudonym(project: &str) -> Option<String> {
         .or(Some(made))
 }
 
+/// This computer's person's pseudonym ID in `project`, if one was made; never makes one. The
+/// app shows the person's own name beside it: the one place the two are joined (decision 0021
+/// § 2), on this computer only.
+pub fn known_pseudonym(project: &str) -> Option<String> {
+    read::<Identities>(IDENTITIES_FILE)
+        .pseudonyms
+        .get(project.trim())
+        .cloned()
+}
+
+/// Where this computer keeps who is behind its pseudonyms (`identities.json`), for the app's
+/// **Show in Finder**; `None` without a settings folder.
+pub fn identities_file() -> Option<PathBuf> {
+    file(IDENTITIES_FILE)
+}
+
 /// The model `session` last named with `alm --model`, on this computer.
 pub fn session_model(session: &str) -> Option<String> {
     read::<SessionModels>(SESSION_MODELS_FILE)

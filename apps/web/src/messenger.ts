@@ -11,7 +11,7 @@ import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { LadderStep } from "./ladderFlow";
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
 export interface TranslateTo {
@@ -169,6 +169,12 @@ export interface Messenger {
     root: string,
     change: { quota?: string; context?: string; writeWhen?: string; agent?: string; clear?: boolean },
   ): Promise<HandoffSettings>;
+  /** Project settings → Audit (Task-A01-frolic587): the identity level. */
+  auditSettings(root: string): Promise<AuditSettings>;
+  /** Changes the identity level, as `alm audit-settings`; resolves to the settings as saved. Rejects with a Problem. */
+  setIdentity(root: string, change: { level?: IdentityLevel; reauthenticate?: boolean; reason?: string }): Promise<AuditSettings>;
+  /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
+  showIdentitiesFile(): Promise<void>;
   /** One task's recorded changes, newest first (Task-A01-17). */
   taskHistory(root: string, id: string): Promise<TaskHistory>;
   /** The person's name the app records its task changes under; null until it has been asked (Task-A01-18). */
@@ -445,6 +451,15 @@ export const desktopMessenger: Messenger = {
       agent: c.agent ?? null,
       clear: c.clear ?? false,
     }),
+  auditSettings: (root) => invoke<AuditSettings>("audit_settings", { root }),
+  setIdentity: (root, c) =>
+    invoke<AuditSettings>("set_identity", {
+      root,
+      level: c.level ?? null,
+      reauthenticate: c.reauthenticate ?? null,
+      reason: c.reason ?? null,
+    }),
+  showIdentitiesFile: () => invoke<void>("show_identities_file"),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   ownerName: () => invoke<string | null>("owner_name"),
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),

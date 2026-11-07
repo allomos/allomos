@@ -634,6 +634,22 @@ enum Command {
         #[arg(long)]
         clear: bool,
     },
+    /// The project's audit settings (decision 0021 § 6): so far the identity level. Without
+    /// options, show them. The history only ever holds a pseudonym ID at every level; who is
+    /// behind it is kept on this computer (local project) or in the cloud (cloud project).
+    #[command(name = "audit-settings")]
+    AuditSettings {
+        /// Where identities come from: pseudonym (the default), account (the Allomos account)
+        /// or sso (company sign-in). account and sso need a cloud project.
+        #[arg(long, value_name = "LEVEL")]
+        identity: Option<String>,
+        /// Sign in again to approve or check: on or off (only with account or sso).
+        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        reauthenticate: Option<String>,
+        /// Why, recorded in the history (needed when turning a control off or down).
+        #[arg(long, value_name = "TEXT")]
+        reason: Option<String>,
+    },
     /// Hand a task off (--as your session): its handoff note becomes this text (where it stopped,
     /// the one next step, who it waits on), --evidence is added under its description's Evidence,
     /// and its history records who handed it off. Several tasks: once for each.
@@ -894,6 +910,7 @@ impl Command {
             | Command::MoveIn { .. }
             | Command::Translate { .. }
             | Command::HandoffRules { .. }
+            | Command::AuditSettings { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
             | Command::Folder { .. }
@@ -922,6 +939,14 @@ impl Command {
         } = self
         {
             return quota.is_some() || context.is_some() || write_when.is_some() || *clear;
+        }
+        if let Command::AuditSettings {
+            identity,
+            reauthenticate,
+            ..
+        } = self
+        {
+            return identity.is_some() || reauthenticate.is_some();
         }
         if let Command::Cards { what } = self {
             return what.is_some();
@@ -1024,6 +1049,7 @@ impl Command {
             Command::MoveIn { .. } => "move-in",
             Command::Translate { .. } => "translate",
             Command::HandoffRules { .. } => "handoff-rules",
+            Command::AuditSettings { .. } => "audit-settings",
             Command::Handoff { .. } => "handoff",
         }
     }
@@ -1637,6 +1663,34 @@ fn locate(cli: &Cli, cwd: &Path) -> Result<PathBuf, Problem> {
         }
         None => find_taskbag(cwd).ok_or_else(|| not_found(cwd)),
     }
+}
+
+/// The identity settings in plain words (`alm audit-settings`).
+fn identity_lines(id: &allomos_core::audit::Identity) -> String {
+    let level = match id.level {
+        allomos_core::audit::ACCOUNT => "Allomos account",
+        allomos_core::audit::SSO => "Company sign-in (SSO)",
+        _ => "Pseudonym",
+    };
+    let mut text = format!("Identity: {level}");
+    if let Some(w) = &id.written {
+        text.push_str(&format!(
+            " (project.json says \"{w}\", which this Allomos does not know)"
+        ));
+    }
+    text.push_str(&format!(
+        ".\nSign in again to approve or check: {}.\n",
+        if id.reauthenticate { "on" } else { "off" }
+    ));
+    text.push_str(
+        "The history only ever holds a pseudonym ID; who is behind each one is kept on this computer (local project) or in the cloud (cloud project), never in the taskbag.\n",
+    );
+    if !id.sign_in_available {
+        text.push_str(
+            "Allomos account and Company sign-in (SSO) need a cloud project; this project is local-only.\n",
+        );
+    }
+    text
 }
 
 /// One line saying which language to write tasks in, and why.
@@ -2382,6 +2436,48 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             }
             let mut done = Done::new(
                 json!({ "taskbag": root, "handoff_rules": rules, "applied": applied }),
+                text,
+            );
+            done.issues = issues;
+            Ok(done)
+        }
+        Command::AuditSettings {
+            identity,
+            reauthenticate,
+            reason,
+        } => {
+            let root = locate(cli, cwd)?;
+            let changing = identity.is_some() || reauthenticate.is_some();
+            let (bag, issues, changed) = if changing {
+                let lock = Lock::acquire(&root, lock_wait())?;
+                let (bag, issues) = taskbag_of(&root, lock.load())?;
+                let change = allomos_core::audit::IdentityChange {
+                    level: identity.as_deref(),
+                    reauthenticate: reauthenticate.as_deref().map(|v| v == "on"),
+                    reason: reason.as_deref().or(cli.why.as_deref()),
+                };
+                let (project, changes) = allomos_core::audit::set_identity(&bag, &change)?;
+                let changed = !changes.is_empty();
+                let event = Actor::alm(me).event(
+                    "audit-settings",
+                    Kind::Project,
+                    Some(&project.id),
+                    changes,
+                );
+                lock.record(&event, |l| l.save_project(&project))?;
+                (Taskbag { project, ..bag }, issues, Some(changed))
+            } else {
+                let (bag, issues) = taskbag_of(&root, load(&root))?;
+                (bag, issues, None)
+            };
+            let id = allomos_core::audit::identity(&bag.project);
+            let mut text = String::new();
+            if changed == Some(false) {
+                text.push_str("Nothing changed: the audit settings already say that.\n");
+            }
+            text.push_str(&identity_lines(&id));
+            let mut done = Done::new(
+                json!({ "taskbag": root, "identity": id, "changed": changed }),
                 text,
             );
             done.issues = issues;

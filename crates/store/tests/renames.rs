@@ -91,7 +91,14 @@ fn each_change_writes_one_event() {
             e.by.as_deref(),
             e.via.as_str()
         ),
-        ("rename area", Kind::Area, Some("A01"), Some("Will"), "app")
+        (
+            "rename area",
+            Kind::Area,
+            Some("A01"),
+            // The person's pseudonym, never their name (Task-A01-frolic587).
+            e.actor.as_ref().and_then(|a| a.person.as_deref()),
+            "app"
+        )
     );
     assert_eq!(e.changes.len(), 1);
     assert_eq!(

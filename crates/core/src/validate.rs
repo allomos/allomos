@@ -358,6 +358,9 @@ pub fn validate_taskbag(
             unknown_notes("project.json", &prefix, &g.extra, &[], &mut issues);
         }
     }
+    if let Some(audit) = &project.audit {
+        unknown_notes("project.json", "audit.", &audit.extra, &[], &mut issues);
+    }
     for (file, area) in areas {
         unknown_notes(file, "", &area.extra, &[], &mut issues);
     }

@@ -1480,6 +1480,7 @@ mod tests {
                 project_folder: None,
                 task_language: None,
                 handoff: None,
+                audit: None,
             },
             areas: vec![],
             iterations: vec![],

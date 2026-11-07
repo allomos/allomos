@@ -252,6 +252,15 @@ problems! {
     CardEmpty { path } => "card_empty", "The card file {path} is empty, so nothing was moved in.";
     /// `alm card` without `--from`, for a task no agent reported a card file for.
     CardNotReported { id } => "card_not_reported", "No card file was reported for task {id}, and its description links to none outside its folder. Name it: `alm card {id} --from <file>`.";
+    /// An identity level Allomos does not know (Task-A01-frolic587, decision 0021 § 2).
+    IdentityLevelUnknown { value } => "identity_level_unknown", "\"{value}\" is not an identity level. Use pseudonym, account or sso.";
+    /// The Allomos account and company sign-in (SSO) levels need a cloud project; this one is
+    /// local-only (Task-A01-frolic587, decision 0021 § 6).
+    IdentityNeedsCloud { level } => "identity_needs_cloud", "The identity level \"{level}\" needs a cloud project; this project is local-only, so it keeps the pseudonym.";
+    /// Signing in again to approve or check needs a sign-in level (Task-A01-frolic587).
+    ReauthenticateNeedsSignIn => "reauthenticate_needs_sign_in", "Signing in again to approve or check needs the Allomos account or company sign-in (SSO) identity level; with a pseudonym there is nothing to sign in to.";
+    /// Turning an audit control off or down needs a reason (decision 0021 § 6).
+    AuditReasonMissing { setting } => "audit_reason_missing", "Turning {setting} off or down needs a reason: add --reason \"<why>\".";
     /// The command was used wrongly. `detail` is the parser's own text.
     BadUsage { detail } => "bad_usage", "{detail}";
 }

@@ -91,6 +91,10 @@ pub struct Project {
     /// When a handoff must be written (Task-A03-06). Missing: the defaults.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff: Option<HandoffRules>,
+    /// The project's audit settings (decision 0021 § 6): its identity level, so far
+    /// (Task-A01-frolic587). Missing: the defaults.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit: Option<crate::audit::Audit>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,

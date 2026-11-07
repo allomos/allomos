@@ -7,11 +7,13 @@
 // the project's label table, where its own labels can be changed (Task-A05-yeti951, decision 0020).
 // Handoff holds the handoff rules (Task-A05-yacht960). Project folders binds, renames, locates
 // and unbinds the taskbag's folders (Task-A05-plaza078). Agents shows in which folders each agent
-// is set up, with Set up… for the others (Task-A05-bag963).
+// is set up, with Set up… for the others (Task-A05-bag963). Audit holds the identity level
+// (Task-A01-frolic587, decision 0021 § 6); its other parts come with A01-tail719.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AgentsSection } from "./AgentsSection";
 import { HandoffSection } from "./HandoffSettings";
+import { AuditSection } from "./AuditSettings";
 import { ProjectFolders } from "./ProjectFolders";
 import { LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
 import { LanguageMenu } from "./LanguageMenu";
@@ -23,7 +25,7 @@ import { middleEllipsis } from "./paths";
 import { isProblem, type LabelEntry, type VersionCheck } from "./types";
 import { movingTasks, updateNotice, upgradeFrom } from "./versionFlow";
 
-const SECTIONS = ["general", "folders", "agents", "tasks", "handoff"] as const;
+const SECTIONS = ["general", "folders", "agents", "tasks", "handoff", "audit"] as const;
 type Section = (typeof SECTIONS)[number];
 
 /** The location in its monospace font, shortened in the middle to the characters that fit its
@@ -368,6 +370,7 @@ export function TaskbagSettings({
             )}
             {section === "agents" && <AgentsSection messenger={messenger} root={root} onSetUp={onSetUpAgent} />}
             {section === "handoff" && <HandoffSection messenger={messenger} root={root} />}
+            {section === "audit" && <AuditSection messenger={messenger} root={root} fileManagerKey={fileManagerKey} />}
             {section === "folders" && <ProjectFolders messenger={messenger} root={root} fileManagerKey={fileManagerKey} onChanged={onChanged} />}
           </div>
         </div>

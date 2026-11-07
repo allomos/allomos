@@ -741,7 +741,8 @@ export function TaskPane({
               {history.events.map((e, i) => (
                 <li key={`${e.at}-${i}`} className="small">
                   <span className="muted">
-                    {localTime(e.at)} · {e.by || t("pane.history_someone")}
+                    {/* Your own pseudonym with your name beside it: joined on this computer only (Task-A01-frolic587). */}
+                    {localTime(e.at)} · {e.by && e.by === history.you && ownerName ? t("pane.history_you", { name: ownerName, id: e.by }) : e.by || t("pane.history_someone")}
                     {e.agent && ` · ${agentName(agentId(e.agent))}`}
                   </span>
                   {e.changes.map((c, j) => (

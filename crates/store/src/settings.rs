@@ -317,6 +317,7 @@ mod tests {
             project_folder: None,
             task_language: language.map(String::from),
             handoff: None,
+            audit: None,
         }
     }
 
