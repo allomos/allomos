@@ -56,3 +56,11 @@ test("an approval record shows as its ID; an older approval text as it is (Task-
   assert.equal(valueText("approval", { id: "ap-abc123", channel: "chat" }, t), "ap-abc123");
   assert.equal(valueText("approval", "Deploy (plan 0123)", t), "Deploy (plan 0123)");
 });
+
+test("a human check shows its result, where, who, the steps and the words (Task-A01-table778)", () => {
+  assert.equal(
+    valueText("human_check", { checker: "p-abc123", steps_sha256: "0123456789ab", result: "partly", words: "OK", where: "deployed" }, t),
+    'pane.human_check_partly (pane.human_check_deployed), pane.human_check_by(p-abc123), pane.human_check_steps_sha(01234567): "OK"',
+  );
+  assert.equal(fieldName("human_check", t), "pane.human_check");
+});

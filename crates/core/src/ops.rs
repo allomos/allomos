@@ -898,8 +898,12 @@ fn clear_human_check(task: &mut Task) {
 
 /// A person has checked a finished task (Task-A03-18, decision 0020): it gets a "by human"
 /// label and leaves "To check". See [`crate::labels::checked`].
-pub fn checked(taskbag: &Taskbag, id: &str) -> Result<Outcome, Problem> {
-    crate::labels::checked(taskbag, id, None)
+pub fn checked(
+    taskbag: &Taskbag,
+    id: &str,
+    given: &crate::labels::CheckGiven,
+) -> Result<Outcome, Problem> {
+    crate::labels::checked(taskbag, id, None, given)
 }
 
 /// Send a finished task back to "To check" (Task-A03-37): its work changed after a person checked
@@ -1205,8 +1209,14 @@ pub enum Edit {
         #[serde(default)]
         expected_version: Option<String>,
     },
-    /// A person checked the finished task: like `alm checked` (Task-A03-18).
-    Checked,
+    /// A person checked the finished task: like `alm checked` (Task-A03-18), with what they
+    /// saw and said (Task-A01-table778); both may be left out (a pass, no words).
+    Checked {
+        #[serde(default)]
+        result: crate::labels::CheckResult,
+        #[serde(default)]
+        words: Option<String>,
+    },
     /// Reopen a done or dropped task, saying why: like `alm reopen` (Task-A01-50).
     Reopen {
         note: String,
@@ -1285,7 +1295,16 @@ pub fn edit(
             check_version(taskbag, id, expected_version.as_deref())?;
             set_description(taskbag, id, me, text).map(|o| (o, "describe"))
         }
-        Edit::Checked => checked(taskbag, id).map(|o| (o, "checked")),
+        Edit::Checked { result, words } => checked(
+            taskbag,
+            id,
+            &crate::labels::CheckGiven {
+                checker: None,
+                result: *result,
+                words: words.as_deref(),
+            },
+        )
+        .map(|o| (o, "checked")),
         Edit::Reopen { note } => reopen(taskbag, id, note).map(|o| (o, "reopen")),
         Edit::Folders { folders } => {
             crate::folders::set(taskbag, id, me, folders).map(|o| (o, "folders"))
@@ -2334,7 +2353,7 @@ mod tests {
         assert!(again.task.human_check_steps.is_some());
         // A person checks it: a "by human" label, note and steps cleared; only a done task
         // (Task-A03-18, decision 0020). Without "deployed and verified by agent": locally.
-        let c = checked(&s, "A01-01").unwrap().task;
+        let c = checked(&s, "A01-01", &Default::default()).unwrap().task;
         assert!(c.has_label(crate::labels::LOCALLY_BY_HUMAN));
         assert_eq!(
             (&c.without_human_check, &c.human_check_steps),
@@ -2342,7 +2361,7 @@ mod tests {
         );
         assert!(!c.to_check());
         assert!(matches!(
-            checked(&s, "A01-02"),
+            checked(&s, "A01-02", &Default::default()),
             Err(Problem::NotDone { .. })
         ));
         // With "deployed and verified by agent": deployed; the person may choose the other one.
@@ -2350,14 +2369,19 @@ mod tests {
         dep.labels = vec![crate::labels::DEPLOYED_BY_AGENT.into()];
         let mut d2 = s.clone();
         put!(d2, dep);
-        let c = checked(&d2, "A01-01").unwrap().task;
+        let c = checked(&d2, "A01-01", &Default::default()).unwrap().task;
         assert!(c.has_label(crate::labels::DEPLOYED_BY_HUMAN) && !c.to_check());
-        let c = crate::labels::checked(&d2, "A01-01", Some(crate::labels::LOCALLY_BY_HUMAN))
-            .unwrap()
-            .task;
+        let c = crate::labels::checked(
+            &d2,
+            "A01-01",
+            Some(crate::labels::LOCALLY_BY_HUMAN),
+            &Default::default(),
+        )
+        .unwrap()
+        .task;
         assert!(c.has_label(crate::labels::LOCALLY_BY_HUMAN));
         assert_eq!(
-            crate::labels::checked(&d2, "A01-01", Some("shipped"))
+            crate::labels::checked(&d2, "A01-01", Some("shipped"), &Default::default())
                 .unwrap_err()
                 .code(),
             "label_not_by_human"
@@ -2384,18 +2408,32 @@ mod tests {
             .task;
         assert_eq!(moved.without_human_check.as_deref(), Some("loop run"));
         assert!(
-            checked(&s, "A01-01")
+            checked(&s, "A01-01", &Default::default())
                 .unwrap()
                 .task
                 .without_human_check
                 .is_none()
         );
         // Through the app's edit: the same rule, recorded as `checked`.
-        let (o, command) = edit(&s, "A01-01", Some("z"), &Edit::Checked).unwrap();
+        let plain = Edit::Checked {
+            result: Default::default(),
+            words: None,
+        };
+        let (o, command) = edit(&s, "A01-01", Some("z"), &plain).unwrap();
         assert_eq!(command, "checked");
         assert!(o.task.has_label(crate::labels::LOCALLY_BY_HUMAN));
+        assert_eq!(o.recorded[0].field, crate::labels::HUMAN_CHECK);
         let e: Edit = serde_json::from_str(r#"{"field":"checked"}"#).unwrap();
-        assert_eq!(e, Edit::Checked);
+        assert_eq!(e, plain);
+        let e: Edit =
+            serde_json::from_str(r#"{"field":"checked","result":"partly","words":"OK"}"#).unwrap();
+        assert!(matches!(
+            e,
+            Edit::Checked {
+                result: crate::labels::CheckResult::Partly,
+                ..
+            }
+        ));
         // Its work changed after the check: the agent sends it back to To check (Task-A03-37).
         put!(s, o.task);
         let back = recheck(&s, "A01-01", " The save button moved ", None).unwrap();

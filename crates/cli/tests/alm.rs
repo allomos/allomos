@@ -3502,6 +3502,46 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
         .find(|c| c["field"] == "without_human_check")
         .unwrap();
     assert_eq!(note["from"], "card run, approver away");
+    // Beside the label: who checked, against which steps, the result and the words
+    // (Task-A01-table778, decision 0021 § 1.1).
+    let check = |history: &Value| {
+        history["events"][0]["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["field"] == "human_check")
+            .unwrap()["to"]
+            .clone()
+    };
+    let hc = check(&history);
+    assert_eq!(hc["result"], "pass");
+    assert_eq!(hc["where"], "local");
+    assert!(hc["words"].is_null());
+    let steps_were = note["from"].clone();
+    assert!(steps_were.is_string());
+    ok(
+        &repo,
+        &[
+            "--as",
+            "will",
+            "checked",
+            "A01-01",
+            "--result",
+            "partly",
+            "--words",
+            "Works; the button is small",
+            "--checker",
+            "p-abc123",
+            "--deployed",
+        ],
+    );
+    let hc = check(&ok(&repo, &["history", "A01-01"]));
+    assert_eq!(hc["checker"], "p-abc123");
+    assert_eq!(hc["result"], "partly");
+    assert_eq!(hc["words"], "Works; the button is small");
+    assert_eq!(hc["where"], "deployed");
+    let out = alm(&repo, &["checked", "A01-01", "--result", "fail"]);
+    assert!(!out.status.success());
     assert_eq!(ids(&ok(&repo, &["human"])["to_check"]), ["A02-01"]);
     // The top label set on a finished task is the human check too.
     ok(

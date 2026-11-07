@@ -244,9 +244,13 @@ Work a task:
   `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
   open, what to click, what they should see. On a task already done, it only records its human
   check again (the old `--without-owner` still works).
-- `alm checked <id> [--deployed|--locally]`: a person has checked the finished task: it gets a
+- `alm checked <id> [--deployed|--locally] [--result pass|partly] [--words \"<their words>\"]
+  [--checker <pseudonym>]`: a person has checked the finished task: it gets a
   \"by human\" label (deployed and verified by human when it has deployed and verified by agent,
   else locally verified by human) and leaves To check; the note and steps stay in its history. Run it only when the person says so.
+  Its history records who checked (the person you work for unless `--checker`), the steps'
+  fingerprint, the result (`partly`: passed with conditions) and the person's own words; pass
+  them as they said them. A failed check is not `checked`: reopen the task instead.
   It does not review the task's AI decisions.
 - `alm recheck <id> --reason \"<what changed>\" [--steps <file.md>]`: the work of a checked task
   changed afterwards, so the person's check no longer covers it: the task goes back to To check

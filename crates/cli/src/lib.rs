@@ -281,6 +281,17 @@ enum Command {
         /// The person checked it on their own computer: "locally verified by human".
         #[arg(long)]
         locally: bool,
+        /// What the person saw: `pass`, or `partly` (passed with conditions; say which in
+        /// --words). A check that failed is not `alm checked`: reopen or recheck the task instead.
+        #[arg(long, value_name = "RESULT", default_value = "pass", value_parser = ["pass", "partly"])]
+        result: String,
+        /// The person's own words about the check, as they said them.
+        #[arg(long, value_name = "TEXT")]
+        words: Option<String>,
+        /// The checker's pseudonym ID, when it is not the person you work for (this computer's
+        /// person, or `--for`).
+        #[arg(long, value_name = "PSEUDONYM")]
+        checker: Option<String>,
     },
     /// Send a finished task back to To check: its work changed after a person checked it, so
     /// the check no longer covers it. You decide when; say what changed. A task at the top label
@@ -3494,7 +3505,19 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             id,
             deployed,
             locally,
+            result,
+            words,
+            checker,
         } => {
+            let given = allomos_core::labels::CheckGiven {
+                checker: checker.as_deref(),
+                result: if result == "partly" {
+                    allomos_core::labels::CheckResult::Partly
+                } else {
+                    allomos_core::labels::CheckResult::Pass
+                },
+                words: words.as_deref(),
+            };
             let which = if *deployed {
                 Some(allomos_core::labels::DEPLOYED_BY_HUMAN)
             } else if *locally {
@@ -3503,7 +3526,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 None
             };
             change(cli, cwd, |bag| {
-                allomos_core::labels::checked(bag, id, which)
+                allomos_core::labels::checked(bag, id, which, &given)
             })
         }
         Command::Recheck { id, reason, steps } => {
