@@ -889,5 +889,17 @@
   "settings.labels_duplicate": "同じ名前のラベルが 2 つあるか、組み込みラベルと同じ名前のものがあります。",
   "task.not_human_checked_plain": "完了していますが、まだ人が確認していません：人の検証ラベルが付いていません。",
   "edit.labels_none": "ラベル表にまだラベルがありません。",
-  "edit.labels_legend": "このタスクに付いているラベル"
+  "edit.labels_legend": "このタスクに付いているラベル",
+  "pane.approvals": "承認",
+  "pane.approval_by": "{by}、{channel}、{at}",
+  "pane.approval_channel.chat": "会話で",
+  "pane.approval_channel.app": "「肩代」アプリで",
+  "pane.approval_channel.confirm": "確認画面で「進める」",
+  "pane.approval_status.applies": "有効",
+  "pane.approval_status.plan_changed": "もう有効ではありません：計画が変わりました",
+  "pane.approval_status.expired": "もう有効ではありません：{expires} を過ぎました",
+  "pane.approval_status.withdrawn": "取り消し済み（{at}）",
+  "problem.approval_words_missing": "承認したときの本人の言葉をそのまま書いてください。",
+  "problem.approval_not_found": "承認 {id} を記録したタスクはありません。",
+  "problem.approval_already_withdrawn": "承認 {id} はすでに取り消されています。"
 }

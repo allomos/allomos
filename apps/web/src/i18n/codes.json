@@ -3,6 +3,13 @@
     "agent"
   ],
   "ai_decision_missing": [],
+  "approval_already_withdrawn": [
+    "id"
+  ],
+  "approval_not_found": [
+    "id"
+  ],
+  "approval_words_missing": [],
   "area_name_missing": [],
   "area_not_empty": [
     "id",

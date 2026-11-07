@@ -307,6 +307,37 @@ enum Command {
     /// A person has reviewed the task's AI decisions: they leave To review; the history keeps
     /// them. Run it only when the person says so.
     Reviewed { id: String },
+    /// Record a person's approval of a plan (decision 0021): who approved (their pseudonym ID),
+    /// of exactly which plan (the SHA-256 of the tasks' descriptions, or of `--plan`'s file), when,
+    /// through which channel, in their own words, and until when. Once the plan changes, it no
+    /// longer applies. Run it only when the person approved; `alm show` lists a task's approvals.
+    Approve {
+        /// The tasks it covers.
+        #[arg(required = true, value_name = "ID")]
+        ids: Vec<String>,
+        /// The person's own words, exactly as they wrote them (needed for `--channel chat`).
+        #[arg(long, value_name = "TEXT")]
+        words: Option<String>,
+        /// Where they approved: chat (in the conversation), app (a button in the Allomos app) or
+        /// confirm (Go ahead on `alm confirm`, which records it by itself).
+        #[arg(long, default_value = "chat", value_name = "CHANNEL")]
+        channel: String,
+        /// The file holding the plan shown to the person, when it is not the tasks' descriptions.
+        #[arg(long, value_name = "FILE")]
+        plan: Option<PathBuf>,
+        /// The last day it holds (YYYY-MM-DD, UTC), when the person gave one.
+        #[arg(long, value_name = "DATE")]
+        expires: Option<String>,
+        /// The approver's pseudonym ID, when it is not this computer's person.
+        #[arg(long, value_name = "PSEUDONYM")]
+        approver: Option<String>,
+    },
+    /// Withdraw an approval (when the person takes it back): it no longer applies; the history
+    /// keeps it. Say why with `--why`.
+    Withdraw {
+        #[arg(value_name = "APPROVAL ID")]
+        id: String,
+    },
     /// Show one task in full.
     Show { id: String },
     /// Fill in or correct the session a task records, afterwards (Task-A03-ham538): each option
@@ -818,6 +849,8 @@ impl Command {
             | Command::Drop { id }
             | Command::Reopen { id, .. } => Some(id),
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
+            Command::Approve { ids, .. } => ids.first().map(String::as_str),
+            Command::Withdraw { .. } => None,
             Command::Init { .. }
             | Command::Labels { .. }
             | Command::Project { .. }
@@ -936,6 +969,8 @@ impl Command {
             Command::Recheck { .. } => "recheck",
             Command::AiDecided { .. } => "ai-decided",
             Command::Reviewed { .. } => "reviewed",
+            Command::Approve { .. } => "approve",
+            Command::Withdraw { .. } => "withdraw",
             Command::Human { .. } => "human",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
@@ -1710,19 +1745,25 @@ fn confirm(
                 "The person chose Go ahead, for exactly this plan (fingerprint {}). If the plan changes, ask again.\n",
                 asked.fingerprint
             );
+            let mut approval = Value::Null;
             if let (Some(root), Some(id)) = (&root, task) {
-                let task = allomos_store::record_approval(
+                let approved = allomos_store::record_approval(
                     root,
                     Actor::alm(cli.holder.as_deref()),
                     lock_wait(),
                     id,
                     title,
-                    &asked.fingerprint,
+                    &plan.to_string_lossy(),
+                    &text,
                 )?;
-                out.push_str(&format!("Recorded in {}'s history.\n", task.id));
+                out.push_str(&format!(
+                    "Recorded in {}'s history as approval {}: pass `--approval {}` on the changes that rely on it.\n",
+                    id, approved.approval.id, approved.approval.id
+                ));
+                approval = json!(approved.approval);
             }
             Ok(Done::new(
-                json!({ "answer": "yes", "project": project, "fingerprint": asked.fingerprint, "task": task }),
+                json!({ "answer": "yes", "project": project, "fingerprint": asked.fingerprint, "task": task, "approval": approval }),
                 out,
             ))
         }
@@ -2055,6 +2096,7 @@ fn decision_lines(decisions: &[Decision]) -> String {
 }
 
 /// One line about a task: ID, state, label, holder, title.
+mod approve;
 mod folders;
 
 fn task_line(t: &Task) -> String {
@@ -3077,6 +3119,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str("AI decided (to review):\n");
                 text.push_str(&decision_lines(&decisions));
             }
+            let approvals = allomos_store::approvals::approvals(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            text.push_str(&approve::lines(&approvals));
             // Whoever takes over checks before trusting the handoff note and repeats nothing
             // (Task-A03-23).
             let taking_over = task.handoff_note.as_ref().map(|_| handoff::TAKING_OVER);
@@ -3094,7 +3140,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "ai_decisions": decisions, "approvals": approvals, "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3500,6 +3546,26 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = d.issues;
             Ok(done)
         }
+        Command::Approve {
+            ids,
+            words,
+            channel,
+            plan,
+            expires,
+            approver,
+        } => approve::approve(
+            cli,
+            cwd,
+            &approve::Args {
+                ids,
+                words: words.as_deref(),
+                channel,
+                plan: plan.as_deref(),
+                expires: expires.as_deref(),
+                approver: approver.as_deref(),
+            },
+        ),
+        Command::Withdraw { id } => approve::withdraw(cli, cwd, id),
         Command::Reviewed { id } => {
             let root = locate(cli, cwd)?;
             let d = allomos_store::review_ai_decisions(

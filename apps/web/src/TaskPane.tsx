@@ -12,7 +12,7 @@
 // rows (Task-A03-37), and History names the agent behind each change.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useI18n } from "./i18n";
+import { useI18n, type Key } from "./i18n";
 import { WhoForm } from "./WhoForm";
 import { Markdown } from "./Markdown";
 import { localTime } from "./timeFlow";
@@ -620,6 +620,28 @@ export function TaskPane({
               {error && !editing && asking === "reviewed" && <p className="banner error small">{error}</p>}
             </>
           )}
+        </div>
+      )}
+      {(task.approvals ?? []).length > 0 && (
+        <div className="pane-check pane-approvals">
+          <h3>{t("pane.approvals")}</h3>
+          <ul className="approvals">
+            {(task.approvals ?? []).map((a) => (
+              <li key={a.id} className={a.status === "applies" ? "" : "muted"}>
+                {a.words ? `“${a.words}”` : a.id}{" "}
+                <span className="muted small">
+                  {t("pane.approval_by", {
+                    by: a.approver || t("pane.history_someone"),
+                    channel: t(`pane.approval_channel.${a.channel}` as Key),
+                    at: localTime(a.at),
+                  })}
+                </span>{" "}
+                <span className="badge small">
+                  {t(`pane.approval_status.${a.status}` as Key, { at: a.withdrawn_at ? localTime(a.withdrawn_at) : "", expires: a.expires ?? "" })}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {canReopen(task) && (

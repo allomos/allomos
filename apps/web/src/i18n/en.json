@@ -889,5 +889,17 @@
   "settings.labels_duplicate": "Two labels have the same name, or one has a built-in label's name.",
   "task.not_human_checked_plain": "Done, and no person has checked it yet: it carries no “by human” label.",
   "edit.labels_none": "No label in the table yet.",
-  "edit.labels_legend": "The labels this task carries"
+  "edit.labels_legend": "The labels this task carries",
+  "pane.approvals": "Approvals",
+  "pane.approval_by": "{by}, {channel}, {at}",
+  "pane.approval_channel.chat": "in the conversation",
+  "pane.approval_channel.app": "in the Allomos app",
+  "pane.approval_channel.confirm": "Go ahead on a confirmation",
+  "pane.approval_status.applies": "Applies",
+  "pane.approval_status.plan_changed": "No longer applies: the plan changed",
+  "pane.approval_status.expired": "No longer applies: expired after {expires}",
+  "pane.approval_status.withdrawn": "Withdrawn {at}",
+  "problem.approval_words_missing": "Give the person's own words of approval, as they wrote them.",
+  "problem.approval_not_found": "No task records approval {id}.",
+  "problem.approval_already_withdrawn": "Approval {id} is already withdrawn."
 }

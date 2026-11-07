@@ -10,3 +10,5 @@ publish.workspace = true
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+# SHA-256 of approved plans (Task-A01-coach782); the version the lockfile already had.
+sha2 = "=0.10.9"

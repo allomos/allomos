@@ -889,5 +889,17 @@
   "settings.labels_duplicate": "有两个标签名字相同，或有一个和内置标签同名。",
   "task.not_human_checked_plain": "已完成，还没有人检查过：它没有人工验证的标签。",
   "edit.labels_none": "标签表里还没有标签。",
-  "edit.labels_legend": "这个任务带着的标签"
+  "edit.labels_legend": "这个任务带着的标签",
+  "pane.approvals": "批准",
+  "pane.approval_by": "{by}，{channel}，{at}",
+  "pane.approval_channel.chat": "在对话中",
+  "pane.approval_channel.app": "在「换肩」应用中",
+  "pane.approval_channel.confirm": "在确认窗口中选了继续",
+  "pane.approval_status.applies": "有效",
+  "pane.approval_status.plan_changed": "不再适用：计划已改",
+  "pane.approval_status.expired": "不再适用：已于 {expires} 之后失效",
+  "pane.approval_status.withdrawn": "已撤回（{at}）",
+  "problem.approval_words_missing": "请写下这个人批准时的原话。",
+  "problem.approval_not_found": "没有任务记有批准 {id}。",
+  "problem.approval_already_withdrawn": "批准 {id} 已经撤回。"
 }
