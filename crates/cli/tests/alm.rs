@@ -3504,7 +3504,6 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
     // under To review; `alm reviewed` takes it off, and the history keeps both.
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    let before = task_file(&repo, "A01-01");
     let events = event_count(&repo);
     refused(
         &repo,

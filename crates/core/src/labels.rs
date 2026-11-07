@@ -116,11 +116,9 @@ pub fn deserialize_table<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<LabelEnt
 /// into `labels` as the upgrade writes it, without the history (so `human verified` reads as
 /// `locally verified by human`). Nothing changes for an `allomos/7` task.
 pub fn read_old_label(task: &mut Task) {
-    if let Some(old) = task.extra.remove("label") {
-        if let Value::String(old) = old {
-            if let Some(new) = upgraded_label(&old, false) {
-                task.add_label(&new);
-            }
+    if let Some(Value::String(old)) = task.extra.remove("label") {
+        if let Some(new) = upgraded_label(&old, false) {
+            task.add_label(&new);
         }
     }
 }
