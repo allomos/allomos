@@ -393,8 +393,70 @@ export function untickedNames(filter: StateFilter, t: T): string[] {
   });
 }
 
-/** The filter's name as the Show button words it: "All tasks", "Hide Backlog, Dropped", "Filtered (3 hidden)". */
+/**
+ * The Show filter's presets (Task-A01-wigwam308): each only sets the grid's ticks, adding no rule
+ * of its own. Five tick whole rows; "Needs you" ticks what `alm human` lists: To check (Done,
+ * "Checked by a human: No"), To answer (the whole Waiting row) and To review ("AI decisions to
+ * review: Yes" in every row, a checked Done task among them).
+ */
+export type Preset = "all" | "not_finished" | "ready" | "in_hand" | "needs_you" | "finished";
+
+export const PRESETS: Preset[] = ["all", "not_finished", "ready", "in_hand", "needs_you", "finished"];
+
+/** The rows a row preset ticks whole. */
+const PRESET_ROWS: Record<Exclude<Preset, "needs_you">, State[]> = {
+  all: FILTER_STATES,
+  not_finished: ["backlog", "ready", "in_progress", "waiting", "blocked"],
+  ready: ["ready"],
+  in_hand: ["in_progress", "waiting", "blocked"],
+  finished: ["done", "dropped"],
+};
+
+/** The grid's ticks a preset sets, on this label table. */
+export function presetFilter(preset: Preset, labels: readonly string[]): StateFilter {
+  const none = tickAll(allTicked(labels), false);
+  if (preset !== "needs_you") return PRESET_ROWS[preset].reduce((f, s) => tickRow(f, s, true), none);
+  let f = tickRow(none, "waiting", true);
+  for (const s of FILTER_STATES) f = tickCell(f, s, AI_DECISIONS, "yes", true);
+  return tickCell(f, "done", HUMAN_COLUMN, "no", true);
+}
+
+/** The preset whose ticks the filter has exactly, worked out once per filter; `null`: none. */
+const matched = new WeakMap<StateFilter, Preset | null>();
+export function matchPreset(filter: StateFilter): Preset | null {
+  if (matched.has(filter)) return matched.get(filter) ?? null;
+  const off = lookup(filter).off;
+  const found =
+    PRESETS.find((p) => {
+      const cells = presetFilter(p, filter.labels).off;
+      return cells.length === off.size && cells.every((c) => off.has(cellKey(c.state, c.column, c.side)));
+    }) ?? null;
+  matched.set(filter, found);
+  return found;
+}
+
+/** A preset's name: "All tasks", "Needs you". */
+export function presetName(preset: Preset, t: T): string {
+  return preset === "all" ? t("filter.all_tasks") : t(`filter.preset.${preset}` as Key);
+}
+
+/** What a preset ticks, in words: its rows by name, or a sentence for "All tasks" and "Needs you". */
+export function presetTicks(preset: Preset, t: T): string {
+  if (preset === "all" || preset === "needs_you") return t(`filter.preset_ticks.${preset}` as Key);
+  return PRESET_ROWS[preset].map((s) => t(`state.${s}` as Key)).join(t("filter.list_sep"));
+}
+
+/** How many of these tasks a preset lists now. */
+export function presetCount(preset: Preset, labels: readonly string[], tasks: readonly Task[]): number {
+  const f = presetFilter(preset, labels);
+  return tasks.filter((task) => keepState(f, task)).length;
+}
+
+/** The filter's name as the Show button words it: a preset's name when the ticks are exactly a
+ * preset's ("All tasks", "Needs you"), else "Hide Backlog, Dropped", "Filtered (3 hidden)". */
 export function filterName(filter: StateFilter, t: T): string {
+  const preset = matchPreset(filter);
+  if (preset) return presetName(preset, t);
   const off = untickedNames(filter, t);
   if (off.length === 0) return t("filter.all_tasks");
   if (off.length <= 2) return t("filter.hide", { names: off.join(t("filter.list_sep")) });

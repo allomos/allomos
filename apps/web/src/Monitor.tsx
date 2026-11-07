@@ -179,6 +179,7 @@ export function MonitorControl({
   onOpen,
   onOpenSession,
   onError,
+  onNeedYou,
 }: {
   monitor: Monitor;
   tasks: Task[];
@@ -189,6 +190,8 @@ export function MonitorControl({
   onOpen: () => void;
   onOpenSession: (id: string) => Promise<void>;
   onError: (e: unknown) => void;
+  /** Picks the Show filter's "Needs you" preset (Task-A01-wigwam308): "K need you" is then a link. */
+  onNeedYou?: () => void;
 }) {
   const { t } = useI18n();
   const { run, last, now } = monitor;
@@ -201,7 +204,18 @@ export function MonitorControl({
         {last && counts && (
           <span className="monitor-last muted small">
             {t("monitor.last_run", { time: localTime(last.ended), scope: scopeName(last.scope, t), done: counts.done })}
-            {counts.needYou > 0 && <> · {t("monitor.last_run_need", { n: counts.needYou })}</>}
+            {counts.needYou > 0 && (
+              <>
+                {" · "}
+                {onNeedYou ? (
+                  <button type="button" className="link" title={t("monitor.last_run_need_tip")} onClick={onNeedYou}>
+                    {t("monitor.last_run_need", { n: counts.needYou })}
+                  </button>
+                ) : (
+                  t("monitor.last_run_need", { n: counts.needYou })
+                )}
+              </>
+            )}
           </span>
         )}
         <button type="button" className="monitor-button" onClick={onOpen} title={ready === 0 ? t("monitor.button_none_tip") : undefined}>

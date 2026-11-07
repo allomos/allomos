@@ -823,6 +823,21 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .filter-grid tbody tr td:first-child { border-radius: 6px 0 0 6px; }
 .filter-grid tbody tr td:last-child { border-radius: 0 6px 6px 0; }
 .filter-empty { color: var(--warn); margin: 6px 8px 2px; }
+/* Task-A01-wigwam308: the panel's two tabs (Presets, Custom) and the preset list. */
+.filter-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: -6px -4px 6px; padding: 0 6px; }
+.filter-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 13px; padding: 7px 12px 6px; margin-bottom: -1px; }
+.filter-tabs button.on { color: var(--ink); font-weight: 650; border-bottom-color: var(--accent); }
+.filter-presets { display: flex; flex-direction: column; min-width: 340px; max-width: 460px; }
+.filter-preset { display: flex; align-items: flex-start; gap: 8px; text-align: left; border: 0; border-radius: 6px; background: none; padding: 6px 8px; font-weight: 400; }
+.filter-preset:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.filter-preset.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.filter-preset-mark { flex: none; width: 14px; color: var(--accent-ink); font-weight: 650; }
+.filter-preset-words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.filter-preset-name { font-weight: 600; }
+.filter-preset.on .filter-preset-name { color: var(--accent-ink); }
+.filter-preset-ticks { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.filter-preset-count { flex: none; color: var(--muted); font-size: 12px; white-space: nowrap; padding-top: 1px; }
+.monitor-last button.link { align-self: baseline; font-size: inherit; line-height: inherit; }
 /* A phone (Task-A04-02-03): one column, the ID before the title on the first line. */
 @media (max-width: 720px) {
   .task { display: block; }
