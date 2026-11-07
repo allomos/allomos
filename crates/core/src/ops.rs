@@ -1168,6 +1168,12 @@ pub enum Edit {
     Label {
         label: String,
     },
+    /// Every label the task carries, as the Labels picker chose them (Task-A01-petal376): like
+    /// `alm label` for each one added and `alm label --remove` for each one left out.
+    Labels {
+        #[serde(default)]
+        labels: Vec<String>,
+    },
     /// What the task waits on; like `alm wait`, this also makes it `waiting` (its `who` stays).
     WaitingOn {
         text: String,
@@ -1248,6 +1254,9 @@ pub fn edit(
             }),
         },
         Edit::Label { label } => set_label(taskbag, id, me, label).map(|o| (o, "label")),
+        Edit::Labels { labels } => {
+            crate::labels::set(taskbag, id, me, labels).map(|o| (o, "label"))
+        }
         Edit::WaitingOn { text } => {
             let who = find_task(taskbag, id)?.who;
             wait(taskbag, id, me, text, who.as_deref()).map(|o| (o, "wait"))
@@ -2160,6 +2169,41 @@ mod tests {
             set_next(&s, "Z", None, None).map(|_| ()),
             Err(Problem::TaskNotFound { id: "Z".into() })
         );
+    }
+
+    #[test]
+    /// Task-A01-petal376: the app's Labels picker sets every label at once, by the rules of
+    /// `alm label` and `alm label --remove`; a "by human" label on a done task is the human check.
+    fn the_labels_picker_adds_and_removes_by_the_alm_rules() {
+        use crate::labels::{AI_DECISIONS, DEPLOYED_BY_AGENT, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN};
+        let mut s = bag();
+        let mut t = find_task(&s, "A01-01").unwrap();
+        t.state = State::Done;
+        t.labels = vec![LOCALLY_BY_AGENT.into(), AI_DECISIONS.into()];
+        t.without_human_check = Some("loop run".into());
+        t.human_check_steps = Some("1. Open it.".into());
+        put!(s, t);
+        let e: Edit = serde_json::from_str(
+            r#"{"field":"labels","labels":[" locally verified by agent ","deployed and verified by agent",""]}"#,
+        )
+        .unwrap();
+        let (o, command) = edit(&s, "A01-01", Some("z"), &e).unwrap();
+        assert_eq!(command, "label");
+        assert_eq!(o.task.labels, [LOCALLY_BY_AGENT, DEPLOYED_BY_AGENT]);
+        assert!(o.task.to_check(), "only by-agent labels: still to check");
+        assert_eq!(o.task.without_human_check.as_deref(), Some("loop run"));
+        let checked = crate::labels::set(&s, "A01-01", None, &[LOCALLY_BY_HUMAN.into()]).unwrap();
+        assert_eq!(checked.task.labels, [LOCALLY_BY_HUMAN]);
+        assert!(!checked.task.to_check());
+        assert_eq!(checked.task.without_human_check, None);
+        assert_eq!(checked.task.human_check_steps, None);
+        let none = crate::labels::set(&s, "A01-01", None, &[]).unwrap();
+        assert!(none.task.labels.is_empty());
+        put!(s, claim(&s, "A01-02", Some("a"), false).unwrap().task);
+        assert!(matches!(
+            crate::labels::set(&s, "A01-02", Some("b"), &[LOCALLY_BY_AGENT.into()]),
+            Err(Problem::TaskHeld { .. })
+        ));
     }
 
     #[test]

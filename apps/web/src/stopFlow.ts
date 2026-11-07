@@ -5,7 +5,7 @@
 // blocker is done the app only says so, as `alm` does.
 
 import type { Key } from "./i18n";
-import type { Opened, State, Task } from "./types";
+import type { LabelEntry, Opened, Project, State, Task } from "./types";
 
 type T = (key: Key, params?: Record<string, string | number>) => string;
 
@@ -65,20 +65,116 @@ export function stopFact(task: Task, tasks: readonly Task[], t: T): StopFact | n
   return null;
 }
 
-/** Finished without the human check and not checked since: "Not human-checked" (Task-A03-18). */
+// Labels (decision 0020, Task-A01-petal376): Allomos's five built-in labels, a task's labels, the
+// project's label table as the app lists it, To check, and which "by human" label Checked adds.
+// Every label is plain: no kind, no order, none excludes another; a task has a label or not.
+// The same rules as crates/core/src/labels.rs; Rust decides every change.
+
+export const LOCALLY_BY_AGENT = "locally verified by agent";
+export const DEPLOYED_BY_AGENT = "deployed and verified by agent";
+export const LOCALLY_BY_HUMAN = "locally verified by human";
+export const DEPLOYED_BY_HUMAN = "deployed and verified by human";
+export const AI_DECISIONS = "AI decisions to review";
+
+/** The built-in labels in the table's order, each with its words in the interface language. */
+const BUILT_IN: { name: string; key: Key; meaning: Key }[] = [
+  { name: LOCALLY_BY_AGENT, key: "label.locally_by_agent", meaning: "label.meaning.locally_by_agent" },
+  { name: DEPLOYED_BY_AGENT, key: "label.deployed_by_agent", meaning: "label.meaning.deployed_by_agent" },
+  { name: LOCALLY_BY_HUMAN, key: "label.locally_by_human", meaning: "label.meaning.locally_by_human" },
+  { name: DEPLOYED_BY_HUMAN, key: "label.deployed_by_human", meaning: "label.meaning.deployed_by_human" },
+  { name: AI_DECISIONS, key: "label.ai_decisions", meaning: "label.meaning.ai_decisions" },
+];
+
+export const BUILT_IN_NAMES: readonly string[] = BUILT_IN.map((b) => b.name);
+
+/** Either one is the human check. */
+export const BY_HUMAN: readonly string[] = [LOCALLY_BY_HUMAN, DEPLOYED_BY_HUMAN];
+
+export function isBuiltIn(label: string): boolean {
+  return BUILT_IN_NAMES.includes(label);
+}
+
+/** The labels a task carries, in the order they were added. */
+export function taskLabels(task: Task): string[] {
+  return task.labels ?? [];
+}
+
+export function hasLabel(task: Task, label: string): boolean {
+  return taskLabels(task).includes(label);
+}
+
+/** A person has checked it: it carries a "by human" label. */
+export function humanChecked(task: Task): boolean {
+  return BY_HUMAN.some((l) => hasLabel(task, l));
+}
+
+/** To check (decision 0020): a done task with neither "by human" label. Not a label: worked out. */
 export function toCheck(task: Task): boolean {
-  return task.state === "done" && !!task.without_human_check;
+  return task.state === "done" && !humanChecked(task);
+}
+
+/** The task pane's Check row: a person checked it (a "by human" label on a done task), it waits
+ * for one (To check), or not yet (not done). */
+export type Check = "checked" | "to_check" | "not_yet";
+
+export function check(task: Task): Check {
+  if (task.state !== "done") return "not_yet";
+  return humanChecked(task) ? "checked" : "to_check";
+}
+
+/** An agent decided things here that wait for review: the task carries "AI decisions to review". */
+export function toReview(task: Task): boolean {
+  return hasLabel(task, AI_DECISIONS);
+}
+
+/** The "by human" label Checked adds, as `alm checked` decides it: "deployed and verified by
+ * human" when the task carries "deployed and verified by agent", else "locally verified by human". */
+export function checkedLabel(task: Task): string {
+  return hasLabel(task, DEPLOYED_BY_AGENT) ? DEPLOYED_BY_HUMAN : LOCALLY_BY_HUMAN;
+}
+
+/** The project's label table as the app lists it: the built-in labels first, in their own order,
+ * then the others as the table lists them, then any label a task carries that the table does not
+ * list yet (Rust adds it on the next change). Each name once. */
+export function labelTable(project: Pick<Project, "labels"> | undefined, tasks: readonly Task[] = []): LabelEntry[] {
+  // A taskbag read before `allomos/7` may still send plain names.
+  const table = (project?.labels ?? []).map((e): LabelEntry => (typeof e === "string" ? { name: e } : e));
+  const out: LabelEntry[] = BUILT_IN.map((b) => ({ ...(table.find((e) => e.name === b.name) ?? { name: b.name }), built_in: true }));
+  const add = (e: LabelEntry) => {
+    if (!out.some((o) => o.name === e.name)) out.push({ ...e, built_in: false });
+  };
+  table.forEach(add);
+  tasks.forEach((task) => taskLabels(task).forEach((name) => add({ name })));
+  return out;
+}
+
+/** The names of the table, built-in first. */
+export function labelNames(project: Pick<Project, "labels"> | undefined, tasks: readonly Task[] = []): string[] {
+  return labelTable(project, tasks).map((e) => e.name);
+}
+
+/** A label as the app shows it: a built-in one in the interface language, others as written. */
+export function labelText(label: string, t: T): string {
+  const b = BUILT_IN.find((x) => x.name === label);
+  return b ? t(b.key) : label;
+}
+
+/** A label's meaning as the settings show it: a built-in one in the interface language, a custom
+ * one as the project wrote it (empty when it wrote none). */
+export function labelMeaning(entry: LabelEntry, t: T): string {
+  const b = BUILT_IN.find((x) => x.name === entry.name);
+  return b ? t(b.meaning) : (entry.meaning ?? "");
+}
+
+/** The labels a task shows as chips in the list and the pane: every label it carries, except
+ * "AI decisions to review", which its own badge shows. */
+export function chipLabels(task: Task): string[] {
+  return taskLabels(task).filter((l) => l !== AI_DECISIONS);
 }
 
 /** Why it was finished without the human check (the note). */
 export function humanCheckNote(task: Task): string {
   return task.without_human_check ?? "";
-}
-
-/** An AI agent decided something here on its own, and nobody has reviewed it yet: "AI decisions to review"
- * (Task-A03-19). */
-export function toReview(task: Task): boolean {
-  return (task.ai_decisions?.length ?? 0) > 0;
 }
 
 /** The opened taskbag with each task's AI decisions to review put on the task (Task-A03-19). */
@@ -91,22 +187,22 @@ export function withDecisions(opened: Opened): Opened {
 }
 
 /**
- * The list's filter (Task-A01-lens781): ticks in two groups, states and labels; a task is listed
- * when its state is ticked and, for each label of the ladder, its side is ticked: Yes when it has
- * reached that label (its own label is that one or a higher one), No when it has not (no label, or
- * one off the ladder). Everything ticked is no filter at all. Kept as what is unticked, so a state
- * or label new to the list starts ticked; `ladder` is the project's, filled in when the list draws.
- * Labeled (Task-A01-teacup726) comes first: its Yes keeps tasks that carry a label, its No those
- * that carry none; a task with no label is decided by Labeled's No alone, and the ladder's sides
- * apply only to labelled tasks.
+ * The list's filter (Task-A01-lens781; decision 0020, Task-A01-petal376): ticks in two groups,
+ * states and labels; a task is listed when its state is ticked and, for each label of the
+ * project's label table, its side is ticked: Yes when the task has that label, No when it does
+ * not. Every label is plain: no order, no "this one or higher". Everything ticked is no filter at
+ * all. Kept as what is unticked, so a state or label new to the list starts ticked; `labels` are
+ * the table's names, built-in first, filled in when the list draws. Labeled (Task-A01-teacup726)
+ * comes first: its Yes keeps tasks that carry a label, its No those that carry none; a task with
+ * no label is decided by Labeled's No alone, and each label's sides apply only to labelled tasks.
  */
-export type StateFilter = { states: State[]; labeled: Side[]; yes: string[]; no: string[]; ladder: string[] };
+export type StateFilter = { states: State[]; labeled: Side[]; yes: string[]; no: string[]; labels: string[] };
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
 /** Everything ticked: every task listed. */
-export function allTicked(ladder: readonly string[] = []): StateFilter {
-  return { states: [], labeled: [], yes: [], no: [], ladder: [...ladder] };
+export function allTicked(labels: readonly string[] = []): StateFilter {
+  return { states: [], labeled: [], yes: [], no: [], labels: [...labels] };
 }
 
 /** One side of a label's tick. */
@@ -114,15 +210,16 @@ export type Side = "yes" | "no";
 
 const SIDES: Side[] = ["yes", "no"];
 
-/** The filter for this ladder: unticked labels no longer on it are let go. */
-export function onLadder(filter: StateFilter, ladder: readonly string[]): StateFilter {
-  const keep = (labels: string[]) => labels.filter((l) => ladder.includes(l));
+/** The filter for this label table: unticked labels no longer in it are let go (so are an older
+ * build's ladder steps, which `allomos/7` renamed). */
+export function onTable(filter: StateFilter, labels: readonly string[]): StateFilter {
+  const keep = (list: string[]) => list.filter((l) => labels.includes(l));
   return {
     states: filter.states.filter((s) => FILTER_STATES.includes(s)),
     labeled: SIDES.filter((s) => filter.labeled.includes(s)),
     yes: keep(filter.yes),
     no: keep(filter.no),
-    ladder: [...ladder],
+    labels: [...labels],
   };
 }
 
@@ -131,18 +228,14 @@ export function isAll(filter: StateFilter): boolean {
   return filter.states.length === 0 && filter.labeled.length === 0 && filter.yes.length === 0 && filter.no.length === 0;
 }
 
-/** Whether a task has reached `label`: its own label is that one or a higher one on the ladder. */
-export function reached(task: Task, label: string, ladder: readonly string[]): boolean {
-  const own = task.label ? ladder.indexOf(task.label) : -1;
-  return own >= 0 && own >= ladder.indexOf(label);
-}
-
-/** The tasks the filter keeps. */
+/** The tasks the filter keeps: its state ticked; with no label, Labeled's No ticked; with labels,
+ * Labeled's Yes ticked and, for every label in the table, Yes ticked if the task has it, No if not. */
 export function keepState(filter: StateFilter, task: Task): boolean {
   if (filter.states.includes(task.state)) return false;
-  if (!task.label) return !filter.labeled.includes("no");
+  const has = taskLabels(task);
+  if (has.length === 0) return !filter.labeled.includes("no");
   if (filter.labeled.includes("yes")) return false;
-  return filter.ladder.every((label) => !(reached(task, label, filter.ladder) ? filter.yes : filter.no).includes(label));
+  return filter.labels.every((label) => !(has.includes(label) ? filter.yes : filter.no).includes(label));
 }
 
 /** A state ticked or unticked. */
@@ -151,34 +244,34 @@ export function tickState(filter: StateFilter, state: State, on: boolean): State
   return { ...filter, states: on ? states : FILTER_STATES.filter((s) => s === state || states.includes(s)) };
 }
 
-/** One side of Labeled ticked or unticked; the ladder's ticks stay as they were. */
+/** One side of Labeled ticked or unticked; each label's ticks stay as they were. */
 export function tickLabeled(filter: StateFilter, side: Side, on: boolean): StateFilter {
   const list = filter.labeled.filter((s) => s !== side);
   return { ...filter, labeled: on ? list : SIDES.filter((s) => s === side || list.includes(s)) };
 }
 
-/** Whether the ladder's rows are greyed out: Labeled's Yes is unticked, so no labelled task is shown. */
-export function ladderOff(filter: StateFilter): boolean {
+/** Whether the labels' rows are greyed out: Labeled's Yes is unticked, so no labelled task is shown. */
+export function labelsOff(filter: StateFilter): boolean {
   return filter.labeled.includes("yes");
 }
 
 /** One side of a label ticked or unticked. */
 export function tickLabel(filter: StateFilter, label: string, side: Side, on: boolean): StateFilter {
   const list = filter[side].filter((l) => l !== label);
-  return { ...filter, [side]: on ? list : filter.ladder.filter((l) => l === label || list.includes(l)) };
+  return { ...filter, [side]: on ? list : filter.labels.filter((l) => l === label || list.includes(l)) };
 }
 
 /** A whole group ticked (Select all) or unticked (Clear all). */
 export function tickGroup(filter: StateFilter, group: "states" | "labels", on: boolean): StateFilter {
   if (group === "states") return { ...filter, states: on ? [] : [...FILTER_STATES] };
-  return { ...filter, labeled: on ? [] : [...SIDES], yes: on ? [] : [...filter.ladder], no: on ? [] : [...filter.ladder] };
+  return { ...filter, labeled: on ? [] : [...SIDES], yes: on ? [] : [...filter.labels], no: on ? [] : [...filter.labels] };
 }
 
 /** Whether a group is all ticked, or all unticked: the grey Select all, the grey Clear all. */
 export function groupTicks(filter: StateFilter, group: "states" | "labels"): { all: boolean; none: boolean } {
   if (group === "states") return { all: filter.states.length === 0, none: filter.states.length === FILTER_STATES.length };
   const off = filter.labeled.length + filter.yes.length + filter.no.length;
-  return { all: off === 0, none: off === (filter.ladder.length + 1) * 2 };
+  return { all: off === 0, none: off === (filter.labels.length + 1) * 2 };
 }
 
 /** Why the filter lists no task at all, whatever the tasks: no state ticked, Labeled with neither
@@ -187,23 +280,8 @@ export function emptyBy(filter: StateFilter): { kind: "states" } | { kind: "labe
   if (filter.states.length === FILTER_STATES.length) return { kind: "states" };
   if (filter.labeled.length === SIDES.length) return { kind: "labeled" };
   if (!filter.labeled.includes("no")) return null;
-  const label = filter.ladder.find((l) => filter.yes.includes(l) && filter.no.includes(l));
+  const label = filter.labels.find((l) => filter.yes.includes(l) && filter.no.includes(l));
   return label === undefined ? null : { kind: "label", label };
-}
-
-/** The ladder's own labels, which the filter shows in the interface language; others as written. */
-const LADDER_KEYS: Record<string, Key> = {
-  drafted: "filter.ladder.drafted",
-  implemented: "filter.ladder.implemented",
-  "locally verified": "filter.ladder.locally_verified",
-  "deployed and verified": "filter.ladder.deployed_and_verified",
-  "human verified": "filter.ladder.human_verified",
-};
-
-/** A label as the filter shows it. */
-export function labelText(label: string, t: T): string {
-  const key = LADDER_KEYS[label];
-  return key ? t(key) : label;
 }
 
 /** The filter as stored: what is unticked. */
@@ -223,7 +301,7 @@ export function readFilter(value: string | null, old: string | null = null): Sta
       const v = JSON.parse(value) as Record<string, unknown>;
       const states = words(v.states).filter((s): s is State => (FILTER_STATES as string[]).includes(s));
       const labeled = SIDES.filter((s) => words(v.labeled).includes(s));
-      return { states, labeled, yes: words(v.yes), no: words(v.no), ladder: [] };
+      return { states, labeled, yes: words(v.yes), no: words(v.no), labels: [] };
     } catch {
       return allTicked();
     }
@@ -251,13 +329,13 @@ export function hiddenText(hidden: Hidden, t: T): string {
 }
 
 /** The unticked boxes by name, in the panel's order: states, Labeled's Yes and No, then each
- * label's Yes and No, unless the ladder is greyed out (its ticks then hide nothing). */
+ * label's Yes and No, unless the labels are greyed out (their ticks then hide nothing). */
 export function untickedNames(filter: StateFilter, t: T): string[] {
   const side = (label: string, s: Side) => t(`filter.side_${s}`, { label: labelText(label, t) });
   return [
     ...FILTER_STATES.filter((s) => filter.states.includes(s)).map((s) => t(`state.${s}` as Key)),
     ...SIDES.filter((s) => filter.labeled.includes(s)).map((s) => t(`filter.side_${s}`, { label: t("filter.labeled") })),
-    ...(ladderOff(filter) ? [] : filter.ladder).flatMap((l) => [
+    ...(labelsOff(filter) ? [] : filter.labels).flatMap((l) => [
       ...(filter.yes.includes(l) ? [side(l, "yes")] : []),
       ...(filter.no.includes(l) ? [side(l, "no")] : []),
     ]),

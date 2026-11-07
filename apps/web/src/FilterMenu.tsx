@@ -1,9 +1,9 @@
 // The task list's Show filter (Task-A01-lens781): a button saying what is hidden, which opens a
 // panel of ticks in two groups, states and labels, each label with a Yes and a No; each group has
 // Select all and Clear all, grey when there is nothing for them to do, and a ↻ beside the button
-// ticks everything again. The Labels column starts with Labeled (Task-A01-teacup726), the ladder's
-// labels indented under it and greyed out while its Yes is unticked. What the ticks keep is
-// decided in stopFlow.ts.
+// ticks everything again. The Labels column starts with Labeled (Task-A01-teacup726), then every
+// label of the project's label table, built-in first (decision 0020), indented under it and greyed
+// out while its Yes is unticked. What the ticks keep is decided in stopFlow.ts.
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
@@ -14,7 +14,7 @@ import {
   filterName,
   groupTicks,
   isAll,
-  ladderOff,
+  labelsOff,
   labelText,
   tickGroup,
   tickLabel,
@@ -58,7 +58,7 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
       </span>
     );
   };
-  const greyed = ladderOff(filter);
+  const greyed = labelsOff(filter);
   const side = (label: string, s: Side) => (
     <label className="filter-side">
       <input
@@ -97,7 +97,7 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
         disabled={isAll(filter)}
         aria-label={t("filter.restore")}
         title={t("filter.restore")}
-        onClick={() => onChange(allTicked(filter.ladder))}
+        onClick={() => onChange(allTicked(filter.labels))}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">
           <path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M15.5 4v3h-3" />
@@ -122,7 +122,7 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
                 </label>
               ))}
             </div>
-            {filter.ladder.length > 0 && (
+            {filter.labels.length > 0 && (
               <div className="filter-column">
                 <div className="filter-heading">
                   <span title={t("filter.labels_hint")}>{t("filter.labels")}</span>
@@ -135,7 +135,7 @@ export function FilterMenu({ filter, onChange }: { filter: StateFilter; onChange
                   {labeledSide("yes")}
                   {labeledSide("no")}
                 </div>
-                {filter.ladder.map((label) => (
+                {filter.labels.map((label) => (
                   <div key={label} className={greyed ? "filter-row filter-label-row filter-child off" : "filter-row filter-label-row filter-child"}>
                     <span className="filter-label-name">{labelText(label, t)}</span>
                     {side(label, "yes")}

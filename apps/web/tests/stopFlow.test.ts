@@ -1,10 +1,11 @@
 // Tests for how a stopped task is worded, and the list's Show filter (decision 0016, Task-A01-31,
-// Task-A01-lens781).
+// Task-A01-lens781; decision 0020, Task-A01-petal376).
 // Run: npm --prefix apps/web test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FILTER_STATES, allTicked, allBlockersDone, blockers, bothBanner, emptyBy, filterBanner, filterGroups, filterName, groupTicks, hiddenByFilter, isAll, labelText, ladderOff, onLadder, reached, searchBanner, storeFilter, taskCount, taskListBanners, tickGroup, tickLabel, tickLabeled, tickState, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { FILTER_STATES, allTicked, allBlockersDone, blockers, bothBanner, emptyBy, filterBanner, filterGroups, filterName, groupTicks, hiddenByFilter, isAll, labelText, labelsOff, onTable, searchBanner, storeFilter, taskCount, taskListBanners, tickGroup, tickLabel, tickLabeled, tickState, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { AI_DECISIONS, DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN } from "../src/stopFlow.ts";
 import type { Opened, State, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 
@@ -17,7 +18,6 @@ const base: Task = {
   title: "Blocked state",
   area: "A01",
   state: "ready",
-  label: null,
   holder: null,
   waiting_on: null,
   next_dependency: null,
@@ -68,8 +68,9 @@ test("blocked names each blocker with its state now; a dropped one is flagged, n
   assert.deepEqual(blockers(task({ state: "blocked", blocked_by: ["A09-09"] }), []), [{ id: "A09-09", state: null }]);
 });
 
-const LADDER = ["drafted", "implemented", "locally verified", "deployed and verified", "human verified"];
-const all = allTicked(LADDER);
+// Decision 0020 (Task-A01-petal376): the table's labels, built-in first, then this project's own.
+const LABELS = [LOCALLY_BY_AGENT, DEPLOYED_BY_AGENT, LOCALLY_BY_HUMAN, DEPLOYED_BY_HUMAN, AI_DECISIONS, "shipped"];
+const all = allTicked(LABELS);
 /** Only these states ticked; every label side ticked. */
 const only = (...states: State[]): StateFilter => ({ ...all, states: FILTER_STATES.filter((s) => !states.includes(s)) });
 
@@ -85,27 +86,44 @@ test("the state ticks keep waiting and blocked apart; everything ticked keeps ev
   assert.equal(isAll(only("done")), false);
 });
 
-test("a label's Yes is reached it or a higher one; No is not reached, or no label (Task-A01-lens781)", () => {
-  const local = task({ label: "locally verified" });
-  assert.equal(reached(local, "implemented", LADDER), true);
-  assert.equal(reached(local, "locally verified", LADDER), true);
-  assert.equal(reached(local, "human verified", LADDER), false);
-  assert.equal(reached(task({ label: null }), "drafted", LADDER), false);
-  assert.equal(reached(task({ label: "off the ladder" }), "drafted", LADDER), false);
-  // Human verified: Yes unticked leaves the tasks not yet checked by a person.
-  const noHuman = tickLabel(all, "human verified", "yes", false);
-  assert.equal(keepState(noHuman, local), true);
-  assert.equal(keepState(noHuman, task({ label: "human verified" })), false);
-  assert.equal(keepState(noHuman, task({ label: null })), true);
-  // Locally verified: No unticked keeps only tasks that reached it.
-  const verified = tickLabel(all, "locally verified", "no", false);
-  assert.equal(keepState(verified, local), true);
-  assert.equal(keepState(verified, task({ label: "implemented" })), false);
-  assert.equal(keepState(verified, task({ label: null })), true, "no label: Labeled's No alone decides (Task-A01-teacup726)");
-  // State and label together: done and not human verified.
-  const toCheckToo = { ...noHuman, states: only("done").states };
-  assert.equal(keepState(toCheckToo, task({ state: "done", label: "locally verified" })), true);
-  assert.equal(keepState(toCheckToo, task({ state: "ready", label: "locally verified" })), false);
+test("a label's Yes keeps the tasks that have it, its No those that do not; no order, no 'or higher' (decision 0020)", () => {
+  const local = task({ labels: [LOCALLY_BY_AGENT] });
+  const both = task({ labels: [LOCALLY_BY_AGENT, DEPLOYED_BY_AGENT] });
+  const deployed = task({ labels: [DEPLOYED_BY_AGENT] });
+  // Locally verified by agent, No unticked: only the tasks that carry it, whatever else they carry.
+  const hasLocal = tickLabel(all, LOCALLY_BY_AGENT, "no", false);
+  assert.equal(keepState(hasLocal, local), true);
+  assert.equal(keepState(hasLocal, both), true);
+  assert.equal(keepState(hasLocal, deployed), false, "deployed is not 'higher': it does not carry the label");
+  assert.equal(keepState(hasLocal, task({ labels: [] })), true, "no label: Labeled's No alone decides (Task-A01-teacup726)");
+  // Deployed and verified by agent, Yes unticked: the tasks without it.
+  const notDeployed = tickLabel(all, DEPLOYED_BY_AGENT, "yes", false);
+  assert.equal(keepState(notDeployed, local), true);
+  assert.equal(keepState(notDeployed, both), false);
+  // Two labels at once: both conditions hold.
+  const localNotDeployed = tickLabel(hasLocal, DEPLOYED_BY_AGENT, "yes", false);
+  assert.equal(keepState(localNotDeployed, local), true);
+  assert.equal(keepState(localNotDeployed, both), false);
+  // A custom label is a label like any other.
+  assert.equal(keepState(tickLabel(all, "shipped", "no", false), task({ labels: ["shipped"] })), true);
+  assert.equal(keepState(tickLabel(all, "shipped", "no", false), local), false);
+  // A label the table does not list (yet) hides nothing by itself.
+  assert.equal(keepState(hasLocal, task({ labels: [LOCALLY_BY_AGENT, "not in the table"] })), true);
+});
+
+test("to check through the filter: done, with both 'by human' labels at No (decision 0020)", () => {
+  const f = { ...tickLabel(tickLabel(all, LOCALLY_BY_HUMAN, "yes", false), DEPLOYED_BY_HUMAN, "yes", false), states: only("done").states };
+  assert.equal(keepState(f, task({ state: "done", labels: [LOCALLY_BY_AGENT] })), true);
+  assert.equal(keepState(f, task({ state: "done", labels: [DEPLOYED_BY_AGENT, AI_DECISIONS] })), true);
+  assert.equal(keepState(f, task({ state: "done", labels: [] })), true, "a done task with no label is to check too");
+  assert.equal(keepState(f, task({ state: "done", labels: [LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN] })), false);
+  assert.equal(keepState(f, task({ state: "done", labels: [DEPLOYED_BY_HUMAN] })), false);
+  assert.equal(keepState(f, task({ state: "ready", labels: [LOCALLY_BY_AGENT] })), false);
+  // The same tasks toCheck finds.
+  for (const labels of [[LOCALLY_BY_AGENT], [], [LOCALLY_BY_HUMAN], [DEPLOYED_BY_HUMAN, DEPLOYED_BY_AGENT]]) {
+    const x = task({ state: "done", labels });
+    assert.equal(keepState(f, x), toCheck(x), labels.join(", "));
+  }
 });
 
 test("ticking and unticking keeps the panel's order; Select all and Clear all per group, and when each is grey", () => {
@@ -123,47 +141,48 @@ test("ticking and unticking keeps the panel's order; Select all and Clear all pe
   assert.deepEqual(groupTicks(noLabels, "labels"), { all: false, none: true });
   assert.deepEqual(noLabels.states, [], "clearing labels leaves the states alone");
   assert.deepEqual(groupTicks(tickGroup(noLabels, "labels", true), "labels"), { all: true, none: false });
-  let g = tickLabel(all, "human verified", "yes", false);
-  g = tickLabel(g, "drafted", "yes", false);
-  assert.deepEqual(g.yes, ["drafted", "human verified"]);
+  let g = tickLabel(all, AI_DECISIONS, "yes", false);
+  g = tickLabel(g, LOCALLY_BY_AGENT, "yes", false);
+  assert.deepEqual(g.yes, [LOCALLY_BY_AGENT, AI_DECISIONS], "in the table's order");
 });
 
 test("the list is empty whatever the tasks: no state ticked, or a label with neither side", () => {
   assert.equal(emptyBy(all), null);
   assert.deepEqual(emptyBy(tickGroup(all, "states", false)), { kind: "states" });
-  const neither = tickLabel(tickLabel(all, "implemented", "yes", false), "implemented", "no", false);
+  const neither = tickLabel(tickLabel(all, "shipped", "yes", false), "shipped", "no", false);
   assert.equal(emptyBy(neither), null, "tasks with no label are still listed");
-  assert.equal(keepState(neither, task({ label: "implemented" })), false);
-  assert.equal(keepState(neither, task({ label: null })), true);
+  assert.equal(keepState(neither, task({ labels: ["shipped"] })), false);
+  assert.equal(keepState(neither, task({ labels: [LOCALLY_BY_AGENT] })), false);
+  assert.equal(keepState(neither, task({})), true);
   const labelledOnly = tickLabeled(neither, "no", false);
-  assert.deepEqual(emptyBy(labelledOnly), { kind: "label", label: "implemented" });
+  assert.deepEqual(emptyBy(labelledOnly), { kind: "label", label: "shipped" });
   assert.deepEqual(emptyBy(tickLabeled(tickLabeled(all, "yes", false), "no", false)), { kind: "labeled" });
   assert.equal(emptyBy(tickLabeled(all, "yes", false)), null);
 });
 
 // Task-A01-teacup726: Labeled (Yes / No) first in the Labels column.
 test("Labeled's No hides exactly the tasks with no label; its Yes hides every labelled task", () => {
-  const none = task({ label: null });
-  const local = task({ label: "locally verified" });
-  const off = task({ label: "off the ladder" });
+  const none = task({});
+  const local = task({ labels: [LOCALLY_BY_AGENT] });
+  const off = task({ labels: ["not in the table"] });
   const noNo = tickLabeled(all, "no", false);
   assert.equal(keepState(noNo, none), false);
   assert.equal(keepState(noNo, local), true);
-  assert.equal(keepState(noNo, off), true, "a label off the ladder is still a label");
+  assert.equal(keepState(noNo, off), true, "a label the table does not list is still a label");
   const noYes = tickLabeled(all, "yes", false);
   assert.equal(keepState(noYes, none), true);
   assert.equal(keepState(noYes, local), false);
   assert.equal(keepState(noYes, off), false);
   assert.equal(isAll(noYes), false);
-  // The ladder greys out with its ticks kept; ticking Yes again brings them back.
-  const ticks = tickLabel(all, "human verified", "yes", false);
+  // The labels grey out with their ticks kept; ticking Yes again brings them back.
+  const ticks = tickLabel(all, LOCALLY_BY_HUMAN, "yes", false);
   const greyed = tickLabeled(ticks, "yes", false);
-  assert.equal(ladderOff(greyed), true);
-  assert.deepEqual(greyed.yes, ["human verified"]);
+  assert.equal(labelsOff(greyed), true);
+  assert.deepEqual(greyed.yes, [LOCALLY_BY_HUMAN]);
   const back = tickLabeled(greyed, "yes", true);
   assert.deepEqual(back, ticks);
-  assert.equal(ladderOff(back), false);
-  assert.equal(keepState(back, task({ label: "human verified" })), false);
+  assert.equal(labelsOff(back), false);
+  assert.equal(keepState(back, task({ labels: [LOCALLY_BY_HUMAN] })), false);
 });
 
 test("Select all, Clear all and the restore include Labeled; the button names it", () => {
@@ -172,36 +191,39 @@ test("Select all, Clear all and the restore include Labeled; the button names it
   assert.deepEqual(groupTicks(cleared, "labels"), { all: false, none: true });
   assert.deepEqual(groupTicks(tickLabeled(all, "no", false), "labels"), { all: false, none: false });
   assert.deepEqual(tickGroup(cleared, "labels", true), all);
-  assert.deepEqual(allTicked(LADDER), all);
+  assert.deepEqual(allTicked(LABELS), all);
   assert.equal(filterName(tickLabeled(all, "no", false), t), "Hide Labeled: no");
   assert.equal(filterName(tickLabeled(tickState(all, "done", false), "yes", false), t), "Hide Done, Labeled: yes");
-  // While greyed out, the ladder's ticks hide nothing, so the button leaves them out.
-  const greyed = tickLabeled(tickLabel(tickLabel(all, "drafted", "no", false), "implemented", "no", false), "yes", false);
+  // While greyed out, the labels' ticks hide nothing, so the button leaves them out.
+  const greyed = tickLabeled(tickLabel(tickLabel(all, "shipped", "no", false), AI_DECISIONS, "no", false), "yes", false);
   assert.equal(filterName(greyed, t), "Hide Labeled: yes");
   // Stored and read back; an older stored filter has Labeled all ticked.
-  assert.deepEqual(onLadder(readFilter(storeFilter(greyed)), LADDER), greyed);
-  assert.deepEqual(onLadder(readFilter(JSON.stringify({ states: [], yes: [], no: ["drafted"] })), LADDER).labeled, []);
+  assert.deepEqual(onTable(readFilter(storeFilter(greyed)), LABELS), greyed);
+  assert.deepEqual(onTable(readFilter(JSON.stringify({ states: [], yes: [], no: ["shipped"] })), LABELS).labeled, []);
 });
 
 test("the filter is remembered as what is unticked; the older single choice comes back as that state", () => {
-  const f = tickLabel(only("ready", "done"), "human verified", "yes", false);
-  const back = onLadder(readFilter(storeFilter(f)), LADDER);
+  const f = tickLabel(only("ready", "done"), LOCALLY_BY_HUMAN, "yes", false);
+  const back = onTable(readFilter(storeFilter(f)), LABELS);
   assert.deepEqual(back, f);
   assert.equal(readFilter("not json").states.length, 0);
   assert.deepEqual(readFilter(null), allTicked());
   // Before Task-A01-lens781: a state alone, or everything ticked for the choices that are gone.
-  assert.deepEqual(onLadder(readFilter(null, "blocked"), LADDER), only("blocked"));
+  assert.deepEqual(onTable(readFilter(null, "blocked"), LABELS), only("blocked"));
   for (const old of ["all", "open", "human", "nonsense", null]) assert.equal(isAll(readFilter(null, old)), true, String(old));
-  // A label no longer on the ladder is let go; a new one starts ticked.
-  const renamed = onLadder(readFilter(storeFilter(tickLabel(all, "drafted", "no", false))), ["draft", "done right"]);
-  assert.equal(isAll(renamed), true);
+  // A label no longer in the table is let go, such as an older build's ladder step; a new one starts ticked.
+  const old = onTable(readFilter(JSON.stringify({ states: [], yes: ["human verified"], no: ["locally verified"] })), LABELS);
+  assert.equal(isAll(old), true);
 });
 
-test("not human-checked: a done task with the note (Task-A03-18)", () => {
-  const finished = task({ state: "done", without_human_check: "loop run", human_check_steps: "1. Open it." });
+test("to check: a done task with no 'by human' label, whatever its note (decision 0020)", () => {
+  const finished = task({ state: "done", labels: [LOCALLY_BY_AGENT], without_human_check: "loop run", human_check_steps: "1. Open it." });
   assert.equal(toCheck(finished), true);
   assert.equal(humanCheckNote(finished), "loop run");
-  assert.equal(toCheck(task({ state: "done" })), false, "finished the usual way");
+  assert.equal(toCheck(task({ state: "done" })), true, "no label, no note: still to check");
+  assert.equal(toCheck(task({ state: "done", labels: [DEPLOYED_BY_AGENT, AI_DECISIONS] })), true, "'by agent' labels are not the human check");
+  assert.equal(toCheck(task({ state: "done", labels: [LOCALLY_BY_HUMAN] })), false);
+  assert.equal(toCheck(task({ state: "done", labels: [DEPLOYED_BY_HUMAN], without_human_check: "old note" })), false, "the note decides nothing");
   assert.equal(toCheck(task({ state: "in_progress", without_human_check: "x" })), false, "not finished");
 });
 
@@ -230,23 +252,23 @@ test("the filter's hidden tasks are counted by state, in the filter's order", ()
 test("the filter is named as the Show button words it: what it hides", () => {
   assert.equal(filterName(all, t), "All tasks");
   assert.equal(filterName(tickState(all, "backlog", false), t), "Hide Backlog");
-  assert.equal(filterName(tickLabel(tickState(all, "dropped", false), "human verified", "yes", false), t), "Hide Dropped, human verified: yes");
+  assert.equal(filterName(tickLabel(tickState(all, "dropped", false), LOCALLY_BY_HUMAN, "yes", false), t), "Hide Dropped, locally verified by human: yes");
   assert.equal(filterName(only("done"), t), "Filtered (6 hidden)");
-  assert.equal(labelText("locally verified", t), "locally verified");
-  assert.equal(labelText("our own step", t), "our own step");
+  assert.equal(labelText(DEPLOYED_BY_AGENT, t), "deployed and verified by agent");
+  assert.equal(labelText("our own label", t), "our own label");
 });
 
-test("AI decided: the decisions from the history go on their tasks (Task-A03-19)", () => {
+test("AI decisions to review: the badge reads the label; the decisions from the history go on their tasks (Task-A03-19, decision 0020)", () => {
   const decision = { at: "2026-10-15T10:00:00Z", by: "claude/x", text: "Names: alm describe — match alm title" };
   const opened: Opened = {
     root: "/r",
     readme_added: false,
     loaded: {
       taskbag: {
-        project: { format: "allomos/4", id: "P", name: "P", labels: ["human verified"] },
+        project: { format: "allomos/7", id: "P", name: "P", labels: [{ name: AI_DECISIONS, built_in: true }] },
         areas: [],
         iterations: [],
-        tasks: [task({ id: "A01-01", state: "backlog" }), task({ id: "A01-02" })],
+        tasks: [task({ id: "A01-01", state: "backlog", labels: [AI_DECISIONS] }), task({ id: "A01-02" })],
       },
       issues: [],
     },
@@ -257,9 +279,9 @@ test("AI decided: the decisions from the history go on their tasks (Task-A03-19)
   assert.equal(tasks[1].ai_decisions, undefined);
   assert.equal(toReview(tasks[0]), true, "even a backlog task");
   assert.equal(toReview(tasks[1]), false);
-  // Reviewed: the history no longer lists it, so the badge goes.
-  const after = withDecisions({ ...opened, ai_decisions: {} }).loaded.taskbag!.tasks;
-  assert.equal(toReview(after[0]), false);
+  // The label decides, not the history: reviewed (`alm reviewed` removes the label), the badge goes.
+  assert.equal(toReview({ ...tasks[0], labels: [] }), false);
+  assert.equal(toReview(task({ labels: [AI_DECISIONS] })), true, "the label alone, before the history is read");
   assert.equal(withDecisions({ ...opened, ai_decisions: undefined }).loaded.taskbag!.tasks[0].ai_decisions, undefined);
   assert.equal(t("task.ai_decided"), "AI decisions to review");
 });

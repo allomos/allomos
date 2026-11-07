@@ -12,7 +12,10 @@ const t = (key: string, params?: Record<string, string | number>) =>
 test("task fields use the task pane's names; unknown fields stay as stored", () => {
   assert.equal(fieldName("next_dependency", t), "pane.next");
   assert.equal(fieldName("title", t), "pane.title");
-  assert.equal(fieldName("labels", t), "labels");
+  assert.equal(fieldName("colour", t), "colour");
+  // Decision 0020: a task's labels, a list since `allomos/7`, under the same name as before.
+  assert.equal(fieldName("labels", t), "pane.label");
+  assert.equal(fieldName("label", t), "pane.label");
   // Task-A03-18: the human check's note (under either name) and its steps.
   assert.equal(fieldName("without_human_check", t), "pane.without_human_check");
   assert.equal(fieldName("finished_without_owner", t), "pane.without_human_check");
@@ -29,7 +32,9 @@ test("a state is worded, an empty side is a dash, long text is shortened", () =>
   assert.equal(valueText("holder", "", t), "—");
   assert.equal(valueText("title", "x".repeat(70), t), `${"x".repeat(60)}…`);
   assert.equal(valueText("handoff_note", "first line\nsecond", t), "first line…");
-  assert.equal(valueText("labels", ["a", "b"], t), '["a","b"]');
+  assert.equal(valueText("labels", ["a", "b"], t), "a, b");
+  assert.equal(valueText("labels", [], t), "—");
+  assert.equal(valueText("colours", ["a", "b"], t), '["a","b"]');
 });
 
 test("a change reads field: from → to; a description only says it changed", () => {

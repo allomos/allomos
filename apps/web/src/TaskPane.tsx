@@ -1,10 +1,12 @@
 // The task pane (Task-A01-16): everything about one task, beside the list. History lists the
 // task's recorded changes (Task-A01-17). Eight fields can be changed here (Task-A01-18); Rust
 // checks each change by the same rule as its `alm` command, and a refusal is shown in its words.
-// A task finished without the human check shows "Not human-checked", its steps and a Checked
-// button, which works like `alm checked` (Task-A03-18). The iteration is chosen from a drop-down
+// A done task with no "by human" label (To check, decision 0020) shows "Not human-checked", its
+// steps and a Checked button, which works like `alm checked` (Task-A03-18): it adds the "by human"
+// label `alm checked` would. Labels shows every label the task carries, and its picker ticks them
+// on and off (Task-A01-petal376). The iteration is chosen from a drop-down
 // whose first item, "New…", creates an iteration and plans the task in it (Task-A01-39). A task
-// with AI decisions nobody has reviewed shows "AI decisions to review", the decisions and a Reviewed button,
+// carrying "AI decisions to review" shows that badge, the decisions and a Reviewed button,
 // like `alm reviewed` (Task-A03-19). A done or dropped task has Reopen…, which asks why and works
 // like `alm reopen` (Task-A01-50). Responsible person, agent, check and session are separate
 // rows (Task-A03-37), and History names the agent behind each change.
@@ -29,15 +31,18 @@ import {
   toEdit,
   toPaneIteration,
   toggleBlocker,
+  toggleLabel,
   type Draft,
   type EditField,
   changedVersion,
   type NewIterationDraft,
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
-import { ACTIVE_MINUTES, check, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
+import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
-import { blockerText, blockers, humanCheckNote, stopText, toCheck, toReview } from "./stopFlow";
+import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
+import { LabelChips } from "./LabelChips";
+import { checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
 import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
@@ -70,7 +75,7 @@ export function TaskPane({
   onLink: (href: string) => void;
   /** The task's recorded changes; null until read, or when they cannot be. */
   history: TaskHistory | null;
-  /** The project's label ladder, lowest step first. */
+  /** The names in the project's label table, built-in first (decision 0020). */
   labels: string[];
   /** The project's iterations, in order. */
   iterations: Iteration[];
@@ -98,7 +103,7 @@ export function TaskPane({
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<EditField | null>(null);
-  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [], folders: [] });
+  const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [], folders: [], labels: [] });
   const [created, setCreated] = useState<NewIterationDraft>(EMPTY_NEW_ITERATION);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -324,19 +329,18 @@ export function TaskPane({
       case "folders":
         return folderPicker();
       case "label":
-        return (
-          <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
-            {!task.label && (
-              <option value="" disabled>
-                {t("edit.no_label")}
-              </option>
-            )}
+        // Every label in the table, ticked when the task carries it (decision 0020).
+        return labels.length === 0 ? (
+          <p className="muted small">{t("edit.labels_none")}</p>
+        ) : (
+          <fieldset className="label-picker" disabled={busy}>
+            <legend className="small">{t("edit.labels_legend")}</legend>
             {labels.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
+              <label key={l} className="small">
+                <input type="checkbox" checked={draft.labels.includes(l)} onChange={() => setDraft((d) => toggleLabel(d, l))} /> {labelText(l, t)}
+              </label>
             ))}
-          </select>
+          </fieldset>
         );
       case "iteration":
         return (
@@ -535,16 +539,16 @@ export function TaskPane({
   // 2026-10-14), and the others have no change of their own in `alm` (the Checked button below
   // clears the note). The fourth item is the label's hover text.
   // The fifth item is a button beside the value (the Session row's, Task-A03-hive049).
-  const rows: [string, string | null, EditField | null, string?, ReactNode?][] = [
+  const rows: [string, ReactNode, EditField | null, string?, ReactNode?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
     [t("pane.state"), stop ?? t(`state.${task.state}`), "state"],
     // Always shown (approver, 2026-10-25), whatever the number of bound folders.
     [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
-    [t("pane.label"), task.label, "label"],
+    [t("pane.label"), chipLabels(task).length > 0 ? <LabelChips task={task} /> : null, "label"],
     [t("pane.responsible"), ownerName ?? t("task.you"), null, t("pane.responsible_title")],
     [t("pane.agent"), agentText, null],
-    [t("pane.check"), t(`check.${check(task, labels)}`), null],
+    [t("pane.check"), t(`check.${check(task)}`), null],
     [t("pane.session"), sessionText, null, t("pane.session_title", { minutes: ACTIVE_MINUTES }), sessionButton],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],
     [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
@@ -587,7 +591,7 @@ export function TaskPane({
               <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
                 {t("pane.checked_button")}
               </button>
-              <p className="muted small">{t("pane.checked_hint", { label: labels[labels.length - 1] ?? "" })}</p>
+              <p className="muted small">{t("pane.checked_hint", { label: labelText(checkedLabel(task), t) })}</p>
               {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
             </>
           )}
@@ -737,18 +741,19 @@ export function TaskPane({
 export function HumanCheckBadge({ task }: { task: Task }) {
   const { t } = useI18n();
   return (
-    <span className="badge to-check" title={t("task.not_human_checked_title", { why: humanCheckNote(task) })}>
+    <span className="badge to-check" title={checkTitle(task, t)}>
       {t("task.not_human_checked")}
     </span>
   );
 }
 
-/** "AI decisions to review" on a task with AI decisions nobody has reviewed yet (Task-A03-19): in the lists
- * and the task pane; hovering says how many. */
+/** "AI decisions to review" on a task that carries that label (Task-A03-19, decision 0020): in the
+ * lists and the task pane; hovering says how many the history holds. */
 export function AiDecidedBadge({ task }: { task: Task }) {
   const { t } = useI18n();
+  const count = task.ai_decisions?.length ?? 0;
   return (
-    <span className="badge ai-decided" title={t("task.ai_decided_title", { count: task.ai_decisions?.length ?? 0 })}>
+    <span className="badge ai-decided" title={count > 0 ? t("task.ai_decided_title", { count }) : t("label.meaning.ai_decisions")}>
       {t("task.ai_decided")}
     </span>
   );

@@ -13,7 +13,6 @@ const task = (over: Partial<Task>): Task => ({
   title: "Search finds words in the handoff note",
   area: "A01",
   state: "ready",
-  label: null,
   holder: null,
   waiting_on: null,
   next_dependency: null,

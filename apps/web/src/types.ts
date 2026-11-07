@@ -6,11 +6,21 @@ export interface Project {
   format: string;
   id: string;
   name: string;
-  labels: string[];
+  /** The label table (`allomos/7`, decision 0020): every label the project knows, the built-in
+   * ones first. */
+  labels: LabelEntry[];
   /** `ui` (follow the interface), a language code such as `ja`, or missing (follow the interface). */
   task_language?: string;
   /** `allomos/6`: the project folders, the first the main one (decision 0019). */
   project_folders?: { name: string; path: string }[];
+}
+
+/** One label of the project's label table (decision 0020): its name, an optional meaning, and
+ * whether it is one of Allomos's five built-in labels. Every label is plain: a task has it or not. */
+export interface LabelEntry {
+  name: string;
+  meaning?: string;
+  built_in?: boolean;
 }
 
 export interface Area {
@@ -55,7 +65,9 @@ export interface Task {
   /** The project folders it belongs to (`allomos/6`, decision 0019); missing: none in particular. */
   folders?: string[];
   state: State;
-  label: string | null;
+  /** The labels the task carries (`allomos/7`, decision 0020), in the order they were added;
+   * left out when none. */
+  labels?: string[];
   holder: string | null;
   /** For a waiting task: what a person must do. */
   waiting_on: string | null;
@@ -66,7 +78,9 @@ export interface Task {
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
-  /** Why the task was finished without the human check (Task-A03-15, A03-18, A03-31). */
+  /** Why the task was finished without the human check (Task-A03-15, A03-18, A03-31): text for
+   * the person who checks; since `allomos/7` it decides nothing (To check is worked out from the
+   * labels, decision 0020). */
   without_human_check: string | null;
   /** How a person checks it, in Markdown (Task-A03-18). */
   human_check_steps: string | null;
@@ -99,6 +113,7 @@ export interface AiDecision {
 export type Edit =
   | { field: "state"; state: State; waiting_on?: string | null; who?: string | null; blocked_by?: string[] }
   | { field: "label"; label: string }
+  | { field: "labels"; labels: string[] }
   | { field: "waiting_on"; text: string }
   | { field: "blocked_by"; ids: string[] }
   | { field: "next_dependency"; text: string | null }

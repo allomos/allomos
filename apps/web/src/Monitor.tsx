@@ -11,6 +11,7 @@ import type { Messenger } from "./messenger";
 import { AGENT_KEY } from "./AgentPicker";
 import { localTime } from "./timeFlow";
 import { sessionPlace } from "./sessionFlow";
+import { toCheck } from "./stopFlow";
 import {
   FREQUENCIES,
   follow,
@@ -194,7 +195,7 @@ export function MonitorControl({
   const [menu, setMenu] = useState(false);
 
   if (!run) {
-    const counts = last ? lastRunCounts(last, tasks) : null;
+    const counts = last ? lastRunCounts(last, tasks, toCheck) : null;
     return (
       <span className="monitor">
         {last && counts && (

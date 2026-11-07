@@ -209,6 +209,35 @@ pub fn remove(
     Ok(Outcome::plain(task))
 }
 
+/// The task's labels set to `labels`, as the app's Labels picker chose them (Task-A01-petal376):
+/// each label left out is removed on purpose and each new one added, by the rules of
+/// `alm label --remove` and `alm label` (a "by human" label added to a done task is the human
+/// check: its note and steps are cleared). The labels it keeps stay in their order; new ones
+/// follow in the order given. A label the table does not list is added there by the caller.
+pub fn set(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    labels: &[String],
+) -> Result<Outcome, Problem> {
+    let want: Vec<String> = labels
+        .iter()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    let mut task = find_task(taskbag, id)?;
+    check_holder(&task, me)?;
+    check_open(&task, &[State::Dropped])?;
+    task.labels.retain(|l| want.contains(l));
+    for l in &want {
+        if task.add_label(l) && task.state == State::Done && BY_HUMAN.contains(&l.as_str()) {
+            task.without_human_check = None;
+            task.human_check_steps = None;
+        }
+    }
+    Ok(Outcome::plain(task))
+}
+
 /// A label added to the table, or its meaning changed (`alm labels add`). A built-in label keeps
 /// its name; only its meaning can change.
 pub fn table_add(taskbag: &Taskbag, name: &str, meaning: Option<&str>) -> Result<Project, Problem> {
