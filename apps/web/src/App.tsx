@@ -35,6 +35,7 @@ import {
   stopFact,
   type StopFact,
   tableFilter,
+  presetFilter,
   taskListBanners,
   type Hidden,
   type StateFilter,
@@ -1349,6 +1350,8 @@ function TaskbagView({
           .map((g) => ({ ...g, tasks: g.tasks.filter((task) => keepFolder(folderFilter, task)) }))
           .filter((g) => g.tasks.length > 0);
   const filtered = filterGroups(byFolder, stateFilter);
+  // The tasks the Show filter's presets count (Task-A01-wigwam308): the Folder filter applied.
+  const folderTasks = box ? (folderFilter.kind === "all" ? box.tasks : box.tasks.filter((task) => keepFolder(folderFilter, task))) : [];
   // A search keeps only the tasks that match, and groups with none are left out; each group left
   // holds a match, so it opens even if it was collapsed (the collapsed list itself is kept).
   const found = searchGroups(filtered, terms);
@@ -1567,6 +1570,7 @@ function TaskbagView({
         onOpen={() => setMonitorFrom(from)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
         onError={onError}
+        onNeedYou={() => chooseFilter(presetFilter("needs_you", ladder))}
       />
     );
 
@@ -1585,7 +1589,7 @@ function TaskbagView({
                   </button>
                 ))}
               </div>
-              <FilterMenu filter={stateFilter} onChange={chooseFilter} />
+              <FilterMenu filter={stateFilter} tasks={folderTasks} onChange={chooseFilter} />
               {showFolders(folders) && (
                 <label className="state-filter small">
                   {t("filter.folder")}{" "}

@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FILTER_STATES, HUMAN_COLUMN, allTicked, allBlockersDone, blockers, bothBanner, columnText, emptyBy, filterBanner, filterColumns, filterGroups, filterName, gridTicks, hiddenByFilter, isAll, isTicked, labelText, onTable, rowTicks, searchBanner, sideOf, storeFilter, tableFilter, taskCount, taskListBanners, tickAll, tickCell, tickRow, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions } from "../src/stopFlow.ts";
+import { FILTER_STATES, HUMAN_COLUMN, allTicked, allBlockersDone, blockers, bothBanner, columnText, emptyBy, filterBanner, filterColumns, filterGroups, filterName, gridTicks, hiddenByFilter, isAll, isTicked, labelText, onTable, rowTicks, searchBanner, sideOf, storeFilter, tableFilter, taskCount, taskListBanners, tickAll, tickCell, tickRow, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions, PRESETS, SIDES, matchPreset, presetCount, presetFilter, presetName, presetTicks, type Preset } from "../src/stopFlow.ts";
 import { AI_DECISIONS, BY_HUMAN, DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN } from "../src/stopFlow.ts";
 import type { Opened, State, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
@@ -426,4 +426,87 @@ test("filter and search narrow the task list together; clearing either falls bac
 test("the search banner says how much was found", () => {
   assert.equal(plain(searchBanner("task", 2, "alm", t)), "**2 tasks** found for “alm”.");
   assert.equal(plain(searchBanner("task", 2, "alm", t, "In progress")), "**2 tasks** found for “alm” with the “In progress” filter on.");
+});
+
+// The Show filter's presets (Task-A01-wigwam308): each only sets the grid's ticks.
+
+/** Every kind of task the grid tells apart: each state, with and without each label of LABELS. */
+const everyTask: Task[] = FILTER_STATES.flatMap((state) =>
+  [[], [LOCALLY_BY_AGENT], [DEPLOYED_BY_AGENT], [LOCALLY_BY_HUMAN], [DEPLOYED_BY_HUMAN], [AI_DECISIONS], [LOCALLY_BY_HUMAN, AI_DECISIONS], ["shipped"], [DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, AI_DECISIONS, "shipped"]].flatMap((labels, i) =>
+    [null, "Ann"].map((who) => task({ id: `${state}-${i}-${who ?? "me"}`, state, labels, who: who ?? undefined })),
+  ),
+);
+const listed = (f: StateFilter) => everyTask.filter((x) => keepState(f, x)).map((x) => x.id);
+const inStates = (...states: State[]) => everyTask.filter((x) => states.includes(x.state)).map((x) => x.id);
+
+test("each row preset ticks its rows whole, nothing else", () => {
+  const rows: Record<string, State[]> = {
+    all: FILTER_STATES,
+    not_finished: ["backlog", "ready", "in_progress", "waiting", "blocked"],
+    ready: ["ready"],
+    in_hand: ["in_progress", "waiting", "blocked"],
+    finished: ["done", "dropped"],
+  };
+  for (const [p, states] of Object.entries(rows)) {
+    const f = presetFilter(p as Preset, LABELS);
+    for (const s of FILTER_STATES) assert.equal(rowTicks(f, s), states.includes(s) ? "all" : "none", `${p}: ${s}`);
+    assert.deepEqual(listed(f), inStates(...states), p);
+  }
+  assert.ok(isAll(presetFilter("all", LABELS)), "All tasks is everything ticked");
+});
+
+test("Needs you ticks the grid as the approver set it (2026-11-08)", () => {
+  const f = presetFilter("needs_you", LABELS);
+  const ticked = (s: State) =>
+    filterColumns(f).flatMap((c) => SIDES.filter((side) => isTicked(f, s, c, side)).map((side) => `${c || "human"}:${side}`));
+  assert.deepEqual(ticked("done"), ["human:no", `${AI_DECISIONS}:yes`]);
+  assert.equal(rowTicks(f, "waiting"), "all");
+  for (const s of ["backlog", "ready", "in_progress", "blocked", "dropped"] as State[]) assert.deepEqual(ticked(s), [`${AI_DECISIONS}:yes`], s);
+});
+
+test("Needs you lists exactly alm human's three lists: to check, to answer, to review", () => {
+  // As `alm human` (crates/cli/src/lib.rs, fn human) works them out.
+  const toAnswer = (x: Task) => x.state === "waiting";
+  const human = everyTask.filter((x) => toCheck(x) || toAnswer(x) || toReview(x)).map((x) => x.id);
+  assert.deepEqual(listed(presetFilter("needs_you", LABELS)), human);
+  // A done task a person checked, whose AI decisions wait for review, is among them.
+  const checked = task({ id: "D", state: "done", labels: [LOCALLY_BY_HUMAN, AI_DECISIONS] });
+  assert.ok(!toCheck(checked) && toReview(checked));
+  assert.ok(keepState(presetFilter("needs_you", LABELS), checked));
+  // Waiting for someone else is To answer too (no "Waits for me" yet).
+  assert.ok(keepState(presetFilter("needs_you", LABELS), task({ state: "waiting", who: "Ann" })));
+});
+
+test("the ticks of a preset show it: ✓ and the Show button's name; any change clears it", () => {
+  for (const p of PRESETS) {
+    const f = presetFilter(p, LABELS);
+    assert.equal(matchPreset(f), p);
+    assert.equal(filterName(f, t), presetName(p, t));
+  }
+  assert.equal(filterName(presetFilter("needs_you", LABELS), t), "Needs you");
+  assert.equal(filterName(presetFilter("ready", LABELS), t), "Ready to start");
+  assert.equal(filterName(all, t), "All tasks");
+  const changed = tickCell(presetFilter("needs_you", LABELS), "ready", "shipped", "no", true);
+  assert.equal(matchPreset(changed), null);
+  assert.match(filterName(changed, t), /^Filtered \(\d+ hidden\)$/);
+  assert.equal(matchPreset(tickRow(presetFilter("finished", LABELS), "dropped", false)), null);
+  assert.equal(matchPreset(tickAll(all, false)), null, "nothing ticked is no preset");
+  // Ticked by hand to the same cells, it is the preset again.
+  assert.equal(matchPreset(tickRow(tickRow(tickAll(all, false), "done", true), "dropped", true)), "finished");
+  // A new label in the table starts ticked everywhere, so a preset's ticks no longer match it.
+  assert.equal(matchPreset(onTable(presetFilter("ready", LABELS), [...LABELS, "new"])), null);
+  assert.equal(matchPreset(presetFilter("ready", [...LABELS, "new"])), "ready");
+});
+
+test("each preset says what it ticks and how many tasks it lists now", () => {
+  assert.equal(presetTicks("not_finished", t), "Backlog, Ready, In progress, Waiting, Blocked");
+  assert.equal(presetTicks("in_hand", t), "In progress, Waiting, Blocked");
+  assert.equal(presetTicks("finished", t), "Done, Dropped");
+  assert.equal(presetTicks("ready", t), "Ready");
+  assert.match(presetTicks("needs_you", t), /AI decisions to review/);
+  const tasks = [task({ id: "a", state: "ready" }), task({ id: "b", state: "waiting" }), task({ id: "c", state: "done" }), task({ id: "d", state: "done", labels: [LOCALLY_BY_HUMAN] })];
+  assert.deepEqual(
+    PRESETS.map((p) => presetCount(p, LABELS, tasks)),
+    [4, 2, 1, 1, 2, 2],
+  );
 });
