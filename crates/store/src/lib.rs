@@ -298,9 +298,9 @@ the project notes (below).
 - A line in the conversation that starts with `alm ` followed by one of its commands (for example
   `alm guide github release`) is a command: run it as written, and when it prints a guide, follow
   that guide. The word alm inside a sentence is not one.
-- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
-  When the work is finished and only a person's hands-on check is left, in quiet and normal
-  mode alike, finish it below the top label with `alm done <id> --without-human-check \"<why>\"
+- Finished: with a \"by human\" label (a person has checked it: the human check):
+  `alm done <id>`. When the work is finished and only a person's hands-on check is left, in
+  quiet and normal mode alike, finish it without one with `alm done <id> --without-human-check \"<why>\"
   --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
   `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
   a real question, an approval or an outside effect.

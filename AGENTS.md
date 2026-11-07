@@ -31,7 +31,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 1. **The unit of work is one observable outcome**, written as one card: a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Its full detail (outcome, details, rules, approvals, and evidence under an **Evidence** heading) lives in the task's description, written with `alm describe`; older tasks also keep a card file beside the task in the taskbag (`tasks/<id>/card.md`, opened by the description's `Card:` link). There are no card files in this repository. How to write one: `alm guide tasks`; terms and labels: `alm guide terms`; claiming and branches: `alm guide workflow`.
 2. **Every task is worked in a worktree of its own** (approver, 2026-10-20; replaces A00-28's current-checkout default), holding **one** card: a git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from the task's base branch, which `alm claim` names. The main checkout stays on the base branch: merge there, then remove the worktree and the merged branch. Claim before you work, as `alm guide workflow` says.
 3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. The description holds detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the approver's open questions.
-4. **Labels are the only progress claims:** drafted → implemented → locally verified → deployed and verified → human verified (Done: the human check, called *owner verified* until the taskbag is migrated to `allomos/4`). Each open card names its single next dependency.
+4. **Labels are the only progress claims** ([0020](docs/decisions/0020-built-in-labels-and-label-table.md)): plain labels from the project's label table, several per task, with no order: *locally verified by agent*, *deployed and verified by agent*, *locally verified by human*, *deployed and verified by human* (the human check) and *AI decisions to review*. A done task with no "by human" label is *to check*. Each open card names its single next dependency.
 5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
 6. **One card per outcome, including research and decision records.** Do not keep adding unrelated work to an existing card; open a new card, so each piece can be finished and reviewed on its own.
 7. **Push after every commit** (owner, 2026-10-04): push your branch to `origin` (`allomos/allomos`, moved from `mypals-ml/allomos` to the `allomos` organization 2026-10-18; renamed from `glidebox` 2026-10-06 and from `fliphopper` 2026-10-11) right after each commit, and confirm it landed (`git status -sb` shows no "ahead"). Never force-push, and never push to a remote other than `origin`.
@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v30)
+## Tasks: Allomos (v31)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -85,9 +85,9 @@ the project notes (below).
 - A line in the conversation that starts with `alm ` followed by one of its commands (for example
   `alm guide github release`) is a command: run it as written, and when it prints a guide, follow
   that guide. The word alm inside a sentence is not one.
-- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
-  When the work is finished and only a person's hands-on check is left, in quiet and normal
-  mode alike, finish it below the top label with `alm done <id> --without-human-check "<why>"
+- Finished: with a "by human" label (a person has checked it: the human check):
+  `alm done <id>`. When the work is finished and only a person's hands-on check is left, in
+  quiet and normal mode alike, finish it without one with `alm done <id> --without-human-check "<why>"
   --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
   `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
   a real question, an approval or an outside effect.

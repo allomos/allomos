@@ -88,7 +88,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// and `alm session` fills in session details later (Task-A03-ham538).
 /// 30: an agent in the Claude desktop app must pass `--session-kind desktop --app-session-id`
 /// at the claim; `--session-kind terminal` in a terminal (Task-A03-sugar117).
-pub const SECTION_VERSION: u32 = 30;
+/// 31: finishing names the "by human" labels instead of the ladder's top label (decision 0020,
+/// Task-A01-moth111).
+pub const SECTION_VERSION: u32 = 31;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
