@@ -26,10 +26,9 @@ Today every project defines its own **label ladder**: an ordered list of progres
 | `verified by human` | yes | a person checked it by hand (the human check) | verified by human | 人已验证 | 人が検証済み | `alm label`, `alm checked`, the app's **Checked** | removing it on purpose; `alm reopen` |
 | `to be verified by human` | yes | finished without the human check; a person still has to check it by hand | to be verified by human | 待人验证 | 人の検証待ち | `alm done <id> --without-human-check "<why>" --steps <file>` | `alm checked` (which adds `verified by human`); `alm reopen` |
 | `AI decisions to review` | yes | an agent decided things here that wait for review | AI decisions to review | 待审阅 AI 决定 | レビュー待ちの AI の決定 | `alm ai-decided <id> "…"` | `alm reviewed <id>` |
-| `drafted` | no (this project) | — | — | — | — | `alm label` | removing it on purpose |
 
 - The interface names come from the app's existing texts (`filter.ladder.*`, `check.to_check`, `task.ai_decided`); the work may shorten them for the label chips.
-- Custom labels are shown as written. In this project only `drafted` (no task) is custom; `implemented` is dropped (Decided, 6). Other projects bring their own.
+- Custom labels are shown as written. This project has none: `implemented` and `drafted` are dropped (Decided, 6 and 12). Other projects bring their own.
 - Who set a label is not part of it: the task's history records who made every change (session, agent, or a person in the app). Today agents set almost every label, `verified by human` included, on the approver's word.
 - **To check** keeps its reason and check steps in the task's fields (`without_human_check`, `human_check_steps`); the label is what lists and filters read.
 - **AI decisions to review** says "there are decisions to review"; the decisions themselves stay in the task's history, as now.
@@ -69,6 +68,7 @@ The approver's answers on 2026-11-07, in this session's chat:
 9. `human verified`: "change this to verified by human". Renamed in the table and on every task (116 today); older taskbags' `owner verified` becomes `verified by human` too.
 10. `to check`: asked whether it means "needs to be checked by a person" (yes); "Yes, rename it" to `to be verified by human`.
 11. `AI decided`: it means the task has AI decisions nobody has reviewed yet (it goes away after `alm reviewed`, though the decisions stay in the history). "ok" to the shorter name `AI decisions to review`, the app's existing wording.
+12. `drafted`: "drop this" (replacing the earlier "ok" to keeping it). No task carries it, so it simply leaves the table.
 
 Earlier in the same chat: "only these ladders are useful: locally verified, deployed and verified, human verified … we only need to update the taskbag version and map these 3 ladder values"; "i also want to allow the labels to be customized in the future. so we need a label table … updated if new labels are found. it should not be auto deleted if a defined label in the table is not used"; "i want the ai decide mark be move to the label field too".
 
@@ -81,13 +81,13 @@ Earlier in the same chat: "only these ladders are useful: locally verified, depl
 5. **New labels are added, not refused:** when `alm label` (or the app) sets a label that is not in the table, or a move-in brings one, it is added and `alm` says so ("Added the label 'x' to the label table; if that was a typo, …"). Following "`alm` tells; the agent checks", `alm` does not judge whether it is wanted.
 6. **Never removed automatically:** an unused entry stays. Someone can remove one on purpose, refused while a task still carries it; built-in labels cannot be removed.
 7. **Where the table lives: `project.json`**, not `project-notes.md`: `alm` and the app must read and update it reliably, and the project notes are free text agents edit by hand.
-8. **Format `allomos/6` → `allomos/7`:** each ladder step becomes a table entry, except `implemented`, which is dropped (with it, from every task), `locally verified`, which becomes `locally verified by agent`, `deployed and verified`, which becomes `deployed and verified by agent`, and `human verified`, which becomes `verified by human` (in the table and on every task); each task's label moves into its list; `to be verified by human` is added to every done task with `without_human_check`, and `AI decisions to review` to every task whose history has unreviewed decisions (worked out once). Older Allomos builds see the newer format and ask to be updated.
+8. **Format `allomos/6` → `allomos/7`:** each ladder step becomes a table entry, except `drafted` and `implemented`, which are dropped (`implemented` also from every task), `locally verified`, which becomes `locally verified by agent`, `deployed and verified`, which becomes `deployed and verified by agent`, and `human verified`, which becomes `verified by human` (in the table and on every task); each task's label moves into its list; `to be verified by human` is added to every done task with `without_human_check`, and `AI decisions to review` to every task whose history has unreviewed decisions (worked out once). Older Allomos builds see the newer format and ask to be updated.
 
 ### What happens to the old steps
 
 | Old step | A: keep | B: drop | C: raise / rename |
 |---|---|---|---|
-| `drafted` (unused here) | **decided: stays in the table, unused** | removed | — |
+| `drafted` (unused here) | — | **decided (Decided, 12): removed** | — |
 | `implemented` (19 tasks here) | — | **decided (Decided, 6): dropped; the 19 tasks lose it** | — |
 | `locally verified` | — | — | renamed `locally verified by agent` on every task (Decided, 7) |
 | `deployed and verified` | — | — | renamed `deployed and verified by agent` on every task (Decided, 8) |
@@ -95,7 +95,7 @@ Earlier in the same chat: "only these ladders are useful: locally verified, depl
 | other projects' own steps | **decided: stay as custom labels** | — | — |
 | `owner verified` (older taskbags) | becomes `verified by human` | | |
 
-For `drafted` and other projects' steps, A keeps the change mechanical. `implemented` is dropped rather than raised: a task whose notes prove its checks passed can be given `locally verified by agent` afterwards, as an ordinary change.
+For other projects' steps, A keeps the change mechanical. `implemented` is dropped rather than raised: a task whose notes prove its checks passed can be given `locally verified by agent` afterwards, as an ordinary change.
 
 ## Alternatives considered
 
