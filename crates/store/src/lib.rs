@@ -2340,6 +2340,39 @@ pub fn set_base(
     Ok((task, after, issues))
 }
 
+/// Every task's traces (the requirements and decisions it serves), by task ID
+/// (Task-A01-fennel617), from the history.
+pub fn traces(root: &Path) -> std::collections::BTreeMap<String, Vec<String>> {
+    allomos_core::traces::recorded(&events::list(root).0)
+}
+
+/// Add and remove task `id`'s traces (`alm trace`, Task-A01-fennel617): one `trace` event, under
+/// the lock, when the list changes; the task's files do not change. Returns the task and its
+/// traces after it.
+pub fn set_traces(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    add: &[String],
+    remove: &[String],
+) -> Result<(Task, Vec<String>, Vec<Issue>), Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let recorded = traces(root);
+    let (changes, after) = allomos_core::traces::set(&bag, &recorded, id, actor.by, add, remove)?;
+    let task = ops::find_task(&bag, id)?;
+    if !changes.is_empty() {
+        let event = actor.event(
+            allomos_core::traces::TRACE,
+            Kind::Task,
+            Some(&task.id),
+            changes,
+        );
+        lock.record(&event, |_| Ok(()))?;
+    }
+    Ok((task, after, issues))
+}
+
 /// What [`record_ai_decision`] or [`review_ai_decisions`] did (Task-A03-19).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Decided {

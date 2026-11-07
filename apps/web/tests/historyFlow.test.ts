@@ -64,3 +64,9 @@ test("a human check shows its result, where, who, the steps and the words (Task-
   );
   assert.equal(fieldName("human_check", t), "pane.human_check");
 });
+
+test("a task's traces show as a list (Task-A01-fennel617)", () => {
+  assert.equal(valueText("traces", ["R77", "0021"], t), "R77, 0021");
+  assert.equal(valueText("traces", [], t), "—");
+  assert.equal(fieldName("traces", t), "pane.traces");
+});

@@ -292,6 +292,10 @@ Plan:
   --branch <the branch you are on> [--base <name>]`: without an ID, a new word ID in the
   area (`A01-tiger042`); the base branch as `alm guide tasks` says. Read `alm guide tasks` first.
 - `alm base <id> <branch>`: change the branch a task starts from and merges into.
+- `alm trace <id> <ref>… [--remove]`: record which requirements (their REQUIREMENTS.md IDs, like
+  R77) and decisions (their numbers, like 0021) a task serves, in its history; done tasks too.
+  `alm traces <ref>` lists the tasks of a requirement or decision; `alm traces`, every one with its
+  tasks. alm checks only how each is written: check that it exists.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
@@ -1793,6 +1797,8 @@ mod tests {
             "--branch <the branch you are on> [--base <name>]",
             "alm base <id> <branch>",
             "--working <name>",
+            "alm trace <id> <ref>… [--remove]",
+            "`alm traces <ref>` lists the tasks",
         ] {
             assert!(flat_all.contains(words), "{words}");
         }

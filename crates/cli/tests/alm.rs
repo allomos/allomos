@@ -6128,3 +6128,80 @@ fn an_approval_is_recorded_withdrawn_and_ends_when_the_plan_changes() {
         "{list}"
     );
 }
+
+#[test]
+fn a_task_traces_to_requirements_and_decisions_and_back() {
+    // Task-A01-fennel617 (decision 0021 § 1.1 "Traceability"): `alm trace` records the
+    // requirements and decisions a task serves as a `traces` change in its history only;
+    // `alm show` lists them; `alm traces <ref>` finds the tasks back.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &["--as", "a", "trace", "A01-01", "R77", "audit"],
+        1,
+        "trace_invalid",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "trace", "A09-09", "R77"],
+        1,
+        "task_not_found",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "trace", "A01-01", "R77"],
+        1,
+        "task_held",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "trace",
+            "A01-01",
+            "0021-audit-trail",
+            "r77",
+            "R5",
+        ],
+    );
+    assert_eq!(v["traces"], json!(["R5", "R77", "0021"]));
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "trace");
+    assert_eq!(last["changes"][0]["field"], "traces");
+    assert_eq!(last["changes"][0]["to"], json!(["R5", "R77", "0021"]));
+
+    // The same list again changes nothing and records nothing.
+    let events = event_count(&repo);
+    ok(&repo, &["--as", "a", "trace", "A01-01", "R77"]);
+    assert_eq!(event_count(&repo), events);
+
+    // A task nobody holds, done ones included, may be traced; --remove takes one off.
+    ok(&repo, &["trace", "A01-02", "0021"]);
+    let v = ok(&repo, &["--as", "a", "trace", "A01-01", "--remove", "R5"]);
+    assert_eq!(v["traces"], json!(["R77", "0021"]));
+
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["traces"], json!(["R77", "0021"]));
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(out.contains("traces: R77, 0021"), "{out}");
+
+    let v = ok(&repo, &["traces", "21"]);
+    assert_eq!(v["reference"], "0021");
+    assert_eq!(v["tasks"], json!(["A01-01", "A01-02"]));
+    let v = ok(&repo, &["traces", "R5"]);
+    assert_eq!(v["tasks"], json!([]));
+    let v = ok(&repo, &["traces"]);
+    assert_eq!(
+        v["traces"],
+        json!({ "R77": ["A01-01"], "0021": ["A01-01", "A01-02"] })
+    );
+    refused(&repo, &["traces", "nope"], 1, "trace_invalid");
+}
