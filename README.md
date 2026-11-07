@@ -13,7 +13,7 @@ Your AI agent or account hits its usage limit, and you have to switch. A teammat
   <img src="docs/images/readme/hop-en-light.svg" alt="A task shifts from Claude Code (account 1) to Codex (account 2) when the quota is used up, then to a teammate at hand-off; all three read and write the same taskbag in the repository." width="560">
 </picture>
 
-`Local app · free` · `macOS · Windows` · `Claude Code · Codex` · `Cloud · optional, paid`
+`Local app` · `macOS · Windows` · `Claude Code · Codex` · `Cloud · optional`
 
 > **Status: early development.** v0.1, the macOS local tracker, is done; v0.2 (macOS and Windows, editing in the app) is in progress. Features below marked *(planned)* are not built yet.
 
@@ -56,7 +56,7 @@ alm claim A01-03
 
 ### Switch between teammates: hand over the project, not a pile of notes
 
-The same taskbag carries the work from you to a teammate and back. Each of you keeps your own agents, and everyone sees the same tasks. Every task carries **who holds it** (a person or an agent session), its **proven step** (implemented … human verified), what it is **waiting on**, and its **handoff note**. In a shared repository the taskbag travels with Git at no cost; a cloud project adds live sharing, email invitations and roles *(planned)*.
+The same taskbag carries the work from you to a teammate and back. Each of you keeps your own agents, and everyone sees the same tasks. Every task carries **who holds it** (a person or an agent session), its **proven step** (implemented … human verified), what it is **waiting on**, and its **handoff note**. In a shared repository the taskbag travels with Git; a cloud project adds live sharing, email invitations and roles *(planned)*.
 
 ### Task management: nothing hides in a chat
 
@@ -84,11 +84,11 @@ Progress by area with each task's proven step; the decisions only you can make, 
 
 *An example of the forecast to come, not real data.*
 
-## Pricing: free on your machine, pay only for the cloud
+## Local app and cloud
 
-| Local app: **free** | Cloud: **optional** |
+| Local app | Cloud: **optional** |
 |---|---|
-| No account, no card, no trial clock | Only if you want it; pricing to be announced |
+| No account; your data stays on your machine | Only if you want it; in development |
 | Switch between AI agents and accounts, by command line | Switch between teammates live: a cloud copy on any computer |
 | Desktop app for macOS and Windows | Team sign-in, email invitations and roles |
 | Local projects in your own repositories | Live collaboration and merged edits |

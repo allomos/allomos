@@ -67,7 +67,7 @@ p{margin:0}
 .hero .lede{margin-top:16px}
 .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
 .pill{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--ink)}
-.pill.free{border-color:var(--teal);color:var(--teal)}
+.pill.local{border-color:var(--teal);color:var(--teal)}
 
 /* glide path chart */
 .chart{width:100%;height:auto;display:block}
@@ -126,7 +126,7 @@ p{margin:0}
 .node b{display:block;font-family:var(--display);font-size:20px;line-height:1.1}
 .arrow{font-family:var(--mono);color:var(--amber-ink)}
 
-/* pricing */
+/* local & cloud */
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}
 .plan{border:1px solid var(--line);border-radius:12px;padding:clamp(18px,2.4vw,28px);display:flex;flex-direction:column;gap:14px;min-width:0}
 .plan.local{border:2px solid var(--teal)}
@@ -226,10 +226,10 @@ body.presenting .nav{display:flex;position:fixed;left:50%;bottom:calc(14px + env
         <h1 style="font-size:clamp(34px,4.6vw,60px)">换智能体，换队友，<em>项目不断线。</em></h1>
         <p class="lede">一个 AI 智能体或账号的额度用完了，另一个从停下的地方接着做。把工作交给队友时，也不会有东西落在聊天记录里。项目装在它的任务包里：就是你自己代码仓库里的普通文件。</p>
         <div class="pill-row">
-          <span class="pill free">本地应用免费</span>
+          <span class="pill local">本地应用</span>
           <span class="pill">macOS · Windows</span>
           <span class="pill">Claude Code · Codex</span>
-          <span class="pill">云端服务按需付费</span>
+          <span class="pill">云端协作（可选）</span>
         </div>
       </div>
       <figure style="margin:0">
@@ -417,14 +417,14 @@ alm claim A01-03</div>
   </section>
 
   <!-- 8 -->
-  <section class="slide" aria-label="价格">
-    <p class="eyebrow">价格</p>
-    <h2>本地免费用，用云端才收费</h2>
+  <section class="slide" aria-label="本地与云端">
+    <p class="eyebrow">本地与云端</p>
+    <h2>在本地就能用，需要团队协作时再加上云端</h2>
     <div class="plans">
       <div class="plan local">
         <h3>本地应用</h3>
-        <div class="price">免费</div>
-        <p class="sub">不用注册 · 不用绑卡 · 没有试用期限</p>
+        <div class="price">装上就能用</div>
+        <p class="sub">不用注册 · 数据留在你的电脑上</p>
         <ul class="ticks">
           <li><span>在 AI 智能体和账号之间切换，通过命令行和 MCP 接入</span></li>
           <li><span>macOS 和 Windows 桌面应用</span></li>
@@ -434,8 +434,8 @@ alm claim A01-03</div>
       </div>
       <div class="plan">
         <h3>云端</h3>
-        <div class="price">按需</div>
-        <p class="sub">需要时再开通 · 价格待定</p>
+        <div class="price">团队一起用</div>
+        <p class="sub">需要时再开通 · 正在开发</p>
         <ul class="ticks">
           <li><span>和队友实时切换：项目存一份到云端，换台电脑也能接着用</span></li>
           <li><span>团队登录、邮箱邀请和角色权限</span></li>
@@ -467,9 +467,9 @@ alm claim A01-03</div>
   <section class="slide close" aria-label="结尾">
     <p class="eyebrow">换肩</p>
     <h2>换智能体，换队友，<br><em>项目不断线。</em></h2>
-    <p class="lede">主线让项目在 AI 智能体和人之间顺畅流转；AI 技能和进度管理用的是同一个任务包。本地免费使用，需要云端时再付费。</p>
+    <p class="lede">主线让项目在 AI 智能体和人之间顺畅流转；AI 技能和进度管理用的是同一个任务包。本地就能用，需要团队协作时再加上云端。</p>
     <div class="pill-row">
-      <span class="pill free">本地应用免费</span>
+      <span class="pill local">本地应用</span>
       <span class="pill">早期开发中 · 首个版本支持 macOS</span>
     </div>
     <div class="foot"><span>换肩 · 2026 年 10 月</span><span>10 / 10</span></div>
