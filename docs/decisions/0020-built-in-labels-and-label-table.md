@@ -1,39 +1,48 @@
-# 0020 — Three built-in labels, and a label table per project
+# 0020 — Built-in labels, several labels per task, and a label table per project
 
 | Status | Raised | Decided | Approver |
 |---|---|---|---|
-| **Proposed** | 2026-11-07 | — | will.w.hui |
+| **Accepted** | 2026-11-07 | 2026-11-07 | will.w.hui |
 
-Card: task `A01-meadow698`. Raised by the approver in chat on 2026-11-07, while reviewing the "Needs you" preset of the Show filter (task `A01-wigwam308`).
+Card: task `A01-meadow698`. Raised by the approver in chat on 2026-11-07, while reviewing the "Needs you" preset of the Show filter (task `A01-wigwam308`); accepted in the same chat (see [Decided](#decided)).
 
 ## In plain words
 
-Today every project defines its own **label ladder**: an ordered list of progress steps in `project.json`, and each task carries one of them as its label. This project's ladder is drafted → implemented → locally verified → deployed and verified → human verified.
+Today every project defines its own **label ladder**: an ordered list of progress steps in `project.json`, and each task carries **one** of them. This project's ladder is drafted → implemented → locally verified → deployed and verified → human verified. Two other facts a person needs (a task finished without the human check, and AI decisions waiting for review) are kept elsewhere, so the Show filter cannot find them.
 
-Looking at this project's 316 tasks, only three of those steps carry real information:
+**Decided:**
 
-- **locally verified**: built and tested on this computer;
-- **deployed and verified**: live, and checked after deploying (mostly releases);
-- **human verified**: a person checked it by hand (the human check).
+1. Allomos has **five built-in labels**: three **progress** labels (locally verified → deployed and verified → human verified) and two **marks** (**to check** and **AI decided**).
+2. A task can carry **several labels**: at most one progress label, plus any marks and custom labels.
+3. Each project has a **label table** in `project.json`: every label it knows, with a short meaning. The built-in labels are always in it. A label not yet in the table is **added when it is first found**, and `alm` says so. An entry is **never removed automatically** because no task uses it.
+4. The taskbag format moves to `allomos/7`. Existing ladder steps that are not built in stay as **custom labels**; no task loses a label.
 
-"Drafted" was never used, and "implemented" was used where "locally verified" was meant (most of its tasks say their tests passed).
+## The label values
 
-**Proposal:**
+| Label | Kind | en | zh-CN | ja | Set by | Removed by |
+|---|---|---|---|---|---|---|
+| `locally verified` | progress, 1 | locally verified | 本地已验证 | ローカルで検証済み | `alm label <id> "locally verified"` | another progress label |
+| `deployed and verified` | progress, 2 | deployed and verified | 已部署并验证 | デプロイして検証済み | `alm label` | another progress label |
+| `human verified` | progress, 3 (the human check) | human verified | 人工已验证 | 人が確認済み | `alm label`, `alm checked`, the app's **Checked** | `alm reopen` |
+| `to check` | mark | to check | 待检查 | 要確認 | `alm done <id> --without-human-check "<why>" --steps <file>` | `human verified` (`alm checked`), `alm reopen` |
+| `AI decided` | mark | AI decided | 待审阅 AI 决定 | レビュー待ちの AI の決定 | `alm ai-decided <id> "…"` | `alm reviewed <id>` |
+| `drafted` | custom (this project) | — | — | — | `alm label` | removing it from the task |
+| `implemented` | custom (this project) | — | — | — | `alm label` | removing it from the task |
 
-1. Allomos itself defines these **three built-in labels**, always in this order. A project no longer chooses its own ladder.
-2. Each project keeps a **label table**: every label the project knows, with a short meaning. The three built-in labels are always in it. When a label not yet in the table is found (an agent sets one, or a taskbag is moved in), it is **added** to the table, and `alm` says so. An entry is **never removed automatically** just because no task uses it any more. This keeps the way open for projects to define their own labels later.
-3. **AI decisions waiting for review become a label too** ("AI decided"), next to the progress label. So a task can carry **several labels**.
-4. The taskbag format moves to `allomos/7`. Existing ladders become label tables: nothing a task carries is lost.
+- The interface names come from the app's existing texts (`filter.ladder.*`, `check.to_check`, `task.ai_decided`); the work may shorten them for the label chips.
+- Custom labels are shown as written. In this project only `drafted` (no task) and `implemented` (19 tasks) are custom; other projects bring their own.
+- **To check** keeps its reason and check steps in the task's fields (`without_human_check`, `human_check_steps`); the label is what lists and filters read.
+- **AI decided** says "there are decisions to review"; the decisions themselves stay in the task's history, as now.
 
-## Context
+## Context (before this decision)
 
-- The ladder lives in `project.json` as `labels` (an ordered list; default `implemented`, `locally verified`, `deployed and verified`, `human verified`), see [FILE-FORMAT](../product/FILE-FORMAT.md). A task's `label` must be a step on it; `alm label` refuses any other (`crates/core/src/ops.rs`).
-- The top step is the **human check**: `alm done` without `--without-human-check` needs it, and setting it on a done task clears `without_human_check` (as `alm checked` does).
-- The Show filter offers each step with **Yes** ("reached this step or higher") and **No**; it translates the default steps and shows other names as written (`apps/web/src/stopFlow.ts`).
-- `alm labels "<a,b,…>"` sets the ladder (refused if a task's label would be left off) and `alm rename label` renames a step (`alm guide customize`).
-- AGENTS.md rule 4 names this project's ladder.
+- The ladder lives in `project.json` as `labels` (default `implemented`, `locally verified`, `deployed and verified`, `human verified`), see [FILE-FORMAT](../product/FILE-FORMAT.md). A task's `label` must be a step on it; `alm label` refuses any other.
+- The top step is the human check: `alm done` without `--without-human-check` needs it, and setting it on a done task clears `without_human_check` (as `alm checked` does).
+- **To check** is a done task with `without_human_check` set (written by `alm done --without-human-check`); `alm human` lists it and the app shows "To check".
+- **AI decisions**: inside a task an agent makes routine choices on its own (a name, a file layout, a small detail with an obvious default) and records each with `alm ai-decided`. They are events in the taskbag's history (field `ai_decision`); `alm reviewed` adds an event that marks them reviewed, and "has decisions to review" is worked out from the history. The app shows a badge and `alm human` lists the task under To review.
+- The Show filter offers each ladder step with Yes ("this step or higher") and No; it cannot see the two marks.
 
-### What this project's tasks actually carry (2026-11-07, 316 tasks)
+### What this project's tasks carried (2026-11-07, 316 tasks)
 
 | State | no label | implemented | locally verified | deployed and verified | human verified |
 |---|---|---|---|---|---|
@@ -43,67 +52,56 @@ Looking at this project's 316 tasks, only three of those steps carry real inform
 | done | 7 | 17 | 105 | 26 | 116 |
 | dropped | 17 | 2 | 2 | | |
 
-No task is `ready` or `blocked` right now; no task carries `drafted`. Of the done tasks, 144 are **to check** (finished without the human check): 105 at locally verified, 20 at deployed and verified, 17 at implemented, 2 with no label.
+No task carried `drafted`. 144 done tasks were to check (105 locally verified, 20 deployed and verified, 17 implemented, 2 no label); 77 tasks had AI decisions to review, 13 of them already human verified.
 
-## Proposal in detail
+## Decided
 
-1. **Built-in labels.** `locally verified` < `deployed and verified` < `human verified`, fixed by Allomos, translated in every interface language. `human verified` is the human check everywhere (`alm done`, `alm checked`, "to check", the filter), with no lookup of a project's top step.
-2. **The label table** replaces the ladder in `project.json`: one entry per label, each with its name, an optional one-line meaning, and whether it is built in. Order matters only among the built-in three; other labels have no place in that order (the filter shows them with a plain Yes / No).
-3. **Finding new labels.** When `alm label` (or the app) sets a label that is not in the table, or a move-in brings one, it is added to the table and `alm` says so in its output ("Added the label 'x' to the label table; if that was a typo, …"). This replaces today's refusal. Following "`alm` tells; the agent checks", `alm` does not judge whether the new label is wanted: the agent does, and can rename it.
-4. **Never removed automatically.** An unused entry stays. A person or agent can remove one on purpose (for example `alm labels remove "<name>"`), refused while a task still carries it; the three built-in labels cannot be removed.
-5. **AI decisions become a label** (approver, 2026-11-07: "i want the ai decide mark be move to the label field too"). See [AI decisions as a label](#ai-decisions-as-a-label) below. Because a task keeps its progress label at the same time, this needs **several labels per task**.
-6. **Format `allomos/6` → `allomos/7`.** Each ladder step becomes a table entry; every task keeps its label. Older Allomos builds see the newer format and ask to be updated.
-7. **Where the table lives: `project.json`, not `project-notes.md`.** `alm` and the app must read and update it reliably; `project-notes.md` is free text that agents edit by hand. People see the table in `alm show`-style output and in the app's settings.
+The approver's answers on 2026-11-07, in this session's chat:
 
-## AI decisions as a label
+1. Built-in labels and the table: "yes, but more than 3 build in labels right?" Yes: the three progress labels plus the two marks below.
+2. Old steps: "ok" to keeping them as custom labels (option A below).
+3. Unknown labels: "this." — `alm` adds them to the table and says so.
+4. AI decisions as a label, several labels per task: "yes". To check as a label the same way: "yes".
 
-**What an AI decision is today.** Inside a task, an agent makes routine choices on its own instead of asking: a name, a file layout, how something is built within the task, a small detail with an obvious default (anything cheap to undo). AGENTS.md asks it to record each one with `alm ai-decided <id> "<what and why>"`, so the approver can look at them later and overturn any. The task then shows a badge in the app and is listed by `alm human` under **To review: AI decisions**, until the approver runs `alm reviewed <id>` (or says so in the app).
+Earlier in the same chat: "only these ladders are useful: locally verified, deployed and verified, human verified … we only need to update the taskbag version and map these 3 ladder values"; "i also want to allow the labels to be customized in the future. so we need a label table … updated if new labels are found. it should not be auto deleted if a defined label in the table is not used"; "i want the ai decide mark be move to the label field too".
 
-**Where it is stored today.** Not in `task.json`: each decision is an event in the taskbag's history (`events/`, a change of the field `ai_decision`), and `alm reviewed` adds an event that marks all earlier ones reviewed. Whether a task has decisions to review is worked out from the history. That is why no state or label tick in the Show filter can find these tasks (77 here today, 13 of them already `human verified`).
+## In detail
 
-**Proposal.** A built-in label **AI decided** (shown translated): `alm ai-decided` adds it to the task, `alm reviewed` removes it. The decisions themselves stay in the history, as now; the label only says "there are decisions to review". It is not a progress step, so it sits outside the order of the three progress labels.
+1. **Progress labels** are ordered; a task carries at most one. The filter's "this or higher" applies to them only. `human verified` is the human check everywhere, with no lookup of a project's top step.
+2. **Marks** (`to check`, `AI decided`) are set and removed by the commands in the table above, never by hand; they sit outside the progress order (plain Yes / No in the filter).
+3. **Several labels per task:** `task.json`'s `label` (one name) becomes `labels` (a list). `alm label <id> "<progress label>"` replaces the progress label and keeps the others; custom labels are added and removed on purpose (the exact commands are the implementing task's choice).
+4. **The label table** replaces the ladder in `project.json`: one entry per label, with its name, an optional one-line meaning, and whether it is built in.
+5. **New labels are added, not refused:** when `alm label` (or the app) sets a label that is not in the table, or a move-in brings one, it is added and `alm` says so ("Added the label 'x' to the label table; if that was a typo, …"). Following "`alm` tells; the agent checks", `alm` does not judge whether it is wanted.
+6. **Never removed automatically:** an unused entry stays. Someone can remove one on purpose, refused while a task still carries it; built-in labels cannot be removed.
+7. **Where the table lives: `project.json`**, not `project-notes.md`: `alm` and the app must read and update it reliably, and the project notes are free text agents edit by hand.
+8. **Format `allomos/6` → `allomos/7`:** each ladder step becomes a table entry; each task's label moves into its list; `to check` is added to every done task with `without_human_check`, and `AI decided` to every task whose history has unreviewed decisions (worked out once). Older Allomos builds see the newer format and ask to be updated.
 
-**What it needs.**
+### What happens to the old steps
 
-- **Several labels per task:** `label` (one name) becomes `labels` (a list) in `task.json`, still with at most one of the three progress labels. The filter's "this step or higher" applies to the progress label only; other labels are plain Yes / No.
-- **Existing tasks:** the format change gives the label to every task that has unreviewed decisions today (worked out once from the history).
-- **The same could later hold for "to check"** (`without_human_check`): it too is a mark beside the progress label. Not proposed here, since it also carries the reason and the check steps; the approver may ask for it.
-
-## What happens to the old steps
-
-| Old step | Option A (recommended): keep | Option B: drop | Option C: raise |
+| Old step | **A: keep (decided)** | B: drop | C: raise |
 |---|---|---|---|
 | `drafted` (unused here) | stays in the table, unused | removed | — |
-| `implemented` (19 tasks here) | stays in the table as a custom label; the 19 tasks keep it | the 19 tasks lose their label | the 19 tasks become `locally verified` |
-| other projects' own step names | stay as custom labels | — | — |
+| `implemented` (19 tasks here) | stays as a custom label; the 19 tasks keep it | the tasks lose it | the tasks become `locally verified` |
+| other projects' own steps | stay as custom labels | — | — |
 | `owner verified` (older taskbags) | becomes `human verified`, as today | | |
 
-**Recommended: A.** The format change is then purely mechanical: no task's progress claim is lowered or raised, and nothing needs an agent's judgement. Cleaning up afterwards (for example `alm rename label "implemented" "locally verified"` for tasks whose notes prove their tests passed, or removing `drafted`) is an ordinary change the approver can ask for at any time. B loses information; C raises 19 progress claims without evidence that each one holds.
+A keeps the format change mechanical: no progress claim is lowered or raised. Cleaning up later (for example renaming `implemented` on tasks whose notes prove their tests passed) is an ordinary change.
 
 ## Alternatives considered
 
-| Option | What it is | Why not (proposed) |
+| Option | What it is | Why not |
 |---|---|---|
-| **Built-in three + table** (proposed) | as above | — |
-| Keep per-project ladders | today's model; only remove `drafted` and fold `implemented` here | Keeps the cost of a configurable ladder (lookups, translations only for default names, `alm labels`) for a choice the data shows nobody uses. |
-| Fixed three, no table | built-in labels only; anything else refused | Simplest, but closes the door on project labels, which the approver wants to keep open. |
-| Merge labels into states | `done` split by how it was finished | Labels appear almost only on done tasks here, but a task can wait or be blocked part-way ("waiting, locally verified"); merging changes every state and the run loop. Left out of this decision. |
+| **Built-in labels + table, several per task** (decided) | as above | — |
+| Keep per-project ladders | today's model, minus `drafted` | Keeps a configurable ladder nobody uses, and the filter still cannot find the marks. |
+| Built-in labels only, no table | anything else refused | Closes the door on project labels, which the approver wants to keep open. |
+| Merge labels into states | `done` split by how it was finished | A task can wait or be blocked part-way ("waiting, locally verified"); merging changes every state and the run loop. |
 | Table in `project-notes.md` | a Markdown table agents keep | Free text: `alm` and the app cannot update or read it reliably. |
 
 ## Consequences
 
-- **Format:** `allomos/7`; [FILE-FORMAT](../product/FILE-FORMAT.md) describes the table and drops "must be a step on the ladder" in favour of "is added to the table".
-- **`alm`:** `alm label` adds unknown labels instead of refusing them; `alm labels` becomes the table's command (list, add with a meaning, remove an unused one); `alm rename label` stays; the human check is always `human verified`. `alm guide terms` and `alm guide customize` are rewritten for the table.
-- **App:** the Show filter lists the built-in three first (with "or higher"), then the table's other labels; the settings show the table.
-- **AGENTS.md:** rule 4 names the three built-in labels instead of this project's ladder; running sessions are told (shared rule change).
-- **Filter presets (`A01-wigwam308`):** "Needs you" can rely on `human verified` being fixed and tick the **AI decided** label; whether "to check" gets a tick of its own follows open point 4.
-- **Several labels per task:** `task.json`'s `label` becomes `labels`; `alm label` adds or replaces the progress label and keeps the others; the task list and pane show every label; the history records the list.
-- **AI decisions:** the badge and `alm human`'s To review read the **AI decided** label instead of working it out from the history; `alm ai-decided` and `alm reviewed` set and clear it.
-- **Not changed:** states, `without_human_check`, where the decisions themselves are kept (the history).
-
-## Open for the approver
-
-1. Accept the three built-in labels and the label table in `project.json`?
-2. Old steps: option A (keep as custom labels), B (drop) or C (raise)?
-3. Unknown labels: add them and say so (proposed), or keep refusing until someone adds them to the table?
-4. AI decisions as the built-in label **AI decided**, with several labels per task: accept? And should "to check" become a label the same way?
+- **Format:** `allomos/7`; [FILE-FORMAT](../product/FILE-FORMAT.md) describes `labels` on tasks, the label table, and how the marks are set and cleared.
+- **`alm`:** `alm label` keeps other labels and adds unknown ones to the table; `alm labels` manages the table (list, add with a meaning, remove an unused one); `alm rename label` stays; `alm done --without-human-check`, `alm checked`, `alm ai-decided`, `alm reviewed` and `alm reopen` set and clear the marks; `alm human` reads the marks; `alm guide terms` and `alm guide customize` describe the table.
+- **App:** the task list and pane show every label; the Show filter lists the progress labels (with "or higher"), then the marks, then custom labels; the AI-decision badge and "To check" read the marks; the settings show the table; texts in en, zh-CN and ja.
+- **Filter presets (`A01-wigwam308`):** "Needs you" can tick the marks `to check` and `AI decided`. `alm human` also lists waiting tasks (To answer); today's filter joins its state and label ticks with "and", so taking in waiting tasks too is that task's question.
+- **AGENTS.md:** rule 4 names the built-in labels instead of this project's ladder; running sessions are told (shared rule change).
+- **Not changed:** the states; where the human-check reason and steps, and the AI decisions themselves, are kept.
