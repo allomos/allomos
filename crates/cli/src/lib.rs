@@ -3393,20 +3393,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 None => None,
             };
             change(cli, cwd, |bag| {
-                // Decision 0020: finishing without --without-human-check needs a "by human" label.
-                if without_human_check.is_none() {
-                    let task = ops::find_task(bag, id)?;
-                    if task.state != State::Done && !task.human_checked() {
-                        return Err(Problem::HumanCheckLabelMissing { id: task.id });
-                    }
-                }
-                ops::finish(
+                // Decision 0020: finishing without --without-human-check needs a "by human" label
+                // (checked after the usual rules, so a held task still says who holds it).
+                let was_done = ops::find_task(bag, id)?.state == State::Done;
+                let out = ops::finish(
                     bag,
                     id,
                     me,
                     without_human_check.as_deref(),
                     steps.as_deref(),
-                )
+                )?;
+                if without_human_check.is_none() && !was_done && !out.task.human_checked() {
+                    return Err(Problem::HumanCheckLabelMissing { id: out.task.id });
+                }
+                Ok(out)
             })
         }
         Command::Checked {
