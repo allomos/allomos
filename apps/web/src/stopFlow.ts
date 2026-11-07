@@ -223,6 +223,14 @@ export function onTable(filter: StateFilter, labels: readonly string[]): StateFi
   };
 }
 
+/** The list's filter for an opened project: the stored ticks on the project's label table, by
+ * name (Task-A01-key755). The desktop app sends the table as entries (`allomos/7`), never names:
+ * 0.1.41 put those entries in the filter as they came, and opening the Show filter then drew an
+ * entry as text, which React cannot do, so the window went blank and stopped answering. */
+export function tableFilter(stored: StateFilter, project: Pick<Project, "labels"> | undefined, tasks: readonly Task[] = []): StateFilter {
+  return onTable(stored, labelNames(project, tasks));
+}
+
 /** Whether nothing is unticked. */
 export function isAll(filter: StateFilter): boolean {
   return filter.states.length === 0 && filter.labeled.length === 0 && filter.yes.length === 0 && filter.no.length === 0;
