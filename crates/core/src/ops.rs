@@ -56,7 +56,7 @@ fn check_id(id: &str) -> Result<(), Problem> {
     }
 }
 
-fn non_empty(text: Option<&str>) -> Option<String> {
+pub(crate) fn non_empty(text: Option<&str>) -> Option<String> {
     text.map(str::trim)
         .filter(|t| !t.is_empty())
         .map(String::from)
@@ -266,66 +266,20 @@ pub fn set_handoff_rules(taskbag: &Taskbag, change: &HandoffChange) -> Result<Pr
     })
 }
 
-/// The project with a new label ladder, lowest step first (`alm labels`). Refused when it is
-/// empty, or when a task's label is not on it: changing the ladder never strands a task.
+/// The project's label table with its custom labels replaced by `labels`, in that order; the
+/// built-in labels stay first (the app's Tasks section; decision 0020). See [`crate::labels::set_custom`].
 pub fn set_ladder(taskbag: &Taskbag, labels: &[String]) -> Result<Project, Problem> {
-    let labels: Vec<String> = labels
-        .iter()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect();
-    if labels.is_empty() {
-        return Err(Problem::LadderEmpty);
-    }
-    if let Some(label) = taskbag
-        .tasks
-        .iter()
-        .filter_map(|t| t.label.as_ref())
-        .find(|l| !labels.contains(l))
-    {
-        return Err(Problem::LabelNotOnLadder {
-            label: label.clone(),
-            ladder: labels.join(" → "),
-        });
-    }
-    Ok(Project {
-        labels,
-        ..taskbag.project.clone()
-    })
+    crate::labels::set_custom(taskbag, labels)
 }
 
-/// A step of the ladder renamed, with every task that carries it (`alm rename label`,
-/// Task-A01-32): the project with the new ladder (same order), and the tasks whose label changed,
-/// done and dropped ones too. The old name must be on the ladder; the new one must not be.
+/// A custom label renamed in the table and on every task that carries it (`alm rename label`,
+/// Task-A01-32). See [`crate::labels::rename`].
 pub fn rename_label(
     taskbag: &Taskbag,
     old: &str,
     new: &str,
 ) -> Result<(Project, Vec<Task>), Problem> {
-    let old = old.trim();
-    let new = non_empty(Some(new)).ok_or(Problem::LabelNameMissing)?;
-    let ladder = &taskbag.project.labels;
-    let Some(at) = ladder.iter().position(|l| l == old) else {
-        return Err(Problem::LabelNotOnLadder {
-            label: old.to_string(),
-            ladder: ladder.join(" → "),
-        });
-    };
-    if ladder.iter().any(|l| *l == new) {
-        return Err(Problem::LabelExists { label: new });
-    }
-    let mut project = taskbag.project.clone();
-    project.labels[at] = new.clone();
-    let tasks = taskbag
-        .tasks
-        .iter()
-        .filter(|t| t.label.as_deref() == Some(old))
-        .map(|t| Task {
-            label: Some(new.clone()),
-            ..t.clone()
-        })
-        .collect();
-    Ok((project, tasks))
+    crate::labels::rename(taskbag, old, new)
 }
 
 /// The parts of a new iteration besides its ID and name; all optional.
@@ -681,7 +635,7 @@ pub fn new_task(
         title,
         area: area.to_string(),
         state: State::Backlog,
-        label: None,
+        labels: Vec::new(),
         holder: None,
         waiting_on: None,
         who: None,
@@ -722,29 +676,15 @@ pub fn claim(
     Ok(Outcome::warned(task, warnings))
 }
 
-/// Set the task's label. It must be a step on the project's ladder.
+/// Add a label to the task, keeping its others (decision 0020). A label the table does not list
+/// yet is added there by the caller ([`crate::labels::add`] says when).
 pub fn set_label(
     taskbag: &Taskbag,
     id: &str,
     me: Option<&str>,
     label: &str,
 ) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
-    check_holder(&task, me)?;
-    check_open(&task, &[State::Dropped])?;
-    if !taskbag.project.labels.iter().any(|l| l == label) {
-        return Err(Problem::LabelNotOnLadder {
-            label: label.to_string(),
-            ladder: taskbag.project.labels.join(" → "),
-        });
-    }
-    task.label = Some(label.to_string());
-    // The top label on a finished task is the human check (Task-A03-18).
-    if task.state == State::Done && taskbag.project.labels.last().map(String::as_str) == Some(label)
-    {
-        clear_human_check(&mut task);
-    }
-    Ok(Outcome::plain(task))
+    crate::labels::add(taskbag, id, me, label).map(|l| l.outcome)
 }
 
 /// Fill in or correct the task's recorded session afterwards (`alm session`, Task-A03-ham538): each
@@ -956,31 +896,18 @@ fn clear_human_check(task: &mut Task) {
     task.human_check_steps = None;
 }
 
-/// A person has checked a finished task (Task-A03-18): it gets the top label of the ladder and
-/// leaves "To check"; the note and the steps are cleared, and stay in its history. Only a done
-/// task can be checked. The holder rule does not apply: the person checking is rarely the agent
-/// session that held it.
+/// A person has checked a finished task (Task-A03-18, decision 0020): it gets a "by human"
+/// label and leaves "To check". See [`crate::labels::checked`].
 pub fn checked(taskbag: &Taskbag, id: &str) -> Result<Outcome, Problem> {
-    let mut task = find_task(taskbag, id)?;
-    if task.state != State::Done {
-        return Err(Problem::NotDone {
-            id: task.id.clone(),
-            state: task.state.as_str().to_string(),
-        });
-    }
-    if let Some(top) = taskbag.project.labels.last() {
-        task.label = Some(top.clone());
-    }
-    clear_human_check(&mut task);
-    Ok(Outcome::plain(task))
+    crate::labels::checked(taskbag, id, None)
 }
 
 /// Send a finished task back to "To check" (Task-A03-37): its work changed after a person checked
 /// it, so the earlier check no longer covers it. The AI agent decides when (approver,
 /// 2026-10-20); `alm` does not look at the work. `reason` says what changed and is shown where the
 /// task waits for its check; `steps` replace the steps for checking it (without them, the earlier
-/// steps stay, or the warning `human_check_steps_missing` asks for them). A task at the top label
-/// goes one step down, since the person's check no longer covers it. Only a done task can be sent
+/// steps stay, or the warning `human_check_steps_missing` asks for them). Its "by human" labels
+/// are removed (decision 0020), since the person's check no longer covers it. Only a done task can be sent
 /// back; the holder rule does not apply, as for `checked`.
 pub fn recheck(
     taskbag: &Taskbag,
@@ -1007,9 +934,8 @@ pub fn recheck(
         }
         None => {}
     }
-    let ladder = &taskbag.project.labels;
-    if ladder.len() > 1 && task.label.as_ref() == ladder.last() {
-        task.label = Some(ladder[ladder.len() - 2].clone());
+    for l in crate::labels::BY_HUMAN {
+        task.remove_label(l);
     }
     task.without_human_check = Some(note);
     Ok(Outcome::warned(task, warnings))
@@ -1433,7 +1359,8 @@ pub const REOPEN_NOTE: &str = "reopen_note";
 /// `dropped` task becomes `ready`, held by nobody, so more work on the same outcome stays on the
 /// same task. `note` says why (required); it is recorded in the task's history only
 /// ([`REOPEN_NOTE`]), not in its files. The new work has proven nothing yet, so the label is
-/// cleared, and so is the human-check record (the note and its steps); both stay in the history.
+/// cleared (all but `AI decisions to review`), and so is the human-check record (the note and its
+/// steps); both stay in the history.
 /// The description, handoff note and next dependency are kept. Any other state is refused
 /// (`cannot_reopen`). The holder rule does not apply: a finished task is held by nobody (A00-30).
 pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Problem> {
@@ -1447,7 +1374,9 @@ pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Proble
     let note = non_empty(Some(note)).ok_or(Problem::ReopenNoteMissing)?;
     task.state = State::Ready;
     task.holder = None;
-    task.label = None;
+    // Decision 0020: every label goes but `AI decisions to review`, which only `alm reviewed`
+    // removes (the decisions are still unreviewed).
+    task.labels.retain(|l| l == crate::labels::AI_DECISIONS);
     clear_stop(&mut task);
     clear_human_check(&mut task);
     let mut outcome = Outcome::plain(task);
@@ -1789,7 +1718,8 @@ mod tests {
         assert_eq!(reopen(&s, "A01-01", "  "), Err(Problem::ReopenNoteMissing));
         let o = reopen(&s, "A01-01", " failed its check ").unwrap();
         let t = &o.task;
-        assert_eq!((t.state, &t.holder, &t.label), (State::Ready, &None, &None));
+        assert_eq!((t.state, &t.holder), (State::Ready, &None));
+        assert!(t.labels.is_empty());
         assert_eq!(
             (&t.without_human_check, &t.human_check_steps),
             (&None, &None)
@@ -1832,31 +1762,35 @@ mod tests {
     #[test]
     fn renaming_a_label_renames_it_on_the_tasks_too() {
         let mut s = bag();
-        s.tasks[0].label = Some("human verified".into());
-        s.tasks[1].label = Some("human verified".into());
+        s.project
+            .labels
+            .push(crate::LabelEntry::custom("shipped", None));
+        s.tasks[0].labels = vec!["shipped".into()];
+        s.tasks[1].labels = vec!["shipped".into(), crate::labels::AI_DECISIONS.into()];
         s.tasks[1].state = State::Done;
-        s.tasks[2].label = Some("implemented".into());
-        let (p, tasks) = rename_label(&s, "human verified", " human checked ").unwrap();
-        assert_eq!(p.labels[3], "human checked");
-        assert_eq!(p.labels.len(), 4);
+        let (p, tasks) = rename_label(&s, "shipped", " released ").unwrap();
+        assert_eq!(p.labels[5].name, "released");
+        assert_eq!(p.labels.len(), 6);
         assert_eq!(tasks.len(), 2, "the done task too");
-        assert!(
-            tasks
-                .iter()
-                .all(|t| t.label.as_deref() == Some("human checked"))
+        assert_eq!(tasks[1].labels, ["released", crate::labels::AI_DECISIONS]);
+        assert_eq!(
+            rename_label(&s, "nope", "x").unwrap_err().code(),
+            "label_not_in_table"
         );
         assert_eq!(
-            rename_label(&s, "shipped", "x").unwrap_err().code(),
-            "label_not_on_ladder"
-        );
-        assert_eq!(
-            rename_label(&s, "human verified", "implemented"),
+            rename_label(&s, "shipped", crate::labels::AI_DECISIONS),
             Err(Problem::LabelExists {
-                label: "implemented".into()
+                label: crate::labels::AI_DECISIONS.into()
             })
         );
         assert_eq!(
-            rename_label(&s, "human verified", " "),
+            rename_label(&s, crate::labels::LOCALLY_BY_AGENT, "x")
+                .unwrap_err()
+                .code(),
+            "label_built_in"
+        );
+        assert_eq!(
+            rename_label(&s, "shipped", " "),
             Err(Problem::LabelNameMissing)
         );
     }
@@ -2015,21 +1949,29 @@ mod tests {
     }
 
     #[test]
-    fn the_ladder_changes_only_when_no_task_is_stranded() {
+    fn the_custom_labels_change_only_when_no_task_is_stranded() {
         let mut s = bag();
-        let ladder = |l: &[&str]| l.iter().map(|x| x.to_string()).collect::<Vec<_>>();
-        let p = set_ladder(&s, &ladder(&["implemented", " connected ", ""])).unwrap();
-        assert_eq!(p.labels, ["implemented", "connected"]);
+        let names = |l: &[&str]| l.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let p = set_ladder(
+            &s,
+            &names(&["shipped", " connected ", "", crate::labels::AI_DECISIONS]),
+        )
+        .unwrap();
+        let got: Vec<&str> = p.labels.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(&got[5..], ["shipped", "connected"]);
+        assert_eq!(p.labels.len(), 7, "the built-in labels stay");
         assert_eq!((p.id.as_str(), p.name.as_str()), ("p", "P"));
-        assert_eq!(set_ladder(&s, &ladder(&[" "])), Err(Problem::LadderEmpty));
-        s.tasks[0].label = Some("human verified".into());
+        s.project = p;
+        s.tasks[0].labels = vec!["shipped".into()];
         assert_eq!(
-            set_ladder(&s, &ladder(&["implemented"])),
-            Err(Problem::LabelNotOnLadder {
-                label: "human verified".into(),
-                ladder: "implemented".into()
+            set_ladder(&s, &names(&["connected"])),
+            Err(Problem::LabelInUse {
+                label: "shipped".into(),
+                tasks: s.tasks[0].id.clone()
             })
         );
+        let p = set_ladder(&s, &names(&["shipped"])).unwrap();
+        assert!(p.label("connected").is_none());
     }
 
     #[test]
@@ -2224,19 +2166,43 @@ mod tests {
     fn label_wait_done_release() {
         let mut s = bag();
         put!(s, claim(&s, "A01-01", Some("a"), false).unwrap().task);
+        // A label the table does not list is accepted; the caller adds it to the table.
+        let l = crate::labels::add(&s, "A01-01", Some("a"), "shipped").unwrap();
+        assert_eq!(l.outcome.task.labels, ["shipped"]);
+        assert!(l.project.unwrap().label("shipped").is_some());
         assert!(matches!(
-            set_label(&s, "A01-01", Some("a"), "shipped"),
-            Err(Problem::LabelNotOnLadder { .. })
-        ));
-        assert!(matches!(
-            set_label(&s, "A01-01", Some("b"), "implemented"),
+            set_label(&s, "A01-01", Some("b"), crate::labels::LOCALLY_BY_AGENT),
             Err(Problem::TaskHeld { .. })
         ));
         put!(
             s,
-            set_label(&s, "A01-01", Some("a"), "implemented")
+            set_label(&s, "A01-01", Some("a"), crate::labels::LOCALLY_BY_AGENT)
                 .unwrap()
                 .task,
+        );
+        // A second label keeps the first; the same one twice is kept once.
+        let two = set_label(&s, "A01-01", Some("a"), crate::labels::DEPLOYED_BY_AGENT).unwrap();
+        assert_eq!(
+            two.task.labels,
+            [
+                crate::labels::LOCALLY_BY_AGENT,
+                crate::labels::DEPLOYED_BY_AGENT
+            ]
+        );
+        let built_in =
+            crate::labels::add(&s, "A01-01", Some("a"), crate::labels::LOCALLY_BY_AGENT).unwrap();
+        assert_eq!(built_in.outcome.task.labels.len(), 1);
+        assert!(built_in.project.is_none());
+        // Removing one on purpose; one it does not carry is refused.
+        let removed =
+            crate::labels::remove(&s, "A01-01", Some("a"), crate::labels::LOCALLY_BY_AGENT)
+                .unwrap();
+        assert!(removed.task.labels.is_empty());
+        assert_eq!(
+            crate::labels::remove(&s, "A01-01", Some("a"), "shipped")
+                .unwrap_err()
+                .code(),
+            "label_not_on_task"
         );
         assert_eq!(
             wait(&s, "A01-01", Some("a"), "  ", None),
@@ -2322,9 +2288,10 @@ mod tests {
         assert!(again.warnings.is_empty());
         assert_eq!(again.task.without_human_check.as_deref(), Some("loop run"));
         assert!(again.task.human_check_steps.is_some());
-        // A person checks it: top label, note and steps cleared; only a done task (Task-A03-18).
+        // A person checks it: a "by human" label, note and steps cleared; only a done task
+        // (Task-A03-18, decision 0020). Without "deployed and verified by agent": locally.
         let c = checked(&s, "A01-01").unwrap().task;
-        assert_eq!(c.label.as_deref(), Some("human verified"));
+        assert!(c.has_label(crate::labels::LOCALLY_BY_HUMAN));
         assert_eq!(
             (&c.without_human_check, &c.human_check_steps),
             (&None, &None)
@@ -2334,22 +2301,40 @@ mod tests {
             checked(&s, "A01-02"),
             Err(Problem::NotDone { .. })
         ));
-        // The top label set on a finished task is the human check too.
-        let l = set_label(&s, "A01-01", Some("b"), "human verified")
+        // With "deployed and verified by agent": deployed; the person may choose the other one.
+        let mut dep = find_task(&s, "A01-01").unwrap();
+        dep.labels = vec![crate::labels::DEPLOYED_BY_AGENT.into()];
+        let mut d2 = s.clone();
+        put!(d2, dep);
+        let c = checked(&d2, "A01-01").unwrap().task;
+        assert!(c.has_label(crate::labels::DEPLOYED_BY_HUMAN) && !c.to_check());
+        let c = crate::labels::checked(&d2, "A01-01", Some(crate::labels::LOCALLY_BY_HUMAN))
+            .unwrap()
+            .task;
+        assert!(c.has_label(crate::labels::LOCALLY_BY_HUMAN));
+        assert_eq!(
+            crate::labels::checked(&d2, "A01-01", Some("shipped"))
+                .unwrap_err()
+                .code(),
+            "label_not_by_human"
+        );
+        // A "by human" label set on a finished task is the human check too.
+        let l = set_label(&s, "A01-01", Some("b"), crate::labels::DEPLOYED_BY_HUMAN)
             .unwrap()
             .task;
         assert_eq!(l.without_human_check, None);
-        // A lower label leaves it to check.
-        let l = set_label(&s, "A01-01", Some("b"), "implemented")
+        assert!(!l.to_check());
+        // A "by agent" label leaves it to check.
+        let l = set_label(&s, "A01-01", Some("b"), crate::labels::DEPLOYED_BY_AGENT)
             .unwrap()
             .task;
         assert!(l.to_check());
-        // `done` on a finished task records only its human check.
+        // To check does not depend on the note any more: a done task with no "by human" label is.
         let mut old = find_task(&s, "A01-01").unwrap();
         old.without_human_check = None;
         old.human_check_steps = None;
         put!(s, old);
-        assert!(!find_task(&s, "A01-01").unwrap().to_check());
+        assert!(find_task(&s, "A01-01").unwrap().to_check());
         let moved = finish(&s, "A01-01", None, Some("loop run"), None)
             .unwrap()
             .task;
@@ -2364,7 +2349,7 @@ mod tests {
         // Through the app's edit: the same rule, recorded as `checked`.
         let (o, command) = edit(&s, "A01-01", Some("z"), &Edit::Checked).unwrap();
         assert_eq!(command, "checked");
-        assert_eq!(o.task.label.as_deref(), Some("human verified"));
+        assert!(o.task.has_label(crate::labels::LOCALLY_BY_HUMAN));
         let e: Edit = serde_json::from_str(r#"{"field":"checked"}"#).unwrap();
         assert_eq!(e, Edit::Checked);
         // Its work changed after the check: the agent sends it back to To check (Task-A03-37).
@@ -2374,7 +2359,7 @@ mod tests {
             back.task.without_human_check.as_deref(),
             Some("The save button moved")
         );
-        assert_eq!(back.task.label.as_deref(), Some("deployed and verified"));
+        assert!(!back.task.human_checked());
         assert!(back.task.to_check());
         assert!(matches!(
             back.warnings[..],

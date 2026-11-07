@@ -1099,10 +1099,11 @@ struct LadderStep {
     to: String,
 }
 
-/// Change the progress ladder as the Tasks section edited it (Task-A05-yeti951): each renamed step
-/// as `alm rename label` (on every task that carries it), then the steps in their new order, added
-/// and removed, as `alm labels`. Checked first, so nothing changes when any of it is refused:
-/// removing a step tasks still carry names those tasks.
+/// Change the project's own labels as the Tasks section edited them (Task-A05-yeti951; decision
+/// 0020: the label table, whose five built-in labels stay as they are): each renamed label as
+/// `alm rename label` (on every task that carries it), then the labels in their new order, added
+/// and removed. Checked first, so nothing changes when any of it is refused: removing a label
+/// tasks still carry names those tasks. Returns the whole table's names, built-in first.
 #[tauri::command]
 fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, Problem> {
     let loaded = allomos_store::load(&root);
@@ -1131,7 +1132,7 @@ fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, P
     // A rename onto a name another step still has before its own rename would collide midway.
     if let Some((_, to)) = renames
         .iter()
-        .find(|(_, to)| bag.project.labels.iter().any(|l| l == to))
+        .find(|(_, to)| bag.project.labels.iter().any(|l| l.name == *to))
     {
         return Err(Problem::LabelExists {
             label: to.to_string(),
@@ -1140,14 +1141,14 @@ fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, P
     let kept: Vec<&str> = steps.iter().filter_map(|s| s.from.as_deref()).collect();
     for label in bag
         .project
-        .labels
+        .label_names()
         .iter()
-        .filter(|l| !kept.contains(&l.as_str()))
+        .filter(|l| !kept.contains(&l.as_str()) && !allomos_core::labels::is_built_in(l))
     {
         let tasks: Vec<&str> = bag
             .tasks
             .iter()
-            .filter(|t| t.label.as_deref() == Some(label))
+            .filter(|t| t.labels.contains(label))
             .map(|t| t.id.as_str())
             .collect();
         if !tasks.is_empty() {
@@ -1166,8 +1167,8 @@ fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, P
     let bag = loaded
         .taskbag
         .ok_or_else(|| loaded.issues[0].problem.clone())?;
-    let project = allomos_core::ops::set_ladder(&bag, &names)?;
-    if project.labels != bag.project.labels {
+    let project = allomos_core::labels::set_custom(&bag, &names)?;
+    if project.label_names() != bag.project.label_names() {
         let event = allomos_store::Actor::APP.event(
             "labels",
             allomos_core::event::Kind::Project,
@@ -1176,7 +1177,7 @@ fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, P
         );
         lock.record(&event, |l| l.save_project(&project))?;
     }
-    Ok(project.labels)
+    Ok(project.label_names())
 }
 
 /// The taskbag's project folders (decision 0019), each with whether it is found here and how many
@@ -2618,20 +2619,22 @@ mod tests {
         let file = root.join("tasks").join(&task.id).join("task.json");
         let mut v: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-        v["label"] = serde_json::json!("implemented");
+        v["labels"] = serde_json::json!(["implemented"]);
         std::fs::write(&file, v.to_string()).unwrap();
         let step = |from: Option<&str>, to: &str| LadderStep {
             from: from.map(String::from),
             to: to.into(),
         };
-        let ladder = || allomos_store::load(&root).taskbag.unwrap().project.labels;
+        let ladder = || {
+            allomos_store::load(&root)
+                .taskbag
+                .unwrap()
+                .project
+                .label_names()
+        };
         let before = ladder();
         // Removing "implemented", which the task carries: refused, naming the task.
-        let err = change_ladder(
-            root.clone(),
-            vec![step(Some("human verified"), "human verified")],
-        )
-        .unwrap_err();
+        let err = change_ladder(root.clone(), vec![step(None, "spare")]).unwrap_err();
         assert_eq!(
             err,
             Problem::LabelInUse {
@@ -2640,20 +2643,18 @@ mod tests {
             }
         );
         assert_eq!(ladder(), before);
-        // Rename it, add a step, drop two others, and reorder.
+        // Rename it and add one; the built-in labels stay first.
         let saved = change_ladder(
             root.clone(),
-            vec![
-                step(Some("implemented"), "built"),
-                step(None, "reviewed"),
-                step(Some("human verified"), "human verified"),
-            ],
+            vec![step(Some("implemented"), "built"), step(None, "reviewed")],
         )
         .unwrap();
-        assert_eq!(saved, ["built", "reviewed", "human verified"]);
+        assert_eq!(saved.len(), 7, "{saved:?}");
+        assert_eq!(saved[0], "locally verified by agent");
+        assert_eq!(&saved[5..], ["built", "reviewed"]);
         assert_eq!(ladder(), saved);
         let bag = allomos_store::load(&root).taskbag.unwrap();
-        assert_eq!(bag.tasks[0].label.as_deref(), Some("built"));
+        assert_eq!(bag.tasks[0].labels, ["built"]);
         // Two steps with one name, and an empty name, are refused.
         assert!(change_ladder(root.clone(), vec![step(None, "x"), step(None, "x")]).is_err());
         assert!(change_ladder(root.clone(), vec![step(Some("built"), " ")]).is_err());
@@ -3130,10 +3131,10 @@ mod tests {
             edit_task_as(&root, Some(" "), "A01-01", &edit),
             Err(Problem::HolderMissing)
         );
-        assert!(load(&root).taskbag.unwrap().tasks[0].label.is_none());
+        assert!(load(&root).taskbag.unwrap().tasks[0].labels.is_empty());
 
         let task = edit_task_as(&root, Some("Will"), "A01-01", &edit).unwrap();
-        assert_eq!(task.label.as_deref(), Some("implemented"));
+        assert_eq!(task.labels, ["implemented"]);
         let h = allomos_store::events::history(&root, "A01-01");
         let e = &h.events[0];
         assert_eq!(
@@ -3213,8 +3214,8 @@ mod tests {
         .unwrap();
         let task = edit_task_as(&root, Some("Will"), "A01-01", &reopen).unwrap();
         assert_eq!(
-            (task.state, task.holder, task.label),
-            (allomos_core::State::Ready, None, None)
+            (task.state, task.holder, task.labels),
+            (allomos_core::State::Ready, None, vec![])
         );
         let e = &allomos_store::events::history(&root, "A01-01").events[0];
         assert_eq!(

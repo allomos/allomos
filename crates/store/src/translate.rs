@@ -87,8 +87,13 @@ mod tests {
         let r = agent_translate_request_in("en", p, b, "vi", Some("Tiếng Việt"));
         assert!(r.contains("into Tiếng Việt (`vi`)"), "{r}");
         assert!(r.contains("task-language vi"), "{r}");
-        assert!(r.contains("Keep as they are: commands, task IDs, iteration IDs, file paths and code."));
-        assert!(r.contains("every iteration's name (`alm change iteration <id> --name`)"), "{r}");
+        assert!(
+            r.contains("Keep as they are: commands, task IDs, iteration IDs, file paths and code.")
+        );
+        assert!(
+            r.contains("every iteration's name (`alm change iteration <id> --name`)"),
+            "{r}"
+        );
         assert!(r.contains("confirm"), "{r}");
         // Without a name, the code alone; every language says the same.
         assert!(agent_translate_request_in("en", p, b, "pt-BR", None).contains("into `pt-BR`"));
@@ -96,7 +101,10 @@ mod tests {
             let r = agent_translate_request_in(language, p, b, "vi", Some("Tiếng Việt"));
             assert!(r.contains("Tiếng Việt (`vi`)"), "{language}: {r}");
             assert!(r.contains("task-language vi"), "{language}: {r}");
-            assert!(r.contains("alm change iteration <id> --name"), "{language}: {r}");
+            assert!(
+                r.contains("alm change iteration <id> --name"),
+                "{language}: {r}"
+            );
         }
     }
 }

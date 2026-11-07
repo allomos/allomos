@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(old.main_folder(), Some("."));
         let new = upgraded(&old, Some("Allomos Site")).unwrap();
         assert!(new.upgraded());
-        assert_eq!(new.format, "allomos/6");
+        assert_eq!(new.format, crate::FORMAT);
         assert_eq!(new.project_folder, None);
         assert_eq!(new.project_folders[0].name, "allomos-site");
         assert_eq!(new.main_folder(), Some("."));

@@ -308,7 +308,7 @@ mod tests {
             title: id.into(),
             area: "A01".into(),
             state,
-            label: None,
+            labels: Vec::new(),
             holder: holder.map(String::from),
             waiting_on: None,
             who: None,

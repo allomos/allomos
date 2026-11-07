@@ -28,7 +28,7 @@ pub(crate) fn folder_here(root: &Path, project: &Project, cwd: &Path) -> Option<
 pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Done, Problem> {
     let loaded = allomos_store::load(root);
     let (bag, issues) = allomos_store::taskbag_of(root, loaded)?;
-    if bag.project.upgraded() {
+    if bag.project.current() {
         let mut done = Done::new(
             json!({ "taskbag": root, "format": bag.project.format, "upgraded": false }),
             format!(
@@ -40,14 +40,18 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
         return Ok(done);
     }
     if !confirm {
-        let folder = match bag.project.main_folder() {
-            Some(path) => format!(
-                "Its project folder ({path}) becomes the first of its project folders, named after the folder."
-            ),
-            None => "It has no project folder recorded yet.".to_string(),
+        let folder = if bag.project.upgraded() {
+            String::new()
+        } else {
+            match bag.project.main_folder() {
+                Some(path) => format!(
+                    " Its project folder ({path}) becomes the first of its project folders, named after the folder."
+                ),
+                None => " It has no project folder recorded yet.".to_string(),
+            }
         };
         let text = format!(
-            "This taskbag is in {}. Upgrading writes {FORMAT}, which task folders need. {folder}\nAfter the upgrade, Allomos versions older than this one (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Install it first, then run `alm upgrade --confirm`.\n",
+            "This taskbag is in {}. Upgrading writes {FORMAT}: the label ladder becomes the label table with the five built-in labels, and each task's label moves into its list of labels (drafted and implemented are dropped; locally verified and deployed and verified become \"… by agent\"; human verified becomes deployed and verified by human when the task's history shows deployed and verified before it, else locally verified by human; a task with unreviewed AI decisions gets AI decisions to review).{folder}\nAfter the upgrade, Allomos versions older than this one (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Install it first, then run `alm upgrade --confirm`.\n",
             bag.project.format
         );
         let mut done = Done::new(
@@ -60,15 +64,23 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
     let actor = allomos_store::Actor::alm(me);
     let up = allomos_store::upgrade(root, actor, crate::lock_wait())?;
     let text = match &up {
-        Some(u) => format!(
-            "Upgraded from {} to {}.{}\n",
-            u.from,
-            u.to,
-            u.folder
-                .as_ref()
-                .map(|f| format!(" The project folder is named {f}."))
-                .unwrap_or_default()
-        ),
+        Some(u) => {
+            let mut text = format!(
+                "Upgraded from {} to {}.{}\nLabels changed on {} task(s); {} lost a dropped label (drafted, implemented). Tasks per label now:\n",
+                u.from,
+                u.to,
+                u.folder
+                    .as_ref()
+                    .map(|f| format!(" The project folder is named {f}."))
+                    .unwrap_or_default(),
+                u.tasks,
+                u.dropped,
+            );
+            for (label, n) in &u.labels {
+                text.push_str(&format!("  {label}: {n}\n"));
+            }
+            text
+        }
         None => "Already up to date.\n".to_string(),
     };
     let mut done = Done::new(

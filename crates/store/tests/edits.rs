@@ -81,7 +81,7 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
     let (dir, root) = taskbag("fields");
     let edits = [
         Edit::Label {
-            label: "implemented".into(),
+            label: "locally verified by agent".into(),
         },
         Edit::NextDependency {
             text: Some("the owner's check".into()),
@@ -148,7 +148,7 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
         .into_iter()
         .find(|t| t.id == "A01-01")
         .unwrap();
-    assert_eq!(t.label.as_deref(), Some("implemented"));
+    assert_eq!(t.labels, ["locally verified by agent"]);
     assert_eq!(t.next_dependency.as_deref(), Some("the owner's check"));
     assert_eq!(t.handoff_note.as_deref(), Some("Read the card first."));
     assert_eq!(t.iteration.as_deref(), Some("I01"));
@@ -201,7 +201,7 @@ fn a_refused_edit_changes_no_file() {
         (
             "A01-02",
             Edit::Label {
-                label: "implemented".into(),
+                label: "locally verified by agent".into(),
             },
         ),
         (
@@ -211,12 +211,7 @@ fn a_refused_edit_changes_no_file() {
                 expected_version: None,
             },
         ),
-        (
-            "A01-01",
-            Edit::Label {
-                label: "not on the ladder".into(),
-            },
-        ),
+        ("A01-01", Edit::Label { label: " ".into() }),
         (
             "A01-01",
             Edit::Title {
@@ -289,7 +284,7 @@ fn a_refused_edit_changes_no_file() {
             &root,
             "A01-02",
             Edit::Label {
-                label: "implemented".into()
+                label: "locally verified by agent".into()
             }
         )
         .unwrap_err(),
@@ -441,7 +436,7 @@ fn events_written_under_a_number_carry_it() {
         &root,
         "A01-01",
         Edit::Label {
-            label: "implemented".into(),
+            label: "locally verified by agent".into(),
         },
     );
     events::set_request(None);

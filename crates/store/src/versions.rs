@@ -88,7 +88,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// and `alm session` fills in session details later (Task-A03-ham538).
 /// 30: an agent in the Claude desktop app must pass `--session-kind desktop --app-session-id`
 /// at the claim; `--session-kind terminal` in a terminal (Task-A03-sugar117).
-pub const SECTION_VERSION: u32 = 30;
+/// 31: finishing names the "by human" labels instead of the ladder's top label (decision 0020,
+/// Task-A01-moth111).
+pub const SECTION_VERSION: u32 = 31;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -235,6 +237,21 @@ pub fn write_allowed(root: &Path) -> Result<(), Problem> {
             current: FORMAT.to_string(),
         }),
         FormatState::Current | FormatState::Unknown => Ok(()),
+    }
+}
+
+/// Before a change other than the upgrade itself: an `allomos/5` or `allomos/6` taskbag is read
+/// (its labels translated as the upgrade writes them) but not written until a person upgrades it,
+/// since its labels have a new shape in `allomos/7` (decision 0020, Task-A01-moth111).
+pub fn upgraded_for_writing(root: &Path) -> Result<(), Problem> {
+    match read_format(root) {
+        Some(found) if format_version(&found).is_some_and(|n| n < FORMAT_VERSION) => {
+            Err(Problem::TaskbagToUpgrade {
+                found,
+                current: FORMAT.to_string(),
+            })
+        }
+        _ => Ok(()),
     }
 }
 

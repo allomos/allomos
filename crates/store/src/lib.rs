@@ -298,9 +298,9 @@ the project notes (below).
 - A line in the conversation that starts with `alm ` followed by one of its commands (for example
   `alm guide github release`) is a command: run it as written, and when it prints a guide, follow
   that guide. The word alm inside a sentence is not one.
-- Finished: at the top label (a person has checked it: the human check): `alm done <id>`.
-  When the work is finished and only a person's hands-on check is left, in quiet and normal
-  mode alike, finish it below the top label with `alm done <id> --without-human-check \"<why>\"
+- Finished: with a \"by human\" label (a person has checked it: the human check):
+  `alm done <id>`. When the work is finished and only a person's hands-on check is left, in
+  quiet and normal mode alike, finish it without one with `alm done <id> --without-human-check \"<why>\"
   --steps <file.md>` (the steps tell a person how to check it; it shows as done, to check, in
   `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
   a real question, an approval or an outside effect.
@@ -999,6 +999,12 @@ pub fn load(root: &Path) -> Loaded {
     }
 
     issues.extend(validate_taskbag(&project, &areas, &iterations, &tasks));
+    // Labels the tasks carry that the table does not list yet are shown as table entries; they
+    // are written with the next change to `project.json` (decision 0020, 5).
+    let mut project = project;
+    for (_, t) in &tasks {
+        allomos_core::labels::add_found(&mut project, &t.labels);
+    }
     let mut areas: Vec<Area> = areas.into_iter().map(|(_, a)| a).collect();
     areas.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
     let mut iterations: Vec<Iteration> = iterations.into_iter().map(|(_, i)| i).collect();
@@ -1116,7 +1122,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             title: title.into(),
             area: area.into(),
             state,
-            label: label.map(String::from),
+            labels: label.map(String::from).into_iter().collect(),
             holder: None,
             waiting_on: None,
             who: None,
@@ -1326,12 +1332,11 @@ fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Prob
 /// Never creates a Git repository.
 /// This is how the app creates one, so its first event says `via: app`.
 pub fn init(root: &Path, id: &str, name: &str) -> Result<PathBuf, Problem> {
-    init_with_labels(root, id, name, allomos_core::default_labels(), Actor::APP)
+    init_with_labels(root, id, name, Vec::new(), Actor::APP)
 }
 
-/// [`init`] with the project's own label ladder, lowest step first, made by `actor`. An empty
-/// ladder is refused (`ladder_empty`), like an invalid ID. The taskbag's first event records its
-/// creation, which is when its history starts.
+/// [`init`] with the project's own labels besides the built-in ones (decision 0020), made by
+/// `actor`. The taskbag's first event records its creation, which is when its history starts.
 pub fn init_with_labels(
     root: &Path,
     id: &str,
@@ -1350,7 +1355,14 @@ pub fn init_with_labels(
         format: FORMAT.to_string(),
         id: id.to_string(),
         name: name.to_string(),
-        labels,
+        labels: allomos_core::labels::with_built_ins(
+            labels
+                .iter()
+                .map(|l| l.trim())
+                .filter(|l| !l.is_empty())
+                .map(|l| allomos_core::LabelEntry::custom(l, None))
+                .collect(),
+        ),
         project_folder: None,
         // New taskbags follow the app's language until someone sets another (Task-A01-21).
         task_language: Some(allomos_core::TASK_LANGUAGE_UI.to_string()),
@@ -1597,35 +1609,131 @@ pub fn taskbag_of(root: &Path, loaded: Loaded) -> Result<(Taskbag, Vec<Issue>), 
 /// not write ([`versions::write_allowed`]: a newer one, or an older one whose tasks are to be moved
 /// in, Task-A01-45); take the lock (waiting up to `wait` for another writer), then load what the
 /// change builds on.
-/// What [`upgrade`] did: the format before and after, and the main folder's new name.
+/// What [`upgrade`] did: the format before and after, the main folder's new name, and how the
+/// labels moved (decision 0020).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Upgraded {
     pub from: String,
     pub to: String,
     pub folder: Option<String>,
+    /// Tasks whose labels changed.
+    pub tasks: usize,
+    /// How many tasks carry each label after the upgrade, by label.
+    pub labels: std::collections::BTreeMap<String, usize>,
+    /// Tasks that lost a dropped label (`drafted`, `implemented`).
+    pub dropped: usize,
 }
 
-/// Upgrade an `allomos/5` taskbag to `allomos/6` (decision 0019, Task-A01-dime494), which only
-/// a person asks for (approver, 2026-10-25): `project_folder` becomes the first of
-/// `project_folders`, named after the folder. `None` when it is already up to date.
+/// Upgrade an older taskbag to `allomos/7`, which only a person asks for (approver,
+/// 2026-10-25). From `allomos/5`: `project_folder` becomes the first of `project_folders`, named
+/// after the folder (decision 0019). From `allomos/5` or `allomos/6`: the ladder becomes the label
+/// table and each task's `label` its `labels` (decision 0020, In detail 8): `drafted` and
+/// `implemented` are dropped, `locally verified` and `deployed and verified` become "… by agent",
+/// `human verified` (or `owner verified`) becomes `deployed and verified by human` when the task's
+/// history shows `deployed and verified` before it, else `locally verified by human`, and a task
+/// whose history has unreviewed AI decisions gets `AI decisions to review`. `None` when it is
+/// already up to date.
 pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgraded>, Problem> {
-    let (lock, bag, _) = lock_for_change(root, wait)?;
+    versions::write_allowed(root)?;
+    let lock = Lock::acquire(root, wait)?;
+    let (bag, _) = taskbag_of(root, lock.load())?;
+    if bag.project.current() {
+        return Ok(None);
+    }
     let base = setup::project_folder_of(root, &bag.project)
         .and_then(|f| f.file_name().map(|n| n.to_string_lossy().into_owned()));
-    let Some(project) = allomos_core::folders::upgraded(&bag.project, base.as_deref()) else {
-        return Ok(None);
+    let mut project = allomos_core::folders::upgraded(&bag.project, base.as_deref())
+        .unwrap_or(bag.project.clone());
+    project.format = FORMAT.to_string();
+    let (history, _) = events::list(root);
+    let deployed: std::collections::BTreeSet<String> = history
+        .iter()
+        .filter(|e| e.kind == Kind::Task)
+        .filter(|e| {
+            e.changes.iter().any(|c| {
+                matches!(c.field.as_str(), "label" | "labels")
+                    && c.to.as_ref().is_some_and(|v| {
+                        v.as_str() == Some("deployed and verified")
+                            || v.as_array().is_some_and(|a| {
+                                a.iter()
+                                    .any(|x| x.as_str() == Some("deployed and verified"))
+                            })
+                    })
+            })
+        })
+        .filter_map(|e| e.id.clone())
+        .collect();
+    let unreviewed = decision::pending(&history);
+    let mut changed = Vec::new();
+    let mut dropped = 0;
+    for task in &bag.tasks {
+        let path = root.join("tasks").join(&task.id).join("task.json");
+        let old = fs::read_to_string(&path)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .and_then(|v| v.get("label").and_then(|l| l.as_str()).map(String::from));
+        if old
+            .as_deref()
+            .is_some_and(|o| allomos_core::labels::upgraded_label(o, false).is_none())
+        {
+            dropped += 1;
+        }
+        let labels = allomos_core::labels::upgraded_labels(
+            old.as_deref(),
+            deployed.contains(&task.id),
+            unreviewed.get(&task.id).is_some_and(|d| !d.is_empty()),
+        );
+        let mut next = task.clone();
+        next.labels = labels;
+        allomos_core::labels::add_found(&mut project, &next.labels);
+        changed.push(next);
+    }
+    let before = Project {
+        format: bag.project.format.clone(),
+        ..bag.project.clone()
     };
     let event = actor.event(
         "upgrade",
         Kind::Project,
         Some(&project.id),
-        event::changes(Some(&bag.project), &project, &[]),
+        event::changes(Some(&before), &project, &[]),
     );
     lock.record(&event, |l| l.save_project(&project))?;
+    let mut tasks = 0;
+    let mut counts = std::collections::BTreeMap::new();
+    for next in &changed {
+        for l in &next.labels {
+            *counts.entry(l.clone()).or_insert(0) += 1;
+        }
+        // Every file is rewritten in the new shape, so the old `label` field goes.
+        let raw_label = fs::read_to_string(root.join("tasks").join(&next.id).join("task.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .and_then(|v| v.get("label").cloned())
+            .filter(|v| !v.is_null());
+        let to = (!next.labels.is_empty()).then(|| serde_json::json!(next.labels));
+        let mut changes = Vec::new();
+        if raw_label.is_some() || to.is_some() {
+            changes.push(allomos_core::event::Change {
+                extra: Default::default(),
+                field: "labels".into(),
+                from: raw_label,
+                to,
+            });
+        }
+        if !changes.is_empty() {
+            tasks += 1;
+        }
+        let event = actor.event("upgrade", Kind::Task, Some(&next.id), changes);
+        lock.record(&event, |l| l.save_task(next))?;
+    }
     Ok(Some(Upgraded {
         from: bag.project.format.clone(),
         to: project.format.clone(),
         folder: project.project_folders.first().map(|f| f.name.clone()),
+        tasks,
+        labels: counts,
+        dropped,
     }))
 }
 
@@ -1634,6 +1742,7 @@ pub(crate) fn lock_for_change(
     wait: Duration,
 ) -> Result<(Lock, Taskbag, Vec<Issue>), Problem> {
     versions::write_allowed(root)?;
+    versions::upgraded_for_writing(root)?;
     let lock = Lock::acquire(root, wait)?;
     let (bag, issues) = taskbag_of(root, lock.load())?;
     Ok((lock, bag, issues))
@@ -1841,7 +1950,7 @@ pub fn rename_label(
         lock.record(&event, |l| l.save_task(task))?;
     }
     Ok(Added {
-        item: (project.labels, tasks),
+        item: (project.label_names(), tasks),
         issues,
     })
 }
@@ -2084,7 +2193,25 @@ pub fn change_task(
     rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
 ) -> Result<Changed, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let (outcome, command) = rule(&bag)?;
+    let (mut outcome, command) = rule(&bag)?;
+    // A label the table does not list yet is added to it, and `alm` says so (decision 0020, 5).
+    let mut project = bag.project.clone();
+    let added = allomos_core::labels::add_found(&mut project, &outcome.task.labels);
+    if !added.is_empty() {
+        let event = actor.event(
+            "labels",
+            Kind::Project,
+            Some(&project.id),
+            event::changes(Some(&bag.project), &project, &[]),
+        );
+        lock.record(&event, |l| l.save_project(&project))?;
+        outcome
+            .warnings
+            .extend(added.into_iter().map(|label| Problem::LabelAddedToTable {
+                id: outcome.task.id.clone(),
+                label,
+            }));
+    }
     let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
     let described = before.is_some_and(|b| b.description != outcome.task.description);
     let mut changes = event::changes(before, &outcome.task, event::TASK_FIELDS);
@@ -2238,10 +2365,19 @@ pub fn record_ai_decision(
     text: &str,
 ) -> Result<Decided, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let changes = decision::decide(&bag, id, text)?;
-    let task = ops::find_task(&bag, id)?;
+    let mut changes = decision::decide(&bag, id, text)?;
+    let before = ops::find_task(&bag, id)?;
+    // The task carries `AI decisions to review` until `alm reviewed` (decision 0020).
+    let mut task = before.clone();
+    task.add_label(allomos_core::labels::AI_DECISIONS);
+    changes.extend(event::changes(Some(&before), &task, event::TASK_FIELDS));
     let event = actor.event(decision::DECIDED, Kind::Task, Some(&task.id), changes);
-    lock.record(&event, |_| Ok(()))?;
+    lock.record(&event, |l| {
+        if task != before {
+            l.save_task(&task)?;
+        }
+        Ok(())
+    })?;
     let pending = ai_decisions(root).remove(&task.id).unwrap_or_default();
     let decisions = pending.last().cloned().into_iter().collect();
     Ok(Decided {
@@ -2292,11 +2428,24 @@ pub fn review_ai_decisions(
     id: &str,
 ) -> Result<Decided, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let task = ops::find_task(&bag, id)?;
-    let decisions = ai_decisions(root).remove(&task.id).unwrap_or_default();
-    let changes = decision::review(&bag, id, &decisions)?;
+    let before = ops::find_task(&bag, id)?;
+    let decisions = ai_decisions(root).remove(&before.id).unwrap_or_default();
+    let mut task = before.clone();
+    let had_label = task.remove_label(allomos_core::labels::AI_DECISIONS);
+    // A task carrying the label with nothing left in its history is cleared too (decision 0020).
+    let mut changes = if decisions.is_empty() && had_label {
+        Vec::new()
+    } else {
+        decision::review(&bag, id, &decisions)?
+    };
+    changes.extend(event::changes(Some(&before), &task, event::TASK_FIELDS));
     let event = actor.event(decision::REVIEWED, Kind::Task, Some(&task.id), changes);
-    lock.record(&event, |_| Ok(()))?;
+    lock.record(&event, |l| {
+        if task != before {
+            l.save_task(&task)?;
+        }
+        Ok(())
+    })?;
     Ok(Decided {
         task,
         decisions,
@@ -2397,18 +2546,17 @@ mod tests {
     fn init_with_own_id_and_ladder() {
         let dir = tmp("init-ladder");
         let root = dir.join(DEFAULT_DIR);
-        let ladder = vec!["drafted".to_string(), "owner verified".to_string()];
-        init_with_labels(&root, "allomos", "Allomos", ladder.clone(), Actor::APP).unwrap();
+        let ladder = vec!["shipped".to_string(), " ".to_string()];
+        init_with_labels(&root, "allomos", "Allomos", ladder, Actor::APP).unwrap();
         let bag = load(&root).taskbag.unwrap();
-        assert_eq!(
-            (bag.project.id.as_str(), bag.project.labels),
-            ("allomos", ladder)
-        );
+        let names = bag.project.label_names();
+        assert_eq!(bag.project.id, "allomos");
+        assert_eq!(names.len(), 6, "{names:?}");
+        assert_eq!(names[5], "shipped");
         let other = dir.join("other");
-        assert_eq!(
-            init_with_labels(&other, "p", "P", vec![], Actor::APP),
-            Err(Problem::LadderEmpty)
-        );
+        init_with_labels(&other, "p", "P", vec![], Actor::APP).unwrap();
+        assert_eq!(load(&other).taskbag.unwrap().project.labels.len(), 5);
+        let other = dir.join("other-2");
         assert!(!other.exists());
         assert!(matches!(
             init_with_labels(&dir.join("x"), "bad id", "P", vec!["a".into()], Actor::APP),

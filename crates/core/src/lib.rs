@@ -10,6 +10,7 @@ pub mod decision;
 pub mod event;
 pub mod folders;
 pub mod ids;
+pub mod labels;
 mod model;
 pub mod ops;
 mod problem;
@@ -18,8 +19,8 @@ mod validate;
 
 pub use model::{
     AgentSession, AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN,
-    Extra, FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, Project,
-    ProjectFolder, READ_FROM, State, TASK_LANGUAGE_UI, Task, Taskbag, default_labels,
+    Extra, FORMAT, FORMAT_VERSION, Gates, HandoffRules, Iteration, IterationState, LabelEntry,
+    Project, ProjectFolder, READ_FROM, State, TASK_LANGUAGE_UI, Task, Taskbag, default_labels,
     folder_name_from, format_version, valid_folder_name, valid_language,
 };
 pub use problem::Problem;

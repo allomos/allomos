@@ -57,12 +57,14 @@ about the project's tasks.
   optional who says who; no who means the approver), blocked (another task in this taskbag must
   finish first: its blocked-by lists them), done, or dropped (will not be done). A task blocked by
   a task and also waiting on a person is blocked; the person part goes in its next dependency.
-- **Label**: the highest step of the project's progress **ladder** the task has proven, for
-  example implemented → locally verified → human verified. It is the only progress claim; test
-  counts support a label but are never one.
-- **Human check**: a person tries the finished task by hand. Its step is the ladder's top label.
-  A task finished without it (in an automatic or loop run) carries why, and the steps for the
-  person who checks it; it is **to check** until someone marks it checked.
+- **Label**: a plain tag on a task, from the project's **label table**; a task can have several,
+  with no order between them. Five are built in: locally verified by agent, deployed and verified
+  by agent, locally verified by human, deployed and verified by human, AI decisions to review.
+  Labels are the only progress claims; test counts support a label but are never one.
+- **Human check**: a person tries the finished task by hand; it then has a \"by human\" label
+  (locally verified by human, or deployed and verified by human). A done task with no \"by human\"
+  label is **to check** (that is not a label); one finished in an automatic or loop run carries
+  why, and the steps for the person who checks it.
 - **Approver**: the person who decides and approves (cards, plans, external effects). A waiting
   task without a who waits for the approver.
 - **AI decision**: a routine choice an agent made on its own inside a task (a name, a layout, a
@@ -85,7 +87,7 @@ const CUSTOMIZE: &str = "# What a project may change, and what is fixed
 |---|---|---|
 | Areas | which areas exist, their IDs and names | `alm add area <id> \"<name>\"`, `alm rename area`, `alm delete area` (only an empty one) |
 | Iterations | which exist, their names, releases and dates; which task is in which | `alm add iteration`, `alm change iteration`, `alm rename iteration` (its ID, with its tasks), `alm move iteration` (its place in the plan), `alm delete iteration` (only an empty one), `alm plan` |
-| Label ladder | its steps and their order | `alm labels \"<a,b,…>\"` (refused if a task's label would be left off); `alm rename label \"<old>\" \"<new>\"` renames a step and the tasks that carry it |
+| Label table | the project's own labels and what each means (the five built-in labels stay) | `alm labels` (each with how many tasks carry it), `alm labels add \"<name>\" [--meaning \"…\"]`, `alm labels remove \"<name>\"` (refused while a task carries it); `alm rename label \"<old>\" \"<new>\"` renames one and the tasks that carry it |
 | Task IDs and titles | any ID of letters, digits, `-` or `_` (for example A01-02) | `alm add task <id> --area <id> --title \"…\"` |
 | Description | free Markdown in description.md | written with `alm add task --description` |
 | Task language | `ui` (follow the Allomos app's language, the default) or a language code | `alm task-language <code or ui>`; only when the person asks |
@@ -99,7 +101,7 @@ Fixed for every project:
   checks every change.
 
 Read the project's current areas, iterations and tasks with `alm list` (`--by iteration`), and its
-ladder in the taskbag's project.json.
+label table with `alm labels`.
 ";
 
 const TASKS: &str = "# How to add a task
@@ -219,7 +221,8 @@ Work a task:
   as Fact lines what the task is missing (`--json`: `missing`, each with `code`, `fact` and `fix`):
   session details the app needs to reopen the session, the working branch of a task that was
   claimed, and the handoff note of a task done to check. It refuses nothing; run the fix.
-- `alm label <id> \"<label>\"`: a step of the ladder.
+- `alm label <id> \"<label>\" [--remove]`: adds a label (the others stay; a new one joins the
+  label table, with a warning), or takes it off.
 - `alm needs <id> \"<what>\"`: its next dependency (no text clears it).
 - `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).
 - `alm wait <id> --on \"<what>\" [--who \"<who>\"]`: state waiting: a person (or an outside
@@ -233,8 +236,9 @@ Work a task:
   `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
   open, what to click, what they should see. On a task already done, it only records its human
   check again (the old `--without-owner` still works).
-- `alm checked <id>`: a person has checked the finished task: it gets the top label and leaves
-  To check; the note and steps stay in its history. Run it only when the person says so.
+- `alm checked <id> [--deployed|--locally]`: a person has checked the finished task: it gets a
+  \"by human\" label (deployed and verified by human when it has deployed and verified by agent,
+  else locally verified by human) and leaves To check; the note and steps stay in its history. Run it only when the person says so.
   It does not review the task's AI decisions.
 - `alm recheck <id> --reason \"<what changed>\" [--steps <file.md>]`: the work of a checked task
   changed afterwards, so the person's check no longer covers it: the task goes back to To check
@@ -282,8 +286,8 @@ Plan:
   `tasks/<id>/card.md`, and point the description's `Card:` link to it; a different card already
   there is replaced only with `--replace` (to keep a moved card up to date). Same holder rule as
   `alm describe`. See `alm guide move-cards`.
-- `alm plan <id> [<iteration>]`; `alm labels \"<a,b,…>\"`; `alm rename label \"<old>\" \"<new>\"`
-  (a step of the ladder, and every task that carries it)
+- `alm plan <id> [<iteration>]`; `alm labels [add|remove]`; `alm rename label \"<old>\" \"<new>\"`
+  (one of the project's own labels, and every task that carries it)
 - `alm task-language`: the language to write new and changed tasks in (run it before
   `alm add task`, `alm title` and `alm describe`);
   `alm task-language <code|ui>` sets it.
@@ -493,9 +497,9 @@ const WORKFLOW: &str = "# How to work the tasks
    **Evidence**); other evidence with `alm describe`.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
-7. Finished: once the task has the top label of the ladder (a person has checked it: the
-   human check), `alm done <id>`. When the work is finished and only a person's hands-on check
-   is left, finish it below the top label, in quiet and normal mode alike (step 8):
+7. Finished: once the task has a \"by human\" label (a person has checked it: the human check),
+   `alm done <id>`. When the work is finished and only a
+   person's hands-on check is left, finish it without that label, in quiet and normal mode alike (step 8):
    `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
    Do not leave such a task waiting: `alm wait` is only for a real question, an approval or an
    outside effect (step 4). Write the steps so a person can pick it up and test
@@ -962,7 +966,7 @@ name> --branch <the branch you are on>` (save and share the claim; it prints the
 it, `alm label <id> \"<label>\"` as each step is proven, and finish it the same way in either
 run mode: once the work is finished and only the person's check by hand is left,
 `alm done <id> --without-human-check \"Goal run\" --steps <file.md>`, the steps telling the
-person how to try it (at the top label, once the person has checked it: `alm done <id>`).
+person how to try it (with a \"by human\" label, once the person has checked it: `alm done <id>`).
 
 **Checking a release.** Prove each check with automated tests and command-line checks first: the
 project's test suite, `curl` against the running server, a headless test runner. Use the browser
@@ -1691,7 +1695,7 @@ mod tests {
         assert!(crate::agent_section().contains("run `alm task-language`"));
         // The rule for finishing, with its automatic/loop exception (Task-A03-15).
         for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
-            assert!(text.contains("top label"), "{text}");
+            assert!(text.contains("\"by human\" label"), "{text}");
             assert!(text.contains("automatic or loop run"), "{text}");
             assert!(text.contains("--without-human-check"), "{text}");
             assert!(text.contains("--steps <file.md>"), "{text}");

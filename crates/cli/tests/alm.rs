@@ -179,8 +179,17 @@ fn work_one_task_from_claim_to_done() {
     assert_eq!(v["task"]["holder"], "agent-a");
     assert_eq!(v["warnings"], serde_json::json!([]));
 
-    let v = ok(&sub, &["--as", "agent-a", "label", "A01-01", "implemented"]);
-    assert_eq!(v["task"]["label"], "implemented");
+    let v = ok(
+        &sub,
+        &[
+            "--as",
+            "agent-a",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
+    );
+    assert_eq!(v["task"]["labels"], json!(["locally verified by agent"]));
     let v = ok(
         &sub,
         &["--as", "agent-a", "wait", "A01-01", "--on", "owner review"],
@@ -188,15 +197,26 @@ fn work_one_task_from_claim_to_done() {
     assert_eq!(v["task"]["state"], "waiting");
     assert_eq!(v["task"]["waiting_on"], "owner review");
 
-    // Below the top label: finished with no warning; `alm` does not judge (Task-A03-15).
-    let v = ok(&sub, &["--as", "agent-a", "done", "A01-01"]);
+    // Finished without the human check (decision 0020: no "by human" label yet).
+    let v = ok(
+        &sub,
+        &[
+            "--as",
+            "agent-a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     assert_eq!(v["task"]["state"], "done");
-    assert_eq!(v["warnings"], json!([]));
+    // Without steps, `alm` asks for them (Task-A03-18).
+    assert_eq!(v["warnings"][0]["code"], "human_check_steps_missing");
 
     // The files say what the command said.
     let file = task_file(&repo, "A01-01");
     assert_eq!(file["state"], "done");
-    assert_eq!(file["label"], "implemented");
+    assert_eq!(file["labels"], json!(["locally verified by agent"]));
     assert_eq!(file["holder"], "agent-a");
     assert!(file.get("waiting_on").is_none() && file.get("description").is_none());
     let v = ok(&repo, &["show", "A01-01"]);
@@ -219,7 +239,12 @@ fn work_one_task_from_claim_to_done() {
     // Text output for people.
     let out = alm(&repo, &["list"]);
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("A01  Tracking\n  A01-01  done  implemented  agent-a  Open a taskbag"));
+    assert!(
+        text.contains(
+            "A01  Tracking\n  A01-01  done  locally verified by agent  agent-a  Open a taskbag"
+        ),
+        "{text}"
+    );
 }
 
 #[test]
@@ -364,9 +389,9 @@ fn refusals_have_codes_and_exit_codes() {
     assert_eq!(v["warnings"][0]["code"], "took_over");
     refused(
         &repo,
-        &["--as", "b", "label", "A01-01", "shipped"],
+        &["--as", "b", "label", "A01-01", "--remove", "shipped"],
         1,
-        "label_not_on_ladder",
+        "label_not_on_task",
     );
     refused(
         &repo,
@@ -374,7 +399,17 @@ fn refusals_have_codes_and_exit_codes() {
         1,
         "waiting_on_missing",
     );
-    ok(&repo, &["--as", "b", "done", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     refused(&repo, &["--as", "b", "claim", "A01-01"], 1, "task_closed");
     refused(
         &repo,
@@ -627,10 +662,16 @@ fn needs_ready_drop_and_init_options() {
     )
     .unwrap();
     assert_eq!(project["id"], "allomos");
-    assert_eq!(project["labels"], json!(["drafted", "owner verified"]));
-    let empty = tmp("init-empty-ladder");
-    refused(&empty, &["init", "--labels", " , "], 1, "ladder_empty");
-    assert!(!empty.join(".allomos/taskbag").exists());
+    // The five built-in labels first, then the project's own (decision 0020).
+    let names: Vec<&str> = project["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names.len(), 7);
+    assert_eq!(names[0], "locally verified by agent");
+    assert_eq!(&names[5..], ["drafted", "owner verified"]);
 }
 
 /// Task-A01-50: `alm reopen` turns a done or dropped task into a ready one held by nobody, with
@@ -653,7 +694,10 @@ fn reopen_a_done_or_dropped_task() {
     // Done without the human check, with a label: reopened by someone else (finished tasks are
     // held by nobody); label and human-check record cleared, handoff note and description kept.
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "label", "A01-01", "implemented"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-01", "locally verified by agent"],
+    );
     ok(&repo, &["--as", "a", "note", "A01-01", "see the log"]);
     ok(
         &repo,
@@ -696,7 +740,10 @@ fn reopen_a_done_or_dropped_task() {
     assert_eq!(t["handoff_note"], "see the log");
     let file = task_file(&repo, "A01-01");
     assert_eq!(file["state"], "ready");
-    assert!(file.get("label").is_none_or(Value::is_null));
+    assert!(
+        file.get("labels")
+            .is_none_or(|l| l.as_array().is_none_or(Vec::is_empty))
+    );
     // The history: who, the command, the cleared fields and the reason.
     let h = ok(&repo, &["history", "A01-01"]);
     let e = &h["events"][0];
@@ -707,10 +754,8 @@ fn reopen_a_done_or_dropped_task() {
         change("state"),
         Some(json!({ "field": "state", "from": "done", "to": "ready" }))
     );
-    assert_eq!(
-        change("label"),
-        Some(json!({ "field": "label", "from": "implemented" }))
-    );
+    let labels = change("labels").expect("the labels change");
+    assert_eq!(labels["from"], json!(["locally verified by agent"]));
     assert_eq!(
         change("reopen_note"),
         Some(json!({ "field": "reopen_note", "to": "The check failed: no total" }))
@@ -929,7 +974,13 @@ fn printed_git_commands_share_only_that_change() {
     // For people: the same commands, then the rule.
     let out = alm(
         &repo,
-        &["--as", "agent-a", "label", "A01-01", "implemented"],
+        &[
+            "--as",
+            "agent-a",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
     );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(
@@ -969,7 +1020,13 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
         String::from_utf8(out.stdout).unwrap()
     };
     let text = run(
-        &["--as", "claude/a03", "label", "A01-01", "implemented"],
+        &[
+            "--as",
+            "claude/a03",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
         None,
     );
     assert!(
@@ -985,7 +1042,13 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
         Some("2026-10-21T10:00:00Z"),
     );
     let text = run(
-        &["--as", "claude/a03", "label", "A01-01", "locally verified"],
+        &[
+            "--as",
+            "claude/a03",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
         Some("2026-10-21T10:29:00Z"),
     );
     assert!(!text.contains("Quota:"), "{text}");
@@ -996,7 +1059,7 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
             "claude/a03",
             "label",
             "A01-01",
-            "implemented",
+            "locally verified by agent",
         ],
         Some("2026-10-21T10:45:00Z"),
     ))
@@ -1048,7 +1111,13 @@ fn the_quota_ask_never_names_a_plain_session_name_as_the_agent() {
         "claude-code",
     ]);
     assert!(!text.contains("Quota:"), "{text}");
-    let text = run(&["--as", "loop-hourly", "label", "A01-01", "implemented"]);
+    let text = run(&[
+        "--as",
+        "loop-hourly",
+        "label",
+        "A01-01",
+        "locally verified by agent",
+    ]);
     assert!(
         text.contains("Quota: Your agent (claude-code) has not reported its quota")
             && text.contains("\n  alm quota --agent claude-code --left <percent>"),
@@ -1083,7 +1152,7 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
             "add", "task", "A01-01", "--area", "A01", "--title", "T", "--branch", "main",
         ],
         &["--as", "a", "claim", "A01-01", "--branch", "main"],
-        &["--as", "a", "label", "A01-01", "human verified"],
+        &["--as", "a", "label", "A01-01", "locally verified by human"],
         &[
             "--as",
             "a",
@@ -1104,7 +1173,14 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
     }
     assert!(!dir.join(".git").exists());
     for flag in ["--push", "--commit"] {
-        let (code, v) = run(&["--as", "a", "label", "A01-01", "implemented", flag]);
+        let (code, v) = run(&[
+            "--as",
+            "a",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+            flag,
+        ]);
         assert_eq!(code, 2, "{flag}: {v}");
         assert_eq!(v["error"]["code"], "bad_usage", "{flag}: {v}");
         assert!(
@@ -1153,7 +1229,7 @@ fn each_change_names_exactly_the_files_it_wrote() {
             "Why.",
         ],
         vec!["--as", "a", "claim", "A01-01"],
-        vec!["--as", "a", "label", "A01-01", "implemented"],
+        vec!["--as", "a", "label", "A01-01", "locally verified by agent"],
         vec!["--as", "a", "needs", "A01-01", "a person"],
         vec!["--as", "a", "note", "A01-01", "half way"],
         vec!["--as", "a", "describe", "A01-01", "--text", "New words."],
@@ -1185,11 +1261,9 @@ fn each_change_names_exactly_the_files_it_wrote() {
         vec!["rename", "area", "A02", "Graphs"],
         vec!["change", "iteration", "I01", "--release", "v0.1"],
         vec!["delete", "iteration", "I02"],
-        vec![
-            "labels",
-            "drafted,implemented,locally verified,deployed and verified,human verified",
-        ],
+        vec!["labels", "add", "drafted", "--meaning", "Written down"],
         vec!["rename", "label", "drafted", "sketched"],
+        vec!["labels", "remove", "sketched"],
         vec!["project", "--name", "Demo 2"],
         vec!["task-language", "ja"],
         vec!["handoff-rules", "--quota", "5"],
@@ -1465,7 +1539,10 @@ fn app_changes_not_shared_yet_come_with_the_next_change() {
             .any(|f| f == "tasks/A01-02/task.json")
     );
     // Handed over: the next change no longer lists them.
-    let v = ok(&repo, &["--as", "a", "label", "A01-01", "implemented"]);
+    let v = ok(
+        &repo,
+        &["--as", "a", "label", "A01-01", "locally verified by agent"],
+    );
     assert!(v.get("app_changes").is_none(), "{v}");
 }
 
@@ -1552,7 +1629,17 @@ fn plan_tasks_in_iterations_and_list_by_iteration() {
 
     // Planning ignores who holds the task, and works on finished tasks.
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     let v = ok(&repo, &["--as", "b", "plan", "A01-01", "I01"]);
     assert_eq!(v["task"]["iteration"], "I01");
     ok(&repo, &["plan", "A02-01", "I02"]);
@@ -1737,20 +1824,48 @@ fn confirm_waits_for_the_answer_in_the_app() {
 
 #[test]
 fn labels_change_the_ladder_without_stranding_a_task() {
+    // Decision 0020: the project's label table; built-in labels stay, others are added and
+    // removed, and a label in use is not removed.
     let repo = filled();
-    let v = ok(&repo, &["labels", "implemented, connected,owner verified"]);
-    assert_eq!(
-        v["labels"],
-        json!(["implemented", "connected", "owner verified"])
+    let v = ok(
+        &repo,
+        &[
+            "labels",
+            "add",
+            "connected",
+            "--meaning",
+            "Wired end to end",
+        ],
     );
+    let names: Vec<&str> = v["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"locally verified by agent") && names.contains(&"connected"));
+    // Adding it again changes nothing.
+    let v = ok(&repo, &["labels", "add", "connected"]);
+    assert_eq!(v["changed_files"], json!([]));
     ok(&repo, &["label", "A01-01", "connected"]);
-    refused(&repo, &["labels", "implemented"], 1, "label_not_on_ladder");
-    refused(&repo, &["labels", " , "], 1, "ladder_empty");
+    refused(
+        &repo,
+        &["labels", "remove", "locally verified by agent"],
+        1,
+        "label_built_in",
+    );
+    refused(&repo, &["labels", "remove", "connected"], 1, "label_in_use");
     let project: Value = serde_json::from_str(
         &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
     )
     .unwrap();
-    assert_eq!(project["labels"][1], "connected");
+    let entry = project["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["name"] == "connected")
+        .unwrap();
+    assert_eq!(entry["meaning"], "Wired end to end");
 }
 
 #[test]
@@ -2134,7 +2249,17 @@ fn areas_and_iterations_are_renamed_changed_and_deleted() {
     ok(&repo, &["drop", "A02-01"]);
     ok(&repo, &["plan", "A01-01", "I01"]);
     ok(&repo, &["--as", "w", "claim", "A01-01"]);
-    ok(&repo, &["--as", "w", "done", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "w",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     let before = events();
     let v = refused(&repo, &["delete", "area", "A02"], 1, "area_not_empty");
     assert_eq!(v["error"]["params"]["count"], "1");
@@ -2463,7 +2588,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v30)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v31)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2473,7 +2598,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v30)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v31)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -3023,14 +3148,14 @@ fn every_older_taskbag_is_to_be_moved_in() {
             &["show", "A01-01"],
             &["claim", "A01-01", "--as", "a"],
             &["add", "task", "--area", "A01", "--title", "x"],
-            &["labels", "a,b"],
-            &["rename", "label", "implemented", "built"],
+            &["labels"],
+            &["rename", "label", "locally verified by agent", "built"],
             &["handoff", "A01-01", "--as", "a", "--text", "n"],
             &["handoff-rules"],
         ] {
             let v = refused(&repo, args, 1, "taskbag_to_move_in");
             assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
-            assert_eq!(v["error"]["params"]["current"], "allomos/6");
+            assert_eq!(v["error"]["params"]["current"], "allomos/7");
             let message = v["error"]["message"].as_str().unwrap();
             assert!(message.contains("Update the taskbag…"), "{message}");
             assert!(message.contains("`alm move-in`"), "{message}");
@@ -3105,34 +3230,30 @@ fn move_in_names_the_old_folder_beside_a_new_taskbag() {
 
 #[test]
 fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
+    // Decision 0020: a project's own label is renamed in the table and on its tasks; a built-in
+    // label is not renamed.
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "label", "A01-01", "human verified"]);
+    ok(&repo, &["--as", "a", "label", "A01-01", "connected"]);
     let v = ok(
         &repo,
-        &[
-            "--as",
-            "a",
-            "rename",
-            "label",
-            "human verified",
-            "checked by a person",
-        ],
+        &["--as", "a", "rename", "label", "connected", "wired"],
     );
-    assert_eq!(
-        v["labels"],
-        json!([
-            "implemented",
-            "locally verified",
-            "deployed and verified",
-            "checked by a person"
-        ])
+    let names: Vec<&str> = v["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l.as_str().or(l["name"].as_str()).unwrap())
+        .collect();
+    assert!(
+        names.contains(&"wired") && !names.contains(&"connected"),
+        "{v}"
     );
     assert_eq!(v["tasks"][0]["id"], "A01-01");
-    assert_eq!(v["tasks"][0]["label"], "checked by a person");
+    assert_eq!(v["tasks"][0]["labels"], json!(["wired"]));
     assert_eq!(v["issues"], json!([]));
     let shown = ok(&repo, &["show", "A01-01"]);
-    assert_eq!(shown["task"]["label"], "checked by a person");
+    assert_eq!(shown["task"]["labels"], json!(["wired"]));
     assert_eq!(
         ok(&repo, &["history", "A01-01"])["events"][0]["command"],
         "rename label"
@@ -3141,21 +3262,28 @@ fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
         &repo,
         &["rename", "label", "shipped", "x"],
         1,
-        "label_not_on_ladder",
+        "label_not_in_table",
     );
     refused(
         &repo,
-        &["rename", "label", "checked by a person", "implemented"],
+        &["rename", "label", "wired", "locally verified by agent"],
         1,
         "label_exists",
     );
     refused(
         &repo,
-        &["rename", "label", "implemented", " "],
+        &["rename", "label", "locally verified by agent", "built"],
+        1,
+        "label_built_in",
+    );
+    refused(
+        &repo,
+        &["rename", "label", "wired", " "],
         1,
         "label_name_missing",
     );
-    let out = alm(&repo, &["rename", "label", "implemented", "built"]);
+    ok(&repo, &["labels", "add", "spare"]);
+    let out = alm(&repo, &["rename", "label", "spare", "extra"]);
     assert_eq!(out.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&out.stdout).contains("No task carried the label."));
 }
@@ -3166,7 +3294,10 @@ fn rename_label_renames_it_on_the_ladder_and_the_tasks() {
 fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "label", "A01-01", "locally verified"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-01", "locally verified by agent"],
+    );
     // Empty text is refused, and nothing changes; so are steps without a note.
     refused(
         &repo,
@@ -3200,7 +3331,11 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     assert_eq!(v["task"]["without_human_check"], "card run, approver away");
     let file = task_file(&repo, "A01-01");
     assert_eq!(file["without_human_check"], "card run, approver away");
-    assert_eq!(file["label"], "locally verified", "the label stays");
+    assert_eq!(
+        file["labels"],
+        json!(["locally verified by agent"]),
+        "the label stays"
+    );
 
     // The steps, from a file, on the task already done; an empty file is refused.
     fs::write(repo.join("empty.md"), " \n").unwrap();
@@ -3258,6 +3393,10 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
 
     // A task finished the usual way is not listed; a waiting one is To answer; backlog is not.
     ok(&repo, &["--as", "b", "claim", "A01-02"]);
+    ok(
+        &repo,
+        &["--as", "b", "label", "A01-02", "locally verified by human"],
+    );
     ok(&repo, &["--as", "b", "done", "A01-02"]);
     ok(
         &repo,
@@ -3326,7 +3465,11 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     // A person checked it: top label, off To check; anyone may say so; history keeps the note.
     refused(&repo, &["checked", "A01-03"], 1, "not_done");
     let v = ok(&repo, &["--as", "will", "checked", "A01-01"]);
-    assert_eq!(v["task"]["label"], "human verified");
+    // The agent's label stays; the by-human label is added (decision 0020).
+    assert_eq!(
+        v["task"]["labels"],
+        json!(["locally verified by agent", "locally verified by human"])
+    );
     let file = task_file(&repo, "A01-01");
     assert!(file.get("without_human_check").is_none());
     assert!(file.get("human_check_steps").is_none());
@@ -3342,7 +3485,10 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     assert_eq!(note["from"], "card run, approver away");
     assert_eq!(ids(&ok(&repo, &["human"])["to_check"]), ["A02-01"]);
     // The top label set on a finished task is the human check too.
-    ok(&repo, &["--as", "c", "label", "A02-01", "human verified"]);
+    ok(
+        &repo,
+        &["--as", "c", "label", "A02-01", "locally verified by human"],
+    );
     assert!(
         task_file(&repo, "A02-01")
             .get("without_human_check")
@@ -3358,7 +3504,6 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
     // under To review; `alm reviewed` takes it off, and the history keeps both.
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    let before = task_file(&repo, "A01-01");
     let events = event_count(&repo);
     refused(
         &repo,
@@ -3390,14 +3535,18 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
         "Names: alm describe, alm note — match alm title"
     );
     assert_eq!(v["decision"]["by"], "a");
-    assert_eq!(v["changed_files"].as_array().unwrap().len(), 1, "{v}");
+    // The first one adds the label "AI decisions to review" to the task (decision 0020).
+    assert_eq!(v["changed_files"].as_array().unwrap().len(), 2, "{v}");
     assert!(
         v["changed_files"][0]
             .as_str()
             .unwrap()
             .starts_with("events/")
     );
-    // Anyone may record one, on any task: recording changes nothing in the task.
+    assert_eq!(v["changed_files"][1], "tasks/A01-01/task.json");
+    let before = task_file(&repo, "A01-01");
+    assert_eq!(before["labels"], json!(["AI decisions to review"]));
+    // Anyone may record one, on any task: once the label is there, the task stays as it is.
     ok(
         &repo,
         &[
@@ -3457,8 +3606,21 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
     assert_eq!(shown["ai_decisions"].as_array().unwrap().len(), 2);
 
     // Marking a done task checked does not review its decisions: they are separate questions.
-    ok(&repo, &["--as", "a", "label", "A01-01", "human verified"]);
-    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-01", "locally verified by human"],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     assert_eq!(
         ok(&repo, &["human"])["to_review"].as_array().unwrap().len(),
         2
@@ -3478,9 +3640,17 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
     let last = &ok(&repo, &["history", "A01-01"])["events"][0];
     assert_eq!(last["command"], "reviewed");
     assert_eq!(last["by"], "will");
-    assert_eq!(last["changes"].as_array().unwrap().len(), 2);
-    assert!(last["changes"][0]["to"].is_null());
-    assert_eq!(last["changes"][1]["from"], "Layout: one file per command");
+    // Both decisions, and the label "AI decisions to review" taken off (decision 0020).
+    let changes = last["changes"].as_array().unwrap();
+    assert_eq!(changes.len(), 3, "{last}");
+    let decisions: Vec<&Value> = changes
+        .iter()
+        .filter(|c| c["field"] == "ai_decision")
+        .collect();
+    assert_eq!(decisions.len(), 2);
+    assert!(decisions[0]["to"].is_null());
+    assert_eq!(decisions[1]["from"], "Layout: one file per command");
+    assert!(changes.iter().any(|c| c["field"] == "labels"));
     refused(&repo, &["reviewed", "A01-01"], 1, "nothing_to_review");
     assert_eq!(ok(&repo, &["show", "A01-01"])["ai_decisions"], json!([]));
 }
@@ -3817,7 +3987,17 @@ fn backlog_sends_an_unheld_task_back() {
             .unwrap()
             .contains("alm release")
     );
-    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     let v = refused(&repo, &["backlog", "A01-01"], 1, "cannot_back_to_backlog");
     assert!(
         v["error"]["message"]
@@ -3892,16 +4072,17 @@ fn every_change_writes_exactly_one_event_and_a_refusal_none() {
         &["add", "iteration", "I01", "First"],
         &["ready", "A01-01"],
         &["--as", "a", "claim", "A01-01"],
-        &["--as", "a", "label", "A01-01", "implemented"],
+        &["--as", "a", "label", "A01-01", "locally verified by agent"],
         &["--as", "a", "needs", "A01-01", "a check"],
         &["plan", "A01-01", "I01"],
         &["--as", "a", "title", "A01-01", "Open a folder"],
         &["--as", "a", "wait", "A01-01", "--on", "the owner"],
         &["--as", "a", "release", "A01-01", "--note", "over to you"],
         &["--as", "b", "claim", "A01-01"],
+        &["--as", "b", "label", "A01-01", "locally verified by human"],
         &["--as", "b", "done", "A01-01"],
         &["drop", "A01-02"],
-        &["labels", "implemented,locally verified,owner verified"],
+        &["labels", "add", "shipped"],
         &["project", "--name", "Demo 2"],
         &["task-language", "ja"],
         &["handoff-rules", "--quota", "5"],
@@ -3915,9 +4096,9 @@ fn every_change_writes_exactly_one_event_and_a_refusal_none() {
     refused(&repo, &["--as", "c", "claim", "A01-01"], 1, "task_closed");
     refused(
         &repo,
-        &["--as", "b", "label", "A02-01", "nope"],
+        &["--as", "b", "label", "A02-01", "--remove", "nope"],
         1,
-        "label_not_on_ladder",
+        "label_not_on_task",
     );
     refused(
         &repo,
@@ -3940,7 +4121,13 @@ fn history_lists_a_tasks_changes_newest_first() {
     ok(&repo, &["--as", "claude/x", "claim", "A01-01"]);
     ok(
         &repo,
-        &["--as", "claude/x", "label", "A01-01", "implemented"],
+        &[
+            "--as",
+            "claude/x",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
     );
     let v = ok(&repo, &["history", "A01-01"]);
     assert!(v["since"].as_str().unwrap().ends_with('Z'));
@@ -4029,7 +4216,13 @@ fn two_copies_with_different_events_merge_without_conflict() {
     // This copy commits without pushing: the first of the printed commands only.
     for args in [
         &["--as", "claude/a", "claim", "A01-01"][..],
-        &["--as", "claude/a", "label", "A01-01", "implemented"],
+        &[
+            "--as",
+            "claude/a",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
     ] {
         let mut v = ok(&repo, args);
         v["git_commands"].as_array_mut().unwrap().truncate(2);
@@ -4060,7 +4253,17 @@ fn two_copies_with_different_events_merge_without_conflict() {
 fn done_asks_nothing_about_handoff_files() {
     let repo = filled();
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    let v = ok(&repo, &["--as", "a", "done", "A01-01"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     assert!(v.get("handoff_check").is_none(), "{v}");
 }
 
@@ -4154,7 +4357,17 @@ fn block_shows_blockers_and_next_only_tells() {
     assert_eq!(v["blocked"], json!([]));
 
     // A dropped blocker is flagged, never counted as done.
-    ok(&repo, &["--as", "a", "done", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
     ok(&repo, &["drop", "A02-01"]);
     let v = ok(&repo, &["next"]);
     assert_eq!(v["blocked"][0]["id"], "A01-02");
@@ -4212,7 +4425,7 @@ fn block_shows_blockers_and_next_only_tells() {
 #[test]
 fn a_newer_taskbag_is_refused_by_an_older_build() {
     let repo = filled();
-    set_format(&repo, "allomos/7");
+    set_format(&repo, "allomos/8");
     refused(&repo, &["list"], 4, "taskbag_newer");
 }
 
@@ -4663,7 +4876,7 @@ fn events_record_the_agent_alm_runs_under() {
             ("CLAUDECODE", "1"),
             ("CLAUDE_CODE_ENTRYPOINT", "claude-desktop"),
         ],
-        &["--as", "s1", "label", "A01-01", "implemented"],
+        &["--as", "s1", "label", "A01-01", "locally verified by agent"],
     );
     assert_eq!(
         (&e["agent"], &e["tool"]),
@@ -4728,7 +4941,7 @@ fn history_records_with_unknown_fields_still_show() {
     fs::write(
         bag.join("events/2099-01-01-000000-000-zzzzzz.json"),
         r#"{"at":"2099-01-01T00:00:00Z","by":"newer","via":"alm","command":"label","kind":"task",
-"id":"A01-01","from_a_newer_allomos":true,"changes":[{"field":"label","to":"implemented","extra":1}]}"#,
+"id":"A01-01","from_a_newer_allomos":true,"changes":[{"field":"label","to":"locally verified by agent","extra":1}]}"#,
     )
     .unwrap();
     let v = ok(&repo, &["list"]);
@@ -5110,7 +5323,7 @@ fn tasks_name_their_project_folders_after_an_upgrade() {
         v["format"] = json!("allomos/5");
         v["project_folder"] = json!(".");
     });
-    // Still read and changed as allomos/5; folders need the upgrade.
+    // Still read as allomos/5, but changes (folders too) need the upgrade.
     ok(&repo, &["list"]);
     let add = |extra: &[&str]| {
         let mut args = vec!["add", "task", "--area", "A01", "--title", "x"];
@@ -5120,12 +5333,12 @@ fn tasks_name_their_project_folders_after_an_upgrade() {
     fn strs(v: &[String]) -> Vec<&str> {
         v.iter().map(String::as_str).collect()
     }
-    ok(&repo, &strs(&add(&[])));
+    refused(&repo, &strs(&add(&[])), 1, "taskbag_to_upgrade");
     refused(
         &repo,
         &strs(&add(&["--folder", "main"])),
         1,
-        "upgrade_first",
+        "taskbag_to_upgrade",
     );
     // `alm upgrade` alone says what it will do and changes nothing.
     let before = snapshot(&repo);
@@ -5135,7 +5348,7 @@ fn tasks_name_their_project_folders_after_an_upgrade() {
     let v = ok(&repo, &["upgrade", "--confirm"]);
     assert_eq!(v["upgraded"], true, "{v}");
     let project: Value = serde_json::from_str(&fs::read_to_string(&project_file).unwrap()).unwrap();
-    assert_eq!(project["format"], "allomos/6");
+    assert_eq!(project["format"], "allomos/7");
     assert_eq!(project.get("project_folder"), None);
     assert_eq!(project["project_folders"][0]["path"], ".");
     let main = project["project_folders"][0]["name"]
@@ -5426,7 +5639,13 @@ fn task_commands_list_what_the_task_is_missing() {
     );
     let v = ok(
         &repo,
-        &["--as", "claude/x", "label", "A01-01", "implemented"],
+        &[
+            "--as",
+            "claude/x",
+            "label",
+            "A01-01",
+            "locally verified by agent",
+        ],
     );
     let codes: Vec<&str> = v["missing"]
         .as_array()
