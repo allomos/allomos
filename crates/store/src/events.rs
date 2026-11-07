@@ -267,6 +267,28 @@ fn fill_who(root: &Path, event: &mut Event) {
     GAPS.lock().unwrap_or_else(|e| e.into_inner()).extend(gaps);
 }
 
+/// Name the checker of a `human_check` change that has none (Task-A01-table778, decision 0021
+/// § 1.1): the person an agent works for (`for`), else the person who made the change in the app
+/// or with `alm` (`actor.person`). Always a pseudonym; left null when neither is known.
+fn fill_checker(event: &mut Event) {
+    let who = event
+        .on_behalf_of
+        .clone()
+        .or_else(|| event.actor.as_ref().and_then(|a| a.person.clone()));
+    let Some(who) = who else { return };
+    for c in event
+        .changes
+        .iter_mut()
+        .filter(|c| c.field == allomos_core::labels::HUMAN_CHECK)
+    {
+        if let Some(to) = c.to.as_mut().and_then(|v| v.as_object_mut()) {
+            if to.get("checker").is_none_or(|v| v.is_null()) {
+                to.insert("checker".into(), serde_json::Value::String(who.clone()));
+            }
+        }
+    }
+}
+
 /// Add why to a task `event` (Task-A01-air289, decision 0021 § 1.1), unless its writer already
 /// did: a `reason` change with what [`Who::reason`] says. A state or plan change `alm` writes
 /// without one is noted in [`GAPS`] (`reason`), so `alm` asks for it; nothing is refused.
@@ -298,6 +320,7 @@ pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     let path = root.join(new_file(root));
     let mut event = event.clone();
     fill_who(root, &mut event);
+    fill_checker(&mut event);
     fill_reason(&mut event);
     if let Some(change) = REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
         event.changes.push(change.clone());

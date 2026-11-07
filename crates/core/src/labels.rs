@@ -364,11 +364,55 @@ pub fn rename(taskbag: &Taskbag, old: &str, new: &str) -> Result<(Project, Vec<T
     Ok((project, tasks))
 }
 
+/// The change a human check adds beside its label (Task-A01-table778, decision 0021 § 1.1).
+pub const HUMAN_CHECK: &str = "human_check";
+
+/// What the person saw. A failed check is not `alm checked`: the task stays to check (or is
+/// reopened), so only these two are recorded here.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CheckResult {
+    #[default]
+    Pass,
+    /// Passed with conditions: the person's words say which.
+    Partly,
+}
+
+impl CheckResult {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CheckResult::Pass => "pass",
+            CheckResult::Partly => "partly",
+        }
+    }
+}
+
+/// What a person said about their check (`alm checked --result --words --checker`, or the app's
+/// **Checked**).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CheckGiven<'a> {
+    /// The checker's pseudonym ID; left out, the writer fills in this computer's person (the
+    /// person an agent works for).
+    pub checker: Option<&'a str>,
+    pub result: CheckResult,
+    /// The person's own words, as they said them.
+    pub words: Option<&'a str>,
+}
+
 /// A person checked done task `id` (`alm checked`, decision 0020, In detail 2): it gets
 /// `deployed and verified by human` when it carries `deployed and verified by agent`, else
 /// `locally verified by human`; `which` picks one of the two instead. The note and steps are
 /// cleared and stay in its history. The holder rule does not apply.
-pub fn checked(taskbag: &Taskbag, id: &str, which: Option<&str>) -> Result<Outcome, Problem> {
+///
+/// Beside the label the event records a `human_check` change (decision 0021 § 1.1): `{checker,
+/// steps_sha256, result, words, where}`; `steps_sha256` is the SHA-256 of the steps the task
+/// carried (null when it had none), `where` is `deployed` or `local` after the label given.
+pub fn checked(
+    taskbag: &Taskbag,
+    id: &str,
+    which: Option<&str>,
+    given: &CheckGiven,
+) -> Result<Outcome, Problem> {
     let mut task = find_task(taskbag, id)?;
     if task.state != State::Done {
         return Err(Problem::NotDone {
@@ -386,10 +430,30 @@ pub fn checked(taskbag: &Taskbag, id: &str, which: Option<&str>) -> Result<Outco
         None if task.has_label(DEPLOYED_BY_AGENT) => DEPLOYED_BY_HUMAN,
         None => LOCALLY_BY_HUMAN,
     };
+    let record = human_check(task.human_check_steps.as_deref(), label, given);
     task.add_label(label);
     task.without_human_check = None;
     task.human_check_steps = None;
-    Ok(Outcome::plain(task))
+    let mut out = Outcome::plain(task);
+    out.recorded.push(crate::event::Change {
+        field: HUMAN_CHECK.to_string(),
+        from: None,
+        to: Some(record),
+        extra: Default::default(),
+    });
+    Ok(out)
+}
+
+/// The `human_check` record for a check against `steps` that gave `label`.
+fn human_check(steps: Option<&str>, label: &str, given: &CheckGiven) -> Value {
+    let clean = |s: Option<&str>| s.map(str::trim).filter(|s| !s.is_empty()).map(String::from);
+    serde_json::json!({
+        "checker": clean(given.checker),
+        "steps_sha256": clean(steps).map(|s| crate::approval::sha256(&s)),
+        "result": given.result.as_str(),
+        "words": clean(given.words),
+        "where": if label == DEPLOYED_BY_HUMAN { "deployed" } else { "local" },
+    })
 }
 
 #[cfg(test)]
@@ -415,6 +479,32 @@ mod tests {
     }
 
     use super::*;
+
+    /// A human check records who, against which steps, the result and the words, beside the label
+    /// (Task-A01-table778).
+    #[test]
+    fn a_human_check_records_who_steps_result_and_words() {
+        let r = human_check(
+            Some("1. Open it\n"),
+            DEPLOYED_BY_HUMAN,
+            &CheckGiven {
+                checker: Some(" p-abc123 "),
+                result: CheckResult::Partly,
+                words: Some("Works, but the button is small"),
+            },
+        );
+        assert_eq!(r["checker"], "p-abc123");
+        assert_eq!(r["steps_sha256"], crate::approval::sha256("1. Open it"));
+        assert_eq!(r["result"], "partly");
+        assert_eq!(r["words"], "Works, but the button is small");
+        assert_eq!(r["where"], "deployed");
+        let r = human_check(None, LOCALLY_BY_HUMAN, &CheckGiven::default());
+        assert!(r["checker"].is_null() && r["steps_sha256"].is_null() && r["words"].is_null());
+        assert_eq!(
+            (r["result"].as_str(), r["where"].as_str()),
+            (Some("pass"), Some("local"))
+        );
+    }
 
     #[test]
     fn old_steps_map_as_decided() {

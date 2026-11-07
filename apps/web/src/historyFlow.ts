@@ -22,6 +22,7 @@ const FIELD_KEYS: Record<string, Key> = {
   finished_without_owner: "pane.without_human_check",
   ai_decision: "pane.ai_decision",
   approval: "pane.approval",
+  human_check: "pane.human_check",
   reopen_note: "pane.reopen_note",
   reason: "pane.reason",
   card: "pane.card",
@@ -45,6 +46,8 @@ export function valueText(field: string, value: unknown, t: T): string {
   if (field === "state" && typeof value === "string") return t(`state.${value}` as Key);
   // An approval record (Task-A01-coach782) by its ID; older approvals were a text.
   if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
+  // A human check (Task-A01-table778): its result, where, who and the person's words.
+  if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
   if ((field === "blocked_by" || field === "labels") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const first = text.split("\n")[0];
@@ -55,4 +58,25 @@ export function valueText(field: string, value: unknown, t: T): string {
 export function changeLine(c: FieldChange, t: T): string {
   if (c.field === "description") return t("pane.history_description", { field: fieldName(c.field, t) });
   return `${fieldName(c.field, t)}: ${valueText(c.field, c.from, t)} → ${valueText(c.field, c.to, t)}`;
+}
+
+/** A `human_check` record (decision 0021 § 1.1), as stored in a `checked` event. */
+export type HumanCheck = {
+  checker?: string | null;
+  steps_sha256?: string | null;
+  result?: string;
+  words?: string | null;
+  where?: string;
+};
+
+/** "Passed (deployed), by p-abc123, steps 0123abcd: "Works"". */
+export function humanCheckText(c: HumanCheck, t: T): string {
+  const parts = [
+    `${t(c.result === "partly" ? "pane.human_check_partly" : "pane.human_check_pass")} (${t(
+      c.where === "deployed" ? "pane.human_check_deployed" : "pane.human_check_local",
+    )})`,
+  ];
+  if (c.checker) parts.push(t("pane.human_check_by", { who: c.checker }));
+  parts.push(c.steps_sha256 ? t("pane.human_check_steps_sha", { sha: c.steps_sha256.slice(0, 8) }) : t("pane.human_check_no_steps"));
+  return c.words ? `${parts.join(", ")}: "${c.words}"` : parts.join(", ");
 }
