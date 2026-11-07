@@ -83,6 +83,9 @@ mod tests {
             id: Some("A01-30".into()),
             agent: None,
             tool: None,
+            actor: None,
+            on_behalf_of: None,
+            approval: None,
             changes,
         }
     }

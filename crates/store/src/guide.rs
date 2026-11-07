@@ -174,8 +174,12 @@ Every command takes `--taskbag <path>` (or ALLOMOS_TASKBAG; default: the nearest
 (one JSON object on standard output) and `--request-id <id>` (a one-time number of your own
 for a change: run the same command again with the same number, after a crash for example, and
 alm returns the first result instead of doing it twice; the same number with a different command
-is refused). Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not
-writable.
+is refused). An agent also passes `--model <its exact model ID>` (or ALLOMOS_MODEL; once per
+session on this computer is enough, alm remembers it), and when it applies `--for <pseudonym>` (the
+person it works for, when not this computer's person) and `--approval <id>` (the approval the
+change relies on): each event records them, with the agent's session ID and this computer's
+person's pseudonym, which alm finds by itself. What alm could not learn is listed after the change.
+Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not writable.
 
 `alm` never runs or reads your version control tool. After a change it prints \"Save this change
 in your version control tool and share it\", the files that change wrote, and, \"For Git:\", the

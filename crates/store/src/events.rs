@@ -62,6 +62,9 @@ impl<'a> Actor<'a> {
             id: id.map(String::from),
             agent,
             tool,
+            actor: None,
+            on_behalf_of: None,
+            approval: None,
             changes,
         }
     }
@@ -95,6 +98,11 @@ fn now() -> (String, String) {
         format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}Z"),
         format!("{y:04}-{m:02}-{d:02}-{hh:02}{mm:02}{ss:02}-{millis:03}"),
     )
+}
+
+/// Six random lowercase letters and digits (a new pseudonym's, too).
+pub(crate) fn random_suffix() -> String {
+    suffix()
 }
 
 /// Six random lowercase letters and digits, from the standard library's random hash keys.
@@ -140,23 +148,132 @@ pub fn set_request(request: Option<(&str, &str)>) {
     *REQUEST.lock().unwrap_or_else(|e| e.into_inner()) = change;
 }
 
+/// What the writer said about who runs the changes made now (Task-A01-black004): `alm`'s
+/// `--model`, `--for` and `--approval` (or `ALLOMOS_MODEL`, `ALLOMOS_FOR`, `ALLOMOS_APPROVAL`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Who {
+    /// The exact model ID the agent runs on.
+    pub model: Option<String>,
+    /// The pseudonym ID of the person the agent works for, when it is not this computer's person.
+    pub on_behalf_of: Option<String>,
+    /// The approval ID the change relies on.
+    pub approval: Option<String>,
+}
+
+static WHO: std::sync::Mutex<Option<Who>> = std::sync::Mutex::new(None);
+
+/// What every event written from now on says about who runs it ([`Who`]); `None` stops it.
+pub fn set_who(who: Option<Who>) {
+    *WHO.lock().unwrap_or_else(|e| e.into_inner()) = who;
+}
+
+/// What the events written since the last [`take_gaps`] could not say about who made them
+/// (Task-A01-black004): `model`, `session` or `for`, each once, in that order.
+static GAPS: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
+
+/// The gaps of the events written since the last call ([`GAPS`]), and forget them.
+pub fn take_gaps() -> Vec<&'static str> {
+    let mut gaps = std::mem::take(&mut *GAPS.lock().unwrap_or_else(|e| e.into_inner()));
+    let order = ["model", "session", "for"];
+    gaps.sort_by_key(|g| order.iter().position(|o| o == g));
+    gaps.dedup();
+    gaps
+}
+
+fn clean(value: Option<String>) -> Option<String> {
+    value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// The project an event belongs to, for its pseudonym: the event's own ID for a project event
+/// (`init` writes it before `project.json`), else `project.json`'s `id`.
+fn project_id(root: &Path, event: &Event) -> Option<String> {
+    if event.kind == Kind::Project {
+        if let Some(id) = clean(event.id.clone()) {
+            return Some(id);
+        }
+    }
+    let text = crate::read_text(&root.join("project.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    clean(v.get("id")?.as_str().map(String::from))
+}
+
+/// Fill in who made `event` (Task-A01-black004, decision 0021 § 1.1), unless its writer already
+/// did. An agent's change (`agent` set) gets its session ID from the environment, its model from
+/// `--model` (or the one its session named before, on this computer) and `for`, this computer's
+/// person's pseudonym unless `--for` names another. A change in the app, or with `alm` where no
+/// agent was seen, gets the person's pseudonym as `actor.person`. What could not be learned is
+/// left out and noted in [`GAPS`].
+fn fill_who(root: &Path, event: &mut Event) {
+    let env = |name: &str| clean(std::env::var(name).ok());
+    let who = WHO
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+        .unwrap_or_default();
+    let mut gaps = Vec::new();
+    if event.approval.is_none() {
+        event.approval = clean(who.approval).or_else(|| env("ALLOMOS_APPROVAL"));
+    }
+    let given_for = clean(who.on_behalf_of).or_else(|| env("ALLOMOS_FOR"));
+    if event.actor.is_none() {
+        let mut actor = allomos_core::event::EventActor::default();
+        let project = project_id(root, event);
+        let pseudonym = || project.as_deref().and_then(crate::identity::pseudonym);
+        match event.agent.clone() {
+            Some(agent) if event.via == "alm" => {
+                actor.session =
+                    allomos_core::event::session_from_env(&agent, |n| std::env::var(n).ok());
+                let named = clean(who.model).or_else(|| env("ALLOMOS_MODEL"));
+                actor.model = match (&named, &actor.session) {
+                    (Some(model), Some(session)) => {
+                        crate::identity::remember_session_model(session, model);
+                        named.clone()
+                    }
+                    (Some(_), None) => named.clone(),
+                    (None, Some(session)) => crate::identity::session_model(session),
+                    (None, None) => None,
+                };
+                if event.on_behalf_of.is_none() {
+                    event.on_behalf_of = given_for.clone().or_else(pseudonym);
+                }
+                if actor.model.is_none() {
+                    gaps.push("model");
+                }
+                if actor.session.is_none() {
+                    gaps.push("session");
+                }
+                if event.on_behalf_of.is_none() {
+                    gaps.push("for");
+                }
+            }
+            _ => {
+                actor.person = pseudonym();
+                if event.on_behalf_of.is_none() {
+                    event.on_behalf_of = given_for;
+                }
+            }
+        }
+        if !actor.is_empty() {
+            event.actor = Some(actor);
+        }
+    }
+    GAPS.lock().unwrap_or_else(|e| e.into_inner()).extend(gaps);
+}
+
 /// Write one event. Returns its file, so a change that then fails can take it back.
 /// Callers hold the taskbag's lock.
 pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     let dir = root.join(EVENTS_DIR);
     fs::create_dir_all(&dir).map_err(|e| write_failed(&dir, e))?;
     let path = root.join(new_file(root));
-    let marked;
-    let event = match REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
-        Some(change) => {
-            let mut e = event.clone();
-            e.changes.push(change.clone());
-            marked = e;
-            &marked
-        }
-        None => event,
-    };
-    write_atomic(&path, &json_text(event))?;
+    let mut event = event.clone();
+    fill_who(root, &mut event);
+    if let Some(change) = REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        event.changes.push(change.clone());
+    }
+    write_atomic(&path, &json_text(&event))?;
     Ok(path)
 }
 
@@ -618,6 +735,9 @@ mod tests {
             id: Some("A01-01".into()),
             agent: agent.map(String::from),
             tool: tool.map(String::from),
+            actor: None,
+            on_behalf_of: None,
+            approval: None,
             changes: if changed {
                 vec![Change {
                     extra: Default::default(),
