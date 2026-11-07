@@ -112,6 +112,7 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .settings-value { overflow-wrap: anywhere; }
 .settings-section select { max-width: 100%; }
 .folder-picker { display: grid; gap: 4px; border: none; padding: 0; margin: 0; }
+.label-picker { display: grid; gap: 4px; border: none; padding: 0; margin: 0; }
 .project-folders { width: 100%; display: grid; gap: 8px; justify-items: start; }
 .banner.folders-note { box-sizing: border-box; width: 100%; background: color-mix(in srgb, var(--accent) 12%, transparent); }
 button.with-icon { display: inline-flex; align-items: center; gap: 6px; }
@@ -126,6 +127,11 @@ button.with-icon { display: inline-flex; align-items: center; gap: 6px; }
 .banner.unbind-confirm { display: grid; gap: 6px; align-items: start; }
 .unbind-confirm ul { margin: 0; padding-left: 18px; }
 .folder-chip { border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; font-size: 0.85em; }
+/* The label table in the settings (decision 0020). */
+.label-table { display: grid; gap: 6px; }
+.label-table ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.label-table h4 { margin: 6px 0 0; font-size: 13px; }
+.label-table .label-chip.own { color: var(--ink); border-color: var(--line); }
 .ladder-edit { display: grid; gap: 6px; justify-items: start; width: 100%; }
 .ladder-edit ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; width: 100%; }
 .ladder-edit li { display: flex; align-items: center; gap: 6px; }
@@ -491,6 +497,10 @@ button.link:hover { text-decoration: underline; }
   .row-facts { grid-template-columns: minmax(0, 1fr); }
 }
 .label { color: var(--ok); }
+/* Decision 0020 (Task-A01-petal376): a task's labels as chips; a "by human" one solid. */
+.label-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; max-width: 100%; min-width: 0; vertical-align: middle; }
+.label-chip { font-size: 12px; line-height: 1.5; padding: 0 7px; border-radius: 9px; max-width: 100%; overflow-wrap: anywhere; color: var(--ok); border: 1px solid var(--ok); }
+.label-chip.by-human { background: var(--ok-bg); font-weight: 600; }
 .task { cursor: pointer; }
 .task:hover { background: var(--hover, rgba(127, 127, 127, 0.06)); }
 .task:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -795,9 +805,10 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .filter-row { display: flex; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13px; border-radius: 6px; white-space: nowrap; }
 label.filter-row { cursor: pointer; }
 label.filter-row:hover, .filter-side:hover { background: var(--bg); }
-.filter-label-name { flex: 1; margin-right: 8px; }
+.filter-label-name { flex: 1; min-width: 0; margin-right: 8px; white-space: normal; }
+.filter-label-row .filter-side { flex: none; }
 .filter-side { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); padding: 1px 6px; border-radius: 6px; cursor: pointer; }
-/* Task-A01-teacup726: the ladder's labels under Labeled, greyed out while its Yes is unticked. */
+/* Task-A01-teacup726: the table's labels under Labeled, greyed out while its Yes is unticked. */
 .filter-child { padding-left: 22px; }
 .filter-child.off { opacity: 0.45; }
 .filter-child.off .filter-side { cursor: default; }

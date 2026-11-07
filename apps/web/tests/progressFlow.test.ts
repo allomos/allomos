@@ -21,7 +21,7 @@ test("an agent waiting for the person's answer is never quiet; finished still wi
 });
 
 test("the popup finds the agent's window from the task it holds with a recorded session", () => {
-  const task = (id: string, more: Partial<Task>): Task => ({ id, title: id, area: "A01", state: "in_progress", label: null, holder: null, waiting_on: null, next_dependency: null, iteration: null, handoff_note: null, without_human_check: null, human_check_steps: null, description: "", ...more }) as Task;
+  const task = (id: string, more: Partial<Task>): Task => ({ id, title: id, area: "A01", state: "in_progress", holder: null, waiting_on: null, next_dependency: null, iteration: null, handoff_note: null, without_human_check: null, human_check_steps: null, description: "", ...more }) as Task;
   const tasks = [
     task("A01-1", { holder: "codex/other", session: { agent: "codex", id: "s1" } as Task["session"] }),
     task("A01-2", { holder: "claude/x" }),

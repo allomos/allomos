@@ -19,9 +19,10 @@ export type EditField =
 
 /**
  * What the person typed or chose. `waitingOn` and `who` go with the state `waiting`; `blockedBy`
- * (task IDs) with the state `blocked` and the field "Blocked by" (decision 0016).
+ * (task IDs) with the state `blocked` and the field "Blocked by" (decision 0016); `labels` with
+ * the field Labels (decision 0020, Task-A01-petal376): every label the task is to carry.
  */
-export type Draft = { value: string; waitingOn: string; who: string; blockedBy: string[]; folders: string[] };
+export type Draft = { value: string; waitingOn: string; who: string; blockedBy: string[]; folders: string[]; labels: string[] };
 
 /**
  * The states the app can set, each by its `alm` command (backlog, ready, wait, block, done, drop).
@@ -62,10 +63,17 @@ export function startDraft(task: Task, field: EditField): Draft {
       ? task.state
       : field === "description"
         ? task.description
-        : field === "blocked_by" || field === "folders"
+        : field === "blocked_by" || field === "folders" || field === "label"
           ? ""
           : (task[field] ?? "");
-  return { value, waitingOn: task.waiting_on ?? "", who: task.who ?? "", blockedBy: [...(task.blocked_by ?? [])], folders: [...(task.folders ?? [])] };
+  return {
+    value,
+    waitingOn: task.waiting_on ?? "",
+    who: task.who ?? "",
+    blockedBy: [...(task.blocked_by ?? [])],
+    folders: [...(task.folders ?? [])],
+    labels: [...(task.labels ?? [])],
+  };
 }
 
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -75,6 +83,7 @@ export function draftChanged(task: Task, field: EditField, draft: Draft): boolea
   const start = startDraft(task, field);
   if (field === "blocked_by") return draft.blockedBy.length > 0 && !sameIds(draft.blockedBy, start.blockedBy);
   if (field === "folders") return !sameIds(draft.folders, start.folders);
+  if (field === "label") return !sameIds([...draft.labels].sort(), [...start.labels].sort());
   if (field === "state" && draft.value === "waiting") {
     return task.state !== "waiting" || draft.waitingOn.trim() !== start.waitingOn.trim() || draft.who.trim() !== start.who.trim();
   }
@@ -98,7 +107,7 @@ export function toEdit(field: EditField, draft: Draft, version: string | null = 
           ? { field, state: "blocked", blocked_by: draft.blockedBy }
           : { field, state: draft.value as State };
     case "label":
-      return { field, label: draft.value };
+      return { field: "labels", labels: draft.labels };
     case "waiting_on":
       return { field, text };
     case "blocked_by":
@@ -120,6 +129,13 @@ export function toEdit(field: EditField, draft: Draft, version: string | null = 
 /** The tasks a task may be blocked by: every other task, in ID order (Rust checks the rest). */
 export function blockerChoices(task: Task, tasks: readonly Task[]): Task[] {
   return tasks.filter((x) => x.id !== task.id).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** The draft's labels with `label` switched on or off: one switched off leaves the others in their
+ * order, one switched on goes at the end (as Rust adds it). */
+export function toggleLabel(draft: Draft, label: string): Draft {
+  const on = draft.labels.includes(label);
+  return { ...draft, labels: on ? draft.labels.filter((l) => l !== label) : [...draft.labels, label] };
 }
 
 /** The draft's blocking tasks with `id` switched on or off, kept in ID order. */

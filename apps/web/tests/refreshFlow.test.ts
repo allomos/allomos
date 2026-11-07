@@ -16,7 +16,6 @@ const base: Task = {
   title: "Refresh line",
   area: "A01",
   state: "ready",
-  label: null,
   holder: null,
   waiting_on: null,
   next_dependency: null,
@@ -63,9 +62,9 @@ test("changed, added and removed tasks are found; field order does not count as 
   // Same fields in another order: the same task.
   const reordered = Object.fromEntries(Object.entries(b).reverse()) as Task;
   assert.deepEqual(changedTasks([a, b], [a, reordered]), []);
-  // A01-02 changed its label, A01-04 is new, A01-03 is gone.
+  // A01-02 changed its labels, A01-04 is new, A01-03 is gone.
   const d = task({ id: "A01-04" });
-  assert.deepEqual(changedTasks([a, b, c], [a, { ...b, label: "implemented" }, d]), ["A01-02", "A01-04", "A01-03"]);
+  assert.deepEqual(changedTasks([a, b, c], [a, { ...b, labels: ["shipped"] }, d]), ["A01-02", "A01-04", "A01-03"]);
   // A new AI decision counts as a change of its task.
   assert.deepEqual(changedTasks([a], [{ ...a, ai_decisions: [{ at: "2026-10-15T14:00Z", text: "x" }] }]), ["A01-01"]);
 });

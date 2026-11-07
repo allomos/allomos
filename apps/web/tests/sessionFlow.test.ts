@@ -3,10 +3,11 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { check, paneAgent, titleOpen, session, sessionPlace } from "../src/sessionFlow.ts";
+import { paneAgent, titleOpen, session, sessionPlace } from "../src/sessionFlow.ts";
+import { check } from "../src/stopFlow.ts";
 import type { Task, TaskHistory } from "../src/types.ts";
 
-const task = (over: Partial<Task> = {}): Task => ({ id: "A01-01", title: "t", area: "A01", state: "in_progress", label: null, ...over }) as Task;
+const task = (over: Partial<Task> = {}): Task => ({ id: "A01-01", title: "t", area: "A01", state: "in_progress", ...over }) as Task;
 const history = (over: Partial<TaskHistory> = {}): TaskHistory => ({ since: "2026-10-01T00:00:00Z", events: [], seen: [], ...over });
 const now = new Date("2026-10-22T10:00:00Z");
 
@@ -72,10 +73,11 @@ test("the agent is the holder, else the last session that changed the task throu
   assert.equal(paneAgent(task(), history()), null);
 });
 
-test("the check: checked at the top label, to check when finished without it, otherwise not yet", () => {
-  const labels = ["drafted", "implemented", "human verified"];
-  assert.equal(check(task({ state: "done", label: "human verified" }), labels), "checked");
-  assert.equal(check(task({ state: "done", label: "implemented", without_human_check: "needs a Mac" }), labels), "to_check");
-  assert.equal(check(task({ state: "done", label: "implemented" }), labels), "not_yet");
-  assert.equal(check(task({ label: "human verified" }), labels), "not_yet");
+test("the check: checked with a 'by human' label, to check when done without one, otherwise not yet (decision 0020)", () => {
+  assert.equal(check(task({ state: "done", labels: ["locally verified by agent", "locally verified by human"] })), "checked");
+  assert.equal(check(task({ state: "done", labels: ["deployed and verified by human"] })), "checked");
+  assert.equal(check(task({ state: "done", labels: ["locally verified by agent"], without_human_check: "needs a Mac" })), "to_check");
+  assert.equal(check(task({ state: "done", labels: ["deployed and verified by agent"] })), "to_check", "no note: still to check");
+  assert.equal(check(task({ state: "done" })), "to_check");
+  assert.equal(check(task({ labels: ["locally verified by human"] })), "not_yet", "not done");
 });

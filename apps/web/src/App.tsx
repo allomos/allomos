@@ -30,7 +30,8 @@ import {
   hiddenByFilter,
   hiddenText,
   isAll,
-  onLadder,
+  labelNames,
+  onTable,
   readFilter,
   storeFilter,
   stopFact,
@@ -1242,8 +1243,8 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  // The Show filter (Task-A01-lens781): ticked states and, for each label of the ladder, its Yes
-  // and No; everything ticked lists every task.
+  // The Show filter (Task-A01-lens781): ticked states and, for each label of the label table
+  // (built-in first, decision 0020), its Yes and No; everything ticked lists every task.
   const [storedFilter, setStoredFilter] = useState<StateFilter>(() => {
     try {
       return readFilter(localStorage.getItem(LIST_FILTER_KEY), localStorage.getItem(STATE_FILTER_KEY));
@@ -1251,8 +1252,8 @@ function TaskbagView({
       return allTicked();
     }
   });
-  const ladder = box?.project.labels ?? [];
-  const stateFilter = onLadder(storedFilter, ladder);
+  const ladder = labelNames(box?.project, box?.tasks);
+  const stateFilter = onTable(storedFilter, ladder);
   const chooseFilter = (f: StateFilter) => {
     setStoredFilter(f);
     try {
@@ -1700,7 +1701,7 @@ function TaskbagView({
                 onClose={() => setSelectedId(null)}
                 onLink={openLink}
                 history={history?.id === selected.id ? history.history : null}
-                labels={box.project.labels}
+                labels={ladder}
                 iterations={iterations}
                 ownerName={ownerName}
                 onSaveName={saveOwnerName}

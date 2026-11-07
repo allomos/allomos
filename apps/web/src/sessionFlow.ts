@@ -76,13 +76,3 @@ export function session(task: Task, history: TaskHistory | null, now: Date): Ses
   if (Number.isNaN(at)) return { kind: "unknown" };
   return now.getTime() - at <= ACTIVE_MINUTES * 60_000 ? { kind: "active", at: seen.at } : { kind: "last_seen", at: seen.at };
 }
-
-/** The human check: a person checked it (done at the top label), it waits for one, or not yet. */
-export type Check = "checked" | "to_check" | "not_yet";
-
-export function check(task: Task, labels: string[]): Check {
-  // Like stopFlow's toCheck: finished without the human check.
-  if (task.state === "done" && !!task.without_human_check) return "to_check";
-  const top = labels[labels.length - 1];
-  return task.state === "done" && !!top && task.label === top ? "checked" : "not_yet";
-}

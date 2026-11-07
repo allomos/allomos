@@ -22,6 +22,7 @@ import {
   startRun,
   take,
 } from "../src/monitorFlow.ts";
+import { toCheck } from "../src/stopFlow.ts";
 import type { Iteration, Task } from "../src/types.ts";
 
 const task = (id: string, over: Partial<Task> = {}): Task =>
@@ -30,7 +31,6 @@ const task = (id: string, over: Partial<Task> = {}): Task =>
     title: `Task ${id}`,
     area: id.split("-")[0],
     state: "ready",
-    label: null,
     holder: null,
     waiting_on: null,
     next_dependency: null,
@@ -167,13 +167,13 @@ test("a session with no sign of life for 30 minutes shows as stalled", () => {
 test("the last run counts the tasks done and those that need the person now", () => {
   const last = { ended: "2026-11-04T10:00:00Z", scope: { kind: "all" as const }, taken: ["A01-01", "A01-02", "A01-03", "A01-04"] };
   const now = [
-    task("A01-01", { state: "done" }),
-    task("A01-02", { state: "done", without_human_check: "only a person can try it" }),
+    task("A01-01", { state: "done", labels: ["locally verified by agent", "locally verified by human"] }),
+    task("A01-02", { state: "done", labels: ["locally verified by agent"], without_human_check: "only a person can try it" }),
     task("A01-03", { state: "waiting", waiting_on: "which colour?" }),
     task("A01-04", { state: "waiting", waiting_on: "a reply", who: "the designer" }),
     task("A01-05", { state: "waiting", waiting_on: "not in this run" }),
   ];
-  assert.deepEqual(lastRunCounts(last, now), { done: 2, needYou: 2 });
+  assert.deepEqual(lastRunCounts(last, now, toCheck), { done: 2, needYou: 2 });
 });
 
 test("each task's request names the session, the run mode and only that task", () => {

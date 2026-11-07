@@ -19,6 +19,7 @@ import {
   changedVersion,
   toPaneIteration,
   toggleBlocker,
+  toggleLabel,
 } from "../src/editFlow.ts";
 import type { Iteration, Task } from "../src/types.ts";
 
@@ -27,7 +28,7 @@ const task: Task = {
   title: "Do it",
   area: "A01",
   state: "in_progress",
-  label: null,
+  labels: ["locally verified by agent"],
   holder: null,
   waiting_on: null,
   next_dependency: "the owner",
@@ -68,8 +69,9 @@ test("back to backlog: offered for an unheld ready, waiting or blocked task, exp
 });
 
 test("an editor starts from the task's value", () => {
-  assert.deepEqual(startDraft(task, "state"), { value: "in_progress", waitingOn: "", who: "", blockedBy: [], folders: [] });
+  assert.deepEqual(startDraft(task, "state"), { value: "in_progress", waitingOn: "", who: "", blockedBy: [], folders: [], labels: ["locally verified by agent"] });
   assert.equal(startDraft(task, "label").value, "");
+  assert.deepEqual(startDraft(task, "label").labels, ["locally verified by agent"]);
   assert.equal(startDraft(task, "next_dependency").value, "the owner");
   assert.equal(startDraft(task, "description").value, "Why.\n");
 });
@@ -108,7 +110,6 @@ test("each field becomes the change Rust reads", () => {
   assert.deepEqual(toEdit("state", d("blocked", "", "", ["A01-17"])), { field: "state", state: "blocked", blocked_by: ["A01-17"] });
   assert.deepEqual(toEdit("blocked_by", d("", "", "", ["A01-17", "A01-20"])), { field: "blocked_by", ids: ["A01-17", "A01-20"] });
   assert.deepEqual(toEdit("state", d("done")), { field: "state", state: "done" });
-  assert.deepEqual(toEdit("label", d("implemented")), { field: "label", label: "implemented" });
   assert.deepEqual(toEdit("waiting_on", d(" x ")), { field: "waiting_on", text: "x" });
   assert.deepEqual(toEdit("next_dependency", d(" ")), { field: "next_dependency", text: null });
   assert.deepEqual(toEdit("handoff_note", d("Read it")), { field: "handoff_note", text: "Read it" });
@@ -117,12 +118,29 @@ test("each field becomes the change Rust reads", () => {
   assert.deepEqual(toEdit("description", d("Text\n")), { field: "description", text: "Text\n", expected_version: null });
 });
 
+// Decision 0020, Task-A01-petal376: the Labels picker sets every label the task carries.
+test("the Labels picker ticks labels on and off; Save sends the whole list when it changed", () => {
+  const start = startDraft(task, "label");
+  assert.equal(draftChanged(task, "label", start), false);
+  const more = toggleLabel(start, "AI decisions to review");
+  assert.deepEqual(more.labels, ["locally verified by agent", "AI decisions to review"]);
+  assert.equal(draftChanged(task, "label", more), true);
+  assert.deepEqual(toEdit("label", more), { field: "labels", labels: ["locally verified by agent", "AI decisions to review"] });
+  const none = toggleLabel(start, "locally verified by agent");
+  assert.deepEqual(none.labels, []);
+  assert.deepEqual(toEdit("label", none), { field: "labels", labels: [] });
+  // The same labels in another order are no change.
+  const two = { ...task, labels: ["a", "b"] };
+  assert.equal(draftChanged(two, "label", { ...startDraft(two, "label"), labels: ["b", "a"] }), false);
+  assert.deepEqual(startDraft({ ...task, labels: undefined }, "label").labels, []);
+});
+
 test("a title or description carries the version it started from; a refusal names the version now (Task-A01-57)", () => {
   const d = (value: string) => ({ value, waitingOn: "", who: "", blockedBy: [] });
   assert.deepEqual(toEdit("title", d("New"), "0123456789abcdef"), { field: "title", title: "New", expected_version: "0123456789abcdef" });
   assert.deepEqual(toEdit("description", d("Text"), "0123456789abcdef"), { field: "description", text: "Text", expected_version: "0123456789abcdef" });
   // Other fields carry no version.
-  assert.deepEqual(toEdit("label", d("implemented"), "0123456789abcdef"), { field: "label", label: "implemented" });
+  assert.deepEqual(toEdit("label", { ...d(""), labels: ["shipped"] }, "0123456789abcdef"), { field: "labels", labels: ["shipped"] });
   assert.equal(changedVersion({ code: "task_changed", params: { id: "A01-01", version: "fedcba9876543210" } }), "fedcba9876543210");
   assert.equal(changedVersion({ code: "task_held", params: { id: "A01-01", holder: "x" } }), null);
   assert.equal(changedVersion("boom"), null);

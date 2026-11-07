@@ -19,7 +19,6 @@ function task(id: string, title: string, description = "", area = "A01"): Task {
     title,
     area,
     state: "ready",
-    label: null,
     holder: null,
     waiting_on: null,
     next_dependency: null,

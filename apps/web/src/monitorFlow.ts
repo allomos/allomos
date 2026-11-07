@@ -144,7 +144,7 @@ export function startRun(scope: Scope, agent: TerminalAgent, quiet: boolean, eve
 
 /** What of a task its session changes as it works it. */
 function seenOf(task: Task | undefined): string {
-  return task ? JSON.stringify([task.state, task.holder, task.label, task.handoff_note, task.waiting_on]) : "";
+  return task ? JSON.stringify([task.state, task.holder, task.labels ?? [], task.handoff_note, task.waiting_on]) : "";
 }
 
 /** The run with its current task followed in the taskbag as it is now. The task is finished when
@@ -200,12 +200,13 @@ export interface LastRun {
 }
 
 /** The tasks of the last run that are done, and those that need the person now: waiting on them,
- * or done but for a person's check. Counted from the taskbag as it is now. */
-export function lastRunCounts(last: LastRun, tasks: Task[]): { done: number; needYou: number } {
+ * or done but for a person's check (`toCheck`: stopFlow's, a done task with no "by human" label,
+ * decision 0020). Counted from the taskbag as it is now. */
+export function lastRunCounts(last: LastRun, tasks: Task[], toCheck: (task: Task) => boolean): { done: number; needYou: number } {
   const mine = tasks.filter((t) => last.taken.includes(t.id));
   return {
     done: mine.filter((t) => t.state === "done").length,
-    needYou: mine.filter((t) => (t.state === "waiting" && !t.who) || (t.state === "done" && Boolean(t.without_human_check))).length,
+    needYou: mine.filter((t) => (t.state === "waiting" && !t.who) || toCheck(t)).length,
   };
 }
 

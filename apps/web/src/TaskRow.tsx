@@ -9,10 +9,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useI18n } from "./i18n";
+import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
-import { humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
+import { chipLabels, humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import type { Task } from "./types";
 
@@ -54,10 +55,17 @@ export function TaskRow({
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
   ];
-  // Label only when the task has one (Task-A01-cell542); the details pane always shows it.
-  if (task.label) facts.push([t("pane.label"), <span className="label">{task.label}</span>]);
-  if (toReview(task)) facts.push([t("row.ai_decided"), t("row.ai_decided_value", { count: decisions }), t("task.ai_decided_title", { count: decisions })]);
-  if (toCheck(task)) facts.push([t("pane.check"), t("task.not_human_checked"), t("task.not_human_checked_title", { why: humanCheckNote(task) })]);
+  // Labels only when the task has some (Task-A01-cell542): every label it carries (decision 0020);
+  // "AI decisions to review" as its own fact below. The details pane always shows them.
+  if (chipLabels(task).length > 0) facts.push([t("pane.label"), <LabelChips task={task} />]);
+  // The decisions from the history; before it is read (or once none is left there), the label alone.
+  if (toReview(task))
+    facts.push([
+      t("row.ai_decided"),
+      decisions > 0 ? t("row.ai_decided_value", { count: decisions }) : t("task.ai_decided"),
+      decisions > 0 ? t("task.ai_decided_title", { count: decisions }) : t("label.meaning.ai_decisions"),
+    ]);
+  if (toCheck(task)) facts.push([t("pane.check"), t("task.not_human_checked"), checkTitle(task, t)]);
   facts.push([
     t("row.held_by"),
     <span className="held-by">
@@ -189,4 +197,11 @@ function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
       )}
     </div>
   );
+}
+
+/** Why a task is to check, on hover: the reason it was finished without the human check, or,
+ * with none written, that no person has checked it (decision 0020). */
+export function checkTitle(task: Task, t: ReturnType<typeof useI18n>["t"]): string {
+  const why = humanCheckNote(task).trim();
+  return why ? t("task.not_human_checked_title", { why }) : t("task.not_human_checked_plain");
 }

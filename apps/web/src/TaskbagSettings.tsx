@@ -3,8 +3,8 @@
 // Close and Esc close it. General shows the taskbag's name, with Rename (Task-A05-chalk937), its
 // format and whether it is up to date, with Update the Taskbag… when it is older (the same check as
 // the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
-// sets the language tasks are written in and changes the progress ladder (Task-A05-yeti951), and
-// has Translate the taskbag… (Task-A05-board831).
+// sets the language tasks are written in, has Translate the taskbag… (Task-A05-board831), and shows
+// the project's label table, where its own labels can be changed (Task-A05-yeti951, decision 0020).
 // Handoff holds the handoff rules (Task-A05-yacht960). Project folders binds, renames, locates
 // and unbinds the taskbag's folders (Task-A05-plaza078). Agents shows in which folders each agent
 // is set up, with Set up… for the others (Task-A05-bag963).
@@ -16,10 +16,11 @@ import { ProjectFolders } from "./ProjectFolders";
 import { LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
 import { LanguageMenu } from "./LanguageMenu";
 import { TranslateDialog } from "./TranslateDialog";
-import { addStep, ladderChanged, ladderProblem, moveStep, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
+import { addStep, ladderChanged, ladderProblem, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
+import { BUILT_IN_NAMES, labelMeaning, labelTable, labelText } from "./stopFlow";
 import type { Messenger } from "./messenger";
 import { middleEllipsis } from "./paths";
-import { isProblem, type VersionCheck } from "./types";
+import { isProblem, type LabelEntry, type VersionCheck } from "./types";
 import { movingTasks, updateNotice, upgradeFrom } from "./versionFlow";
 
 const SECTIONS = ["general", "folders", "agents", "tasks", "handoff"] as const;
@@ -191,24 +192,27 @@ function Translate({ messenger, root }: { messenger: Messenger; root: string }) 
   );
 }
 
-/** The progress ladder, lowest step first, with Change: rename, add, remove and reorder steps. */
-function Ladder({ labels, onSave }: { labels: string[]; onSave: (steps: LadderStep[]) => Promise<void> }) {
+/** The project's label table (decision 0020, Task-A01-petal376): every label with its meaning, the
+ * five built-in ones first and marked; then the project's own, with Change: rename, add and remove
+ * them (the built-in labels cannot be changed). */
+function LabelTable({ labels, onSave }: { labels: LabelEntry[]; onSave: (steps: LadderStep[]) => Promise<void> }) {
   const { t, problem } = useI18n();
   const [steps, setSteps] = useState<LadderStep[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  if (steps === null) {
-    return (
-      <div className="settings-row">
-        <span className="settings-value">{labels.join(" → ")}</span>
-        <button type="button" className="link reveal" onClick={() => setSteps(startLadder(labels))}>
-          {t("settings.change")}
-        </button>
-      </div>
-    );
-  }
-  const why = ladderProblem(steps);
+  const table = labelTable({ labels });
+  const builtIn = table.filter((e) => e.built_in);
+  const own = table.filter((e) => !e.built_in).map((e) => e.name);
+  const row = (e: LabelEntry) => (
+    <li key={e.name}>
+      <span className={e.built_in ? "label-chip" : "label-chip own"}>{labelText(e.name, t)}</span>
+      {e.built_in && <span className="muted small"> {t("settings.built_in")}</span>}
+      {labelMeaning(e, t) && <div className="muted small">{labelMeaning(e, t)}</div>}
+    </li>
+  );
+  const why = steps && ladderProblem(steps, BUILT_IN_NAMES);
   const save = async () => {
+    if (!steps) return;
     setBusy(true);
     setError(null);
     try {
@@ -221,37 +225,45 @@ function Ladder({ labels, onSave }: { labels: string[]; onSave: (steps: LadderSt
     }
   };
   return (
-    <div className="ladder-edit">
-      <ol>
-        {steps.map((s, i) => (
-          <li key={i}>
-            <input aria-label={t("settings.step", { n: i + 1 })} value={s.to} onChange={(e) => setSteps(renameStep(steps, i, e.target.value))} />
-            <button type="button" aria-label={t("settings.step_up")} title={t("settings.step_up")} disabled={i === 0} onClick={() => setSteps(moveStep(steps, i, -1))}>
-              ↑
+    <div className="label-table">
+      <p className="muted small">{t("settings.labels_note")}</p>
+      <ul>{builtIn.map(row)}</ul>
+      <h4>{t("settings.own_labels")}</h4>
+      {steps === null ? (
+        <div className="settings-row">
+          {own.length > 0 ? <ul>{table.filter((e) => !e.built_in).map(row)}</ul> : <span className="muted small">{t("settings.no_own_labels")}</span>}
+          <button type="button" className="link reveal" onClick={() => setSteps(startLadder(own))}>
+            {t("settings.change")}
+          </button>
+        </div>
+      ) : (
+        <div className="ladder-edit">
+          <ol>
+            {steps.map((s, i) => (
+              <li key={i}>
+                <input aria-label={t("settings.label_n", { n: i + 1 })} value={s.to} onChange={(e) => setSteps(renameStep(steps, i, e.target.value))} />
+                <button type="button" className="link reveal" onClick={() => setSteps(removeStep(steps, i))}>
+                  {t("settings.label_remove")}
+                </button>
+              </li>
+            ))}
+          </ol>
+          <button type="button" className="link reveal" onClick={() => setSteps(addStep(steps))}>
+            {t("settings.label_add")}
+          </button>
+          <p className="muted small">{t("settings.own_labels_note")}</p>
+          {why && <p className="muted small">{t(`settings.labels_${why}` as Key)}</p>}
+          {error && <p className="banner error">{error}</p>}
+          <div className="row">
+            <button type="button" className="primary" disabled={busy || why !== null || !ladderChanged(own, steps)} onClick={() => void save()}>
+              {t("settings.save")}
             </button>
-            <button type="button" aria-label={t("settings.step_down")} title={t("settings.step_down")} disabled={i === steps.length - 1} onClick={() => setSteps(moveStep(steps, i, 1))}>
-              ↓
+            <button type="button" disabled={busy} onClick={() => setSteps(null)}>
+              {t("settings.cancel")}
             </button>
-            <button type="button" className="link reveal" onClick={() => setSteps(removeStep(steps, i))}>
-              {t("settings.step_remove")}
-            </button>
-          </li>
-        ))}
-      </ol>
-      <button type="button" className="link reveal" onClick={() => setSteps(addStep(steps))}>
-        {t("settings.step_add")}
-      </button>
-      <p className="muted small">{t("settings.ladder_note")}</p>
-      {why && <p className="muted small">{t(`settings.ladder_${why}` as Key)}</p>}
-      {error && <p className="banner error">{error}</p>}
-      <div className="row">
-        <button type="button" className="primary" disabled={busy || why !== null || !ladderChanged(labels, steps)} onClick={() => void save()}>
-          {t("settings.save")}
-        </button>
-        <button type="button" disabled={busy} onClick={() => setSteps(null)}>
-          {t("settings.cancel")}
-        </button>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -273,7 +285,8 @@ export function TaskbagSettings({
 }: {
   messenger: Messenger;
   name: string;
-  labels: string[];
+  /** The project's label table. */
+  labels: LabelEntry[];
   taskLanguage: string | undefined;
   /** `project.json`'s format, for example `allomos/5`. */
   format: string;
@@ -343,8 +356,8 @@ export function TaskbagSettings({
                   }}
                 />
                 <Translate messenger={messenger} root={root} />
-                <h3>{t("settings.ladder")}</h3>
-                <Ladder
+                <h3>{t("settings.labels")}</h3>
+                <LabelTable
                   labels={labels}
                   onSave={async (steps) => {
                     await messenger.changeLadder(root, steps);
