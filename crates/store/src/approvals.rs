@@ -24,6 +24,10 @@ pub struct Input<'a> {
     pub expires: Option<&'a str>,
     /// The plan shown, as `(file name, its text)`; `None`: the tasks' descriptions.
     pub plan: Option<(&'a str, &'a str)>,
+    /// The description the person read before approving it (the app's Approve, Task-A01-baker800):
+    /// when the tasks' plan text is no longer exactly this, nothing is recorded
+    /// (`task_changed`), so a person never approves a plan they did not see. `None`: not checked.
+    pub shown: Option<&'a str>,
 }
 
 /// What [`approve`] or [`withdraw`] did.
@@ -68,6 +72,15 @@ pub fn approve(
     input: &Input,
 ) -> Result<Approved, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
+    if let (Some(shown), None) = (input.shown, input.plan) {
+        if approval::plan_text(&bag, input.tasks)? != shown {
+            let task = ops::find_task(&bag, input.tasks.first().map_or("", String::as_str))?;
+            return Err(Problem::TaskChanged {
+                version: ops::task_version(&task),
+                id: task.id,
+            });
+        }
+    }
     let id = format!("ap-{}", events::random_suffix());
     let pseudonym = match input.approver {
         Some(a) => Some(a.trim().to_string()).filter(|a| !a.is_empty()),
@@ -107,9 +120,16 @@ pub fn approve(
     })
 }
 
-/// Withdraw approval `id`: one `withdraw` event in each task it covers, under the lock. Refused
-/// for an ID no task records and for one already withdrawn.
-pub fn withdraw(root: &Path, actor: Actor, wait: Duration, id: &str) -> Result<Approved, Problem> {
+/// Withdraw approval `id`: one `withdraw` event in each task it covers, under the lock, with
+/// `reason` (the app's Withdraw asks for one; `alm withdraw --why` gives it through the change's
+/// who) as a `reason` change. Refused for an ID no task records and for one already withdrawn.
+pub fn withdraw(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    reason: Option<&str>,
+) -> Result<Approved, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
     let id = id.trim();
     let found = approval::all(&events::list(root).0, &bag, &today())
@@ -119,7 +139,10 @@ pub fn withdraw(root: &Path, actor: Actor, wait: Duration, id: &str) -> Result<A
     if found.withdrawn_at.is_some() {
         return Err(Problem::ApprovalAlreadyWithdrawn { id: id.to_string() });
     }
-    let change = approval::withdraw(&found.approval);
+    let mut changes = vec![approval::withdraw(&found.approval)];
+    if let Some(why) = reason.map(str::trim).filter(|r| !r.is_empty()) {
+        changes.push(allomos_core::event::reason_change(why));
+    }
     let mut tasks = Vec::new();
     for task_id in &found.approval.scope.tasks {
         // A task removed since keeps its history; the others get the event.
@@ -130,7 +153,7 @@ pub fn withdraw(root: &Path, actor: Actor, wait: Duration, id: &str) -> Result<A
             approval::WITHDRAW,
             Kind::Task,
             Some(&task.id),
-            vec![change.clone()],
+            changes.clone(),
         );
         event.approval = Some(found.approval.id.clone());
         lock.record(&event, |_| Ok(()))?;

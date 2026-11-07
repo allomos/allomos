@@ -6140,6 +6140,39 @@ fn an_approval_is_recorded_withdrawn_and_ends_when_the_plan_changes() {
 }
 
 #[test]
+fn an_approval_withdrawn_while_in_progress_is_pointed_out() {
+    // Task-A01-baker800 (approver, 2026-11-08): withdrawing stops nothing; `alm show` and
+    // `alm next` say so while the task is in progress, and the holder decides.
+    let repo = filled();
+    let v = ok(&repo, &["approve", "A01-01", "--words", "go"]);
+    let id = v["approval"]["id"].as_str().unwrap().to_string();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert!(shown["approval_withdrawn"].is_null(), "{shown}");
+    ok(&repo, &["--why", "wrong plan", "withdraw", &id]);
+    let shown = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(shown["approval_withdrawn"], id.as_str(), "{shown}");
+    assert_eq!(shown["task"]["state"], "in_progress");
+    let text = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(
+        text.contains("Approval withdrawn:") && text.contains("a decides"),
+        "{text}"
+    );
+    let next = ok(&repo, &["next"]);
+    assert_eq!(
+        next["approval_withdrawn"],
+        json!([{ "task": "A01-01", "approval": id }]),
+        "{next}"
+    );
+    let text = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(text.contains("Approval withdrawn:"), "{text}");
+    // A newer approval that applies: nothing to point out.
+    ok(&repo, &["approve", "A01-01", "--words", "go again"]);
+    let next = ok(&repo, &["next"]);
+    assert_eq!(next["approval_withdrawn"], json!([]), "{next}");
+}
+
+#[test]
 fn a_task_traces_to_requirements_and_decisions_and_back() {
     // Task-A01-fennel617 (decision 0021 § 1.1 "Traceability"): `alm trace` records the
     // requirements and decisions a task serves as a `traces` change in its history only;

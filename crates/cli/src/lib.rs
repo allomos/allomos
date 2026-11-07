@@ -3266,6 +3266,14 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .remove(&task.id)
                 .unwrap_or_default();
             text.push_str(&approve::lines(&approvals));
+            let withdrawn = allomos_core::approval::withdrawn_notice(&task, &approvals);
+            if let Some(r) = withdrawn {
+                text.push_str(&approve::withdrawn_line(
+                    &task.id,
+                    task.holder.as_deref(),
+                    r,
+                ));
+            }
             // Whoever takes over checks before trusting the handoff note and repeats nothing
             // (Task-A03-23).
             let taking_over = task.handoff_note.as_ref().map(|_| handoff::TAKING_OVER);
@@ -3283,7 +3291,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3403,6 +3411,21 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             }
             text.push_str(&instruction);
             text.push('\n');
+            // An approval withdrawn while a task is in progress (approver, 2026-11-08,
+            // Task-A01-baker800): said here too; the holder decides whether to stop.
+            let approvals = allomos_store::approvals::approvals(&root);
+            let mut withdrawn = Vec::new();
+            for t in bag.tasks.iter().filter(|t| {
+                iteration
+                    .as_ref()
+                    .is_none_or(|i| t.iteration.as_ref() == Some(i))
+            }) {
+                let list = approvals.get(&t.id).map(Vec::as_slice).unwrap_or_default();
+                if let Some(r) = allomos_core::approval::withdrawn_notice(t, list) {
+                    text.push_str(&approve::withdrawn_line(&t.id, t.holder.as_deref(), r));
+                    withdrawn.push(json!({ "task": t.id, "approval": r.approval.id }));
+                }
+            }
             // Blocked tasks are skipped by their state; `alm` tells when one may go on, or when a
             // blocker was dropped, and moves nothing (decision 0016).
             let mut blocked = Vec::new();
@@ -3464,6 +3487,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "instruction": instruction,
                     "taking_over": taking_over,
                     "blocked": blocked,
+                    "approval_withdrawn": withdrawn,
                     "handoff_rules": rules,
                     "project_notes": notes,
                     "cards_outside": outside,

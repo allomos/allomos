@@ -1462,6 +1462,19 @@ function TaskbagView({
     await messenger.reviewAiDecisions(opened.root, id);
     await onReload().catch(() => undefined);
   };
+  // Task-A01-baker800: Approve and Withdraw in the task pane (desktop only).
+  const approveTask = async (id: string, shown: string, expires: string | null, ready: boolean) => {
+    try {
+      await messenger.approveTask(opened.root, id, shown, expires, ready);
+    } finally {
+      // Approve and make ready may have recorded the approval before refusing the second step.
+      await onReload().catch(() => undefined);
+    }
+  };
+  const withdrawApproval = async (id: string, reason: string) => {
+    await messenger.withdrawApproval(opened.root, id, reason);
+    await onReload().catch(() => undefined);
+  };
 
   // New tasks, areas and iterations (Task-A01-19): one form open at a time, with the next free IDs
   // suggested, read again whenever the taskbag reloads.
@@ -1710,6 +1723,8 @@ function TaskbagView({
                 onSaveName={saveOwnerName}
                 onEdit={(edit) => editTask(selected.id, edit)}
                 onReview={() => reviewDecisions(selected.id)}
+                onApprove={canOpenSessions ? (shown, expires, ready) => approveTask(selected.id, shown, expires, ready) : undefined}
+                onWithdraw={canOpenSessions ? withdrawApproval : undefined}
                 nextIterationId={nextIds?.iteration ?? null}
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 folders={folders}

@@ -44,6 +44,7 @@ pub(crate) fn approve(cli: &Cli, cwd: &Path, args: &Args) -> Result<Done, Proble
             words: args.words,
             expires: args.expires,
             plan: plan.as_ref().map(|(n, t)| (n.as_str(), t.as_str())),
+            shown: None,
         },
     )?;
     let mut out = String::new();
@@ -84,7 +85,13 @@ pub(crate) fn approve(cli: &Cli, cwd: &Path, args: &Args) -> Result<Done, Proble
 
 pub(crate) fn withdraw(cli: &Cli, cwd: &Path, id: &str) -> Result<Done, Problem> {
     let root = locate(cli, cwd)?;
-    let a = approvals::withdraw(&root, Actor::alm(cli.holder.as_deref()), lock_wait(), id)?;
+    let a = approvals::withdraw(
+        &root,
+        Actor::alm(cli.holder.as_deref()),
+        lock_wait(),
+        id,
+        None,
+    )?;
     let mut out = String::new();
     for t in &a.tasks {
         out.push_str(&format!("{}\n", task_line(t)));
@@ -99,6 +106,19 @@ pub(crate) fn withdraw(cli: &Cli, cwd: &Path, id: &str) -> Result<Done, Problem>
     );
     done.issues = a.issues;
     Ok(done)
+}
+
+/// The line pointing out an approval withdrawn while task `id` is in progress (approver,
+/// 2026-11-08, Task-A01-baker800): `alm` says so; the holder decides whether to stop.
+pub(crate) fn withdrawn_line(id: &str, holder: Option<&str>, r: &Recorded) -> String {
+    format!(
+        "Approval withdrawn: {} on {} was withdrawn {} while {} is in progress. Withdrawing stops nothing by itself: {} decides whether to stop (`alm history {id}` says why).\n",
+        r.approval.id,
+        id,
+        r.withdrawn_at.as_deref().unwrap_or(""),
+        id,
+        holder.unwrap_or("whoever holds it"),
+    )
 }
 
 /// Where an approval stands, in words.
