@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nested filter mockup</title>
+<style>
+/* Colours and filter rules copied from apps/web/src/styles.css, so the panels look like the app. */
+:root {
+  --bg: #f3f6f9; --surface: #ffffff; --ink: #12223a; --muted: #5a6a7e; --line: #d6dee7;
+  --accent: #c97d14; --accent-ink: #8f5306; --ok: #1c7479; --ok-bg: #e3f2f2;
+  --warn: #9a5b07; --warn-bg: #fdf1df; --err: #a1302a; --err-bg: #fbe7e5; --info: #1f5fa8; --info-bg: #e6effa;
+  --s-backlog: #b5651d; --s-ready: #0a66ff; --s-in_progress: #12a150; --s-waiting: #9a7000;
+  --s-blocked: #e5161b; --s-done: #8b2cf5;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1420; --surface: #111d2e; --ink: #e5edf6; --muted: #93a5ba; --line: #22344a;
+    --accent: #f0a63a; --accent-ink: #f4bc63; --ok: #55b8be; --ok-bg: #12302f;
+    --warn: #f4bc63; --warn-bg: #33270f; --err: #f08a83; --err-bg: #3a1716; --info: #8cbcf0; --info-bg: #142a45;
+    --s-backlog: #f0a860; --s-ready: #5aa9ff; --s-in_progress: #3ddc84; --s-waiting: #ffd23f;
+    --s-blocked: #ff5c5c; --s-done: #b980ff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1420; --surface: #111d2e; --ink: #e5edf6; --muted: #93a5ba; --line: #22344a;
+  --accent: #f0a63a; --accent-ink: #f4bc63; --ok: #55b8be; --ok-bg: #12302f;
+  --warn: #f4bc63; --warn-bg: #33270f; --err: #f08a83; --err-bg: #3a1716; --info: #8cbcf0; --info-bg: #142a45;
+  --s-backlog: #f0a860; --s-ready: #5aa9ff; --s-in_progress: #3ddc84; --s-waiting: #ffd23f;
+  --s-blocked: #ff5c5c; --s-done: #b980ff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font); }
+button { font: 500 13px var(--font); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; }
+.small { font-size: 13px; }
+.s-backlog-text { color: var(--s-backlog); } .s-ready-text { color: var(--s-ready); } .s-in_progress-text { color: var(--s-in_progress); }
+.s-waiting-text { color: var(--s-waiting); } .s-blocked-text { color: var(--s-blocked); } .s-done-text { color: var(--s-done); }
+.s-dropped-text { color: var(--muted); text-decoration: line-through; }
+.state-filter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.filter-menu { display: inline-flex; align-items: center; gap: 6px; }
+.filter-button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
+.filter-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.filter-button.on { border-color: var(--accent); color: var(--accent-ink); }
+.filter-popover { width: max-content; max-width: 100%; overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px 8px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); margin-top: 6px; }
+.ptabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 2px; gap: 2px; margin: -6px -8px 6px; }
+.ptabs span { padding: 7px 12px 6px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ptabs span.on { color: var(--ink); font-weight: 650; border-bottom-color: var(--accent); }
+
+/* The nested panel: one row per state, that state's label ticks across it */
+.mx { border-collapse: collapse; font-size: 13px; }
+.mx th { font-weight: 400; color: var(--muted); font-size: 12px; padding: 2px 4px; }
+.mx th.lab { border-left: 1px solid var(--line); padding: 4px 6px 0; max-width: 112px; white-space: normal; line-height: 1.25; vertical-align: bottom; }
+.mx th.yn { font-size: 11px; }
+.mx th.yn:nth-child(odd) { border-left: 1px solid var(--line); }
+.mx td { text-align: center; padding: 3px 6px; }
+.mx td:nth-child(even) { border-left: 1px solid var(--line); }
+.mx td.st, .mx th.st { text-align: left; white-space: nowrap; padding-right: 12px; border-left: 0; }
+.mx td.na { color: var(--line); }
+/* Row colours: each state's row tinted with its state colour */
+.mx { --row-share: 11%; }
+.mx tr.r-backlog td { background: color-mix(in srgb, var(--s-backlog) var(--row-share), transparent); }
+.mx tr.r-ready td { background: color-mix(in srgb, var(--s-ready) var(--row-share), transparent); }
+.mx tr.r-in_progress td { background: color-mix(in srgb, var(--s-in_progress) var(--row-share), transparent); }
+.mx tr.r-waiting td { background: color-mix(in srgb, var(--s-waiting) calc(var(--row-share) + 4%), transparent); }
+.mx tr.r-blocked td { background: color-mix(in srgb, var(--s-blocked) var(--row-share), transparent); }
+.mx tr.r-done td { background: color-mix(in srgb, var(--s-done) var(--row-share), transparent); }
+.mx tr.r-dropped td { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+.mx tbody tr + tr td { border-top: 2px solid var(--surface); }
+.mx tbody tr td:first-child { border-radius: 6px 0 0 6px; }
+.mx tbody tr td:last-child { border-radius: 0 6px 6px 0; }
+.mx input { margin: 0; }
+.tri { display: inline-block; width: 16px; color: var(--muted); }
+.tri.all { color: var(--accent); } .tri.some { color: var(--accent); }
+
+/* Option A's column, for comparison */
+.filter-columns { display: flex; gap: 4px; }
+.filter-column { min-width: 0; padding: 0 4px; }
+.filter-column + .filter-column { border-left: 1px solid var(--line); }
+.filter-heading { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; padding: 4px 6px 6px; }
+.filter-row { display: flex; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13px; border-radius: 6px; white-space: nowrap; }
+.filter-label-name { flex: 1; min-width: 0; margin-right: 8px; white-space: normal; }
+.filter-side { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); padding: 1px 6px; border-radius: 6px; }
+.filter-child { padding-left: 22px; }
+.chg { background: var(--warn-bg); }
+.newcol { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0 0 6px; }
+.lead { color: var(--muted); margin: 0 0 22px; max-width: 840px; }
+section { margin-bottom: 36px; }
+h2 { font-size: 17px; margin: 0 0 4px; }
+.why { color: var(--muted); margin: 0 0 10px; max-width: 840px; }
+.why b { color: var(--ink); }
+.result { margin-top: 10px; font-size: 13px; padding: 8px 10px; border-radius: 8px; max-width: 840px; }
+.result.good { background: var(--ok-bg); color: var(--ok); }
+.result.warn { background: var(--warn-bg); color: var(--warn); }
+.rules { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); max-width: 840px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 14px; height: 12px; vertical-align: -1px; margin-right: 4px; border-radius: 3px; }
+</style>
+</head>
+<body><main>
+<h1>Nested Show filter (your design), next to A</h1>
+<p class="lead">In this design, the Custom tab is one row per state, with that state's label ticks across the row. A task is listed when it matches <b>any</b> tick in its state's row. The tick before each state just sums up its row: ☑ all, ▣ some, ☐ none. The two “by human” labels are one column, <b>Checked by a human</b>, and Waiting has an extra column, <b>Waits for me</b> (whom <code>alm wait --who</code> names).</p>
+
+<section>
+<h2>1. Default: every task</h2>
+<p class="why">Everything ticked, so every task in every state matches.</p>
+<div class="filter-menu"><span class="state-filter small">Show</span><button class="filter-button"><span>All tasks</span><svg viewBox="0 0 20 20"><path d="M5 8l5 5 5-5"/></svg></button></div>
+<div class="filter-popover">
+  <div class="ptabs"><span>Presets</span><span class="on">Custom</span></div>
+  <table class="mx"><thead><tr><th class="st">State</th><th colspan="2" class="lab">Checked by a human</th><th colspan="2" class="lab">locally verified by agent</th><th colspan="2" class="lab">deployed and verified by agent</th><th colspan="2" class="lab">AI decisions to review</th><th colspan="2" class="lab">Waits for me</th></tr><tr><th></th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th></tr></thead><tbody><tr class="r-backlog"><td class="st"><span class="tri all">☑</span> <span class="s-backlog-text">Backlog</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-ready"><td class="st"><span class="tri all">☑</span> <span class="s-ready-text">Ready</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-in_progress"><td class="st"><span class="tri all">☑</span> <span class="s-in_progress-text">In progress</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-waiting"><td class="st"><span class="tri all">☑</span> <span class="s-waiting-text">Waiting</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td></tr><tr class="r-blocked"><td class="st"><span class="tri all">☑</span> <span class="s-blocked-text">Blocked</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-done"><td class="st"><span class="tri all">☑</span> <span class="s-done-text">Done</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-dropped"><td class="st"><span class="tri all">☑</span> <span class="s-dropped-text">Dropped</span></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr></tbody></table>
+</div>
+</section>
+
+<section>
+<h2>2. After picking “Needs you” in Presets</h2>
+<p class="why">The preset unticks everything except the ticks listed below.</p>
+<ul class="rules">
+  <li><b>Done:</b> “Checked by a human: No” (① to try out) and “AI decisions to review: Yes” (③).</li>
+  <li><b>Waiting:</b> “Waits for me: Yes” (② to answer) and “AI decisions to review: Yes” (③).</li>
+  <li><b>The other five states:</b> “AI decisions to review: Yes” (③).</li>
+</ul>
+<div class="filter-menu" style="margin-top:10px"><span class="state-filter small">Show</span><button class="filter-button on"><span>Needs you</span><svg viewBox="0 0 20 20"><path d="M5 8l5 5 5-5"/></svg></button></div>
+<div class="filter-popover">
+  <div class="ptabs"><span>Presets</span><span class="on">Custom</span></div>
+  <table class="mx"><thead><tr><th class="st">State</th><th colspan="2" class="lab">Checked by a human</th><th colspan="2" class="lab">locally verified by agent</th><th colspan="2" class="lab">deployed and verified by agent</th><th colspan="2" class="lab">AI decisions to review</th><th colspan="2" class="lab">Waits for me</th></tr><tr><th></th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th></tr></thead><tbody><tr class="r-backlog"><td class="st"><span class="tri some">▣</span> <span class="s-backlog-text">Backlog</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-ready"><td class="st"><span class="tri some">▣</span> <span class="s-ready-text">Ready</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-in_progress"><td class="st"><span class="tri some">▣</span> <span class="s-in_progress-text">In progress</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-waiting"><td class="st"><span class="tri some">▣</span> <span class="s-waiting-text">Waiting</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td></tr><tr class="r-blocked"><td class="st"><span class="tri some">▣</span> <span class="s-blocked-text">Blocked</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-done"><td class="st"><span class="tri some">▣</span> <span class="s-done-text">Done</span></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-dropped"><td class="st"><span class="tri some">▣</span> <span class="s-dropped-text">Dropped</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr></tbody></table>
+</div>
+<p class="result good">Matches ① ② ③ with no gap. A Done task you checked but whose AI decisions you haven't reviewed shows, through the “AI decisions to review: Yes” tick in the Done row.</p>
+</section>
+
+<section>
+<h2>3. An everyday filter: unfinished tasks without AI decisions</h2>
+<p class="why">To see how ticks feel day to day. Today you'd untick Done and Dropped, and untick “Yes” on “AI decisions to review”: three clicks. Here you keep only “AI decisions to review: No” in each unfinished row, and nothing in Done or Dropped.</p>
+<div class="filter-popover">
+  <div class="ptabs"><span>Presets</span><span class="on">Custom</span></div>
+  <table class="mx"><thead><tr><th class="st">State</th><th colspan="2" class="lab">Checked by a human</th><th colspan="2" class="lab">locally verified by agent</th><th colspan="2" class="lab">deployed and verified by agent</th><th colspan="2" class="lab">AI decisions to review</th><th colspan="2" class="lab">Waits for me</th></tr><tr><th></th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th><th class="yn">Yes</th><th class="yn">No</th></tr></thead><tbody><tr class="r-backlog"><td class="st"><span class="tri some">▣</span> <span class="s-backlog-text">Backlog</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-ready"><td class="st"><span class="tri some">▣</span> <span class="s-ready-text">Ready</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-in_progress"><td class="st"><span class="tri some">▣</span> <span class="s-in_progress-text">In progress</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-waiting"><td class="st"><span class="tri some">▣</span> <span class="s-waiting-text">Waiting</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td></tr><tr class="r-blocked"><td class="st"><span class="tri some">▣</span> <span class="s-blocked-text">Blocked</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td><input type="checkbox" checked></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-done"><td class="st"><span class="tri none">☐</span> <span class="s-done-text">Done</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr><tr class="r-dropped"><td class="st"><span class="tri none">☐</span> <span class="s-dropped-text">Dropped</span></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="chg"><input type="checkbox"></td><td class="na">–</td><td class="na">–</td></tr></tbody></table>
+</div>
+<p class="result warn">It works, but it takes many more clicks: each row is its own small filter. Buttons per column (“tick this in every state”) would help.</p>
+</section>
+
+<section>
+<h2>For comparison: A, after picking “Needs you”</h2>
+<p class="why">Today's panel unchanged, plus one new column on the right. Inside that column, the three kinds count as “or”.</p>
+<div class="filter-popover">
+  <div class="ptabs"><span>Presets</span><span class="on">Custom</span></div>
+  <div class="filter-columns">
+    <div class="filter-column">
+      <div class="filter-heading"><span>State</span></div>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-backlog-text">Backlog</span></label>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-ready-text">Ready</span></label>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-in_progress-text">In progress</span></label>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-waiting-text">Waiting</span></label>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-blocked-text">Blocked</span></label>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-done-text">Done</span></label>
+      <label class="filter-row"><input type="checkbox" checked><span class="s-dropped-text">Dropped</span></label>
+    </div>
+    <div class="filter-column">
+      <div class="filter-heading"><span>Labels</span></div>
+      <div class="filter-row"><span class="filter-label-name">Labeled</span><label class="filter-side"><input type="checkbox" checked>Yes</label><label class="filter-side"><input type="checkbox" checked>No</label></div>
+      <div class="filter-row filter-child"><span class="filter-label-name">… every label, Yes and No ticked</span><label class="filter-side"><input type="checkbox" checked>Yes</label><label class="filter-side"><input type="checkbox" checked>No</label></div>
+    </div>
+    <div class="filter-column newcol">
+      <div class="filter-heading"><span>Needs you (new)</span></div>
+      <div class="filter-row"><span class="filter-label-name">Needs you</span><label class="filter-side"><input type="checkbox" checked>Yes</label><label class="filter-side chg"><input type="checkbox">No</label></div>
+      <label class="filter-row filter-child"><input type="checkbox" checked>To check</label>
+      <label class="filter-row filter-child"><input type="checkbox" checked>To answer</label>
+      <label class="filter-row filter-child"><input type="checkbox" checked>To review</label>
+    </div>
+  </div>
+</div>
+<p class="result good">Also matches ① ② ③ exactly. Everyday filters stay as they are today.</p>
+</section>
+
+<p class="legend"><span><i style="background:var(--warn-bg)"></i>in A: a tick the preset changed</span><span>row colour = the state's own colour</span><span>– not used in that state</span></p>
+</main></body></html>

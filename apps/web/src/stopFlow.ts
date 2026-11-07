@@ -187,40 +187,86 @@ export function withDecisions(opened: Opened): Opened {
 }
 
 /**
- * The list's filter (Task-A01-lens781; decision 0020, Task-A01-petal376): ticks in two groups,
- * states and labels; a task is listed when its state is ticked and, for each label of the
- * project's label table, its side is ticked: Yes when the task has that label, No when it does
- * not. Every label is plain: no order, no "this one or higher". Everything ticked is no filter at
- * all. Kept as what is unticked, so a state or label new to the list starts ticked; `labels` are
- * the table's names, built-in first, filled in when the list draws. Labeled (Task-A01-teacup726)
- * comes first: its Yes keeps tasks that carry a label, its No those that carry none; a task with
- * no label is decided by Labeled's No alone, and each label's sides apply only to labelled tasks.
+ * The list's filter (Task-A01-lens781; decision 0020; Task-A01-rock075): a grid with one row per
+ * state and, across each row, a Yes and a No for each column. The columns are "Checked by a human"
+ * (the two "by human" labels together: Yes when the task carries either, No when it carries
+ * neither), then every other label of the project's label table, built-in first. A task is listed
+ * when it matches any ticked cell of its own state's row: Yes when it has that column's label, No
+ * when it does not. So everything ticked lists every task, and a row with nothing ticked lists
+ * none of that state's tasks. The tick before a state only sums up its row. Kept as the unticked
+ * cells, so a label new to the table starts ticked in every row; `labels` are the table's names,
+ * built-in first, filled in when the list draws.
  */
-export type StateFilter = { states: State[]; labeled: Side[]; yes: string[]; no: string[]; labels: string[] };
+export type StateFilter = { off: Cell[]; labels: string[] };
+
+/** One tick of the grid: a state's row, a column, its Yes or No. */
+export type Cell = { state: State; column: string; side: Side };
+
+/** One side of a column's tick. */
+export type Side = "yes" | "no";
+
+export const SIDES: Side[] = ["yes", "no"];
 
 export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
 
+/** The "Checked by a human" column's name in the grid; no label is named with the empty word. */
+export const HUMAN_COLUMN = "";
+
 /** Everything ticked: every task listed. */
 export function allTicked(labels: readonly string[] = []): StateFilter {
-  return { states: [], labeled: [], yes: [], no: [], labels: [...labels] };
+  return { off: [], labels: [...labels] };
 }
 
-/** One side of a label's tick. */
-export type Side = "yes" | "no";
+/** The grid's columns: "Checked by a human" first, then every other label of the table. */
+export function filterColumns(filter: Pick<StateFilter, "labels">): string[] {
+  return [HUMAN_COLUMN, ...filter.labels.filter((l) => !BY_HUMAN.includes(l))];
+}
 
-const SIDES: Side[] = ["yes", "no"];
+/** A column's heading in the interface language. */
+export function columnText(column: string, t: T): string {
+  return column === HUMAN_COLUMN ? t("filter.human") : labelText(column, t);
+}
 
-/** The filter for this label table: unticked labels no longer in it are let go (so are an older
- * build's ladder steps, which `allomos/7` renamed). */
+/** Which side of a column a task is on: Yes when it has that column's label ("by human": either one). */
+export function sideOf(task: Task, column: string): Side {
+  const has = column === HUMAN_COLUMN ? humanChecked(task) : hasLabel(task, column);
+  return has ? "yes" : "no";
+}
+
+const cellKey = (state: State, column: string, side: Side) => `${state}\u0000${column}\u0000${side}`;
+
+/** The filter's unticked cells as keys and its columns, worked out once per filter (the list asks
+ * for every task, so a big taskbag stays quick). */
+const looked = new WeakMap<StateFilter, { off: Set<string>; columns: string[] }>();
+function lookup(filter: StateFilter): { off: Set<string>; columns: string[] } {
+  let found = looked.get(filter);
+  if (!found) {
+    found = { off: new Set(filter.off.map((c) => cellKey(c.state, c.column, c.side))), columns: filterColumns(filter) };
+    looked.set(filter, found);
+  }
+  return found;
+}
+
+/** Whether a cell is ticked. */
+export function isTicked(filter: StateFilter, state: State, column: string, side: Side): boolean {
+  return !lookup(filter).off.has(cellKey(state, column, side));
+}
+
+/** The filter with these cells unticked, in the grid's order (rows, then columns, then Yes, No). */
+function withOff(filter: StateFilter, off: Set<string>): StateFilter {
+  const columns = filterColumns(filter);
+  const cells: Cell[] = [];
+  for (const state of FILTER_STATES)
+    for (const column of columns) for (const side of SIDES) if (off.has(cellKey(state, column, side))) cells.push({ state, column, side });
+  return { off: cells, labels: filter.labels };
+}
+
+/** The filter for this label table: unticked cells of columns no longer in it are let go. */
 export function onTable(filter: StateFilter, labels: readonly string[]): StateFilter {
-  const keep = (list: string[]) => list.filter((l) => labels.includes(l));
-  return {
-    states: filter.states.filter((s) => FILTER_STATES.includes(s)),
-    labeled: SIDES.filter((s) => filter.labeled.includes(s)),
-    yes: keep(filter.yes),
-    no: keep(filter.no),
-    labels: [...labels],
-  };
+  const table = { off: [], labels: [...labels] };
+  const columns = filterColumns(table);
+  const keep = filter.off.filter((c) => FILTER_STATES.includes(c.state) && columns.includes(c.column) && SIDES.includes(c.side));
+  return withOff(table, new Set(keep.map((c) => cellKey(c.state, c.column, c.side))));
 }
 
 /** The list's filter for an opened project: the stored ticks on the project's label table, by
@@ -233,89 +279,86 @@ export function tableFilter(stored: StateFilter, project: Pick<Project, "labels"
 
 /** Whether nothing is unticked. */
 export function isAll(filter: StateFilter): boolean {
-  return filter.states.length === 0 && filter.labeled.length === 0 && filter.yes.length === 0 && filter.no.length === 0;
+  return filter.off.length === 0;
 }
 
-/** The tasks the filter keeps: its state ticked; with no label, Labeled's No ticked; with labels,
- * Labeled's Yes ticked and, for every label in the table, Yes ticked if the task has it, No if not. */
+/** The tasks the filter keeps: those matching any ticked cell of their own state's row. */
 export function keepState(filter: StateFilter, task: Task): boolean {
-  if (filter.states.includes(task.state)) return false;
-  const has = taskLabels(task);
-  if (has.length === 0) return !filter.labeled.includes("no");
-  if (filter.labeled.includes("yes")) return false;
-  return filter.labels.every((label) => !(has.includes(label) ? filter.yes : filter.no).includes(label));
+  if (filter.off.length === 0) return true;
+  const { off, columns } = lookup(filter);
+  return columns.some((column) => !off.has(cellKey(task.state, column, sideOf(task, column))));
 }
 
-/** A state ticked or unticked. */
-export function tickState(filter: StateFilter, state: State, on: boolean): StateFilter {
-  const states = filter.states.filter((s) => s !== state);
-  return { ...filter, states: on ? states : FILTER_STATES.filter((s) => s === state || states.includes(s)) };
+/** One cell ticked or unticked. */
+export function tickCell(filter: StateFilter, state: State, column: string, side: Side, on: boolean): StateFilter {
+  const off = new Set(lookup(filter).off);
+  if (on) off.delete(cellKey(state, column, side));
+  else off.add(cellKey(state, column, side));
+  return withOff(filter, off);
 }
 
-/** One side of Labeled ticked or unticked; each label's ticks stay as they were. */
-export function tickLabeled(filter: StateFilter, side: Side, on: boolean): StateFilter {
-  const list = filter.labeled.filter((s) => s !== side);
-  return { ...filter, labeled: on ? list : SIDES.filter((s) => s === side || list.includes(s)) };
+/** How a state's row is ticked, which the tick before the state shows: all, some or none. */
+export type RowTicks = "all" | "some" | "none";
+
+export function rowTicks(filter: StateFilter, state: State): RowTicks {
+  const { off, columns } = lookup(filter);
+  const unticked = columns.reduce((n, column) => n + SIDES.filter((side) => off.has(cellKey(state, column, side))).length, 0);
+  return unticked === 0 ? "all" : unticked === columns.length * SIDES.length ? "none" : "some";
 }
 
-/** Whether the labels' rows are greyed out: Labeled's Yes is unticked, so no labelled task is shown. */
-export function labelsOff(filter: StateFilter): boolean {
-  return filter.labeled.includes("yes");
+/** A whole row ticked or unticked (the tick before the state). */
+export function tickRow(filter: StateFilter, state: State, on: boolean): StateFilter {
+  const off = new Set(lookup(filter).off);
+  for (const column of filterColumns(filter))
+    for (const side of SIDES) {
+      if (on) off.delete(cellKey(state, column, side));
+      else off.add(cellKey(state, column, side));
+    }
+  return withOff(filter, off);
 }
 
-/** One side of a label ticked or unticked. */
-export function tickLabel(filter: StateFilter, label: string, side: Side, on: boolean): StateFilter {
-  const list = filter[side].filter((l) => l !== label);
-  return { ...filter, [side]: on ? list : filter.labels.filter((l) => l === label || list.includes(l)) };
+/** The whole grid ticked (Select all) or unticked (Clear all). */
+export function tickAll(filter: StateFilter, on: boolean): StateFilter {
+  if (on) return { off: [], labels: filter.labels };
+  return withOff(filter, new Set(FILTER_STATES.flatMap((s) => filterColumns(filter).flatMap((c) => SIDES.map((side) => cellKey(s, c, side))))));
 }
 
-/** A whole group ticked (Select all) or unticked (Clear all). */
-export function tickGroup(filter: StateFilter, group: "states" | "labels", on: boolean): StateFilter {
-  if (group === "states") return { ...filter, states: on ? [] : [...FILTER_STATES] };
-  return { ...filter, labeled: on ? [] : [...SIDES], yes: on ? [] : [...filter.labels], no: on ? [] : [...filter.labels] };
+/** Whether the grid is all ticked, or all unticked: the grey Select all, the grey Clear all. */
+export function gridTicks(filter: StateFilter): { all: boolean; none: boolean } {
+  return { all: filter.off.length === 0, none: FILTER_STATES.every((s) => rowTicks(filter, s) === "none") };
 }
 
-/** Whether a group is all ticked, or all unticked: the grey Select all, the grey Clear all. */
-export function groupTicks(filter: StateFilter, group: "states" | "labels"): { all: boolean; none: boolean } {
-  if (group === "states") return { all: filter.states.length === 0, none: filter.states.length === FILTER_STATES.length };
-  const off = filter.labeled.length + filter.yes.length + filter.no.length;
-  return { all: off === 0, none: off === (filter.labels.length + 1) * 2 };
+/** Whether the filter lists no task at all, whatever the tasks: nothing ticked in any row. */
+export function emptyBy(filter: StateFilter): boolean {
+  return gridTicks(filter).none;
 }
 
-/** Why the filter lists no task at all, whatever the tasks: no state ticked, Labeled with neither
- * side ticked, or, with Labeled's No unticked, a label with neither side; `null` when it can list some. */
-export function emptyBy(filter: StateFilter): { kind: "states" } | { kind: "labeled" } | { kind: "label"; label: string } | null {
-  if (filter.states.length === FILTER_STATES.length) return { kind: "states" };
-  if (filter.labeled.length === SIDES.length) return { kind: "labeled" };
-  if (!filter.labeled.includes("no")) return null;
-  const label = filter.labels.find((l) => filter.yes.includes(l) && filter.no.includes(l));
-  return label === undefined ? null : { kind: "label", label };
-}
-
-/** The filter as stored: what is unticked. */
+/** The filter as stored: the unticked cells, each as [state, column, side]. */
 export function storeFilter(filter: StateFilter): string {
-  return JSON.stringify({ states: filter.states, labeled: filter.labeled, yes: filter.yes, no: filter.no });
+  return JSON.stringify({ grid: filter.off.map((c) => [c.state, c.column, c.side]) });
 }
 
 /**
- * A stored filter read back; anything else is everything ticked. Before Task-A01-lens781 the filter
- * was one choice (`old`): a state comes back as that state alone, the rest (all, open, human) as
- * everything ticked.
+ * A stored filter read back; anything else is everything ticked. A filter stored before the grid
+ * (Task-A01-rock075: states and labels joined by "and"; before Task-A01-lens781 a single choice)
+ * comes back as everything ticked too.
  */
-export function readFilter(value: string | null, old: string | null = null): StateFilter {
-  const words = (x: unknown) => (Array.isArray(x) ? x.filter((w): w is string => typeof w === "string") : []);
-  if (value) {
-    try {
-      const v = JSON.parse(value) as Record<string, unknown>;
-      const states = words(v.states).filter((s): s is State => (FILTER_STATES as string[]).includes(s));
-      const labeled = SIDES.filter((s) => words(v.labeled).includes(s));
-      return { states, labeled, yes: words(v.yes), no: words(v.no), labels: [] };
-    } catch {
-      return allTicked();
+export function readFilter(value: string | null): StateFilter {
+  if (!value) return allTicked();
+  try {
+    const v = JSON.parse(value) as Record<string, unknown>;
+    if (!Array.isArray(v.grid)) return allTicked();
+    const off: Cell[] = [];
+    for (const c of v.grid) {
+      if (!Array.isArray(c) || c.length !== 3) continue;
+      const [state, column, side] = c as unknown[];
+      if (!(FILTER_STATES as unknown[]).includes(state) || typeof column !== "string" || !(SIDES as unknown[]).includes(side)) continue;
+      off.push({ state: state as State, column, side: side as Side });
     }
+    return { off, labels: [] };
+  } catch {
+    return allTicked();
   }
-  if (old && (FILTER_STATES as string[]).includes(old)) return { ...allTicked(), states: FILTER_STATES.filter((s) => s !== old) };
-  return allTicked();
 }
 
 /** What the filter leaves out of a list of tasks: how many, and how many in each state, in the
@@ -336,18 +379,18 @@ export function hiddenText(hidden: Hidden, t: T): string {
   return t("filter.hidden", { count: hidden.count, states });
 }
 
-/** The unticked boxes by name, in the panel's order: states, Labeled's Yes and No, then each
- * label's Yes and No, unless the labels are greyed out (their ticks then hide nothing). */
+/** The unticked boxes by name, in the grid's order: a row with nothing ticked by its state's name,
+ * otherwise each unticked cell ("Done · Checked by a human: no"). */
 export function untickedNames(filter: StateFilter, t: T): string[] {
-  const side = (label: string, s: Side) => t(`filter.side_${s}`, { label: labelText(label, t) });
-  return [
-    ...FILTER_STATES.filter((s) => filter.states.includes(s)).map((s) => t(`state.${s}` as Key)),
-    ...SIDES.filter((s) => filter.labeled.includes(s)).map((s) => t(`filter.side_${s}`, { label: t("filter.labeled") })),
-    ...(labelsOff(filter) ? [] : filter.labels).flatMap((l) => [
-      ...(filter.yes.includes(l) ? [side(l, "yes")] : []),
-      ...(filter.no.includes(l) ? [side(l, "no")] : []),
-    ]),
-  ];
+  return FILTER_STATES.flatMap((state) => {
+    const ticks = rowTicks(filter, state);
+    const name = t(`state.${state}` as Key);
+    if (ticks === "all") return [];
+    if (ticks === "none") return [name];
+    return filter.off
+      .filter((c) => c.state === state)
+      .map((c) => t("filter.cell", { state: name, cell: t(`filter.side_${c.side}`, { label: columnText(c.column, t) }) }));
+  });
 }
 
 /** The filter's name as the Show button words it: "All tasks", "Hide Backlog, Dropped", "Filtered (3 hidden)". */
