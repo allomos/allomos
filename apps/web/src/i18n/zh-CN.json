@@ -568,6 +568,7 @@
   "filter.preset.finished": "结束了的",
   "filter.preset_ticks.all": "所有状态，全部勾选",
   "filter.preset_ticks.needs_you": "已完成但人还没检查的、所有等待中的，以及有 AI 决定待审阅的任务",
+  "filter.close": "关闭：筛选保持不变",
   "filter.restore": "全部恢复：显示全部任务",
   "filter.verb.match_one": "符合筛选条件",
   "filter.verb.match_other": "符合筛选条件",
