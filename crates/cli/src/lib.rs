@@ -375,6 +375,25 @@ enum Command {
     },
     /// A task's outside effects; with none given, every one in the project, by task.
     Effects { id: Option<String> },
+    /// Record a task's change type and risk (decision 0021): --type standard (pre-approved
+    /// routine), normal (approved before) or emergency (made first, approved afterwards by a
+    /// deadline, --due, three days by default); --risk low, medium or high; --touches production,
+    /// others-data, or none. Without options, shows what is recorded. `alm human` lists
+    /// emergencies not approved afterwards.
+    Classify {
+        id: String,
+        #[arg(long = "type", value_name = "standard|normal|emergency")]
+        change_type: Option<String>,
+        #[arg(long, value_name = "low|medium|high")]
+        risk: Option<String>,
+        /// What it touches: production, others-data (other people's data), or none. Repeatable
+        /// or comma-separated; replaces what was recorded.
+        #[arg(long, value_name = "production|others-data|none")]
+        touches: Vec<String>,
+        /// For an emergency: the last day (YYYY-MM-DD) to record its approval.
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        due: Option<String>,
+    },
     /// Show one task in full.
     Show { id: String },
     /// Fill in or correct the session a task records, afterwards (Task-A03-ham538): each option
@@ -968,6 +987,7 @@ impl Command {
             Command::Withdraw { .. } => None,
             Command::Effect { id, .. } => Some(id),
             Command::Effects { .. } => None,
+            Command::Classify { id, .. } => Some(id),
             Command::Init { .. }
             | Command::Labels { .. }
             | Command::Project { .. }
@@ -1110,6 +1130,7 @@ impl Command {
             Command::Withdraw { .. } => "withdraw",
             Command::Effect { .. } => "effect",
             Command::Effects { .. } => "effects",
+            Command::Classify { .. } => "classify",
             Command::Human { .. } => "human",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
@@ -2236,6 +2257,13 @@ fn human(
             text.push_str(&format!("    {line}\n"));
         }
     }
+    // Task-A01-palm011: emergency changes not approved afterwards.
+    let emergencies = allomos_store::classify::unapproved(root);
+    text.push_str(&classify::human_section(bag, &tasks, &emergencies));
+    let emergencies: Vec<&allomos_core::classify::Unapproved> = emergencies
+        .iter()
+        .filter(|u| tasks.iter().any(|t| t.id == u.task))
+        .collect();
     if !to_check.is_empty() {
         text.push_str("\nOnce a person has checked a task: `alm checked <id>`.\n");
     }
@@ -2257,7 +2285,7 @@ fn human(
         })
         .collect();
     Ok(Done::new(
-        json!({ "taskbag": root, "to_check": list(&to_check), "to_answer": list(&to_answer), "to_review": review }),
+        json!({ "taskbag": root, "to_check": list(&to_check), "to_answer": list(&to_answer), "to_review": review, "to_approve_afterwards": emergencies }),
         text,
     ))
 }
@@ -2275,6 +2303,7 @@ fn decision_lines(decisions: &[Decision]) -> String {
 
 /// One line about a task: ID, state, label, holder, title.
 mod approve;
+mod classify;
 mod effects;
 mod folders;
 mod links;
@@ -3385,6 +3414,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .remove(&task.id)
                 .unwrap_or_default();
             text.push_str(&approve::lines(&approvals));
+            let classification = allomos_store::classify::by_task(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            text.push_str(&classify::lines(&task.id, &classification, &approvals));
             let outside_effects = allomos_store::effects::by_task(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
@@ -3418,7 +3451,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "effects": outside_effects, "links": task_links, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "links": task_links, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3962,6 +3995,23 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             },
         ),
         Command::Effects { id } => effects::list(cli, cwd, id.as_deref()),
+        Command::Classify {
+            id,
+            change_type,
+            risk,
+            touches,
+            due,
+        } => classify::classify(
+            cli,
+            cwd,
+            id,
+            &allomos_core::classify::Given {
+                change_type: change_type.as_deref(),
+                risk: risk.as_deref(),
+                touches: (!touches.is_empty()).then_some(&touches[..]),
+                due: due.as_deref(),
+            },
+        ),
         Command::Link {
             id,
             kind,

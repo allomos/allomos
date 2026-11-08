@@ -9,6 +9,7 @@ pub mod audit;
 pub mod branch;
 pub mod canonical;
 pub mod card;
+pub mod classify;
 pub mod decision;
 pub mod duties;
 pub mod effect;

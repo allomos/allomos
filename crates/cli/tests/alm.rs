@@ -6784,3 +6784,183 @@ fn a_task_links_to_its_code_and_releases_and_back() {
     let v = ok(&repo, &["show", "A01-01"]);
     assert_eq!(v["links"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn a_task_has_a_change_type_and_risk_and_emergencies_are_listed_until_approved_afterwards() {
+    // Task-A01-palm011 (decision 0021 § 1.1 "Risk class and change type"): `alm classify`
+    // records the change type, risk and what a task touches as changes in its history only;
+    // `alm show` lists them; an emergency without an approval recorded afterwards is listed by
+    // `alm human` (with its deadline) until `alm approve` records one.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &["--as", "a", "classify", "A01-01", "--type", "urgent"],
+        1,
+        "classify_invalid",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "classify", "A01-01", "--risk", "critical"],
+        1,
+        "classify_invalid",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "classify", "A01-01", "--touches", "prod"],
+        1,
+        "classify_invalid",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "classify", "A01-01", "--risk", "low"],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "classify",
+            "A01-01",
+            "--type",
+            "normal",
+            "--due",
+            "2026-11-11",
+        ],
+        2,
+        "bad_usage",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "classify",
+            "A01-01",
+            "--type",
+            "emergency",
+            "--due",
+            "soon",
+        ],
+        1,
+        "invalid_date",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    // Nothing recorded yet: alm says how.
+    let v = ok(&repo, &["classify", "A01-01"]);
+    assert_eq!(v["classification"], json!({}));
+    assert_eq!(event_count(&repo), events, "showing records nothing");
+
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "classify",
+            "A01-01",
+            "--type",
+            "Normal",
+            "--risk",
+            "medium",
+            "--touches",
+            "others-data,production",
+        ],
+    );
+    assert_eq!(
+        v["classification"],
+        json!({ "change_type": "normal", "risk": "medium", "touches": ["production", "others_data"] })
+    );
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "classify");
+    let fields: Vec<&str> = last["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["field"].as_str().unwrap())
+        .collect();
+    assert_eq!(fields, vec!["change_type", "risk", "touches"]);
+
+    // The same again records nothing.
+    let events = event_count(&repo);
+    ok(
+        &repo,
+        &["--as", "a", "classify", "A01-01", "--risk", "medium"],
+    );
+    assert_eq!(event_count(&repo), events);
+    let v = ok(&repo, &["human"]);
+    assert_eq!(v["to_approve_afterwards"], json!([]));
+
+    // An emergency, past its deadline: listed by alm human, shown by alm show.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "classify",
+            "A01-01",
+            "--type",
+            "emergency",
+            "--due",
+            "2000-01-01",
+            "--touches",
+            "none",
+        ],
+    );
+    assert_eq!(v["classification"]["approval_due"], "2000-01-01");
+    assert_eq!(
+        v["classification"]["touches"],
+        Value::Null,
+        "touches neither: an empty list"
+    );
+    let v = ok(&repo, &["human"]);
+    let list = v["to_approve_afterwards"].as_array().unwrap();
+    assert_eq!(list.len(), 1, "{v}");
+    assert_eq!(list[0]["task"], "A01-01");
+    assert_eq!(list[0]["overdue"], true);
+    let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(
+        out.contains("To approve afterwards: emergency changes (1)"),
+        "{out}"
+    );
+    assert!(out.contains("(past due)"), "{out}");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(out.contains("change type: emergency"), "{out}");
+    assert!(out.contains("touches: neither"), "{out}");
+    assert!(out.contains("not approved afterwards yet"), "{out}");
+
+    // Approved afterwards: no longer listed.
+    ok(&repo, &["approve", "A01-01", "--words", "fine, keep it"]);
+    let v = ok(&repo, &["human"]);
+    assert_eq!(v["to_approve_afterwards"], json!([]), "{v}");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(out.contains("emergency: approved afterwards"), "{out}");
+
+    // Leaving emergency clears the deadline; a new emergency without --due gets three days.
+    let v = ok(
+        &repo,
+        &["--as", "a", "classify", "A01-01", "--type", "standard"],
+    );
+    assert_eq!(v["classification"]["approval_due"], Value::Null);
+    let out = alm_at(
+        &repo,
+        "2026-12-30T10:00:00Z",
+        &[
+            "--json",
+            "--as",
+            "a",
+            "classify",
+            "A01-02",
+            "--type",
+            "emergency",
+        ],
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["classification"]["approval_due"], "2027-01-02", "{v}");
+}
