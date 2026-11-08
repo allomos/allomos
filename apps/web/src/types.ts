@@ -397,6 +397,26 @@ export interface AuditSettings {
   legal_hold: boolean;
   /** Where this computer keeps who is behind its pseudonyms; null without a settings folder. */
   identities_file: string | null;
+  /** The taskbag's checkpoints (Task-A01-tail719): how many, the newest, and receipts from an outside witness. */
+  checkpoints: { count: number; last: { file: string; at: string } | null; receipts: number };
+  /** Where this computer keeps its signing key; "none": no checkpoint can be made here. */
+  signing: SigningStore;
+}
+
+export type SigningStore = "keychain" | "folder" | "none";
+
+/** What Remove personal details… did (Task-A01-tail719, as `alm redact`): null when nothing was to remove. */
+export interface RedactDone {
+  redaction: { id: string; fields: string[]; files: { file: string; fields: string[] }[]; approved_by?: string } | null;
+}
+
+/** Settings → This computer (Task-A01-tail719, decision 0021 § 6). */
+export interface ThisComputer {
+  store: SigningStore;
+  /** This computer's key, once its first signed change made one. */
+  key: { id: string; public_key: string } | null;
+  /** Last seen history: the last checkpoint seen per project, matched to a recent folder when one is that project. */
+  seen: { project: string; checkpoint: string; seen_at: string; folder: string | null; still_there: boolean | null }[];
 }
 
 export interface HandoffSettings {

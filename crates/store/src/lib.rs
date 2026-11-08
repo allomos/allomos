@@ -51,6 +51,7 @@ pub mod trail;
 mod translate;
 mod update_taskbag;
 pub mod versions;
+pub use signing::{ThisComputer, ThisKey, public_key_export, this_computer};
 pub use confirm::{
     ConfirmRequest, Extra as ConfirmExtra, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm,
     pending_confirms, post_confirm, read_answer, requests_dir, shown_fingerprint, was_seen,

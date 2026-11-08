@@ -403,3 +403,48 @@ pub(crate) fn head(root: &Path, key: &str) -> Option<String> {
     }
     crate::trail::tips(root).remove(key).map(|(_, fp)| fp)
 }
+
+/// This computer's signing key as Settings → This computer shows it (Task-A01-tail719, decision
+/// 0021 § 6): its ID and public key, never the private key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ThisComputer {
+    /// Where the private key is kept: `keychain` (macOS), `folder` (a trial run's settings
+    /// folder) or `none` (no key store here: events are written unsigned).
+    pub store: &'static str,
+    /// The key, once one is made; `None` before this computer's first signed change.
+    pub key: Option<ThisKey>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ThisKey {
+    /// `k-` and the first 16 hexadecimal digits of the public key's SHA-256.
+    pub id: String,
+    /// The 32-byte public key, in hexadecimal.
+    pub public_key: String,
+}
+
+/// This computer's key, read without making one (a key is made by the first signed change).
+pub fn this_computer() -> ThisComputer {
+    let store = match store() {
+        Store::Folder(_) => "folder",
+        Store::Keychain => "keychain",
+        Store::None => "none",
+    };
+    let key = read_private()
+        .and_then(|der| Key::from_pkcs8(&der))
+        .map(|k| ThisKey {
+            id: k.id,
+            public_key: k.public_hex,
+        });
+    ThisComputer { store, key }
+}
+
+/// The public key file to give an auditor or the team: the same fields as `keys/<id>.json`
+/// without the taskbag's own (owner, added).
+pub fn public_key_export(key: &ThisKey) -> String {
+    crate::json_text(&json!({
+        "key": key.id,
+        "algorithm": "ed25519",
+        "public_key": key.public_key,
+    }))
+}

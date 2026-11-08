@@ -51,7 +51,7 @@ import { WhoLine } from "./WhoForm";
 import { afterClick } from "./paneFlow";
 import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
-import { keepListed, noteOpened, parseRecentInfo, type RecentInfoMap } from "./recentFlow";
+import { keepListed, noteOpened, readRecent, readRecentInfo, RECENT_INFO_KEY, RECENT_KEY, RECENT_MAX, type RecentInfoMap } from "./recentFlow";
 import { TaskPane } from "./TaskPane";
 import { TaskRow } from "./TaskRow";
 import { CreateForm, type AddRequest } from "./CreateForm";
@@ -78,29 +78,6 @@ const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
 
 const LAST_ROOT_KEY = "allomos.lastRoot";
 /** Recently opened project folders, newest first, for File → Open Recent. */
-const RECENT_KEY = "allomos.recentFolders";
-const RECENT_MAX = 10;
-
-function readRecent(): string[] {
-  try {
-    const list: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
-    return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string").slice(0, RECENT_MAX) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Each recent folder's project name and when it was last opened, for the start page's Open recent
- * dialog (Task-A01-43). Kept only for folders still in the list. */
-const RECENT_INFO_KEY = "allomos.recentInfo";
-
-function readRecentInfo(): RecentInfoMap {
-  try {
-    return parseRecentInfo(localStorage.getItem(RECENT_INFO_KEY));
-  } catch {
-    return {};
-  }
-}
 
 function saveRecentInfo(info: RecentInfoMap) {
   try {

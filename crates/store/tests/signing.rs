@@ -333,3 +333,29 @@ fn a_redaction_is_listed_not_found_as_tampering() {
     fs::write(root.join(&by), text.replace("by mistake", "on purpose")).unwrap();
     assert_eq!(trail::audit(&root).changed, [by]);
 }
+
+/// Settings → This computer (Task-A01-tail719): the key's ID and public key, matching the one in
+/// the taskbag's `keys/`, the public file to export, and the last checkpoint seen per project.
+#[test]
+fn this_computer_shows_its_key_and_the_checkpoints_seen() {
+    let _turn = turn();
+    let root = taskbag("this-computer");
+    let this = allomos_store::this_computer();
+    assert_eq!(this.store, "folder");
+    let key = this.key.expect("the taskbag's changes made a key");
+    assert!(root.join("keys").join(format!("{}.json", key.id)).is_file());
+    let export: serde_json::Value =
+        serde_json::from_str(&allomos_store::public_key_export(&key)).unwrap();
+    assert_eq!(export["public_key"], serde_json::json!(key.public_key));
+    assert!(export.get("owner").is_none());
+    let made = checkpoint::checkpoint(&root, Duration::from_secs(5), None).unwrap();
+    let _ = trail::audit(&root);
+    let project = fs::read_to_string(root.join("project.json")).unwrap();
+    let project: serde_json::Value = serde_json::from_str(&project).unwrap();
+    let seen = checkpoint::seen();
+    let mine = seen
+        .iter()
+        .find(|s| serde_json::json!(s.project) == project["id"])
+        .expect("audit remembered the checkpoint");
+    assert_eq!(mine.checkpoint, made.file);
+}

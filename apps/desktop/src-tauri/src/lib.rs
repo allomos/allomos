@@ -16,7 +16,10 @@ mod update;
 mod window_list;
 mod windows;
 
-use audit::{audit_settings, set_identity, set_retention, set_separation, show_identities_file};
+use audit::{
+    audit_settings, export_public_key, make_checkpoint, redact_task, set_identity, set_retention,
+    set_separation, show_identities_file, this_computer,
+};
 use windows::{Windows, fit_to_screen, focused_window, open_new_window, open_recent_in_window};
 
 use std::ffi::OsString;
@@ -2571,6 +2574,10 @@ pub fn run() {
             set_retention,
             set_identity,
             show_identities_file,
+            make_checkpoint,
+            redact_task,
+            this_computer,
+            export_public_key,
             lan_status,
             set_lan_viewing,
             rename_project,

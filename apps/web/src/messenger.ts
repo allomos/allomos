@@ -6,13 +6,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { LadderStep } from "./ladderFlow";
 import type { SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
 export interface TranslateTo {
@@ -182,6 +182,10 @@ export interface Messenger {
   setRetention(root: string, years: number | null, legalHold: boolean, reason?: string): Promise<AuditSettings>;
   /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
   showIdentitiesFile(): Promise<void>;
+  /** Project settings → Audit → Make a checkpoint now (Task-A01-tail719), as `alm checkpoint`. Rejects with a Problem (no signing key). */
+  makeCheckpoint(root: string): Promise<AuditSettings>;
+  /** Project settings → Audit → Remove personal details… (Task-A01-tail719), as `alm redact`. Rejects with a Problem. */
+  redactTask(root: string, id: string, fields: string[], reason: string, approvedBy?: string): Promise<RedactDone>;
   /** One task's recorded changes, newest first (Task-A01-17). */
   taskHistory(root: string, id: string): Promise<TaskHistory>;
   /** The person's name the app records its task changes under; null until it has been asked (Task-A01-18). */
@@ -337,6 +341,10 @@ export interface TabsMessenger {
 export interface AppSettingsMessenger {
   appSettings(): Promise<{ start_with: StartWith }>;
   setStartWith(choice: StartWith): Promise<void>;
+  /** Settings → This computer (Task-A01-tail719): the signing key and the last checkpoint seen per project, matched to `folders` (the recent folders). */
+  thisComputer(folders: string[]): Promise<ThisComputer>;
+  /** Export public key…: asks where, then writes the public key file; false when the person cancelled. Rejects with a Problem. */
+  exportPublicKey(suggestedName: string): Promise<boolean>;
 }
 
 export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
@@ -356,6 +364,13 @@ export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
   closeWindow: () => invoke<void>("close_window"),
   appSettings: () => invoke<{ start_with: StartWith }>("app_settings"),
   setStartWith: (choice) => invoke<void>("set_start_with", { choice }),
+  thisComputer: (folders) => invoke<ThisComputer>("this_computer", { folders }),
+  exportPublicKey: async (suggestedName) => {
+    const path = await save({ defaultPath: suggestedName, filters: [{ name: "JSON", extensions: ["json"] }] });
+    if (!path) return false;
+    await invoke<void>("export_public_key", { path });
+    return true;
+  },
 };
 
 /** Pairing (apps/desktop/src-tauri/src/pairing.rs, Task-A04-02-02): what the dialog shows. */
@@ -478,6 +493,9 @@ export const desktopMessenger: Messenger = {
   setSeparation: (root, on, reason) => invoke<AuditSettings>("set_separation", { root, on, reason: reason ?? null }),
   setRetention: (root, years, legalHold, reason) => invoke<AuditSettings>("set_retention", { root, years, legalHold, reason: reason ?? null }),
   showIdentitiesFile: () => invoke<void>("show_identities_file"),
+  makeCheckpoint: (root) => invoke<AuditSettings>("make_checkpoint", { root }),
+  redactTask: (root, id, fields, reason, approvedBy) =>
+    invoke<RedactDone>("redact_task", { root, id, fields, reason, approvedBy: approvedBy ?? null }),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   ownerName: () => invoke<string | null>("owner_name"),
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
