@@ -160,6 +160,14 @@ problems! {
     EffectNotFound { id, task } => "effect_not_found", "Task {task} records no outside effect {id}. `alm effects {task}` lists its effects.";
     /// A new outside effect without its target, action or rollback (Task-A01-job650).
     EffectIncomplete { missing } => "effect_incomplete", "An outside effect is recorded with where it acts, what it does and how it is undone: give {missing}. If it cannot be undone, say so in --rollback.";
+    /// `alm link` with a kind that is not one of the six (Task-A01-mint242).
+    LinkKindUnknown { kind } => "link_kind_unknown", "\"{kind}\" is not a kind of link. Give one of: commit, branch, merge, pr, ci, release.";
+    /// `alm link` with an empty reference, or a commit or merge that is not a hash (Task-A01-mint242).
+    LinkRefInvalid { kind, reference } => "link_ref_invalid", "\"{reference}\" cannot be a {kind} link's reference. Give a commit or merge by its hash (7 to 64 hexadecimal digits), anything else by its name or number.";
+    /// `alm link --url` with something that is not a web address (Task-A01-mint242).
+    LinkUrlInvalid { url } => "link_url_invalid", "\"{url}\" is not a web address. Give one that starts with https:// (or http://).";
+    /// `alm link --remove` with a link the task does not record (Task-A01-mint242).
+    LinkNotRecorded { kind, reference, task } => "link_not_recorded", "Task {task} records no {kind} link {reference}. `alm show {task}` lists its links.";
     /// The app's Withdraw without saying why (Task-A01-baker800).
     WithdrawReasonMissing => "withdraw_reason_missing", "Say why the approval is withdrawn: `alm withdraw <approval ID> --why \"<why>\"`.";
     /// `alm trace` with something that is neither a requirement ID nor a decision number

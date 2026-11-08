@@ -201,11 +201,26 @@
     "id",
     "label"
   ],
+  "link_kind_unknown": [
+    "kind"
+  ],
   "link_not_found": [
     "link"
   ],
+  "link_not_recorded": [
+    "kind",
+    "reference",
+    "task"
+  ],
+  "link_ref_invalid": [
+    "kind",
+    "reference"
+  ],
   "link_refused": [
     "link"
+  ],
+  "link_url_invalid": [
+    "url"
   ],
   "no_session": [
     "id"

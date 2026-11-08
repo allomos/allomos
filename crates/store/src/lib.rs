@@ -37,6 +37,7 @@ pub mod folders;
 mod guide;
 pub mod handoff;
 pub mod identity;
+pub mod links;
 pub mod missing;
 pub mod progress;
 mod quota;

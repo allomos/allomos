@@ -319,6 +319,12 @@ Plan:
   R77) and decisions (their numbers, like 0021) a task serves, in its history; done tasks too.
   `alm traces <ref>` lists the tasks of a requirement or decision; `alm traces`, every one with its
   tasks. alm checks only how each is written: check that it exists.
+- `alm link <id> <kind> <ref> [--url <address>] [--remove]`: record a commit, branch, merge
+  commit, pull request, CI run or release that goes with a task (kind `commit`, `branch`,
+  `merge`, `pr`, `ci` or `release`; a commit or merge by its hash), in its history; done tasks
+  too. alm runs no Git: give what your version control tool and CI show, with the web address
+  so the app can open it. `alm links <ref>` finds the task of a commit (7 digits of its hash or
+  more), branch, PR, run, tag or address; `alm links`, every task's links; `alm show` lists them.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
@@ -1825,6 +1831,8 @@ mod tests {
             "--of <effect ID> --result",
             "`alm effects`, every one in the project",
             "`alm traces <ref>` lists the tasks",
+            "alm link <id> <kind> <ref> [--url <address>] [--remove]",
+            "`alm links <ref>` finds the task of a commit",
         ] {
             assert!(flat_all.contains(words), "{words}");
         }

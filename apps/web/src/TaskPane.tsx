@@ -19,7 +19,7 @@ import { useI18n, type Key } from "./i18n";
 import { WhoForm } from "./WhoForm";
 import { Markdown } from "./Markdown";
 import { localTime } from "./timeFlow";
-import { changeLine } from "./historyFlow";
+import { changeLine, linkText } from "./historyFlow";
 import {
   EMPTY_NEW_ITERATION,
   NEW_ITERATION,
@@ -822,6 +822,32 @@ export function TaskPane({
                     </>
                   )}
                 </dl>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(task.links ?? []).length > 0 && (
+        <div className="pane-check pane-approvals pane-links">
+          <h3>{t("pane.links")}</h3>
+          <ul className="approvals links">
+            {(task.links ?? []).map((l) => (
+              <li key={`${l.kind}-${l.ref}`}>
+                {l.url ? (
+                  <a
+                    href={l.url}
+                    title={l.url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onLink(l.url!);
+                    }}
+                  >
+                    {linkText(l, t)}
+                  </a>
+                ) : (
+                  <span title={t("pane.link_no_url")}>{linkText(l, t)}</span>
+                )}{" "}
+                <span className="muted small">{t("pane.link_by", { by: l.by || t("pane.history_someone"), at: localTime(l.at) })}</span>
               </li>
             ))}
           </ul>

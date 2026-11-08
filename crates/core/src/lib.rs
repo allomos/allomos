@@ -16,6 +16,7 @@ pub mod event;
 pub mod folders;
 pub mod ids;
 pub mod labels;
+pub mod link;
 mod model;
 pub mod ops;
 mod problem;

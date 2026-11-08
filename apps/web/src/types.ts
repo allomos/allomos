@@ -96,6 +96,21 @@ export interface Task {
   /** Its outside effects (Task-A01-job650). Not a field of task.json: worked out from the
    * history and added when the taskbag is opened. */
   effects?: EffectRecord[];
+  /** Its links to code and releases (Task-A01-mint242). Not a field of task.json: worked out
+   * from the history and added when the taskbag is opened. */
+  links?: LinkRecord[];
+}
+
+/** A link to code or a release as recorded (crates/core/src/link.rs, decision 0021 § 1.1): a
+ * commit, branch, merge commit, pull request, CI run or release, and where it opens. */
+export interface LinkRecord {
+  kind: "commit" | "branch" | "merge" | "pr" | "ci" | "release";
+  ref: string;
+  /** Missing when none was given: then it cannot be opened. */
+  url?: string;
+  task: string;
+  at: string;
+  by?: string;
 }
 
 /** An outside effect as recorded (crates/core/src/effect.rs, decision 0021 § 1.1): where it
@@ -288,6 +303,8 @@ export interface Opened {
   approvals?: Record<string, ApprovalRecord[]>;
   /** Each task's outside effects, by task ID (Task-A01-job650). */
   effects?: Record<string, EffectRecord[]>;
+  /** Each task's links to code and releases, by task ID (Task-A01-mint242). */
+  links?: Record<string, LinkRecord[]>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
   /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */
