@@ -101,7 +101,7 @@ fn now() -> (String, String) {
 }
 
 /// Six random lowercase letters and digits (a new pseudonym's, too).
-pub(crate) fn random_suffix() -> String {
+pub fn random_suffix() -> String {
     suffix()
 }
 

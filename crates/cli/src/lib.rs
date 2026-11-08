@@ -375,6 +375,28 @@ enum Command {
     },
     /// A task's outside effects; with none given, every one in the project, by task.
     Effects { id: Option<String> },
+    /// Record an exception (decision 0021): a control skipped, why, and who accepted the risk.
+    /// --kind check_not_run (a check that was not run: name it with --check), without_human_check
+    /// or other; --why (why the control was skipped); --accepted-by (a pseudonym ID or a role, never an email address). Complete
+    /// one later with `--of <exception ID>`. `alm done --without-human-check` records one by
+    /// itself. `alm exceptions` lists them.
+    Exception {
+        id: String,
+        /// The exception to complete or correct, by its ID (`ex-…`); without it, a new one.
+        #[arg(long, value_name = "EXCEPTION ID")]
+        of: Option<String>,
+        /// check_not_run, without_human_check or other (the default for a new one).
+        #[arg(long, value_name = "KIND")]
+        kind: Option<String>,
+        /// The check that was not run (for check_not_run), as the card names it.
+        #[arg(long, value_name = "TEXT")]
+        check: Option<String>,
+        /// Who accepted the risk: a pseudonym ID or a role (for example "approver").
+        #[arg(long, value_name = "WHO")]
+        accepted_by: Option<String>,
+    },
+    /// A task's exceptions; with none given, every one in the project, by task.
+    Exceptions { id: Option<String> },
     /// Record a task's change type and risk (decision 0021): --type standard (pre-approved
     /// routine), normal (approved before) or emergency (made first, approved afterwards by a
     /// deadline, --due, three days by default); --risk low, medium or high; --touches production,
@@ -536,6 +558,10 @@ enum Command {
         /// open, what to click, what they should see.
         #[arg(long, value_name = "FILE", requires = "without_human_check")]
         steps: Option<PathBuf>,
+        /// Who accepted the risk of finishing without the human check: a pseudonym ID or a role
+        /// (for example "approver"). Recorded as an exception in the task's history.
+        #[arg(long, value_name = "WHO", requires = "without_human_check")]
+        accepted_by: Option<String>,
     },
     /// Let go of a task, optionally leaving a handoff note for the next one.
     Release {
@@ -987,6 +1013,8 @@ impl Command {
             Command::Withdraw { .. } => None,
             Command::Effect { id, .. } => Some(id),
             Command::Effects { .. } => None,
+            Command::Exception { id, .. } => Some(id),
+            Command::Exceptions { .. } => None,
             Command::Classify { id, .. } => Some(id),
             Command::Init { .. }
             | Command::Labels { .. }
@@ -1073,6 +1101,7 @@ impl Command {
                 | Command::MoveIn { .. }
                 | Command::Translate { .. }
                 | Command::Audit
+                | Command::Exceptions { .. }
         )
     }
 
@@ -1130,6 +1159,8 @@ impl Command {
             Command::Withdraw { .. } => "withdraw",
             Command::Effect { .. } => "effect",
             Command::Effects { .. } => "effects",
+            Command::Exception { .. } => "exception",
+            Command::Exceptions { .. } => "exceptions",
             Command::Classify { .. } => "classify",
             Command::Human { .. } => "human",
             Command::Release { .. } => "release",
@@ -2305,6 +2336,7 @@ fn decision_lines(decisions: &[Decision]) -> String {
 mod approve;
 mod classify;
 mod effects;
+mod exceptions;
 mod folders;
 mod links;
 mod trail;
@@ -3422,6 +3454,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .remove(&task.id)
                 .unwrap_or_default();
             text.push_str(&effects::lines(&outside_effects));
+            let task_exceptions = allomos_store::exceptions::by_task(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            text.push_str(&exceptions::lines(&task_exceptions));
             let task_links = allomos_store::links::by_task(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
@@ -3451,7 +3487,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "links": task_links, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "exceptions": task_exceptions, "links": task_links, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3858,6 +3894,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             id,
             without_human_check,
             steps,
+            accepted_by,
         } => {
             let steps = match steps {
                 Some(file) => {
@@ -3870,6 +3907,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => None,
             };
+            let mut recorded_exception = None;
             change(cli, cwd, |bag| {
                 // Decision 0020: finishing without --without-human-check needs a "by human" label
                 // (checked after the usual rules, so a held task still says who holds it).
@@ -3884,7 +3922,33 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 if without_human_check.is_none() && !was_done && !out.task.human_checked() {
                     return Err(Problem::HumanCheckLabelMissing { id: out.task.id });
                 }
+                let mut out = out;
+                // Decision 0021 § 1.1 (Task-A01-seed343): finishing without the human check is an
+                // exception, with why and who accepted the risk.
+                if let Some(why) = without_human_check.as_deref() {
+                    let (change, ex) = allomos_core::exception::new(
+                        &allomos_store::exceptions::new_id(),
+                        &allomos_core::exception::Given {
+                            kind: Some(allomos_core::exception::WITHOUT_HUMAN_CHECK),
+                            why: Some(why),
+                            accepted_by: accepted_by.as_deref(),
+                            ..Default::default()
+                        },
+                    )?;
+                    out.recorded.push(change);
+                    recorded_exception = Some(ex);
+                }
                 Ok(out)
+            })
+            .map(|mut done| {
+                if let Some(ex) = &recorded_exception {
+                    done.text
+                        .push_str(&format!("Exception {} recorded:\n", ex.id));
+                    done.text.push_str(&exceptions::exception_lines(ex, "  "));
+                    done.text.push_str(&exceptions::facts(id, ex));
+                    done.fields["exception"] = json!(ex);
+                }
+                done
             })
         }
         Command::Checked {
@@ -3995,6 +4059,25 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             },
         ),
         Command::Effects { id } => effects::list(cli, cwd, id.as_deref()),
+        Command::Exception {
+            id,
+            of,
+            kind,
+            check,
+            accepted_by,
+        } => exceptions::exception(
+            cli,
+            cwd,
+            id,
+            &allomos_core::exception::Given {
+                of: of.as_deref(),
+                kind: kind.as_deref(),
+                why: cli.why.as_deref(),
+                accepted_by: accepted_by.as_deref(),
+                check: check.as_deref(),
+            },
+        ),
+        Command::Exceptions { id } => exceptions::list(cli, cwd, id.as_deref()),
         Command::Classify {
             id,
             change_type,

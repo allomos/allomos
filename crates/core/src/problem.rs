@@ -162,6 +162,12 @@ problems! {
     EffectNotFound { id, task } => "effect_not_found", "Task {task} records no outside effect {id}. `alm effects {task}` lists its effects.";
     /// A new outside effect without its target, action or rollback (Task-A01-job650).
     EffectIncomplete { missing } => "effect_incomplete", "An outside effect is recorded with where it acts, what it does and how it is undone: give {missing}. If it cannot be undone, say so in --rollback.";
+    /// `alm exception --of` with an exception ID the task does not record (Task-A01-seed343).
+    ExceptionNotFound { id, task } => "exception_not_found", "Task {task} records no exception {id}. `alm exceptions {task}` lists its exceptions.";
+    /// `alm exception --kind` with a kind alm does not know (Task-A01-seed343).
+    ExceptionKindUnknown { kind } => "exception_kind_unknown", "\"{kind}\" is not a kind of exception. Give one of: check_not_run, without_human_check, other.";
+    /// A new exception without why, or a check not run without naming the check (Task-A01-seed343).
+    ExceptionIncomplete { missing } => "exception_incomplete", "An exception is recorded with why the control was skipped: give {missing}.";
     /// `alm link` with a kind that is not one of the six (Task-A01-mint242).
     LinkKindUnknown { kind } => "link_kind_unknown", "\"{kind}\" is not a kind of link. Give one of: commit, branch, merge, pr, ci, release.";
     /// `alm link` with an empty reference, or a commit or merge that is not a hash (Task-A01-mint242).

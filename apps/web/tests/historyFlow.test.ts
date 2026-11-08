@@ -100,3 +100,16 @@ test("a change type, risk and what it touches show in words (Task-A01-palm011)",
   assert.equal(fieldName("change_type", t), "pane.change_type");
   assert.equal(fieldName("approval_due", t), "pane.approval_due");
 });
+
+test("an exception shows its kind, why and who accepted the risk (Task-A01-seed343)", () => {
+  assert.equal(
+    valueText("exception", { id: "ex-1", kind: "check_not_run", check: "cargo test", why: "no display" }, t),
+    "pane.exception_kind.check_not_run (cargo test): no display, pane.exception_not_accepted",
+  );
+  assert.equal(
+    valueText("exception", { id: "ex-2", kind: "without_human_check", why: "loop run", accepted_by: "approver" }, t),
+    "pane.exception_kind.without_human_check: loop run, pane.exception_accepted_by(approver)",
+  );
+  assert.equal(valueText("exception", { id: "ex-3", kind: "waiver", why: "x", accepted_by: "p-1" }, t), "waiver: x, pane.exception_accepted_by(p-1)");
+  assert.equal(fieldName("exception", t), "pane.exception");
+});
