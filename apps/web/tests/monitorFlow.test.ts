@@ -14,6 +14,7 @@ import {
   lastRunCounts,
   monitorRequest,
   nextCheck,
+  noticeAfterCheck,
   pick,
   readyTasks,
   scopeOptions,
@@ -22,6 +23,8 @@ import {
   startRun,
   tabToClose,
   take,
+  unblockNotice,
+  withReleased,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
 import type { Iteration, Task } from "../src/types.ts";
@@ -208,4 +211,40 @@ test("each task's request names the session, the run mode and only that task", (
     assert.match(text, /--session-id 1234-abcd/, language);
     assert.match(text, /alm handoff A01-05/, language);
   }
+});
+
+// Task-A01-steam936: the sweep at start and on Check now. What it let go on is said in one line per
+// state, the check it belongs to keeps the line and the next clears it, and until the taskbag is
+// read again the monitor picks from the tasks as the sweep left them.
+test("the sweep's line groups the tasks by the state they went back to", () => {
+  assert.equal(unblockNotice([]), null, "nothing let go on: no line");
+  const n = unblockNotice([
+    { task: task("A01-02"), blockers: ["A01-01"] },
+    { task: task("A01-03", { state: "in_progress", holder: "b" }), blockers: ["A01-01"] },
+    { task: task("A01-04"), blockers: ["A02-01"] },
+  ]);
+  assert.deepEqual(n, {
+    groups: [
+      { state: "ready", ids: ["A01-02", "A01-04"] },
+      { state: "in_progress", ids: ["A01-03"] },
+    ],
+    seen: false,
+  });
+  const seen = noticeAfterCheck(n);
+  assert.equal(seen?.seen, true, "the check it belongs to keeps it");
+  assert.equal(noticeAfterCheck(seen), null, "the next check clears it");
+  assert.equal(noticeAfterCheck(null), null);
+});
+
+test("until the taskbag is read again, the monitor picks a task the sweep let go on", () => {
+  const stale = [task("A01-01", { state: "done" }), task("A01-02", { state: "blocked" })];
+  const released = [task("A01-02")];
+  const run = startRun({ kind: "all" }, "claude_cli", true, 30, 0);
+  const areas = [{ id: "A01" }];
+  assert.equal(pick(run, stale, areas, [], null), null, "as read: still blocked");
+  assert.equal(pick(run, withReleased(stale, released), areas, [], null)?.id, "A01-02");
+  // Read again (here: moved on since): the taskbag as read wins.
+  const read = [task("A01-01", { state: "done" }), task("A01-02", { state: "in_progress", holder: "x" })];
+  assert.equal(withReleased(read, released)[1].holder, "x");
+  assert.equal(withReleased(stale, []), stale);
 });

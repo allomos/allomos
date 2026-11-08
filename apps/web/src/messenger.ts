@@ -9,7 +9,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { LadderStep } from "./ladderFlow";
-import type { SessionTab } from "./monitorFlow";
+import type { Released, SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
@@ -110,6 +110,10 @@ export interface Messenger {
    * `codex_cli`) in the project folder of the taskbag at `taskbag`, in a terminal window of its
    * own, with `request` already sent; `sessionId` is Claude Code's `--session-id`. Rejects with a Problem. */
   monitorStartSession(agent: string, taskbag: string, request: string, sessionId: string | null): Promise<SessionTab | null>;
+  /** When the monitor starts and on Check now (Task-A01-steam936): every blocked task whose
+   * blockers have all finished goes on, as the last blocker's Done would have let it. Resolves with
+   * the tasks it let go on; with none, nothing is written. */
+  releaseFinished(root: string): Promise<Released[]>;
   /** The task of the session in `tab` is done: the tab closes after 30 seconds unless a key is pressed (Task-A03-sierra014). */
   monitorCloseSession(agent: string, tab: SessionTab, texts: { prompt: string; kept: string }): Promise<void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
@@ -451,6 +455,7 @@ export const desktopMessenger: Messenger = {
   monitorStartSession: (agent, taskbag, request, sessionId) =>
     invoke<SessionTab | null>("monitor_start_session", { agent, taskbag, request, sessionId }),
   monitorCloseSession: (agent, tab, texts) => invoke<void>("monitor_close_session", { agent, tab, texts }),
+  releaseFinished: (root) => invoke<Released[]>("release_finished", { root }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

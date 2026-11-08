@@ -4373,7 +4373,7 @@ fn wait_says_what_and_optionally_who() {
 /// Decision 0016: `alm block` and its refusals; each blocker's state in list, show and next; a
 /// dropped blocker flagged; all done told but not acted on; one event per change.
 #[test]
-fn block_shows_blockers_and_next_only_tells() {
+fn block_shows_blockers_and_next_unblocks_left_overs() {
     let repo = filled();
     refused(
         &repo,
@@ -4487,21 +4487,56 @@ fn block_shows_blockers_and_next_only_tells() {
     let v = ok(&repo, &["block", "A01-02", "--by", "A02-01"]);
     assert_eq!(v["warnings"][0]["code"], "blocker_dropped");
 
-    // A task left blocked with every blocker finished (as from before the rule): next tells, and
-    // moves nothing.
+    // A task left blocked with every blocker finished (as from before the rule): `alm next` lets
+    // it go on first, lists it, says so and names the files to share (Task-A01-steam936).
     ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
+    let v = ok(&repo, &["--as", "s", "next"]);
+    assert_eq!(v["unblocked"][0]["id"], "A01-02");
+    assert_eq!(v["unblocked"][0]["state"], "ready");
+    assert_eq!(v["unblocked"][0]["finished_blockers"], json!(["A01-01"]));
+    assert_eq!(v["blocked"], json!([]));
+    assert!(
+        v["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["id"] == "A01-02"),
+        "{v}"
+    );
+    assert!(
+        v["changed_files"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("tasks/A01-02/task.json")),
+        "{v}"
+    );
+    assert!(
+        v["git_commands"][1]
+            .as_str()
+            .unwrap()
+            .contains("alm: unblock A01-02"),
+        "{v}"
+    );
+    let file = task_file(&repo, "A01-02");
+    assert_eq!(file["state"], "ready");
+    assert!(file.get("blocked_by").is_none());
+    assert!(
+        file["handoff_note"]
+            .as_str()
+            .unwrap()
+            .starts_with("Unblocked automatically after A01-01 finished;"),
+        "{file}"
+    );
+    let h = ok(&repo, &["history", "A01-02"]);
+    assert_eq!(h["events"][0]["command"], "unblock");
+    // Nothing more to let go on: `alm next` writes nothing and names no files.
     let before = fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap();
     let events_before = fs::read_dir(repo.join(".allomos/taskbag/events"))
         .unwrap()
         .count();
-    let v = ok(&repo, &["next"]);
-    assert_eq!(v["blocked"][0]["id"], "A01-02");
-    assert_eq!(v["blocked"][0]["all_blockers_done"], true);
     let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
-    assert!(
-        next.contains("A01-02: all blockers have finished (A01-01 (done)) — unblock it?"),
-        "{next}"
-    );
+    assert!(!next.contains("Unblocked A01-02 ("), "{next}");
+    assert!(!next.contains("Changed files"), "{next}");
     assert_eq!(
         fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap(),
         before,
@@ -4515,6 +4550,7 @@ fn block_shows_blockers_and_next_only_tells() {
     );
 
     // Unblock moves it on by hand; only a blocked task.
+    ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
     let v = ok(&repo, &["unblock", "A01-02"]);
     assert_eq!(v["task"]["state"], "ready");
     assert!(task_file(&repo, "A01-02").get("blocked_by").is_none());
@@ -4529,7 +4565,9 @@ fn block_shows_blockers_and_next_only_tells() {
         .collect();
     assert_eq!(
         commands,
-        ["unblock", "block", "block", "unblock", "block", "add task"]
+        [
+            "unblock", "block", "unblock", "block", "block", "unblock", "block", "add task"
+        ]
     );
 }
 

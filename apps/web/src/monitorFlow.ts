@@ -297,3 +297,32 @@ ${mode}
 4. Report progress with alm label; finish with alm done, or stop with alm release --note.
 5. Write a handoff with alm handoff ${id}, then end this session. Work only this task; do not take another one: Allomos opens a new session for the next.`;
 }
+
+/** A task the monitor's sweep let go on (Task-A01-steam936): every blocker had finished. As
+ * `release_finished` sends it. */
+export type Released = { task: Task; blockers: string[] };
+
+/** The line under the monitor's status bar after a sweep let tasks go on: one group per state they
+ * went back to (ready, or in progress when someone holds them). `seen` is set once the check it
+ * belongs to has run; the next check clears it. */
+export type UnblockNotice = { groups: { state: "ready" | "in_progress"; ids: string[] }[]; seen: boolean };
+
+/** What the sweep let go on, as the notice says it; null when it let nothing go on. */
+export function unblockNotice(released: Released[]): UnblockNotice | null {
+  const groups = (["ready", "in_progress"] as const)
+    .map((state) => ({ state, ids: released.filter((r) => r.task.state === state).map((r) => r.task.id) }))
+    .filter((g) => g.ids.length > 0);
+  return groups.length ? { groups, seen: false } : null;
+}
+
+/** The notice after a check: the check it belongs to marks it seen; the next one clears it. */
+export function noticeAfterCheck(notice: UnblockNotice | null): UnblockNotice | null {
+  return notice && !notice.seen ? { ...notice, seen: true } : null;
+}
+
+/** The tasks as the monitor picks from them: a task the sweep let go on, while the taskbag as read
+ * still shows it blocked (it is read again only when its files change), as the sweep left it. */
+export function withReleased(tasks: Task[], released: Task[]): Task[] {
+  if (!released.length) return tasks;
+  return tasks.map((t) => (t.state === "blocked" ? (released.find((r) => r.id === t.id) ?? t) : t));
+}

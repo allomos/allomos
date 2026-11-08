@@ -1720,7 +1720,20 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
     let packed = done.fields["packed"]
         .as_array()
         .is_some_and(|p| !p.is_empty());
-    let changes = (cli.command.changes() || packed) && !matches!(cli.command, Command::Init { .. });
+    // `alm next` that let blocked tasks go on (Task-A01-steam936) shares that change.
+    let swept: Vec<String> = match cli.command {
+        Command::Next { .. } => done.fields["unblocked"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|t| t["id"].as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    let changes = (cli.command.changes() || packed || !swept.is_empty())
+        && !matches!(cli.command, Command::Init { .. });
     let mut text = String::new();
     let mut files: Vec<String> = written
         .iter()
@@ -1743,7 +1756,9 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             Some(id) => format!("alm: {command} {id}"),
             None => format!("alm: {command}"),
         };
-        let subject = if packed && !cli.command.changes() {
+        let subject = if !swept.is_empty() {
+            format!("alm: unblock {}", swept.join(" "))
+        } else if packed && !cli.command.changes() {
             "alm: pack history".to_string()
         } else {
             subject
@@ -3746,6 +3761,18 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             all_folders,
         } => {
             let root = locate(cli, cwd)?;
+            // First, every blocked task whose blockers have all finished goes on, as the last
+            // blocker's `alm done` would have let it (Task-A01-steam936); it is then listed like
+            // any other. Nothing to let go on writes nothing. When the taskbag cannot be written,
+            // `alm next` says why and lists as it is.
+            let (unblocked, unblock_failed) = match allomos_store::release_finished(
+                &root,
+                Actor::alm(cli.holder.as_deref()),
+                lock_wait(),
+            ) {
+                Ok(list) => (list, None),
+                Err(p) => (Vec::new(), Some(p)),
+            };
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             // `alm` lists; the agent chooses (Task-A03-14).
             let mut tasks = ops::next(&bag, iteration.as_deref())?;
@@ -3771,6 +3798,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 CHOOSING_RULE.to_string()
             };
             let mut text = String::new();
+            let unblocked_tasks: Vec<Task> = unblocked.iter().map(|r| r.task.clone()).collect();
+            text.push_str(&unblocked_text(&unblocked_tasks));
+            if !unblocked.is_empty() {
+                text.push('\n');
+            }
             if let Some(name) = &here {
                 text.push_str(&format!(
                     "Inside project folder {name}: only its tasks are listed (tasks with no folder are left out). `alm next --all-folders` lists every task.\n\n"
@@ -3844,9 +3876,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     withdrawn.push(json!({ "task": t.id, "approval": r.approval.id }));
                 }
             }
-            // Blocked tasks are skipped by their state. One whose blockers have all finished goes
-            // on by itself when the last one finishes (Task-A01-tuna668); `alm next` tells only
-            // about one left over from before, and moves nothing.
+            // Blocked tasks are skipped by their state. One whose blockers have all finished went
+            // on above (Task-A01-steam936); one is left over only when that could not be written,
+            // and then `alm next` tells about it.
             let mut blocked = Vec::new();
             for t in bag.tasks.iter().filter(|t| {
                 t.state == State::Blocked
@@ -3903,11 +3935,17 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "handoffs": if handoffs_line.is_empty() { Value::Null } else { json!(handoffs_line.trim_end()) },
                     "active_iteration": ops::active_iteration(&bag).map(|i| i.id.clone()),
                     "folder": here,
+                    "unblocked": unblocked.iter().map(|r| {
+                        let mut v = task_json(&r.task);
+                        v["finished_blockers"] = json!(r.blockers);
+                        v
+                    }).collect::<Vec<_>>(),
                     "finished_iteration": finished.as_ref().map(|(done_it, next_it, words)| json!({ "iteration": done_it, "next": next_it, "suggestion": words })),
                 }),
                 text,
             );
             done.issues = issues;
+            done.warnings.extend(unblock_failed);
             Ok(done)
         }
         Command::Claim {
