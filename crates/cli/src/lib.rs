@@ -529,13 +529,27 @@ enum Command {
         #[command(subcommand)]
         what: FolderWhat,
     },
-    /// Upgrade this taskbag to the newest format (allomos/7: the label table and several labels per
-    /// task, decision 0020; from allomos/5 also project folders, decision 0019). Without --confirm
+    /// Upgrade this taskbag to the newest format (allomos/8: signed changes, keys and checkpoints,
+    /// decision 0021; from allomos/5 or allomos/6 also the label table and several labels per task,
+    /// decision 0020; from allomos/5 also project folders, decision 0019). Without --confirm
     /// it only says what it will do. Older Allomos versions
     /// refuse an upgraded taskbag: install the newest Allomos first.
     Upgrade {
         #[arg(long)]
         confirm: bool,
+    },
+    /// Check the history (decision 0021 § 3.4): recompute the taskbag's fingerprint, check every
+    /// signature and each computer's chain of changes, match the checkpoints, and list what was
+    /// found (unsigned changes, changed ones, gaps, keys not in keys/). Facts only: it never says
+    /// the history is valid or not; you check what they mean.
+    Audit,
+    /// Make a checkpoint now (decision 0021 § 3.2): a signed file in checkpoints/ that fixes a
+    /// fingerprint of the whole taskbag, so a later change to anything it covered is found.
+    Checkpoint {
+        /// The taskbag repository's current commit, when you know it (alm runs no version
+        /// control tool; in Git: `git rev-parse HEAD`).
+        #[arg(long, value_name = "COMMIT")]
+        git_commit: Option<String>,
     },
     /// Card files still outside the taskbag (linked from a task's description, or reported);
     /// `alm cards found <id>=<path>…` reports others you found (see `alm guide move-cards`).
@@ -918,6 +932,8 @@ impl Command {
             | Command::AuditSettings { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
+            | Command::Audit
+            | Command::Checkpoint { .. }
             | Command::Folder { .. }
             | Command::Next { .. }
             | Command::Traces { .. } => None,
@@ -982,6 +998,7 @@ impl Command {
                 | Command::Guide { .. }
                 | Command::MoveIn { .. }
                 | Command::Translate { .. }
+                | Command::Audit
         )
     }
 
@@ -1008,6 +1025,8 @@ impl Command {
             Command::List { .. } => "list",
             Command::Folders { .. } => "folders",
             Command::Upgrade { .. } => "upgrade",
+            Command::Audit => "audit",
+            Command::Checkpoint { .. } => "checkpoint",
             Command::Folder { what } => match what {
                 FolderWhat::List => "folder list",
                 FolderWhat::Add { .. } => "folder add",
@@ -2199,6 +2218,7 @@ fn decision_lines(decisions: &[Decision]) -> String {
 /// One line about a task: ID, state, label, holder, title.
 mod approve;
 mod folders;
+mod trail;
 
 /// A task's traces in one line (Task-A01-fennel617): "R77, 0021", or "none".
 fn traces_text(traces: &[String]) -> String {
@@ -3994,6 +4014,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             allomos_core::folders::set(bag, id, me, names)
         }),
         Command::Upgrade { confirm } => folders::upgrade(&locate(cli, cwd)?, me, *confirm),
+        Command::Audit => trail::audit(&locate(cli, cwd)?),
+        Command::Checkpoint { git_commit } => {
+            trail::checkpoint(&locate(cli, cwd)?, git_commit.as_deref())
+        }
         Command::Folder { what } => folders::folder(&locate(cli, cwd)?, me, what, cwd),
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;

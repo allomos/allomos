@@ -275,6 +275,12 @@ Work a task:
   and approve) a task, and alm refuses it (`self_check`, `self_approve`, `work_after_signing`;
   `checker_unknown`: name the checker with `alm checked --checker <pseudonym>`); off needs
   `--reason`. Settings the person decides: change them only when they ask.
+- `alm audit`: check the history (an `allomos/8` taskbag signs every change with the key of the
+  computer that makes it): it lists unsigned changes, changes made after signing, gaps in a
+  computer's chain (a change removed), keys not in `keys/`, and checkpoints whose changes are
+  gone. Facts only, never a verdict: you check what they mean and tell the person.
+  `alm checkpoint [--git-commit <the taskbag repository's commit>]` fixes a fingerprint of the
+  whole taskbag in `checkpoints/`; save and share it like any change.
   `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task);
   `alm backlog <id>` (back to backlog, to think it over again: an unheld ready, waiting or blocked
   task; write the open questions in its description's Notes).

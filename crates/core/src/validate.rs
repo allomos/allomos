@@ -555,7 +555,7 @@ mod tests {
     fn a_newer_format_is_reported_before_unknown_fields() {
         let err = parse_project(
             "project.json",
-            r#"{"format":"allomos/8","id":"d","name":"D","later":{"context":90}}"#,
+            r#"{"format":"allomos/9","id":"d","name":"D","later":{"context":90}}"#,
         )
         .unwrap_err();
         assert_eq!(err.len(), 1);

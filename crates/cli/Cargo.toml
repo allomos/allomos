@@ -28,4 +28,6 @@ sys-locale = "=0.3.2"
 
 [dev-dependencies]
 allomos-core.workspace = true
-allomos-store.workspace = true
+# Tests never use the person's Keychain or settings folder unless a test chose one with
+# ALLOMOS_SETTINGS_DIR (Task-A01-gusto404).
+allomos-store = { workspace = true, features = ["test-settings"] }

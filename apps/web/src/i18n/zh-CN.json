@@ -289,6 +289,7 @@
   "problem.label_not_on_task": "{id} 没有标签 {label}。",
   "problem.label_not_by_human": "{label} 不是人工检查的标签：请用“人已在本地验证”或“人已在部署后验证”。",
   "problem.human_check_label_missing": "{id} 还没有人工检查的标签。如果有人检查过，请先标为已检查；否则按“未经人检查完成”来完成它。",
+  "problem.no_signing_key": "这台电脑没有签名密钥：「换肩」把它放在系统的密钥存储里，而在这里还没有能用的（目前支持 macOS 钥匙串）。什么都没有写。在这里做的改动不带签名写入，alm audit 会列出它们。",
   "problem.taskbag_to_upgrade": "这个任务包是 {found}；这个「换肩」能读它，但只写 {current}，其中标签的形式变了。什么都没有改。请先更新任务包（“更新任务包…”或 alm upgrade）；较旧版本的「换肩」会拒绝升级后的任务包。",
   "problem.waiting_on_missing": "等待中的任务必须写明在等待什么。",
   "problem.without_human_check_missing": "请写明为什么未经人工检查就完成这个任务。",

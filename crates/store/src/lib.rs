@@ -28,6 +28,7 @@ use serde::Serialize;
 
 pub mod approvals;
 pub mod cards;
+pub mod checkpoint;
 mod confirm;
 mod convert;
 pub mod events;
@@ -40,6 +41,8 @@ pub mod progress;
 mod quota;
 mod settings;
 mod setup;
+mod signing;
+pub mod trail;
 mod translate;
 mod update_taskbag;
 pub mod versions;
@@ -1385,6 +1388,7 @@ pub fn init_with_labels(
     );
     let parent = root.parent().expect("a taskbag root has a parent");
     fs::create_dir_all(parent).map_err(|e| write_failed(parent, e))?;
+    let first_file = events::new_file(root);
     create_dir_atomic(
         root,
         &[
@@ -1394,7 +1398,7 @@ pub fn init_with_labels(
             ("areas/.keep", String::new()),
             ("tasks/.keep", String::new()),
             (handoff::NOTES_FILE, handoff::DEFAULT_NOTES.to_string()),
-            (&events::new_file(root), json_text(&first)),
+            (&first_file, json_text(&first)),
         ],
     )
     .map_err(|p| match p {
@@ -1403,6 +1407,19 @@ pub fn init_with_labels(
         },
         p => p,
     })?;
+    // An `allomos/8` taskbag's history is signed from its first event (Task-A01-gusto404).
+    if signing::wanted(root, &first) {
+        let mut value = serde_json::to_value(&first).expect("events serialize");
+        let new_key = signing::sign_event(root, &mut value, &first_file);
+        let mut first = first;
+        if let Some(sig) = value.get("sig") {
+            first.extra.insert("sig".into(), sig.clone());
+        }
+        write_atomic(&root.join(&first_file), &json_text(&first))?;
+        if let Some(key) = new_key {
+            signing::add_key(root, Some(id), &key, &value)?;
+        }
+    }
     Ok(root.to_path_buf())
 }
 
@@ -1626,9 +1643,12 @@ pub struct Upgraded {
     pub labels: std::collections::BTreeMap<String, usize>,
     /// Tasks that lost a dropped label (`drafted`, `implemented`).
     pub dropped: usize,
+    /// The checkpoint made right after the upgrade (`checkpoints/<name>.json`), which fixes the
+    /// history recorded before signing; `None` without a signing key.
+    pub checkpoint: Option<String>,
 }
 
-/// Upgrade an older taskbag to `allomos/7`, which only a person asks for (approver,
+/// Upgrade an older taskbag to `allomos/8`, which only a person asks for (approver,
 /// 2026-10-25). From `allomos/5`: `project_folder` becomes the first of `project_folders`, named
 /// after the folder (decision 0019). From `allomos/5` or `allomos/6`: the ladder becomes the label
 /// table and each task's `label` its `labels` (decision 0020, In detail 8): `drafted` and
@@ -1670,7 +1690,10 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
     let unreviewed = decision::pending(&history);
     let mut changed = Vec::new();
     let mut dropped = 0;
-    for task in &bag.tasks {
+    // From `allomos/7` on, labels already have their shape: only signing starts.
+    let labels_done = allomos_core::format_version(&bag.project.format)
+        .is_some_and(|n| n >= allomos_core::LABELS_FROM);
+    for task in bag.tasks.iter().filter(|_| !labels_done) {
         let path = root.join("tasks").join(&task.id).join("task.json");
         let old = fs::read_to_string(&path)
             .ok()
@@ -1731,6 +1754,16 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
         let event = actor.event("upgrade", Kind::Task, Some(&next.id), changes);
         lock.record(&event, |l| l.save_task(next))?;
     }
+    if labels_done {
+        for task in &bag.tasks {
+            for l in &task.labels {
+                *counts.entry(l.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    // The `upgrade` event is the first signed one; a checkpoint fixes everything written before
+    // it (decision 0021 § 4, events before signing: option A). Without a key store, none.
+    let checkpoint = checkpoint::make(root, None).ok().map(|m| m.file);
     Ok(Some(Upgraded {
         from: bag.project.format.clone(),
         to: project.format.clone(),
@@ -1738,6 +1771,7 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
         tasks,
         labels: counts,
         dropped,
+        checkpoint,
     }))
 }
 

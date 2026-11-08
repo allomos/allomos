@@ -13,7 +13,7 @@ pub type Extra = BTreeMap<String, Value>;
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/7";
+pub const FORMAT: &str = "allomos/8";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape. An older Allomos
 /// refuses a newer taskbag (Task-A01-25); this one reads only its own format. A taskbag in any
@@ -45,7 +45,16 @@ pub const FORMAT: &str = "allomos/7";
 /// replacing the ladder of names), and several labels per task (`labels`, replacing `label`).
 /// An `allomos/5` or `allomos/6` taskbag is still read (its ladder and labels translated as the
 /// upgrade does), but not written until a person upgrades it (`alm upgrade`): the shape changed.
-pub const FORMAT_VERSION: u32 = 7;
+/// 8: signed events (decision 0021 § 3, Task-A01-gusto404): every event an `allomos/8` taskbag's
+/// writers make carries `sig` (this computer's key, the fingerprint of the key's previous event,
+/// the signature), the public keys are in `keys/` and checkpoints in `checkpoints/`. An older
+/// Allomos refuses it, so it cannot go on writing unsigned events unnoticed. An `allomos/7`
+/// taskbag is still read and written as it is, unsigned, until a person upgrades it.
+pub const FORMAT_VERSION: u32 = 8;
+
+/// The first format with the label table (decision 0020): an older taskbag is read but not
+/// written until it is upgraded.
+pub const LABELS_FROM: u32 = 7;
 
 /// The oldest format this Allomos reads and writes as it is ([`READ_FROM`]..=[`FORMAT_VERSION`]):
 /// `allomos/5` stays readable after `allomos/6`, so nothing changes a taskbag until a person
@@ -117,7 +126,7 @@ impl Project {
         format_version(&self.format).is_some_and(|n| n >= 6)
     }
 
-    /// Written in the current format (`allomos/7`): labels are a table and a list per task.
+    /// Written in the current format (`allomos/8`): nothing to upgrade.
     pub fn current(&self) -> bool {
         format_version(&self.format).is_some_and(|n| n >= FORMAT_VERSION)
     }

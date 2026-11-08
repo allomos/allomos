@@ -12,9 +12,18 @@ allomos-core.workspace = true
 fs4 = { version = "=1.1.0", default-features = false, features = ["sync"] }
 serde.workspace = true
 serde_json.workspace = true
+# Signed events (Task-A01-gusto404, decision 0021 § 3.1): Ed25519 signatures from the version the
+# lockfile already had (the desktop app's TLS uses it), and SHA-256 as allomos-core has it.
+ring = "=0.17.14"
+sha2 = "=0.10.9"
 
 [features]
 # Tests only: never read or write the person's real settings folder for pseudonyms and session
 # models unless a test chose one with ALLOMOS_SETTINGS_DIR (Task-A01-black004). Turned on by the
 # app's dev-dependencies, so a release build never has it.
 test-settings = []
+
+[dev-dependencies]
+# Its own tests too never use the person's Keychain or settings folder unless a test chose one
+# with ALLOMOS_SETTINGS_DIR (Task-A01-gusto404).
+allomos-store = { path = ".", features = ["test-settings"] }

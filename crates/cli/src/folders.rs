@@ -50,10 +50,20 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
                 None => " It has no project folder recorded yet.".to_string(),
             }
         };
-        let text = format!(
-            "This taskbag is in {}. Upgrading writes {FORMAT}: the label ladder becomes the label table with the five built-in labels, and each task's label moves into its list of labels (drafted and implemented are dropped; locally verified and deployed and verified become \"… by agent\"; human verified becomes deployed and verified by human when the task's history shows deployed and verified before it, else locally verified by human; a task with unreviewed AI decisions gets AI decisions to review).{folder}\nAfter the upgrade, Allomos versions older than this one (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Install it first, then run `alm upgrade --confirm`.\n",
-            bag.project.format
-        );
+        let labels_done = allomos_core::format_version(&bag.project.format)
+            .is_some_and(|n| n >= allomos_core::LABELS_FROM);
+        let signing = " From then on every change is signed with the key of the computer that makes it (kept in the system's key store, never in the taskbag; on macOS the Keychain), its public key goes in keys/, and a checkpoint (checkpoints/) fixes a fingerprint of everything recorded before: `alm audit` lists what it finds (decision 0021).";
+        let text = if labels_done {
+            format!(
+                "This taskbag is in {}. Upgrading writes {FORMAT}: labels stay as they are.{signing}\nAfter the upgrade, Allomos versions older than this one (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Install it first, then run `alm upgrade --confirm`.\n",
+                bag.project.format
+            )
+        } else {
+            format!(
+                "This taskbag is in {}. Upgrading writes {FORMAT}: the label ladder becomes the label table with the five built-in labels, and each task's label moves into its list of labels (drafted and implemented are dropped; locally verified and deployed and verified become \"… by agent\"; human verified becomes deployed and verified by human when the task's history shows deployed and verified before it, else locally verified by human; a task with unreviewed AI decisions gets AI decisions to review).{folder}{signing}\nAfter the upgrade, Allomos versions older than this one (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Install it first, then run `alm upgrade --confirm`.\n",
+                bag.project.format
+            )
+        };
         let mut done = Done::new(
             json!({ "taskbag": root, "format": bag.project.format, "upgraded": false, "to": FORMAT }),
             text,
@@ -79,6 +89,10 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
             for (label, n) in &u.labels {
                 text.push_str(&format!("  {label}: {n}\n"));
             }
+            text.push_str(&match &u.checkpoint {
+                Some(c) => format!("Changes are signed from now on; the checkpoint {c} fixes the history recorded before (`alm audit` lists it).\n"),
+                None => "This computer has no signing key store Allomos can use yet, so its changes are written unsigned (`alm audit` lists them) and no checkpoint was made.\n".to_string(),
+            });
             text
         }
         None => "Already up to date.\n".to_string(),
