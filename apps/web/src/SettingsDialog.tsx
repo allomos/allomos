@@ -1,6 +1,10 @@
-// The taskbag's settings (Task-A05-camera758, approver 2026-10-25): opened from Settings beside the
-// taskbag's name in the window header. A list of sections on the left, the chosen one on the right;
-// Close and Esc close it. General shows the taskbag's name, with Rename (Task-A05-chalk937), its
+// The app's one settings dialog (Task-A05-cookie962, approver 2026-11-08): a list of sections on
+// the left in two groups, the chosen one on the right; Close and Esc close it. The **Allomos**
+// group (AppSettings.tsx) holds what affects the whole app on this computer; the group named after
+// the tab's taskbag holds that taskbag's own settings, saved in its project.json. Settings… in the
+// menu opens it at the Allomos group; Settings beside the taskbag's name, at the taskbag's group.
+// A tab without a taskbag shows only the Allomos group. Each section's top line says which group
+// it is in. The taskbag's group (Task-A05-camera758, approver 2026-10-25): General shows the taskbag's name, with Rename (Task-A05-chalk937), its
 // format and whether it is up to date, with Update the Taskbag… when it is older (the same check as
 // the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
 // sets the language tasks are written in, has Translate the taskbag… (Task-A05-board831), and shows
@@ -12,6 +16,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AgentsSection } from "./AgentsSection";
+import { AppGeneralSection, ThisComputerPart } from "./AppSettings";
 import { HandoffSection } from "./HandoffSettings";
 import { AuditSection } from "./AuditSettings";
 import { ProjectFolders } from "./ProjectFolders";
@@ -20,13 +25,16 @@ import { LanguageMenu } from "./LanguageMenu";
 import { TranslateDialog } from "./TranslateDialog";
 import { addStep, ladderChanged, ladderProblem, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
 import { BUILT_IN_NAMES, labelMeaning, labelTable, labelText } from "./stopFlow";
-import type { Messenger } from "./messenger";
+import type { AppSettingsMessenger, Messenger } from "./messenger";
 import { middleEllipsis } from "./paths";
 import { isProblem, type LabelEntry, type VersionCheck } from "./types";
 import { movingTasks, updateNotice, upgradeFrom } from "./versionFlow";
 
+const APP_SECTIONS = ["general", "computer"] as const;
 const SECTIONS = ["general", "folders", "agents", "tasks", "handoff", "audit"] as const;
 type Section = (typeof SECTIONS)[number];
+/** The chosen section: one of the Allomos group's or of the taskbag's. */
+type Chosen = { group: "app"; section: (typeof APP_SECTIONS)[number] } | { group: "taskbag"; section: Section };
 
 /** The location in its monospace font, shortened in the middle to the characters that fit its
  * width (measured, and again when the dialog's width changes). */
@@ -270,22 +278,8 @@ function LabelTable({ labels, onSave }: { labels: LabelEntry[]; onSave: (steps: 
   );
 }
 
-export function TaskbagSettings({
-  messenger,
-  name,
-  labels,
-  taskLanguage,
-  format,
-  root,
-  fileManagerKey,
-  onShowInFileManager,
-  onRename,
-  onUpdate,
-  onSetUpAgent,
-  onChanged,
-  onClose,
-}: {
-  messenger: Messenger;
+/** The taskbag group's facts and what it does: the taskbag the tab shows. */
+export interface TaskbagGroup {
   name: string;
   /** The project's label table. */
   labels: LabelEntry[];
@@ -293,8 +287,6 @@ export function TaskbagSettings({
   /** `project.json`'s format, for example `allomos/5`. */
   format: string;
   root: string;
-  /** `top.show_in_finder`, `top.show_in_explorer` or `top.show_in_files`, for this computer. */
-  fileManagerKey: Key;
   onShowInFileManager: () => void;
   /** Rename the project; rejects with the Problem that refused it. */
   onRename: (name: string) => Promise<void>;
@@ -304,10 +296,31 @@ export function TaskbagSettings({
   onSetUpAgent: (folder: string) => void;
   /** After a change saved here: read the taskbag again. */
   onChanged: () => Promise<void>;
+}
+
+export function SettingsDialog({
+  messenger,
+  app,
+  taskbag,
+  at,
+  fileManagerKey,
+  onClose,
+}: {
+  messenger: Messenger;
+  /** The Allomos group's settings; none outside the desktop app. */
+  app: Omit<AppSettingsMessenger, "takeSettingsRequest"> | undefined;
+  /** The tab's taskbag; none on a blank tab. */
+  taskbag: TaskbagGroup | null;
+  /** Which group it opens at. */
+  at: "app" | "taskbag";
+  /** `top.show_in_finder`, `top.show_in_explorer` or `top.show_in_files`, for this computer. */
+  fileManagerKey: Key;
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const [section, setSection] = useState<Section>("general");
+  const [chosen, setChosen] = useState<Chosen>(() =>
+    (at === "taskbag" && taskbag) || !app ? { group: "taskbag", section: "general" } : { group: "app", section: "general" },
+  );
   // Esc closes the dialog, and only the dialog (not the task pane behind it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -320,58 +333,54 @@ export function TaskbagSettings({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
+  // The taskbag closed while the dialog was open: back to the Allomos group.
+  const shown: Chosen = chosen.group === "taskbag" && !taskbag ? { group: "app", section: "general" } : chosen;
+  const isChosen = (c: Chosen) => c.group === shown.group && c.section === shown.section;
+  const item = (c: Chosen, label: string) => (
+    <button
+      key={`${c.group}.${c.section}`}
+      type="button"
+      className={isChosen(c) ? "chosen" : ""}
+      aria-current={isChosen(c) ? "page" : undefined}
+      onClick={() => setChosen(c)}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="overlay" role="presentation">
       <section className="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <h2 id="settings-title">{t("settings.title", { name })}</h2>
+        <h2 id="settings-title">{t("app_settings.title")}</h2>
         <div className="settings-body">
           <nav className="settings-sections" aria-label={t("settings.sections")}>
-            {SECTIONS.map((s) => (
-              <button key={s} type="button" className={s === section ? "chosen" : ""} aria-current={s === section ? "page" : undefined} onClick={() => setSection(s)}>
-                {t(`settings.${s}` as Key)}
-              </button>
-            ))}
+            {app && (
+              <div className="settings-group" role="group" aria-labelledby="settings-group-app">
+                <div className="settings-group-name" id="settings-group-app">
+                  Allomos
+                </div>
+                {item({ group: "app", section: "general" }, t("settings.general"))}
+                {item({ group: "app", section: "computer" }, t("this_computer.title"))}
+              </div>
+            )}
+            {taskbag && (
+              <div className="settings-group" role="group" aria-labelledby="settings-group-taskbag">
+                <div className="settings-group-name" id="settings-group-taskbag" title={taskbag.name}>
+                  {taskbag.name}
+                </div>
+                {SECTIONS.map((s) => item({ group: "taskbag", section: s }, t(`settings.${s}` as Key)))}
+              </div>
+            )}
           </nav>
           <div className="settings-section">
-            {section === "general" && (
-              <>
-                <h3>{t("settings.name")}</h3>
-                <NameRow name={name} onRename={onRename} />
-                <h3>{t("settings.format")}</h3>
-                <FormatRow messenger={messenger} root={root} format={format} onUpdate={onUpdate} />
-                <h3>{t("settings.location")}</h3>
-                <Location root={root} />
-                <button type="button" className="link reveal" onClick={onShowInFileManager}>
-                  {t(fileManagerKey)}
-                </button>
-              </>
+            <p className={shown.group === "app" ? "settings-scope app" : "settings-scope taskbag"}>
+              {shown.group === "app" ? t("settings.scope_app") : t("settings.scope_taskbag")}
+            </p>
+            {app && shown.group === "app" && shown.section === "general" && <AppGeneralSection settings={app} />}
+            {app && shown.group === "app" && shown.section === "computer" && <ThisComputerPart settings={app} />}
+            {taskbag && shown.group === "taskbag" && (
+              <TaskbagSection messenger={messenger} taskbag={taskbag} section={shown.section} fileManagerKey={fileManagerKey} />
             )}
-            {section === "tasks" && (
-              <>
-                <h3>{t("settings.task_language")}</h3>
-                <TaskLanguage
-                  value={taskLanguage}
-                  onChange={async (value) => {
-                    await messenger.setTaskLanguage(root, value);
-                    await onChanged();
-                  }}
-                />
-                <Translate messenger={messenger} root={root} />
-                <h3>{t("settings.labels")}</h3>
-                <LabelTable
-                  labels={labels}
-                  onSave={async (steps) => {
-                    await messenger.changeLadder(root, steps);
-                    await onChanged();
-                  }}
-                />
-              </>
-            )}
-            {section === "agents" && <AgentsSection messenger={messenger} root={root} onSetUp={onSetUpAgent} />}
-            {section === "handoff" && <HandoffSection messenger={messenger} root={root} />}
-            {section === "audit" && <AuditSection messenger={messenger} root={root} fileManagerKey={fileManagerKey} />}
-            {section === "folders" && <ProjectFolders messenger={messenger} root={root} fileManagerKey={fileManagerKey} onChanged={onChanged} />}
           </div>
         </div>
         <div className="row">
@@ -381,5 +390,53 @@ export function TaskbagSettings({
         </div>
       </section>
     </div>
+  );
+}
+
+/** One section of the taskbag's group: its content as before the two dialogs became one. */
+function TaskbagSection({ messenger, taskbag, section, fileManagerKey }: { messenger: Messenger; taskbag: TaskbagGroup; section: Section; fileManagerKey: Key }) {
+  const { t } = useI18n();
+  const { name, labels, taskLanguage, format, root, onShowInFileManager, onRename, onUpdate, onSetUpAgent, onChanged } = taskbag;
+  return (
+    <>
+      {section === "general" && (
+        <>
+          <h3>{t("settings.name")}</h3>
+          <NameRow name={name} onRename={onRename} />
+          <h3>{t("settings.format")}</h3>
+          <FormatRow messenger={messenger} root={root} format={format} onUpdate={onUpdate} />
+          <h3>{t("settings.location")}</h3>
+          <Location root={root} />
+          <button type="button" className="link reveal" onClick={onShowInFileManager}>
+            {t(fileManagerKey)}
+          </button>
+        </>
+      )}
+      {section === "tasks" && (
+        <>
+          <h3>{t("settings.task_language")}</h3>
+          <TaskLanguage
+            value={taskLanguage}
+            onChange={async (value) => {
+              await messenger.setTaskLanguage(root, value);
+              await onChanged();
+            }}
+          />
+          <Translate messenger={messenger} root={root} />
+          <h3>{t("settings.labels")}</h3>
+          <LabelTable
+            labels={labels}
+            onSave={async (steps) => {
+              await messenger.changeLadder(root, steps);
+              await onChanged();
+            }}
+          />
+        </>
+      )}
+      {section === "agents" && <AgentsSection messenger={messenger} root={root} onSetUp={onSetUpAgent} />}
+      {section === "handoff" && <HandoffSection messenger={messenger} root={root} />}
+      {section === "audit" && <AuditSection messenger={messenger} root={root} fileManagerKey={fileManagerKey} />}
+      {section === "folders" && <ProjectFolders messenger={messenger} root={root} fileManagerKey={fileManagerKey} onChanged={onChanged} />}
+    </>
   );
 }

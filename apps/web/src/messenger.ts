@@ -75,6 +75,8 @@ export interface Messenger {
   onMoveTasksInMenu(handler: () => void): Promise<() => void>;
   /** Calls `handler` when File → Devices on Your Network… is chosen (Task-A04-02-01). */
   onLanMenu(handler: () => void): Promise<() => void>;
+  /** Calls `handler` when Settings… is chosen (Task-A05-cookie962): the settings dialog, at its Allomos group. */
+  onSettingsMenu(handler: () => void): Promise<() => void>;
   /** "Allow devices on your network to view": whether it is on, and the address while it is. */
   lanStatus(): Promise<LanStatus>;
   /** Turns it on or off, remembered; resolves to the new status (with `error` when it could not start). */
@@ -359,6 +361,8 @@ export interface AppSettingsMessenger {
   exportPublicKey(suggestedName: string): Promise<boolean>;
   /** Replace key… (Task-A01-ring220): a new signing key; the old one retired in each taskbag of `folders` (the recent folders) that has it. Rejects with a Problem. */
   replaceKey(folders: string[]): Promise<KeyReplaced>;
+  /** Whether Settings… was chosen while no window was open, so this new window shows the settings (Task-A05-cookie962); asking clears it. */
+  takeSettingsRequest(): Promise<boolean>;
 }
 
 export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
@@ -387,6 +391,7 @@ export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
     return true;
   },
   replaceKey: (folders) => invoke<KeyReplaced>("replace_key", { folders }),
+  takeSettingsRequest: () => invoke<boolean>("take_settings_request"),
 };
 
 /** Pairing (apps/desktop/src-tauri/src/pairing.rs, Task-A04-02-02): what the dialog shows. */
@@ -437,6 +442,7 @@ export const desktopMessenger: Messenger = {
   onConnectMenu: (handler) => getCurrentWebviewWindow().listen("menu:connect", () => handler()),
   onMoveTasksInMenu: (handler) => getCurrentWebviewWindow().listen("menu:move_tasks_in", () => handler()),
   onLanMenu: (handler) => getCurrentWebviewWindow().listen("menu:lan_viewing", () => handler()),
+  onSettingsMenu: (handler) => getCurrentWebviewWindow().listen("menu:settings", () => handler()),
   lanStatus: () => invoke<LanStatus>("lan_status"),
   setLanViewing: (on) => invoke<LanStatus>("set_lan_viewing", { on }),
   lanPairing: () => invoke<PairingView>("lan_pairing"),

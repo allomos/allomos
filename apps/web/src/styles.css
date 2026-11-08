@@ -102,6 +102,12 @@ button.primary { background: var(--ink); color: var(--surface); border-color: va
 .settings-body { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; min-height: 200px; }
 .settings-sections { display: grid; align-content: start; gap: 2px; }
 .settings-sections button { text-align: left; border: none; background: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: inherit; }
+.settings-group { display: grid; gap: 2px; }
+.settings-group + .settings-group { margin-top: 10px; }
+.settings-group-name { padding: 4px 10px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-scope { margin: 0 0 4px; padding: 6px 10px; border-radius: 6px; font-size: 12px; width: 100%; box-sizing: border-box; }
+.settings-scope.app { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
+.settings-scope.taskbag { background: var(--info-bg); color: var(--info); }
 .settings-sections button.chosen { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
 .settings-section { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; }
 .settings-section h3 { margin: 0; font-size: 14px; }
@@ -942,18 +948,13 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .tab-view { flex: 1; min-height: 0; }
 .tab-view[hidden] { display: none; }
 /* The app's own Settings window (Task-A01-marble320). */
-.settings-window { box-sizing: border-box; min-height: 100vh; padding: 24px 28px; background: var(--bg); color: var(--ink); }
-.settings-window h1 { margin: 0 0 16px; font-size: 18px; }
-/* Settings → This computer (Task-A01-tail719). */
-.settings-window h1:not(:first-child) { margin-top: 24px; }
-.settings-window .this-computer { display: grid; gap: 8px; max-width: 640px; }
-.settings-window .this-computer h2 { margin: 8px 0 0; font-size: 14px; }
-.settings-window .this-computer code { overflow-wrap: anywhere; }
-.settings-window .seen-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
-.settings-window .seen-gone { color: var(--warn); }
-.settings-window .warning { color: var(--warn); }
-.settings-window .replace-key { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; }
-@media (max-width: 520px) { .settings-window { padding: 16px; } }
+.this-computer { display: grid; gap: 8px; width: 100%; }
+.this-computer h3 { margin: 8px 0 0; font-size: 14px; }
+.this-computer code { overflow-wrap: anywhere; }
+.this-computer .seen-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.this-computer .seen-gone { color: var(--warn); }
+.this-computer .warning { color: var(--warn); }
+.this-computer .replace-key { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; }
 .settings-choice { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px 14px; margin: 0 0 12px; background: var(--surface); display: grid; gap: 8px; }
 .settings-choice legend { font-weight: 600; padding: 0 4px; }
 .settings-choice label { display: flex; align-items: center; gap: 8px; }

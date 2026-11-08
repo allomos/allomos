@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { App } from "./App";
 import { useI18n } from "./i18n";
-import type { Messenger, TabsMessenger } from "./messenger";
+import type { AppSettingsMessenger, Messenger, TabsMessenger } from "./messenger";
 import { projectFolder } from "./paths";
 import { TabActive } from "./tabActive";
 import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startEntries, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
@@ -47,6 +47,7 @@ function tabMessenger(base: Messenger, id: number, shell: Shell): Messenger {
     onConnectMenu: gate(base.onConnectMenu),
     onMoveTasksInMenu: gate(base.onMoveTasksInMenu),
     onLanMenu: gate(base.onLanMenu),
+    onSettingsMenu: gate(base.onSettingsMenu),
     onCheckUpdatesMenu: gate(base.onCheckUpdatesMenu),
   };
 }
@@ -63,7 +64,7 @@ type TabEdge = { left: number; right: number; width: number };
 /** Where a tab bar's first tab starts: its padding (`.tabbar` in styles.css). */
 const BAR_INSET = { x: 8, y: 6 };
 
-export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tabs: TabsMessenger }) {
+export function WindowTabs({ messenger, tabs: api, settings }: { messenger: Messenger; tabs: TabsMessenger; settings?: AppSettingsMessenger }) {
   const { t } = useI18n();
   const [tabs, setTabs] = useState<TabEntry[]>([]);
   const [front, setFront] = useState<number | null>(null);
@@ -507,7 +508,7 @@ export function WindowTabs({ messenger, tabs: api }: { messenger: Messenger; tab
         .map((tab) => (
           <div key={tab.id} className="tab-view" role="tabpanel" hidden={tab.id !== front}>
             <TabActive.Provider value={tab.id === front}>
-              <App messenger={viewOf(tab.id).messenger} start={tab.start} />
+              <App messenger={viewOf(tab.id).messenger} settings={settings} start={tab.start} />
             </TabActive.Provider>
           </div>
         ))}

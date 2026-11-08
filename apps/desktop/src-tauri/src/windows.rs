@@ -14,9 +14,6 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::window_list;
 
-/// The app's own Settings window (Task-A01-marble320): not a project window, so menu commands
-/// never go to it.
-pub(crate) const SETTINGS_WINDOW: &str = "settings";
 /// The windows' and tabs' file in the settings folder, for **Reopen windows and tabs**.
 const SESSION_FILE: &str = "windows.json";
 /// The events a window hears about its tabs.
@@ -264,13 +261,13 @@ pub(crate) fn restore(app: &AppHandle) {
 }
 
 /// The label of the project window in front, else the first one.
-/// The About and Settings windows are not project windows: menu commands skip them (Task-A07-28).
+/// The About window is not a project window: menu commands skip it (Task-A07-28).
 pub(crate) fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
     let projects = || {
-        windows.iter().filter(|(label, _)| {
-            label.as_str() != crate::ABOUT_WINDOW && label.as_str() != SETTINGS_WINDOW
-        })
+        windows
+            .iter()
+            .filter(|(label, _)| label.as_str() != crate::ABOUT_WINDOW)
     };
     projects()
         .find(|(_, w)| w.is_focused().unwrap_or(false))
@@ -523,30 +520,21 @@ pub(crate) fn show_project_elsewhere(
     }
 }
 
-/// The app's own **Settings…** window (Task-A01-marble320): settings for the whole app, apart from
-/// each taskbag's own. One at a time: choosing it again brings it forward.
-pub(crate) fn open_settings_window(app: &AppHandle, title: &str) -> tauri::Result<()> {
-    if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
-        let _ = window.unminimize();
-        window.show()?;
-        return window.set_focus();
-    }
-    tauri::WebviewWindowBuilder::new(
-        app,
-        SETTINGS_WINDOW,
-        tauri::WebviewUrl::App("index.html?settings".into()),
-    )
-    .title(title)
-    .inner_size(560.0, 380.0)
-    .resizable(false)
-    .maximizable(false)
-    .minimizable(false)
-    .center()
-    .build()
-    .map(drop)
+/// Settings… with no project window open: the new window shows the settings dialog once it has
+/// loaded (Task-A05-cookie962), as it cannot hear an event sent before then.
+static SETTINGS_ASKED: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn ask_for_settings() {
+    SETTINGS_ASKED.store(true, Ordering::SeqCst);
 }
 
-/// The app's settings the Settings window shows.
+/// Whether Settings… was chosen while no window was open; asking clears it.
+#[tauri::command]
+pub(crate) fn take_settings_request() -> bool {
+    SETTINGS_ASKED.swap(false, Ordering::SeqCst)
+}
+
+/// The app's settings the settings dialog's Allomos group shows.
 #[derive(Serialize)]
 pub(crate) struct AppSettings {
     start_with: &'static str,

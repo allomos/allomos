@@ -7,7 +7,7 @@ sidebar:
 
 An auditor asks four things about every change: **who** did it, **on whose approval**, **was it checked**, and **can the record have been changed afterwards**. Allomos keeps a record that answers them, in the taskbag's history (one small file per change).
 
-This page says what Allomos records on its own, what each setting in **Project settings → Audit** adds, and which settings to turn on for some common standards.
+This page says what Allomos records on its own, what each setting in **Settings → your taskbag → Audit** adds, and which settings to turn on for some common standards.
 
 :::note[Allomos helps; it does not certify]
 Allomos is a tool. It **supports** a company's controls and **helps meet** a standard; it never makes a project "compliant". Auditors certify a company's whole practice, not a tool. Allomos does not claim to meet FDA 21 CFR Part 11, which also needs the company's own system-validation documents.
@@ -33,7 +33,7 @@ These need no setting and cannot be turned off. They cost little and help a sing
 
 ## The audit settings
 
-**Project settings → Audit** (open the settings beside the taskbag's name). The settings are stored in the taskbag, so everyone on the project works under the same rules. Every change to them is itself recorded, with a reason; turning a control off is shown in a warning colour and needs a reason.
+**Settings → your taskbag → Audit** (open the settings beside the taskbag's name). The settings are stored in the taskbag, so everyone on the project works under the same rules. Every change to them is itself recorded, with a reason; turning a control off is shown in a warning colour and needs a reason.
 
 ### Identity
 

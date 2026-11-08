@@ -17,7 +17,7 @@ import { outdatedFiles, upgradeFrom } from "./versionFlow";
 import { UpdateTaskbagNotice } from "./UpdateTaskbagNotice";
 import { almDismissFor, almOffer } from "./almOfferFlow";
 import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
-import { TaskbagSettings } from "./TaskbagSettings";
+import { SettingsDialog } from "./SettingsDialog";
 import { LanDialog } from "./LanDialog";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
 import { groupCount } from "./groupCountFlow";
@@ -63,7 +63,7 @@ import { iterationPlaces } from "./iterationPlace";
 import { MonitorControl, useMonitor } from "./Monitor";
 import { MonitorDialog } from "./MonitorDialog";
 import { readyTasks, scopeOptions, type OpenedFrom } from "./monitorFlow";
-import type { Messenger } from "./messenger";
+import type { AppSettingsMessenger, Messenger } from "./messenger";
 import { isProblem } from "./types";
 import { TabActive } from "./tabActive";
 import type { TabStart } from "./tabsFlow";
@@ -128,10 +128,13 @@ const AT_STARTUP: TabStart = { how: "startup", startWith: "last" };
 export function App({
   messenger,
   companion,
+  settings,
   start = AT_STARTUP,
 }: {
   messenger: Messenger;
   companion?: Companion;
+  /** The settings dialog's Allomos group (the desktop app's own settings). */
+  settings?: AppSettingsMessenger;
   start?: TabStart;
 }) {
   const { t, problem, language } = useI18n();
@@ -519,7 +522,10 @@ export function App({
     const stopCards = messenger.onMoveTasksInMenu(() => void openTasksIn());
     // File → Devices on Your Network… (Task-A04-02-01): an app setting, with or without a taskbag.
     const stopLan = messenger.onLanMenu(() => setLanShown(true));
+    // Settings… (Task-A05-cookie962): the one settings dialog, at its Allomos group.
+    const stopSettings = messenger.onSettingsMenu(() => setSettingsShown("app"));
     return () => {
+      void stopSettings.then((f) => f()).catch(() => undefined);
       void stopLan.then((f) => f()).catch(() => undefined);
       void stopClear.then((f) => f()).catch(() => undefined);
       void stopConnect.then((f) => f()).catch(() => undefined);
@@ -528,7 +534,13 @@ export function App({
   }, [messenger, changeRecent, openWizard, openTasksIn]);
 
   const [lanShown, setLanShown] = useState(false);
-  const [settingsShown, setSettingsShown] = useState(false);
+  /** The settings dialog, and the group it opened at. */
+  const [settingsShown, setSettingsShown] = useState<"app" | "taskbag" | null>(null);
+  // Settings… chosen while no window was open: this new window shows it (Task-A05-cookie962).
+  useEffect(() => {
+    if (!active || !settings) return;
+    void settings.takeSettingsRequest().then((asked) => asked && setSettingsShown("app"), () => undefined);
+  }, [active, settings]);
   /** Read the taskbag again after a change made in this window, noting the stamp so the follow
    * does not read it a second time and call it automatic (Task-A01-47). */
   const readAgain = useCallback(
@@ -581,7 +593,7 @@ export function App({
                   </button>
                 )
               ) : (
-              <button type="button" className="link reveal settings-link" onClick={() => setSettingsShown(true)}>
+              <button type="button" className="link reveal settings-link" onClick={() => setSettingsShown("taskbag")}>
                 <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
                   {/* A regular six-tooth gear (Task-A05-lamp100): every tooth the same size and
                       distance from the centre, so it reads as round. */}
@@ -662,30 +674,40 @@ export function App({
           />
         )}
         {lanShown && <LanDialog messenger={messenger} onClose={() => setLanShown(false)} />}
-        {settingsShown && opened?.loaded.taskbag && (
-          <TaskbagSettings
+        {settingsShown && (settings || opened?.loaded.taskbag) && (
+          <SettingsDialog
+            // Settings… while it is open at the taskbag's group goes to the Allomos group.
+            key={settingsShown}
             messenger={messenger}
-            name={opened.loaded.taskbag.project.name}
-            format={opened.loaded.taskbag.project.format}
-            root={opened.root}
+            app={settings}
+            at={settingsShown}
             fileManagerKey={FILE_MANAGER_KEY}
-            onShowInFileManager={() => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e)))}
-            labels={opened.loaded.taskbag.project.labels}
-            taskLanguage={opened.loaded.taskbag.project.task_language}
-            onRename={async (name) => {
-              await messenger.renameProject(opened.root, name);
-              await readAgain(opened.root);
-            }}
-            onChanged={() => readAgain(opened.root)}
-            onUpdate={() => {
-              setSettingsShown(false);
-              void openTasksIn();
-            }}
-            onSetUpAgent={(folder) => {
-              setSettingsShown(false);
-              openWizard({ resume: { root: opened.root, at: 4, project: folder } });
-            }}
-            onClose={() => setSettingsShown(false)}
+            taskbag={
+              opened?.loaded.taskbag
+                ? {
+                    name: opened.loaded.taskbag.project.name,
+                    format: opened.loaded.taskbag.project.format,
+                    root: opened.root,
+                    onShowInFileManager: () => messenger.showInFileManager(opened.root).catch((e) => setError(errorNote(e))),
+                    labels: opened.loaded.taskbag.project.labels,
+                    taskLanguage: opened.loaded.taskbag.project.task_language,
+                    onRename: async (name) => {
+                      await messenger.renameProject(opened.root, name);
+                      await readAgain(opened.root);
+                    },
+                    onChanged: () => readAgain(opened.root),
+                    onUpdate: () => {
+                      setSettingsShown(null);
+                      void openTasksIn();
+                    },
+                    onSetUpAgent: (folder) => {
+                      setSettingsShown(null);
+                      openWizard({ resume: { root: opened.root, at: 4, project: folder } });
+                    },
+                  }
+                : null
+            }
+            onClose={() => setSettingsShown(null)}
           />
         )}
         {building && (
