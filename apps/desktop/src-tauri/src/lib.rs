@@ -1432,6 +1432,10 @@ struct AuditSettings {
     identity: allomos_core::audit::Identity,
     /// Separation of duties (Task-A01-grotto036): off by default.
     separation_of_duties: bool,
+    /// Retention (Task-A01-stem986): years to keep the history; null: forever.
+    retention_years: Option<u32>,
+    /// Legal hold (Task-A01-stem986): nothing in the history may be removed or redacted.
+    legal_hold: bool,
     /// `identities.json` in the settings folder; null without one.
     identities_file: Option<String>,
 }
@@ -1448,6 +1452,8 @@ fn audit_settings_of(root: &Path) -> Result<AuditSettings, Problem> {
     Ok(AuditSettings {
         identity: allomos_core::audit::identity(&bag.project),
         separation_of_duties: allomos_core::duties::on(&bag.project),
+        retention_years: allomos_core::retention::of(&bag.project).years,
+        legal_hold: allomos_core::retention::of(&bag.project).legal_hold,
         identities_file: allomos_store::identity::identities_file()
             .map(|p| p.display().to_string()),
     })
@@ -1481,6 +1487,50 @@ fn set_separation_at(
         .taskbag
         .ok_or_else(|| loaded.issues[0].problem.clone())?;
     let (project, changes) = allomos_core::duties::set(&bag.project, on, reason)?;
+    let event = allomos_store::Actor::APP.event(
+        "audit-settings",
+        allomos_core::event::Kind::Project,
+        Some(&project.id),
+        changes,
+    );
+    lock.record(&event, |l| l.save_project(&project))?;
+    drop(lock);
+    audit_settings_of(root)
+}
+
+/// Change the retention period and the legal hold (Task-A01-stem986), as `alm audit-settings
+/// --retention --legal-hold` does: recorded as an `audit-settings` event; a shorter period and
+/// turning the hold on or off need a reason. `years` null: forever. Returns the settings as saved.
+#[tauri::command]
+fn set_retention(
+    root: PathBuf,
+    years: Option<u32>,
+    legal_hold: bool,
+    reason: Option<String>,
+) -> Result<AuditSettings, Problem> {
+    set_retention_at(&root, years, legal_hold, reason.as_deref())
+}
+
+fn set_retention_at(
+    root: &Path,
+    years: Option<u32>,
+    legal_hold: bool,
+    reason: Option<&str>,
+) -> Result<AuditSettings, Problem> {
+    if let Some(y) = years {
+        allomos_core::retention::parse(&y.to_string())?;
+    }
+    let lock = allomos_store::Lock::acquire(root, LOCK_WAIT)?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let change = allomos_core::retention::RetentionChange {
+        years: Some(years),
+        legal_hold: Some(legal_hold),
+        reason,
+    };
+    let (project, changes) = allomos_core::retention::set(&bag.project, &change)?;
     let event = allomos_store::Actor::APP.event(
         "audit-settings",
         allomos_core::event::Kind::Project,
@@ -2678,6 +2728,7 @@ pub fn run() {
             set_handoff_rules,
             audit_settings,
             set_separation,
+            set_retention,
             set_identity,
             show_identities_file,
             lan_status,
@@ -3362,6 +3413,34 @@ mod tests {
                 .separation_of_duties
         );
         assert_eq!(count(), before + 2);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Project settings → Audit → Retention (Task-A01-stem986): forever and no hold by default; a
+    /// shorter period and the hold need a reason.
+    #[test]
+    fn retention_and_legal_hold_are_set_with_a_reason() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-retention-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let s = audit_settings_of(&root).unwrap();
+        assert_eq!((s.retention_years, s.legal_hold), (None, false));
+        assert_eq!(
+            set_retention_at(&root, Some(7), false, None).err(),
+            Some(Problem::AuditReasonMissing {
+                setting: "retention".into()
+            })
+        );
+        let s = set_retention_at(&root, Some(7), true, Some("policy and a case")).unwrap();
+        assert_eq!((s.retention_years, s.legal_hold), (Some(7), true));
+        assert!(set_retention_at(&root, Some(0), true, Some("x")).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

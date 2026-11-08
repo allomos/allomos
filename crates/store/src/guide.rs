@@ -300,7 +300,18 @@ Work a task:
   `--separation-of-duties on|off`: on, the same person or agent may not both do and check (or do
   and approve) a task, and alm refuses it (`self_check`, `self_approve`, `work_after_signing`;
   `checker_unknown`: name the checker with `alm checked --checker <pseudonym>`); off needs
-  `--reason`. Settings the person decides: change them only when they ask.
+  `--reason`. `--retention forever|<years>`: how long the history is kept (forever by
+  default); alm removes nothing when records pass it, it says how many are older. A shorter
+  period needs `--reason`. `--legal-hold on|off` (with `--reason` both ways): while on, nothing
+  in the history may be removed or redacted. Settings the person decides: change them only when
+  they ask.
+- `alm redact <id> --field <field>… --reason \"<why>\" [--approved-by <who>] [--event <file>…]`:
+  remove a personal detail written into a task by mistake: every past value of the field in
+  the task's history that differs from its current value is replaced by a marker, and one event
+  records which fields and files, who approved it and why, never the old values. Correct the
+  current value first (`alm describe`, `alm title`, `alm note`). Only when the person asks, with
+  their approval; refused while a legal hold is on. The old values stay in Git history unless it
+  is rewritten; `alm audit` lists redacted changes as redacted, not as changed.
 - `alm audit`: check the history (an `allomos/8` taskbag signs every change with the key of the
   computer that makes it): it lists unsigned changes, changes made after signing, gaps in a
   computer's chain (a change removed), keys not in `keys/`, and checkpoints whose changes are

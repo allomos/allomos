@@ -397,6 +397,27 @@ enum Command {
     },
     /// A task's exceptions; with none given, every one in the project, by task.
     Exceptions { id: Option<String> },
+    /// Remove personal details written into a task by mistake (decision 0021): every past value
+    /// of each --field in the task's history that differs from its current value is replaced by
+    /// a marker, and one event records which fields and event files, who approved it (--approved-by)
+    /// and why (--reason), never the old values. Correct the current value first (alm describe,
+    /// alm title, alm note…). Refused while a legal hold is on.
+    Redact {
+        id: String,
+        /// A field of the task's history, as `alm history` names it (for example description or
+        /// handoff_note). Repeatable.
+        #[arg(long = "field", value_name = "FIELD", required = true)]
+        fields: Vec<String>,
+        /// Only these events of the task (`events/<name>.json`, or the name). Repeatable.
+        #[arg(long = "event", value_name = "FILE")]
+        events: Vec<String>,
+        /// Why the details are removed (recorded).
+        #[arg(long, value_name = "TEXT")]
+        reason: Option<String>,
+        /// Who approved the removal: a pseudonym ID or a role (for example "approver").
+        #[arg(long, value_name = "WHO")]
+        approved_by: Option<String>,
+    },
     /// Record a task's change type and risk (decision 0021): --type standard (pre-approved
     /// routine), normal (approved before) or emergency (made first, approved afterwards by a
     /// deadline, --due, three days by default); --risk low, medium or high; --touches production,
@@ -743,8 +764,8 @@ enum Command {
         #[arg(long)]
         clear: bool,
     },
-    /// The project's audit settings (decision 0021 § 6): the identity level and separation of
-    /// duties. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
+    /// The project's audit settings (decision 0021 § 6): the identity level, separation of
+    /// duties, retention and the legal hold. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
     /// behind it is kept on this computer (local project) or in the cloud (cloud project).
     #[command(name = "audit-settings")]
     AuditSettings {
@@ -760,6 +781,15 @@ enum Command {
         /// project with one person cannot finish its checks while it is on.
         #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
         separation_of_duties: Option<String>,
+        /// Keep the history: forever (the default) or a number of years (for example 7). Allomos
+        /// removes nothing when records pass it; it says how many are older. A shorter period
+        /// needs a reason.
+        #[arg(long, value_name = "forever|YEARS")]
+        retention: Option<String>,
+        /// Legal hold: on, nothing in the history may be removed or redacted. Turning it on or
+        /// off needs a reason.
+        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        legal_hold: Option<String>,
         /// Why, recorded in the history (needed when turning a control off or down).
         #[arg(long, value_name = "TEXT")]
         reason: Option<String>,
@@ -1015,6 +1045,7 @@ impl Command {
             Command::Effects { .. } => None,
             Command::Exception { id, .. } => Some(id),
             Command::Exceptions { .. } => None,
+            Command::Redact { id, .. } => Some(id),
             Command::Classify { id, .. } => Some(id),
             Command::Init { .. }
             | Command::Labels { .. }
@@ -1066,10 +1097,17 @@ impl Command {
         if let Command::AuditSettings {
             identity,
             reauthenticate,
+            separation_of_duties,
+            retention,
+            legal_hold,
             ..
         } = self
         {
-            return identity.is_some() || reauthenticate.is_some();
+            return identity.is_some()
+                || reauthenticate.is_some()
+                || separation_of_duties.is_some()
+                || retention.is_some()
+                || legal_hold.is_some();
         }
         if let Command::Cards { what } = self {
             return what.is_some();
@@ -1161,6 +1199,7 @@ impl Command {
             Command::Effects { .. } => "effects",
             Command::Exception { .. } => "exception",
             Command::Exceptions { .. } => "exceptions",
+            Command::Redact { .. } => "redact",
             Command::Classify { .. } => "classify",
             Command::Human { .. } => "human",
             Command::Release { .. } => "release",
@@ -1837,6 +1876,43 @@ fn separation_lines(on: bool) -> String {
     }
 }
 
+/// Retention and the legal hold in plain words (`alm audit-settings`, Task-A01-stem986).
+fn retention_lines(
+    kept: &allomos_core::retention::Retention,
+    past: Option<&allomos_store::redact::PastRetention>,
+) -> String {
+    let mut text = match kept.years {
+        None => "Keep the history: forever.\n".to_string(),
+        Some(y) => format!(
+            "Keep the history: {y} year{}.\n",
+            if y == 1 { "" } else { "s" }
+        ),
+    };
+    if let Some(p) = past {
+        if p.events == 0 {
+            text.push_str(&format!(
+                "No event is older than the retention period (before {}).\n",
+                p.cutoff
+            ));
+        } else {
+            text.push_str(&format!(
+                "Fact: {} event{} older than the retention period (before {}; the oldest from {}). Allomos removes nothing on its own; what to do with them is the project's decision.\n",
+                p.events,
+                if p.events == 1 { " is" } else { "s are" },
+                p.cutoff,
+                p.oldest.as_deref().unwrap_or("?")
+            ));
+        }
+    }
+    text.push_str("China's Cybersecurity Law (Art. 23) asks for network logs to be kept at least six months.\n");
+    text.push_str(if kept.legal_hold {
+        "Legal hold: on. Nothing in the history may be removed or redacted while it is on.\n"
+    } else {
+        "Legal hold: off. Personal details written by mistake can be removed with alm redact.\n"
+    });
+    text
+}
+
 /// One line saying which language to write tasks in, and why.
 fn language_line(l: &allomos_store::TaskLanguage) -> String {
     let why = match l.source {
@@ -2339,6 +2415,7 @@ mod effects;
 mod exceptions;
 mod folders;
 mod links;
+mod redact;
 mod trail;
 
 /// A task's traces in one line (Task-A01-fennel617): "R77, 0021", or "none".
@@ -2601,11 +2678,16 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             identity,
             reauthenticate,
             separation_of_duties,
+            retention,
+            legal_hold,
             reason,
         } => {
             let root = locate(cli, cwd)?;
-            let changing =
-                identity.is_some() || reauthenticate.is_some() || separation_of_duties.is_some();
+            let changing = identity.is_some()
+                || reauthenticate.is_some()
+                || separation_of_duties.is_some()
+                || retention.is_some()
+                || legal_hold.is_some();
             let (bag, issues, changed) = if changing {
                 let lock = Lock::acquire(&root, lock_wait())?;
                 let (bag, issues) = taskbag_of(&root, lock.load())?;
@@ -2622,6 +2704,30 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     let before = bag.project.clone();
                     project = after;
                     changes = allomos_core::event::changes(Some(&before), &project, &[])
+                        .into_iter()
+                        .filter(|c| c.field == "audit")
+                        .collect();
+                    let why = reason.map(str::trim).filter(|r| !r.is_empty());
+                    if let (false, Some(why)) = (changes.is_empty(), why) {
+                        changes.push(allomos_core::event::reason_change(why));
+                    }
+                }
+                if retention.is_some() || legal_hold.is_some() {
+                    let years = retention
+                        .as_deref()
+                        .map(allomos_core::retention::parse)
+                        .transpose()?;
+                    let (after, _) = allomos_core::retention::set(
+                        &project,
+                        &allomos_core::retention::RetentionChange {
+                            years,
+                            legal_hold: legal_hold.as_deref().map(|v| v == "on"),
+                            reason,
+                        },
+                    )?;
+                    // One `audit` change from the first value to the last, one reason.
+                    project = after;
+                    changes = allomos_core::event::changes(Some(&bag.project), &project, &[])
                         .into_iter()
                         .filter(|c| c.field == "audit")
                         .collect();
@@ -2651,11 +2757,20 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             }
             text.push_str(&identity_lines(&id));
             text.push_str(&separation_lines(separated));
+            let kept = allomos_core::retention::of(&bag.project);
+            let today: String = allomos_store::events::now_utc().chars().take(10).collect();
+            let past = kept
+                .years
+                .and_then(|y| allomos_store::redact::past_retention(&root, y, &today));
+            text.push_str(&retention_lines(&kept, past.as_ref()));
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
                     "identity": id,
                     "separation_of_duties": separated,
+                    "retention_years": kept.years,
+                    "legal_hold": kept.legal_hold,
+                    "past_retention": past,
                     "changed": changed
                 }),
                 text,
@@ -4078,6 +4193,23 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             },
         ),
         Command::Exceptions { id } => exceptions::list(cli, cwd, id.as_deref()),
+        Command::Redact {
+            id,
+            fields,
+            events,
+            reason,
+            approved_by,
+        } => redact::redact(
+            cli,
+            cwd,
+            id,
+            &allomos_store::redact::Request {
+                fields,
+                events,
+                reason: reason.as_deref().or(cli.why.as_deref()),
+                approved_by: approved_by.as_deref(),
+            },
+        ),
         Command::Classify {
             id,
             change_type,

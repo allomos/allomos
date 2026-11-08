@@ -24,3 +24,19 @@ test("turning separation of duties off asks for a reason; turning it on does not
   assert.equal(separationNeedsReason(true, false), true);
   assert.equal(separationNeedsReason(false, false), false);
 });
+
+test("a shorter retention period and the legal hold ask for a reason (Task-A01-stem986)", async () => {
+  const { retentionNeedsReason, yearsFrom } = await import("../src/auditFlow.ts");
+  const forever = { years: null, hold: false };
+  assert.equal(retentionNeedsReason(forever, null, false), false);
+  assert.equal(retentionNeedsReason(forever, 7, false), true);
+  assert.equal(retentionNeedsReason({ years: 7, hold: false }, 10, false), false);
+  assert.equal(retentionNeedsReason({ years: 7, hold: false }, null, false), false);
+  assert.equal(retentionNeedsReason({ years: 7, hold: false }, 5, false), true);
+  assert.equal(retentionNeedsReason(forever, null, true), true);
+  assert.equal(retentionNeedsReason({ years: null, hold: true }, null, false), true);
+  assert.equal(yearsFrom("7"), 7);
+  assert.equal(yearsFrom("0"), null);
+  assert.equal(yearsFrom("2.5"), null);
+  assert.equal(yearsFrom(""), null);
+});

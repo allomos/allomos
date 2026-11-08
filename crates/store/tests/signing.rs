@@ -262,3 +262,74 @@ fn turn_again() {
     // SAFETY: as in `turn`.
     unsafe { std::env::set_var("ALLOMOS_SETTINGS_DIR", &settings) };
 }
+
+/// Task-A01-stem986: removing personal details from a signed history. The redacted events no
+/// longer match their signatures; `alm audit` lists them as redacted, from the fingerprints the
+/// redaction recorded, not as changed or as a gap. A packed month's events are redacted in place.
+#[test]
+fn a_redaction_is_listed_not_found_as_tampering() {
+    use allomos_store::redact::{self, Request};
+    let _turn = turn();
+    // SAFETY: as in `turn`.
+    unsafe { std::env::set_var("ALLOMOS_NOW", "2026-09-10T09:00:00Z") };
+    let root = taskbag("redacted");
+    note(&root, "call <PHONE>");
+    unsafe { std::env::set_var("ALLOMOS_NOW", "2026-10-28T09:00:00Z") };
+    let packed = Lock::acquire(&root, Duration::from_secs(5))
+        .unwrap()
+        .pack_history()
+        .unwrap();
+    assert_eq!(packed.len(), 1);
+    note(&root, "fixed");
+    unsafe { std::env::remove_var("ALLOMOS_NOW") };
+    let fields = vec!["handoff_note".to_string()];
+    let r = redact::redact(
+        &root,
+        APP,
+        Duration::from_secs(5),
+        "A01-01",
+        &Request {
+            fields: &fields,
+            events: &[],
+            reason: Some("a phone number written by mistake"),
+            approved_by: Some("approver"),
+        },
+    )
+    .unwrap();
+    let rd = r.redaction.expect("something was removed");
+    // one, two, three, the phone number (all packed), and the `from` of "fixed".
+    assert_eq!(rd.files.len(), 5, "{:?}", rd.files);
+    let all = fs::read_dir(root.join("events"))
+        .unwrap()
+        .map(|e| fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect::<String>();
+    assert!(!all.contains("PHONE"), "the old value is gone");
+    assert!(all.contains("\"fixed\""), "the current value stays");
+    assert!(all.contains("a phone number written by mistake"));
+    let f = trail::audit(&root);
+    assert!(f.changed.is_empty(), "{:?}", f.changed);
+    assert!(f.breaks.is_empty(), "{:?}", f.breaks);
+    assert_eq!(f.redacted.len(), 5);
+    assert!(f.redacted.iter().all(|x| x.redaction == rd.id));
+    // The taskbag still loads, and a second time removes nothing.
+    assert!(allomos_store::load(&root).issues.is_empty());
+    let again = redact::redact(
+        &root,
+        APP,
+        Duration::from_secs(5),
+        "A01-01",
+        &Request {
+            fields: &fields,
+            events: &[],
+            reason: Some("again"),
+            approved_by: None,
+        },
+    )
+    .unwrap();
+    assert!(again.redaction.is_none());
+    // A real change after the redaction is still found: here, to the redaction's own event.
+    let by = f.redacted[0].by_event.clone();
+    let text = fs::read_to_string(root.join(&by)).unwrap();
+    fs::write(root.join(&by), text.replace("by mistake", "on purpose")).unwrap();
+    assert_eq!(trail::audit(&root).changed, [by]);
+}

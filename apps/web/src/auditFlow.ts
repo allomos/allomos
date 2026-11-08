@@ -12,6 +12,19 @@ export function needsReason(now: { level: IdentityLevel; reauthenticate: boolean
   return LEVELS.indexOf(level) < LEVELS.indexOf(now.level) || (now.reauthenticate && !reauthenticate);
 }
 
+/** A shorter retention period, and turning the legal hold on or off, need a reason
+ * (Task-A01-stem986, decision 0021 § 6 item 5). `null` years: forever. */
+export function retentionNeedsReason(now: { years: number | null; hold: boolean }, years: number | null, hold: boolean): boolean {
+  const shorter = years !== null && (now.years === null || years < now.years);
+  return shorter || hold !== now.hold;
+}
+
+/** A retention period typed in the form: a whole number of years from 1 to 100, else null. */
+export function yearsFrom(text: string): number | null {
+  const n = Number(text.trim());
+  return Number.isInteger(n) && n >= 1 && n <= 100 ? n : null;
+}
+
 /** Turning separation of duties off needs a reason (Task-A01-grotto036, decision 0021 § 6);
  * turning it on does not. */
 export function separationNeedsReason(now: boolean, wanted: boolean): boolean {

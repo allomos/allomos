@@ -186,8 +186,21 @@ pub struct Facts {
     /// The last checkpoint this computer saw before, when it is no longer in the history: the
     /// history was rewritten since then (or the checkpoint removed). `(file, seen at)`.
     pub rewritten: Option<(String, String)>,
+    /// Events changed by a recorded redaction (Task-A01-stem986): not listed under `changed`,
+    /// and a later event pointing to their fingerprint before is not a gap.
+    pub redacted: Vec<RedactedFact>,
     /// Files and lines that could not be read (in `events/`, `keys/`, `checkpoints/`).
     pub unreadable: Vec<String>,
+}
+
+/// One event a redaction changed, as `alm audit` lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RedactedFact {
+    pub file: String,
+    /// The redaction's ID and the file of its event.
+    pub redaction: String,
+    pub by_event: String,
+    pub fields: Vec<String>,
 }
 
 /// Check the history at `root` and list what was found. Remembers, on this computer, the last
@@ -215,8 +228,24 @@ pub fn audit(root: &Path) -> Facts {
         changed_since_checkpoint: None,
         events_since_checkpoint: 0,
         rewritten: None,
+        redacted: Vec::new(),
         unreadable,
     };
+
+    // Recorded redactions: file → (fingerprint before, fact).
+    let mut before: BTreeMap<String, String> = BTreeMap::new();
+    for (by_event, r) in allomos_core::retention::all(&events) {
+        for f in r.files {
+            before.insert(f.file.clone(), f.fingerprint.clone());
+            facts.redacted.push(RedactedFact {
+                file: f.file,
+                redaction: r.id.clone(),
+                by_event: by_event.clone(),
+                fields: f.fields,
+            });
+        }
+    }
+    let redacted_with = |file: &str, fp: &str| before.get(file).is_some_and(|b| b == fp);
 
     // Per key: (file, fingerprint, prev), in file order.
     let mut by_key: BTreeMap<String, Vec<(String, String, Option<String>)>> = BTreeMap::new();
@@ -230,6 +259,7 @@ pub fn audit(root: &Path) -> Facts {
         facts.signed += 1;
         match keys.get(key) {
             Some(k) if signing::verify(&k.public_key, e, value) => {}
+            Some(_) if before.contains_key(file) => {}
             Some(_) => facts.changed.push(file.clone()),
             None => facts.unknown_key.push(file.clone()),
         }
@@ -241,7 +271,11 @@ pub fn audit(root: &Path) -> Facts {
     }
 
     for (key, list) in &by_key {
-        let present: BTreeSet<&str> = list.iter().map(|(_, fp, _)| fp.as_str()).collect();
+        let mut present: BTreeSet<&str> = list.iter().map(|(_, fp, _)| fp.as_str()).collect();
+        present.extend(
+            list.iter()
+                .filter_map(|(f, _, _)| before.get(f).map(String::as_str)),
+        );
         let mut after: BTreeMap<Option<&str>, Vec<String>> = BTreeMap::new();
         for (i, (file, _, prev)) in list.iter().enumerate() {
             after.entry(prev.as_deref()).or_default().push(file.clone());
@@ -296,7 +330,9 @@ pub fn audit(root: &Path) -> Facts {
                     .filter_map(|h| {
                         let f = h.get("file")?.as_str()?;
                         let fp = h.get("fingerprint")?.as_str()?;
-                        (fingerprints.get(f).map(String::as_str) != Some(fp)).then(|| f.to_string())
+                        (fingerprints.get(f).map(String::as_str) != Some(fp)
+                            && !redacted_with(f, fp))
+                        .then(|| f.to_string())
                     })
                     .collect()
             })

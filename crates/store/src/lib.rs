@@ -43,6 +43,7 @@ pub mod links;
 pub mod missing;
 pub mod progress;
 mod quota;
+pub mod redact;
 mod settings;
 mod setup;
 mod signing;

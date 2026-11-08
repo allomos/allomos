@@ -7150,3 +7150,136 @@ fn exceptions_record_why_and_who_accepted_the_risk_and_are_listed() {
     );
     refused(&repo, &["exceptions", "nope"], 1, "task_not_found");
 }
+
+/// Task-A01-stem986 (decision 0021 § 1.2, § 6 item 5): a retention period and a legal hold are
+/// set with `alm audit-settings`, each recorded with its reason; while the hold is on, `alm
+/// redact` is refused; a redaction leaves an event naming the field and who approved it, without
+/// the old value.
+#[test]
+fn retention_legal_hold_and_redaction() {
+    let repo = filled();
+    let v = ok(&repo, &["audit-settings"]);
+    assert_eq!(v["retention_years"], Value::Null);
+    assert_eq!(v["legal_hold"], false);
+    // A shorter period and the hold need a reason; a bad period is refused.
+    refused(
+        &repo,
+        &["audit-settings", "--retention", "7"],
+        1,
+        "audit_reason_missing",
+    );
+    refused(
+        &repo,
+        &["audit-settings", "--retention", "6m"],
+        1,
+        "retention_invalid",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "audit-settings",
+            "--retention",
+            "7",
+            "--reason",
+            "company policy",
+        ],
+    );
+    assert_eq!(v["retention_years"], 7);
+    assert_eq!(v["past_retention"]["events"], 0);
+    let out = alm(&repo, &["audit-settings"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("Keep the history: 7 years."), "{text}");
+    assert!(text.contains("Cybersecurity Law"), "{text}");
+    refused(
+        &repo,
+        &["audit-settings", "--legal-hold", "on"],
+        1,
+        "audit_reason_missing",
+    );
+    ok(
+        &repo,
+        &[
+            "audit-settings",
+            "--legal-hold",
+            "on",
+            "--reason",
+            "litigation",
+        ],
+    );
+    let project = fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(project.contains("\"retention_years\": 7"), "{project}");
+    assert!(project.contains("\"legal_hold\": true"), "{project}");
+
+    // A personal detail written by mistake, then corrected.
+    ok(
+        &repo,
+        &["describe", "A01-01", "--text", "Ask <PHONE> about it."],
+    );
+    ok(
+        &repo,
+        &["describe", "A01-01", "--text", "Ask the approver about it."],
+    );
+    let redact = [
+        "redact",
+        "A01-01",
+        "--field",
+        "description",
+        "--reason",
+        "a phone number written by mistake",
+        "--approved-by",
+        "approver",
+    ];
+    refused(&repo, &redact, 1, "legal_hold_on");
+    ok(
+        &repo,
+        &[
+            "audit-settings",
+            "--legal-hold",
+            "off",
+            "--reason",
+            "case closed",
+        ],
+    );
+    refused(
+        &repo,
+        &["redact", "A01-01", "--field", "description"],
+        1,
+        "redact_reason_missing",
+    );
+    refused(
+        &repo,
+        &["redact", "A01-01", "--field", "nickname", "--reason", "x"],
+        1,
+        "redact_field_unknown",
+    );
+    refused(
+        &repo,
+        &[
+            "redact",
+            "A01-01",
+            "--field",
+            "description",
+            "--event",
+            "nope.json",
+            "--reason",
+            "x",
+        ],
+        1,
+        "redact_event_unknown",
+    );
+    let v = ok(&repo, &redact);
+    assert_eq!(v["changed"], true);
+    assert_eq!(v["redaction"]["fields"], json!(["description"]));
+    assert_eq!(v["redaction"]["approved_by"], "approver");
+    let events: String = fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .unwrap()
+        .map(|e| fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect();
+    assert!(!events.contains("PHONE"), "the old value is gone");
+    assert!(events.contains("Ask the approver about it."));
+    assert!(events.contains("\"command\": \"redact\""));
+    assert!(task_file(&repo, "A01-01").is_object());
+    // Again: nothing left to remove, nothing recorded.
+    let v = ok(&repo, &redact);
+    assert_eq!(v["changed"], false);
+}
