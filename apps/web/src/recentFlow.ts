@@ -72,3 +72,29 @@ export function recentRows(list: readonly string[], info: RecentInfoMap, missing
     missing: missing.has(folder),
   }));
 }
+
+/** Where the recent folders are kept on this computer (the window's storage), newest first. */
+export const RECENT_KEY = "allomos.recentFolders";
+export const RECENT_MAX = 10;
+
+/** The recent folders; none when the storage cannot be read. */
+export function readRecent(): string[] {
+  try {
+    const list: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string").slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Each recent folder's project name and when it was last opened, for the start page's Open recent
+ * dialog (Task-A01-43). Kept only for folders still in the list. */
+export const RECENT_INFO_KEY = "allomos.recentInfo";
+
+export function readRecentInfo(): RecentInfoMap {
+  try {
+    return parseRecentInfo(localStorage.getItem(RECENT_INFO_KEY));
+  } catch {
+    return {};
+  }
+}

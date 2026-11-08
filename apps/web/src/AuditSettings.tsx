@@ -5,16 +5,42 @@
 // sign-in levels are shown greyed out, with why. Below it, Separation of duties
 // (Task-A01-grotto036): a checkbox, off by default; turning it off asks why. Then Retention
 // (Task-A01-stem986): keep the history forever or N years, and the legal hold; a shorter period
-// and the hold ask why. Task A01-tail719 adds the section's other parts (among them the
-// "Remove personal details…" button, which runs `alm redact`'s rule).
+// and the hold ask why. Task A01-tail719 adds the rest, top to bottom: Always recorded (a
+// read-only list), Outside witness (its switch waits for the witness itself; meanwhile the
+// taskbag's checkpoints and Make a checkpoint now), Remove personal details… under Retention
+// (`alm redact`'s rule), and Change types (fixed, read-only). Every change is an `audit-settings`
+// event; turning a control off is shown in the warning colour and asks why.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AuditSettings, IdentityLevel } from "./types";
-import { LEVELS, needsReason, retentionNeedsReason, separationNeedsReason, yearsFrom } from "./auditFlow";
+import type { AuditSettings, IdentityLevel, RedactDone } from "./types";
+import { canRedact, LEVELS, needsReason, REDACT_FIELDS, redactFields, retentionNeedsReason, separationNeedsReason, yearsFrom } from "./auditFlow";
+
+/** Always recorded (decision 0021 § 1.1): no switches. */
+const ALWAYS: Key[] = [
+  "audit.always_who",
+  "audit.always_approvals",
+  "audit.always_checks",
+  "audit.always_links",
+  "audit.always_effects",
+  "audit.always_class",
+  "audit.always_reasons",
+  "audit.always_exceptions",
+  "audit.always_ai",
+  "audit.always_traces",
+  "audit.always_signed",
+];
+
+const CHANGE_TYPES: Key[] = ["audit.type_standard", "audit.type_normal", "audit.type_emergency"];
+const RISKS: Key[] = ["audit.risk_low", "audit.risk_medium", "audit.risk_high"];
+
+const when = (utc: string) => {
+  const d = new Date(utc);
+  return Number.isNaN(d.getTime()) ? utc : d.toLocaleString();
+};
 
 
 export function AuditSection({ messenger, root, fileManagerKey }: { messenger: Messenger; root: string; fileManagerKey: Key }) {
@@ -34,6 +60,14 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
   const [hold, setHold] = useState(false);
   const [retReason, setRetReason] = useState("");
   const [retSaved, setRetSaved] = useState(false);
+  const [redacting, setRedacting] = useState(false);
+  const [redTask, setRedTask] = useState("");
+  const [redTicked, setRedTicked] = useState<string[]>([]);
+  const [redTyped, setRedTyped] = useState("");
+  const [redReason, setRedReason] = useState("");
+  const [redBy, setRedBy] = useState("");
+  const [redDone, setRedDone] = useState<RedactDone | null>(null);
+  const [checkpointMade, setCheckpointMade] = useState(false);
 
   const fill = (s: AuditSettings) => {
     setSettings(s);
@@ -108,8 +142,46 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
     }
   };
 
+  const makeCheckpoint = async () => {
+    setBusy(true);
+    setError(null);
+    setCheckpointMade(false);
+    try {
+      fill(await messenger.makeCheckpoint(root));
+      setCheckpointMade(true);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const redFields = redactFields(redTicked, redTyped);
+  const redOk = canRedact(redTask, redFields, redReason, settings.legal_hold);
+  const redact = async () => {
+    setBusy(true);
+    setError(null);
+    setRedDone(null);
+    try {
+      setRedDone(await messenger.redactTask(root, redTask.trim(), redFields, redReason.trim(), redBy.trim() || undefined));
+      setRedReason("");
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const cp = settings.checkpoints;
+
   return (
     <div className="audit-settings">
+      <h3>{t("audit.always")}</h3>
+      <p className="muted small">{t("audit.always_help")}</p>
+      <ul className="audit-always small">
+        {ALWAYS.map((k) => (
+          <li key={k}>{t(k)}</li>
+        ))}
+      </ul>
       <h3>{t("audit.identity")}</h3>
       <p className="muted small">{t("audit.identity_help")}</p>
       <div className="form" role="radiogroup" aria-label={t("audit.identity")}>
@@ -173,6 +245,25 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
           </button>
         </div>
       )}
+      <h3>{t("audit.witness")}</h3>
+      <p className="muted small">{t("audit.witness_help")}</p>
+      <div className="form">
+        <label className="choice muted">
+          <input type="checkbox" checked={false} disabled />
+          {t("audit.witness_switch")}
+          <span className="muted small"> · {t("audit.witness_not_yet")}</span>
+        </label>
+        <p className="small">
+          {cp.last ? t("audit.checkpoints", { count: cp.count, when: when(cp.last.at), receipts: cp.receipts }) : t("audit.checkpoints_none")}
+        </p>
+        {settings.signing === "none" && <p className="muted small">{t("audit.checkpoint_no_key")}</p>}
+      </div>
+      {checkpointMade && <p className="muted small">{t("audit.checkpoint_made")}</p>}
+      <div className="row start">
+        <button type="button" onClick={() => void makeCheckpoint()} disabled={busy || settings.signing === "none"}>
+          {t("audit.checkpoint_now")}
+        </button>
+      </div>
       <h3>{t("audit.retention")}</h3>
       <p className="muted small">{t("audit.retention_help")}</p>
       <div className="form" role="radiogroup" aria-label={t("audit.retention_keep")}>
@@ -208,6 +299,74 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
           </button>
         </div>
       )}
+      <div className="row start">
+        <button type="button" onClick={() => setRedacting(!redacting)} aria-expanded={redacting} disabled={busy}>
+          {t("audit.redact")}
+        </button>
+      </div>
+      {redacting && (
+        <div className="form audit-redact">
+          <p className="muted small">{t("audit.redact_help")}</p>
+          {settings.legal_hold && <p className="warning small">{t("audit.redact_hold")}</p>}
+          <label>
+            {t("audit.redact_task")}
+            <input type="text" value={redTask} onChange={(e) => setRedTask(e.target.value)} disabled={busy} placeholder="A01-01" />
+          </label>
+          <fieldset className="settings-choice">
+            <legend>{t("audit.redact_fields")}</legend>
+            {REDACT_FIELDS.map((f) => (
+              <label key={f} className="choice">
+                <input
+                  type="checkbox"
+                  checked={redTicked.includes(f)}
+                  disabled={busy}
+                  onChange={(e) => setRedTicked(e.target.checked ? [...redTicked, f] : redTicked.filter((x) => x !== f))}
+                />
+                {t(`audit.redact_field_${f}` as Key)}
+              </label>
+            ))}
+            <label>
+              {t("audit.redact_other")}
+              <input type="text" value={redTyped} onChange={(e) => setRedTyped(e.target.value)} disabled={busy} />
+            </label>
+          </fieldset>
+          <label className="warning">
+            {t("audit.reason")}
+            <input type="text" value={redReason} onChange={(e) => setRedReason(e.target.value)} disabled={busy} />
+          </label>
+          <label>
+            {t("audit.redact_approved_by")}
+            <input type="text" value={redBy} onChange={(e) => setRedBy(e.target.value)} disabled={busy} />
+          </label>
+          <p className="muted small">{t("audit.redact_approved_by_help")}</p>
+          <div className="row start">
+            <button type="button" onClick={() => void redact()} disabled={busy || !redOk}>
+              {t("audit.redact_remove")}
+            </button>
+          </div>
+          {redDone &&
+            (redDone.redaction ? (
+              <p className="small">
+                {t("audit.redact_done", { id: redDone.redaction.id, fields: redDone.redaction.fields.join(", "), count: redDone.redaction.files.length })}
+              </p>
+            ) : (
+              <p className="muted small">{t("audit.redact_nothing")}</p>
+            ))}
+        </div>
+      )}
+      <h3>{t("audit.change_types")}</h3>
+      <p className="muted small">{t("audit.change_types_help")}</p>
+      <ul className="audit-always small">
+        {CHANGE_TYPES.map((k) => (
+          <li key={k}>{t(k)}</li>
+        ))}
+      </ul>
+      <ul className="audit-always small">
+        {RISKS.map((k) => (
+          <li key={k}>{t(k)}</li>
+        ))}
+      </ul>
+      <p className="muted small">{t("audit.change_types_fixed")}</p>
       {error && <p className="banner error">{error}</p>}
     </div>
   );

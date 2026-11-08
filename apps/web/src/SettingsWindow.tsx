@@ -1,13 +1,19 @@
 // The app's own Settings window (Task-A01-marble320, approver 2026-10-29): settings for the whole
 // app, apart from each taskbag's own. Its General section has **When Allomos starts**: reopen the
 // windows and tabs (the default), open the last taskbag, or open a blank window. A choice is saved
-// at once. Escape closes the window.
+// at once. Escape closes the window. Below it, **This computer** (Task-A01-tail719, decision 0021
+// § 6): this computer's signing key (its ID and public key, Export public key…) and the Last seen
+// history, the last checkpoint this computer saw of each project and whether that taskbag still
+// has it. Replacing the key is not here yet.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
 import type { StartWith } from "./tabsFlow";
 import { isProblem } from "./types";
+import type { ThisComputer } from "./types";
+import { readRecent, readRecentInfo } from "./recentFlow";
+import { seenState } from "./auditFlow";
 
 const CHOICES: { value: StartWith; key: "app_settings.reopen" | "app_settings.last" | "app_settings.blank" }[] = [
   { value: "reopen", key: "app_settings.reopen" },
@@ -19,6 +25,12 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
   const { t, problem } = useI18n();
   const [startWith, setStartWith] = useState<StartWith | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [computer, setComputer] = useState<ThisComputer | null>(null);
+  const [exported, setExported] = useState(false);
+  useEffect(() => {
+    settings.thisComputer(readRecent()).then(setComputer, (e: unknown) => setError(isProblem(e) ? problem(e) : String(e)));
+    // Read once when the window opens; the language only words an error.
+  }, [settings]);
   useEffect(() => {
     settings
       .appSettings()
@@ -42,6 +54,13 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
       setError(isProblem(e) ? problem(e) : String(e));
     });
   };
+  const exportKey = () => {
+    setError(null);
+    setExported(false);
+    settings
+      .exportPublicKey(`allomos-public-key-${computer?.key?.id ?? "none"}.json`)
+      .then(setExported, (e: unknown) => setError(isProblem(e) ? problem(e) : String(e)));
+  };
   return (
     <main className="settings-window">
       <h1>{t("settings.general")}</h1>
@@ -54,11 +73,64 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
           </label>
         ))}
       </fieldset>
+      <h1>{t("this_computer.title")}</h1>
+      {computer && <ThisComputerSection computer={computer} exported={exported} onExport={exportKey} />}
       {error && (
         <p className="banner error" role="alert">
           {error}
         </p>
       )}
     </main>
+  );
+}
+
+function ThisComputerSection({ computer, exported, onExport }: { computer: ThisComputer; exported: boolean; onExport: () => void }) {
+  const { t } = useI18n();
+  const names = readRecentInfo();
+  const when = (utc: string) => {
+    const d = new Date(utc);
+    return Number.isNaN(d.getTime()) ? utc : d.toLocaleString();
+  };
+  return (
+    <section className="this-computer">
+      <h2>{t("this_computer.key")}</h2>
+      <p className="muted small">{t("this_computer.key_help")}</p>
+      {computer.key ? (
+        <>
+          <p className="small">
+            {t("this_computer.key_id")} <code>{computer.key.id}</code>
+          </p>
+          <p className="small">
+            {t("this_computer.public_key")} <code>{computer.key.public_key}</code>
+          </p>
+          <div className="row start">
+            <button type="button" onClick={onExport}>
+              {t("this_computer.export")}
+            </button>
+          </div>
+          {exported && <p className="muted small">{t("this_computer.exported")}</p>}
+        </>
+      ) : (
+        <p className="muted small">{t(computer.store === "none" ? "this_computer.no_store" : "this_computer.no_key_yet")}</p>
+      )}
+      <h2>{t("this_computer.seen")}</h2>
+      <p className="muted small">{t("this_computer.seen_help")}</p>
+      {computer.seen.length === 0 ? (
+        <p className="muted small">{t("this_computer.seen_none")}</p>
+      ) : (
+        <ul className="seen-list small">
+          {computer.seen.map((s) => {
+            const state = seenState(s.still_there);
+            const name = (s.folder && names[s.folder]?.name) || s.folder || s.project;
+            return (
+              <li key={s.project} className={state === "gone" ? "seen-gone" : undefined}>
+                {t("this_computer.seen_line", { name, checkpoint: s.checkpoint, when: when(s.seen_at) })}{" "}
+                · {t(`this_computer.seen_${state}`)}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

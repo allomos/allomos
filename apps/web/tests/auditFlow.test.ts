@@ -40,3 +40,21 @@ test("a shorter retention period and the legal hold ask for a reason (Task-A01-s
   assert.equal(yearsFrom("2.5"), null);
   assert.equal(yearsFrom(""), null);
 });
+
+test("Remove personal details takes the ticked and typed fields once each", async () => {
+  const { redactFields, canRedact } = await import("../src/auditFlow.ts");
+  assert.deepEqual(redactFields(["description"], "handoff_note, description  title"), ["description", "handoff_note", "title"]);
+  assert.deepEqual(redactFields([], " "), []);
+  assert.equal(canRedact("A01-01", ["description"], "a phone number", false), true);
+  assert.equal(canRedact("A01-01", ["description"], "a phone number", true), false);
+  assert.equal(canRedact("A01-01", ["description"], " ", false), false);
+  assert.equal(canRedact(" ", ["description"], "why", false), false);
+  assert.equal(canRedact("A01-01", [], "why", false), false);
+});
+
+test("a Last seen history line is there, gone or unknown", async () => {
+  const { seenState } = await import("../src/auditFlow.ts");
+  assert.equal(seenState(true), "there");
+  assert.equal(seenState(false), "gone");
+  assert.equal(seenState(null), "unknown");
+});

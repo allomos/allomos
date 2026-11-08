@@ -158,3 +158,33 @@ pub(crate) fn seen_file() -> Option<PathBuf> {
     }
     crate::settings::settings_dir().map(|d| d.join(SEEN_FILE))
 }
+
+/// The last checkpoint this computer saw for one project, outside the taskbag (Settings → This
+/// computer → Last seen history, Task-A01-tail719).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Seen {
+    pub project: String,
+    /// `checkpoints/<name>.json`, relative to the taskbag.
+    pub checkpoint: String,
+    /// When this computer first saw it, in UTC.
+    pub seen_at: String,
+}
+
+/// Every project's last checkpoint seen on this computer, by project ID; empty without a
+/// settings folder or before the first `alm audit`.
+pub fn seen() -> Vec<Seen> {
+    let Some(path) = seen_file() else {
+        return Vec::new();
+    };
+    let map: std::collections::BTreeMap<String, (String, String)> = fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    map.into_iter()
+        .map(|(project, (checkpoint, seen_at))| Seen {
+            project,
+            checkpoint,
+            seen_at,
+        })
+        .collect()
+}

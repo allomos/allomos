@@ -30,3 +30,24 @@ export function yearsFrom(text: string): number | null {
 export function separationNeedsReason(now: boolean, wanted: boolean): boolean {
   return now && !wanted;
 }
+
+/** The fields Remove personal details… offers as checkboxes (Task-A01-tail719); others are typed. */
+export const REDACT_FIELDS = ["title", "description", "handoff_note"] as const;
+
+/** The fields to remove: the ticked ones and those typed (separated by commas or spaces), once each. */
+export function redactFields(ticked: readonly string[], typed: string): string[] {
+  const more = typed.split(/[\s,，、]+/).map((f) => f.trim()).filter(Boolean);
+  return [...new Set([...ticked, ...more])];
+}
+
+/** Whether Remove can be pressed: a task, a field and a reason, and no legal hold. */
+export function canRedact(task: string, fields: readonly string[], reason: string, legalHold: boolean): boolean {
+  return !legalHold && task.trim() !== "" && fields.length > 0 && reason.trim() !== "";
+}
+
+/** One Last seen history line's state (Task-A01-tail719): the checkpoint is still in that
+ * taskbag, gone from it (the history was rewritten, or the checkpoint removed), or unknown
+ * (no recent folder is that project). */
+export function seenState(stillThere: boolean | null): "there" | "gone" | "unknown" {
+  return stillThere === null ? "unknown" : stillThere ? "there" : "gone";
+}
