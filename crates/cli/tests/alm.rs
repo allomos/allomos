@@ -4937,6 +4937,10 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
             "ALLOMOS_MODEL",
             "ALLOMOS_FOR",
             "ALLOMOS_APPROVAL",
+            "CLAUDE_EFFORT",
+            "ALLOMOS_EFFORT",
+            "ALLOMOS_PERMISSION_MODE",
+            "ALLOMOS_RULES",
         ] {
             c.env_remove(name);
         }
@@ -4957,7 +4961,8 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
     // An agent without --model: the session and whom it works for are recorded; the model is
     // listed as missing.
     let (v, e) = run(&claude, &["--as", "s1", "claim", "A01-01"]);
-    assert_eq!(e["actor"], json!({ "session": "sess-1" }), "{e}");
+    assert_eq!(e["actor"]["session"], "sess-1", "{e}");
+    assert_eq!(e["actor"]["model"], "unknown", "{e}");
     let person = e["for"].as_str().unwrap().to_string();
     assert!(person.starts_with("p-") && person.len() == 8, "{e}");
     let codes: Vec<&Value> = v["event_missing"]
@@ -4966,8 +4971,17 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
         .iter()
         .map(|m| &m["code"])
         .collect();
-    assert_eq!(codes, [&json!("model")], "{v}");
-    // With --model and --approval: both recorded, nothing missing.
+    assert_eq!(
+        codes,
+        [
+            &json!("model"),
+            &json!("effort"),
+            &json!("permission_mode"),
+            &json!("rules")
+        ],
+        "{v}"
+    );
+    // With --model and --approval: both recorded, the model no longer missing.
     let (v, e) = run(
         &claude,
         &[
@@ -4983,8 +4997,8 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
         ],
     );
     assert_eq!(
-        e["actor"],
-        json!({ "session": "sess-1", "model": "claude-opus-5-5" }),
+        (&e["actor"]["session"], &e["actor"]["model"]),
+        (&json!("sess-1"), &json!("claude-opus-5-5")),
         "{e}"
     );
     assert_eq!(
@@ -4992,7 +5006,7 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
         (&json!(person), &json!("ap-1")),
         "{e}"
     );
-    assert!(v.get("event_missing").is_none(), "{v}");
+    assert!(!v["event_missing"].to_string().contains("\"model\""), "{v}");
     // The same session again without --model: this computer remembers its model.
     let (_, e) = run(&claude, &["--as", "s1", "note", "A01-01", "half way"]);
     assert_eq!(e["actor"]["model"], "claude-opus-5-5", "{e}");
@@ -5041,6 +5055,167 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
         v.to_string().contains("before"),
         "the old event still shows: {v}"
     );
+}
+
+/// Decision 0021 § 1.1, AI details (Task-A01-urchin867): an agent's event records its model,
+/// effort, permission mode, the AGENTS.md commit it works under and alm's version; what the agent
+/// did not say is "unknown", never guessed; a session names each once on this computer.
+#[test]
+fn events_record_the_ai_details() {
+    let repo = filled();
+    let settings = repo.join("settings-of-this-computer");
+    let run = |vars: &[(&str, &str)], args: &[&str]| {
+        let mut c = alm_command();
+        c.current_dir(&repo).arg("--json").args(args);
+        for name in [
+            "ALLOMOS_TASKBAG",
+            "ALLOMOS_HOLDER",
+            "CLAUDECODE",
+            "CLAUDE_CODE_ENTRYPOINT",
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_EFFORT",
+            "CODEX_THREAD_ID",
+            "CODEX_SANDBOX",
+            "CODEX_SANDBOX_NETWORK_DISABLED",
+            "ALLOMOS_MODEL",
+            "ALLOMOS_EFFORT",
+            "ALLOMOS_PERMISSION_MODE",
+            "ALLOMOS_RULES",
+        ] {
+            c.env_remove(name);
+        }
+        c.env("ALLOMOS_SETTINGS_DIR", &settings);
+        for (k, v) in vars {
+            c.env(k, v);
+        }
+        let out = c.output().unwrap();
+        assert!(out.status.success(), "{args:?}: {out:?}");
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        (v, newest_event(&repo))
+    };
+    let codes = |v: &Value| -> Vec<String> {
+        v["event_missing"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|m| m["code"].as_str().unwrap().to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let version = env!("CARGO_PKG_VERSION");
+    // Codex, saying nothing: every AI detail is "unknown", and listed.
+    let (v, e) = run(
+        &[("CODEX_THREAD_ID", "t-1")],
+        &["--as", "c1", "claim", "A01-01"],
+    );
+    assert_eq!(
+        e["actor"],
+        json!({
+            "session": "t-1",
+            "model": "unknown",
+            "effort": "unknown",
+            "permission_mode": "unknown",
+            "rules": "unknown",
+            "alm": version,
+        }),
+        "{e}"
+    );
+    assert_eq!(
+        codes(&v),
+        ["model", "effort", "permission_mode", "rules"],
+        "{v}"
+    );
+    // Claude Code gives its effort by itself; the agent names the rest once.
+    let claude = [
+        ("CLAUDECODE", "1"),
+        ("CLAUDE_CODE_ENTRYPOINT", "cli"),
+        ("CLAUDE_CODE_SESSION_ID", "sess-9"),
+        ("CLAUDE_EFFORT", "medium"),
+    ];
+    let (v, e) = run(
+        &claude,
+        &[
+            "--as",
+            "s9",
+            "--model",
+            "claude-opus-5-5",
+            "--permission-mode",
+            "auto",
+            "--rules",
+            "ea4c3b25",
+            "claim",
+            "A01-02",
+        ],
+    );
+    assert_eq!(
+        e["actor"],
+        json!({
+            "session": "sess-9",
+            "model": "claude-opus-5-5",
+            "effort": "medium",
+            "permission_mode": "auto",
+            "rules": "ea4c3b25",
+            "alm": version,
+        }),
+        "{e}"
+    );
+    assert!(codes(&v).is_empty(), "{v}");
+    // The same session later: remembered; a new effort from the environment wins.
+    let mut later = claude;
+    later[3] = ("CLAUDE_EFFORT", "high");
+    let (v, e) = run(&later, &["--as", "s9", "note", "A01-02", "half way"]);
+    assert_eq!(
+        (
+            &e["actor"]["model"],
+            &e["actor"]["effort"],
+            &e["actor"]["permission_mode"],
+            &e["actor"]["rules"]
+        ),
+        (
+            &json!("claude-opus-5-5"),
+            &json!("high"),
+            &json!("auto"),
+            &json!("ea4c3b25")
+        ),
+        "{e}"
+    );
+    assert!(codes(&v).is_empty(), "{v}");
+    // Naming one detail anew changes only that one.
+    let (_, e) = run(
+        &claude,
+        &[
+            "--as",
+            "s9",
+            "--rules",
+            "1baa4f64",
+            "note",
+            "A01-02",
+            "rules moved",
+        ],
+    );
+    assert_eq!(
+        (&e["actor"]["rules"], &e["actor"]["permission_mode"]),
+        (&json!("1baa4f64"), &json!("auto")),
+        "{e}"
+    );
+    // The text names what is unknown and how to give it.
+    let mut c = alm_command();
+    c.current_dir(&repo)
+        .args(["--as", "c1", "note", "A01-01", "x"]);
+    c.env("ALLOMOS_SETTINGS_DIR", &settings)
+        .env("CODEX_THREAD_ID", "t-2")
+        .env_remove("CLAUDECODE")
+        .env_remove("ALLOMOS_PERMISSION_MODE")
+        .env_remove("ALLOMOS_RULES");
+    let text = String::from_utf8(c.output().unwrap().stdout).unwrap();
+    assert!(
+        text.contains("alm --permission-mode")
+            && text.contains("git log -1 --format=%H -- AGENTS.md"),
+        "{text}"
+    );
+    let v = ok(&repo, &["history", "A01-02"]);
+    assert_eq!(v["issues"], json!([]), "{v}");
 }
 
 /// Approver, 2026-10-18 (Task-A03-27): every event `alm` writes names the agent it runs under,

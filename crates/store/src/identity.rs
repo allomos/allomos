@@ -7,7 +7,8 @@
 //! never written anywhere by Allomos. An audit joins the two.
 //!
 //! The same folder's `session-models.json` remembers the model an agent session named with
-//! `alm --model`, so the session need not repeat it on every command.
+//! `alm --model`, and its effort, permission mode and rules (`--effort`, `--permission-mode`,
+//! `--rules`, Task-A01-urchin867), so the session need not repeat them on every command.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -36,11 +37,27 @@ struct SessionModels {
     sessions: BTreeMap<String, SessionModel>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SessionModel {
+    /// Empty when the session named only other details (files written before
+    /// Task-A01-urchin867 always have it).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     model: String,
+    #[serde(flatten)]
+    details: SessionDetails,
     /// When it was last named, in UTC, so the oldest can be dropped.
     at: String,
+}
+
+/// What an agent session last named about itself, besides its model (Task-A01-urchin867).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rules: Option<String>,
 }
 
 fn file(name: &str) -> Option<PathBuf> {
@@ -116,21 +133,43 @@ pub fn session_model(session: &str) -> Option<String> {
         .sessions
         .get(session)
         .map(|s| s.model.clone())
+        .filter(|m| !m.is_empty())
 }
 
-/// Remember that `session` runs on `model`. Keeps the most recent sessions only.
-pub fn remember_session_model(session: &str, model: &str) {
+/// The effort, permission mode and rules `session` last named, on this computer.
+pub fn session_details(session: &str) -> SessionDetails {
+    read::<SessionModels>(SESSION_MODELS_FILE)
+        .sessions
+        .get(session)
+        .map(|s| s.details.clone())
+        .unwrap_or_default()
+}
+
+/// Remember what `session` named now (each detail that is `Some`), keeping what it named before
+/// for the rest. Keeps the most recent sessions only.
+pub fn remember(session: &str, model: Option<&str>, details: &SessionDetails) {
     let mut all: SessionModels = read(SESSION_MODELS_FILE);
-    if all.sessions.get(session).is_some_and(|s| s.model == model) {
+    let mut entry = all.sessions.get(session).cloned().unwrap_or_default();
+    let before = (entry.model.clone(), entry.details.clone());
+    if let Some(model) = model {
+        entry.model = model.to_string();
+    }
+    let d = &mut entry.details;
+    for (slot, named) in [
+        (&mut d.effort, &details.effort),
+        (&mut d.permission_mode, &details.permission_mode),
+        (&mut d.rules, &details.rules),
+    ] {
+        if named.is_some() {
+            *slot = named.clone();
+        }
+    }
+    if all.sessions.contains_key(session) && before == (entry.model.clone(), entry.details.clone())
+    {
         return;
     }
-    all.sessions.insert(
-        session.to_string(),
-        SessionModel {
-            model: model.to_string(),
-            at: crate::events::now_utc(),
-        },
-    );
+    entry.at = crate::events::now_utc();
+    all.sessions.insert(session.to_string(), entry);
     while all.sessions.len() > SESSION_MODELS_KEPT {
         let oldest = all
             .sessions
