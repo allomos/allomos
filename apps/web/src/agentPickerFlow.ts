@@ -18,6 +18,8 @@ export type Choice = Agent["id"] | typeof MANUAL;
 export const GROUPS: { name: string; tools: Agent["id"][] }[] = [
   { name: "Claude", tools: ["claude_app", "claude_cli"] },
   { name: "Codex", tools: ["codex_app", "codex_cli"] },
+  // Google Antigravity's command-line agent `agy` only (approver, 2026-11-07, Task-A03-queen969).
+  { name: "Antigravity", tools: ["antigravity_cli"] },
 ];
 
 /** The groups with at least one tool found, each with its found tools in order. */

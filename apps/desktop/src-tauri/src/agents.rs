@@ -13,7 +13,8 @@ use serde::Serialize;
 /// One agent the person can ask.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Agent {
-    /// `claude_cli`, `claude_app`, `codex_cli` or `codex_app`.
+    /// `claude_cli`, `claude_app`, `codex_cli`, `codex_app` or `antigravity_cli` (Google
+    /// Antigravity's `agy`, Task-A03-queen969).
     pub id: String,
     /// What was found: the command's path, or the app's name.
     pub found: String,
@@ -68,6 +69,8 @@ fn tool_dirs(home: &Path) -> Vec<PathBuf> {
             ("APPDATA", &["npm"][..]),
             ("LOCALAPPDATA", &["pnpm"][..]),
             ("LOCALAPPDATA", &["Microsoft", "WinGet", "Links"][..]),
+            // Where Antigravity's installer puts `agy` (Task-A03-queen969).
+            ("LOCALAPPDATA", &["agy", "bin"][..]),
         ] {
             if let Some(base) = std::env::var_os(var) {
                 dirs.push(sub.iter().fold(PathBuf::from(base), |p, part| p.join(part)));
@@ -292,6 +295,16 @@ pub fn find_agents() -> Vec<Agent> {
             how: "link".into(),
         });
     }
+    // Google Antigravity's command-line agent (Task-A03-queen969): its installer puts `agy` in
+    // `~/.local/bin`. The Antigravity app and editor plug-ins are not offered (approver,
+    // 2026-11-07).
+    if let Some(agy) = find_tool("agy", &tools) {
+        agents.push(Agent {
+            id: "antigravity_cli".into(),
+            found: agy.display().to_string(),
+            how: "paste".into(),
+        });
+    }
     agents
 }
 
@@ -351,6 +364,7 @@ fn name(agent: &str) -> &'static str {
         "claude_app" => "Claude (app)",
         "codex_cli" => "Codex (terminal)",
         "codex_app" => "Codex (app)",
+        "antigravity_cli" => "Antigravity (terminal)",
         _ => "another agent",
     }
 }
@@ -481,6 +495,7 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     let program = match id {
         "claude_cli" => "claude",
         "codex_cli" => "codex",
+        "antigravity_cli" => "agy",
         _ => return Err(ask_failed(id, "no way to open it")),
     };
     copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
@@ -510,7 +525,8 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
 /// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
-/// its own. The request goes through a file because a long, many-line request typed into a
+/// its own, and so does Antigravity's `agy`, which takes an initial prompt only after `-i`
+/// (`--prompt-interactive`; Task-A03-queen969). The request goes through a file because a long, many-line request typed into a
 /// terminal window breaks at its first line end.
 fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
     let file = shell_quote(&file.display().to_string());
@@ -521,6 +537,7 @@ fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<St
         }
         ("claude_cli", None) => Some(format!("claude {request}")),
         ("codex_cli", _) => Some(format!("codex {request}")),
+        ("antigravity_cli", _) => Some(format!("agy -i {request}")),
         _ => None,
     }
 }
@@ -537,6 +554,7 @@ fn powershell_session(
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
+        ("antigravity_cli", _) => "-i ".to_string(),
         _ => String::new(),
     };
     let start = format!(
@@ -741,6 +759,23 @@ mod tests {
             Some(
                 "codex \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
+        );
+        assert_eq!(
+            session_command("antigravity_cli", file, Some("ignored")).as_deref(),
+            Some(
+                "agy -i \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
+            )
+        );
+        assert_eq!(
+            powershell_session(
+                "antigravity_cli",
+                Path::new(r"C:\p"),
+                r"C:\agy\bin\agy.exe",
+                Path::new(r"C:\t\r.txt"),
+                None,
+                None
+            ),
+            r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
         );
         assert_eq!(session_command("claude_app", file, None), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));

@@ -17,6 +17,7 @@ import type { Agent, VersionCheck } from "./types";
 const AGENTS: { group: string; recorded: string; tools: Agent["id"][] }[] = [
   { group: "Claude", recorded: "claude", tools: ["claude_app", "claude_cli"] },
   { group: "Codex", recorded: "codex", tools: ["codex_app", "codex_cli"] },
+  { group: "Antigravity", recorded: "antigravity", tools: ["antigravity_cli"] },
 ];
 
 /** Whether the taskbag needs updating: card files outside it (`cardsOutside`), an older taskbag's

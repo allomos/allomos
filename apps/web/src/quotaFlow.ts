@@ -6,7 +6,7 @@
 import type { QuotaReport } from "./types";
 
 /** The agents Allomos knows by name; others are shown by the id they reported. */
-export const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex" };
+export const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", antigravity: "Antigravity" };
 
 export function agentName(id: string): string {
   return AGENT_NAMES[id] ?? id;
@@ -15,13 +15,17 @@ export function agentName(id: string): string {
 /**
  * The agent's id from what a session reported, as alm folds it since Task-A03-39 (reports saved
  * before that are folded here): the part before any `/`, and a word starting with `claude` is
- * `claude-code`, one starting with `codex` is `codex`. A session that reported under its session
+ * `claude-code`, one starting with `codex` is `codex`, one starting with `antigravity` or `agy`
+ * itself is `antigravity` (Task-A03-queen969). A session that reported under its session
  * name (`claude/a09-28-kanto-picker`) no longer gets a chip of its own.
  */
 export function agentId(reported: string): string {
   const word = (reported.trim().split("/")[0] ?? "").trim();
   const lower = word.toLowerCase();
-  return lower.startsWith("claude") ? "claude-code" : lower.startsWith("codex") ? "codex" : word;
+  if (lower.startsWith("claude")) return "claude-code";
+  if (lower.startsWith("codex")) return "codex";
+  if (lower.startsWith("antigravity") || lower === "agy") return "antigravity";
+  return word;
 }
 
 /** Every report under its folded agent id, newest first. */
@@ -72,7 +76,9 @@ export interface Chip {
 export function chips(reports: QuotaReport[], setup: { codex: boolean; claude: boolean }): Chip[] {
   const newest = folded(reports);
   const current = newest[0]?.agent ?? null;
-  const told = (agent: string) => (agent === "claude-code" ? setup.claude : agent === "codex" ? setup.codex : null);
+  // Antigravity reads AGENTS.md by itself, as Codex does (Task-A03-queen969).
+  const told = (agent: string) =>
+    agent === "claude-code" ? setup.claude : agent === "codex" || agent === "antigravity" ? setup.codex : null;
   const order = [current, "claude-code", "codex", ...newest.map((r) => r.agent)].filter(
     (a, i, all): a is string => a !== null && all.indexOf(a) === i,
   );

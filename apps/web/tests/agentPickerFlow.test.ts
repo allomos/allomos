@@ -19,6 +19,14 @@ test("found agents are grouped, the app before the terminal, Claude before Codex
   // A group with no tool found is not offered.
   assert.deepEqual(foundGroups([agent("codex_app")]).map((g) => g.name), ["Codex"]);
   assert.deepEqual(foundGroups([]), []);
+  // Task-A03-queen969: Antigravity's terminal agent is a group of its own, after Codex.
+  assert.deepEqual(
+    foundGroups([agent("antigravity_cli"), agent("codex_cli")]).map((g) => [g.name, g.tools.map((a) => a.id)]),
+    [
+      ["Codex", ["codex_cli"]],
+      ["Antigravity", ["antigravity_cli"]],
+    ],
+  );
 });
 
 test("the first found tool is chosen first; with none found, Manual", () => {

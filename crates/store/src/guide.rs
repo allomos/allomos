@@ -850,7 +850,8 @@ contradictions.
    - what applies to that agent alone (its model or effort settings, its own tools and
      commands).
    A tool that reads AGENTS.md by itself needs no pointer, but shared rules in its own file
-   still move. Create a file for your own tool only when it reads nothing else. Do not change
+   still move. Codex and Google Antigravity (`agy`) read AGENTS.md by themselves; Antigravity
+   also reads GEMINI.md and `.agents/rules/`, so shared rules found there move too. Create a file for your own tool only when it reads nothing else. Do not change
    what any rule means, and do not copy Allomos's section (`alm brief`) into an agent's own file.
 3. **Contradictions are not yours to settle.** When two files say different things about the
    same matter (one says push after every commit, another says never push), do not choose
@@ -894,7 +895,9 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
    - 指向 AGENTS.md 的一行：工具支持导入时用导入行（Claude Code：只含 `@AGENTS.md` 的一行），
      否则用一句话：“Read and follow AGENTS.md.”；
    - 只适用于这个智能体的内容（它的模型或推理强度设置，它自己的工具和命令）。
-   自己会读 AGENTS.md 的工具不需要指向行，但它自己文件里的共用规则仍要移走。只有当你的工具不读
+   自己会读 AGENTS.md 的工具不需要指向行，但它自己文件里的共用规则仍要移走。Codex 和
+   Google Antigravity（`agy`）会自己读 AGENTS.md；Antigravity 还读 GEMINI.md 和 `.agents/rules/`，
+   那里的共用规则也要移走。只有当你的工具不读
    其他任何文件时，才为它新建文件。不要改变任何规则的意思，也不要把 Allomos 的一节（`alm brief`）
    复制到某个智能体自己的文件里。
 3. **矛盾不由你来定。** 两个文件对同一件事说法不同时（一个说每次提交后推送，另一个说从不推送），
@@ -941,6 +944,8 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
    - そのエージェントだけに当てはまること（モデルや推論の強さの設定、そのツール自身の道具や
      コマンド）。
    AGENTS.md を自分で読むツールには指す行は要りませんが、そのファイルにある共通ルールは移します。
+   Codex と Google Antigravity（`agy`）は AGENTS.md を自分で読みます。Antigravity は GEMINI.md と
+   `.agents/rules/` も読むので、そこにある共通ルールも移します。
    自分のツール用のファイルを新しく作るのは、そのツールがほかに何も読まないときだけです。どの
    ルールも意味を変えず、Allomos の節（`alm brief`）をエージェント自身のファイルにコピーしません。
 3. **食い違いはあなたが決めません。** 二つのファイルが同じことについて違うことを言っているとき
@@ -1909,6 +1914,9 @@ mod tests {
                 "`.cursor/rules/`",
                 "`.github/copilot-instructions.md`",
                 "`.windsurfrules`",
+                "Google Antigravity",
+                "`agy`",
+                "`.agents/rules/`",
                 "`@AGENTS.md`",
                 "Read and follow AGENTS.md.",
                 "`alm brief`",

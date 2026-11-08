@@ -37,7 +37,11 @@ export function MonitorDialog({
     [t],
   );
   const { agents, slow, choice: agent, setChoice: setAgent } = useAgents(messenger, undefined, unavailable);
-  const how: Partial<Record<Choice, string>> = { claude_cli: t("monitor.how_terminal"), codex_cli: t("monitor.how_terminal") };
+  const how: Partial<Record<Choice, string>> = {
+    claude_cli: t("monitor.how_terminal"),
+    codex_cli: t("monitor.how_terminal"),
+    antigravity_cli: t("monitor.how_terminal"),
+  };
   const [scope, setScope] = useState<Scope>(() => firstScope(options, from));
   const selectable = options.other.items.filter((i) => i.ready > 0);
   const [otherId, setOtherId] = useState<string | null>(() => (scope.kind === "iteration" && !scope.current ? scope.id : (selectable[0]?.id ?? null)));
@@ -174,7 +178,7 @@ export function MonitorDialog({
             </details>
           )}
           <p className="banner update">
-            {t(agent === "claude_cli" || agent === "codex_cli" ? `monitor.permissions_${agent}` : "build.auto_mode")}
+            {t(agent === "claude_cli" || agent === "codex_cli" || agent === "antigravity_cli" ? `monitor.permissions_${agent}` : "build.auto_mode")}
           </p>
           <p className="muted small">{t("monitor.backlog_note")}</p>
         </div>

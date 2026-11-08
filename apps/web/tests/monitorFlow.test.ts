@@ -205,6 +205,9 @@ test("each task's request names the session, the run mode and only that task", (
   assert.match(en, /--taskbag "\.\.\/allomos-taskbag\/\.allomos\/taskbag"/);
   const codex = monitorRequest(task("A01-05"), tb, "en", "codex_cli", null, false);
   assert.match(codex, /--session-agent codex --session-id <your session's ID>/);
+  // Task-A03-queen969: Antigravity's agy claims under its quota id.
+  const agy = monitorRequest(task("A01-05"), tb, "en", "antigravity_cli", null, false);
+  assert.match(agy, /--session-agent antigravity --session-id <your session's ID>/);
   assert.match(codex, /Run mode: normal/);
   for (const language of ["zh-CN", "ja"] as const) {
     const text = monitorRequest(task("A01-05"), tb, language, "claude_cli", "1234-abcd", true);

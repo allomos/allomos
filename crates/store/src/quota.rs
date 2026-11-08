@@ -93,7 +93,9 @@ fn bad(detail: String) -> Problem {
 /// (`claude/a09-28-kanto-picker`) or a short form (`Claude`, `codex-cli`) instead of the id, which
 /// gave the app a chip per session (Task-A03-39): the part before any `/` is taken, and a word
 /// that starts with `claude` is Claude Code (`claude-code`), one that starts with `codex` is Codex
-/// (`codex`). Any other id is kept as given.
+/// (`codex`), and one that starts with `antigravity` or is `agy` (its command) is Google
+/// Antigravity (`antigravity`, approver 2026-11-07, Task-A03-queen969). Any other id is kept as
+/// given.
 pub fn agent_id(reported: &str) -> String {
     let word = reported.trim().split('/').next().unwrap_or("").trim();
     let lower = word.to_ascii_lowercase();
@@ -101,6 +103,8 @@ pub fn agent_id(reported: &str) -> String {
         "claude-code".into()
     } else if lower.starts_with("codex") {
         "codex".into()
+    } else if lower.starts_with("antigravity") || lower == "agy" {
+        "antigravity".into()
     } else {
         word.to_string()
     }
@@ -225,12 +229,13 @@ pub(crate) fn utc_seconds(text: &str) -> Option<i64> {
     Some(days * 86_400 + hh * 3600 + mm * 60 + ss)
 }
 
-/// The agent's id a session name gives for certain: `claude/…` and `codex/…` only. Any other
+/// The agent's id a session name gives for certain: `claude/…`, `codex/…` and `antigravity/…`
+/// (or `agy/…`) only. Any other
 /// session name (`loop-hourly`) names no agent; printed as the id, agents copied it into
 /// `alm quota --agent` and the app showed a chip per session (Task-A03-possum352).
 fn known_agent(holder: &str) -> Option<String> {
     let id = agent_id(holder);
-    (id == "claude-code" || id == "codex").then_some(id)
+    matches!(id.as_str(), "claude-code" | "codex" | "antigravity").then_some(id)
 }
 
 /// What a command that moves a task on asks of the agent, given every report and the time now
@@ -391,6 +396,10 @@ mod tests {
             ("codex-cli/loop-2", "codex"),
             ("gemini", "gemini"),
             ("gemini/run-3", "gemini"),
+            ("antigravity", "antigravity"),
+            ("Antigravity CLI", "antigravity"),
+            ("agy/loop-1", "antigravity"),
+            ("agyx", "agyx"),
         ] {
             assert_eq!(agent_id(given), id, "{given}");
         }

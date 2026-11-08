@@ -1959,10 +1959,13 @@ async fn monitor_start_session(
         });
     }
     let found = agents::find_agents();
-    let Some(chosen) = found
-        .iter()
-        .find(|a| a.id == agent && matches!(a.id.as_str(), "claude_cli" | "codex_cli"))
-    else {
+    let Some(chosen) = found.iter().find(|a| {
+        a.id == agent
+            && matches!(
+                a.id.as_str(),
+                "claude_cli" | "codex_cli" | "antigravity_cli"
+            )
+    }) else {
         return Err(Problem::AgentNotFound { agent });
     };
     agents::start_session(chosen, &project, &request, session_id.as_deref())

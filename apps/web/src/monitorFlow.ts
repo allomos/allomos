@@ -19,8 +19,8 @@ export const FIRST_FREQUENCY: Frequency = 30;
 export const STALL_MS = 30 * 60 * 1000;
 
 /** The agents whose sessions Allomos starts itself, in a terminal. */
-export type TerminalAgent = "claude_cli" | "codex_cli";
-export const TERMINAL_AGENTS: readonly string[] = ["claude_cli", "codex_cli"];
+export type TerminalAgent = "claude_cli" | "codex_cli" | "antigravity_cli";
+export const TERMINAL_AGENTS: readonly string[] = ["claude_cli", "codex_cli", "antigravity_cli"];
 
 /** Which tasks the monitor takes: every ready one, or one iteration's (`current`: it was the
  * active iteration when the run started, shown as "current iteration"). */
@@ -237,7 +237,7 @@ export function frequencyText(every: Frequency): { unit: "minute" | "minutes" | 
 
 /** The name an agent passes to `alm claim --session-agent`. */
 function sessionAgent(agent: TerminalAgent): string {
-  return agent === "claude_cli" ? "claude-code" : "codex";
+  return agent === "claude_cli" ? "claude-code" : agent === "antigravity_cli" ? "antigravity" : "codex";
 }
 
 /** The request a new session gets for one task, in the interface language. `taskbag` is the

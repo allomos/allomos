@@ -16,8 +16,23 @@ use crate::agents::{
 pub enum Reopen {
     /// The Claude desktop app's link for its `local_…` session.
     App(String),
-    /// `claude --resume <id>` in a terminal, in this folder.
-    Terminal { id: String, folder: PathBuf },
+    /// `<resume> <id>` in a terminal, in this folder: `claude --resume`, or Antigravity's
+    /// `agy --conversation` (Task-A03-queen969).
+    Terminal {
+        id: String,
+        folder: PathBuf,
+        resume: &'static str,
+    },
+}
+
+/// The command that resumes a terminal session of `agent` (what `--session-agent` recorded):
+/// Antigravity's `agy --conversation <id>`; Claude Code's `claude --resume <id>` for every other
+/// agent, as before.
+fn resume_command(agent: Option<&str>) -> &'static str {
+    match agent.map(allomos_store::quota_agent_id).as_deref() {
+        Some("antigravity") => "agy --conversation",
+        _ => "claude --resume",
+    }
 }
 
 /// An ID only ever has letters, digits, `_`, `-` and `.`: anything else is not put in a link or
@@ -45,7 +60,11 @@ pub fn reopen(session: &AgentSession, base: &Path) -> Option<Reopen> {
         .map(|f| base.join(f.replace('\\', "/")))
         .filter(|f| f.is_dir())
         .unwrap_or_else(|| base.to_path_buf());
-    Some(Reopen::Terminal { id, folder })
+    Some(Reopen::Terminal {
+        id,
+        folder,
+        resume: resume_command(session.agent.as_deref()),
+    })
 }
 
 fn failed(detail: impl ToString) -> Problem {
@@ -59,14 +78,14 @@ fn failed(detail: impl ToString) -> Problem {
 pub fn open(how: &Reopen) -> Result<(), Problem> {
     match how {
         Reopen::App(url) => open_link(url).map_err(failed),
-        Reopen::Terminal { id, folder } => open_terminal(id, folder),
+        Reopen::Terminal { id, folder, resume } => open_terminal(id, folder, resume),
     }
 }
 
-fn open_terminal(id: &str, folder: &Path) -> Result<(), Problem> {
+fn open_terminal(id: &str, folder: &Path, resume: &str) -> Result<(), Problem> {
     if cfg!(windows) {
         let script = format!(
-            "Set-Location -LiteralPath {}; claude --resume {}",
+            "Set-Location -LiteralPath {}; {resume} {}",
             powershell_quote(&folder.display().to_string()),
             powershell_quote(id)
         );
@@ -81,7 +100,7 @@ fn open_terminal(id: &str, folder: &Path) -> Result<(), Problem> {
     }
     let script = format!(
         "tell application \"Terminal\"\nactivate\ndo script {}\nend tell",
-        applescript_string(&terminal_line(id, folder))
+        applescript_string(&terminal_line(id, folder, resume))
     );
     let status = command("/usr/bin/osascript")
         .args(["-e", &script])
@@ -94,9 +113,9 @@ fn open_terminal(id: &str, folder: &Path) -> Result<(), Problem> {
 }
 
 /// What the new Terminal window types (macOS).
-fn terminal_line(id: &str, folder: &Path) -> String {
+fn terminal_line(id: &str, folder: &Path, resume: &str) -> String {
     format!(
-        "cd {} && claude --resume {}",
+        "cd {} && {resume} {}",
         shell_quote(&folder.display().to_string()),
         shell_quote(id)
     )
@@ -136,6 +155,7 @@ mod tests {
             Some(Reopen::Terminal {
                 id: "9ad4-1e".into(),
                 folder: base.join("wt/a"),
+                resume: "claude --resume",
             })
         );
         // The folder is gone (a removed worktree): the project folder.
@@ -145,6 +165,7 @@ mod tests {
             Some(Reopen::Terminal {
                 id: "9ad4-1e".into(),
                 folder: base.clone(),
+                resume: "claude --resume",
             })
         );
         let _ = std::fs::remove_dir_all(&base);
@@ -170,8 +191,31 @@ mod tests {
     #[test]
     fn the_terminal_line_quotes_the_folder() {
         assert_eq!(
-            terminal_line("ab-1", Path::new("/a b/it's")),
+            terminal_line("ab-1", Path::new("/a b/it's"), "claude --resume"),
             "cd '/a b/it'\\''s' && claude --resume 'ab-1'"
         );
+    }
+
+    /// Task-A03-queen969: an Antigravity session resumes with `agy --conversation <id>`.
+    #[test]
+    fn an_antigravity_session_resumes_with_agy() {
+        let mut s = session(Some("c0nv-42"), None, None);
+        s.agent = Some("antigravity".into());
+        assert_eq!(
+            reopen(&s, Path::new("/p")),
+            Some(Reopen::Terminal {
+                id: "c0nv-42".into(),
+                folder: PathBuf::from("/p"),
+                resume: "agy --conversation",
+            })
+        );
+        assert_eq!(
+            terminal_line("c0nv-42", Path::new("/p"), "agy --conversation"),
+            "cd '/p' && agy --conversation 'c0nv-42'"
+        );
+        // Recorded under another spelling: the same agent.
+        assert_eq!(resume_command(Some("Antigravity")), "agy --conversation");
+        assert_eq!(resume_command(Some("claude-code")), "claude --resume");
+        assert_eq!(resume_command(None), "claude --resume");
     }
 }

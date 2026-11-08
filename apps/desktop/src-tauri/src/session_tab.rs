@@ -71,7 +71,7 @@ fn banner(text: &str) -> String {
 /// since Codex takes text and Return arriving together as a paste and does not send it.
 pub fn exit_command(agent: &str) -> Option<&'static str> {
     match agent {
-        "claude_cli" | "codex_cli" => Some("/exit"),
+        "claude_cli" | "codex_cli" | "antigravity_cli" => Some("/exit"),
         _ => None,
     }
 }
@@ -237,6 +237,7 @@ mod tests {
         );
         assert_eq!(exit_command("claude_cli"), Some("/exit"));
         assert_eq!(exit_command("codex_cli"), Some("/exit"));
+        assert_eq!(exit_command("antigravity_cli"), Some("/exit"));
         assert_eq!(exit_command("claude_app"), None);
     }
 

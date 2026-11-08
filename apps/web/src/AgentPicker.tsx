@@ -20,6 +20,7 @@ export const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_app: "agents.claude_app",
   codex_cli: "agents.codex_cli",
   codex_app: "agents.codex_app",
+  antigravity_cli: "agents.antigravity_cli",
 };
 
 /** The keys that paste in a terminal on this computer. */

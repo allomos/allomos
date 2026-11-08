@@ -333,7 +333,7 @@ export interface CardOutside {
 
 /** An AI agent found on this computer (see apps/desktop/src-tauri/src/agents.rs). */
 export interface Agent {
-  id: "claude_cli" | "claude_app" | "codex_cli" | "codex_app";
+  id: "claude_cli" | "claude_app" | "codex_cli" | "codex_app" | "antigravity_cli";
   /** The command's path, or the app's name. */
   found: string;
   /** "link": opens with the request typed in; "paste": a terminal opens and the request is on the clipboard. */

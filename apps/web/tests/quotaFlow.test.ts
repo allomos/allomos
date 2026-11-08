@@ -71,6 +71,16 @@ test("a report under a session name or short form counts for its agent, not as a
     ["claude-code", "claude/a09-28-kanto-picker", " Claude ", "codex-cli/loop-2", "gemini/run-3"].map(agentId),
     ["claude-code", "claude-code", "claude-code", "codex", "gemini"],
   );
+  // Task-A03-queen969: Antigravity, by its id, its name or its command.
+  assert.deepEqual(["antigravity", "Antigravity CLI", "agy/loop-1", "agyx"].map(agentId), ["antigravity", "antigravity", "antigravity", "agyx"]);
+  assert.deepEqual(
+    chips([r("antigravity", 30, "2026-10-20T10:00:00Z")], { codex: true, claude: false }).map((c) => [c.name, c.current, c.told]),
+    [
+      ["Antigravity", true, true],
+      ["Claude Code", false, false],
+      ["Codex", false, true],
+    ],
+  );
   const reports = [
     r("codex", 40, "2026-10-20T10:00:00Z"),
     r("claude/a09-28-kanto-picker", 86, "2026-10-20T10:30:00Z"),
