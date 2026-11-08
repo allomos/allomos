@@ -30,6 +30,11 @@ export default defineConfig({
           items: [{ autogenerate: { directory: 'start' } }],
         },
         {
+          label: 'Audit',
+          translations: { 'zh-CN': '审计', ja: '監査' },
+          items: [{ autogenerate: { directory: 'audit' } }],
+        },
+        {
           label: 'Release notes',
           translations: { 'zh-CN': '发布说明', ja: 'リリースノート' },
           items: [{ autogenerate: { directory: 'release-notes' } }],

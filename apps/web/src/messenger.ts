@@ -186,6 +186,8 @@ export interface Messenger {
   witnessTick(root: string): Promise<unknown>;
   /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
   showIdentitiesFile(): Promise<void>;
+  /** Opens the user guide's standards map (Task-A01-gnome953) in the default browser, in `language` (en, zh-CN or ja). */
+  openStandardsMap(language: string): Promise<void>;
   /** Project settings → Audit → Make a checkpoint now (Task-A01-tail719), as `alm checkpoint`. Rejects with a Problem (no signing key). */
   makeCheckpoint(root: string): Promise<AuditSettings>;
   /** Project settings → Audit → Remove personal details… (Task-A01-tail719), as `alm redact`. Rejects with a Problem. */
@@ -513,6 +515,7 @@ export const desktopMessenger: Messenger = {
       reason: c.reason ?? null,
     }),
   showIdentitiesFile: () => invoke<void>("show_identities_file"),
+  openStandardsMap: (language) => invoke<void>("open_standards_map", { language }),
   makeCheckpoint: (root) => invoke<AuditSettings>("make_checkpoint", { root }),
   witnessTick: (root) => invoke<unknown>("witness_tick", { root }),
   redactTask: (root, id, fields, reason, approvedBy) =>

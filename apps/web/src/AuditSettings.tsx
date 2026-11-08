@@ -52,7 +52,7 @@ const when = (utc: string) => {
 
 
 export function AuditSection({ messenger, root, fileManagerKey }: { messenger: Messenger; root: string; fileManagerKey: Key }) {
-  const { t, problem } = useI18n();
+  const { t, problem, language } = useI18n();
   const [settings, setSettings] = useState<AuditSettings | null>(null);
   const [level, setLevel] = useState<IdentityLevel>("pseudonym");
   const [reauth, setReauth] = useState(false);
@@ -259,6 +259,11 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
           <li key={k}>{t(k)}</li>
         ))}
       </ul>
+      <p className="small">
+        <button type="button" className="link small" onClick={() => void messenger.openStandardsMap(language).catch(say)}>
+          {t("audit.standards_map")}
+        </button>
+      </p>
       <h3>{t("audit.identity")}</h3>
       <p className="muted small">{t("audit.identity_help")}</p>
       <div className="form" role="radiogroup" aria-label={t("audit.identity")}>

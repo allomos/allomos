@@ -464,6 +464,31 @@ pub(crate) fn set_identity_at(
     audit_settings_of(root)
 }
 
+/// The user guide's standards map (Task-A01-gnome953), in the window's language: which settings
+/// each standard needs. Fixed addresses: the window cannot ask to open any other.
+pub(crate) fn standards_map_url(language: &str) -> &'static str {
+    match language {
+        "zh-CN" => "https://allomos.github.io/allomos/zh-cn/audit/standards-map/",
+        "ja" => "https://allomos.github.io/allomos/ja/audit/standards-map/",
+        _ => "https://allomos.github.io/allomos/audit/standards-map/",
+    }
+}
+
+/// Project settings → Audit → See which settings each standard needs: the standards map in the
+/// default browser.
+#[tauri::command]
+pub(crate) fn open_standards_map(language: String) -> Result<(), Problem> {
+    let url = standards_map_url(&language);
+    opener()
+        .arg(url)
+        .spawn()
+        .map(drop)
+        .map_err(|e| Problem::OpenFailed {
+            path: url.to_string(),
+            detail: e.to_string(),
+        })
+}
+
 /// Show `identities.json` (who is behind this computer's pseudonyms) in Finder or Explorer:
 /// its folder, which is made if missing.
 #[tauri::command]
@@ -485,6 +510,15 @@ pub(crate) fn show_identities_file() -> Result<(), Problem> {
 mod tests {
     use super::*;
     use allomos_store::init;
+
+    /// The standards map's address follows the window's language; any other value gets English.
+    #[test]
+    fn standards_map_in_each_language() {
+        assert!(standards_map_url("en").ends_with("/allomos/audit/standards-map/"));
+        assert!(standards_map_url("zh-CN").ends_with("/allomos/zh-cn/audit/standards-map/"));
+        assert!(standards_map_url("ja").ends_with("/allomos/ja/audit/standards-map/"));
+        assert_eq!(standards_map_url("fr"), standards_map_url("en"));
+    }
 
     /// Project settings → Audit → Separation of duties (Task-A01-grotto036): off by default; on
     /// and off are recorded, and off needs a reason.
