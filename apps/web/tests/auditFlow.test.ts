@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LEVELS, needsReason, replacedSummary } from "../src/auditFlow.ts";
+import { LEVELS, needsReason, replacedSummary, witnessChoice, witnessUrl, witnessUrlOk } from "../src/auditFlow.ts";
 
 test("the levels go from the pseudonym up", () => {
   assert.deepEqual(LEVELS, ["pseudonym", "account", "sso"]);
@@ -70,4 +70,20 @@ test("after Replace key…, the taskbags where the old key was retired are count
   };
   assert.deepEqual(replacedSummary(r), { replaced: 2, failed: ["/c/.allomos/taskbag"] });
   assert.deepEqual(replacedSummary({ taskbags: [] }), { replaced: 0, failed: [] });
+});
+
+test("outside witness: a list choice stands for an address, and back (Task-A01-wood982)", () => {
+  const presets = [
+    { id: "freetsa", url: "https://freetsa.org/tsr" },
+    { id: "digicert", url: "http://timestamp.digicert.com" },
+  ];
+  assert.equal(witnessUrl("freetsa", "", presets), "https://freetsa.org/tsr");
+  assert.equal(witnessUrl("custom", " https://tsa.example.com/tsr ", presets), "https://tsa.example.com/tsr");
+  assert.equal(witnessUrl("", "", presets), "");
+  assert.equal(witnessChoice("http://timestamp.digicert.com", presets), "digicert");
+  assert.equal(witnessChoice("https://tsa.example.com/tsr", presets), "custom");
+  assert.equal(witnessChoice(undefined, presets), "");
+  assert.ok(witnessUrlOk("https://tsa.example.com/tsr"));
+  assert.ok(!witnessUrlOk("tsa.example.com"));
+  assert.ok(!witnessUrlOk("https://a b"));
 });

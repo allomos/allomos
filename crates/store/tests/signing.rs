@@ -158,8 +158,10 @@ fn a_changed_event_is_found() {
 fn checkpoints_find_a_removed_last_event_and_a_rewritten_history() {
     let _turn = turn();
     let root = taskbag("checkpoint");
-    let made = checkpoint::checkpoint(&root, Duration::ZERO, Some("abc123")).unwrap();
+    let (made, witnessed) = checkpoint::checkpoint(&root, Duration::ZERO, Some("abc123")).unwrap();
     assert_eq!(made.heads, 1);
+    // The outside witness is off: nothing sent, nothing waiting.
+    assert_eq!(witnessed, checkpoint::Witnessed::default());
     let c: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(root.join(&made.file)).unwrap()).unwrap();
     assert_eq!(c["git_commit"], "abc123");
@@ -191,6 +193,106 @@ fn checkpoints_find_a_removed_last_event_and_a_rewritten_history() {
     assert_eq!(file, made.file);
     // And it stays said.
     assert!(trail::audit(&root).rewritten.is_some());
+}
+
+/// The outside witness (Task-A01-wood982): a checkpoint names its service, waits while the
+/// service cannot be reached, gets its receipt later, and `alm audit` matches the receipt to the
+/// checkpoint's fingerprint. The service is a recorded reply (tests/fixtures/tsa-reply.der).
+#[test]
+fn the_outside_witness_countersigns_checkpoints_and_the_audit_matches_them() {
+    let _turn = turn();
+    let root = taskbag("witness");
+    let project = root.join("project.json");
+    let mut p: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&project).unwrap()).unwrap();
+    p["audit"] = serde_json::json!({ "witness": { "service": "https://tsa.test/tsr" } });
+    fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
+
+    // Offline: the checkpoint is made and signed, and waits.
+    // SAFETY: as in `turn`.
+    unsafe { std::env::set_var("ALLOMOS_TSA_REPLY", "offline") };
+    let (made, witnessed) = checkpoint::checkpoint(&root, Duration::ZERO, None).unwrap();
+    assert!(witnessed.receipts.is_empty());
+    assert_eq!(witnessed.waiting.len(), 1);
+    assert_eq!(witnessed.waiting[0].service, "https://tsa.test/tsr");
+    let f = trail::audit(&root);
+    assert!(f.checkpoints[0].signed);
+    assert_eq!(f.checkpoints[0].waiting, ["https://tsa.test/tsr"]);
+    assert_eq!(
+        f.receipts_missing,
+        [format!("{}: https://tsa.test/tsr", made.file)]
+    );
+
+    // A reply for another fingerprint is not kept: it still waits, and says why.
+    let fixture = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/tsa-reply.der");
+    unsafe { std::env::set_var("ALLOMOS_TSA_REPLY", fixture) };
+    let w = checkpoint::send_waiting(&root, Duration::ZERO).unwrap();
+    assert!(w.receipts.is_empty());
+    assert!(
+        w.waiting[0]
+            .why
+            .as_deref()
+            .unwrap()
+            .contains("different fingerprint")
+    );
+
+    // A receipt added to a checkpoint leaves its signature whole.
+    let path = root.join(&made.file);
+    let mut c: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    c["receipts"] = serde_json::json!([{ "service": "https://other.test/", "token": "AAAA" }]);
+    fs::write(&path, serde_json::to_string_pretty(&c).unwrap()).unwrap();
+    let f = trail::audit(&root);
+    assert!(f.checkpoints[0].signed);
+    assert!(!f.checkpoints[0].witnessed[0].readable);
+    assert_eq!(
+        f.receipts_not_matching,
+        [format!("{}: https://other.test/", made.file)]
+    );
+
+    // The fingerprint the recorded reply countersigns: the receipt comes back and matches.
+    c["sha256"] = serde_json::json!(allomos_store::tsa::FIXTURE_SHA256);
+    c["receipts"] = serde_json::json!([]);
+    fs::write(&path, serde_json::to_string_pretty(&c).unwrap()).unwrap();
+    let w = checkpoint::send_waiting(&root, Duration::ZERO).unwrap();
+    assert_eq!(w.receipts.len(), 1, "{:?}", w.waiting);
+    assert!(w.waiting.is_empty());
+    assert!(checkpoint::waiting(&root).is_empty());
+    let f = trail::audit(&root);
+    let r = &f.checkpoints[0].witnessed[0];
+    assert!(r.readable && r.matches && r.whole, "{r:?}");
+    assert_eq!(
+        r.signer.as_deref(),
+        Some("O=Allomos test, CN=Allomos test TSA")
+    );
+    assert!(!r.expires_within_a_year);
+    assert!(f.receipts_missing.is_empty() && f.receipts_not_matching.is_empty());
+    assert!(f.receipt_signature_check.is_some());
+
+    // Turned off: a waiting fingerprint is no longer sent.
+    let off = serde_json::json!({ "format": p["format"], "id": p["id"], "name": p["name"] });
+    fs::write(&project, serde_json::to_string_pretty(&off).unwrap()).unwrap();
+    let mut c: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    c["receipts"] = serde_json::json!([]);
+    fs::write(&path, serde_json::to_string_pretty(&c).unwrap()).unwrap();
+    assert_eq!(
+        checkpoint::send_waiting(&root, Duration::ZERO).unwrap(),
+        checkpoint::Witnessed::default()
+    );
+    assert_eq!(checkpoint::waiting(&root).len(), 1);
+    fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
+    checkpoint::send_waiting(&root, Duration::ZERO).unwrap();
+
+    // The checkpoint's fingerprint changed after the receipt: they no longer match.
+    let mut c: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    c["sha256"] = serde_json::json!("00".repeat(32));
+    fs::write(&path, serde_json::to_string_pretty(&c).unwrap()).unwrap();
+    let f = trail::audit(&root);
+    assert!(!f.checkpoints[0].witnessed[0].matches);
+    assert_eq!(f.receipts_not_matching.len(), 1);
+    unsafe { std::env::remove_var("ALLOMOS_TSA_REPLY") };
 }
 
 #[test]
@@ -348,7 +450,7 @@ fn this_computer_shows_its_key_and_the_checkpoints_seen() {
         serde_json::from_str(&allomos_store::public_key_export(&key)).unwrap();
     assert_eq!(export["public_key"], serde_json::json!(key.public_key));
     assert!(export.get("owner").is_none());
-    let made = checkpoint::checkpoint(&root, Duration::from_secs(5), None).unwrap();
+    let (made, _) = checkpoint::checkpoint(&root, Duration::from_secs(5), None).unwrap();
     let _ = trail::audit(&root);
     let project = fs::read_to_string(root.join("project.json")).unwrap();
     let project: serde_json::Value = serde_json::from_str(&project).unwrap();

@@ -180,6 +180,8 @@ export interface Messenger {
   setSeparation(root: string, on: boolean, reason?: string): Promise<AuditSettings>;
   /** Sets the retention period (null: forever) and the legal hold, as `alm audit-settings --retention --legal-hold`; a shorter period and the hold need a reason. Rejects with a Problem. */
   setRetention(root: string, years: number | null, legalHold: boolean, reason?: string): Promise<AuditSettings>;
+  /** Turns the outside witness on or off, or changes its services (Task-A01-wood982), as `alm audit-settings --witness`; on needs `confirmed`, off a reason; `on` undefined keeps it on. Rejects with a Problem. */
+  setWitness(root: string, change: { on?: boolean; service?: string; second?: string; confirmed?: boolean; reason?: string }): Promise<AuditSettings>;
   /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
   showIdentitiesFile(): Promise<void>;
   /** Project settings → Audit → Make a checkpoint now (Task-A01-tail719), as `alm checkpoint`. Rejects with a Problem (no signing key). */
@@ -495,6 +497,15 @@ export const desktopMessenger: Messenger = {
     }),
   setSeparation: (root, on, reason) => invoke<AuditSettings>("set_separation", { root, on, reason: reason ?? null }),
   setRetention: (root, years, legalHold, reason) => invoke<AuditSettings>("set_retention", { root, years, legalHold, reason: reason ?? null }),
+  setWitness: (root, c) =>
+    invoke<AuditSettings>("set_witness", {
+      root,
+      on: c.on ?? null,
+      service: c.service ?? null,
+      second: c.second ?? null,
+      confirmed: c.confirmed ?? false,
+      reason: c.reason ?? null,
+    }),
   showIdentitiesFile: () => invoke<void>("show_identities_file"),
   makeCheckpoint: (root) => invoke<AuditSettings>("make_checkpoint", { root }),
   redactTask: (root, id, fields, reason, approvedBy) =>

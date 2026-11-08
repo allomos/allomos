@@ -19,15 +19,36 @@ pub(crate) fn audit(root: &Path) -> Result<Done, Problem> {
 }
 
 pub(crate) fn checkpoint(root: &Path, git_commit: Option<&str>) -> Result<Done, Problem> {
-    let made = allomos_store::checkpoint::checkpoint(root, lock_wait(), git_commit)?;
-    let text = format!(
+    let (made, witnessed) = allomos_store::checkpoint::checkpoint(root, lock_wait(), git_commit)?;
+    let mut text = format!(
         "Checkpoint {}: fingerprint {} of {} file(s), {} change(s), the last change of {} key(s). A later change to anything it covers shows in `alm audit`.\n",
         made.file, made.sha256, made.files, made.events, made.heads
     );
+    text.push_str(&witnessed_text(&witnessed));
     Ok(Done::new(
-        json!({ "taskbag": root, "checkpoint": made }),
+        json!({ "taskbag": root, "checkpoint": made, "witness": witnessed }),
         text,
     ))
+}
+
+/// What the outside witness did, in plain lines (Task-A01-wood982).
+fn witnessed_text(w: &allomos_store::checkpoint::Witnessed) -> String {
+    let mut out = String::new();
+    for r in &w.receipts {
+        out.push_str(&format!(
+            "Receipt: {} countersigned the fingerprint of {} at {} (only the fingerprint was sent).\n",
+            r.service, r.file, r.time
+        ));
+    }
+    for x in &w.waiting {
+        out.push_str(&format!(
+            "Waiting: {} for {}{}; the next `alm checkpoint` sends it again, and its receipt will carry that later time.\n",
+            x.service,
+            x.file,
+            x.why.as_deref().map(|y| format!(" ({y})")).unwrap_or_default()
+        ));
+    }
+    out
 }
 
 fn list(title: &str, items: &[String], out: &mut String) {
@@ -107,6 +128,21 @@ fn facts_text(f: &Facts) -> String {
             out.push_str(&format!("  key {}: {}\n", k.key, k.files.join(", ")));
         }
     }
+    list(
+        "Receipts that do not countersign their checkpoint's fingerprint, or are not whole, or cannot be read",
+        &f.receipts_not_matching,
+        &mut out,
+    );
+    list(
+        "Checkpoints without the receipt of a service they name (offline or refused; `alm checkpoint` sends them again)",
+        &f.receipts_missing,
+        &mut out,
+    );
+    list(
+        "Receipts whose service's certificate expires within a year (give them a new time-stamp before then, RFC 4998)",
+        &f.receipts_expiring,
+        &mut out,
+    );
     list("Signed with a key not in keys/", &f.unknown_key, &mut out);
     list("Unsigned after signing started", &f.unsigned, &mut out);
     list("Could not be read", &f.unreadable, &mut out);
@@ -134,7 +170,7 @@ fn facts_text(f: &Facts) -> String {
         out.push_str(&format!("Checkpoints ({}):\n", f.checkpoints.len()));
         for c in &f.checkpoints {
             out.push_str(&format!(
-                "  {} at {}: {}, {} change(s), {} receipt(s){}\n",
+                "  {} at {}: {}, {} change(s), {} receipt(s){}{}\n",
                 c.file,
                 c.at,
                 if c.signed {
@@ -144,6 +180,17 @@ fn facts_text(f: &Facts) -> String {
                 },
                 c.events,
                 c.receipts,
+                c.witnessed
+                    .iter()
+                    .map(|r| {
+                        let says = if r.readable && r.matches && r.whole {
+                            "countersigns this fingerprint"
+                        } else {
+                            "does not match"
+                        };
+                        [" [", &r.service, " at ", &r.time, ", ", says, "]"].concat()
+                    })
+                    .collect::<String>(),
                 if c.heads_missing.is_empty() {
                     String::new()
                 } else {
@@ -162,6 +209,11 @@ fn facts_text(f: &Facts) -> String {
             Some(false) => out.push_str("Since the last checkpoint nothing has changed.\n"),
             None => {}
         }
+    }
+    if let Some(cmd) = f.receipt_signature_check {
+        out.push_str(&format!(
+            "Receipts are matched by their content here; their services' signatures are not checked by alm. To check one: {cmd}\n"
+        ));
     }
     out.push_str("These are facts, not a verdict: you check what they mean.\n");
     out

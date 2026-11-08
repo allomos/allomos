@@ -397,10 +397,25 @@ export interface AuditSettings {
   legal_hold: boolean;
   /** Where this computer keeps who is behind its pseudonyms; null without a settings folder. */
   identities_file: string | null;
-  /** The taskbag's checkpoints (Task-A01-tail719): how many, the newest, and receipts from an outside witness. */
-  checkpoints: { count: number; last: { file: string; at: string } | null; receipts: number };
+  /** The taskbag's checkpoints (Task-A01-tail719): how many, the newest, receipts from an outside
+   * witness, and fingerprints waiting to be sent (Task-A01-wood982). */
+  checkpoints: { count: number; last: { file: string; at: string } | null; receipts: number; waiting: number };
+  /** The outside witness (Task-A01-wood982): its services; null while it is off. */
+  witness: { service: string; second?: string } | null;
+  /** The time-stamp services offered by name, the default first. */
+  witness_presets: WitnessPreset[];
+  /** What the last Make a checkpoint now sent; only on its answer. */
+  witnessed?: { receipts: { file: string; service: string; time: string }[]; waiting: { file: string; service: string; why?: string }[] };
   /** Where this computer keeps its signing key; "none": no checkpoint can be made here. */
   signing: SigningStore;
+}
+
+/** A time-stamp service offered by name (decision 0021 § 3.3). */
+export interface WitnessPreset {
+  id: string;
+  name: string;
+  url: string;
+  default: boolean;
 }
 
 export type SigningStore = "keychain" | "credential_manager" | "folder" | "none";

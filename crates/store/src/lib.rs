@@ -49,6 +49,7 @@ mod setup;
 mod signing;
 pub mod trail;
 mod translate;
+pub mod tsa;
 mod update_taskbag;
 pub mod versions;
 pub use confirm::{

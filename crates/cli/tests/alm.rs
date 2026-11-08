@@ -7527,3 +7527,63 @@ fn retention_legal_hold_and_redaction() {
     let v = ok(&repo, &redact);
     assert_eq!(v["changed"], false);
 }
+
+/// The outside witness (Task-A01-wood982): off by default; on only with the person's yes
+/// (--confirm), with FreeTSA unless another service is named; off only with a reason.
+#[test]
+fn the_outside_witness_is_turned_on_with_a_yes_and_off_with_a_reason() {
+    let repo = filled();
+    let v = ok(&repo, &["audit-settings"]);
+    assert_eq!(v["witness"], Value::Null);
+    refused(
+        &repo,
+        &["audit-settings", "--witness", "on"],
+        1,
+        "witness_not_confirmed",
+    );
+    refused(
+        &repo,
+        &["audit-settings", "--witness-service", "freetsa"],
+        1,
+        "witness_off",
+    );
+    let v = ok(&repo, &["audit-settings", "--witness", "on", "--confirm"]);
+    assert_eq!(v["witness"]["service"], "https://freetsa.org/tsr");
+    refused(
+        &repo,
+        &["audit-settings", "--witness-second", "tsa.example.com"],
+        1,
+        "witness_service_invalid",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "audit-settings",
+            "--witness-second",
+            "https://tsa.example.com/tsr",
+        ],
+    );
+    assert_eq!(v["witness"]["second"], "https://tsa.example.com/tsr");
+    refused(
+        &repo,
+        &["audit-settings", "--witness", "off"],
+        1,
+        "audit_reason_missing",
+    );
+    let v = ok(
+        &repo,
+        &[
+            "audit-settings",
+            "--witness",
+            "off",
+            "--reason",
+            "trial over",
+        ],
+    );
+    assert_eq!(v["witness"], Value::Null);
+    let out = alm(&repo, &["audit-settings"]);
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("Outside witness: off."),
+        "{out:?}"
+    );
+}
