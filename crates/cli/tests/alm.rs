@@ -615,9 +615,15 @@ fn git_sees_only_text_files() {
         .lines()
         .map(|l| l[3..].to_string())
         .partition(|f| f.starts_with(".allomos/taskbag/events/"));
-    // One event per change: init, add area, add task, claim (Task-A01-17).
-    assert_eq!(events.len(), 4, "{events:?}");
+    // One event per change: init, add area, add task, claim (Task-A01-17), and the first signed
+    // change's `add key` (Task-A01-gusto404).
+    assert_eq!(events.len(), 5, "{events:?}");
     assert!(events.iter().all(|f| f.ends_with(".json")));
+    // This computer's public key (its name is the key's ID).
+    let (keys, files): (Vec<String>, Vec<String>) = files
+        .into_iter()
+        .partition(|f| f.starts_with(".allomos/taskbag/keys/"));
+    assert_eq!(keys.len(), 1, "{keys:?}");
     assert_eq!(
         files,
         [
@@ -3184,7 +3190,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
         ] {
             let v = refused(&repo, args, 1, "taskbag_to_move_in");
             assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
-            assert_eq!(v["error"]["params"]["current"], "allomos/7");
+            assert_eq!(v["error"]["params"]["current"], "allomos/8");
             let message = v["error"]["message"].as_str().unwrap();
             assert!(message.contains("Update the taskbag…"), "{message}");
             assert!(message.contains("`alm move-in`"), "{message}");
@@ -4135,8 +4141,8 @@ fn event_count(repo: &Path) -> usize {
 #[test]
 fn every_change_writes_exactly_one_event_and_a_refusal_none() {
     let repo = filled();
-    // init, two areas and three tasks so far.
-    assert_eq!(event_count(&repo), 6);
+    // add key, init, two areas and three tasks so far.
+    assert_eq!(event_count(&repo), 7);
     let changes: &[&[&str]] = &[
         &["add", "iteration", "I01", "First"],
         &["ready", "A01-01"],
@@ -4158,7 +4164,7 @@ fn every_change_writes_exactly_one_event_and_a_refusal_none() {
     ];
     for (i, args) in changes.iter().enumerate() {
         ok(&repo, args);
-        assert_eq!(event_count(&repo), 7 + i, "after {args:?}");
+        assert_eq!(event_count(&repo), 8 + i, "after {args:?}");
     }
     let n = event_count(&repo);
     // Refused changes write nothing.
@@ -4494,7 +4500,7 @@ fn block_shows_blockers_and_next_only_tells() {
 #[test]
 fn a_newer_taskbag_is_refused_by_an_older_build() {
     let repo = filled();
-    set_format(&repo, "allomos/8");
+    set_format(&repo, "allomos/9");
     refused(&repo, &["list"], 4, "taskbag_newer");
 }
 
@@ -5551,7 +5557,7 @@ fn tasks_name_their_project_folders_after_an_upgrade() {
     let v = ok(&repo, &["upgrade", "--confirm"]);
     assert_eq!(v["upgraded"], true, "{v}");
     let project: Value = serde_json::from_str(&fs::read_to_string(&project_file).unwrap()).unwrap();
-    assert_eq!(project["format"], "allomos/7");
+    assert_eq!(project["format"], "allomos/8");
     assert_eq!(project.get("project_folder"), None);
     assert_eq!(project["project_folders"][0]["path"], ".");
     let main = project["project_folders"][0]["name"]

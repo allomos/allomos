@@ -362,6 +362,27 @@ pub(crate) fn write(root: &Path, event: &Event) -> Result<PathBuf, Problem> {
     if let Some(change) = REQUEST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
         event.changes.push(change.clone());
     }
+    // Signed in an `allomos/8` taskbag (Task-A01-gusto404, decision 0021 § 3.1).
+    if crate::signing::wanted(root, &event) {
+        let mut value = serde_json::to_value(&event).expect("events serialize");
+        let file = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let new_key = crate::signing::sign_event(root, &mut value, &file);
+        // Written in the event's usual field order, `sig` last; the signature is over the
+        // canonical form, so the order does not matter to it.
+        if let Some(sig) = value.get("sig") {
+            event.extra.insert("sig".into(), sig.clone());
+        }
+        write_atomic(&path, &json_text(&event))?;
+        if let Some(key) = new_key {
+            let project = project_id(root, &event);
+            crate::signing::add_key(root, project.as_deref(), &key, &value)?;
+        }
+        return Ok(path);
+    }
     write_atomic(&path, &json_text(&event))?;
     Ok(path)
 }

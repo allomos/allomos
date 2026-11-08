@@ -203,6 +203,7 @@
   "no_session": [
     "id"
   ],
+  "no_signing_key": [],
   "not_a_taskbag": [
     "path"
   ],

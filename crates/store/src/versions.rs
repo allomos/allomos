@@ -216,6 +216,11 @@ fn recorded_folder(value: &Value) -> Option<String> {
         .map(String::from)
 }
 
+/// `project.json`'s `format`, read on its own.
+pub(crate) fn format_of(root: &Path) -> Option<String> {
+    read_format(root)
+}
+
 fn read_format(root: &Path) -> Option<String> {
     read_project(root)?
         .get("format")?
@@ -245,7 +250,7 @@ pub fn write_allowed(root: &Path) -> Result<(), Problem> {
 /// since its labels have a new shape in `allomos/7` (decision 0020, Task-A01-moth111).
 pub fn upgraded_for_writing(root: &Path) -> Result<(), Problem> {
     match read_format(root) {
-        Some(found) if format_version(&found).is_some_and(|n| n < FORMAT_VERSION) => {
+        Some(found) if format_version(&found).is_some_and(|n| n < allomos_core::LABELS_FROM) => {
             Err(Problem::TaskbagToUpgrade {
                 found,
                 current: FORMAT.to_string(),

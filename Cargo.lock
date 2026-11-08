@@ -77,9 +77,12 @@ name = "allomos-store"
 version = "0.1.42"
 dependencies = [
  "allomos-core",
+ "allomos-store",
  "fs4",
+ "ring",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

@@ -289,6 +289,7 @@
   "problem.label_not_on_task": "{id} does not carry the label {label}.",
   "problem.label_not_by_human": "{label} is not a human-check label: use locally verified by human or deployed and verified by human.",
   "problem.human_check_label_missing": "{id} has no human-check label yet. If a person checked it, mark it checked first; otherwise finish it without the human check.",
+  "problem.no_signing_key": "This computer has no signing key: Allomos keeps it in the system's key store, and has none it can use here yet (it has the macOS Keychain). Nothing was written. Changes made here are written unsigned, and alm audit lists them.",
   "problem.taskbag_to_upgrade": "This taskbag is in {found}; this Allomos reads it but writes only {current}, whose labels have a new shape. Nothing was changed. Update the taskbag first (Update the taskbag…, or alm upgrade); older Allomos versions refuse an upgraded taskbag.",
   "problem.waiting_on_missing": "A waiting task must say what it is waiting on.",
   "problem.without_human_check_missing": "Say why the task is finished without the human check.",
