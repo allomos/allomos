@@ -944,6 +944,8 @@
   "monitor.last_run_need": "{n} 个需要你",
   "monitor.last_run_need_tip": "显示需要你的任务（预设“需要你”）",
   "monitor.start_failed": "监测已停止：没能为 {id} 启动 {agent}。{detail}",
+  "monitor.close_prompt": "「换肩」：任务已完成。这个标签页 30 秒后关闭；按任意键保留。",
+  "monitor.close_kept": "「换肩」：这个标签页保留。",
   "label.locally_by_agent": "智能体已在本地验证",
   "label.deployed_by_agent": "智能体已部署并验证",
   "label.locally_by_human": "人已在本地验证",

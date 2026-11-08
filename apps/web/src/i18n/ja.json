@@ -944,6 +944,8 @@
   "monitor.last_run_need": "あなたの対応が必要 {n} 件",
   "monitor.last_run_need_tip": "対応が必要なタスクを表示（プリセット「あなたの対応が必要」）",
   "monitor.start_failed": "監視を止めました：{id} のために {agent} を起動できませんでした。{detail}",
+  "monitor.close_prompt": "「肩代」：タスクが完了しました。このタブは 30 秒後に閉じます。残すには何かキーを押してください。",
+  "monitor.close_kept": "「肩代」：このタブを残します。",
   "label.locally_by_agent": "エージェントがローカルで検証済み",
   "label.deployed_by_agent": "エージェントがデプロイして検証済み",
   "label.locally_by_human": "人がローカルで検証済み",

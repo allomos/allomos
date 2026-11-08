@@ -566,7 +566,7 @@ pub fn start_session(
     project: &Path,
     request: &str,
     session_id: Option<&str>,
-) -> Result<(), Problem> {
+) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     let id = agent.id.as_str();
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -590,22 +590,25 @@ pub fn start_session(
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
-            .map(drop)
+            .map(|_| None)
             .map_err(|e| ask_failed(id, e));
     }
+    // The new tab's window and terminal device are kept, to close that tab once its task is done
+    // (Task-A03-sierra014).
     let script = format!(
-        "tell application \"Terminal\"\ndo script {}\nend tell",
+        "tell application \"Terminal\"\nset t to do script {}\nset w to (first window whose tabs contains t)\nreturn (id of w as text) & \", \" & (tty of t)\nend tell",
         applescript_string(&terminal_script(project, &program, alm_dir))
     );
-    command("/usr/bin/osascript")
+    let out = command("/usr/bin/osascript")
         .args(["-e", &script])
-        .status()
-        .map_err(|e| ask_failed(id, e))
-        .and_then(|s| {
-            s.success()
-                .then_some(())
-                .ok_or_else(|| ask_failed(id, "Terminal did not open"))
-        })
+        .output()
+        .map_err(|e| ask_failed(id, e))?;
+    if !out.status.success() {
+        return Err(ask_failed(id, "Terminal did not open"));
+    }
+    Ok(crate::session_tab::parse_opened(&String::from_utf8_lossy(
+        &out.stdout,
+    )))
 }
 
 /// Open `url` with the app the system has for its scheme.

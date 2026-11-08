@@ -105,12 +105,21 @@ export function scopeReady(options: ScopeOptions, scope: Scope): number {
   return options.other.items.find((i) => i.id === scope.id)?.ready ?? 0;
 }
 
+/** The terminal tab Allomos opened for a session (macOS Terminal: its window and terminal device),
+ * so that tab alone is closed once its task is done (Task-A03-sierra014). */
+export interface SessionTab {
+  window: number;
+  tty: string;
+}
+
 /** The task a session is working for the monitor. */
 export interface Current {
   id: string;
   /** The session ID Allomos gave the agent (Claude Code's `--session-id`); null when the agent
    * picks its own (Codex). */
   sessionId: string | null;
+  /** The tab it runs in, when Allomos can close it (null: it stays open whatever happens). */
+  tab: SessionTab | null;
   /** When the session was started (ms). */
   at: number;
   /** Seen held by someone since it was started: it was claimed. */
@@ -163,6 +172,15 @@ export function follow(run: Run, tasks: Task[], now: number): { run: Run; finish
   return { run: next === cur ? run : { ...run, current: next }, finished: null };
 }
 
+/** The tab to close now that the run's current task is finished: only when the task is **done**
+ * (approver, 2026-11-08); waiting, blocked, released, dropped or gone leaves the tab open, so the
+ * person can see why it stopped. `run` is the run before [`follow`] let the task go. */
+export function tabToClose(run: Run, tasks: Task[]): SessionTab | null {
+  const cur = run.current;
+  if (!cur?.tab) return null;
+  return tasks.find((t) => t.id === cur.id)?.state === "done" ? cur.tab : null;
+}
+
 /** When the next check is due (ms). */
 export function nextCheck(run: Run): number {
   return run.checked + run.every * 60_000;
@@ -176,11 +194,11 @@ export function pick(run: Run, tasks: Task[], areas: { id: string }[], iteration
 }
 
 /** The run with a session started for `task`. */
-export function take(run: Run, task: Task, sessionId: string | null, now: number): Run {
+export function take(run: Run, task: Task, sessionId: string | null, now: number, tab: SessionTab | null = null): Run {
   return {
     ...run,
     taken: [...run.taken, task.id],
-    current: { id: task.id, sessionId, at: now, seenHeld: Boolean(task.holder), seen: seenOf(task), changed: now },
+    current: { id: task.id, sessionId, tab, at: now, seenHeld: Boolean(task.holder), seen: seenOf(task), changed: now },
     checked: now,
   };
 }

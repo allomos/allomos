@@ -8,6 +8,7 @@ mod agents;
 mod alm_command;
 mod lan;
 mod pairing;
+mod session_tab;
 mod sessions;
 mod tab_drag;
 mod update;
@@ -2096,7 +2097,7 @@ async fn monitor_start_session(
     taskbag: PathBuf,
     request: String,
     session_id: Option<String>,
-) -> Result<(), Problem> {
+) -> Result<Option<session_tab::SessionTab>, Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -2111,6 +2112,18 @@ async fn monitor_start_session(
         return Err(Problem::AgentNotFound { agent });
     };
     agents::start_session(chosen, &project, &request, session_id.as_deref())
+}
+
+/// **Monitor ready tasks** (Task-A03-sierra014): the task of the session in `tab` is done: the tab
+/// says it closes in 30 seconds unless a key is pressed, then the agent is ended with its exit
+/// command and the tab closed. Returns at once; the countdown runs in the background.
+#[tauri::command]
+fn monitor_close_session(
+    agent: String,
+    tab: session_tab::SessionTab,
+    texts: session_tab::CloseTexts,
+) {
+    session_tab::close_when_done(agent, tab, texts);
 }
 
 /// **Work on it…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
@@ -2782,6 +2795,7 @@ pub fn run() {
             proceed_with_agent,
             proceed_manual_request,
             monitor_start_session,
+            monitor_close_session,
             run_modes_text,
             copy_text,
             instruction_files,

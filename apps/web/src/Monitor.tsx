@@ -22,6 +22,7 @@ import {
   pick,
   stalled,
   startRun,
+  tabToClose,
   take,
 } from "./monitorFlow";
 import type { Frequency, LastRun, Run, Scope, TerminalAgent } from "./monitorFlow";
@@ -112,8 +113,8 @@ export function useMonitor({
       try {
         const taskbag = await messenger.proceedTaskbag(root).catch(() => root);
         const request = monitorRequest(task, taskbag, language, r.agent, sessionId, r.quiet);
-        await messenger.monitorStartSession(r.agent, root, request, sessionId);
-        setRun((now) => (now && now.started === r.started ? take(now, task, sessionId, Date.now()) : now));
+        const tab = await messenger.monitorStartSession(r.agent, root, request, sessionId);
+        setRun((now) => (now && now.started === r.started ? take(now, task, sessionId, Date.now(), tab) : now));
       } catch (e) {
         const detail = isProblem(e) ? problem(e) : String(e);
         onError(t("monitor.start_failed", { agent: t(AGENT_KEY[r.agent]), id: task.id, detail }));
@@ -133,6 +134,12 @@ export function useMonitor({
     if (!run || !box) return;
     const at = Date.now();
     const followed = follow(run, box.tasks, at);
+    // Its task done, the session's tab closes after 30 seconds unless a key is pressed in it.
+    const tab = followed.finished ? tabToClose(run, box.tasks) : null;
+    if (tab) {
+      const texts = { prompt: t("monitor.close_prompt"), kept: t("monitor.close_kept") };
+      void messenger.monitorCloseSession(run.agent, tab, texts).catch(() => {});
+    }
     let r = followed.run;
     if (followed.finished && r.stopping) return end(r);
     if (!r.current && !r.stopping && !starting.current && (followed.finished || at >= nextCheck(r))) {
@@ -145,7 +152,7 @@ export function useMonitor({
       r = { ...r, checked: at };
     }
     if (r !== run) setRun(r);
-  }, [run, box, now, active, end, startSession]);
+  }, [run, box, now, active, end, startSession, messenger, t]);
 
   return {
     run,
