@@ -82,7 +82,7 @@ pub fn refresh(app: &AppHandle, closing: Option<&str>) {
             (label, title, front)
         })
         .collect();
-    let mut skip = vec![crate::ABOUT_WINDOW, crate::windows::SETTINGS_WINDOW];
+    let mut skip = vec![crate::ABOUT_WINDOW];
     skip.extend(closing);
     // A menu that cannot be rebuilt keeps its previous list; nothing else depends on it.
     let _ = fill(app, &menu, &entries(&windows, &skip));

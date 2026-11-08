@@ -2112,9 +2112,11 @@ fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem> {
 const NEW_WINDOW_ID: &str = "new_window";
 /// File → New Tab (⌘T / Ctrl+T): a new tab on the start page (Task-A01-marble320).
 const NEW_TAB_ID: &str = "new_tab";
-/// **Settings…** (⌘, / Ctrl+,): the app's own settings window (Task-A01-marble320); in the
-/// Allomos menu on macOS, in the File menu elsewhere.
+/// **Settings…** (⌘, / Ctrl+,): the settings dialog of the window in front, at its Allomos group
+/// (Task-A01-marble320, Task-A05-cookie962); in the Allomos menu on macOS, in the File menu
+/// elsewhere.
 const SETTINGS_ID: &str = "app_settings";
+const SETTINGS_EVENT: &str = "menu:settings";
 /// A recent folder's item is `recent:<position in the list>`.
 const RECENT_PREFIX: &str = "recent:";
 const CLEAR_RECENT_ID: &str = "recent_clear";
@@ -2540,13 +2542,15 @@ pub fn run() {
             } else if id == NEW_TAB_ID {
                 windows::new_tab(app);
             } else if id == SETTINGS_ID {
-                let title = app
-                    .state::<MenuTexts>()
-                    .settings
-                    .text()
-                    .unwrap_or_else(|_| "Settings".into());
-                let title = title.trim_end_matches('…').trim_end_matches("...");
-                let _ = windows::open_settings_window(app, title);
+                // One settings dialog, in the window in front (Task-A05-cookie962); with no window
+                // open, a new one shows it once it has loaded.
+                match &target {
+                    Some(_) => send(SETTINGS_EVENT, None),
+                    None => {
+                        windows::ask_for_settings();
+                        let _ = open_new_window(app);
+                    }
+                }
             } else if id == CONNECT_ID {
                 send(CONNECT_EVENT, None);
             } else if id == MOVE_TASKS_IN_ID {
@@ -2587,6 +2591,7 @@ pub fn run() {
             open_website,
             close_window,
             windows::window_start,
+            windows::take_settings_request,
             windows::set_window_tabs,
             windows::show_project_elsewhere,
             tab_drag::drag_tear,
