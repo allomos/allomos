@@ -154,6 +154,13 @@ pub fn set_request(request: Option<(&str, &str)>) {
 pub struct Who {
     /// The exact model ID the agent runs on.
     pub model: Option<String>,
+    /// The agent's effort, permission mode and the commit hash of the `AGENTS.md` it works under
+    /// (`--effort`, `--permission-mode`, `--rules`; Task-A01-urchin867).
+    pub effort: Option<String>,
+    pub permission_mode: Option<String>,
+    pub rules: Option<String>,
+    /// The writing `alm`'s version (`alm --version`), recorded in each agent's event.
+    pub alm: Option<String>,
     /// The pseudonym ID of the person the agent works for, when it is not this computer's person.
     pub on_behalf_of: Option<String>,
     /// The approval ID the change relies on.
@@ -172,14 +179,22 @@ pub fn set_who(who: Option<Who>) {
 }
 
 /// What the events written since the last [`take_gaps`] could not say about who made them
-/// (Task-A01-black004): `reason` (Task-A01-air289), `model`, `session` or `for`, each once, in
-/// that order.
+/// (Task-A01-black004): `reason` (Task-A01-air289), `model`, `effort`, `permission_mode`,
+/// `rules` (Task-A01-urchin867), `session` or `for`, each once, in that order.
 static GAPS: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
 
 /// The gaps of the events written since the last call ([`GAPS`]), and forget them.
 pub fn take_gaps() -> Vec<&'static str> {
     let mut gaps = std::mem::take(&mut *GAPS.lock().unwrap_or_else(|e| e.into_inner()));
-    let order = ["reason", "model", "session", "for"];
+    let order = [
+        "reason",
+        "model",
+        "effort",
+        "permission_mode",
+        "rules",
+        "session",
+        "for",
+    ];
     gaps.sort_by_key(|g| order.iter().position(|o| o == g));
     gaps.dedup();
     gaps
@@ -210,11 +225,14 @@ fn project_json_id(root: &Path) -> Option<String> {
 }
 
 /// Fill in who made `event` (Task-A01-black004, decision 0021 § 1.1), unless its writer already
-/// did. An agent's change (`agent` set) gets its session ID from the environment, its model from
-/// `--model` (or the one its session named before, on this computer) and `for`, this computer's
+/// did. An agent's change (`agent` set) gets its session ID from the environment, its AI details
+/// (model, effort, permission mode, rules: Task-A01-urchin867) from `--model`, `--effort`,
+/// `--permission-mode` and `--rules` (or its own environment, or what its session named before,
+/// on this computer; else `"unknown"`) and `for`, this computer's
 /// person's pseudonym unless `--for` names another. A change in the app, or with `alm` where no
-/// agent was seen, gets the person's pseudonym as `actor.person`. What could not be learned is
-/// left out and noted in [`GAPS`].
+/// agent was seen, gets the person's pseudonym as `actor.person` and nothing else about them. An
+/// agent's event also names the writing `alm`'s version (`actor.alm`). What could not be learned
+/// is noted in [`GAPS`].
 fn fill_who(root: &Path, event: &mut Event) {
     let env = |name: &str| clean(std::env::var(name).ok());
     let who = WHO
@@ -235,21 +253,52 @@ fn fill_who(root: &Path, event: &mut Event) {
             Some(agent) if event.via == "alm" => {
                 actor.session =
                     allomos_core::event::session_from_env(&agent, |n| std::env::var(n).ok());
-                let named = clean(who.model).or_else(|| env("ALLOMOS_MODEL"));
-                actor.model = match (&named, &actor.session) {
-                    (Some(model), Some(session)) => {
-                        crate::identity::remember_session_model(session, model);
-                        named.clone()
-                    }
-                    (Some(_), None) => named.clone(),
-                    (None, Some(session)) => crate::identity::session_model(session),
-                    (None, None) => None,
+                // The AI details (Task-A01-urchin867, decision 0021 § 1.1): what the agent named
+                // now, else what its own environment says, else what its session named before on
+                // this computer, else "unknown", never a guess.
+                let named_model = clean(who.model).or_else(|| env("ALLOMOS_MODEL"));
+                let named = crate::identity::SessionDetails {
+                    effort: clean(who.effort).or_else(|| env("ALLOMOS_EFFORT")),
+                    permission_mode: clean(who.permission_mode)
+                        .or_else(|| env("ALLOMOS_PERMISSION_MODE")),
+                    rules: clean(who.rules).or_else(|| env("ALLOMOS_RULES")),
                 };
+                let before = match &actor.session {
+                    Some(session) => {
+                        if named_model.is_some() || named != Default::default() {
+                            crate::identity::remember(session, named_model.as_deref(), &named);
+                        }
+                        (
+                            crate::identity::session_model(session),
+                            crate::identity::session_details(session),
+                        )
+                    }
+                    None => (None, Default::default()),
+                };
+                let own_effort =
+                    allomos_core::event::effort_from_env(&agent, |n| std::env::var(n).ok());
+                let details = [
+                    ("model", named_model.or(before.0)),
+                    ("effort", named.effort.or(own_effort).or(before.1.effort)),
+                    (
+                        "permission_mode",
+                        named.permission_mode.or(before.1.permission_mode),
+                    ),
+                    ("rules", named.rules.or(before.1.rules)),
+                ];
+                let [model, effort, permission_mode, rules] = details.map(|(code, value)| {
+                    value.unwrap_or_else(|| {
+                        gaps.push(code);
+                        allomos_core::event::UNKNOWN.to_string()
+                    })
+                });
+                actor.model = Some(model);
+                actor.effort = Some(effort);
+                actor.permission_mode = Some(permission_mode);
+                actor.rules = Some(rules);
+                actor.alm = clean(who.alm.clone());
                 if event.on_behalf_of.is_none() {
                     event.on_behalf_of = given_for.clone().or_else(pseudonym);
-                }
-                if actor.model.is_none() {
-                    gaps.push("model");
                 }
                 if actor.session.is_none() {
                     gaps.push("session");

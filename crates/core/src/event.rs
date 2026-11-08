@@ -93,8 +93,10 @@ pub struct Event {
 }
 
 /// Who ran a change, beyond the event's `agent` and `tool` (Task-A01-black004, decision 0021
-/// § 1.1). Every field is optional: what the writer could not learn is left out, never guessed.
-/// Fields this Allomos does not know (later tasks add more, such as the effort) are kept.
+/// § 1.1). Every field is optional: left out in events recorded before. For an agent's change
+/// made from Task-A01-urchin867 on, the AI details (`model`, `effort`, `permission_mode`,
+/// `rules`) are always there, written [`UNKNOWN`] when the agent could not say, never guessed.
+/// Fields this Allomos does not know are kept.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct EventActor {
     /// The agent's own session ID (Claude Code's `CLAUDE_CODE_SESSION_ID`, Codex's
@@ -104,6 +106,20 @@ pub struct EventActor {
     /// The exact model ID the agent ran on, as the agent named it (`--model`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// The agent's reasoning effort (Task-A01-urchin867): `--effort`, or Claude Code's
+    /// `CLAUDE_EFFORT`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    /// The agent's permission mode (`auto`, `default`, `plan`…), as the agent named it
+    /// (`--permission-mode`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
+    /// The rules the agent worked under: the commit hash of `AGENTS.md` it read (`--rules`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rules: Option<String>,
+    /// The version of `alm` that wrote the event, as `alm --version` gives it (`0.1.42`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alm: Option<String>,
     /// A person's pseudonym ID (`p-7k3q2f`), for a change a person made: in the app, or with
     /// `alm` where no AI agent was seen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -116,9 +132,28 @@ impl EventActor {
     pub fn is_empty(&self) -> bool {
         self.session.is_none()
             && self.model.is_none()
+            && self.effort.is_none()
+            && self.permission_mode.is_none()
+            && self.rules.is_none()
+            && self.alm.is_none()
             && self.person.is_none()
             && self.extra.is_empty()
     }
+}
+
+/// What an AI detail the agent could not say is written as (decision 0021 § 1.1): never a guess.
+pub const UNKNOWN: &str = "unknown";
+
+/// The effort the agent's own environment gives (Task-A01-urchin867): Claude Code's
+/// `CLAUDE_EFFORT`. Codex gives none.
+pub fn effort_from_env(agent: &str, var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    let name = match agent {
+        "claude" => "CLAUDE_EFFORT",
+        _ => return None,
+    };
+    var(name)
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 /// The session ID of the agent `agent_from_env` found, from the same environment: Claude Code's
@@ -520,7 +555,7 @@ mod tests {
         .unwrap();
         assert!(old.actor.is_none() && old.on_behalf_of.is_none() && old.approval.is_none());
         assert!(!serde_json::to_string(&old).unwrap().contains("actor"));
-        let text = r#"{"at":"2026-11-08T10:00:00Z","via":"alm","command":"label","kind":"task","id":"A01-01","agent":"claude","actor":{"session":"s","model":"m","effort":"high"},"for":"p-abc123","approval":"ap-1","changes":[]}"#;
+        let text = r#"{"at":"2026-11-08T10:00:00Z","via":"alm","command":"label","kind":"task","id":"A01-01","agent":"claude","actor":{"session":"s","model":"m","effort":"high","permission_mode":"auto","rules":"abc123","alm":"0.1.42","mood":"later"},"for":"p-abc123","approval":"ap-1","changes":[]}"#;
         let new: Event = serde_json::from_str(text).unwrap();
         let actor = new.actor.clone().unwrap();
         assert_eq!(
@@ -528,13 +563,25 @@ mod tests {
             (Some("s"), Some("m"))
         );
         assert_eq!(
-            actor.extra.get("effort"),
-            Some(&Value::from("high")),
-            "kept"
+            (
+                actor.effort.as_deref(),
+                actor.permission_mode.as_deref(),
+                actor.rules.as_deref(),
+                actor.alm.as_deref()
+            ),
+            (Some("high"), Some("auto"), Some("abc123"), Some("0.1.42"))
         );
+        assert_eq!(actor.extra.get("mood"), Some(&Value::from("later")), "kept");
         assert_eq!(new.on_behalf_of.as_deref(), Some("p-abc123"));
         let back: Value = serde_json::to_value(&new).unwrap();
         assert_eq!(back, serde_json::from_str::<Value>(text).unwrap());
+    }
+
+    #[test]
+    fn the_effort_comes_from_claude_codes_own_variable() {
+        let env = |name: &str| (name == "CLAUDE_EFFORT").then(|| " medium ".to_string());
+        assert_eq!(effort_from_env("claude", env).as_deref(), Some("medium"));
+        assert_eq!(effort_from_env("codex", env), None);
     }
 
     #[test]

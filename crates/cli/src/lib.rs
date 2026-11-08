@@ -74,6 +74,23 @@ struct Cli {
     /// alm remembers it for your session ID.
     #[arg(long, global = true, env = "ALLOMOS_MODEL", value_name = "ID")]
     model: Option<String>,
+    /// Your reasoning effort (for example medium), recorded in each event (Task-A01-urchin867).
+    /// Claude Code tells alm by itself (CLAUDE_EFFORT); once per session is enough otherwise.
+    #[arg(long, global = true, env = "ALLOMOS_EFFORT", value_name = "LEVEL")]
+    effort: Option<String>,
+    /// Your permission mode (for example auto, default, plan), recorded in each event. Once per
+    /// session on this computer is enough.
+    #[arg(
+        long,
+        global = true,
+        env = "ALLOMOS_PERMISSION_MODE",
+        value_name = "MODE"
+    )]
+    permission_mode: Option<String>,
+    /// The commit hash of the AGENTS.md you work under (in Git: `git log -1 --format=%H --
+    /// AGENTS.md`), recorded in each event. Once per session on this computer is enough.
+    #[arg(long, global = true, env = "ALLOMOS_RULES", value_name = "COMMIT")]
+    rules: Option<String>,
     /// The pseudonym ID of the person you work for, when it is not this computer's person
     /// (whose pseudonym alm records by itself).
     #[arg(
@@ -1364,6 +1381,10 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
             }
             allomos_store::events::set_who(Some(allomos_store::events::Who {
                 model: cli.model.clone(),
+                effort: cli.effort.clone(),
+                permission_mode: cli.permission_mode.clone(),
+                rules: cli.rules.clone(),
+                alm: Some(env!("CARGO_PKG_VERSION").to_string()),
                 on_behalf_of: cli.on_behalf_of.clone(),
                 approval: cli.approval.clone(),
                 reason: command_reason(&cli),
@@ -4564,8 +4585,20 @@ fn who_facts(done: &mut Done) -> Option<String> {
                     "alm --why \"<why, in one line>\" … (next time; the change itself is made)",
                 ),
                 "model" => (
-                    "This change's history does not say which model ran it: alm cannot learn it from the environment.",
+                    "This change's history does not say which model ran it (\"unknown\"): alm cannot learn it from the environment.",
                     "alm --model <your exact model ID> … (once per session on this computer; alm remembers it)",
+                ),
+                "effort" => (
+                    "This change's history says the effort is \"unknown\": alm cannot learn it from the environment.",
+                    "alm --effort <your effort level> … (once per session on this computer; alm remembers it)",
+                ),
+                "permission_mode" => (
+                    "This change's history says the permission mode is \"unknown\": alm cannot learn it from the environment.",
+                    "alm --permission-mode <your permission mode, e.g. auto> … (once per session on this computer; alm remembers it)",
+                ),
+                "rules" => (
+                    "This change's history says the rules are \"unknown\": which AGENTS.md commit you work under.",
+                    "alm --rules <in Git: git log -1 --format=%H -- AGENTS.md> … (once per session on this computer; alm remembers it)",
                 ),
                 "session" => (
                     "This change's history does not say which agent session ran it: the environment gave no session ID.",
