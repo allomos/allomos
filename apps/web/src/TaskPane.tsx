@@ -798,6 +798,35 @@ export function TaskPane({
             ))}
         </div>
       )}
+      {(task.effects ?? []).length > 0 && (
+        <div className="pane-check pane-approvals pane-effects">
+          <h3>{t("pane.effects")}</h3>
+          <ul className="approvals effects">
+            {(task.effects ?? []).map((e) => (
+              <li key={e.id}>
+                <strong>{e.target}</strong>: {e.action}{" "}
+                <span className="muted small">{t("pane.effect_by", { by: e.by || t("pane.history_someone"), at: localTime(e.at) })}</span>{" "}
+                {!e.result && <span className="badge small">{t("pane.effect_under_way")}</span>}
+                <dl className="small">
+                  <dt>{t("pane.effect_rollback")}</dt>
+                  <dd>{e.rollback}</dd>
+                  <dt>{t("pane.effect_approval")}</dt>
+                  <dd>{e.approval || t("pane.effect_no_approval")}</dd>
+                  {e.result && (
+                    <>
+                      <dt>{t("pane.effect_result")}</dt>
+                      <dd>
+                        {e.result}
+                        {e.result_at && <span className="muted"> ({localTime(e.result_at)})</span>}
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {canReopen(task) && (
         <div className="pane-check pane-reopen">
           {reason === null ? (

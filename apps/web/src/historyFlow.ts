@@ -1,7 +1,7 @@
 // A task's history in the task pane (Task-A01-17): how each recorded change is worded.
 
 import type { Key } from "./i18n";
-import type { FieldChange } from "./types";
+import type { EffectRecord, FieldChange } from "./types";
 
 /** The task pane's name for each task field, so History uses the same words as the fields above it. */
 const FIELD_KEYS: Record<string, Key> = {
@@ -26,6 +26,7 @@ const FIELD_KEYS: Record<string, Key> = {
   reopen_note: "pane.reopen_note",
   reason: "pane.reason",
   traces: "pane.traces",
+  effect: "pane.effect",
   card: "pane.card",
   card_outside: "pane.card_outside",
   description: "pane.description",
@@ -47,6 +48,8 @@ export function valueText(field: string, value: unknown, t: T): string {
   if (field === "state" && typeof value === "string") return t(`state.${value}` as Key);
   // An approval record (Task-A01-coach782) by its ID; older approvals were a text.
   if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
+  // An outside effect (Task-A01-job650): where, what, and what happened once it has a result.
+  if (field === "effect" && typeof value === "object") return effectText(value as Pick<EffectRecord, "target" | "action" | "result">, t);
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
   if ((field === "blocked_by" || field === "labels" || field === "traces") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
@@ -80,4 +83,11 @@ export function humanCheckText(c: HumanCheck, t: T): string {
   if (c.checker) parts.push(t("pane.human_check_by", { who: c.checker }));
   parts.push(c.steps_sha256 ? t("pane.human_check_steps_sha", { sha: c.steps_sha256.slice(0, 8) }) : t("pane.human_check_no_steps"));
   return c.words ? `${parts.join(", ")}: "${c.words}"` : parts.join(", ");
+}
+
+/** An outside effect (Task-A01-job650) in one line: "production: deploy 0.1.43 → deployed", or
+ * "… (under way)" before its result. */
+export function effectText(e: Pick<EffectRecord, "target" | "action" | "result">, t: T): string {
+  const head = `${e.target}: ${e.action}`;
+  return e.result ? `${head} → ${e.result}` : `${head} (${t("pane.effect_under_way")})`;
 }

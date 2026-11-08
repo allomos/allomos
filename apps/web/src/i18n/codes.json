@@ -104,6 +104,13 @@
   "duplicate_task_id": [
     "id"
   ],
+  "effect_incomplete": [
+    "missing"
+  ],
+  "effect_not_found": [
+    "id",
+    "task"
+  ],
   "field_missing": [],
   "field_unknown": [],
   "folder_choice_missing": [

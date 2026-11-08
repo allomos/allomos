@@ -271,6 +271,13 @@ Work a task:
   The person can also approve or withdraw in the app's task pane (channel `app`). An approval
   withdrawn while a task is in progress shows as \"Approval withdrawn\" in `alm next` and
   `alm show`: it stops nothing; whoever holds the task decides whether to stop.
+- `alm --approval <approval ID> effect <id> --target \"<where>\" --action \"<what>\" --rollback
+  \"<how it is undone>\"`: record an outside effect (a deployment, a change to a hosted resource,
+  SQL run on a real target) before you make it; it prints its ID (`ef-…`). After it:
+  `alm effect <id> --of <effect ID> --result \"<what happened>\"`. Recorded afterwards: all at
+  once. alm says when it names no approval, or one that no longer applies; it refuses nothing for
+  that: the approver's exact approval is still needed (Always-on boundaries). `alm effects <id>`
+  lists a task's effects; `alm effects`, every one in the project; `alm show` lists them too.
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
   `--reason \"<why>\"` change it; account and sso need a cloud project.
@@ -1814,6 +1821,9 @@ mod tests {
             "alm base <id> <branch>",
             "--working <name>",
             "alm trace <id> <ref>… [--remove]",
+            "effect <id> --target",
+            "--of <effect ID> --result",
+            "`alm effects`, every one in the project",
             "`alm traces <ref>` lists the tasks",
         ] {
             assert!(flat_all.contains(words), "{words}");
