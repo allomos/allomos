@@ -1572,6 +1572,7 @@ function TaskbagView({
         showScope={from === "iteration"}
         onOpen={() => setMonitorFrom(from)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
+        onOpenTask={(id) => setSelectedId(id)}
         onError={onError}
         onNeedYou={() => chooseFilter(presetFilter("needs_you", ladder))}
       />

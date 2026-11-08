@@ -992,6 +992,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
    the status bar that takes its place while monitoring, and the dialog's Which tasks field. */
 .monitor { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .monitor-button { font-size: 13px; padding: 4px 12px; }
+.monitor-stack { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.monitor-notice { padding: 0 12px; }
 .monitor-bar { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--ok-bg); color: var(--ok); border-radius: 14px; padding: 3px 6px 3px 12px; font-size: 13px; }
 .monitor-bar.stopping { background: var(--warn-bg); color: var(--warn); }
 .monitor-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: monitor-pulse 1.6s infinite; }

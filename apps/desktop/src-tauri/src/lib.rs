@@ -1968,6 +1968,17 @@ async fn monitor_start_session(
     agents::start_session(chosen, &project, &request, session_id.as_deref())
 }
 
+/// **Monitor ready tasks**, when the monitor starts and on Check now (Task-A01-steam936): every
+/// blocked task whose blockers have all finished goes on, as the last blocker's Done would have let
+/// it, made as the person's saved name (or as the app, when none is saved yet). Returns the tasks
+/// it let go on, with their finished blockers; with none, nothing is written.
+#[tauri::command]
+fn release_finished(root: PathBuf) -> Result<Vec<allomos_store::Released>, Problem> {
+    let name = allomos_store::saved_owner_name();
+    let actor = app_actor(name.as_deref()).unwrap_or(allomos_store::Actor::APP);
+    allomos_store::release_finished(&root, actor, LOCK_WAIT)
+}
+
 /// **Monitor ready tasks** (Task-A03-sierra014): the task of the session in `tab` is done: the tab
 /// says it closes in 30 seconds unless a key is pressed, then the agent is ended with its exit
 /// command and the tab closed. Returns at once; the countdown runs in the background.
@@ -2659,6 +2670,7 @@ pub fn run() {
             proceed_manual_request,
             monitor_start_session,
             monitor_close_session,
+            release_finished,
             run_modes_text,
             copy_text,
             instruction_files,
@@ -3381,6 +3393,49 @@ mod tests {
         assert!(t.blocked_by.is_empty());
         let e = &allomos_store::events::history(&root, "A01-02").events[0];
         assert_eq!((e.via.as_str(), e.command.as_str()), ("app", "unblock"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Task-A01-steam936: the monitor's sweep (at start and on Check now) lets a left-over
+    /// blocked task go on, through the app; a second sweep finds nothing and writes nothing.
+    #[test]
+    fn the_monitors_sweep_unblocks_a_left_over_task() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-sweep-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let lock = allomos_store::Lock::acquire(&root, std::time::Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&allomos_core::ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        for id in ["A01-01", "A01-02"] {
+            let bag = lock.load().taskbag.unwrap();
+            let mut t = allomos_core::ops::new_task(&bag, id, "A01", id, None).unwrap();
+            if id == "A01-01" {
+                t.state = allomos_core::State::Done;
+            } else {
+                t.state = allomos_core::State::Blocked;
+                t.blocked_by = vec!["A01-01".into()];
+            }
+            lock.create_task(&t).unwrap();
+        }
+        drop(lock);
+        let released = release_finished(root.clone()).unwrap();
+        assert_eq!(released.len(), 1);
+        assert_eq!(released[0].task.id, "A01-02");
+        assert_eq!(released[0].task.state, allomos_core::State::Ready);
+        assert_eq!(released[0].blockers, ["A01-01"]);
+        let e = &allomos_store::events::history(&root, "A01-02").events[0];
+        assert_eq!((e.via.as_str(), e.command.as_str()), ("app", "unblock"));
+        let count = allomos_store::events::list(&root).0.len();
+        assert!(release_finished(root.clone()).unwrap().is_empty());
+        assert_eq!(allomos_store::events::list(&root).0.len(), count);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

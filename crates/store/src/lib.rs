@@ -2307,9 +2307,15 @@ fn release_blocked(
         Some(t) => *t = task.clone(),
         None => after.tasks.push(task.clone()),
     }
+    write_released(lock, actor, &after)
+}
+
+/// Every blocked task in `bag` whose blockers have all finished goes on ([`ops::released`]), each
+/// written as its own `unblock` event under the held `lock`.
+fn write_released(lock: &Lock, actor: &Actor, bag: &Taskbag) -> Result<Vec<Task>, Problem> {
     let mut unblocked = Vec::new();
-    for o in ops::released(&after) {
-        let before = after.tasks.iter().find(|t| t.id == o.task.id);
+    for o in ops::released(bag) {
+        let before = bag.tasks.iter().find(|t| t.id == o.task.id);
         let mut changes = event::changes(before, &o.task, event::TASK_FIELDS);
         changes.extend(o.recorded.iter().cloned());
         let event = actor.event("unblock", Kind::Task, Some(&o.task.id), changes);
@@ -2317,6 +2323,44 @@ fn release_blocked(
         unblocked.push(o.task);
     }
     Ok(unblocked)
+}
+
+/// A task [`release_finished`] let go on, with the blockers that had finished.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Released {
+    pub task: Task,
+    /// Its blockers, as `blocked_by` listed them before it was cleared.
+    pub blockers: Vec<String>,
+}
+
+/// Sweep the whole taskbag (Task-A01-steam936): every blocked task whose blockers have all
+/// finished goes on now, as the last blocker's `alm done` or `alm drop` would have let it
+/// ([`ops::released`]), each as its own `unblock` event in one locked change. The monitor calls it
+/// when it starts and on Check now, and `alm next` before it lists. With no such task nothing is
+/// written: not even the lock is taken, so a taskbag that cannot be written is only read.
+pub fn release_finished(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+) -> Result<Vec<Released>, Problem> {
+    let (bag, _) = taskbag_of(root, load(root))?;
+    if ops::released(&bag).is_empty() {
+        return Ok(Vec::new());
+    }
+    let (lock, bag, _) = lock_for_change(root, wait)?;
+    let unblocked = write_released(&lock, &actor, &bag)?;
+    Ok(unblocked
+        .into_iter()
+        .map(|task| Released {
+            blockers: bag
+                .tasks
+                .iter()
+                .find(|t| t.id == task.id)
+                .map(|t| t.blocked_by.clone())
+                .unwrap_or_default(),
+            task,
+        })
+        .collect())
 }
 
 /// Every task's branches (base and working), by task ID (Task-A03-22), from the history.
@@ -2662,6 +2706,79 @@ mod tests {
         );
         assert!(section.contains("in the cloud for example"), "{section}");
         fs::remove_dir_all(base).unwrap();
+    }
+
+    /// Task-A01-steam936: the sweep lets every left-over blocked task go on (in progress when
+    /// held, else ready), each with an `unblock` event; with none, it writes nothing.
+    #[test]
+    fn the_sweep_unblocks_left_overs_and_otherwise_writes_nothing() {
+        let dir = tmp("sweep");
+        let root = dir.join(DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        for id in ["A01-01", "A01-02", "A01-03", "A01-04"] {
+            let bag = lock.load().taskbag.unwrap();
+            lock.create_task(&ops::new_task(&bag, id, "A01", id, None).unwrap())
+                .unwrap();
+        }
+        // A01-02 (held by b) and A01-03 blocked by the done A01-01; A01-04 by the open A01-03.
+        let mut bag = lock.load().taskbag.unwrap();
+        for t in bag.tasks.iter_mut() {
+            match t.id.as_str() {
+                "A01-01" => t.state = allomos_core::State::Done,
+                "A01-02" | "A01-03" => {
+                    t.state = allomos_core::State::Blocked;
+                    t.blocked_by = vec!["A01-01".into()];
+                    if t.id == "A01-02" {
+                        t.holder = Some("b".into());
+                    }
+                }
+                "A01-04" => {
+                    t.state = allomos_core::State::Blocked;
+                    t.blocked_by = vec!["A01-03".into()];
+                }
+                _ => {}
+            }
+            lock.save_task(t).unwrap();
+        }
+        drop(lock);
+        let events = |root: &Path| events::list(root).0.len();
+        let before = events(&root);
+        let released = release_finished(&root, Actor::alm(Some("s")), Duration::ZERO).unwrap();
+        let ids: Vec<&str> = released.iter().map(|r| r.task.id.as_str()).collect();
+        assert_eq!(ids, ["A01-02", "A01-03"]);
+        assert_eq!(released[0].blockers, ["A01-01"]);
+        assert_eq!(events(&root), before + 2);
+        let bag = load(&root).taskbag.unwrap();
+        let state = |id: &str| bag.tasks.iter().find(|t| t.id == id).unwrap().clone();
+        assert_eq!(state("A01-02").state, allomos_core::State::InProgress);
+        assert_eq!(state("A01-03").state, allomos_core::State::Ready);
+        assert!(state("A01-03").blocked_by.is_empty());
+        assert!(
+            state("A01-03")
+                .handoff_note
+                .unwrap()
+                .starts_with(&ops::released_note(&["A01-01".into()]))
+        );
+        assert_eq!(state("A01-04").state, allomos_core::State::Blocked);
+        let e = &events::history(&root, "A01-03").events[0];
+        assert_eq!(e.command, "unblock");
+        assert!(
+            allomos_core::event::reason(e)
+                .unwrap()
+                .starts_with("automatic:")
+        );
+        // Nothing left to let go on: no change, no event.
+        let before = events(&root);
+        assert_eq!(
+            release_finished(&root, Actor::alm(Some("s")), Duration::ZERO).unwrap(),
+            Vec::new()
+        );
+        assert_eq!(events(&root), before);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
