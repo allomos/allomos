@@ -156,6 +156,8 @@ problems! {
     ApprovalNotFound { id } => "approval_not_found", "No task records approval {id}. `alm show <task>` lists a task's approvals.";
     /// `alm withdraw` on an approval already withdrawn (Task-A01-coach782).
     ApprovalAlreadyWithdrawn { id } => "approval_already_withdrawn", "Approval {id} is already withdrawn.";
+    /// `alm classify` with a change type, risk or "touches" value not in its list (Task-A01-palm011).
+    ClassifyInvalid { field, value, allowed } => "classify_invalid", "\"{value}\" is not a {field} alm knows. Give one of: {allowed}.";
     /// `alm effect --of` with an effect ID the task does not record (Task-A01-job650).
     EffectNotFound { id, task } => "effect_not_found", "Task {task} records no outside effect {id}. `alm effects {task}` lists its effects.";
     /// A new outside effect without its target, action or rollback (Task-A01-job650).

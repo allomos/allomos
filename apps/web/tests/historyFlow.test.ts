@@ -89,3 +89,14 @@ test("a link to code shows its kind and a short reference (Task-A01-mint242)", (
   assert.equal(valueText("link", { kind: "release", ref: "v0.1.43" }, t), "pane.link_kind.release v0.1.43");
   assert.equal(fieldName("link", t), "pane.link");
 });
+
+test("a change type, risk and what it touches show in words (Task-A01-palm011)", () => {
+  assert.equal(valueText("change_type", "emergency", t), "classify.emergency");
+  assert.equal(valueText("risk", "high", t), "classify.high");
+  assert.equal(valueText("risk", "extreme", t), "extreme");
+  assert.equal(valueText("touches", ["production", "others_data"], t), "classify.production, classify.others_data");
+  assert.equal(valueText("touches", [], t), "classify.touches_none");
+  assert.equal(valueText("approval_due", "2026-11-11", t), "2026-11-11");
+  assert.equal(fieldName("change_type", t), "pane.change_type");
+  assert.equal(fieldName("approval_due", t), "pane.approval_due");
+});

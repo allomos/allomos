@@ -29,6 +29,7 @@ use serde::Serialize;
 pub mod approvals;
 pub mod cards;
 pub mod checkpoint;
+pub mod classify;
 mod confirm;
 mod convert;
 pub mod effects;

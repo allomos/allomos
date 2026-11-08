@@ -278,6 +278,14 @@ Work a task:
   once. alm says when it names no approval, or one that no longer applies; it refuses nothing for
   that: the approver's exact approval is still needed (Always-on boundaries). `alm effects <id>`
   lists a task's effects; `alm effects`, every one in the project; `alm show` lists them too.
+- `alm classify <id> [--type standard|normal|emergency] [--risk low|medium|high] [--touches
+  production|others-data|none] [--due <YYYY-MM-DD>]`: record a task's change type (standard: a
+  pre-approved routine change; normal: approved before it is made; emergency: made first and
+  approved afterwards), its risk, and whether it touches production or other people's data, in
+  its history; done tasks too. An emergency's approval is due by `--due` (three days after it is
+  marked, by default). `alm human` lists, under To approve afterwards, every emergency without an
+  approval recorded after it was marked (`alm approve`), and which are past due; `alm show` lists
+  a task's. Without options it shows what is recorded.
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
   `--reason \"<why>\"` change it; account and sso need a cloud project.
@@ -1830,6 +1838,8 @@ mod tests {
             "effect <id> --target",
             "--of <effect ID> --result",
             "`alm effects`, every one in the project",
+            "alm classify <id> [--type standard|normal|emergency]",
+            "To approve afterwards",
             "`alm traces <ref>` lists the tasks",
             "alm link <id> <kind> <ref> [--url <address>] [--remove]",
             "`alm links <ref>` finds the task of a commit",

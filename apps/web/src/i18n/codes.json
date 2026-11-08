@@ -81,6 +81,11 @@
     "count",
     "tasks"
   ],
+  "classify_invalid": [
+    "field",
+    "value",
+    "allowed"
+  ],
   "companion_desktop_only": [
     "op"
   ],

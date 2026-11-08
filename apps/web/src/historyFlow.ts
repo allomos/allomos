@@ -26,6 +26,10 @@ const FIELD_KEYS: Record<string, Key> = {
   reopen_note: "pane.reopen_note",
   reason: "pane.reason",
   traces: "pane.traces",
+  change_type: "pane.change_type",
+  risk: "pane.risk",
+  touches: "pane.touches",
+  approval_due: "pane.approval_due",
   effect: "pane.effect",
   link: "pane.link",
   card: "pane.card",
@@ -43,6 +47,9 @@ export function fieldName(field: string, t: T): string {
 
 const SHORT = 60;
 
+/** The change types, risk levels and what a change touches that Allomos names (Task-A01-palm011). */
+const CLASSIFY_VALUES = new Set(["standard", "normal", "emergency", "low", "medium", "high", "production", "others_data"]);
+
 /** One side of a change: a state in words, a description only as "changed", long text shortened. */
 export function valueText(field: string, value: unknown, t: T): string {
   if (value === undefined || value === null || value === "") return "—";
@@ -55,6 +62,10 @@ export function valueText(field: string, value: unknown, t: T): string {
   if (field === "link" && typeof value === "object") return linkText(value as Pick<LinkRecord, "kind" | "ref">, t);
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
+  // A change type, risk and what it touches (Task-A01-palm011), in words.
+  if ((field === "change_type" || field === "risk") && typeof value === "string" && CLASSIFY_VALUES.has(value)) return t(`classify.${value}` as Key);
+  if (field === "touches" && Array.isArray(value))
+    return value.length ? value.map((v) => (CLASSIFY_VALUES.has(String(v)) ? t(`classify.${v}` as Key) : String(v))).join(", ") : t("classify.touches_none");
   if ((field === "blocked_by" || field === "labels" || field === "traces") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const first = text.split("\n")[0];
