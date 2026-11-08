@@ -17,6 +17,11 @@ serde_json.workspace = true
 ring = "=0.17.14"
 sha2 = "=0.10.9"
 
+# Windows: the signing key in the Credential Manager (Task-A01-ring220), from the version the
+# lockfile already has.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+
 [features]
 # Tests only: never read or write the person's real settings folder for pseudonyms and session
 # models unless a test chose one with ALLOMOS_SETTINGS_DIR (Task-A01-black004). Turned on by the

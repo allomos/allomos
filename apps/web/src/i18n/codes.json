@@ -307,6 +307,7 @@
   "session_open_failed": [
     "detail"
   ],
+  "signing_key_not_saved": [],
   "startup_not_a_folder": [
     "path"
   ],

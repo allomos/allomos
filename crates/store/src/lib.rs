@@ -51,7 +51,6 @@ pub mod trail;
 mod translate;
 mod update_taskbag;
 pub mod versions;
-pub use signing::{ThisComputer, ThisKey, public_key_export, this_computer};
 pub use confirm::{
     ConfirmRequest, Extra as ConfirmExtra, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm,
     pending_confirms, post_confirm, read_answer, requests_dir, shown_fingerprint, was_seen,
@@ -81,6 +80,9 @@ pub use settings::{
 pub use setup::{
     SetupState, allomos_folder, project_folder_of, project_folder_paths, record_project_folder,
     relative_path, setup_state,
+};
+pub use signing::{
+    Replaced, ReplacedIn, ThisComputer, ThisKey, public_key_export, replace_key, this_computer,
 };
 pub use translate::{agent_translate_request_in, translation_steps_in};
 pub use update_taskbag::{

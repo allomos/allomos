@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LEVELS, needsReason } from "../src/auditFlow.ts";
+import { LEVELS, needsReason, replacedSummary } from "../src/auditFlow.ts";
 
 test("the levels go from the pseudonym up", () => {
   assert.deepEqual(LEVELS, ["pseudonym", "account", "sso"]);
@@ -57,4 +57,17 @@ test("a Last seen history line is there, gone or unknown", async () => {
   assert.equal(seenState(true), "there");
   assert.equal(seenState(false), "gone");
   assert.equal(seenState(null), "unknown");
+});
+
+test("after Replace key…, the taskbags where the old key was retired are counted and failures named", () => {
+  const r = {
+    taskbags: [
+      { root: "/a/.allomos/taskbag", outcome: "replaced" },
+      { root: "/b/.allomos/taskbag", outcome: "not_here" },
+      { root: "/c/.allomos/taskbag", outcome: "failed" },
+      { root: "/d/.allomos/taskbag", outcome: "replaced" },
+    ],
+  };
+  assert.deepEqual(replacedSummary(r), { replaced: 2, failed: ["/c/.allomos/taskbag"] });
+  assert.deepEqual(replacedSummary({ taskbags: [] }), { replaced: 0, failed: [] });
 });

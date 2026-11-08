@@ -403,7 +403,15 @@ export interface AuditSettings {
   signing: SigningStore;
 }
 
-export type SigningStore = "keychain" | "folder" | "none";
+export type SigningStore = "keychain" | "credential_manager" | "folder" | "none";
+
+/** What Replace key… did (Task-A01-ring220): the retired key, the new one, and one line per taskbag. */
+export interface KeyReplaced {
+  old: string;
+  new: { id: string; public_key: string };
+  /** "replaced": the old key retired there and the new one added; "not_here": that taskbag does not have the old key (or is not signed), nothing written; "failed": see problem. */
+  taskbags: { root: string; outcome: "replaced" | "not_here" | "failed"; problem?: Problem }[];
+}
 
 /** What Remove personal details… did (Task-A01-tail719, as `alm redact`): null when nothing was to remove. */
 export interface RedactDone {

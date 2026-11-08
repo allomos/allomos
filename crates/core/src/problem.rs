@@ -85,7 +85,9 @@ problems! {
     /// Decision 0020: an `allomos/5` or `allomos/6` taskbag is read, but not written, until upgraded.
     /// Task-A01-gusto404 (decision 0021 § 3): a checkpoint is signed with this computer's key, and
     /// this computer has none (no key store Allomos can use yet).
-    NoSigningKey => "no_signing_key", "This computer has no signing key: Allomos keeps it in the system's key store, and has none it can use here yet (it has the macOS Keychain). Nothing was written. Changes made here are written unsigned, and `alm audit` lists them.";
+    NoSigningKey => "no_signing_key", "This computer has no signing key: Allomos keeps it in the system's key store, and has none it can use here yet (it has the macOS Keychain and the Windows Credential Manager). Nothing was written. Changes made here are written unsigned, and `alm audit` lists them.";
+    /// Task-A01-ring220: Replace key… could not save the new key in the system's key store.
+    SigningKeyNotSaved => "signing_key_not_saved", "The new signing key could not be saved in this computer's key store, so the key was not replaced. Nothing was written to any taskbag; the old key is still this computer's.";
     TaskbagToUpgrade { found, current } => "taskbag_to_upgrade", "This taskbag is in {found}; this Allomos reads it but writes only {current}, whose labels have a new shape. Nothing was changed. Run `alm upgrade` (or Update the taskbag… in the Allomos app) first; older Allomos versions refuse an upgraded taskbag.";
     /// Task-A01-piano403: the state was written by a newer Allomos, or mistyped.
     StateUnknown { id, state } => "state_unknown", "{id} has the state {state}, which this version of Allomos does not know, so it does not change it. Update Allomos, or correct the state in its file.";

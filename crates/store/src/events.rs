@@ -208,7 +208,7 @@ fn clean(value: Option<String>) -> Option<String> {
 
 /// The project an event belongs to, for its pseudonym: the event's own ID for a project event
 /// (`init` writes it before `project.json`), else `project.json`'s `id`.
-fn project_id(root: &Path, event: &Event) -> Option<String> {
+pub(crate) fn project_id(root: &Path, event: &Event) -> Option<String> {
     if event.kind == Kind::Project {
         if let Some(id) = clean(event.id.clone()) {
             return Some(id);

@@ -12,7 +12,7 @@ import type { LadderStep } from "./ladderFlow";
 import type { SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
 export interface TranslateTo {
@@ -345,6 +345,8 @@ export interface AppSettingsMessenger {
   thisComputer(folders: string[]): Promise<ThisComputer>;
   /** Export public key…: asks where, then writes the public key file; false when the person cancelled. Rejects with a Problem. */
   exportPublicKey(suggestedName: string): Promise<boolean>;
+  /** Replace key… (Task-A01-ring220): a new signing key; the old one retired in each taskbag of `folders` (the recent folders) that has it. Rejects with a Problem. */
+  replaceKey(folders: string[]): Promise<KeyReplaced>;
 }
 
 export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
@@ -371,6 +373,7 @@ export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
     await invoke<void>("export_public_key", { path });
     return true;
   },
+  replaceKey: (folders) => invoke<KeyReplaced>("replace_key", { folders }),
 };
 
 /** Pairing (apps/desktop/src-tauri/src/pairing.rs, Task-A04-02-02): what the dialog shows. */

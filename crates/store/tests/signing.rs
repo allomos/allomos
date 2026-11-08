@@ -359,3 +359,70 @@ fn this_computer_shows_its_key_and_the_checkpoints_seen() {
         .expect("audit remembered the checkpoint");
     assert_eq!(mine.checkpoint, made.file);
 }
+
+/// Replace key… (Task-A01-ring220): the new key is this computer's; each taskbag given that has
+/// the old key gets a `retire key` event signed by the old key naming the new one, the old key
+/// file kept and marked retired, and the new key's `add key`. The old key's events still check,
+/// and later changes are signed with the new key. A taskbag without the old key is left alone.
+#[test]
+fn replacing_the_key_retires_the_old_one_and_keeps_its_events_checkable() {
+    let _turn = turn();
+    let root = taskbag("replace-key");
+    let old = allomos_store::this_computer().key.expect("a key").id;
+    let elsewhere = tmp("replace-key-not-a-taskbag");
+    let done = allomos_store::replace_key(
+        &[root.clone(), elsewhere.clone()],
+        APP,
+        Duration::from_secs(5),
+    )
+    .unwrap();
+    assert_eq!(done.old, old);
+    assert_ne!(done.new.id, old);
+    assert_eq!(
+        allomos_store::this_computer().key.map(|k| k.id),
+        Some(done.new.id.clone())
+    );
+    let outcomes: Vec<_> = done.taskbags.iter().map(|t| t.outcome).collect();
+    assert_eq!(outcomes, ["replaced", "not_here"]);
+
+    let old_file: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(root.join("keys").join(format!("{old}.json"))).unwrap(),
+    )
+    .unwrap();
+    assert!(old_file["retired"].is_string());
+    assert!(
+        root.join("keys")
+            .join(format!("{}.json", done.new.id))
+            .is_file()
+    );
+
+    note(&root, "after the new key");
+    let (events, _) = trail::raw_events(&root);
+    let retire = events
+        .iter()
+        .find(|(_, e)| e["command"] == "retire key")
+        .expect("a retire key event");
+    assert_eq!(retire.1["sig"]["key"], serde_json::json!(old));
+    assert_eq!(retire.1["replaced_by"], serde_json::json!(done.new.id));
+    // Who made it, as for any change (the person's pseudonym).
+    assert!(retire.1["by"].is_string());
+    let last = &events.last().unwrap().1;
+    assert_eq!(last["sig"]["key"], serde_json::json!(done.new.id));
+
+    let f = trail::audit(&root);
+    assert!(f.changed.is_empty(), "{:?}", f.changed);
+    assert!(f.unknown_key.is_empty() && f.breaks.is_empty() && f.forks.is_empty());
+    assert!(f.unsigned.is_empty());
+    let keys: Vec<_> = f.chains.iter().map(|c| c.key.clone()).collect();
+    assert!(keys.contains(&old) && keys.contains(&done.new.id));
+
+    // Replacing again retires the second key the same way; three chains, none broken.
+    let again = allomos_store::replace_key(&[root.clone()], APP, Duration::from_secs(5)).unwrap();
+    assert_eq!(
+        (again.old.as_str(), again.taskbags[0].outcome),
+        (done.new.id.as_str(), "replaced")
+    );
+    let f = trail::audit(&root);
+    assert_eq!(f.chains.len(), 3);
+    assert!(f.breaks.is_empty() && f.changed.is_empty());
+}

@@ -4,16 +4,17 @@
 // at once. Escape closes the window. Below it, **This computer** (Task-A01-tail719, decision 0021
 // § 6): this computer's signing key (its ID and public key, Export public key…) and the Last seen
 // history, the last checkpoint this computer saw of each project and whether that taskbag still
-// has it. Replacing the key is not here yet.
+// has it. **Replace key…** (Task-A01-ring220) makes a new key after an inline confirmation; the old
+// one is retired in every recent folder's taskbag that has it, so its changes can still be checked.
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
 import type { StartWith } from "./tabsFlow";
 import { isProblem } from "./types";
-import type { ThisComputer } from "./types";
+import type { KeyReplaced, ThisComputer } from "./types";
 import { readRecent, readRecentInfo } from "./recentFlow";
-import { seenState } from "./auditFlow";
+import { replacedSummary, seenState } from "./auditFlow";
 
 const CHOICES: { value: StartWith; key: "app_settings.reopen" | "app_settings.last" | "app_settings.blank" }[] = [
   { value: "reopen", key: "app_settings.reopen" },
@@ -27,8 +28,12 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
   const [error, setError] = useState<string | null>(null);
   const [computer, setComputer] = useState<ThisComputer | null>(null);
   const [exported, setExported] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const [replaced, setReplaced] = useState<KeyReplaced | null>(null);
+  const readComputer = () => settings.thisComputer(readRecent()).then(setComputer, (e: unknown) => setError(isProblem(e) ? problem(e) : String(e)));
   useEffect(() => {
-    settings.thisComputer(readRecent()).then(setComputer, (e: unknown) => setError(isProblem(e) ? problem(e) : String(e)));
+    void readComputer();
     // Read once when the window opens; the language only words an error.
   }, [settings]);
   useEffect(() => {
@@ -61,6 +66,22 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
       .exportPublicKey(`allomos-public-key-${computer?.key?.id ?? "none"}.json`)
       .then(setExported, (e: unknown) => setError(isProblem(e) ? problem(e) : String(e)));
   };
+  const replaceKey = () => {
+    setError(null);
+    setExported(false);
+    setReplacing(true);
+    settings
+      .replaceKey(readRecent())
+      .then(
+        (r) => {
+          setReplaced(r);
+          setConfirming(false);
+          return readComputer();
+        },
+        (e: unknown) => setError(isProblem(e) ? problem(e) : String(e)),
+      )
+      .finally(() => setReplacing(false));
+  };
   return (
     <main className="settings-window">
       <h1>{t("settings.general")}</h1>
@@ -74,7 +95,17 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
         ))}
       </fieldset>
       <h1>{t("this_computer.title")}</h1>
-      {computer && <ThisComputerSection computer={computer} exported={exported} onExport={exportKey} />}
+      {computer && (
+        <ThisComputerSection
+          computer={computer}
+          exported={exported}
+          onExport={exportKey}
+          replace={{ confirming, replacing, replaced, onAsk: () => {
+              setReplaced(null);
+              setConfirming(true);
+            }, onCancel: () => setConfirming(false), onReplace: replaceKey }}
+        />
+      )}
       {error && (
         <p className="banner error" role="alert">
           {error}
@@ -84,8 +115,18 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
   );
 }
 
-function ThisComputerSection({ computer, exported, onExport }: { computer: ThisComputer; exported: boolean; onExport: () => void }) {
+interface ReplaceState {
+  confirming: boolean;
+  replacing: boolean;
+  replaced: KeyReplaced | null;
+  onAsk: () => void;
+  onCancel: () => void;
+  onReplace: () => void;
+}
+
+function ThisComputerSection({ computer, exported, onExport, replace }: { computer: ThisComputer; exported: boolean; onExport: () => void; replace: ReplaceState }) {
   const { t } = useI18n();
+  const summary = replace.replaced && replacedSummary(replace.replaced);
   const names = readRecentInfo();
   const when = (utc: string) => {
     const d = new Date(utc);
@@ -103,12 +144,39 @@ function ThisComputerSection({ computer, exported, onExport }: { computer: ThisC
           <p className="small">
             {t("this_computer.public_key")} <code>{computer.key.public_key}</code>
           </p>
+          {computer.store !== "none" && <p className="muted small">{t(`this_computer.store_${computer.store}`)}</p>}
           <div className="row start">
             <button type="button" onClick={onExport}>
               {t("this_computer.export")}
             </button>
+            {!replace.confirming && (
+              <button type="button" onClick={replace.onAsk}>
+                {t("this_computer.replace")}
+              </button>
+            )}
           </div>
           {exported && <p className="muted small">{t("this_computer.exported")}</p>}
+          {replace.confirming && (
+            <div className="replace-key">
+              <p className="small">{t("this_computer.replace_help")}</p>
+              <div className="row start">
+                <button type="button" className="warning" disabled={replace.replacing} onClick={replace.onReplace}>
+                  {t("this_computer.replace_confirm")}
+                </button>
+                <button type="button" disabled={replace.replacing} onClick={replace.onCancel}>
+                  {t("this_computer.replace_cancel")}
+                </button>
+              </div>
+            </div>
+          )}
+          {replace.replaced && summary && (
+            <p className="muted small" role="status">
+              {t("this_computer.replaced", { old: replace.replaced.old, count: summary.replaced })}
+            </p>
+          )}
+          {summary && summary.failed.length > 0 && (
+            <p className="warning small">{t("this_computer.replaced_failed", { taskbags: summary.failed.join(", ") })}</p>
+          )}
         </>
       ) : (
         <p className="muted small">{t(computer.store === "none" ? "this_computer.no_store" : "this_computer.no_key_yet")}</p>

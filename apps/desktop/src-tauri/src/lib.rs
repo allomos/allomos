@@ -17,8 +17,8 @@ mod window_list;
 mod windows;
 
 use audit::{
-    audit_settings, export_public_key, make_checkpoint, redact_task, set_identity, set_retention,
-    set_separation, show_identities_file, this_computer,
+    audit_settings, export_public_key, make_checkpoint, redact_task, replace_key, set_identity,
+    set_retention, set_separation, show_identities_file, this_computer,
 };
 use windows::{Windows, fit_to_screen, focused_window, open_new_window, open_recent_in_window};
 
@@ -2578,6 +2578,7 @@ pub fn run() {
             redact_task,
             this_computer,
             export_public_key,
+            replace_key,
             lan_status,
             set_lan_viewing,
             rename_project,

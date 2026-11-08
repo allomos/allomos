@@ -51,3 +51,12 @@ export function canRedact(task: string, fields: readonly string[], reason: strin
 export function seenState(stillThere: boolean | null): "there" | "gone" | "unknown" {
   return stillThere === null ? "unknown" : stillThere ? "there" : "gone";
 }
+
+/** Settings → This computer → Replace key… (Task-A01-ring220): how many taskbags had the old key
+ * retired, and the ones that could not be written, for the line shown after replacing. */
+export function replacedSummary(r: { taskbags: { root: string; outcome: string }[] }): { replaced: number; failed: string[] } {
+  return {
+    replaced: r.taskbags.filter((t) => t.outcome === "replaced").length,
+    failed: r.taskbags.filter((t) => t.outcome === "failed").map((t) => t.root),
+  };
+}

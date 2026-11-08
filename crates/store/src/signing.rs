@@ -4,10 +4,11 @@
 //! Each computer has one Ed25519 key (RFC 8032), made on first use. The private key stays in the
 //! operating system's key store: on macOS the login Keychain (item "Allomos signing key",
 //! service `io.allomos.signing`), reached through the system's own `security` tool, so a rebuilt
-//! `alm` is not asked again for access. Never in the taskbag. Where Allomos has no key store yet
-//! (Windows, Linux), events are written unsigned, and the audit lists them as such. A test, or a
-//! trial run with `ALLOMOS_SETTINGS_DIR`, keeps its key in that settings folder instead, never in
-//! the person's Keychain.
+//! `alm` is not asked again for access; on Windows the Credential Manager (a generic credential
+//! named `io.allomos.signing/this-computer`, kept for this user on this computer, Task-A01-ring220).
+//! Never in the taskbag. Where Allomos has no key store yet (Linux), events are written unsigned,
+//! and the audit lists them as such. A test, or a trial run with `ALLOMOS_SETTINGS_DIR`, keeps its
+//! key in that settings folder instead, never in the person's key store.
 //!
 //! In an `allomos/8` taskbag every event gets `sig`: `{key, prev, value}`. `value` is the
 //! signature over the event in canonical JSON without `sig` ([`allomos_core::canonical`]); `prev`
@@ -15,16 +16,22 @@
 //! wrote form a chain, and removing one from the middle breaks it. The public keys are in the
 //! taskbag's `keys/<key ID>.json`; the first signed change on a computer adds its key there,
 //! recorded as a signed `add key` event.
+//!
+//! **Replace key…** (Settings → This computer, Task-A01-ring220, decision 0021 § 6) makes a new
+//! key and, in each taskbag it is given, retires the old one: a `retire key` event signed by the
+//! old key, naming the new one (`replaced_by`), the old `keys/` file kept with `retired` set, and
+//! the new key's `add key` event. The old key's events can still be checked.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use allomos_core::Problem;
 use allomos_core::canonical::{fingerprint, hex, signed_bytes, unhex};
-use allomos_core::event::{Event, Kind};
+use allomos_core::event::{Change, Event, Kind};
 use ring::rand::SystemRandom;
 use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
@@ -86,6 +93,8 @@ enum Store {
     Folder(PathBuf),
     /// The macOS login Keychain.
     Keychain,
+    /// The Windows Credential Manager.
+    CredentialManager,
     /// No key store: events are written unsigned.
     None,
 }
@@ -105,8 +114,20 @@ fn store() -> Store {
     }
     if cfg!(target_os = "macos") {
         Store::Keychain
+    } else if cfg!(windows) {
+        Store::CredentialManager
     } else {
         Store::None
+    }
+}
+
+/// Where the cached key came from, so a test changing its settings folder gets its own.
+fn place() -> Option<PathBuf> {
+    match store() {
+        Store::Folder(d) => Some(d),
+        Store::Keychain => Some(PathBuf::from("keychain")),
+        Store::CredentialManager => Some(PathBuf::from("credential-manager")),
+        Store::None => None,
     }
 }
 
@@ -116,11 +137,7 @@ static KEY: Mutex<Option<(PathBuf, Arc<Key>)>> = Mutex::new(None);
 /// This computer's key, made and saved the first time; `None` without a key store (or when the
 /// key store could not be read or written: then the change is written unsigned, never refused).
 pub(crate) fn key() -> Option<Arc<Key>> {
-    let place = match store() {
-        Store::Folder(d) => d,
-        Store::Keychain => PathBuf::from("keychain"),
-        Store::None => return None,
-    };
+    let place = place()?;
     let mut cached = KEY.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((p, k)) = cached.as_ref() {
         if *p == place {
@@ -156,25 +173,34 @@ fn read_private() -> Option<Vec<u8>> {
             }
             unhex(String::from_utf8(out.stdout).ok()?.trim())
         }
+        Store::CredentialManager => unhex(credentials::read()?.trim()),
         Store::None => None,
     }
 }
 
+/// Save a new private key, keeping one already saved (another process may have made one first),
+/// or, with `replace`, overwriting it.
 fn save_private(der: &[u8]) -> Option<()> {
+    put_private(der, false)
+}
+
+fn put_private(der: &[u8], replace: bool) -> Option<()> {
     let text = hex(der);
     match store() {
         Store::Folder(dir) => {
             fs::create_dir_all(&dir).ok()?;
             let path = dir.join(KEY_FILE);
-            if path.exists() {
+            if path.exists() && !replace {
                 return Some(());
             }
-            fs::write(&path, &text).ok()?;
+            let tmp = dir.join(format!("{KEY_FILE}.tmp-{}", std::process::id()));
+            fs::write(&tmp, &text).ok()?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+                let _ = fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600));
             }
+            crate::replace_file(&tmp, &path).ok()?;
             Some(())
         }
         Store::Keychain => {
@@ -188,13 +214,98 @@ fn save_private(der: &[u8]) -> Option<()> {
                 .stderr(Stdio::null())
                 .spawn()
                 .ok()?;
+            // `-U` updates the item when it is there: only when replacing the key.
+            let update = if replace { " -U" } else { "" };
             let line = format!(
-                "add-generic-password -s {SERVICE} -a {ACCOUNT} -l \"{LABEL}\" -w {text}\n"
+                "add-generic-password -s {SERVICE} -a {ACCOUNT} -l \"{LABEL}\"{update} -w {text}\n"
             );
             child.stdin.take()?.write_all(line.as_bytes()).ok()?;
             child.wait().ok()?.success().then_some(())
         }
+        Store::CredentialManager => {
+            // Writing a credential replaces one of the same name: look first, unless replacing.
+            if !replace && credentials::read().is_some() {
+                return Some(());
+            }
+            credentials::write(&text)
+        }
         Store::None => None,
+    }
+}
+
+/// The Windows Credential Manager, through its own functions (`CredReadW`, `CredWriteW`): one
+/// generic credential, kept for this user on this computer (not roaming), holding the private key
+/// in hexadecimal.
+#[cfg(windows)]
+mod credentials {
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::Security::Credentials::{
+        CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredFree, CredReadW, CredWriteW,
+    };
+
+    const TARGET: &str = "io.allomos.signing/this-computer";
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(Some(0)).collect()
+    }
+
+    pub(super) fn read() -> Option<String> {
+        let target = wide(TARGET);
+        let mut cred: *mut CREDENTIALW = std::ptr::null_mut();
+        // SAFETY: `target` is a NUL-terminated wide string that outlives the call; on success
+        // `cred` points to a credential the system allocated, read once and freed with `CredFree`.
+        unsafe {
+            if CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred) == 0 || cred.is_null() {
+                return None;
+            }
+            let c = &*cred;
+            let blob = if c.CredentialBlob.is_null() {
+                Vec::new()
+            } else {
+                std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize).to_vec()
+            };
+            CredFree(cred as *const _);
+            String::from_utf8(blob).ok()
+        }
+    }
+
+    pub(super) fn write(text: &str) -> Option<()> {
+        let target = wide(TARGET);
+        let user = wide(super::ACCOUNT);
+        let comment = wide(super::LABEL);
+        let mut blob = text.as_bytes().to_vec();
+        let cred = CREDENTIALW {
+            Flags: 0,
+            Type: CRED_TYPE_GENERIC,
+            TargetName: target.as_ptr() as *mut u16,
+            Comment: comment.as_ptr() as *mut u16,
+            LastWritten: FILETIME {
+                dwLowDateTime: 0,
+                dwHighDateTime: 0,
+            },
+            CredentialBlobSize: u32::try_from(blob.len()).ok()?,
+            CredentialBlob: blob.as_mut_ptr(),
+            Persist: CRED_PERSIST_LOCAL_MACHINE,
+            AttributeCount: 0,
+            Attributes: std::ptr::null_mut(),
+            TargetAlias: std::ptr::null_mut(),
+            UserName: user.as_ptr() as *mut u16,
+        };
+        // SAFETY: every pointer in `cred` points into a buffer above that outlives the call;
+        // `CredWriteW` copies what it keeps.
+        (unsafe { CredWriteW(&cred, 0) } != 0).then_some(())
+    }
+}
+
+/// No Credential Manager outside Windows: [`store`] never chooses it there.
+#[cfg(not(windows))]
+mod credentials {
+    pub(super) fn read() -> Option<String> {
+        None
+    }
+
+    pub(super) fn write(_text: &str) -> Option<()> {
+        None
     }
 }
 
@@ -352,7 +463,9 @@ struct Head {
 fn heads_file() -> Option<PathBuf> {
     match store() {
         Store::Folder(d) => Some(d.join(HEADS_FILE)),
-        Store::Keychain => crate::settings::settings_dir().map(|d| d.join(HEADS_FILE)),
+        Store::Keychain | Store::CredentialManager => {
+            crate::settings::settings_dir().map(|d| d.join(HEADS_FILE))
+        }
         Store::None => None,
     }
 }
@@ -408,8 +521,9 @@ pub(crate) fn head(root: &Path, key: &str) -> Option<String> {
 /// 0021 § 6): its ID and public key, never the private key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ThisComputer {
-    /// Where the private key is kept: `keychain` (macOS), `folder` (a trial run's settings
-    /// folder) or `none` (no key store here: events are written unsigned).
+    /// Where the private key is kept: `keychain` (macOS), `credential_manager` (Windows),
+    /// `folder` (a trial run's settings folder) or `none` (no key store here: events are written
+    /// unsigned).
     pub store: &'static str,
     /// The key, once one is made; `None` before this computer's first signed change.
     pub key: Option<ThisKey>,
@@ -428,6 +542,7 @@ pub fn this_computer() -> ThisComputer {
     let store = match store() {
         Store::Folder(_) => "folder",
         Store::Keychain => "keychain",
+        Store::CredentialManager => "credential_manager",
         Store::None => "none",
     };
     let key = read_private()
@@ -447,4 +562,140 @@ pub fn public_key_export(key: &ThisKey) -> String {
         "algorithm": "ed25519",
         "public_key": key.public_key,
     }))
+}
+
+/// What **Replace key…** did (Task-A01-ring220).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Replaced {
+    /// The retired key's ID.
+    pub old: String,
+    /// The new key, now this computer's.
+    pub new: ThisKey,
+    /// One line per taskbag given, in the order given.
+    pub taskbags: Vec<ReplacedIn>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReplacedIn {
+    pub root: String,
+    /// `replaced`: the old key retired and the new one added; `not_here`: the taskbag does not
+    /// have the old key (or is not signed, before `allomos/8`), so nothing was written: the new
+    /// key is added with this computer's next change there; `failed`: see `problem`.
+    pub outcome: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub problem: Option<Problem>,
+}
+
+/// **Replace key…** (Settings → This computer, Task-A01-ring220, decision 0021 § 6): make a new
+/// key, save it in the key store in place of the old one, and in each taskbag of `roots` that has
+/// the old key, retire it: a `retire key` event signed by the old key that names the new one
+/// (`replaced_by`), `keys/<old>.json` kept with `retired` set, and the new key's signed `add key`
+/// event. Refused without a key (`no_signing_key`) and when the new key could not be saved
+/// (`signing_key_not_saved`, nothing written); a taskbag that cannot be written is reported in its
+/// line, and the others are still done.
+pub fn replace_key(
+    roots: &[PathBuf],
+    actor: crate::Actor,
+    wait: Duration,
+) -> Result<Replaced, Problem> {
+    let place = place().ok_or(Problem::NoSigningKey)?;
+    let old = read_private()
+        .and_then(|d| Key::from_pkcs8(&d))
+        .ok_or(Problem::NoSigningKey)?;
+    let der = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new())
+        .map_err(|_| Problem::SigningKeyNotSaved)?;
+    let new = Key::from_pkcs8(der.as_ref()).ok_or(Problem::SigningKeyNotSaved)?;
+    put_private(der.as_ref(), true).ok_or(Problem::SigningKeyNotSaved)?;
+    if read_private().as_deref() != Some(der.as_ref()) {
+        return Err(Problem::SigningKeyNotSaved);
+    }
+    let new = Arc::new(new);
+    *KEY.lock().unwrap_or_else(|e| e.into_inner()) = Some((place, new.clone()));
+    let taskbags = roots
+        .iter()
+        .map(|root| {
+            let (outcome, problem) = match retire_in(root, actor, wait, &old, &new) {
+                Ok(true) => ("replaced", None),
+                Ok(false) => ("not_here", None),
+                Err(p) => ("failed", Some(p)),
+            };
+            ReplacedIn {
+                root: root.display().to_string(),
+                outcome,
+                problem,
+            }
+        })
+        .collect();
+    Ok(Replaced {
+        old: old.id.clone(),
+        new: ThisKey {
+            id: new.id.clone(),
+            public_key: new.public_hex.clone(),
+        },
+        taskbags,
+    })
+}
+
+/// Retire `old` in the taskbag at `root` and add `new`; `false` when it does not have `old`, not
+/// retired yet, or is not signed.
+fn retire_in(
+    root: &Path,
+    actor: crate::Actor,
+    wait: Duration,
+    old: &Key,
+    new: &Key,
+) -> Result<bool, Problem> {
+    let old_file = root.join(KEYS_DIR).join(format!("{}.json", old.id));
+    let signed = crate::versions::format_of(root)
+        .and_then(|f| allomos_core::format_version(&f))
+        .is_some_and(|n| n >= SIGNED_FROM);
+    if !signed || !old_file.is_file() {
+        return Ok(false);
+    }
+    crate::versions::write_allowed(root)?;
+    let _lock = crate::Lock::acquire(root, wait)?;
+    let Some(before) = crate::read_text(&old_file)
+        .ok()
+        .and_then(|t| serde_json::from_str::<PublicKey>(&t).ok())
+        .filter(|k| k.retired.is_none())
+    else {
+        return Ok(false);
+    };
+    let mut after = before.clone();
+    after.retired = Some(crate::events::now_utc());
+    let change = Change {
+        field: "key".into(),
+        from: serde_json::to_value(&before).ok(),
+        to: serde_json::to_value(&after).ok(),
+        extra: Default::default(),
+    };
+    let draft = actor.event("retire key", Kind::Project, None, vec![change]);
+    let project = crate::events::project_id(root, &draft);
+    let mut event = actor.event(
+        "retire key",
+        Kind::Project,
+        project.as_deref(),
+        draft.changes,
+    );
+    event.extra.insert("replaced_by".into(), json!(new.id));
+    let mut event = crate::events::as_written(root, &event);
+    let file = crate::events::new_file(root);
+    let mut value = serde_json::to_value(&event).expect("events serialize");
+    put_sig(old, &mut value, head(root, &old.id));
+    if let Some(sig) = value.get("sig") {
+        event.extra.insert("sig".into(), sig.clone());
+    }
+    let events = root.join(crate::events::EVENTS_DIR);
+    fs::create_dir_all(&events).map_err(|e| crate::write_failed(&events, e))?;
+    crate::write_atomic(&root.join(&file), &crate::json_text(&event))?;
+    remember_head(root, &old.id, &file, &fingerprint(&value));
+    crate::write_atomic(&old_file, &crate::json_text(&after))?;
+    if !root
+        .join(KEYS_DIR)
+        .join(format!("{}.json", new.id))
+        .exists()
+    {
+        add_key(root, project.as_deref(), new, &value)?;
+    }
+    Ok(true)
 }

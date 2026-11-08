@@ -1,7 +1,7 @@
 //! Project settings → Audit and Settings → This computer (decision 0021 § 6): the commands
 //! behind them. The identity level (Task-A01-frolic587), separation of duties
 //! (Task-A01-grotto036), retention and legal hold (Task-A01-stem986); the rest of the section
-//! and This computer: Task-A01-tail719.
+//! and This computer: Task-A01-tail719; Replace key…: Task-A01-ring220.
 
 use std::path::{Path, PathBuf};
 
@@ -190,6 +190,29 @@ fn this_computer_with(folders: &[String]) -> ThisComputerView {
         signing: allomos_store::this_computer(),
         seen,
     }
+}
+
+/// **Replace key…** (Task-A01-ring220, decision 0021 § 6): a new signing key for this computer;
+/// in each taskbag of `folders` (the recent folders the window passes) that has the old key, the
+/// old one is retired and the new one added, each with its signed event. Returns what was done
+/// per taskbag; folders that are not a taskbag are left out.
+#[tauri::command]
+pub(crate) fn replace_key(folders: Vec<String>) -> Result<allomos_store::Replaced, Problem> {
+    let roots = taskbag_roots(&folders);
+    allomos_store::replace_key(&roots, allomos_store::Actor::APP, LOCK_WAIT)
+}
+
+/// The taskbag of each folder that has one, each once.
+fn taskbag_roots(folders: &[String]) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    for f in folders {
+        if let allomos_store::Inspection::Found { root } = allomos_store::inspect(Path::new(f)) {
+            if !roots.contains(&root) {
+                roots.push(root);
+            }
+        }
+    }
+    roots
 }
 
 /// **Export public key…**: write this computer's public key file where the person chose.
@@ -530,6 +553,30 @@ mod tests {
             .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
             .collect::<String>();
         assert!(!text.contains("<PHONE>"));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Replace key… (Task-A01-ring220): each taskbag once, folders without one left out; refused
+    /// without a key store (tests never use the person's Keychain or Credential Manager).
+    #[test]
+    fn replace_key_needs_a_key_and_takes_each_taskbag_once() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-replace-key-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let folder = dir.display().to_string();
+        let nowhere = dir.join("nowhere").display().to_string();
+        assert_eq!(
+            taskbag_roots(&[folder.clone(), nowhere, folder.clone()]).len(),
+            1
+        );
+        assert_eq!(replace_key(vec![folder]).err(), Some(Problem::NoSigningKey));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
