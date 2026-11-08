@@ -54,6 +54,8 @@ struct Opened {
     approvals: std::collections::BTreeMap<String, Vec<allomos_core::approval::Recorded>>,
     /// Each task's outside effects, by task ID (Task-A01-job650), from the history.
     effects: std::collections::BTreeMap<String, Vec<allomos_core::effect::Recorded>>,
+    /// Each task's links to code and releases, by task ID (Task-A01-mint242), from the history.
+    links: std::collections::BTreeMap<String, Vec<allomos_core::link::Recorded>>,
     /// Each task's base and working branch, by task ID (Task-A03-22), from the history: the New
     /// task form chooses the new task's base from the open tasks' bases.
     branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
@@ -146,6 +148,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
         ai_decisions: allomos_store::ai_decisions(&root),
         approvals: allomos_store::approvals::approvals(&root),
         effects: allomos_store::effects::by_task(&root),
+        links: allomos_store::links::by_task(&root),
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
         cards_outside,
@@ -184,6 +187,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         ai_decisions: Default::default(),
         approvals: Default::default(),
         effects: Default::default(),
+        links: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),
@@ -1136,6 +1140,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         ai_decisions: Default::default(),
         approvals: Default::default(),
         effects: Default::default(),
+        links: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
         cards_outside: Vec::new(),

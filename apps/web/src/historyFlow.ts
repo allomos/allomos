@@ -1,7 +1,7 @@
 // A task's history in the task pane (Task-A01-17): how each recorded change is worded.
 
 import type { Key } from "./i18n";
-import type { EffectRecord, FieldChange } from "./types";
+import type { EffectRecord, FieldChange, LinkRecord } from "./types";
 
 /** The task pane's name for each task field, so History uses the same words as the fields above it. */
 const FIELD_KEYS: Record<string, Key> = {
@@ -27,6 +27,7 @@ const FIELD_KEYS: Record<string, Key> = {
   reason: "pane.reason",
   traces: "pane.traces",
   effect: "pane.effect",
+  link: "pane.link",
   card: "pane.card",
   card_outside: "pane.card_outside",
   description: "pane.description",
@@ -50,6 +51,8 @@ export function valueText(field: string, value: unknown, t: T): string {
   if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
   // An outside effect (Task-A01-job650): where, what, and what happened once it has a result.
   if (field === "effect" && typeof value === "object") return effectText(value as Pick<EffectRecord, "target" | "action" | "result">, t);
+  // A link to code or a release (Task-A01-mint242): its kind and reference.
+  if (field === "link" && typeof value === "object") return linkText(value as Pick<LinkRecord, "kind" | "ref">, t);
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
   if ((field === "blocked_by" || field === "labels" || field === "traces") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
@@ -90,4 +93,11 @@ export function humanCheckText(c: HumanCheck, t: T): string {
 export function effectText(e: Pick<EffectRecord, "target" | "action" | "result">, t: T): string {
   const head = `${e.target}: ${e.action}`;
   return e.result ? `${head} → ${e.result}` : `${head} (${t("pane.effect_under_way")})`;
+}
+
+/** A link to code or a release (Task-A01-mint242) in one line: "Commit abcdef1", "PR #7". A
+ * commit or merge shows the first 7 digits of its hash. */
+export function linkText(l: Pick<LinkRecord, "kind" | "ref">, t: T): string {
+  const ref = l.kind === "commit" || l.kind === "merge" ? l.ref.slice(0, 7) : l.kind === "pr" ? `#${l.ref}` : l.ref;
+  return `${t(`pane.link_kind.${l.kind}` as Key)} ${ref}`;
 }

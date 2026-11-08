@@ -82,3 +82,10 @@ test("an outside effect shows where, what and its result (Task-A01-job650)", () 
   );
   assert.equal(fieldName("effect", t), "pane.effect");
 });
+
+test("a link to code shows its kind and a short reference (Task-A01-mint242)", () => {
+  assert.equal(valueText("link", { kind: "commit", ref: "abcdef1234567890", url: "https://x.test/c" }, t), "pane.link_kind.commit abcdef1");
+  assert.equal(valueText("link", { kind: "pr", ref: "7" }, t), "pane.link_kind.pr #7");
+  assert.equal(valueText("link", { kind: "release", ref: "v0.1.43" }, t), "pane.link_kind.release v0.1.43");
+  assert.equal(fieldName("link", t), "pane.link");
+});

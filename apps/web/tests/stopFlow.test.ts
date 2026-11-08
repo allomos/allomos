@@ -338,6 +338,11 @@ test("AI decisions to review: the badge reads the label; the decisions from the 
   const withEffects = withDecisions({ ...opened, effects: { "A01-02": [effect] } }).loaded.taskbag!.tasks;
   assert.deepEqual(withEffects[1].effects, [effect]);
   assert.equal(withEffects[0].effects, undefined);
+  // Task-A01-mint242: and its links to code and releases.
+  const link = { kind: "commit" as const, ref: "abcdef1", task: "A01-02", at: "2026-11-08T10:00:00Z" };
+  const withLinks = withDecisions({ ...opened, links: { "A01-02": [link] } }).loaded.taskbag!.tasks;
+  assert.deepEqual(withLinks[1].links, [link]);
+  assert.equal(withLinks[0].links, undefined);
 });
 
 // Task-A01-44: groups with nothing left after the filter are not drawn; the banner says what it shows.

@@ -451,6 +451,30 @@ enum Command {
         #[arg(value_name = "REF")]
         reference: Option<String>,
     },
+    /// Record a commit, branch, merge commit, pull request, CI run or release that goes with a
+    /// task (decision 0021): its kind (commit, branch, merge, pr, ci, release), its reference (a
+    /// hash, a name, a number, a tag) and, with --url, where it opens. alm runs no Git: you give
+    /// what your version control tool and CI show. --remove takes it off. `alm links <ref>`
+    /// finds the task of a commit.
+    Link {
+        id: String,
+        #[arg(value_name = "KIND")]
+        kind: String,
+        #[arg(value_name = "REF")]
+        reference: String,
+        /// Where it opens: its web address (https://…).
+        #[arg(long, value_name = "URL")]
+        url: Option<String>,
+        /// Take it off the task instead.
+        #[arg(long)]
+        remove: bool,
+    },
+    /// The tasks a commit (by its hash, 7 digits or more), branch, PR, run, tag or web address
+    /// goes with; with none given, every task's links.
+    Links {
+        #[arg(value_name = "REF")]
+        reference: Option<String>,
+    },
     /// Add a label to a task, keeping its others (decision 0020). A label the label table does
     /// not list yet is added to it, and alm says so. --remove takes it off the task.
     Label {
@@ -916,6 +940,7 @@ impl Command {
             | Command::Session { id, .. }
             | Command::Base { id, .. }
             | Command::Trace { id, .. }
+            | Command::Link { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
             | Command::Block { id, .. }
@@ -964,7 +989,8 @@ impl Command {
             | Command::Checkpoint { .. }
             | Command::Folder { .. }
             | Command::Next { .. }
-            | Command::Traces { .. } => None,
+            | Command::Traces { .. }
+            | Command::Links { .. } => None,
         }
     }
 
@@ -1069,6 +1095,8 @@ impl Command {
             Command::Base { .. } => "base",
             Command::Trace { .. } => "trace",
             Command::Traces { .. } => "traces",
+            Command::Link { .. } => "link",
+            Command::Links { .. } => "links",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",
             Command::Block { .. } => "block",
@@ -2249,6 +2277,7 @@ fn decision_lines(decisions: &[Decision]) -> String {
 mod approve;
 mod effects;
 mod folders;
+mod links;
 mod trail;
 
 /// A task's traces in one line (Task-A01-fennel617): "R77, 0021", or "none".
@@ -3360,6 +3389,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .remove(&task.id)
                 .unwrap_or_default();
             text.push_str(&effects::lines(&outside_effects));
+            let task_links = allomos_store::links::by_task(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            text.push_str(&links::lines(&task_links));
             let withdrawn = allomos_core::approval::withdrawn_notice(&task, &approvals);
             if let Some(r) = withdrawn {
                 text.push_str(&approve::withdrawn_line(
@@ -3385,7 +3418,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "effects": outside_effects, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "effects": outside_effects, "links": task_links, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3929,6 +3962,14 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             },
         ),
         Command::Effects { id } => effects::list(cli, cwd, id.as_deref()),
+        Command::Link {
+            id,
+            kind,
+            reference,
+            url,
+            remove,
+        } => links::link(cli, cwd, id, kind, reference, url.as_deref(), *remove),
+        Command::Links { reference } => links::list(cli, cwd, reference.as_deref()),
         Command::Reviewed { id } => {
             let root = locate(cli, cwd)?;
             let d = allomos_store::review_ai_decisions(

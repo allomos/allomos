@@ -6645,3 +6645,142 @@ fn separation_of_duties_refuses_checking_your_own_work_only_when_on() {
     let project = fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap();
     assert!(!project.contains("audit"), "{project}");
 }
+
+#[test]
+fn a_task_links_to_its_code_and_releases_and_back() {
+    // Task-A01-mint242 (decision 0021 § 1.1 "Links to code and releases"): `alm link` records a
+    // commit, branch, merge, PR, CI run or release as a `link` change in the task's history only;
+    // `alm show` lists them and `alm links <ref>` finds the task of a commit.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &["--as", "a", "link", "A01-01", "tag", "v1"],
+        1,
+        "link_kind_unknown",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "link", "A01-01", "commit", "main"],
+        1,
+        "link_ref_invalid",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "link",
+            "A01-01",
+            "pr",
+            "7",
+            "--url",
+            "example.test/7",
+        ],
+        1,
+        "link_url_invalid",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "link", "A01-01", "branch", "x"],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "link", "A01-01", "branch", "x", "--remove"],
+        1,
+        "link_not_recorded",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    let out = alm(
+        &repo,
+        &["--as", "a", "link", "A01-01", "commit", "ABCDEF1234567890"],
+    );
+    assert!(out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("commit abcdef1234567890 recorded."), "{text}");
+    assert!(text.contains("it has no web address"), "{text}");
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "link",
+            "A01-01",
+            "pr",
+            "#7",
+            "--url",
+            "https://example.test/pull/7",
+        ],
+    );
+    assert_eq!(v["link"]["ref"], "7");
+    assert_eq!(v["links"].as_array().unwrap().len(), 2);
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "link");
+    assert_eq!(last["changes"][0]["field"], "link");
+    assert_eq!(last["changes"][0]["to"]["kind"], "pr");
+
+    // The same commit again with its address: changed; again: nothing.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "link",
+            "A01-01",
+            "commit",
+            "abcdef1234567890",
+            "--url",
+            "https://example.test/commit/abcdef1",
+        ],
+    );
+    assert_eq!(v["changed"], json!(true));
+    let events = event_count(&repo);
+    let v = ok(
+        &repo,
+        &["--as", "a", "link", "A01-01", "commit", "abcdef1234567890"],
+    );
+    assert_eq!(v["changed"], json!(false));
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+
+    // A release on a task nobody holds, afterwards.
+    ok(&repo, &["link", "A01-02", "release", "v0.1.43"]);
+
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["links"].as_array().unwrap().len(), 2);
+    assert_eq!(v["links"][0]["kind"], "commit");
+    assert_eq!(v["links"][0]["url"], "https://example.test/commit/abcdef1");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(out.contains("Links to code and releases:"), "{out}");
+    assert!(
+        out.contains("- pr: 7  https://example.test/pull/7"),
+        "{out}"
+    );
+
+    // Back from a commit (a short hash), a PR address, a tag; and every task's links.
+    let v = ok(&repo, &["links", "abcdef1"]);
+    assert_eq!(v["tasks"], json!(["A01-01"]));
+    let v = ok(&repo, &["links", "https://example.test/pull/7"]);
+    assert_eq!(v["tasks"], json!(["A01-01"]));
+    let v = ok(&repo, &["links", "v0.1.43"]);
+    assert_eq!(v["tasks"], json!(["A01-02"]));
+    let v = ok(&repo, &["links", "fffffff"]);
+    assert_eq!(v["tasks"], json!([]));
+    let v = ok(&repo, &["links"]);
+    assert_eq!(v["tasks"], json!(["A01-01", "A01-02"]));
+
+    // Taken off.
+    let v = ok(
+        &repo,
+        &["--as", "a", "link", "A01-01", "pr", "7", "--remove"],
+    );
+    assert_eq!(v["removed"], json!(true));
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["links"].as_array().unwrap().len(), 1);
+}
