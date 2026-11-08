@@ -2623,7 +2623,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v31)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v32)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2633,7 +2633,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v31)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v32)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -4431,8 +4431,8 @@ fn block_shows_blockers_and_next_only_tells() {
     let v = ok(&repo, &["next"]);
     assert_eq!(v["blocked"], json!([]));
 
-    // A dropped blocker is flagged, never counted as done.
-    ok(
+    // The first blocker done: still blocked, and the output names nothing unblocked.
+    let out = alm(
         &repo,
         &[
             "--as",
@@ -4443,17 +4443,52 @@ fn block_shows_blockers_and_next_only_tells() {
             "test run",
         ],
     );
-    ok(&repo, &["drop", "A02-01"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(!text.contains("Unblocked"), "{text}");
+    assert_eq!(task_file(&repo, "A01-02")["state"], "blocked");
+
+    // The last blocker dropped: a dropped blocker counts as finished, so the same change moves
+    // it on by itself (Task-A01-tuna668): ready, blockers cleared, a note, an `unblock` event.
+    let v = ok(&repo, &["drop", "A02-01"]);
+    assert_eq!(v["unblocked"][0]["id"], "A01-02");
+    assert_eq!(v["unblocked"][0]["state"], "ready");
+    assert!(
+        v["changed_files"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("tasks/A01-02/task.json")),
+        "{v}"
+    );
+    let file = task_file(&repo, "A01-02");
+    assert_eq!(file["state"], "ready");
+    assert!(file.get("blocked_by").is_none());
+    assert!(
+        file["handoff_note"]
+            .as_str()
+            .unwrap()
+            .starts_with("Unblocked automatically after A01-01, A02-01 finished;"),
+        "{file}"
+    );
+    let v = ok(&repo, &["history", "A01-02"]);
+    let last = &v["events"][0];
+    assert_eq!(last["command"], "unblock");
+    assert!(
+        last["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["field"] == "reason" && c["to"].as_str().unwrap().starts_with("automatic:")),
+        "{last}"
+    );
     let v = ok(&repo, &["next"]);
-    assert_eq!(v["blocked"][0]["id"], "A01-02");
-    assert_eq!(v["blocked"][0]["all_blockers_done"], false);
-    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
-    assert!(next.contains("A02-01 (dropped; still blocked?)"), "{next}");
-    // Blocking on a dropped task is allowed, with a warning.
+    assert_eq!(v["blocked"], json!([]), "nothing left over to tell");
+
+    // Blocking on a dropped task is allowed, with a warning: it holds nothing back.
     let v = ok(&repo, &["block", "A01-02", "--by", "A02-01"]);
     assert_eq!(v["warnings"][0]["code"], "blocker_dropped");
 
-    // Every blocker done: next tells, and moves nothing.
+    // A task left blocked with every blocker finished (as from before the rule): next tells, and
+    // moves nothing.
     ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
     let before = fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap();
     let events_before = fs::read_dir(repo.join(".allomos/taskbag/events"))
@@ -4464,7 +4499,7 @@ fn block_shows_blockers_and_next_only_tells() {
     assert_eq!(v["blocked"][0]["all_blockers_done"], true);
     let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
     assert!(
-        next.contains("A01-02: all blockers are done (A01-01 (done)) — unblock it?"),
+        next.contains("A01-02: all blockers have finished (A01-01 (done)) — unblock it?"),
         "{next}"
     );
     assert_eq!(
@@ -4479,7 +4514,7 @@ fn block_shows_blockers_and_next_only_tells() {
         events_before
     );
 
-    // Unblock moves it on; only a blocked task.
+    // Unblock moves it on by hand; only a blocked task.
     let v = ok(&repo, &["unblock", "A01-02"]);
     assert_eq!(v["task"]["state"], "ready");
     assert!(task_file(&repo, "A01-02").get("blocked_by").is_none());
@@ -4492,7 +4527,41 @@ fn block_shows_blockers_and_next_only_tells() {
         .iter()
         .map(|e| e["command"].as_str().unwrap())
         .collect();
-    assert_eq!(commands, ["unblock", "block", "block", "block", "add task"]);
+    assert_eq!(
+        commands,
+        ["unblock", "block", "block", "unblock", "block", "add task"]
+    );
+}
+
+/// Task-A01-tuna668: a held blocked task goes on in progress when its last blocker is done; a
+/// task left blocked from before goes on at the next finishing change.
+#[test]
+fn the_last_blocker_finishing_unblocks_a_held_task_and_left_overs() {
+    let repo = filled();
+    ok(&repo, &["--as", "b", "claim", "A01-02"]);
+    ok(&repo, &["--as", "b", "block", "A01-02", "--by", "A01-01"]);
+    let v = ok(
+        &repo,
+        &["done", "A01-01", "--without-human-check", "test run"],
+    );
+    assert_eq!(v["unblocked"][0]["id"], "A01-02");
+    assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
+    assert_eq!(task_file(&repo, "A01-02")["holder"], "b");
+    let text =
+        String::from_utf8(alm(&repo, &["--as", "b", "block", "A01-02", "--by", "A01-01"]).stdout)
+            .unwrap();
+    assert!(
+        !text.contains("Unblocked"),
+        "blocking moves nothing: {text}"
+    );
+    // Left over (its blocker finished before): the next done or drop lets it go on too.
+    let out = alm(&repo, &["drop", "A02-01"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Unblocked A01-02 (in progress): all its blockers have finished."),
+        "{text}"
+    );
+    assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
 }
 
 /// A taskbag in format 4 is newer than an allomos/3 build: the older build says so

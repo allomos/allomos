@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v31)
+## Tasks: Allomos (v32)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -69,8 +69,9 @@ the project notes (below).
   the main checkout; once merged, remove your worktree and the merged branch.
 - Report progress: `alm label <id> "<label>"`.
 - Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
-  another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
-  then check and move it on: `alm unblock <id>`.
+  another task: `alm block <id> --by <task-id>`. When its last blocker finishes (done or
+  dropped), it goes on by itself; read its blockers' AI decisions before you start it. To let it
+  go on earlier: `alm unblock <id>`.
 - Stopping before it is done: `alm release <id> --note "<what the next one needs>"`.
 - Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
   another), ask the person to choose quiet or normal mode: show them what

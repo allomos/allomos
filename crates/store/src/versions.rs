@@ -90,7 +90,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// at the claim; `--session-kind terminal` in a terminal (Task-A03-sugar117).
 /// 31: finishing names the "by human" labels instead of the ladder's top label (decision 0020,
 /// Task-A01-moth111).
-pub const SECTION_VERSION: u32 = 31;
+/// 32: a blocked task goes on by itself when its last blocker finishes; `alm unblock` lets it go
+/// earlier (Task-A01-tuna668).
+pub const SECTION_VERSION: u32 = 32;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

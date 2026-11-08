@@ -295,8 +295,9 @@ the project notes (below).
   the main checkout; once merged, remove your worktree and the merged branch.
 - Report progress: `alm label <id> \"<label>\"`.
 - Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
-  another task: `alm block <id> --by <task-id>`. `alm next` says when all blockers are done;
-  then check and move it on: `alm unblock <id>`.
+  another task: `alm block <id> --by <task-id>`. When its last blocker finishes (done or
+  dropped), it goes on by itself; read its blockers' AI decisions before you start it. To let it
+  go on earlier: `alm unblock <id>`.
 - Stopping before it is done: `alm release <id> --note \"<what the next one needs>\"`.
 - Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
   another), ask the person to choose quiet or normal mode: show them what
@@ -1617,6 +1618,9 @@ pub struct Changed {
     pub warnings: Vec<Problem>,
     /// Problems found in the taskbag's files while loading it.
     pub issues: Vec<Issue>,
+    /// The blocked tasks this change let go on by themselves: their last blocker finished
+    /// (Task-A01-tuna668).
+    pub unblocked: Vec<Task>,
 }
 
 /// The taskbag loaded at `root`, or why it cannot be worked on.
@@ -1892,6 +1896,7 @@ pub fn add_iteration_and_plan(
             task: planned.task,
             warnings: planned.warnings,
             issues,
+            unblocked: Vec::new(),
         },
     ))
 }
@@ -2270,11 +2275,46 @@ pub fn change_task(
         }
         Ok(())
     })?;
+    let unblocked = release_blocked(&lock, &actor, &bag, &outcome.task)?;
     Ok(Changed {
         task: outcome.task,
         warnings: outcome.warnings,
         issues,
+        unblocked,
     })
+}
+
+/// After a change that leaves `task` finished (done or dropped): every blocked task whose
+/// blockers have now all finished goes on by itself, each as its own `unblock` event in the same
+/// locked change (Task-A01-tuna668, approver 2026-11-08). A task left blocked from before, whose
+/// blockers all finished earlier, goes on at the same time. Any other change moves nothing.
+fn release_blocked(
+    lock: &Lock,
+    actor: &Actor,
+    bag: &Taskbag,
+    task: &Task,
+) -> Result<Vec<Task>, Problem> {
+    if !matches!(
+        task.state,
+        allomos_core::State::Done | allomos_core::State::Dropped
+    ) {
+        return Ok(Vec::new());
+    }
+    let mut after = bag.clone();
+    match after.tasks.iter_mut().find(|t| t.id == task.id) {
+        Some(t) => *t = task.clone(),
+        None => after.tasks.push(task.clone()),
+    }
+    let mut unblocked = Vec::new();
+    for o in ops::released(&after) {
+        let before = after.tasks.iter().find(|t| t.id == o.task.id);
+        let mut changes = event::changes(before, &o.task, event::TASK_FIELDS);
+        changes.extend(o.recorded.iter().cloned());
+        let event = actor.event("unblock", Kind::Task, Some(&o.task.id), changes);
+        lock.record(&event, |l| l.save_task(&o.task))?;
+        unblocked.push(o.task);
+    }
+    Ok(unblocked)
 }
 
 /// Every task's branches (base and working), by task ID (Task-A03-22), from the history.
@@ -2360,6 +2400,7 @@ pub fn claim_task(
             task: outcome.task,
             warnings,
             issues,
+            unblocked: Vec::new(),
         },
         branches: at,
     })

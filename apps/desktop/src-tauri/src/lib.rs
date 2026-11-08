@@ -3314,6 +3314,48 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// Task-A01-tuna668: finishing the last blocker in the task pane (Done, as the interface sends
+    /// it) moves the blocked task on in the same change, as `alm done` does.
+    #[test]
+    fn finishing_the_last_blocker_in_the_app_unblocks_the_task() {
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-unblock-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let lock = allomos_store::Lock::acquire(&root, std::time::Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&allomos_core::ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        for id in ["A01-01", "A01-02"] {
+            let bag = lock.load().taskbag.unwrap();
+            lock.create_task(&allomos_core::ops::new_task(&bag, id, "A01", id, None).unwrap())
+                .unwrap();
+        }
+        drop(lock);
+        let block: allomos_core::ops::Edit = serde_json::from_value(serde_json::json!(
+            { "field": "state", "state": "blocked", "blocked_by": ["A01-01"] }
+        ))
+        .unwrap();
+        edit_task_as(&root, Some("Will"), "A01-02", &block).unwrap();
+        let done: allomos_core::ops::Edit =
+            serde_json::from_value(serde_json::json!({ "field": "state", "state": "done" }))
+                .unwrap();
+        edit_task_as(&root, Some("Will"), "A01-01", &done).unwrap();
+        let bag = load(&root).taskbag.unwrap();
+        let t = bag.tasks.iter().find(|t| t.id == "A01-02").unwrap();
+        assert_eq!(t.state, allomos_core::State::Ready);
+        assert!(t.blocked_by.is_empty());
+        let e = &allomos_store::events::history(&root, "A01-02").events[0];
+        assert_eq!((e.via.as_str(), e.command.as_str()), ("app", "unblock"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// The task pane's change command (Task-A01-18): the edit arrives as the interface sends it,
     /// is refused without the person's name or by the holder rule, and is otherwise recorded
     /// under that name, through the app.

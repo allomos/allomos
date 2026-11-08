@@ -133,7 +133,7 @@ problems! {
     /// `alm unblock` on a task that is not blocked.
     NotBlocked { id, state } => "not_blocked", "Task {id} is {state}, not blocked, so there is nothing to unblock.";
     /// A warning: a blocking task is dropped, so it will never be done (owner, 2026-10-14).
-    BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: it will never be done, and it does not count as done. Is {id} still blocked?";
+    BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: a dropped blocker counts as finished, so it holds {id} back no longer.";
     /// `alm done --without-human-check` with no text, or the field empty in `task.json`
     /// (Task-A03-15; renamed from `without_owner_missing` in Task-A03-18).
     WithoutHumanCheckMissing => "without_human_check_missing", "Say why the task is finished without the human check.";

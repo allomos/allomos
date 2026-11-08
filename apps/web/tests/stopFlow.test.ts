@@ -47,7 +47,7 @@ test("the list's stop fact: its name, then its text; a named person leads the te
   });
   const blocker = task({ id: "A01-17", state: "done" });
   const me = task({ state: "blocked", blocked_by: ["A01-17"] });
-  assert.deepEqual(stopFact(me, [blocker, me], t), { name: "pane.blocked_by", text: "A01-17 (Done) — all done; unblock it?" });
+  assert.deepEqual(stopFact(me, [blocker, me], t), { name: "pane.blocked_by", text: "A01-17 (Done) — all finished; unblock it?" });
   assert.equal(stopFact(task({ state: "in_progress" }), [], t), null);
 });
 
@@ -58,13 +58,13 @@ test("blocked names each blocker with its state now; a dropped one is flagged, n
   assert.equal(allBlockersDone(me, [blocker, me]), false);
 
   const done = { ...blocker, state: "done" as const };
-  assert.equal(stopText(me, [done, me], t), "Blocked by A01-17 (Done) — all done; unblock it?");
+  assert.equal(stopText(me, [done, me], t), "Blocked by A01-17 (Done) — all finished; unblock it?");
   assert.equal(allBlockersDone(me, [done, me]), true);
-  assert.equal(me.state, "blocked", "the app only tells; it moves nothing");
+  assert.equal(me.state, "blocked", "a left-over task only tells; the change that finishes a blocker moves it");
 
   const dropped = { ...blocker, state: "dropped" as const };
-  assert.equal(stopText(me, [dropped, me], t), "Blocked by A01-17 (dropped — still blocked?)");
-  assert.equal(allBlockersDone(me, [dropped, me]), false);
+  assert.equal(stopText(me, [dropped, me], t), "Blocked by A01-17 (dropped) — all finished; unblock it?");
+  assert.equal(allBlockersDone(me, [dropped, me]), true, "a dropped blocker counts as finished");
   assert.deepEqual(blockers(task({ state: "blocked", blocked_by: ["A09-09"] }), []), [{ id: "A09-09", state: null }]);
 });
 

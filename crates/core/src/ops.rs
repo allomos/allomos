@@ -750,10 +750,9 @@ pub struct Blocker {
 }
 
 impl Blocker {
-    /// `A01-17 (in progress)`; a dropped blocker is flagged, as it will never be done.
+    /// `A01-17 (in progress)`, `A01-20 (dropped)`.
     pub fn describe(&self) -> String {
         match self.state {
-            Some(State::Dropped) => format!("{} (dropped; still blocked?)", self.id),
             Some(state) => format!("{} ({})", self.id, state.as_str().replace('_', " ")),
             None => format!("{} (no such task)", self.id),
         }
@@ -771,19 +770,69 @@ pub fn blockers(taskbag: &Taskbag, task: &Task) -> Vec<Blocker> {
         .collect()
 }
 
-/// Whether a `blocked` task's blockers are all done. A dropped blocker never counts as done
-/// (owner, 2026-10-14). `alm` only tells; it never moves the task by itself.
+/// Whether a blocker has finished: `done` or `dropped`. Blocking only puts tasks in order, so a
+/// dropped blocker is past that point too (approver, 2026-11-08, Task-A01-tuna668; it replaces
+/// "a dropped blocker never counts as done", 2026-10-14). A blocker that is no task any more has
+/// not finished.
+pub fn finished(state: Option<State>) -> bool {
+    matches!(state, Some(State::Done | State::Dropped))
+}
+
+/// Whether a `blocked` task's blockers have all finished ([`finished`]: done or dropped).
 pub fn all_blockers_done(taskbag: &Taskbag, task: &Task) -> bool {
     task.state == State::Blocked
         && !task.blocked_by.is_empty()
-        && blockers(taskbag, task)
-            .iter()
-            .all(|b| b.state == Some(State::Done))
+        && blockers(taskbag, task).iter().all(|b| finished(b.state))
+}
+
+/// The first line of the handoff note of a task that was unblocked by itself
+/// ([`released`]), naming its blockers.
+pub fn released_note(blockers: &[String]) -> String {
+    format!(
+        "Unblocked automatically after {} finished; before starting, read their AI decisions and handoffs (`alm show <id>`), and change this task's plan if they changed what it needs.",
+        blockers.join(", ")
+    )
+}
+
+/// The blocked tasks that go on by themselves (Task-A01-tuna668, approver 2026-11-08): every
+/// `blocked` task in `taskbag` whose blockers have all finished ([`all_blockers_done`]). Each moves
+/// on as [`unblock`] moves it (`in_progress` when someone holds it, else `ready`; its blockers
+/// cleared), its handoff note starts with [`released_note`], and its history records why
+/// (a [`crate::event::REASON`] change). Unblocking is a logic step, not a judgement: the agent
+/// that takes the task checks whether its plan still holds. `taskbag` is the taskbag as it is
+/// after the change that finished a blocker; the caller writes each outcome as an `unblock`.
+pub fn released(taskbag: &Taskbag) -> Vec<Outcome> {
+    taskbag
+        .tasks
+        .iter()
+        .filter(|t| all_blockers_done(taskbag, t))
+        .map(|t| {
+            let mut task = t.clone();
+            let by = std::mem::take(&mut task.blocked_by);
+            clear_stop(&mut task);
+            task.state = if task.holder.is_some() {
+                State::InProgress
+            } else {
+                State::Ready
+            };
+            let note = released_note(&by);
+            task.handoff_note = Some(match task.handoff_note.take() {
+                Some(old) if !old.trim().is_empty() => format!("{note}\n\n{old}"),
+                _ => note,
+            });
+            let mut outcome = Outcome::plain(task);
+            outcome.recorded.push(crate::event::reason_change(&format!(
+                "automatic: its blockers {} have finished (done or dropped)",
+                by.join(", ")
+            )));
+            outcome
+        })
+        .collect()
 }
 
 /// Mark the task `blocked` by other tasks in this taskbag that must finish first (`alm block`,
 /// decision 0016). `by` needs at least one ID; each must be a task here and not the task itself.
-/// A dropped blocker is allowed but warned about: it will never be done. What it waited on is
+/// A dropped blocker is allowed but warned about: it counts as finished, so it holds nothing back. What it waited on is
 /// cleared; a person part belongs in the task's next dependency.
 pub fn block(
     taskbag: &Taskbag,
@@ -826,8 +875,9 @@ pub fn block(
 }
 
 /// Move a `blocked` task on (`alm unblock`): back to `in_progress` when someone holds it, else
-/// `ready`. Its blocking tasks are cleared. `alm` does not check that they are done: the agent
-/// does (owner, 2026-10-14).
+/// `ready`. Its blocking tasks are cleared. `alm` does not check that they are done: this is for
+/// letting a task go on early, before its blockers finish (owner, 2026-10-14). When the last
+/// blocker finishes, the task goes on by itself ([`released`], Task-A01-tuna668).
 pub fn unblock(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
@@ -1654,14 +1704,49 @@ mod tests {
             vec!["A01-02 (backlog)", "A02-01 (backlog)"]
         );
         assert!(!all_blockers_done(&s, &t));
-        // One done, one dropped: a dropped blocker never counts as done, and is flagged.
+        // One done: not all finished yet, nothing goes on.
         put!(s, finish(&s, "A01-02", None, None, None).unwrap().task);
-        put!(s, drop_task(&s, "A02-01", None).unwrap().task);
         let t = find_task(&s, "A01-01").unwrap();
         assert!(!all_blockers_done(&s, &t));
+        assert!(released(&s).is_empty());
+        // The other dropped: a dropped blocker counts as finished (Task-A01-tuna668).
+        put!(s, drop_task(&s, "A02-01", None).unwrap().task);
+        let t = find_task(&s, "A01-01").unwrap();
+        assert!(all_blockers_done(&s, &t));
+        assert_eq!(blockers(&s, &t)[1].describe(), "A02-01 (dropped)");
+        // It goes on by itself: ready (no holder), blockers cleared, a note and a reason.
+        let r = released(&s);
+        assert_eq!(r.len(), 1);
         assert_eq!(
-            blockers(&s, &t)[1].describe(),
-            "A02-01 (dropped; still blocked?)"
+            (
+                r[0].task.id.as_str(),
+                r[0].task.state,
+                r[0].task.blocked_by.len()
+            ),
+            ("A01-01", State::Ready, 0)
+        );
+        assert!(
+            r[0].task
+                .handoff_note
+                .as_deref()
+                .unwrap()
+                .starts_with("Unblocked automatically after A01-02, A02-01 finished;")
+        );
+        assert_eq!(r[0].recorded[0].field, crate::event::REASON);
+        // An earlier handoff note is kept under the new line; a held task goes in progress.
+        let mut held = s.clone();
+        let mut t = find_task(&held, "A01-01").unwrap();
+        t.holder = Some("a".into());
+        t.handoff_note = Some("Old note".into());
+        put!(held, t);
+        let r = released(&held);
+        assert_eq!(r[0].task.state, State::InProgress);
+        assert!(
+            r[0].task
+                .handoff_note
+                .as_deref()
+                .unwrap()
+                .ends_with("\n\nOld note")
         );
         // Blocking on a dropped task is allowed, with a warning.
         let o = block(&s, "A01-01", None, &by(&["A02-01"])).unwrap();

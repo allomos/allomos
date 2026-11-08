@@ -2,7 +2,8 @@
 // (or an outside event) must act — "Waiting for you: approve the card", "Waiting for Ann: …";
 // `blocked` means another task must finish first — "Blocked by A01-17 (in progress)", each
 // blocker with its state now. Also the list's state filter. Nothing here moves a task: when every
-// blocker is done the app only says so, as `alm` does.
+// blocker has finished (done or dropped) the task goes on by itself when the last one
+// finishes (Task-A01-tuna668); a task left over from before only says so, as `alm` does.
 
 import type { Key } from "./i18n";
 import type { LabelEntry, Opened, Project, State, Task } from "./types";
@@ -17,13 +18,13 @@ export function blockers(task: Task, tasks: readonly Task[]): Blocker[] {
   return (task.blocked_by ?? []).map((id) => ({ id, state: tasks.find((x) => x.id === id)?.state ?? null }));
 }
 
-/** Whether a blocked task's blockers are all done. A dropped blocker never counts as done. */
+/** Whether a blocked task's blockers have all finished: done or dropped (Task-A01-tuna668). */
 export function allBlockersDone(task: Task, tasks: readonly Task[]): boolean {
   const list = blockers(task, tasks);
-  return task.state === "blocked" && list.length > 0 && list.every((b) => b.state === "done");
+  return task.state === "blocked" && list.length > 0 && list.every((b) => b.state === "done" || b.state === "dropped");
 }
 
-/** "A01-17 (in progress)"; a dropped blocker is flagged; an unknown one said so. */
+/** "A01-17 (in progress)", "A01-20 (dropped)"; an unknown one said so. */
 export function blockerText(b: Blocker, t: T): string {
   if (b.state === null) return t("task.blocker_missing", { id: b.id });
   if (b.state === "dropped") return t("task.blocker_dropped", { id: b.id });

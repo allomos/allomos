@@ -240,9 +240,12 @@ Work a task:
 - `alm wait <id> --on \"<what>\" [--who \"<who>\"]`: state waiting: a person (or an outside
   event) must act; without `--who`, the approver.
 - `alm block <id> --by <task-id> [<task-id>…]`: state blocked: those tasks must finish first.
-  `alm list`, `show` and `next` show each blocker's state; a dropped blocker is flagged and never
-  counts as done. When all are done, `alm next` says so, and moves nothing: check, then
-  `alm unblock <id>` (ready, or in progress when someone holds it).
+  `alm list`, `show` and `next` show each blocker's state. A blocker has finished when it is
+  done or dropped. When the last one finishes (`alm done`, `alm drop`, or finishing it in the
+  app), the blocked task goes on by itself in the same change: ready, or in progress when someone
+  holds it; its handoff note says so, and whoever takes it reads its blockers' AI decisions first.
+- `alm unblock <id>`: let a blocked task go on before its blockers finish (ready, or in progress
+  when someone holds it); `alm` does not check its blockers: you do.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
 - `alm done <id> [--without-human-check \"<why>\" --steps <file.md> --accepted-by <who>]`: finished (see
   `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
@@ -568,8 +571,9 @@ const WORKFLOW: &str = "# How to work the tasks
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
    [--who \"<who>\"]`; when another task must finish first, `alm block <id> --by <task-id>` (if
    a person must act too, say so with `alm needs`). Blocked and waiting tasks are never in
-   `alm next`'s list: they are skipped by their state. When `alm next` says all of a task's
-   blockers are done, check it, then `alm unblock <id>`.
+   `alm next`'s list: they are skipped by their state. A blocked task goes on by itself when its
+   last blocker finishes (done or dropped); read its blockers' AI decisions before you start it.
+   To let one go on earlier, check it, then `alm unblock <id>`.
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate while you
    hold a task, then release it with `alm release <id> --note` naming the working branch, so the
    next session continues it; and after every meaningful step), into each task you worked: `alm handoff <id> --as <your session name>
@@ -1058,7 +1062,8 @@ run page scripts on a local network address such as `192.168.x.x`: the browser a
 approve every script there, and the run would stall. When an acceptance check still needs the
 browser, write that in the task's steps for the person, finish the task as above, and go on.
 
-When `alm next` says all of a task's blockers are done, check it, then `alm unblock <id>`. A task
+A blocked task goes on by itself when its last blocker finishes; read its blockers' AI decisions
+before you start it (to let one go on earlier: `alm unblock <id>`). A task
 with an outside effect: `alm wait <id> --on \"<what the approver must do>\"`, then go on with the
 next ready task. A task that needs another one first: add that task if it is missing, then
 `alm block`. A task given up: `alm drop <id>`, with the reason in its note (`alm note`). Write your
@@ -1066,7 +1071,8 @@ handoff (`alm handoff`) after every task, and follow `alm handoff-rules`.
 
 ## 4. Finish
 
-When the last iteration's acceptance check is done: `alm unblock` the goal task, check the whole
+When the last iteration's acceptance check is done (the goal task goes on by itself when its last
+blocker finishes; if it is still blocked, `alm unblock` it), check the whole
 app against the spec's acceptance criteria, and finish the goal task the same way, done and to
 check by the person:
 `alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`, the steps
@@ -1148,14 +1154,14 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 `192.168.x.x` 这样的局域网地址上运行页面脚本：浏览器在那里每运行一段脚本都要那个人批准，运行会卡住。
 如果某个验收检查仍然需要浏览器，就把这一点写进这个任务给那个人的步骤里，照上面的方式完成任务，接着往下做。
 
-当 `alm next` 说某个任务的阻塞任务都已完成时，检查一下，然后 `alm unblock <id>`。对外有影响的任务：
+被阻塞的任务在最后一个阻塞任务结束（完成或放弃）时自动解除阻塞；开工前读它的阻塞任务的 AI 决定（要提前放行：`alm unblock <id>`）。对外有影响的任务：
 `alm wait <id> --on \"<what the approver must do>\"`，然后接着做下一个就绪的任务。需要先做另一个任务
 的任务：如果那个任务还没有，就添加它，然后 `alm block`。放弃的任务：`alm drop <id>`，把原因写进它的
 备注（`alm note`）。每完成一个任务就写交接（`alm handoff`），并遵守 `alm handoff-rules`。
 
 ## 4. 收尾
 
-最后一个迭代的验收检查完成后：对目标任务运行 `alm unblock`，对照规格的验收标准检查整个应用，然后用同一种
+最后一个迭代的验收检查完成后（目标任务在最后一个阻塞任务结束时自动解除阻塞；仍被阻塞就对它运行 `alm unblock`），对照规格的验收标准检查整个应用，然后用同一种
 方式完成目标任务，标为已完成、待那个人检查：
 `alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`，步骤告诉那个人怎么试用整个应用。如果发现目标做不到，目标
 任务改为等待那个人，并写明原因。然后打印 `alm list --json`，停下。
@@ -1245,7 +1251,7 @@ name> --branch <the branch you are on>`（担当を保存して共有します�
 承認を求め、実行が止まってしまうからです。それでもブラウザが要る受け入れ確認は、そのタスクのその人向けの
 手順にそう書き、上のとおりタスクを終えて先へ進みます。
 
-`alm next` があるタスクのブロック元がすべて完了したと言ったら、確かめてから `alm unblock <id>`。
+ブロックされたタスクは、最後のブロック元が終わる（完了か取りやめ）とひとりでに解除されます。始める前にブロック元の AI の判断を読みます（早めに進めるなら `alm unblock <id>`）。
 外部への影響があるタスク：`alm wait <id> --on \"<what the approver must do>\"`、そして次の準備完了の
 タスクへ。先に別のタスクが要るタスク：そのタスクがなければ加え、`alm block`。やめたタスク：
 `alm drop <id>`、理由はメモに（`alm note`）。タスクを一つ終えるたびにハンドオフを書き
@@ -1253,7 +1259,7 @@ name> --branch <the branch you are on>`（担当を保存して共有します�
 
 ## 4. 仕上げる
 
-最後のイテレーションの受け入れ確認が終わったら：ゴールのタスクを `alm unblock` し、仕様の受け入れ
+最後のイテレーションの受け入れ確認が終わったら（ゴールのタスクは最後のブロック元が終わるとひとりでに解除されます。まだブロック中なら `alm unblock`）、仕様の受け入れ
 基準に照らしてアプリ全体を確かめ、ゴールのタスクも同じように、完了・その人の確認待ちにして終えます：
 `alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`。手順には
 アプリ全体を試すしかたを書きます。ゴールが無理だと分かったら、代わりにゴールのタスクを

@@ -580,8 +580,9 @@ enum Command {
         #[arg(long, value_name = "TASK-ID", num_args = 1.., required = true)]
         by: Vec<String>,
     },
-    /// Move a blocked task on (ready, or in progress when someone holds it). `alm` does not check
-    /// its blockers: you do.
+    /// Move a blocked task on (ready, or in progress when someone holds it) before its blockers
+    /// finish. `alm` does not check its blockers: you do. When the last blocker finishes (done or
+    /// dropped), the task goes on by itself; this command is for letting it go earlier.
     Unblock { id: String },
     /// Finish a task. Finish it at the top label (a person has checked it); when only a person's
     /// hands-on check is left, in any run mode, finish it below it with --without-human-check and
@@ -2137,7 +2138,10 @@ fn stop_line(bag: &Taskbag, t: &Task) -> Option<String> {
                 .collect();
             let mut line = format!("blocked by {}", list.join(", "));
             if ops::all_blockers_done(bag, t) {
-                line.push_str(&format!(" — all done: check, then `alm unblock {}`", t.id));
+                line.push_str(&format!(
+                    " — all finished: check, then `alm unblock {}`",
+                    t.id
+                ));
             }
             Some(line)
         }
@@ -3614,7 +3618,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             }
             if ops::all_blockers_done(&bag, &task) {
                 text.push_str(&format!(
-                    "All blockers are done: check, then `alm unblock {}`. alm moves nothing by itself.\n",
+                    "All blockers have finished (done or dropped), before blockers went on by themselves: check, then `alm unblock {}`. The next `alm done` or `alm drop` lets it go on too.\n",
                     task.id
                 ));
             }
@@ -3758,8 +3762,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     withdrawn.push(json!({ "task": t.id, "approval": r.approval.id }));
                 }
             }
-            // Blocked tasks are skipped by their state; `alm` tells when one may go on, or when a
-            // blocker was dropped, and moves nothing (decision 0016).
+            // Blocked tasks are skipped by their state. One whose blockers have all finished goes
+            // on by itself when the last one finishes (Task-A01-tuna668); `alm next` tells only
+            // about one left over from before, and moves nothing.
             let mut blocked = Vec::new();
             for t in bag.tasks.iter().filter(|t| {
                 t.state == State::Blocked
@@ -3767,31 +3772,19 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         .as_ref()
                         .is_none_or(|i| t.iteration.as_ref() == Some(i))
             }) {
-                let all_done = ops::all_blockers_done(&bag, t);
-                let dropped = ops::blockers(&bag, t)
-                    .iter()
-                    .any(|b| b.state == Some(State::Dropped));
-                if !(all_done || dropped) {
+                if !ops::all_blockers_done(&bag, t) {
                     continue;
                 }
                 let list: Vec<String> = ops::blockers(&bag, t)
                     .iter()
                     .map(ops::Blocker::describe)
                     .collect();
-                text.push_str(&if all_done {
-                    format!(
-                        "{}: all blockers are done ({}) — unblock it? Check, then `alm unblock {}`.\n",
-                        t.id,
-                        list.join(", "),
-                        t.id
-                    )
-                } else {
-                    format!(
-                        "{}: blocked by {}: a dropped task is never done.\n",
-                        t.id,
-                        list.join(", ")
-                    )
-                });
+                text.push_str(&format!(
+                    "{}: all blockers have finished ({}) — unblock it? Check, then `alm unblock {}` (the next `alm done` or `alm drop` also lets it go on).\n",
+                    t.id,
+                    list.join(", "),
+                    t.id
+                ));
                 blocked.push(task_json_in(&bag, t));
             }
             // Card files (Task-A00-30): what the tasks' `Card:` links point to outside the
@@ -4599,14 +4592,30 @@ fn change(
         lock_wait(),
         |bag| rule(bag).map(|o| (o, command)),
     )?;
-    let text = format!("{}\n", task_line(&changed.task));
-    let mut done = Done::new(
-        json!({ "taskbag": root, "task": task_json(&changed.task) }),
-        text,
-    );
+    let mut text = format!("{}\n", task_line(&changed.task));
+    text.push_str(&unblocked_text(&changed.unblocked));
+    let mut fields = json!({ "taskbag": root, "task": task_json(&changed.task) });
+    if !changed.unblocked.is_empty() {
+        fields["unblocked"] = json!(changed.unblocked.iter().map(task_json).collect::<Vec<_>>());
+    }
+    let mut done = Done::new(fields, text);
     done.warnings = changed.warnings;
     done.issues = changed.issues;
     Ok(done)
+}
+
+/// What a change that finished a task says about the blocked tasks it let go on
+/// (Task-A01-tuna668): nothing when there are none.
+fn unblocked_text(unblocked: &[Task]) -> String {
+    let mut text = String::new();
+    for t in unblocked {
+        text.push_str(&format!(
+            "Unblocked {} ({}): all its blockers have finished. Its handoff note says so; whoever takes it reads its blockers' AI decisions first.\n",
+            t.id,
+            t.state.as_str().replace('_', " ")
+        ));
+    }
+    text
 }
 
 /// What `alm cards` says: the card files agents reported as still in the project folder, and what
