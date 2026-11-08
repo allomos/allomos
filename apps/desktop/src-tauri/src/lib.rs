@@ -17,8 +17,9 @@ mod window_list;
 mod windows;
 
 use audit::{
-    audit_settings, export_public_key, make_checkpoint, redact_task, replace_key, set_identity,
-    set_retention, set_separation, set_witness, show_identities_file, this_computer, witness_tick,
+    audit_settings, export_public_key, make_checkpoint, open_standards_map, redact_task,
+    replace_key, set_identity, set_retention, set_separation, set_witness, show_identities_file,
+    this_computer, witness_tick,
 };
 use windows::{Windows, fit_to_screen, focused_window, open_new_window, open_recent_in_window};
 
@@ -2599,6 +2600,7 @@ pub fn run() {
             set_retention,
             set_identity,
             show_identities_file,
+            open_standards_map,
             make_checkpoint,
             witness_tick,
             redact_task,

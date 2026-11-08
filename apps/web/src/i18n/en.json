@@ -605,6 +605,7 @@
   "audit.legal_hold_help": "While it is on, nothing in the history can be removed or redacted. Turning it on or off asks why.",
   "audit.always": "Always recorded",
   "audit.always_help": "Allomos always records who made each change, approvals, human checks, links to code, outside effects and reasons. These cannot be turned off.",
+  "audit.standards_map": "See which settings each standard needs",
   "audit.always_who": "Who ran each change (agent, model, session) and for whom",
   "audit.always_approvals": "Approvals: who approved what, when, how, and when it expires",
   "audit.always_checks": "Human checks: who checked, against which steps, and the result",

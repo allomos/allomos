@@ -605,6 +605,7 @@
   "audit.legal_hold_help": "开着时，历史里的任何内容都不能删除或脱敏。打开或关掉都要写明理由。",
   "audit.always": "一直记录",
   "audit.always_help": "Allomos 一直记录每次改动是谁做的、批准、人工验证、关联的代码、外部影响和原因。这些不能关掉。",
+  "audit.standards_map": "查看标准对照表：各标准要打开哪几项",
   "audit.always_who": "每次改动是谁做的（agent、模型、会话），替谁做的",
   "audit.always_approvals": "批准：谁批准了什么、何时、经什么渠道、何时失效",
   "audit.always_checks": "人工验证：谁验证的、按哪一版步骤、结果如何",
