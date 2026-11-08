@@ -23,6 +23,7 @@ mod model;
 pub mod ops;
 mod problem;
 pub mod request;
+pub mod retention;
 pub mod traces;
 mod validate;
 

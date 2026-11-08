@@ -3,8 +3,10 @@
 // fresh sign-in. The history only ever holds a pseudonym ID; who is behind it stays on this
 // computer (local project) or in the cloud. A local-only project keeps the pseudonym: the
 // sign-in levels are shown greyed out, with why. Below it, Separation of duties
-// (Task-A01-grotto036): a checkbox, off by default; turning it off asks why. Task A01-tail719 adds
-// the section's other parts.
+// (Task-A01-grotto036): a checkbox, off by default; turning it off asks why. Then Retention
+// (Task-A01-stem986): keep the history forever or N years, and the legal hold; a shorter period
+// and the hold ask why. Task A01-tail719 adds the section's other parts (among them the
+// "Remove personal details…" button, which runs `alm redact`'s rule).
 
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
@@ -12,7 +14,7 @@ import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { AuditSettings, IdentityLevel } from "./types";
-import { LEVELS, needsReason, separationNeedsReason } from "./auditFlow";
+import { LEVELS, needsReason, retentionNeedsReason, separationNeedsReason, yearsFrom } from "./auditFlow";
 
 
 export function AuditSection({ messenger, root, fileManagerKey }: { messenger: Messenger; root: string; fileManagerKey: Key }) {
@@ -27,6 +29,11 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
   const [separate, setSeparate] = useState(false);
   const [sepReason, setSepReason] = useState("");
   const [sepSaved, setSepSaved] = useState(false);
+  const [forever, setForever] = useState(true);
+  const [yearsText, setYearsText] = useState("7");
+  const [hold, setHold] = useState(false);
+  const [retReason, setRetReason] = useState("");
+  const [retSaved, setRetSaved] = useState(false);
 
   const fill = (s: AuditSettings) => {
     setSettings(s);
@@ -35,6 +42,10 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
     setReason("");
     setSeparate(s.separation_of_duties);
     setSepReason("");
+    setForever(s.retention_years === null);
+    if (s.retention_years !== null) setYearsText(String(s.retention_years));
+    setHold(s.legal_hold);
+    setRetReason("");
   };
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
   useEffect(() => {
@@ -71,6 +82,25 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
     try {
       fill(await messenger.setSeparation(root, separate, sepReason.trim() || undefined));
       setSepSaved(true);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const years = forever ? null : yearsFrom(yearsText);
+  const yearsBad = !forever && years === null;
+  const retNow = { years: settings.retention_years, hold: settings.legal_hold };
+  const retChanged = !yearsBad && (years !== retNow.years || hold !== retNow.hold);
+  const retAsksReason = !yearsBad && retentionNeedsReason(retNow, years, hold);
+  const saveRetention = async () => {
+    setBusy(true);
+    setError(null);
+    setRetSaved(false);
+    try {
+      fill(await messenger.setRetention(root, years, hold, retReason.trim() || undefined));
+      setRetSaved(true);
     } catch (e) {
       say(e);
     } finally {
@@ -139,6 +169,41 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
       {sepChanged && (
         <div className="row start">
           <button type="button" onClick={() => void saveSeparation()} disabled={busy || (sepAsksReason && !sepReason.trim())}>
+            {t("handoff_settings.save")}
+          </button>
+        </div>
+      )}
+      <h3>{t("audit.retention")}</h3>
+      <p className="muted small">{t("audit.retention_help")}</p>
+      <div className="form" role="radiogroup" aria-label={t("audit.retention_keep")}>
+        <span>{t("audit.retention_keep")}</span>
+        <label className="choice">
+          <input type="radio" name="retention" checked={forever} disabled={busy} onChange={() => setForever(true)} />
+          {t("audit.retention_forever")}
+        </label>
+        <label className="choice">
+          <input type="radio" name="retention" checked={!forever} disabled={busy} onChange={() => setForever(false)} />
+          <input type="number" min={1} max={100} value={yearsText} disabled={busy || forever} onChange={(e) => setYearsText(e.target.value)} aria-label={t("audit.retention_years")} />{" "}
+          {t("audit.retention_years")}
+        </label>
+        <p className="muted small">{t("audit.retention_law")}</p>
+        {yearsBad && <p className="warning small">{t("problem.retention_invalid", { value: yearsText })}</p>}
+        <label className="choice">
+          <input type="checkbox" checked={hold} disabled={busy} onChange={(e) => setHold(e.target.checked)} />
+          {t("audit.legal_hold")}
+        </label>
+        <p className="muted small">{t("audit.legal_hold_help")}</p>
+        {retAsksReason && (
+          <label className="warning">
+            {t("audit.reason")}
+            <input type="text" value={retReason} onChange={(e) => setRetReason(e.target.value)} disabled={busy} />
+          </label>
+        )}
+      </div>
+      {retSaved && <p className="muted small">{t("handoff_settings.saved")}</p>}
+      {retChanged && (
+        <div className="row start">
+          <button type="button" onClick={() => void saveRetention()} disabled={busy || (retAsksReason && !retReason.trim())}>
             {t("handoff_settings.save")}
           </button>
         </div>

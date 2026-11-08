@@ -113,3 +113,14 @@ test("an exception shows its kind, why and who accepted the risk (Task-A01-seed3
   assert.equal(valueText("exception", { id: "ex-3", kind: "waiver", why: "x", accepted_by: "p-1" }, t), "waiver: x, pane.exception_accepted_by(p-1)");
   assert.equal(fieldName("exception", t), "pane.exception");
 });
+
+test("a redaction shows which fields were removed and who approved it; removed values show as removed (Task-A01-stem986)", () => {
+  const files = [{ file: "events/a.json", fingerprint: "f", fields: ["description"] }];
+  assert.equal(
+    valueText("redaction", { id: "rd-1", fields: ["description"], files, approved_by: "approver" }, t),
+    "pane.redaction_removed(pane.description,1), pane.redaction_approved_by(approver)",
+  );
+  assert.equal(valueText("redaction", { id: "rd-2", fields: ["handoff_note"], files }, t), "pane.redaction_removed(pane.handoff,1), pane.redaction_not_approved");
+  assert.equal(valueText("description", { redacted: "rd-1" }, t), "pane.redacted");
+  assert.equal(fieldName("redaction", t), "pane.redaction");
+});

@@ -286,6 +286,19 @@ problems! {
     ReauthenticateNeedsSignIn => "reauthenticate_needs_sign_in", "Signing in again to approve or check needs the Allomos account or company sign-in (SSO) identity level; with a pseudonym there is nothing to sign in to.";
     /// Turning an audit control off or down needs a reason (decision 0021 § 6).
     AuditReasonMissing { setting } => "audit_reason_missing", "Turning {setting} off or down needs a reason: add --reason \"<why>\".";
+    /// A retention period that is neither `forever` nor a number of years from 1 to 100
+    /// (Task-A01-stem986).
+    RetentionInvalid { value } => "retention_invalid", "\"{value}\" is not a retention period: use forever, or a number of years from 1 to 100 (for example 7).";
+    /// A legal hold is on: nothing in the history may be removed or redacted (Task-A01-stem986).
+    LegalHoldOn => "legal_hold_on", "A legal hold is on in this project: nothing in the history may be removed or redacted. It is turned off with a reason (`alm audit-settings --legal-hold off --reason \"<why>\"`).";
+    /// `alm redact` without a field (Task-A01-stem986).
+    RedactFieldMissing => "redact_field_missing", "Name the field to remove: --field <name> (for example description or handoff_note).";
+    /// `alm redact` without a reason (Task-A01-stem986).
+    RedactReasonMissing => "redact_reason_missing", "Say why the details are removed: --reason \"<why>\" (it is recorded; the removed values are not).";
+    /// A field the task's history has no change of (Task-A01-stem986).
+    RedactFieldUnknown { id, field } => "redact_field_unknown", "Task {id}'s history has no change of the field \"{field}\". The fields it has are listed by `alm history {id}`.";
+    /// An event file named with --event that is not one of the task's (Task-A01-stem986).
+    RedactEventUnknown { id, file } => "redact_event_unknown", "{file} is not an event of task {id}.";
     /// Separation of duties is on and the person who worked on the task would also check it
     /// (Task-A01-grotto036, decision 0021 § 1.2).
     SelfCheck { id, who } => "self_check", "Separation of duties is on in this project: {who} worked on task {id}, so they may not also check it. Someone else checks it, or the switch is turned off with a reason (`alm audit-settings --separation-of-duties off --reason \"<why>\"`).";

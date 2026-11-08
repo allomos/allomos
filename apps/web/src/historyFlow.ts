@@ -32,6 +32,7 @@ const FIELD_KEYS: Record<string, Key> = {
   approval_due: "pane.approval_due",
   effect: "pane.effect",
   exception: "pane.exception",
+  redaction: "pane.redaction",
   link: "pane.link",
   card: "pane.card",
   card_outside: "pane.card_outside",
@@ -54,6 +55,10 @@ const CLASSIFY_VALUES = new Set(["standard", "normal", "emergency", "low", "medi
 /** One side of a change: a state in words, a description only as "changed", long text shortened. */
 export function valueText(field: string, value: unknown, t: T): string {
   if (value === undefined || value === null || value === "") return "—";
+  // A value removed by a redaction (Task-A01-stem986): only the marker is left.
+  if (isRedacted(value)) return t("pane.redacted");
+  // A redaction: which fields were removed, from how many events, and who approved it.
+  if (field === "redaction" && typeof value === "object") return redactionText(value as RedactionRecord, t);
   if (field === "state" && typeof value === "string") return t(`state.${value}` as Key);
   // An approval record (Task-A01-coach782) by its ID; older approvals were a text.
   if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
@@ -127,6 +132,26 @@ export function exceptionText(e: ExceptionRecord, t: T): string {
   const head = e.check ? `${kind} (${e.check})` : kind;
   const who = e.accepted_by ? t("pane.exception_accepted_by", { who: e.accepted_by }) : t("pane.exception_not_accepted");
   return `${head}: ${e.why}, ${who}`;
+}
+
+/** What a redaction records (Task-A01-stem986, decision 0021 § 6): never the old values. */
+export interface RedactionRecord {
+  id: string;
+  fields: string[];
+  files: { file: string; fingerprint: string; fields: string[] }[];
+  approved_by?: string;
+}
+
+/** The marker a redaction leaves in place of a removed value: `{"redacted": "rd-…"}`. */
+export function isRedacted(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 1 && "redacted" in value;
+}
+
+/** A redaction in one line: "Description removed from 3 events, approved by approver". */
+export function redactionText(r: RedactionRecord, t: T): string {
+  const fields = r.fields.map((f) => fieldName(f, t)).join(", ");
+  const head = t("pane.redaction_removed", { fields, count: r.files.length });
+  return `${head}, ${r.approved_by ? t("pane.redaction_approved_by", { who: r.approved_by }) : t("pane.redaction_not_approved")}`;
 }
 
 /** A link to code or a release (Task-A01-mint242) in one line: "Commit abcdef1", "PR #7". A

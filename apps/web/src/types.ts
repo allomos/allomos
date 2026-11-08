@@ -391,6 +391,10 @@ export interface AuditSettings {
   /** Separation of duties (Task-A01-grotto036): the same person or agent may not both do and
    * check (or do and approve) a task. Off by default. */
   separation_of_duties: boolean;
+  /** Retention (Task-A01-stem986): years to keep the history; null: forever. */
+  retention_years: number | null;
+  /** Legal hold (Task-A01-stem986): while on, nothing in the history may be removed or redacted. */
+  legal_hold: boolean;
   /** Where this computer keeps who is behind its pseudonyms; null without a settings folder. */
   identities_file: string | null;
 }

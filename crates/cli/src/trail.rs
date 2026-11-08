@@ -61,6 +61,22 @@ fn facts_text(f: &Facts) -> String {
         &f.changed,
         &mut out,
     );
+    if !f.redacted.is_empty() {
+        // Task-A01-stem986: changed by a recorded redaction, so not listed as changed above.
+        out.push_str(&format!(
+            "Redacted (personal details removed, recorded by a redaction; the signature no longer matches) ({}):\n",
+            f.redacted.len()
+        ));
+        for r in &f.redacted {
+            out.push_str(&format!(
+                "  {} ({}): {}, recorded in {}\n",
+                r.file,
+                r.fields.join(", "),
+                r.redaction,
+                r.by_event
+            ));
+        }
+    }
     if !f.breaks.is_empty() {
         out.push_str(&format!(
             "Gaps in a computer's chain: the change before these is missing ({}):\n",

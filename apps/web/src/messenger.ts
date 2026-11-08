@@ -175,6 +175,8 @@ export interface Messenger {
   setIdentity(root: string, change: { level?: IdentityLevel; reauthenticate?: boolean; reason?: string }): Promise<AuditSettings>;
   /** Turns separation of duties on or off, as `alm audit-settings --separation-of-duties`; off needs a reason. Rejects with a Problem. */
   setSeparation(root: string, on: boolean, reason?: string): Promise<AuditSettings>;
+  /** Sets the retention period (null: forever) and the legal hold, as `alm audit-settings --retention --legal-hold`; a shorter period and the hold need a reason. Rejects with a Problem. */
+  setRetention(root: string, years: number | null, legalHold: boolean, reason?: string): Promise<AuditSettings>;
   /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
   showIdentitiesFile(): Promise<void>;
   /** One task's recorded changes, newest first (Task-A01-17). */
@@ -470,6 +472,7 @@ export const desktopMessenger: Messenger = {
       reason: c.reason ?? null,
     }),
   setSeparation: (root, on, reason) => invoke<AuditSettings>("set_separation", { root, on, reason: reason ?? null }),
+  setRetention: (root, years, legalHold, reason) => invoke<AuditSettings>("set_retention", { root, years, legalHold, reason: reason ?? null }),
   showIdentitiesFile: () => invoke<void>("show_identities_file"),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   ownerName: () => invoke<string | null>("owner_name"),

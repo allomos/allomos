@@ -5,7 +5,7 @@
 //! behind a pseudonym comes from, and whether approving and checking ask for a fresh sign-in.
 //! Whatever the level, the history only ever holds a pseudonym ID; who is behind it is kept
 //! outside the taskbag. Separation of duties (Task-A01-grotto036) sits beside it, with its rule in
-//! [`crate::duties`]. Later tasks add the other switches (the outside witness, retention); until
+//! [`crate::duties`]. Retention and the legal hold (Task-A01-stem986) are in [`crate::retention`]. Later tasks add the outside witness; until
 //! then a newer Allomos's fields are kept as they are.
 
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,14 @@ pub struct Audit {
     /// check, or do and approve, a task. Off by default; see [`crate::duties`].
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub separation_of_duties: bool,
+    /// Retention (Task-A01-stem986): how many years the history is meant to be kept; missing
+    /// means forever. See [`crate::retention`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention_years: Option<u32>,
+    /// Legal hold (Task-A01-stem986): while on, nothing in the history may be removed or
+    /// redacted.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legal_hold: bool,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
@@ -241,6 +249,8 @@ mod tests {
             identity: Some(SSO.into()),
             reauthenticate: true,
             separation_of_duties: false,
+            retention_years: None,
+            legal_hold: false,
             extra: Default::default(),
         }));
         assert_eq!(identity(&b.project).level, SSO);
@@ -298,6 +308,8 @@ mod tests {
             identity: Some("passkey".into()),
             reauthenticate: false,
             separation_of_duties: false,
+            retention_years: None,
+            legal_hold: false,
             extra,
         }));
         let id = identity(&b.project);

@@ -216,6 +216,7 @@
     "id",
     "label"
   ],
+  "legal_hold_on": [],
   "link_kind_unknown": [
     "kind"
   ],
@@ -270,12 +271,25 @@
     "detail"
   ],
   "reauthenticate_needs_sign_in": [],
+  "redact_event_unknown": [
+    "id",
+    "file"
+  ],
+  "redact_field_missing": [],
+  "redact_field_unknown": [
+    "id",
+    "field"
+  ],
+  "redact_reason_missing": [],
   "reopen_note_missing": [],
   "request_not_found": [
     "id"
   ],
   "request_reused": [
     "id"
+  ],
+  "retention_invalid": [
+    "value"
   ],
   "second_active_iteration": [
     "id",
