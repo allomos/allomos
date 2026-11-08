@@ -156,6 +156,10 @@ problems! {
     ApprovalNotFound { id } => "approval_not_found", "No task records approval {id}. `alm show <task>` lists a task's approvals.";
     /// `alm withdraw` on an approval already withdrawn (Task-A01-coach782).
     ApprovalAlreadyWithdrawn { id } => "approval_already_withdrawn", "Approval {id} is already withdrawn.";
+    /// `alm effect --of` with an effect ID the task does not record (Task-A01-job650).
+    EffectNotFound { id, task } => "effect_not_found", "Task {task} records no outside effect {id}. `alm effects {task}` lists its effects.";
+    /// A new outside effect without its target, action or rollback (Task-A01-job650).
+    EffectIncomplete { missing } => "effect_incomplete", "An outside effect is recorded with where it acts, what it does and how it is undone: give {missing}. If it cannot be undone, say so in --rollback.";
     /// The app's Withdraw without saying why (Task-A01-baker800).
     WithdrawReasonMissing => "withdraw_reason_missing", "Say why the approval is withdrawn: `alm withdraw <approval ID> --why \"<why>\"`.";
     /// `alm trace` with something that is neither a requirement ID nor a decision number

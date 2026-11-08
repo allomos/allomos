@@ -349,6 +349,32 @@ enum Command {
         #[arg(value_name = "APPROVAL ID")]
         id: String,
     },
+    /// Record an outside effect of a task (decision 0021): a deployment, a change to a hosted
+    /// resource, SQL run on a real target. Before it: where it acts (--target), what it does
+    /// (--action), how it is undone (--rollback), and the approval it relies on (the global
+    /// --approval <approval ID>, from `alm approve`). After it: `--of <effect ID> --result
+    /// "<what happened>"`. Recorded afterwards: everything at once. `alm effects` lists them.
+    Effect {
+        id: String,
+        /// The effect to record the result of (or correct), by its ID (`ef-…`); without it, a new
+        /// one.
+        #[arg(long, value_name = "EFFECT ID")]
+        of: Option<String>,
+        /// Where it acts: the environment or resource (for example "production database").
+        #[arg(long, value_name = "TEXT")]
+        target: Option<String>,
+        /// What is done there.
+        #[arg(long, value_name = "TEXT")]
+        action: Option<String>,
+        /// How it is undone (or why it cannot be).
+        #[arg(long, value_name = "TEXT")]
+        rollback: Option<String>,
+        /// What happened.
+        #[arg(long, value_name = "TEXT")]
+        result: Option<String>,
+    },
+    /// A task's outside effects; with none given, every one in the project, by task.
+    Effects { id: Option<String> },
     /// Show one task in full.
     Show { id: String },
     /// Fill in or correct the session a task records, afterwards (Task-A03-ham538): each option
@@ -915,6 +941,8 @@ impl Command {
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Approve { ids, .. } => ids.first().map(String::as_str),
             Command::Withdraw { .. } => None,
+            Command::Effect { id, .. } => Some(id),
+            Command::Effects { .. } => None,
             Command::Init { .. }
             | Command::Labels { .. }
             | Command::Project { .. }
@@ -1052,6 +1080,8 @@ impl Command {
             Command::Reviewed { .. } => "reviewed",
             Command::Approve { .. } => "approve",
             Command::Withdraw { .. } => "withdraw",
+            Command::Effect { .. } => "effect",
+            Command::Effects { .. } => "effects",
             Command::Human { .. } => "human",
             Command::Release { .. } => "release",
             Command::Needs { .. } => "needs",
@@ -2217,6 +2247,7 @@ fn decision_lines(decisions: &[Decision]) -> String {
 
 /// One line about a task: ID, state, label, holder, title.
 mod approve;
+mod effects;
 mod folders;
 mod trail;
 
@@ -3325,6 +3356,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .remove(&task.id)
                 .unwrap_or_default();
             text.push_str(&approve::lines(&approvals));
+            let outside_effects = allomos_store::effects::by_task(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            text.push_str(&effects::lines(&outside_effects));
             let withdrawn = allomos_core::approval::withdrawn_notice(&task, &approvals);
             if let Some(r) = withdrawn {
                 text.push_str(&approve::withdrawn_line(
@@ -3350,7 +3385,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "effects": outside_effects, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -3874,6 +3909,26 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             },
         ),
         Command::Withdraw { id } => approve::withdraw(cli, cwd, id),
+        Command::Effect {
+            id,
+            of,
+            target,
+            action,
+            rollback,
+            result,
+        } => effects::effect(
+            cli,
+            cwd,
+            &effects::Args {
+                id,
+                of: of.as_deref(),
+                target: target.as_deref(),
+                action: action.as_deref(),
+                rollback: rollback.as_deref(),
+                result: result.as_deref(),
+            },
+        ),
+        Command::Effects { id } => effects::list(cli, cwd, id.as_deref()),
         Command::Reviewed { id } => {
             let root = locate(cli, cwd)?;
             let d = allomos_store::review_ai_decisions(

@@ -11,6 +11,7 @@ pub mod canonical;
 pub mod card;
 pub mod decision;
 pub mod duties;
+pub mod effect;
 pub mod event;
 pub mod folders;
 pub mod ids;

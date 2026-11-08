@@ -70,3 +70,15 @@ test("a task's traces show as a list (Task-A01-fennel617)", () => {
   assert.equal(valueText("traces", [], t), "—");
   assert.equal(fieldName("traces", t), "pane.traces");
 });
+
+test("an outside effect shows where, what and its result (Task-A01-job650)", () => {
+  assert.equal(
+    valueText("effect", { id: "ef-1", target: "production", action: "deploy 0.1.43", rollback: "redeploy", result: "deployed" }, t),
+    "production: deploy 0.1.43 → deployed",
+  );
+  assert.equal(
+    valueText("effect", { id: "ef-1", target: "production", action: "deploy 0.1.43", rollback: "redeploy" }, t),
+    "production: deploy 0.1.43 (pane.effect_under_way)",
+  );
+  assert.equal(fieldName("effect", t), "pane.effect");
+});

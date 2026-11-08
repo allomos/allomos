@@ -574,6 +574,10 @@ button.link:hover { text-decoration: underline; }
 /* Task-A01-baker800: Approve… shows the plan being approved, as it is; Withdraw… asks why. */
 .pane-approvals h3, .pane-approvals .approvals, .pane-approvals .banner, .pane-approvals .editor { flex-basis: 100%; margin: 0; }
 .pane-approvals .approvals { padding-left: 20px; }
+/* Task-A01-job650: a task's outside effects, each with its rollback, approval and result. */
+.pane-effects dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 8px; margin: 4px 0 8px; }
+.pane-effects dt { color: var(--muted); }
+.pane-effects dd { margin: 0; overflow-wrap: anywhere; }
 .approve-plan { max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 4px 0; padding: 8px; font-size: 0.85em; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
 /* Two layouts of one page (Task-A04-02-03): wider than about 900 px, the list with the task pane
    on its right; narrower (a phone), the task pane fills the screen with a back arrow. */

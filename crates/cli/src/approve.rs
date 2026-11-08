@@ -122,7 +122,7 @@ pub(crate) fn withdrawn_line(id: &str, holder: Option<&str>, r: &Recorded) -> St
 }
 
 /// Where an approval stands, in words.
-fn status_words(r: &Recorded) -> String {
+pub(crate) fn status_words(r: &Recorded) -> String {
     match r.status {
         Status::Applies => "applies".into(),
         Status::PlanChanged => "no longer applies: the plan changed since".into(),

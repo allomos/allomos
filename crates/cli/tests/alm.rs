@@ -6255,6 +6255,205 @@ fn a_task_traces_to_requirements_and_decisions_and_back() {
     refused(&repo, &["traces", "nope"], 1, "trace_invalid");
 }
 
+#[test]
+fn an_outside_effect_is_recorded_before_and_after_and_listed() {
+    // Task-A01-job650 (decision 0021 § 1.1 "Outside effects"): `alm effect` records target,
+    // action, rollback, approval and result as an `effect` change in the task's history only;
+    // `alm show` and `alm effects` list them, for one task and for the project.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &["--as", "a", "effect", "A01-01", "--target", "production"],
+        1,
+        "effect_incomplete",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "effect",
+            "A01-01",
+            "--target",
+            "t",
+            "--action",
+            "a",
+            "--rollback",
+            "r",
+        ],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "--approval",
+            "ap-nope00",
+            "effect",
+            "A01-01",
+            "--target",
+            "t",
+            "--action",
+            "a",
+            "--rollback",
+            "r",
+        ],
+        1,
+        "approval_not_found",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "effect",
+            "A01-01",
+            "--of",
+            "ef-nope00",
+            "--result",
+            "ok",
+        ],
+        1,
+        "effect_not_found",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    // Without an approval: recorded, and alm says so (it refuses nothing).
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "effect",
+            "A01-01",
+            "--target",
+            "staging",
+            "--action",
+            "apply 0003.sql",
+            "--rollback",
+            "apply 0003-down.sql",
+        ],
+    );
+    assert!(out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("it names no approval"), "{text}");
+    assert!(text.contains("Under way."), "{text}");
+
+    let ap = ok(
+        &repo,
+        &["--as", "a", "approve", "A01-01", "--words", "deploy it"],
+    );
+    let ap_id = ap["approval"]["id"].as_str().unwrap().to_string();
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "--approval",
+            &ap_id,
+            "effect",
+            "A01-01",
+            "--target",
+            "production",
+            "--action",
+            "deploy 0.1.43",
+            "--rollback",
+            "redeploy 0.1.42",
+        ],
+    );
+    let ef_id = v["effect"]["id"].as_str().unwrap().to_string();
+    assert!(ef_id.starts_with("ef-"), "{ef_id}");
+    assert_eq!(v["effect"]["approval"], json!(ap_id));
+    assert_eq!(v["effect"].get("result"), None);
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "effect");
+    assert_eq!(last["approval"], json!(ap_id));
+    assert_eq!(last["changes"][0]["field"], "effect");
+    assert_eq!(last["changes"][0]["to"]["target"], "production");
+
+    // After it: the result; the same again changes nothing.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "effect",
+            "A01-01",
+            "--of",
+            &ef_id,
+            "--result",
+            "deployed; health check green",
+        ],
+    );
+    assert_eq!(v["changed"], json!(true));
+    assert_eq!(
+        v["effect"]["approval"],
+        json!(ap_id),
+        "the approval is kept"
+    );
+    let history = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(
+        history["events"][0]["changes"][0]["from"]["id"],
+        json!(ef_id)
+    );
+    let events = event_count(&repo);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "effect",
+            "A01-01",
+            "--of",
+            &ef_id,
+            "--result",
+            "deployed; health check green",
+        ],
+    );
+    assert_eq!(v["changed"], json!(false));
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+
+    // One recorded afterwards gives everything at once (a task nobody holds).
+    ok(
+        &repo,
+        &[
+            "effect",
+            "A01-02",
+            "--target",
+            "DNS",
+            "--action",
+            "add a record",
+            "--rollback",
+            "remove it",
+            "--result",
+            "added",
+        ],
+    );
+
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["effects"].as_array().unwrap().len(), 2);
+    assert_eq!(v["effects"][1]["result"], "deployed; health check green");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(out.contains("Outside effects:"), "{out}");
+    assert!(out.contains("rollback: redeploy 0.1.42"), "{out}");
+
+    let v = ok(&repo, &["effects", "A01-01"]);
+    assert_eq!(v["effects"].as_array().unwrap().len(), 2);
+    let v = ok(&repo, &["effects"]);
+    let all = v["effects"].as_array().unwrap();
+    assert_eq!(all.len(), 3);
+    assert_eq!(all[2]["task"], "A01-02");
+    let out = String::from_utf8(alm(&repo, &["effects"]).stdout).unwrap();
+    assert!(out.contains("1 without a result yet"), "{out}");
+}
+
 /// Task-A01-frolic587 (decision 0021 § 2, § 6): the identity level is shown and set with
 /// `alm audit-settings`; a local-only project keeps the pseudonym, and the events of a person's
 /// changes hold only their pseudonym.

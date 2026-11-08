@@ -333,6 +333,11 @@ test("AI decisions to review: the badge reads the label; the decisions from the 
   assert.deepEqual(withApprovals[1].approvals, [approval]);
   assert.deepEqual(withApprovals[0].ai_decisions, [decision], "decisions stay");
   assert.equal(withApprovals[0].approvals, undefined);
+  // Task-A01-job650: and its outside effects.
+  const effect = { id: "ef-abc123", task: "A01-02", target: "production", action: "deploy", rollback: "redeploy", at: "2026-11-08T10:00:00Z" };
+  const withEffects = withDecisions({ ...opened, effects: { "A01-02": [effect] } }).loaded.taskbag!.tasks;
+  assert.deepEqual(withEffects[1].effects, [effect]);
+  assert.equal(withEffects[0].effects, undefined);
 });
 
 // Task-A01-44: groups with nothing left after the filter are not drawn; the banner says what it shows.

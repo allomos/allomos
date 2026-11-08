@@ -93,6 +93,25 @@ export interface Task {
   /** Its approvals, with where each stands now (Task-A01-coach782). Not a field of task.json:
    * worked out from the history and added when the taskbag is opened. */
   approvals?: ApprovalRecord[];
+  /** Its outside effects (Task-A01-job650). Not a field of task.json: worked out from the
+   * history and added when the taskbag is opened. */
+  effects?: EffectRecord[];
+}
+
+/** An outside effect as recorded (crates/core/src/effect.rs, decision 0021 § 1.1): where it
+ * acts, what it does, how it is undone, the approval it relies on and what happened. */
+export interface EffectRecord {
+  id: string;
+  task: string;
+  target: string;
+  action: string;
+  rollback: string;
+  approval?: string;
+  /** Missing while it is under way. */
+  result?: string;
+  at: string;
+  by?: string;
+  result_at?: string;
 }
 
 /** A person's approval as recorded (crates/core/src/approval.rs, decision 0021 § 1.1). */
@@ -267,6 +286,8 @@ export interface Opened {
   ai_decisions?: Record<string, AiDecision[]>;
   /** Each task's approvals, by task ID (Task-A01-coach782). */
   approvals?: Record<string, ApprovalRecord[]>;
+  /** Each task's outside effects, by task ID (Task-A01-job650). */
+  effects?: Record<string, EffectRecord[]>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
   /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */
