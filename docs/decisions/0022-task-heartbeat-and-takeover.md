@@ -2,9 +2,9 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Proposed** | 2026-11-08 | — | will.w.hui |
+| **Accepted** (with the give-up rule of § 8) | 2026-11-08 | 2026-11-09 | will.w.hui |
 
-Card: task `A00-letter120`. Written from the approver's discussion of 2026-11-08; every point below was agreed there, and this record writes it down for approval.
+Card: task `A00-letter120`. Written from the approver's discussion of 2026-11-08; every point below was agreed there. On 2026-11-09 the approver added that a taken-over session gives the task up (§ 8) and accepted the record (see [Decided](#decided)).
 
 ## In plain words
 
@@ -114,6 +114,6 @@ No reminder or escalation when a task is lost several times in a row (discussed 
 - **History:** no new events for heartbeats; takeovers are claim events with the former holder; burndown and timeline unchanged.
 - **Commits:** about one taskbag commit per holding session every 10 minutes when it changes nothing else.
 
-## Open for the approver
+## Decided
 
-1. Approve this record as proposed (status **Accepted**), or say what to change.
+2026-11-09, will.w.hui: **Accepted**, with one addition made that day: a session whose task was taken over gives the task up (§ 8). The agent's three routine choices (English and number 0022; field names left to the implementation card; the two implied points in § 6 and § 8) were reviewed and kept.
