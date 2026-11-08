@@ -299,6 +299,8 @@ problems! {
     WitnessNotConfirmed => "witness_not_confirmed", "Turning the outside witness on sends each checkpoint's fingerprint (a hash, never the content) to the chosen time-stamp service. Ask the person first; when they say yes, add --confirm.";
     /// Choosing a service while the outside witness is off (Task-A01-wood982).
     WitnessOff => "witness_off", "The outside witness is off: turn it on with --witness on (and the person's yes, --confirm) to choose its services.";
+    /// How often the outside witness checkpoints, not one of the three (Task-A01-bake791).
+    WitnessWhenInvalid { value } => "witness_when_invalid", "\"{value}\" is not how often to make checkpoints: use daily, approvals (each approval and human check) or asked (only when asked).";
     /// `alm redact` without a field (Task-A01-stem986).
     RedactFieldMissing => "redact_field_missing", "Name the field to remove: --field <name> (for example description or handoff_note).";
     /// `alm redact` without a reason (Task-A01-stem986).

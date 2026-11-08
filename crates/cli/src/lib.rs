@@ -820,6 +820,12 @@ enum Command {
         /// A second time-stamp service, sent each checkpoint too (none: remove it).
         #[arg(long, value_name = "SERVICE")]
         witness_second: Option<String>,
+        /// How often checkpoints are made by themselves while the outside witness is on: daily
+        /// (the default when turning it on: by the app while open and by any alm command that
+        /// changes the taskbag, once a day), approvals (after each approval and human check), or
+        /// asked (only `alm checkpoint`, Make a checkpoint now, and upgrading).
+        #[arg(long, value_name = "daily|approvals|asked", value_parser = ["daily", "approvals", "asked"])]
+        witness_when: Option<String>,
         /// The person said yes to sending fingerprints to the service (needed with --witness on).
         #[arg(long)]
         confirm: bool,
@@ -1136,6 +1142,7 @@ impl Command {
             witness,
             witness_service,
             witness_second,
+            witness_when,
             ..
         } = self
         {
@@ -1146,7 +1153,8 @@ impl Command {
                 || legal_hold.is_some()
                 || witness.is_some()
                 || witness_service.is_some()
-                || witness_second.is_some();
+                || witness_second.is_some()
+                || witness_when.is_some();
         }
         if let Command::Cards { what } = self {
             return what.is_some();
@@ -1457,6 +1465,7 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
             let mut done = done?;
             done.warnings.extend(outdated);
             pack_history(&cli, cwd, &mut done);
+            trail::auto_checkpoint(&cli, cwd, &mut done);
             Ok(done)
         })
     });
@@ -1924,8 +1933,13 @@ fn witness_lines(w: Option<&allomos_core::witness::Witness>) -> String {
     match w {
         None => "Outside witness: off. Checkpoints are signed on this computer only; no fingerprint leaves it.\n".into(),
         Some(w) => format!(
-            "Outside witness: on. Each checkpoint's fingerprint (a hash, never the content) is sent to {}; the receipt is kept in the checkpoint.\n",
-            w.services().join(" and ")
+            "Outside witness: on. Each checkpoint's fingerprint (a hash, never the content) is sent to {}; the receipt is kept in the checkpoint.\n{}",
+            w.services().join(" and "),
+            match w.when() {
+                allomos_core::witness::When::Daily => "How often: daily. The app while it is open, and any alm command that changes the taskbag, make a checkpoint when the last one is a day old.\n",
+                allomos_core::witness::When::Approvals => "How often: at each approval and human check (alm approve, alm checked and the app's same).\n",
+                allomos_core::witness::When::Asked => "How often: only when asked (alm checkpoint, Make a checkpoint now, and upgrading).\n",
+            }
         ),
     }
 }
@@ -2740,12 +2754,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             witness,
             witness_service,
             witness_second,
+            witness_when,
             confirm,
             reason,
         } => {
             let root = locate(cli, cwd)?;
-            let witness_changing =
-                witness.is_some() || witness_service.is_some() || witness_second.is_some();
+            let witness_changing = witness.is_some()
+                || witness_service.is_some()
+                || witness_second.is_some()
+                || witness_when.is_some();
             let changing = identity.is_some()
                 || reauthenticate.is_some()
                 || separation_of_duties.is_some()
@@ -2807,6 +2824,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                             on: witness.as_deref().map(|v| v == "on"),
                             service: witness_service.as_deref(),
                             second: witness_second.as_deref(),
+                            when: witness_when.as_deref(),
                             confirmed: *confirm,
                             reason,
                         },

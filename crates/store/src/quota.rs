@@ -206,7 +206,7 @@ impl QuotaAsk {
 }
 
 /// Seconds since 1970 for a UTC time `YYYY-MM-DDTHH:MM:SSZ`, or `None` for another shape.
-fn utc_seconds(text: &str) -> Option<i64> {
+pub(crate) fn utc_seconds(text: &str) -> Option<i64> {
     let b = text.as_bytes();
     if b.len() != 20 || b[19] != b'Z' || b[10] != b'T' {
         return None;

@@ -27,6 +27,7 @@ use allomos_core::{
 use serde::Serialize;
 
 pub mod approvals;
+pub mod cadence;
 pub mod cards;
 pub mod checkpoint;
 pub mod classify;

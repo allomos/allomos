@@ -10,7 +10,7 @@ use allomos_core::Problem;
 use allomos_store::trail::Facts;
 use serde_json::json;
 
-use crate::{Done, lock_wait};
+use crate::{Cli, Command, Done, lock_wait};
 
 pub(crate) fn audit(root: &Path) -> Result<Done, Problem> {
     let facts = allomos_store::trail::audit(root);
@@ -29,6 +29,48 @@ pub(crate) fn checkpoint(root: &Path, git_commit: Option<&str>) -> Result<Done, 
         json!({ "taskbag": root, "checkpoint": made, "witness": witnessed }),
         text,
     ))
+}
+
+/// After a command that changed the taskbag: the outside witness's "how often" (Task-A01-bake791)
+/// may make a checkpoint (daily, or at an approval or human check) and send what waits. Its file
+/// is listed with the change's files to share. It never fails the command: a refusal (no signing
+/// key, the lock busy) is told as a warning, the change itself is made.
+pub(crate) fn auto_checkpoint(cli: &Cli, cwd: &std::path::Path, done: &mut Done) {
+    if !cli.command.changes()
+        || matches!(
+            cli.command,
+            Command::Checkpoint { .. } | Command::Upgrade { .. } | Command::AuditSettings { .. }
+        )
+    {
+        return;
+    }
+    let Ok(root) = crate::locate(cli, cwd) else {
+        return;
+    };
+    let trigger = if matches!(
+        cli.command,
+        Command::Approve { .. } | Command::Checked { .. }
+    ) {
+        allomos_store::cadence::Trigger::Approval
+    } else {
+        allomos_store::cadence::Trigger::Change
+    };
+    match allomos_store::cadence::auto(&root, lock_wait(), trigger) {
+        Ok(None) => {}
+        Ok(Some(auto)) => {
+            if let Some(m) = &auto.made {
+                done.text.push_str(&format!(
+                    "Checkpoint {} made by itself (outside witness, how often: {}): fingerprint {} of {} file(s).\n",
+                    m.file, auto.when, m.sha256, m.files
+                ));
+            }
+            if let Some(w) = &auto.witnessed {
+                done.text.push_str(&witnessed_text(w));
+            }
+            done.fields["auto_checkpoint"] = json!(auto);
+        }
+        Err(p) => done.warnings.push(p),
+    }
 }
 
 /// What the outside witness did, in plain lines (Task-A01-wood982).

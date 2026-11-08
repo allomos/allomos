@@ -7587,3 +7587,135 @@ fn the_outside_witness_is_turned_on_with_a_yes_and_off_with_a_reason() {
         "{out:?}"
     );
 }
+
+/// `alm --json` at a given time with the time-stamp service offline (Task-A01-bake791): nothing
+/// leaves the test.
+fn witness_at(dir: &Path, now: &str, args: &[&str]) -> Value {
+    let out = alm_command()
+        .current_dir(dir)
+        .arg("--json")
+        .args(args)
+        .env_remove("ALLOMOS_TASKBAG")
+        .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_LOCK_WAIT_MS")
+        .env("ALLOMOS_NOW", now)
+        .env("ALLOMOS_TSA_REPLY", "offline")
+        .output()
+        .unwrap();
+    let v: Value = serde_json::from_str(String::from_utf8(out.stdout).unwrap().trim()).unwrap();
+    assert_eq!(v["ok"], true, "{args:?}: {v}");
+    v
+}
+
+fn checkpoint_count(repo: &Path) -> usize {
+    fs::read_dir(repo.join(".allomos/taskbag/checkpoints"))
+        .map(|d| d.count())
+        .unwrap_or(0)
+}
+
+/// The outside witness's "how often" (Task-A01-bake791): daily is chosen when it is turned on; a
+/// change a day after the last checkpoint makes one (listed to share, its fingerprint waiting
+/// while offline, the command ending as usual), the next change that day none; at approvals, an
+/// `alm checked` makes one; only when asked, nothing by itself.
+#[test]
+fn the_outside_witness_makes_checkpoints_by_itself_as_often_as_set() {
+    let repo = filled();
+    let t0 = "2026-11-01T09:00:00Z";
+    let v = witness_at(
+        &repo,
+        t0,
+        &["audit-settings", "--witness", "on", "--confirm"],
+    );
+    assert_eq!(v["witness"]["when"], "daily");
+    assert_eq!(checkpoint_count(&repo), 0, "turning it on makes none");
+    witness_at(&repo, t0, &["checkpoint"]);
+    assert_eq!(checkpoint_count(&repo), 1);
+
+    // The same day: no more.
+    let v = witness_at(&repo, "2026-11-01T18:00:00Z", &["note", "A01-01", "later"]);
+    assert_eq!(checkpoint_count(&repo), 1);
+    assert!(v["auto_checkpoint"]["made"].is_null(), "{v}");
+
+    // A day after the last one: a checkpoint, listed with the change's files; offline, it waits.
+    let v = witness_at(
+        &repo,
+        "2026-11-02T09:00:00Z",
+        &["note", "A01-01", "next day"],
+    );
+    assert_eq!(checkpoint_count(&repo), 2);
+    let made = v["auto_checkpoint"]["made"]["file"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(v["auto_checkpoint"]["when"], "daily");
+    let files: Vec<&str> = v["changed_files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(files.contains(&made.as_str()), "{files:?}");
+    assert!(
+        !v["auto_checkpoint"]["witnessed"]["waiting"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    // Run again: no more.
+    witness_at(&repo, "2026-11-02T09:05:00Z", &["note", "A01-01", "again"]);
+    assert_eq!(checkpoint_count(&repo), 2);
+
+    // At each approval and human check: a change makes none, `alm checked` one.
+    let v = witness_at(
+        &repo,
+        "2026-11-02T10:00:00Z",
+        &["audit-settings", "--witness-when", "approvals"],
+    );
+    assert_eq!(v["witness"]["when"], "approvals");
+    witness_at(
+        &repo,
+        "2026-11-04T10:00:00Z",
+        &["--as", "b", "claim", "A01-01"],
+    );
+    witness_at(
+        &repo,
+        "2026-11-04T10:01:00Z",
+        &["--as", "b", "done", "A01-01", "--without-owner", "test"],
+    );
+    assert_eq!(checkpoint_count(&repo), 2);
+    let v = witness_at(
+        &repo,
+        "2026-11-04T10:02:00Z",
+        &["--as", "will", "checked", "A01-01"],
+    );
+    assert_eq!(checkpoint_count(&repo), 3);
+    assert_eq!(v["auto_checkpoint"]["when"], "approvals");
+
+    // Only when asked: nothing by itself, even days later.
+    witness_at(
+        &repo,
+        "2026-11-04T11:00:00Z",
+        &["audit-settings", "--witness-when", "asked"],
+    );
+    witness_at(
+        &repo,
+        "2026-11-09T11:00:00Z",
+        &["note", "A01-02", "much later"],
+    );
+    assert_eq!(checkpoint_count(&repo), 3);
+
+    // An unknown value is refused; the audit still reads every checkpoint.
+    refused(
+        &repo,
+        &["audit-settings", "--witness-when", "hourly"],
+        2,
+        "bad_usage",
+    );
+    let out = alm(&repo, &["audit-settings"]);
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("How often: only when asked"),
+        "{out:?}"
+    );
+    let v = ok(&repo, &["audit"]);
+    assert_eq!(v["audit"]["checkpoints"].as_array().unwrap().len(), 3);
+}

@@ -18,7 +18,7 @@ mod windows;
 
 use audit::{
     audit_settings, export_public_key, make_checkpoint, redact_task, replace_key, set_identity,
-    set_retention, set_separation, set_witness, show_identities_file, this_computer,
+    set_retention, set_separation, set_witness, show_identities_file, this_computer, witness_tick,
 };
 use windows::{Windows, fit_to_screen, focused_window, open_new_window, open_recent_in_window};
 
@@ -326,10 +326,15 @@ fn edit_task_as(
     edit: &allomos_core::ops::Edit,
 ) -> Result<allomos_core::Task, Problem> {
     let actor = app_actor(name)?;
-    allomos_store::change_task(root, actor, LOCK_WAIT, |bag| {
+    let task = allomos_store::change_task(root, actor, LOCK_WAIT, |bag| {
         allomos_core::ops::edit(bag, id, actor.by, edit)
     })
-    .map(|c| c.task)
+    .map(|c| c.task)?;
+    // The person's check: the outside witness may make a checkpoint (Task-A01-bake791).
+    if matches!(edit, allomos_core::ops::Edit::Checked { .. }) {
+        audit::after_approval(root);
+    }
+    Ok(task)
 }
 
 /// The person has reviewed task `id`'s AI decisions (Task-A03-19): the same change as
@@ -393,6 +398,7 @@ fn approve_as(
             shown: Some(shown),
         },
     )?;
+    audit::after_approval(root);
     if ready {
         edit_task_as(
             root,
@@ -2594,6 +2600,7 @@ pub fn run() {
             set_identity,
             show_identities_file,
             make_checkpoint,
+            witness_tick,
             redact_task,
             this_computer,
             export_public_key,

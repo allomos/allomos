@@ -12,7 +12,7 @@ import type { LadderStep } from "./ladderFlow";
 import type { SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
 export interface TranslateTo {
@@ -181,7 +181,9 @@ export interface Messenger {
   /** Sets the retention period (null: forever) and the legal hold, as `alm audit-settings --retention --legal-hold`; a shorter period and the hold need a reason. Rejects with a Problem. */
   setRetention(root: string, years: number | null, legalHold: boolean, reason?: string): Promise<AuditSettings>;
   /** Turns the outside witness on or off, or changes its services (Task-A01-wood982), as `alm audit-settings --witness`; on needs `confirmed`, off a reason; `on` undefined keeps it on. Rejects with a Problem. */
-  setWitness(root: string, change: { on?: boolean; service?: string; second?: string; confirmed?: boolean; reason?: string }): Promise<AuditSettings>;
+  setWitness(root: string, change: { on?: boolean; service?: string; second?: string; when?: WitnessWhen; confirmed?: boolean; reason?: string }): Promise<AuditSettings>;
+  /** The window's clock for the outside witness's daily checkpoint (Task-A01-bake791): makes one when due (the last is a day old) and tries waiting fingerprints again; null when nothing was due. */
+  witnessTick(root: string): Promise<unknown>;
   /** Shows the folder holding `identities.json` (who is behind this computer's pseudonyms). */
   showIdentitiesFile(): Promise<void>;
   /** Project settings → Audit → Make a checkpoint now (Task-A01-tail719), as `alm checkpoint`. Rejects with a Problem (no signing key). */
@@ -506,11 +508,13 @@ export const desktopMessenger: Messenger = {
       on: c.on ?? null,
       service: c.service ?? null,
       second: c.second ?? null,
+      when: c.when ?? null,
       confirmed: c.confirmed ?? false,
       reason: c.reason ?? null,
     }),
   showIdentitiesFile: () => invoke<void>("show_identities_file"),
   makeCheckpoint: (root) => invoke<AuditSettings>("make_checkpoint", { root }),
+  witnessTick: (root) => invoke<unknown>("witness_tick", { root }),
   redactTask: (root, id, fields, reason, approvedBy) =>
     invoke<RedactDone>("redact_task", { root, id, fields, reason, approvedBy: approvedBy ?? null }),
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),

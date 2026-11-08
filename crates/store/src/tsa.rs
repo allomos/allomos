@@ -33,6 +33,9 @@ const OID_MESSAGE_DIGEST: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x
 
 /// How long one request may take before the service counts as unreachable.
 const TIMEOUT_SECONDS: &str = "20";
+/// How long reaching the service may take: a checkpoint made by itself (Task-A01-bake791) must
+/// not hold a command up long on a poor network; the fingerprint waits instead.
+const CONNECT_SECONDS: &str = "5";
 
 // --- A small DER reader: only what a time-stamp token needs. ---
 
@@ -479,6 +482,8 @@ fn post(service: &str, body: &[u8]) -> Result<Vec<u8>, Refused> {
             "--fail",
             "--max-time",
             TIMEOUT_SECONDS,
+            "--connect-timeout",
+            CONNECT_SECONDS,
             "--header",
             "Content-Type: application/timestamp-query",
             "--data-binary",

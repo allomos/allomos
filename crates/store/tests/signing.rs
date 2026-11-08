@@ -528,3 +528,101 @@ fn replacing_the_key_retires_the_old_one_and_keeps_its_events_checkable() {
     assert_eq!(f.chains.len(), 3);
     assert!(f.breaks.is_empty() && f.changed.is_empty());
 }
+
+/// The outside witness's "how often" (Task-A01-bake791), as the app's clock and `alm` ask: daily
+/// makes one when the last is a day old, two asking at once make one between them, offline the
+/// fingerprint waits; requests to one service stay over a second apart, across calls too;
+/// approvals only at an approval; asked and off, nothing.
+#[test]
+fn how_often_makes_checkpoints_by_themselves() {
+    use allomos_store::cadence::{self, Trigger};
+    let _turn = turn();
+    let root = taskbag("cadence");
+    let project = root.join("project.json");
+    let set_when = |when: Option<&str>| {
+        let mut p: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&project).unwrap()).unwrap();
+        p["audit"] = match when {
+            Some(w) => {
+                serde_json::json!({ "witness": { "service": "https://tsa.test/tsr", "when": w } })
+            }
+            None => serde_json::Value::Null,
+        };
+        fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
+    };
+    let count = || checkpoint::list(&root).0.len();
+    // SAFETY: as in `turn`.
+    unsafe {
+        std::env::set_var("ALLOMOS_TSA_REPLY", "offline");
+        std::env::set_var("ALLOMOS_NOW", "2026-11-01T09:00:00Z");
+    }
+    set_when(Some("daily"));
+
+    // None yet: two asking at once (the app and `alm`) make one.
+    let a = std::thread::scope(|s| {
+        let one = s.spawn(|| cadence::auto(&root, Duration::from_secs(5), Trigger::Change));
+        let two = s.spawn(|| cadence::auto(&root, Duration::from_secs(5), Trigger::Change));
+        [one.join().unwrap().unwrap(), two.join().unwrap().unwrap()]
+    });
+    assert_eq!(count(), 1);
+    assert_eq!(
+        a.iter()
+            .filter(|x| x.as_ref().is_some_and(|x| x.made.is_some()))
+            .count(),
+        1
+    );
+    // Offline: made here, its fingerprint waiting.
+    assert_eq!(checkpoint::waiting(&root).len(), 1);
+
+    // Later the same day (the test clock): none.
+    unsafe { std::env::set_var("ALLOMOS_NOW", "2026-11-01T23:59:00Z") };
+    let a = cadence::auto(&root, Duration::ZERO, Trigger::Change).unwrap();
+    assert!(a.is_none_or(|a| a.made.is_none()));
+    assert_eq!(count(), 1);
+    // A day after: one.
+    unsafe { std::env::set_var("ALLOMOS_NOW", "2026-11-02T09:00:00Z") };
+    let a = cadence::auto(&root, Duration::ZERO, Trigger::Change)
+        .unwrap()
+        .unwrap();
+    assert!(a.made.is_some());
+    assert_eq!(a.when, "daily");
+    assert_eq!(count(), 2);
+
+    // At approvals: a change makes none; two approvals one after the other make two, their
+    // requests to the service more than a second apart.
+    set_when(Some("approvals"));
+    assert!(
+        cadence::auto(&root, Duration::ZERO, Trigger::Change)
+            .unwrap()
+            .is_none()
+    );
+    cadence::auto(&root, Duration::ZERO, Trigger::Approval)
+        .unwrap()
+        .unwrap();
+    let started = std::time::Instant::now();
+    cadence::auto(&root, Duration::ZERO, Trigger::Approval)
+        .unwrap()
+        .unwrap();
+    assert!(
+        started.elapsed() >= Duration::from_millis(1000),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(count(), 4);
+
+    // Only when asked, or off: nothing made, nothing sent.
+    set_when(Some("asked"));
+    unsafe { std::env::set_var("ALLOMOS_NOW", "2026-11-09T09:00:00Z") };
+    for t in [Trigger::Change, Trigger::Approval] {
+        assert!(cadence::auto(&root, Duration::ZERO, t).unwrap().is_none());
+    }
+    set_when(None);
+    for t in [Trigger::Change, Trigger::Approval] {
+        assert!(cadence::auto(&root, Duration::ZERO, t).unwrap().is_none());
+    }
+    assert_eq!(count(), 4);
+    unsafe {
+        std::env::remove_var("ALLOMOS_TSA_REPLY");
+        std::env::remove_var("ALLOMOS_NOW");
+    }
+}

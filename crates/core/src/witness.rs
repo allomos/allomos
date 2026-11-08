@@ -20,12 +20,63 @@ pub struct Witness {
     /// An optional second service, so one service closing does not end the chain.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub second: Option<String>,
+    /// How often checkpoints are made by themselves (Task-A01-bake791): `daily`, `approvals` or
+    /// `asked`; see [`When`]. Kept as written, so a value from a newer Allomos survives; a value
+    /// this one does not know, or none, counts as `asked` (nothing is made by itself).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<String>,
     /// Fields this Allomos does not know, kept as they are (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: crate::model::Extra,
 }
 
+/// How often the outside witness's checkpoints are made by themselves (Task-A01-bake791).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum When {
+    /// Once a day: by the app while it is open, and by any `alm` command that changes the
+    /// taskbag, when the last checkpoint is a day old or more.
+    Daily,
+    /// After each approval and each human check (`alm approve`, `alm checked`, the app's same).
+    Approvals,
+    /// Only when asked: `alm checkpoint`, **Make a checkpoint now**, and on upgrading.
+    Asked,
+}
+
+impl When {
+    pub const ALL: [When; 3] = [When::Daily, When::Approvals, When::Asked];
+    /// What turning the witness on chooses when nothing is said (the task's outcome).
+    pub const FIRST: When = When::Daily;
+
+    pub fn id(self) -> &'static str {
+        match self {
+            When::Daily => "daily",
+            When::Approvals => "approvals",
+            When::Asked => "asked",
+        }
+    }
+
+    /// `daily`, `approvals` or `asked` (any case). Refused: anything else (`witness_when_invalid`).
+    pub fn parse(value: &str) -> Result<When, Problem> {
+        let v = value.trim();
+        When::ALL
+            .into_iter()
+            .find(|w| w.id().eq_ignore_ascii_case(v))
+            .ok_or_else(|| Problem::WitnessWhenInvalid {
+                value: v.to_string(),
+            })
+    }
+}
+
 impl Witness {
+    /// How often checkpoints are made by themselves; `asked` when unset or unknown.
+    pub fn when(&self) -> When {
+        self.when
+            .as_deref()
+            .and_then(|w| When::parse(w).ok())
+            .unwrap_or(When::Asked)
+    }
+
     /// The services each checkpoint is sent to, first one first.
     pub fn services(&self) -> Vec<String> {
         let mut out = vec![self.service.clone()];
@@ -113,6 +164,8 @@ pub struct WitnessChange<'a> {
     pub service: Option<&'a str>,
     /// A preset or an address; `Some("")` or `Some("none")` removes the second service.
     pub second: Option<&'a str>,
+    /// `daily`, `approvals` or `asked`; missing when turning on: `daily` (Task-A01-bake791).
+    pub when: Option<&'a str>,
     /// The person said yes to sending fingerprints out (needed to turn it on).
     pub confirmed: bool,
     pub reason: Option<&'a str>,
@@ -144,13 +197,21 @@ pub fn set(
             None => now.as_ref().and_then(|w| w.second.clone()),
         }
         .filter(|s| *s != service);
+        let when = match change.when {
+            Some(w) => Some(When::parse(w)?.id().to_string()),
+            None => match &now {
+                Some(w) => w.when.clone(),
+                None => Some(When::FIRST.id().to_string()),
+            },
+        };
         Some(Witness {
             service,
             second,
+            when,
             extra: now.as_ref().map(|w| w.extra.clone()).unwrap_or_default(),
         })
     } else {
-        if change.service.is_some() || change.second.is_some() {
+        if change.service.is_some() || change.second.is_some() || change.when.is_some() {
             return Err(Problem::WitnessOff);
         }
         None
@@ -220,7 +281,57 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].field, "audit");
         let text = serde_json::to_string(&p).unwrap();
-        assert!(text.contains(r#""witness":{"service":"https://freetsa.org/tsr"}"#));
+        assert!(text.contains(r#""witness":{"service":"https://freetsa.org/tsr","when":"daily"}"#));
+        assert_eq!(w.when(), When::Daily);
+    }
+
+    #[test]
+    fn how_often_is_daily_first_and_kept_as_written() {
+        let (p, _) = on(&project(), None).unwrap();
+        let (p, changes) = set(
+            &p,
+            &WitnessChange {
+                when: Some("Approvals"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(of(&p).unwrap().when(), When::Approvals);
+        assert_eq!(
+            set(
+                &p,
+                &WitnessChange {
+                    when: Some("hourly"),
+                    ..Default::default()
+                }
+            ),
+            Err(Problem::WitnessWhenInvalid {
+                value: "hourly".into()
+            })
+        );
+        // Changing only the service keeps how often.
+        let (p, _) = set(
+            &p,
+            &WitnessChange {
+                service: Some("sectigo"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(of(&p).unwrap().when(), When::Approvals);
+        // None, or a value from a newer Allomos: only when asked, and the value is kept.
+        let w: Witness =
+            serde_json::from_value(json!({ "service": "https://x.example", "when": "hourly" }))
+                .unwrap();
+        assert_eq!(w.when(), When::Asked);
+        assert!(
+            serde_json::to_string(&w)
+                .unwrap()
+                .contains(r#""when":"hourly""#)
+        );
+        let w: Witness = serde_json::from_value(json!({ "service": "https://x.example" })).unwrap();
+        assert_eq!(w.when(), When::Asked);
     }
 
     #[test]

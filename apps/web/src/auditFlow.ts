@@ -1,3 +1,4 @@
+import type { WitnessWhen } from "./types";
 // Project settings → Audit → Identity (Task-A01-frolic587, decision 0021 § 6): what the section
 // decides without the window, so it is tested on its own.
 
@@ -78,3 +79,8 @@ export function witnessChoice(url: string | undefined, presets: readonly { id: s
 export function witnessUrlOk(url: string): boolean {
   return /^https?:\/\/\S+$/i.test(url.trim());
 }
+
+/** How often checkpoints are made by themselves (Task-A01-bake791), in the list's order; the first
+ * time the witness is turned on, daily is chosen. */
+export const WITNESS_WHENS: readonly WitnessWhen[] = ["daily", "approvals", "asked"];
+export const FIRST_WITNESS_WHEN: WitnessWhen = "daily";

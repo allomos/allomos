@@ -276,6 +276,8 @@ pub fn send_waiting(root: &Path, wait: std::time::Duration) -> Result<Witnessed,
                 std::thread::sleep(rest);
             }
         }
+        // Across processes on this computer too (Task-A01-bake791).
+        crate::cadence::space_out(&w.service);
         last_sent.insert(w.service.clone(), std::time::Instant::now());
         match crate::tsa::countersign(&w.service, &sha256, &crate::events::now_utc()) {
             Ok(receipt) => {

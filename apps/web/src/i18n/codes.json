@@ -388,6 +388,9 @@
   "witness_service_invalid": [
     "value"
   ],
+  "witness_when_invalid": [
+    "value"
+  ],
   "work_after_signing": [
     "id",
     "who"

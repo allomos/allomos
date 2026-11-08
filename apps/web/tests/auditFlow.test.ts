@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LEVELS, needsReason, replacedSummary, witnessChoice, witnessUrl, witnessUrlOk } from "../src/auditFlow.ts";
+import { FIRST_WITNESS_WHEN, LEVELS, needsReason, replacedSummary, WITNESS_WHENS, witnessChoice, witnessUrl, witnessUrlOk } from "../src/auditFlow.ts";
 
 test("the levels go from the pseudonym up", () => {
   assert.deepEqual(LEVELS, ["pseudonym", "account", "sso"]);
@@ -86,4 +86,9 @@ test("outside witness: a list choice stands for an address, and back (Task-A01-w
   assert.ok(witnessUrlOk("https://tsa.example.com/tsr"));
   assert.ok(!witnessUrlOk("tsa.example.com"));
   assert.ok(!witnessUrlOk("https://a b"));
+});
+
+test("outside witness: how often is daily the first time, in the list's order (Task-A01-bake791)", () => {
+  assert.equal(FIRST_WITNESS_WHEN, "daily");
+  assert.deepEqual([...WITNESS_WHENS], ["daily", "approvals", "asked"]);
 });

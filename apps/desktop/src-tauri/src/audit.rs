@@ -28,6 +28,9 @@ pub(crate) struct AuditSettings {
     checkpoints: Checkpoints,
     /// The outside witness (Task-A01-wood982): its services; null while it is off.
     witness: Option<allomos_core::witness::Witness>,
+    /// How often checkpoints are made by themselves (Task-A01-bake791): `daily`, `approvals` or
+    /// `asked`, as this Allomos reads the setting; null while the witness is off.
+    witness_when: Option<&'static str>,
     /// The services offered by name, the default first.
     witness_presets: &'static [allomos_core::witness::Preset],
     /// What the last **Make a checkpoint now** sent: receipts added and fingerprints still
@@ -99,6 +102,7 @@ pub(crate) fn audit_settings_of(root: &Path) -> Result<AuditSettings, Problem> {
         checkpoints: checkpoints_of(root),
         signing: allomos_store::this_computer().store,
         witness: allomos_core::witness::of(&bag.project),
+        witness_when: allomos_core::witness::of(&bag.project).map(|w| w.when().id()),
         witness_presets: &allomos_core::witness::PRESETS,
         witnessed: None,
     })
@@ -126,6 +130,38 @@ pub(crate) fn make_checkpoint_at(root: &Path) -> Result<AuditSettings, Problem> 
     })
 }
 
+/// The window's clock (Task-A01-bake791): while a project is open, the window asks every few
+/// minutes; with the outside witness on and set to daily, a checkpoint is made when the last one
+/// is a day old (decided again under the lock, so the app and `alm` make one between them), and
+/// waiting fingerprints are tried again. Off the window's thread. Null: nothing was due.
+#[tauri::command]
+pub(crate) async fn witness_tick(
+    root: PathBuf,
+) -> Result<Option<allomos_store::cadence::Auto>, Problem> {
+    tauri::async_runtime::spawn_blocking(move || {
+        allomos_store::cadence::auto(&root, LOCK_WAIT, allomos_store::cadence::Trigger::Change)
+    })
+    .await
+    .map_err(|e| Problem::WriteFailed {
+        path: String::new(),
+        detail: e.to_string(),
+    })?
+}
+
+/// After the app's Approve and its human check (Task-A01-bake791): with the outside witness set
+/// to approvals (or daily and due), a checkpoint, made and sent on a thread of its own so the
+/// window does not wait for the network. A refusal (no signing key) changes nothing.
+pub(crate) fn after_approval(root: &Path) {
+    let root = root.to_path_buf();
+    std::thread::spawn(move || {
+        let _ = allomos_store::cadence::auto(
+            &root,
+            LOCK_WAIT,
+            allomos_store::cadence::Trigger::Approval,
+        );
+    });
+}
+
 /// Turn the outside witness on or off, or change its services (Task-A01-wood982), as `alm
 /// audit-settings --witness` does: recorded as an `audit-settings` event. Turning it on needs
 /// `confirmed` (the window's confirmation: only the fingerprint leaves the computer); off needs a
@@ -136,6 +172,7 @@ pub(crate) fn set_witness(
     on: Option<bool>,
     service: Option<String>,
     second: Option<String>,
+    when: Option<String>,
     confirmed: bool,
     reason: Option<String>,
 ) -> Result<AuditSettings, Problem> {
@@ -143,6 +180,7 @@ pub(crate) fn set_witness(
         on,
         service: service.as_deref(),
         second: second.as_deref(),
+        when: when.as_deref(),
         confirmed,
         reason: reason.as_deref(),
     };

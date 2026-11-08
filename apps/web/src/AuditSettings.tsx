@@ -17,8 +17,15 @@ import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
-import type { AuditSettings, IdentityLevel, RedactDone } from "./types";
-import { canRedact, LEVELS, needsReason, REDACT_FIELDS, redactFields, retentionNeedsReason, separationNeedsReason, witnessChoice, witnessUrl, witnessUrlOk, yearsFrom } from "./auditFlow";
+import type { AuditSettings, IdentityLevel, RedactDone, WitnessWhen } from "./types";
+
+/** Each "how often" choice's name and its plain-words note (Task-A01-bake791). */
+const WHEN_TEXT: Record<WitnessWhen, { name: Key; note: Key }> = {
+  daily: { name: "audit.witness_when_daily", note: "audit.witness_when_daily_note" },
+  approvals: { name: "audit.witness_when_approvals", note: "audit.witness_when_approvals_note" },
+  asked: { name: "audit.witness_when_asked", note: "audit.witness_when_asked_note" },
+};
+import { canRedact, LEVELS, needsReason, REDACT_FIELDS, redactFields, retentionNeedsReason, separationNeedsReason, witnessChoice, witnessUrl, witnessUrlOk, yearsFrom, FIRST_WITNESS_WHEN, WITNESS_WHENS } from "./auditFlow";
 
 /** Always recorded (decision 0021 § 1.1): no switches. */
 const ALWAYS: Key[] = [
@@ -74,6 +81,7 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
   const [wCustom, setWCustom] = useState("");
   const [w2Choice, setW2Choice] = useState("");
   const [w2Custom, setW2Custom] = useState("");
+  const [wWhen, setWWhen] = useState<WitnessWhen>(FIRST_WITNESS_WHEN);
   const [wReason, setWReason] = useState("");
   const [wSaved, setWSaved] = useState(false);
 
@@ -94,6 +102,7 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
     setWCustom(witnessChoice(s.witness?.service, presets) === "custom" ? (s.witness?.service ?? "") : "");
     setW2Choice(witnessChoice(s.witness?.second, presets));
     setW2Custom(witnessChoice(s.witness?.second, presets) === "custom" ? (s.witness?.second ?? "") : "");
+    setWWhen(s.witness_when ?? FIRST_WITNESS_WHEN);
     setWReason("");
   };
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
@@ -163,7 +172,8 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
   const wNow = settings.witness;
   const wTurningOn = witnessOn && wNow === null;
   const wTurningOff = !witnessOn && wNow !== null;
-  const wChanged = wTurningOn || wTurningOff || (witnessOn && (wService !== wNow?.service || wSecond !== (wNow?.second ?? "")));
+  const wChanged =
+    wTurningOn || wTurningOff || (witnessOn && (wService !== wNow?.service || wSecond !== (wNow?.second ?? "") || wWhen !== settings.witness_when));
   const wBad = witnessOn && (!witnessUrlOk(wService) || (wSecond !== "" && !witnessUrlOk(wSecond)));
   const saveWitness = async () => {
     setBusy(true);
@@ -174,7 +184,7 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
         await messenger.setWitness(
           root,
           witnessOn
-            ? { on: true, service: wService, second: wSecond || "none", confirmed: wTurningOn }
+            ? { on: true, service: wService, second: wSecond || "none", when: wWhen, confirmed: wTurningOn }
             : { on: false, reason: wReason.trim() || undefined },
         ),
       );
@@ -324,6 +334,17 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
             {serviceList(wChoice, setWChoice, wCustom, setWCustom, "audit.witness_service", false)}
             {serviceList(w2Choice, setW2Choice, w2Custom, setW2Custom, "audit.witness_second", true)}
             <p className="muted small">{t("audit.witness_presets_note")}</p>
+            <label>
+              {t("audit.witness_when")}
+              <select value={wWhen} disabled={busy} onChange={(e) => setWWhen(e.target.value as WitnessWhen)}>
+                {WITNESS_WHENS.map((w) => (
+                  <option key={w} value={w}>
+                    {t(WHEN_TEXT[w].name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="muted small">{t(WHEN_TEXT[wWhen].note)}</p>
           </>
         )}
         {wTurningOn && <p className="warning small">{t("audit.witness_confirm")}</p>}

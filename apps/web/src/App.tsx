@@ -101,6 +101,9 @@ const FOLLOW_MS = 1000;
  * or CLAUDE.md, to say that running agent sessions have not read it (Task-A05-03). */
 const WATCH_FILES_MS = 2000;
 const WATCH_FILES_FOR_MS = 30 * 60 * 1000;
+/** How often an open project asks whether the outside witness's daily checkpoint is due
+ * (Task-A01-bake791); the app decides from the last checkpoint's time, as `alm` does. */
+const WITNESS_TICK_MS = 5 * 60 * 1000;
 
 /** A banner's text: an interface message, or a problem sent by Rust. */
 type Note = Message | { problem: Problem } | { text: string };
@@ -330,6 +333,16 @@ export function App({
 
   // Follow changes made outside the window (by `alm` or by hand): reload when the files change.
   const root = opened?.root;
+  // The outside witness's daily checkpoint (Task-A01-bake791): while a project is open, ask now
+  // and every few minutes. Nothing happens unless the witness is on and set to daily and the last
+  // checkpoint is a day old; offline, the fingerprint waits and is sent later.
+  useEffect(() => {
+    if (!root) return;
+    const tick = () => void messenger.witnessTick(root).catch(() => null);
+    tick();
+    const timer = window.setInterval(tick, WITNESS_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [messenger, root]);
   // The app knows which tab shows which project, and the window is named after the tab in front
   // (Task-A01-27, Task-A01-marble320); a rename shows at once.
   const shownName = opened?.loaded.taskbag?.project.name ?? null;

@@ -401,7 +401,10 @@ export interface AuditSettings {
    * witness, and fingerprints waiting to be sent (Task-A01-wood982). */
   checkpoints: { count: number; last: { file: string; at: string } | null; receipts: number; waiting: number };
   /** The outside witness (Task-A01-wood982): its services; null while it is off. */
-  witness: { service: string; second?: string } | null;
+  witness: { service: string; second?: string; when?: string } | null;
+  /** How often checkpoints are made by themselves (Task-A01-bake791), as Allomos reads the
+   * setting; null while the witness is off. */
+  witness_when: WitnessWhen | null;
   /** The time-stamp services offered by name, the default first. */
   witness_presets: WitnessPreset[];
   /** What the last Make a checkpoint now sent; only on its answer. */
@@ -409,6 +412,10 @@ export interface AuditSettings {
   /** Where this computer keeps its signing key; "none": no checkpoint can be made here. */
   signing: SigningStore;
 }
+
+/** How often the outside witness's checkpoints are made by themselves (Task-A01-bake791): daily,
+ * after each approval and human check, or only when asked. */
+export type WitnessWhen = "daily" | "approvals" | "asked";
 
 /** A time-stamp service offered by name (decision 0021 § 3.3). */
 export interface WitnessPreset {
