@@ -155,8 +155,34 @@ pub struct CheckpointFacts {
     pub events: u64,
     /// The last events it fixed (one per key) that are no longer in the history, or changed.
     pub heads_missing: Vec<String>,
-    /// Receipts from an outside witness it holds (none until the witness is built).
+    /// Receipts from an outside witness it holds.
     pub receipts: usize,
+    /// What each receipt says, read again from its token (Task-A01-wood982).
+    pub witnessed: Vec<ReceiptFacts>,
+    /// The services it names in `witness` that gave no receipt yet (offline, or refused).
+    pub waiting: Vec<String>,
+}
+
+/// One time-stamp receipt in a checkpoint, as `alm audit` reads it from the token itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReceiptFacts {
+    pub service: String,
+    /// The time the service gives (UTC); empty when the token cannot be read.
+    pub time: String,
+    pub serial: String,
+    /// The token countersigns this checkpoint's fingerprint.
+    pub matches: bool,
+    /// The token's signed attributes name the digest of what it says (it is whole).
+    pub whole: bool,
+    /// The token could be read at all.
+    pub readable: bool,
+    /// When the service's certificate expires (UTC), when the token carries it.
+    pub certificate_expires: Option<String>,
+    /// That certificate expires within a year from today (or has expired): the receipt needs a
+    /// new time-stamp over it before then (RFC 4998).
+    pub expires_within_a_year: bool,
+    /// Who signed it, from the certificate (`CN=…, O=…`).
+    pub signer: Option<String>,
 }
 
 /// What `alm audit` found. Facts only.
@@ -191,6 +217,15 @@ pub struct Facts {
     pub redacted: Vec<RedactedFact>,
     /// Files and lines that could not be read (in `events/`, `keys/`, `checkpoints/`).
     pub unreadable: Vec<String>,
+    /// Receipts that do not countersign their checkpoint's fingerprint, or are not whole, or
+    /// cannot be read: `<checkpoint file>: <service>` (Task-A01-wood982).
+    pub receipts_not_matching: Vec<String>,
+    /// Checkpoints that name a service in `witness` without its receipt: `<file>: <service>`.
+    pub receipts_missing: Vec<String>,
+    /// Receipts whose certificate expires within a year: `<file>: <service> (<date>)`.
+    pub receipts_expiring: Vec<String>,
+    /// The service's own signature on a receipt is not checked here: the command that does.
+    pub receipt_signature_check: Option<&'static str>,
 }
 
 /// One event a redaction changed, as `alm audit` lists it.
@@ -230,6 +265,10 @@ pub fn audit(root: &Path) -> Facts {
         rewritten: None,
         redacted: Vec::new(),
         unreadable,
+        receipts_not_matching: Vec::new(),
+        receipts_missing: Vec::new(),
+        receipts_expiring: Vec::new(),
+        receipt_signature_check: None,
     };
 
     // Recorded redactions: file → (fingerprint before, fact).
@@ -316,11 +355,45 @@ pub fn audit(root: &Path) -> Facts {
         .collect();
     let (checkpoints, bad) = crate::checkpoint::list(root);
     facts.unreadable.extend(bad);
+    let year_from_now = year_later(&crate::events::now_utc());
     for (file, c) in &checkpoints {
+        // Signed with `receipts: []`; receipts come later, each signed by its service.
+        let mut as_signed = c.clone();
+        if as_signed.get("receipts").is_some() {
+            as_signed["receipts"] = Value::Array(Vec::new());
+        }
         let signed = sig(c).is_some_and(|(key, _, value)| {
             keys.get(key)
-                .is_some_and(|k| signing::verify(&k.public_key, c, value))
+                .is_some_and(|k| signing::verify(&k.public_key, &as_signed, value))
         });
+        let fixed = str_of(c, "sha256");
+        let witnessed: Vec<ReceiptFacts> = c
+            .get("receipts")
+            .and_then(Value::as_array)
+            .map(|rs| {
+                rs.iter()
+                    .map(|r| receipt_facts(r, &fixed, &year_from_now))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for r in &witnessed {
+            if !(r.readable && r.matches && r.whole) {
+                facts
+                    .receipts_not_matching
+                    .push(format!("{file}: {}", r.service));
+            }
+            if r.expires_within_a_year {
+                facts.receipts_expiring.push(format!(
+                    "{file}: {} ({})",
+                    r.service,
+                    r.certificate_expires.as_deref().unwrap_or_default()
+                ));
+            }
+        }
+        let waiting = crate::checkpoint::missing_receipts(c);
+        facts
+            .receipts_missing
+            .extend(waiting.iter().map(|s| format!("{file}: {s}")));
         let heads_missing = c
             .get("heads")
             .and_then(Value::as_object)
@@ -344,11 +417,13 @@ pub fn audit(root: &Path) -> Facts {
             sha256: str_of(c, "sha256"),
             events: c.get("events").and_then(Value::as_u64).unwrap_or(0),
             heads_missing,
-            receipts: c
-                .get("receipts")
-                .and_then(Value::as_array)
-                .map_or(0, Vec::len),
+            receipts: witnessed.len(),
+            witnessed,
+            waiting,
         });
+    }
+    if facts.checkpoints.iter().any(|c| c.receipts > 0) {
+        facts.receipt_signature_check = Some(crate::tsa::VERIFY_HINT);
     }
     if let Some(last) = facts.checkpoints.last() {
         facts.changed_since_checkpoint = Some(last.sha256 != facts.sha256);
@@ -369,6 +444,46 @@ pub fn audit(root: &Path) -> Facts {
     }
     facts.rewritten = seen_check(root, &checkpoints);
     facts
+}
+
+/// The same moment a year later (`YYYY-…` → `YYYY+1-…`), to compare dates as text.
+fn year_later(now: &str) -> String {
+    match now.get(..4).and_then(|y| y.parse::<u32>().ok()) {
+        Some(y) => format!("{}{}", y + 1, &now[4..]),
+        None => now.to_string(),
+    }
+}
+
+/// A receipt's facts, read from its token, against the fingerprint its checkpoint fixed.
+fn receipt_facts(r: &Value, fixed: &str, year_from_now: &str) -> ReceiptFacts {
+    let service = str_of(r, "service");
+    match crate::tsa::token_of(r) {
+        Some(t) => ReceiptFacts {
+            service,
+            matches: t.hash == "sha256" && t.imprint == fixed,
+            whole: t.whole,
+            readable: true,
+            expires_within_a_year: t
+                .certificate_expires
+                .as_deref()
+                .is_some_and(|e| e < year_from_now),
+            time: t.time,
+            serial: t.serial,
+            certificate_expires: t.certificate_expires,
+            signer: t.signer,
+        },
+        None => ReceiptFacts {
+            service,
+            time: String::new(),
+            serial: String::new(),
+            matches: false,
+            whole: false,
+            readable: false,
+            certificate_expires: None,
+            expires_within_a_year: false,
+            signer: None,
+        },
+    }
 }
 
 fn str_of(v: &Value, field: &str) -> String {

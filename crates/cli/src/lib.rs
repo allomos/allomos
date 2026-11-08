@@ -783,7 +783,7 @@ enum Command {
         clear: bool,
     },
     /// The project's audit settings (decision 0021 § 6): the identity level, separation of
-    /// duties, retention and the legal hold. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
+    /// duties, retention and the legal hold, and the outside witness. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
     /// behind it is kept on this computer (local project) or in the cloud (cloud project).
     #[command(name = "audit-settings")]
     AuditSettings {
@@ -808,6 +808,21 @@ enum Command {
         /// off needs a reason.
         #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
         legal_hold: Option<String>,
+        /// Outside witness (decision 0021 § 3.3): on, each checkpoint's fingerprint (a hash, never
+        /// the content) is sent to a time-stamp service (RFC 3161) whose receipt is kept in the
+        /// checkpoint. Turning it on needs the person's yes (--confirm); off needs a reason.
+        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        witness: Option<String>,
+        /// The time-stamp service: freetsa (the default), digicert, sectigo, globalsign, or your
+        /// own service's address (https://…).
+        #[arg(long, value_name = "SERVICE")]
+        witness_service: Option<String>,
+        /// A second time-stamp service, sent each checkpoint too (none: remove it).
+        #[arg(long, value_name = "SERVICE")]
+        witness_second: Option<String>,
+        /// The person said yes to sending fingerprints to the service (needed with --witness on).
+        #[arg(long)]
+        confirm: bool,
         /// Why, recorded in the history (needed when turning a control off or down).
         #[arg(long, value_name = "TEXT")]
         reason: Option<String>,
@@ -1118,6 +1133,9 @@ impl Command {
             separation_of_duties,
             retention,
             legal_hold,
+            witness,
+            witness_service,
+            witness_second,
             ..
         } = self
         {
@@ -1125,7 +1143,10 @@ impl Command {
                 || reauthenticate.is_some()
                 || separation_of_duties.is_some()
                 || retention.is_some()
-                || legal_hold.is_some();
+                || legal_hold.is_some()
+                || witness.is_some()
+                || witness_service.is_some()
+                || witness_second.is_some();
         }
         if let Command::Cards { what } = self {
             return what.is_some();
@@ -1895,6 +1916,17 @@ fn separation_lines(on: bool) -> String {
     } else {
         "Separation of duties: off. Anyone may check or approve a task, including who did it.\n"
             .into()
+    }
+}
+
+/// The outside witness in plain words (`alm audit-settings`, Task-A01-wood982).
+fn witness_lines(w: Option<&allomos_core::witness::Witness>) -> String {
+    match w {
+        None => "Outside witness: off. Checkpoints are signed on this computer only; no fingerprint leaves it.\n".into(),
+        Some(w) => format!(
+            "Outside witness: on. Each checkpoint's fingerprint (a hash, never the content) is sent to {}; the receipt is kept in the checkpoint.\n",
+            w.services().join(" and ")
+        ),
     }
 }
 
@@ -2705,14 +2737,21 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             separation_of_duties,
             retention,
             legal_hold,
+            witness,
+            witness_service,
+            witness_second,
+            confirm,
             reason,
         } => {
             let root = locate(cli, cwd)?;
+            let witness_changing =
+                witness.is_some() || witness_service.is_some() || witness_second.is_some();
             let changing = identity.is_some()
                 || reauthenticate.is_some()
                 || separation_of_duties.is_some()
                 || retention.is_some()
-                || legal_hold.is_some();
+                || legal_hold.is_some()
+                || witness_changing;
             let (bag, issues, changed) = if changing {
                 let lock = Lock::acquire(&root, lock_wait())?;
                 let (bag, issues) = taskbag_of(&root, lock.load())?;
@@ -2761,6 +2800,28 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         changes.push(allomos_core::event::reason_change(why));
                     }
                 }
+                if witness_changing {
+                    let (after, _) = allomos_core::witness::set(
+                        &project,
+                        &allomos_core::witness::WitnessChange {
+                            on: witness.as_deref().map(|v| v == "on"),
+                            service: witness_service.as_deref(),
+                            second: witness_second.as_deref(),
+                            confirmed: *confirm,
+                            reason,
+                        },
+                    )?;
+                    // One `audit` change from the first value to the last, one reason.
+                    project = after;
+                    changes = allomos_core::event::changes(Some(&bag.project), &project, &[])
+                        .into_iter()
+                        .filter(|c| c.field == "audit")
+                        .collect();
+                    let why = reason.map(str::trim).filter(|r| !r.is_empty());
+                    if let (false, Some(why)) = (changes.is_empty(), why) {
+                        changes.push(allomos_core::event::reason_change(why));
+                    }
+                }
                 let changed = !changes.is_empty();
                 let event = Actor::alm(me).event(
                     "audit-settings",
@@ -2788,6 +2849,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .years
                 .and_then(|y| allomos_store::redact::past_retention(&root, y, &today));
             text.push_str(&retention_lines(&kept, past.as_ref()));
+            let witness_on = allomos_core::witness::of(&bag.project);
+            text.push_str(&witness_lines(witness_on.as_ref()));
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
@@ -2796,6 +2859,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "retention_years": kept.years,
                     "legal_hold": kept.legal_hold,
                     "past_retention": past,
+                    "witness": witness_on,
                     "changed": changed
                 }),
                 text,

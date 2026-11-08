@@ -26,6 +26,7 @@ pub mod request;
 pub mod retention;
 pub mod traces;
 mod validate;
+pub mod witness;
 
 pub use model::{
     AgentSession, AppliedRules, Area, DEFAULT_CONTEXT_GATE, DEFAULT_QUOTA_GATE, DEFAULT_WRITE_WHEN,

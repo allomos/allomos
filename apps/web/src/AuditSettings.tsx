@@ -6,8 +6,9 @@
 // (Task-A01-grotto036): a checkbox, off by default; turning it off asks why. Then Retention
 // (Task-A01-stem986): keep the history forever or N years, and the legal hold; a shorter period
 // and the hold ask why. Task A01-tail719 adds the rest, top to bottom: Always recorded (a
-// read-only list), Outside witness (its switch waits for the witness itself; meanwhile the
-// taskbag's checkpoints and Make a checkpoint now), Remove personal details… under Retention
+// read-only list), Outside witness (the taskbag's checkpoints and Make a checkpoint now; its
+// switch, service and second service come with Task-A01-wood982: turning it on shows what is sent
+// and asks to confirm, turning it off asks why), Remove personal details… under Retention
 // (`alm redact`'s rule), and Change types (fixed, read-only). Every change is an `audit-settings`
 // event; turning a control off is shown in the warning colour and asks why.
 
@@ -17,7 +18,7 @@ import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { AuditSettings, IdentityLevel, RedactDone } from "./types";
-import { canRedact, LEVELS, needsReason, REDACT_FIELDS, redactFields, retentionNeedsReason, separationNeedsReason, yearsFrom } from "./auditFlow";
+import { canRedact, LEVELS, needsReason, REDACT_FIELDS, redactFields, retentionNeedsReason, separationNeedsReason, witnessChoice, witnessUrl, witnessUrlOk, yearsFrom } from "./auditFlow";
 
 /** Always recorded (decision 0021 § 1.1): no switches. */
 const ALWAYS: Key[] = [
@@ -68,6 +69,13 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
   const [redBy, setRedBy] = useState("");
   const [redDone, setRedDone] = useState<RedactDone | null>(null);
   const [checkpointMade, setCheckpointMade] = useState(false);
+  const [witnessOn, setWitnessOn] = useState(false);
+  const [wChoice, setWChoice] = useState("");
+  const [wCustom, setWCustom] = useState("");
+  const [w2Choice, setW2Choice] = useState("");
+  const [w2Custom, setW2Custom] = useState("");
+  const [wReason, setWReason] = useState("");
+  const [wSaved, setWSaved] = useState(false);
 
   const fill = (s: AuditSettings) => {
     setSettings(s);
@@ -80,6 +88,13 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
     if (s.retention_years !== null) setYearsText(String(s.retention_years));
     setHold(s.legal_hold);
     setRetReason("");
+    const presets = s.witness_presets;
+    setWitnessOn(s.witness !== null);
+    setWChoice(witnessChoice(s.witness?.service, presets) || (presets.find((p) => p.default)?.id ?? "custom"));
+    setWCustom(witnessChoice(s.witness?.service, presets) === "custom" ? (s.witness?.service ?? "") : "");
+    setW2Choice(witnessChoice(s.witness?.second, presets));
+    setW2Custom(witnessChoice(s.witness?.second, presets) === "custom" ? (s.witness?.second ?? "") : "");
+    setWReason("");
   };
   const say = (e: unknown) => setError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
   useEffect(() => {
@@ -141,6 +156,58 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
       setBusy(false);
     }
   };
+
+  const presets = settings.witness_presets;
+  const wService = witnessUrl(wChoice, wCustom, presets);
+  const wSecond = w2Choice ? witnessUrl(w2Choice, w2Custom, presets) : "";
+  const wNow = settings.witness;
+  const wTurningOn = witnessOn && wNow === null;
+  const wTurningOff = !witnessOn && wNow !== null;
+  const wChanged = wTurningOn || wTurningOff || (witnessOn && (wService !== wNow?.service || wSecond !== (wNow?.second ?? "")));
+  const wBad = witnessOn && (!witnessUrlOk(wService) || (wSecond !== "" && !witnessUrlOk(wSecond)));
+  const saveWitness = async () => {
+    setBusy(true);
+    setError(null);
+    setWSaved(false);
+    try {
+      fill(
+        await messenger.setWitness(
+          root,
+          witnessOn
+            ? { on: true, service: wService, second: wSecond || "none", confirmed: wTurningOn }
+            : { on: false, reason: wReason.trim() || undefined },
+        ),
+      );
+      setWSaved(true);
+    } catch (e) {
+      say(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const serviceList = (value: string, set: (v: string) => void, custom: string, setCustom: (v: string) => void, label: Key, none: boolean) => (
+    <>
+      <label>
+        {t(label)}
+        <select value={value} disabled={busy} onChange={(e) => set(e.target.value)}>
+          {none && <option value="">{t("audit.witness_second_none")}</option>}
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+              {p.default ? ` · ${t("audit.witness_default")}` : ""}
+            </option>
+          ))}
+          <option value="custom">{t("audit.witness_custom")}</option>
+        </select>
+      </label>
+      {value === "custom" && (
+        <label>
+          {t("audit.witness_address")}
+          <input type="url" value={custom} disabled={busy} placeholder="https://" onChange={(e) => setCustom(e.target.value)} />
+        </label>
+      )}
+    </>
+  );
 
   const makeCheckpoint = async () => {
     setBusy(true);
@@ -248,17 +315,47 @@ export function AuditSection({ messenger, root, fileManagerKey }: { messenger: M
       <h3>{t("audit.witness")}</h3>
       <p className="muted small">{t("audit.witness_help")}</p>
       <div className="form">
-        <label className="choice muted">
-          <input type="checkbox" checked={false} disabled />
+        <label className="choice">
+          <input type="checkbox" checked={witnessOn} disabled={busy} onChange={(e) => setWitnessOn(e.target.checked)} />
           {t("audit.witness_switch")}
-          <span className="muted small"> · {t("audit.witness_not_yet")}</span>
         </label>
+        {witnessOn && (
+          <>
+            {serviceList(wChoice, setWChoice, wCustom, setWCustom, "audit.witness_service", false)}
+            {serviceList(w2Choice, setW2Choice, w2Custom, setW2Custom, "audit.witness_second", true)}
+            <p className="muted small">{t("audit.witness_presets_note")}</p>
+          </>
+        )}
+        {wTurningOn && <p className="warning small">{t("audit.witness_confirm")}</p>}
+        {wTurningOff && (
+          <label className="warning">
+            {t("audit.reason")}
+            <input type="text" value={wReason} onChange={(e) => setWReason(e.target.value)} disabled={busy} />
+          </label>
+        )}
         <p className="small">
           {cp.last ? t("audit.checkpoints", { count: cp.count, when: when(cp.last.at), receipts: cp.receipts }) : t("audit.checkpoints_none")}
+          {cp.waiting > 0 && <> {t("audit.witness_waiting", { count: cp.waiting })}</>}
         </p>
         {settings.signing === "none" && <p className="muted small">{t("audit.checkpoint_no_key")}</p>}
       </div>
+      {wSaved && <p className="muted small">{t("handoff_settings.saved")}</p>}
+      {wChanged && (
+        <div className="row start">
+          <button type="button" onClick={() => void saveWitness()} disabled={busy || wBad || (wTurningOff && !wReason.trim())}>
+            {wTurningOn ? t("audit.witness_turn_on") : t("handoff_settings.save")}
+          </button>
+        </div>
+      )}
       {checkpointMade && <p className="muted small">{t("audit.checkpoint_made")}</p>}
+      {checkpointMade && settings.witnessed && settings.witnessed.receipts.length > 0 && (
+        <p className="muted small">{t("audit.witness_receipts_added", { count: settings.witnessed.receipts.length })}</p>
+      )}
+      {checkpointMade && settings.witnessed && settings.witnessed.waiting.length > 0 && (
+        <p className="warning small">
+          {t("audit.witness_still_waiting", { count: settings.witnessed.waiting.length, why: settings.witnessed.waiting[0].why ?? "" })}
+        </p>
+      )}
       <div className="row start">
         <button type="button" onClick={() => void makeCheckpoint()} disabled={busy || settings.signing === "none"}>
           {t("audit.checkpoint_now")}

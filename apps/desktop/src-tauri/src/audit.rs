@@ -26,6 +26,14 @@ pub(crate) struct AuditSettings {
     identities_file: Option<String>,
     /// Checkpoints (Task-A01-tail719, shown under Outside witness): how many, and the newest.
     checkpoints: Checkpoints,
+    /// The outside witness (Task-A01-wood982): its services; null while it is off.
+    witness: Option<allomos_core::witness::Witness>,
+    /// The services offered by name, the default first.
+    witness_presets: &'static [allomos_core::witness::Preset],
+    /// What the last **Make a checkpoint now** sent: receipts added and fingerprints still
+    /// waiting; null otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    witnessed: Option<allomos_store::checkpoint::Witnessed>,
     /// Where this computer keeps its signing key: `keychain`, `folder` or `none` (then no
     /// checkpoint can be made here).
     signing: &'static str,
@@ -37,8 +45,10 @@ pub(crate) struct Checkpoints {
     count: usize,
     /// The newest: its file and time; null before the first.
     last: Option<LastCheckpoint>,
-    /// Time-stamp receipts across all checkpoints (the outside witness, not built yet: 0).
+    /// Time-stamp receipts across all checkpoints (the outside witness, Task-A01-wood982).
     receipts: usize,
+    /// Fingerprints waiting to be sent (offline, or the service refused): checkpoint and service.
+    waiting: usize,
 }
 
 #[derive(Serialize)]
@@ -66,6 +76,7 @@ fn checkpoints_of(root: &Path) -> Checkpoints {
         count: all.len(),
         last,
         receipts,
+        waiting: allomos_store::checkpoint::waiting(root).len(),
     }
 }
 
@@ -87,15 +98,78 @@ pub(crate) fn audit_settings_of(root: &Path) -> Result<AuditSettings, Problem> {
             .map(|p| p.display().to_string()),
         checkpoints: checkpoints_of(root),
         signing: allomos_store::this_computer().store,
+        witness: allomos_core::witness::of(&bag.project),
+        witness_presets: &allomos_core::witness::PRESETS,
+        witnessed: None,
     })
 }
 
 /// **Make a checkpoint now** (Task-A01-tail719), as `alm checkpoint` does: a signed fingerprint
-/// of the whole taskbag. Refused without a signing key on this computer. Returns the settings.
+/// of the whole taskbag; with the outside witness on (Task-A01-wood982), every waiting
+/// fingerprint is then sent, off the window's thread. Refused without a signing key on this
+/// computer. Returns the settings, with what was sent.
 #[tauri::command]
-pub(crate) fn make_checkpoint(root: PathBuf) -> Result<AuditSettings, Problem> {
-    allomos_store::checkpoint::checkpoint(&root, LOCK_WAIT, None)?;
-    audit_settings_of(&root)
+pub(crate) async fn make_checkpoint(root: PathBuf) -> Result<AuditSettings, Problem> {
+    tauri::async_runtime::spawn_blocking(move || make_checkpoint_at(&root))
+        .await
+        .map_err(|e| Problem::WriteFailed {
+            path: String::new(),
+            detail: e.to_string(),
+        })?
+}
+
+pub(crate) fn make_checkpoint_at(root: &Path) -> Result<AuditSettings, Problem> {
+    let (_, witnessed) = allomos_store::checkpoint::checkpoint(root, LOCK_WAIT, None)?;
+    Ok(AuditSettings {
+        witnessed: Some(witnessed),
+        ..audit_settings_of(root)?
+    })
+}
+
+/// Turn the outside witness on or off, or change its services (Task-A01-wood982), as `alm
+/// audit-settings --witness` does: recorded as an `audit-settings` event. Turning it on needs
+/// `confirmed` (the window's confirmation: only the fingerprint leaves the computer); off needs a
+/// reason. `on` null: keep it on and change only the services. Returns the settings as saved.
+#[tauri::command]
+pub(crate) fn set_witness(
+    root: PathBuf,
+    on: Option<bool>,
+    service: Option<String>,
+    second: Option<String>,
+    confirmed: bool,
+    reason: Option<String>,
+) -> Result<AuditSettings, Problem> {
+    let change = allomos_core::witness::WitnessChange {
+        on,
+        service: service.as_deref(),
+        second: second.as_deref(),
+        confirmed,
+        reason: reason.as_deref(),
+    };
+    set_witness_at(&root, &change)
+}
+
+pub(crate) fn set_witness_at(
+    root: &Path,
+    change: &allomos_core::witness::WitnessChange,
+) -> Result<AuditSettings, Problem> {
+    let lock = allomos_store::Lock::acquire(root, LOCK_WAIT)?;
+    let loaded = lock.load();
+    let bag = loaded
+        .taskbag
+        .ok_or_else(|| loaded.issues[0].problem.clone())?;
+    let (project, changes) = allomos_core::witness::set(&bag.project, change)?;
+    if !changes.is_empty() {
+        let event = allomos_store::Actor::APP.event(
+            "audit-settings",
+            allomos_core::event::Kind::Project,
+            Some(&project.id),
+            changes,
+        );
+        lock.record(&event, |l| l.save_project(&project))?;
+    }
+    drop(lock);
+    audit_settings_of(root)
 }
 
 /// What **Remove personal details…** did: the redaction, or null when nothing was to remove.
@@ -492,10 +566,41 @@ mod tests {
         let s = audit_settings_of(&root).unwrap();
         assert_eq!((s.checkpoints.count, s.signing), (0, "none"));
         assert!(s.checkpoints.last.is_none());
+        assert_eq!(make_checkpoint_at(&root).err(), Some(Problem::NoSigningKey));
+        assert_eq!(s.witness, None);
+        assert_eq!(s.checkpoints.waiting, 0);
+        // The outside witness (Task-A01-wood982): on only with the confirmation, off with a reason.
+        let on = allomos_core::witness::WitnessChange {
+            on: Some(true),
+            ..Default::default()
+        };
         assert_eq!(
-            make_checkpoint(root.clone()).err(),
-            Some(Problem::NoSigningKey)
+            set_witness_at(&root, &on).err(),
+            Some(Problem::WitnessNotConfirmed)
         );
+        let s = set_witness_at(
+            &root,
+            &allomos_core::witness::WitnessChange {
+                confirmed: true,
+                ..on.clone()
+            },
+        )
+        .unwrap();
+        assert_eq!(s.witness.unwrap().service, "https://freetsa.org/tsr");
+        let off = allomos_core::witness::WitnessChange {
+            on: Some(false),
+            ..Default::default()
+        };
+        assert!(set_witness_at(&root, &off).is_err());
+        let s = set_witness_at(
+            &root,
+            &allomos_core::witness::WitnessChange {
+                reason: Some("trial over"),
+                ..off
+            },
+        )
+        .unwrap();
+        assert_eq!(s.witness, None);
 
         let lock = allomos_store::Lock::acquire(&root, std::time::Duration::ZERO).unwrap();
         let bag = lock.load().taskbag.unwrap();

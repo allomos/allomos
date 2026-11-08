@@ -60,3 +60,21 @@ export function replacedSummary(r: { taskbags: { root: string; outcome: string }
     failed: r.taskbags.filter((t) => t.outcome === "failed").map((t) => t.root),
   };
 }
+
+/** Outside witness (Task-A01-wood982): the address a choice in the service list stands for: a
+ * preset's address, or the custom address typed ("" when none). */
+export function witnessUrl(choice: string, custom: string, presets: readonly { id: string; url: string }[]): string {
+  if (choice === "custom") return custom.trim();
+  return presets.find((p) => p.id === choice)?.url ?? "";
+}
+
+/** The list choice for a service's address: its preset's ID, or "custom". */
+export function witnessChoice(url: string | undefined, presets: readonly { id: string; url: string }[]): string {
+  if (!url) return "";
+  return presets.find((p) => p.url === url)?.id ?? "custom";
+}
+
+/** Whether an address typed for a custom service looks like one (`alm` checks it again). */
+export function witnessUrlOk(url: string): boolean {
+  return /^https?:\/\/\S+$/i.test(url.trim());
+}

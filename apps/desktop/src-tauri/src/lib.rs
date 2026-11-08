@@ -18,7 +18,7 @@ mod windows;
 
 use audit::{
     audit_settings, export_public_key, make_checkpoint, redact_task, replace_key, set_identity,
-    set_retention, set_separation, show_identities_file, this_computer,
+    set_retention, set_separation, set_witness, show_identities_file, this_computer,
 };
 use windows::{Windows, fit_to_screen, focused_window, open_new_window, open_recent_in_window};
 
@@ -2571,6 +2571,7 @@ pub fn run() {
             set_handoff_rules,
             audit_settings,
             set_separation,
+            set_witness,
             set_retention,
             set_identity,
             show_identities_file,

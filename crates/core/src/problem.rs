@@ -293,6 +293,12 @@ problems! {
     RetentionInvalid { value } => "retention_invalid", "\"{value}\" is not a retention period: use forever, or a number of years from 1 to 100 (for example 7).";
     /// A legal hold is on: nothing in the history may be removed or redacted (Task-A01-stem986).
     LegalHoldOn => "legal_hold_on", "A legal hold is on in this project: nothing in the history may be removed or redacted. It is turned off with a reason (`alm audit-settings --legal-hold off --reason \"<why>\"`).";
+    /// Not a preset's name nor an `http(s)://` address (Task-A01-wood982).
+    WitnessServiceInvalid { value } => "witness_service_invalid", "\"{value}\" is not a time-stamp service: use freetsa, digicert, sectigo, globalsign or an address starting with https:// (or http://).";
+    /// Turning the outside witness on without the person's yes (Task-A01-wood982, decision 0021 § 3.3).
+    WitnessNotConfirmed => "witness_not_confirmed", "Turning the outside witness on sends each checkpoint's fingerprint (a hash, never the content) to the chosen time-stamp service. Ask the person first; when they say yes, add --confirm.";
+    /// Choosing a service while the outside witness is off (Task-A01-wood982).
+    WitnessOff => "witness_off", "The outside witness is off: turn it on with --witness on (and the person's yes, --confirm) to choose its services.";
     /// `alm redact` without a field (Task-A01-stem986).
     RedactFieldMissing => "redact_field_missing", "Name the field to remove: --field <name> (for example description or handoff_note).";
     /// `alm redact` without a reason (Task-A01-stem986).

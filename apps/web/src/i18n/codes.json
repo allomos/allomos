@@ -383,6 +383,11 @@
   "waiting_on_missing": [],
   "withdraw_reason_missing": [],
   "without_human_check_missing": [],
+  "witness_not_confirmed": [],
+  "witness_off": [],
+  "witness_service_invalid": [
+    "value"
+  ],
   "work_after_signing": [
     "id",
     "who"
