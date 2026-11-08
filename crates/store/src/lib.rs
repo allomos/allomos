@@ -34,6 +34,7 @@ mod confirm;
 mod convert;
 pub mod effects;
 pub mod events;
+pub mod exceptions;
 pub mod folders;
 mod guide;
 pub mod handoff;

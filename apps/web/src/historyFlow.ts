@@ -31,6 +31,7 @@ const FIELD_KEYS: Record<string, Key> = {
   touches: "pane.touches",
   approval_due: "pane.approval_due",
   effect: "pane.effect",
+  exception: "pane.exception",
   link: "pane.link",
   card: "pane.card",
   card_outside: "pane.card_outside",
@@ -62,6 +63,8 @@ export function valueText(field: string, value: unknown, t: T): string {
   if (field === "link" && typeof value === "object") return linkText(value as Pick<LinkRecord, "kind" | "ref">, t);
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
+  // An exception (Task-A01-seed343): its kind, the check not run, why, and who accepted the risk.
+  if (field === "exception" && typeof value === "object") return exceptionText(value as ExceptionRecord, t);
   // A change type, risk and what it touches (Task-A01-palm011), in words.
   if ((field === "change_type" || field === "risk") && typeof value === "string" && CLASSIFY_VALUES.has(value)) return t(`classify.${value}` as Key);
   if (field === "touches" && Array.isArray(value))
@@ -104,6 +107,26 @@ export function humanCheckText(c: HumanCheck, t: T): string {
 export function effectText(e: Pick<EffectRecord, "target" | "action" | "result">, t: T): string {
   const head = `${e.target}: ${e.action}`;
   return e.result ? `${head} → ${e.result}` : `${head} (${t("pane.effect_under_way")})`;
+}
+
+/** An exception (Task-A01-seed343, decision 0021 § 1.1): a control skipped, why, and who
+ * accepted the risk. */
+export interface ExceptionRecord {
+  id: string;
+  kind: string;
+  why: string;
+  accepted_by?: string;
+  check?: string;
+}
+
+const EXCEPTION_KINDS = new Set(["check_not_run", "without_human_check", "other"]);
+
+/** An exception in one line: "Check not run (cargo test): no display, risk accepted by approver". */
+export function exceptionText(e: ExceptionRecord, t: T): string {
+  const kind = EXCEPTION_KINDS.has(e.kind) ? t(`pane.exception_kind.${e.kind}` as Key) : e.kind;
+  const head = e.check ? `${kind} (${e.check})` : kind;
+  const who = e.accepted_by ? t("pane.exception_accepted_by", { who: e.accepted_by }) : t("pane.exception_not_accepted");
+  return `${head}: ${e.why}, ${who}`;
 }
 
 /** A link to code or a release (Task-A01-mint242) in one line: "Commit abcdef1", "PR #7". A

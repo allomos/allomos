@@ -116,6 +116,16 @@
     "id",
     "task"
   ],
+  "exception_incomplete": [
+    "missing"
+  ],
+  "exception_kind_unknown": [
+    "kind"
+  ],
+  "exception_not_found": [
+    "id",
+    "task"
+  ],
   "field_missing": [],
   "field_unknown": [],
   "folder_choice_missing": [

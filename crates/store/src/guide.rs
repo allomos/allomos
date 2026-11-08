@@ -240,10 +240,11 @@ Work a task:
   counts as done. When all are done, `alm next` says so, and moves nothing: check, then
   `alm unblock <id>` (ready, or in progress when someone holds it).
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
-- `alm done <id> [--without-human-check \"<why>\" --steps <file.md>]`: finished (see
+- `alm done <id> [--without-human-check \"<why>\" --steps <file.md> --accepted-by <who>]`: finished (see
   `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
   open, what to click, what they should see. On a task already done, it only records its human
-  check again (the old `--without-owner` still works).
+  check again (the old `--without-owner` still works). `--accepted-by` names who accepted
+  finishing without the human check (an exception, `alm exceptions`).
 - `alm checked <id> [--deployed|--locally] [--result pass|partly] [--words \"<their words>\"]
   [--checker <pseudonym>]`: a person has checked the finished task: it gets a
   \"by human\" label (deployed and verified by human when it has deployed and verified by agent,
@@ -278,6 +279,13 @@ Work a task:
   once. alm says when it names no approval, or one that no longer applies; it refuses nothing for
   that: the approver's exact approval is still needed (Always-on boundaries). `alm effects <id>`
   lists a task's effects; `alm effects`, every one in the project; `alm show` lists them too.
+- `alm exception <id> --kind check_not_run|without_human_check|other --why \"<why>\" [--check
+  \"<the check not run>\"] [--accepted-by \"<pseudonym ID or role>\"]`: record a skipped control in
+  the task's history, with why and who accepted the risk; done tasks too. A check reported NOT
+  RUN is `check_not_run`, naming the check. `alm done --without-human-check \"<why>\" --accepted-by
+  <who>` records its own. Nobody named yet: alm says so; once the person says they accept it,
+  `alm exception <id> --of <exception ID> --accepted-by <who>`. Never an email address: a
+  pseudonym ID or a role (\"approver\"). `alm exceptions [<id>]` lists them; `alm show` too.
 - `alm classify <id> [--type standard|normal|emergency] [--risk low|medium|high] [--touches
   production|others-data|none] [--due <YYYY-MM-DD>]`: record a task's change type (standard: a
   pre-approved routine change; normal: approved before it is made; emergency: made first and

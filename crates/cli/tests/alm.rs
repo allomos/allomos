@@ -6964,3 +6964,189 @@ fn a_task_has_a_change_type_and_risk_and_emergencies_are_listed_until_approved_a
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["classification"]["approval_due"], "2027-01-02", "{v}");
 }
+
+#[test]
+fn exceptions_record_why_and_who_accepted_the_risk_and_are_listed() {
+    // Task-A01-seed343 (decision 0021 § 1.1 "Exceptions"): a check not run and a task finished
+    // without the human check are `exception` changes in the task's history, with why and who
+    // accepted the risk; `alm show` and `alm exceptions` list them, for one task and the project.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--kind",
+            "skipped",
+            "--why",
+            "x",
+        ],
+        1,
+        "exception_kind_unknown",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "exception", "A01-01", "--kind", "other"],
+        1,
+        "exception_incomplete",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--kind",
+            "check_not_run",
+            "--why",
+            "x",
+        ],
+        1,
+        "exception_incomplete",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "exception", "A01-01", "--why", "x"],
+        1,
+        "task_held",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--of",
+            "ex-nope00",
+            "--accepted-by",
+            "approver",
+        ],
+        1,
+        "exception_not_found",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    // A check not run, nobody named yet: recorded, and alm says so.
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--kind",
+            "check-not-run",
+            "--check",
+            "cargo test -p allomos-desktop",
+            "--why",
+            "no display on this computer",
+        ],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(out.status.success(), "{text}");
+    assert!(
+        text.contains("nobody is named as accepting this risk"),
+        "{text}"
+    );
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+    let v = ok(&repo, &["exceptions", "A01-01"]);
+    let ex = v["exceptions"][0].clone();
+    assert_eq!(ex["kind"], "check_not_run");
+    assert_eq!(ex["check"], "cargo test -p allomos-desktop");
+    assert_eq!(ex["accepted_by"], Value::Null);
+    let id = ex["id"].as_str().unwrap().to_string();
+    assert!(id.starts_with("ex-"));
+
+    // Completed later with who accepted it; the same again changes nothing.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--of",
+            &id,
+            "--accepted-by",
+            "approver",
+        ],
+    );
+    assert_eq!(v["changed"], true);
+    assert_eq!(v["exception"]["accepted_by"], "approver");
+    let events = event_count(&repo);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--of",
+            &id,
+            "--accepted-by",
+            "approver",
+        ],
+    );
+    assert_eq!(v["changed"], false);
+    assert_eq!(event_count(&repo), events);
+
+    // An email address is told about, not refused.
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "exception",
+            "A01-01",
+            "--why",
+            "waived",
+            "--accepted-by",
+            "x@example.com",
+        ],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("looks like an email address"), "{text}");
+
+    // `alm done --without-human-check --accepted-by` records its own exception.
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "only the hands-on check is left",
+            "--accepted-by",
+            "approver",
+        ],
+    );
+    assert_eq!(v["exception"]["kind"], "without_human_check");
+    assert_eq!(v["exception"]["accepted_by"], "approver");
+    assert_eq!(v["exception"]["why"], "only the hands-on check is left");
+
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["exceptions"].as_array().unwrap().len(), 3);
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(out.contains("Exceptions:"), "{out}");
+    assert!(out.contains("finished without the human check"), "{out}");
+
+    // The project's list.
+    let v = ok(&repo, &["exceptions"]);
+    assert_eq!(v["exceptions"].as_array().unwrap().len(), 3);
+    assert!(
+        v["exceptions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["task"] == "A01-01")
+    );
+    refused(&repo, &["exceptions", "nope"], 1, "task_not_found");
+}

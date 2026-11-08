@@ -14,6 +14,7 @@ pub mod decision;
 pub mod duties;
 pub mod effect;
 pub mod event;
+pub mod exception;
 pub mod folders;
 pub mod ids;
 pub mod labels;
