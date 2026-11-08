@@ -341,8 +341,10 @@ export interface TabsMessenger {
 
 /** The app's own Settings window (Task-A01-marble320). */
 export interface AppSettingsMessenger {
-  appSettings(): Promise<{ start_with: StartWith }>;
+  appSettings(): Promise<{ start_with: StartWith; auto_update: boolean }>;
   setStartWith(choice: StartWith): Promise<void>;
+  /** Automatic updates on or off (Task-A07-meter647). Rejects with a Problem. */
+  setAutoUpdate(on: boolean): Promise<void>;
   /** Settings → This computer (Task-A01-tail719): the signing key and the last checkpoint seen per project, matched to `folders` (the recent folders). */
   thisComputer(folders: string[]): Promise<ThisComputer>;
   /** Export public key…: asks where, then writes the public key file; false when the person cancelled. Rejects with a Problem. */
@@ -366,8 +368,9 @@ export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
   onTabOpen: (handler) => getCurrentWebviewWindow().listen<string | null>("tab:open", (e) => handler(e.payload)),
   onTabSelect: (handler) => getCurrentWebviewWindow().listen<number>("tab:select", (e) => handler(e.payload)),
   closeWindow: () => invoke<void>("close_window"),
-  appSettings: () => invoke<{ start_with: StartWith }>("app_settings"),
+  appSettings: () => invoke<{ start_with: StartWith; auto_update: boolean }>("app_settings"),
   setStartWith: (choice) => invoke<void>("set_start_with", { choice }),
+  setAutoUpdate: (on) => invoke<void>("set_auto_update", { on }),
   thisComputer: (folders) => invoke<ThisComputer>("this_computer", { folders }),
   exportPublicKey: async (suggestedName) => {
     const path = await save({ defaultPath: suggestedName, filters: [{ name: "JSON", extensions: ["json"] }] });

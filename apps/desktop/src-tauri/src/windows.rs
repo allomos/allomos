@@ -550,12 +550,15 @@ pub(crate) fn open_settings_window(app: &AppHandle, title: &str) -> tauri::Resul
 #[derive(Serialize)]
 pub(crate) struct AppSettings {
     start_with: &'static str,
+    /// **Automatic updates** (Task-A07-meter647).
+    auto_update: bool,
 }
 
 #[tauri::command]
 pub(crate) fn app_settings() -> AppSettings {
     AppSettings {
         start_with: allomos_store::start_with().as_str(),
+        auto_update: allomos_store::auto_update(),
     }
 }
 

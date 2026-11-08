@@ -12,6 +12,11 @@
 //! then offers **Restart to Update to Allomos <version>**, which runs the installer and starts
 //! the new version. The hash proves only that the download is intact: whoever can upload to the
 //! release could upload a matching hash too (the approver knows and accepted this).
+//!
+//! **Settings… › General › Automatic updates** (Task-A07-meter647, on by default) turns both off:
+//! the app no longer asks GitHub by itself nor downloads in the background, and a remembered newer
+//! version is not offered until the person chooses **Check for Updates…**. An installer already
+//! downloaded and checked stays, and the menu still offers **Restart to Update**.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -130,13 +135,25 @@ pub fn fetch_latest(current: &str) -> Option<String> {
     latest_from_json(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// The whole check: ask GitHub if due, remember the answer, and say what to offer.
-pub fn check(asked: bool) -> UpdateStatus {
+/// What is offered while **Automatic updates** is off and the person did not ask (Task-A07-meter647):
+/// no notice, and the menu names a newer version only when its installer is already downloaded
+/// and checked (**Restart to Update**); otherwise it shows **Check for Updates…**.
+pub fn without_auto_update(mut status: UpdateStatus) -> UpdateStatus {
+    status.newer = None;
+    if status.ready.is_none() {
+        status.available = None;
+    }
+    status
+}
+
+/// The whole check: ask GitHub if due, remember the answer, and say what to offer. With
+/// **Automatic updates** off (`auto` false), GitHub is asked only when the person asked.
+pub fn check(asked: bool, auto: bool) -> UpdateStatus {
     let current = env!("CARGO_PKG_VERSION");
     let mut memory = allomos_store::update_memory();
     let mut failed = false;
     let now = now();
-    if due(memory.checked_at, now, asked) {
+    if (asked || auto) && due(memory.checked_at, now, asked) {
         match fetch_latest(current) {
             Some(latest) => {
                 let _ = allomos_store::save_update_check(now, &latest);
@@ -153,7 +170,11 @@ pub fn check(asked: bool) -> UpdateStatus {
         failed,
     );
     status.ready = ready_version().filter(|r| status.available.as_ref() == Some(r));
-    status
+    if auto || asked {
+        status
+    } else {
+        without_auto_update(status)
+    }
 }
 
 // ---- Downloading and installing (Task-A07-17) ----
@@ -798,6 +819,23 @@ mod tests {
             None
         );
         assert_eq!(decide("0.1.5", None, None, false, true).newer, None);
+    }
+
+    #[test]
+    fn with_automatic_updates_off_only_a_ready_installer_is_offered() {
+        let known = decide("0.1.5", Some("0.1.6"), None, false, false);
+        let quiet = without_auto_update(known.clone());
+        assert_eq!((quiet.newer, quiet.available), (None, None));
+        assert_eq!(quiet.latest.as_deref(), Some("0.1.6"));
+
+        let ready = UpdateStatus {
+            ready: Some("0.1.6".into()),
+            ..known
+        };
+        let quiet = without_auto_update(ready);
+        assert_eq!(quiet.newer, None);
+        assert_eq!(quiet.available.as_deref(), Some("0.1.6"));
+        assert_eq!(quiet.ready.as_deref(), Some("0.1.6"));
     }
 
     #[test]

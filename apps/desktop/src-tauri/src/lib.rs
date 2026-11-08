@@ -1639,15 +1639,32 @@ fn open_download_page() -> Result<(), Problem> {
 ///
 /// When a newer version is known, its installer is downloaded and checked in the background
 /// (Task-A07-17); once it is ready every window hears `update:ready` and asks again.
+///
+/// With **Automatic updates** off (Task-A07-meter647), GitHub is asked only from the menu, and
+/// nothing is downloaded in the background, not even after the menu's check.
 #[tauri::command]
 async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
-    let status = update::check(asked);
-    if let (Some(version), None) = (&status.available, &status.ready) {
+    let auto = allomos_store::auto_update();
+    let status = update::check(asked, auto);
+    if let (true, Some(version), None) = (auto, &status.available, &status.ready) {
         update::prepare_in_background(version.clone(), move || {
             let _ = app.emit(UPDATE_READY_EVENT, ());
         });
     }
     status
+}
+
+/// **Settings… › General › Automatic updates** on or off (Task-A07-meter647). Every window looks
+/// at updates again at once (the `update:ready` event), so the change shows without waiting
+/// for the hourly look: turned off, a notice goes away; turned on, a day-old check runs now.
+#[tauri::command]
+fn set_auto_update(app: AppHandle, on: bool) -> Result<(), Problem> {
+    allomos_store::save_auto_update(on).map_err(|e| Problem::WriteFailed {
+        path: "settings.json".into(),
+        detail: e.to_string(),
+    })?;
+    let _ = app.emit(UPDATE_READY_EVENT, ());
+    Ok(())
 }
 
 /// **Restart to Update to Allomos <version>** (Task-A07-17): run the checked installer and
@@ -2556,6 +2573,7 @@ pub fn run() {
             tab_drag::drag_cancel,
             windows::app_settings,
             windows::set_start_with,
+            set_auto_update,
             inspect_folder,
             open_taskbag,
             taskbag_stamp,

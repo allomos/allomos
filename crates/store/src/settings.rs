@@ -44,6 +44,10 @@ struct Settings {
     /// Missing or unknown: `reopen`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     start_with: Option<String>,
+    /// **Automatic updates** (Task-A07-meter647, approver 2026-11-08: on by default). Kept only
+    /// when off (`false`); missing: on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auto_update: Option<bool>,
 }
 
 /// What Allomos opens when it starts again (Task-A01-marble320, approver 2026-10-29), the app's
@@ -219,6 +223,19 @@ pub fn start_with() -> StartWith {
 pub fn save_start_with(choice: StartWith) -> io::Result<()> {
     let mut settings = read_settings();
     settings.start_with = (choice != StartWith::Reopen).then(|| choice.as_str().to_string());
+    write_settings(&settings)
+}
+
+/// Whether **Automatic updates** is on: the app asks GitHub once a day by itself and downloads a
+/// newer version in the background (Task-A07-meter647). On until the person turns it off.
+pub fn auto_update() -> bool {
+    read_settings().auto_update != Some(false)
+}
+
+/// Remember **Automatic updates** on or off.
+pub fn save_auto_update(on: bool) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.auto_update = (!on).then_some(false);
     write_settings(&settings)
 }
 
@@ -423,6 +440,25 @@ mod tests {
         assert_eq!(start_with(), StartWith::Reopen);
         assert_eq!(StartWith::parse("tabs"), None);
         assert_eq!(saved_ui_language().as_deref(), Some("ja"));
+
+        // Automatic updates (Task-A07-meter647): on until turned off, then remembered; the
+        // update check beside it is kept.
+        assert!(auto_update());
+        save_auto_update(false).unwrap();
+        assert!(!auto_update());
+        assert!(
+            fs::read_to_string(dir.join(SETTINGS_FILE))
+                .unwrap()
+                .contains("\"auto_update\": false")
+        );
+        save_auto_update(true).unwrap();
+        assert!(auto_update());
+        assert!(
+            !fs::read_to_string(dir.join(SETTINGS_FILE))
+                .unwrap()
+                .contains("auto_update")
+        );
+        assert_eq!(update_memory().latest.as_deref(), Some("0.1.6"));
 
         // SAFETY: as above.
         unsafe { std::env::remove_var("ALLOMOS_SETTINGS_DIR") };

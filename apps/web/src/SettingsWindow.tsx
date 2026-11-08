@@ -1,7 +1,9 @@
 // The app's own Settings window (Task-A01-marble320, approver 2026-10-29): settings for the whole
 // app, apart from each taskbag's own. Its General section has **When Allomos starts**: reopen the
 // windows and tabs (the default), open the last taskbag, or open a blank window. A choice is saved
-// at once. Escape closes the window. Below it, **This computer** (Task-A01-tail719, decision 0021
+// at once. Then **Automatic updates** (Task-A07-meter647, on by default): off, the app no longer
+// asks GitHub by itself nor downloads in the background; Check for Updates… still works. Escape
+// closes the window. Below it, **This computer** (Task-A01-tail719, decision 0021
 // § 6): this computer's signing key (its ID and public key, Export public key…) and the Last seen
 // history, the last checkpoint this computer saw of each project and whether that taskbag still
 // has it. **Replace key…** (Task-A01-ring220) makes a new key after an inline confirmation; the old
@@ -25,6 +27,7 @@ const CHOICES: { value: StartWith; key: "app_settings.reopen" | "app_settings.la
 export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messenger, "closeWindow">; settings: AppSettingsMessenger }) {
   const { t, problem } = useI18n();
   const [startWith, setStartWith] = useState<StartWith | null>(null);
+  const [autoUpdate, setAutoUpdate] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [computer, setComputer] = useState<ThisComputer | null>(null);
   const [exported, setExported] = useState(false);
@@ -39,8 +42,14 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
   useEffect(() => {
     settings
       .appSettings()
-      .then((s) => setStartWith(s.start_with))
-      .catch(() => setStartWith("reopen"));
+      .then((s) => {
+        setStartWith(s.start_with);
+        setAutoUpdate(s.auto_update);
+      })
+      .catch(() => {
+        setStartWith("reopen");
+        setAutoUpdate(true);
+      });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") void messenger.closeWindow().catch(() => undefined);
     };
@@ -56,6 +65,15 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
     setError(null);
     settings.setStartWith(value).catch((e: unknown) => {
       setStartWith(before);
+      setError(isProblem(e) ? problem(e) : String(e));
+    });
+  };
+  const switchAutoUpdate = (on: boolean) => {
+    const before = autoUpdate;
+    setAutoUpdate(on);
+    setError(null);
+    settings.setAutoUpdate(on).catch((e: unknown) => {
+      setAutoUpdate(before);
       setError(isProblem(e) ? problem(e) : String(e));
     });
   };
@@ -93,6 +111,14 @@ export function SettingsWindow({ messenger, settings }: { messenger: Pick<Messen
             {t(c.key)}
           </label>
         ))}
+      </fieldset>
+      <fieldset className="settings-choice">
+        <legend>{t("app_settings.updates")}</legend>
+        <label>
+          <input type="checkbox" name="auto_update" checked={autoUpdate ?? true} disabled={autoUpdate === null} onChange={(e) => switchAutoUpdate(e.target.checked)} />
+          {t("app_settings.auto_update")}
+        </label>
+        <p className="muted small">{t("app_settings.auto_update_help")}</p>
       </fieldset>
       <h1>{t("this_computer.title")}</h1>
       {computer && (
