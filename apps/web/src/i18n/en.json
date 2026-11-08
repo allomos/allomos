@@ -925,6 +925,8 @@
   "monitor.last_run_need": "{n} need you",
   "monitor.last_run_need_tip": "Show the tasks that need you (the Needs you preset)",
   "monitor.start_failed": "Monitoring stopped: {agent} could not be started for {id}. {detail}",
+  "monitor.close_prompt": "Allomos: the task is done. This tab closes in 30 seconds; press any key to keep it.",
+  "monitor.close_kept": "Allomos: this tab stays open.",
   "label.locally_by_agent": "locally verified by agent",
   "label.deployed_by_agent": "deployed and verified by agent",
   "label.locally_by_human": "locally verified by human",

@@ -9,6 +9,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { LadderStep } from "./ladderFlow";
+import type { SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck } from "./types";
@@ -108,7 +109,9 @@ export interface Messenger {
   /** Monitor ready tasks (Task-A03-moth285): starts a new session of a terminal agent (`claude_cli`,
    * `codex_cli`) in the project folder of the taskbag at `taskbag`, in a terminal window of its
    * own, with `request` already sent; `sessionId` is Claude Code's `--session-id`. Rejects with a Problem. */
-  monitorStartSession(agent: string, taskbag: string, request: string, sessionId: string | null): Promise<void>;
+  monitorStartSession(agent: string, taskbag: string, request: string, sessionId: string | null): Promise<SessionTab | null>;
+  /** The task of the session in `tab` is done: the tab closes after 30 seconds unless a key is pressed (Task-A03-sierra014). */
+  monitorCloseSession(agent: string, tab: SessionTab, texts: { prompt: string; kept: string }): Promise<void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -417,7 +420,8 @@ export const desktopMessenger: Messenger = {
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   monitorStartSession: (agent, taskbag, request, sessionId) =>
-    invoke<void>("monitor_start_session", { agent, taskbag, request, sessionId }),
+    invoke<SessionTab | null>("monitor_start_session", { agent, taskbag, request, sessionId }),
+  monitorCloseSession: (agent, tab, texts) => invoke<void>("monitor_close_session", { agent, tab, texts }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

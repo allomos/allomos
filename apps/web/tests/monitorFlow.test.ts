@@ -20,6 +20,7 @@ import {
   scopeReady,
   stalled,
   startRun,
+  tabToClose,
   take,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
@@ -154,6 +155,21 @@ test("the current task is finished once claimed and no longer held, or when it l
   assert.equal(follow(r.run, [task("A01-05", { holder: "moth", state: "waiting", waiting_on: "a question" })], 40).finished, "A01-05");
   // Gone from the taskbag.
   assert.equal(follow(start, [], 5).finished, "A01-05");
+});
+
+test("only a done task's tab is closed, and only the tab Allomos opened (Task-A03-sierra014)", () => {
+  const tab = { window: 30229, tty: "/dev/ttys032" };
+  const run = take(startRun({ kind: "all" }, "claude_cli", true, 30, 0), task("A01-05"), "s-1", 0, tab);
+  const held = { holder: "moth" };
+  assert.deepEqual(tabToClose(run, [task("A01-05", { ...held, state: "done" })]), tab);
+  for (const state of ["waiting", "blocked", "dropped", "ready", "in_progress"] as const) {
+    assert.equal(tabToClose(run, [task("A01-05", { ...held, state })]), null, state);
+  }
+  // Gone from the taskbag.
+  assert.equal(tabToClose(run, []), null);
+  // No tab known (Windows, for now): nothing to close.
+  const noTab = take(startRun({ kind: "all" }, "codex_cli", true, 30, 0), task("A01-05"), null, 0);
+  assert.equal(tabToClose(noTab, [task("A01-05", { state: "done" })]), null);
 });
 
 test("a session with no sign of life for 30 minutes shows as stalled", () => {
