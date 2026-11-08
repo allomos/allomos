@@ -21,7 +21,7 @@ Several sessions may now take ready tasks at the same time. A session can vanish
 | Fewer commits | Read-only commands write no heartbeat; commands that change a task write one with the change; `alm beat` writes nothing if the last one is under 5 minutes old; `alm beat --as <session>` with no ID beats for every task that session holds. |
 | Takeover | Claiming a lost task takes it over: the former holder is recorded, work goes on on the original working branch, and `alm` reminds about uncommitted changes in the old worktree. Two sessions taking over at once: the Git push decides who wins. |
 | Chains | The session that took over beats like any other and can itself be taken over when lost. |
-| Coming back | Every `alm` command accepts `--as <session>`. With it, `alm` first checks whether a task this session held has been taken over; if so it tells the session and refuses its further changes to that task. |
+| Coming back | Every `alm` command accepts `--as <session>`. With it, `alm` first checks whether a task this session held has been taken over; if so it tells the session and refuses its further changes to that task. The old session **gives the task up**: it stops work on it and goes on with other work. |
 | Who checks "lost" | `alm` itself. This is a check made by `alm`, which AGENTS.md says needs the approver's approval: the approver agreed to this one in the discussion of 2026-11-08. |
 | Not done | No reminder after a task is lost several times (not chosen in the discussion). |
 
@@ -87,9 +87,15 @@ The session that took over is an ordinary holder: it beats, and when it is lost 
 
 ### 8. A session coming back: `--as <session>` on every command
 
-Every `alm` command accepts `--as <session>`. With it, before anything else, `alm` checks whether a task this session held has since been taken over. If so, it says so (by whom, when) and refuses the session's further changes to that task (`task_held`, with the takeover named). The session may still read the task; it should stop work on it.
+Every `alm` command accepts `--as <session>`. With it, before anything else, `alm` checks whether a task this session held has since been taken over. If so, it says so (by whom, when) and refuses the session's further changes to that task (`task_held`, with the takeover named). The session may still read the task, but it **gives the task up** (approver, 2026-11-09):
 
-*Not chosen:* letting the old session take the task back automatically (two sessions would then work one branch).
+- it stops work on that task at once: no more commits or pushes to the task's working branch, and no attempt to claim it back;
+- it leaves its worktree as it is (any uncommitted changes stay there for the new holder to look at, as § 6 says), and tells the person in its own conversation that the task was taken over and by whom;
+- it goes on with other work: another ready task (`alm next`), or it ends.
+
+`alm`'s message says this in so many words ("this task was taken over by … at …; stop work on it").
+
+*Not chosen:* letting the old session take the task back automatically, or finish the step it was in (two sessions would then work one branch).
 
 ### 9. "Lost" is a check `alm` makes, approved
 
@@ -103,7 +109,7 @@ No reminder or escalation when a task is lost several times in a row (discussed 
 
 - **Format:** `task.json` gains the heartbeat field; the project file gains the two settings. This changes the taskbag's shape, so the format version goes up through the usual guided upgrade (the exact number is set by the implementation card).
 - **Commands:** new `alm beat`; `--as` on every command; `alm claim` takes over lost tasks; task-changing commands write the heartbeat; `alm next` / `list` / `show` show the last heartbeat, busy windows and lost tasks (and `--json` gains them).
-- **Contract text:** AGENTS.md's Tasks section (`alm brief`) tells agents to beat and push every 10 minutes, to declare busy windows, and how a takeover works; CODING_RULES § Holder rules gains "a lost task may be claimed".
+- **Contract text:** AGENTS.md's Tasks section (`alm brief`) tells agents to beat and push every 10 minutes, to declare busy windows, how a takeover works, and that a session whose task was taken over gives it up; CODING_RULES § Holder rules gains "a lost task may be claimed".
 - **App:** shows lost tasks and busy windows; the two numbers in project settings; texts in en, zh-CN and ja.
 - **History:** no new events for heartbeats; takeovers are claim events with the former holder; burndown and timeline unchanged.
 - **Commits:** about one taskbag commit per holding session every 10 minutes when it changes nothing else.
