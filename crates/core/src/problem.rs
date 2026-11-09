@@ -219,6 +219,10 @@ problems! {
     /// `alm session` was given nothing to record (Task-A03-ham538).
     SessionMissing => "session_missing", "Say what to record: --session-agent, --session-id, --session-kind or --app-session-id.";
     TaskHeld { id, holder } => "task_held", "Task {id} is held by {holder}.";
+    /// `alm beat` on a task nobody holds or that is not in progress (Task-A01-nurse164).
+    NotHeld { id, state } => "not_held", "Task {id} is {state} and held by no working session, so it gets no heartbeat. Only the session holding an in-progress task beats (`alm claim` it first).";
+    /// `alm beat --busy` with a length not written as one (Task-A01-nurse164).
+    BusyInvalid { value } => "busy_invalid", "\"{value}\" is not a length of time. Write it like 45m, 2h or 1h30m (0m ends a busy window).";
     /// The one-time number of a change (`--request-id`, Task-A01-58) was used before for a
     /// different change, so nothing was done.
     RequestReused { id } => "request_reused", "The one-time number {id} was already used for a different change, so nothing was done. Use a new number for a new change.";

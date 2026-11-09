@@ -630,6 +630,7 @@ pub fn new_task(
     Ok(Task {
         folders: Default::default(),
         session: None,
+        heartbeat: None,
         extra: Default::default(),
         id: id.to_string(),
         title,
@@ -1153,7 +1154,14 @@ fn with_evidence(description: &str, entry: &str) -> String {
 pub fn task_version(task: &crate::model::Task) -> String {
     // FNV-1a, 64 bits: the same on every computer and Rust version.
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    let json = serde_json::to_string(task).unwrap_or_default();
+    // A heartbeat is not a change of the task (decision 0022): it leaves the version as it is.
+    let json = if task.heartbeat.is_some() {
+        let mut t = task.clone();
+        t.heartbeat = None;
+        serde_json::to_string(&t).unwrap_or_default()
+    } else {
+        serde_json::to_string(task).unwrap_or_default()
+    };
     for b in json
         .bytes()
         .chain(std::iter::once(0))

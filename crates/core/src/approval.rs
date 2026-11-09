@@ -332,6 +332,7 @@ mod tests {
         Task {
             folders: Default::default(),
             session: None,
+            heartbeat: None,
             extra: Default::default(),
             id: id.into(),
             title: "T".into(),

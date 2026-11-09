@@ -254,6 +254,7 @@ mod tests {
         let task = Task {
             folders: Default::default(),
             session: None,
+            heartbeat: None,
             extra: Default::default(),
             id: "A01-1".into(),
             title: "Ship".into(),

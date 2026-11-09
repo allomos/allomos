@@ -7757,3 +7757,180 @@ fn the_outside_witness_makes_checkpoints_by_itself_as_often_as_set() {
     let v = ok(&repo, &["audit"]);
     assert_eq!(v["audit"]["checkpoints"].as_array().unwrap().len(), 3);
 }
+
+/// `alm --json …` at a given time (`ALLOMOS_NOW`): the exit code and the JSON object.
+fn fj_at(dir: &Path, now: &str, args: &[&str]) -> (i32, Value) {
+    let mut all = vec!["--json"];
+    all.extend_from_slice(args);
+    let out = alm_at(dir, now, &all);
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    (out.status.code().unwrap(), v)
+}
+
+fn ok_at(dir: &Path, now: &str, args: &[&str]) -> Value {
+    let (code, v) = fj_at(dir, now, args);
+    assert_eq!((code, &v["ok"]), (0, &Value::Bool(true)), "{args:?}: {v}");
+    v
+}
+
+/// Heartbeats (decision 0022, Task-A01-nurse164): `alm beat` writes the holder's last heartbeat
+/// into the task's file and no event; under half the interval it writes nothing; `--busy` records a
+/// busy window; with no ID it beats for every task the session holds; the holder's changes beat
+/// along with them, reading does not; and a beat leaves the task's version as it is.
+#[test]
+fn holders_beat_and_their_changes_beat_along() {
+    let repo = filled();
+    for id in ["A01-01", "A01-02", "A02-01"] {
+        ok(&repo, &["ready", id]);
+    }
+    let t0 = "2026-11-09T14:00:00Z";
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01"]);
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-02"]);
+    ok_at(&repo, t0, &["--as", "s2", "claim", "A02-01"]);
+    // A claim is the first heartbeat.
+    assert_eq!(
+        task_file(&repo, "A01-01")["heartbeat"],
+        json!({ "at": t0, "by": "s1" })
+    );
+    let events = event_count(&repo);
+    let version = ok(&repo, &["show", "A01-01"])["task"]["version"].clone();
+
+    // Under half the interval (5 of 10 minutes): nothing written, and it says when the next is due.
+    let v = ok_at(
+        &repo,
+        "2026-11-09T14:04:59Z",
+        &["--as", "s1", "beat", "A01-01"],
+    );
+    assert_eq!(v["beats"][0]["written"], false);
+    assert_eq!(v["beats"][0]["ago_seconds"], 299);
+    assert_eq!(v["beats"][0]["due"], "2026-11-09T14:10:00Z");
+    assert_eq!(v["changed_files"], json!([]), "{v}");
+    assert_eq!(task_file(&repo, "A01-01")["heartbeat"]["at"], t0);
+
+    // From half the interval on, it is written: no event, and the version stays.
+    let t1 = "2026-11-09T14:05:00Z";
+    let v = ok_at(&repo, t1, &["--as", "s1", "beat", "A01-01"]);
+    assert_eq!(v["beats"][0]["written"], true);
+    assert_eq!(v["beats"][0]["due"], "2026-11-09T14:15:00Z");
+    assert_eq!(task_file(&repo, "A01-01")["heartbeat"]["at"], t1);
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(ok(&repo, &["show", "A01-01"])["task"]["version"], version);
+
+    // A busy window is written even right after a beat, and shows.
+    let v = ok_at(
+        &repo,
+        "2026-11-09T14:06:00Z",
+        &["--as", "s1", "beat", "A01-01", "--busy", "2h"],
+    );
+    assert_eq!(
+        v["beats"][0]["heartbeat"]["busy_until"],
+        "2026-11-09T16:06:00Z"
+    );
+    let out = alm_at(&repo, "2026-11-09T14:07:00Z", &["show", "A01-01"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains(
+            "heartbeat: 1 min ago (2026-11-09T14:06:00Z, by s1); busy until 2026-11-09T16:06:00Z"
+        ),
+        "{text}"
+    );
+    assert_eq!(event_count(&repo), events);
+
+    // With no ID: every task the session holds, in one change; another session's are left alone.
+    let t2 = "2026-11-09T14:20:00Z";
+    let v = ok_at(&repo, t2, &["--as", "s1", "beat"]);
+    let ids: Vec<&str> = v["beats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["A01-01", "A01-02"]);
+    assert_eq!(v["changed_files"].as_array().unwrap().len(), 2, "{v}");
+    assert_eq!(task_file(&repo, "A01-02")["heartbeat"]["at"], t2);
+    // The busy window still running is kept.
+    assert_eq!(
+        task_file(&repo, "A01-01")["heartbeat"]["busy_until"],
+        "2026-11-09T16:06:00Z"
+    );
+    assert_eq!(task_file(&repo, "A02-01")["heartbeat"]["at"], t0);
+    // `0m` ends it.
+    ok_at(&repo, t2, &["--as", "s1", "beat", "A01-01", "--busy", "0m"]);
+    assert!(
+        task_file(&repo, "A01-01")["heartbeat"]
+            .get("busy_until")
+            .is_none()
+    );
+
+    // Reading writes nothing.
+    let t3 = "2026-11-09T14:40:00Z";
+    for args in [
+        &["--as", "s1", "show", "A01-02"][..],
+        &["--as", "s1", "list"],
+        &["--as", "s1", "next"],
+    ] {
+        ok_at(&repo, t3, args);
+    }
+    assert_eq!(task_file(&repo, "A01-02")["heartbeat"]["at"], t2);
+    // The holder's changes beat along, with the event they make anyway.
+    ok_at(
+        &repo,
+        t3,
+        &["--as", "s1", "label", "A01-02", "locally verified by agent"],
+    );
+    assert_eq!(task_file(&repo, "A01-02")["heartbeat"]["at"], t3);
+    let t4 = "2026-11-09T14:41:00Z";
+    ok_at(&repo, t4, &["--as", "s1", "note", "A01-02", "next: tests"]);
+    assert_eq!(task_file(&repo, "A01-02")["heartbeat"]["at"], t4);
+    let t5 = "2026-11-09T14:42:00Z";
+    ok_at(
+        &repo,
+        t5,
+        &[
+            "--as",
+            "s1",
+            "handoff",
+            "A01-02",
+            "--text",
+            "stopped at tests",
+        ],
+    );
+    assert_eq!(task_file(&repo, "A01-02")["heartbeat"]["at"], t5);
+    let t6 = "2026-11-09T14:43:00Z";
+    ok_at(
+        &repo,
+        t6,
+        &["--as", "s1", "ai-decided", "A01-02", "named it x"],
+    );
+    assert_eq!(task_file(&repo, "A01-02")["heartbeat"]["at"], t6);
+    // …and no event records a heartbeat.
+    let v = ok(&repo, &["history", "A01-02"]);
+    for e in v["events"].as_array().unwrap() {
+        for c in e["changes"].as_array().unwrap() {
+            assert_ne!(c["field"], "heartbeat", "{e}");
+        }
+    }
+    // A released task has no heartbeat.
+    ok_at(
+        &repo,
+        t6,
+        &["--as", "s1", "release", "A01-02", "--note", "n"],
+    );
+    assert!(task_file(&repo, "A01-02").get("heartbeat").is_none());
+
+    // Refused: no session name, a task the session does not hold, a task nobody holds, a bad length.
+    refused(&repo, &["beat", "A01-01"], 1, "holder_missing");
+    refused(&repo, &["--as", "s1", "beat", "A02-01"], 1, "task_held");
+    refused(&repo, &["--as", "s1", "beat", "A01-02"], 1, "not_held");
+    refused(
+        &repo,
+        &["--as", "s1", "beat", "A01-01", "--busy", "soon"],
+        1,
+        "busy_invalid",
+    );
+    // A session holding nothing: nothing written.
+    let v = ok(&repo, &["--as", "s9", "beat"]);
+    assert_eq!(v["beats"], json!([]));
+    let (_, v) = fj(&repo, &["list"]);
+    assert!(v.get("issues").is_none_or(|i| i == &json!([])), "{v}");
+}

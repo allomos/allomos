@@ -504,6 +504,11 @@ pub struct Task {
     /// new claim replaces it, and the history keeps the earlier ones.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<AgentSession>,
+    /// The holding session's last heartbeat (decision 0022, Task-A01-nurse164): written by
+    /// `alm beat` and along with every change the holder makes; no event records it. Gone once the
+    /// task is no longer held and in progress.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub heartbeat: Option<crate::heartbeat::Heartbeat>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
