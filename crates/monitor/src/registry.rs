@@ -186,6 +186,9 @@ pub enum Request {
     /// How many sessions one agent may have at work at once, from the next check on
     /// (Task-A03-weasel276): at least one.
     Sessions { agent: String, count: u32 },
+    /// The difficulty range one agent takes tasks from, from the next check on, as `1-3` or `4`
+    /// (Task-A03-wave335).
+    Difficulty { agent: String, range: String },
 }
 
 /// Leave `request` for run `id` in `dir`; its process takes it within about a second.
@@ -626,7 +629,6 @@ mod tests {
             alive: 0,
             run: Run::start(
                 crate::flow::Scope::All,
-                None,
                 vec!["claude_cli".into()],
                 vec![],
                 true,

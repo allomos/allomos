@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ALL_LEVELS,
   FIRST_FREQUENCY,
   FREQUENCIES,
   STALL_MS,
@@ -14,7 +15,10 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  levelsOf,
+  levelsText,
   nextCheck,
+  parseLevels,
   readEntry,
   readyTasks,
   scopeOptions,
@@ -25,6 +29,7 @@ import {
   unblockNotice,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
+import { levelsHold } from "../src/difficultyFlow.ts";
 import type { Iteration, Task } from "../src/types.ts";
 
 const task = (id: string, over: Partial<Task> = {}): Task =>
@@ -161,6 +166,41 @@ test("a run's sessions per agent: one unless set, and a free slot for each sessi
   assert.equal(sessionsOf(r, "codex_cli"), 1);
   // claude_cli has one session at work (the entry's): one more slot for it, and one for codex.
   assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
+});
+
+test("each agent's difficulty range: every level unless set; a range the run file does not read is left out", () => {
+  const r = readEntry(
+    entry({ agents: ["claude_cli", "codex_cli"], difficulties: { claude_cli: "3-5", codex_cli: "4", antigravity_cli: "1-2", gemini: "1-2" }, no_task: ["claude_cli", "gemini"] }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  assert.deepEqual(r.difficulties, {
+    claude_cli: { low: 3, high: 5 },
+    codex_cli: { low: 4, high: 4 },
+    antigravity_cli: { low: 1, high: 2 },
+  }, "an agent that is not a terminal agent is left out");
+  assert.deepEqual(levelsOf(r, "claude_cli"), { low: 3, high: 5 });
+  assert.deepEqual(levelsOf(r, "gemini" as never), ALL_LEVELS);
+  assert.deepEqual(r.noTask, ["claude_cli"], "an agent that is not a terminal agent is left out of the list too");
+  assert.equal(levelsText({ low: 4, high: 4 }), "4");
+  assert.equal(levelsText({ low: 1, high: 5 }), "1-5");
+});
+
+test("a task is in an agent's range when its level (the default 3 included) is", () => {
+  const leveled = (difficulty?: number) => ({ difficulty: difficulty ?? null }) as Pick<Task, "difficulty">;
+  assert.equal(levelsHold({ low: 1, high: 2 }, leveled(2)), true);
+  assert.equal(levelsHold({ low: 1, high: 2 }, leveled(3)), false);
+  assert.equal(levelsHold({ low: 3, high: 5 }, leveled()), true, "no level counts as 3");
+  assert.equal(levelsHold({ low: 4, high: 5 }, leveled()), false);
+});
+
+test("a difficulty range reads as low-high or one level, both ends from 1 to 5, the low not above the high", () => {
+  assert.deepEqual(parseLevels("1-5"), { low: 1, high: 5 });
+  assert.deepEqual(parseLevels(" 2 "), { low: 2, high: 2 });
+  assert.equal(parseLevels("4-2"), null);
+  assert.equal(parseLevels("0-3"), null);
+  assert.equal(parseLevels("6"), null);
+  assert.equal(parseLevels(3), null);
 });
 
 /** A run's entry as `alm monitor status --json` lists it. */

@@ -77,9 +77,11 @@ pub(crate) struct StartArgs {
     /// (ask as usual). The person chooses (`alm guide run-modes`).
     #[arg(long, value_name = "quiet|normal")]
     mode: String,
-    /// Only tasks of these difficulties: 1-3, or one level such as 4 (no difficulty counts as 3).
-    #[arg(long, value_name = "RANGE")]
-    difficulty: Option<String>,
+    /// The difficulties an agent takes tasks from: 1-3, or one level such as 4 (no difficulty
+    /// counts as 3). Without an agent, every chosen agent; AGENT=RANGE for one, for example
+    /// codex=1-2. Repeat for several. Default: every level, 1-5 (Task-A03-wave335).
+    #[arg(long = "difficulty", value_name = "[AGENT=]RANGE")]
+    difficulty: Vec<String>,
 }
 
 impl MonitorWhat {
@@ -125,9 +127,18 @@ fn agent_id(given: &str) -> Result<&'static str, Problem> {
 fn agents_text(run: &Run) -> Vec<String> {
     run.agents
         .iter()
-        .map(|a| match run.sessions_of(a) {
-            1 => agent_word(a).to_string(),
-            n => format!("{} ×{n}", agent_word(a)),
+        .map(|a| {
+            let count = match run.sessions_of(a) {
+                1 => String::new(),
+                n => format!(" ×{n}"),
+            };
+            let range = run.range_of(a);
+            let levels = if range == allomos_core::difficulty::Range::all() {
+                String::new()
+            } else {
+                format!(" ({})", range.text())
+            };
+            format!("{}{count}{levels}", agent_word(a))
         })
         .collect()
 }
@@ -187,9 +198,7 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
             });
         }
     };
-    if let Some(d) = &args.difficulty {
-        allomos_core::difficulty::Range::parse(d)?;
-    }
+    let difficulties = difficulties_of(&args.difficulty, &agents)?;
     let sessions = sessions_of(&args.sessions, &agents)?;
     let (bag, _) = allomos_store::taskbag_of(root, allomos_store::load(root))?;
     let scope = match &args.iteration {
@@ -208,19 +217,56 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         .filter(|a| found.iter().any(|f| f == *a))
         .map(|a| a.to_string())
         .collect();
-    let mut run = Run::start(
-        scope,
-        args.difficulty.clone(),
-        agents,
-        offered,
-        quiet,
-        args.every,
-        now,
-    );
+    let mut run = Run::start(scope, agents, offered, quiet, args.every, now);
     for (agent, count) in sessions {
         run.set_sessions(&agent, count);
     }
+    // A range without an agent is every chosen agent's; one naming an agent is that agent's, so
+    // it is set after them.
+    let chosen = run.agents.clone();
+    for (_, range) in difficulties.iter().filter(|(a, _)| a.is_none()) {
+        for a in &chosen {
+            run.set_difficulty(a, range);
+        }
+    }
+    for (agent, range) in &difficulties {
+        if let Some(a) = agent {
+            run.set_difficulty(a, range);
+        }
+    }
     Ok(run)
+}
+
+/// The `--difficulty` values as (agent ID, or none for every chosen agent; range text). Each
+/// range must read as `alm next --difficulty` does, and an agent must be one of `agents` (the
+/// run's).
+fn difficulties_of(
+    given: &[String],
+    agents: &[String],
+) -> Result<Vec<(Option<String>, String)>, Problem> {
+    let mut out = Vec::new();
+    for g in given {
+        let (agent, range) = match g.split_once('=') {
+            Some((name, range)) => {
+                let id = agent_id(name)?;
+                if !agents.iter().any(|a| a == id) {
+                    return Err(Problem::BadUsage {
+                        detail: format!(
+                            "--difficulty {g}: {} is not one of the run's agents (give it with --agent)",
+                            agent_word(id)
+                        ),
+                    });
+                }
+                (Some(id.to_string()), range)
+            }
+            None => (None, g.as_str()),
+        };
+        out.push((
+            agent,
+            allomos_core::difficulty::Range::parse(range.trim())?.text(),
+        ));
+    }
+    Ok(out)
 }
 
 /// The `--sessions AGENT=N` values as (agent ID, count): each agent must be one of `agents` (the
@@ -279,9 +325,9 @@ fn run_words(id: &str, root: &Path, args: &StartArgs, language: &str, run: &Run)
         w.push("--iteration".to_string());
         w.push(i.clone());
     }
-    if let Some(d) = &args.difficulty {
+    for (a, range) in &run.difficulties {
         w.push("--difficulty".to_string());
-        w.push(d.clone());
+        w.push(format!("{}={range}", agent_word(a)));
     }
     w
 }
@@ -312,11 +358,6 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                 Scope::All => "every ready task".to_string(),
                 Scope::Iteration { id } => format!("iteration {id}"),
             };
-            let difficulty = run
-                .difficulty
-                .as_ref()
-                .map(|d| format!(", difficulty {d}"))
-                .unwrap_or_default();
             let agents = agents_text(run);
             let working: Vec<String> = run
                 .working
@@ -334,7 +375,7 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                 )
             };
             let mut text = format!(
-                "{}  running  process {}{}\n  tasks: {scope}{difficulty}; agents: {}; every {} min; {} mode\n  working: {}; {state}\n",
+                "{}  running  process {}{}\n  tasks: {scope}; agents: {}; every {} min; {} mode\n  working: {}; {state}\n",
                 r.id,
                 r.pid,
                 if with_project {
@@ -351,6 +392,13 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                     working.join(", ")
                 },
             );
+            if !run.no_task.is_empty() {
+                let words: Vec<&str> = run.no_task.iter().map(|a| agent_word(a)).collect();
+                text.push_str(&format!(
+                    "  no ready task in the levels of: {} (no session starts for them)\n",
+                    words.join(", ")
+                ));
+            }
             if !run.taken.is_empty() {
                 text.push_str(&format!(
                     "  sessions started for: {}\n",
@@ -620,6 +668,27 @@ mod tests {
         assert!(sessions_of(&["claude-code=0".to_string()], &agents).is_err());
         assert!(sessions_of(&["claude-code".to_string()], &agents).is_err());
         assert!(sessions_of(&["codex=2".to_string()], &agents).is_err());
+    }
+
+    #[test]
+    fn difficulties_are_ranges_of_the_runs_agents() {
+        let agents = vec!["claude_cli".to_string(), "codex_cli".to_string()];
+        assert_eq!(
+            difficulties_of(&["3-5".to_string()], &agents).unwrap(),
+            vec![(None, "3-5".to_string())]
+        );
+        assert_eq!(
+            difficulties_of(&["codex=1-2".to_string(), "4".to_string()], &agents).unwrap(),
+            vec![
+                (Some("codex_cli".to_string()), "1-2".to_string()),
+                (None, "4".to_string())
+            ]
+        );
+        assert!(difficulties_of(&["0-3".to_string()], &agents).is_err());
+        assert!(difficulties_of(&["4-2".to_string()], &agents).is_err());
+        assert!(
+            difficulties_of(&["claude-code=1-2".to_string()], &["codex_cli".to_string()]).is_err()
+        );
     }
 
     #[test]

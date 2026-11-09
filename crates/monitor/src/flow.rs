@@ -52,11 +52,16 @@ pub struct Working {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Run {
     pub scope: Scope,
-    /// Only tasks of these difficulties (`1-3`, `4`), as `alm next --difficulty` takes them.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub difficulty: Option<String>,
     /// The agents ready tasks are given to.
     pub agents: Vec<String>,
+    /// Each agent's difficulty range (agent ID → `1-3`, `4`, as `alm next --difficulty` takes
+    /// it). An agent not listed takes every level, 1 to 5 (Task-A03-wave335).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub difficulties: BTreeMap<String, String>,
+    /// The agents with a free session slot that no ready task in their range fitted at the last
+    /// check: the status bar says why they got no session (Task-A03-wave335).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub no_task: Vec<String>,
     /// How many sessions each agent may have at work at once (agent ID → count, at least 1). An
     /// agent not listed has one (Task-A03-weasel276).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -105,7 +110,6 @@ impl Run {
     /// A new run; it checks at once.
     pub fn start(
         scope: Scope,
-        difficulty: Option<String>,
         agents: Vec<String>,
         offered: Vec<String>,
         quiet: bool,
@@ -114,13 +118,14 @@ impl Run {
     ) -> Run {
         Run {
             scope,
-            difficulty,
             agents,
             offered,
             quiet,
             every,
             started: now,
             sessions: BTreeMap::new(),
+            difficulties: BTreeMap::new(),
+            no_task: Vec::new(),
             taken: Vec::new(),
             taken_by: BTreeMap::new(),
             working: Vec::new(),
@@ -145,6 +150,23 @@ impl Run {
     pub fn set_sessions(&mut self, agent: &str, count: u32) {
         if count >= 1 {
             self.sessions.insert(agent.to_string(), count);
+        }
+    }
+
+    /// The difficulty range `agent` takes tasks from: every level unless the person chose one
+    /// (Task-A03-wave335). A stored range that does not read is taken as every level.
+    pub fn range_of(&self, agent: &str) -> Range {
+        self.difficulties
+            .get(agent)
+            .and_then(|r| Range::parse(r).ok())
+            .unwrap_or_else(Range::all)
+    }
+
+    /// The range `agent` takes tasks from, from the next check on (Task-A03-wave335). A range
+    /// that does not read is left as it is.
+    pub fn set_difficulty(&mut self, agent: &str, range: &str) {
+        if let Ok(r) = Range::parse(range) {
+            self.difficulties.insert(agent.to_string(), r.text());
         }
     }
 
@@ -196,29 +218,52 @@ impl Run {
         finished
     }
 
-    /// One check's share-out: each free session slot, in the run's order, with the next ready task
-    /// in the scope this run has not taken yet, while there are tasks. Every session claims its
-    /// task first, so two sessions never work the same one.
+    /// One check's share-out: each free session slot, in the run's order, gets the first ready
+    /// task in the scope this run has not taken yet that is in its agent's difficulty range; a
+    /// slot with no such task gets none (see [`Run::unfilled`]). Every session claims its task
+    /// first, so two sessions never work the same one.
     pub fn share(&self, bag: &Taskbag) -> Vec<(String, Task)> {
         let iteration = match &self.scope {
             Scope::All => None,
             Scope::Iteration { id } => Some(id.as_str()),
         };
-        let range = self
-            .difficulty
-            .as_deref()
-            .and_then(|d| Range::parse(d).ok());
         let ready: Vec<&Task> = ops::next(bag, iteration)
             .unwrap_or_default()
             .into_iter()
-            .filter(|t| range.as_ref().is_none_or(|r| r.holds(t)))
             .filter(|t| !self.taken.contains(&t.id))
             .collect();
-        self.free_agents()
-            .into_iter()
-            .zip(ready)
-            .map(|(agent, task)| (agent, task.clone()))
-            .collect()
+        let mut given = vec![false; ready.len()];
+        let mut shares = Vec::new();
+        for agent in self.free_agents() {
+            let range = self.range_of(&agent);
+            let found = ready
+                .iter()
+                .enumerate()
+                .position(|(i, t)| !given[i] && range.holds(t));
+            if let Some(i) = found {
+                given[i] = true;
+                shares.push((agent, ready[i].clone()));
+            }
+        }
+        shares
+    }
+
+    /// The agents with a free session slot that `shares` left without a task: no ready task in
+    /// their range was left for them (Task-A03-wave335). Each agent once.
+    pub fn unfilled(&self, shares: &[(String, Task)]) -> Vec<String> {
+        let mut left = self.free_agents();
+        for (agent, _) in shares {
+            if let Some(i) = left.iter().position(|a| a == agent) {
+                left.remove(i);
+            }
+        }
+        let mut out: Vec<String> = Vec::new();
+        for agent in left {
+            if !out.contains(&agent) {
+                out.push(agent);
+            }
+        }
+        out
     }
 
     /// A session of `agent` started for `task`.
@@ -330,15 +375,7 @@ mod tests {
 
     fn run(agents: &[&str]) -> Run {
         let agents: Vec<String> = agents.iter().map(|a| a.to_string()).collect();
-        Run::start(
-            Scope::All,
-            None,
-            agents.clone(),
-            agents,
-            true,
-            30,
-            1_000_000,
-        )
+        Run::start(Scope::All, agents.clone(), agents, true, 30, 1_000_000)
     }
 
     #[test]
@@ -483,6 +520,95 @@ mod tests {
         assert_eq!(r.working.len(), 1);
         r.set_agents(&[]);
         assert_eq!(r.agents, ["claude_cli"]);
+    }
+
+    #[test]
+    fn each_agent_has_every_level_unless_it_is_given_a_range() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        assert_eq!(r.range_of("claude_cli"), Range::all());
+        r.set_difficulty("claude_cli", "3-5");
+        r.set_difficulty("codex_cli", "1-2");
+        assert_eq!(r.difficulties["claude_cli"], "3-5");
+        assert_eq!(r.range_of("codex_cli"), Range { low: 1, high: 2 });
+        // A range that does not read is left as it was.
+        r.set_difficulty("codex_cli", "4-2");
+        assert_eq!(r.difficulties["codex_cli"], "1-2");
+        r.set_difficulty("claude_cli", "4");
+        assert_eq!(r.difficulties["claude_cli"], "4");
+    }
+
+    /// A ready task of level `level` (as `task.json` writes it).
+    fn leveled(id: &str, level: i64) -> Task {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "title": id, "area": "A01", "state": "ready", "difficulty": level
+        }))
+        .unwrap()
+    }
+
+    /// A taskbag of these tasks, one area and no iterations.
+    fn bag_of(tasks: Vec<Task>) -> Taskbag {
+        Taskbag {
+            project: serde_json::from_value(serde_json::json!({
+                "format": "allomos/7", "id": "P", "name": "P"
+            }))
+            .unwrap(),
+            areas: vec![
+                serde_json::from_value(serde_json::json!({
+                    "id": "A01", "name": "A01", "order": 1
+                }))
+                .unwrap(),
+            ],
+            iterations: vec![],
+            tasks,
+        }
+    }
+
+    #[test]
+    fn each_slot_gets_the_first_ready_task_in_its_agents_range() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        r.set_difficulty("claude_cli", "4-5");
+        r.set_difficulty("codex_cli", "1-2");
+        let bag = bag_of(vec![
+            leveled("A01-1", 1),
+            leveled("A01-2", 5),
+            leveled("A01-3", 2),
+        ]);
+        let shares: Vec<(String, String)> =
+            r.share(&bag).into_iter().map(|(a, t)| (a, t.id)).collect();
+        // Claude takes the first task of 4-5 (A01-2); codex the first of 1-2 (A01-1).
+        assert_eq!(
+            shares,
+            [
+                ("claude_cli".to_string(), "A01-2".to_string()),
+                ("codex_cli".to_string(), "A01-1".to_string())
+            ]
+        );
+        // No task is in claude's 4-5: it gets none and is named; codex takes the first of 1-2.
+        let bag = bag_of(vec![leveled("A01-1", 1), leveled("A01-3", 2)]);
+        let shares = r.share(&bag);
+        assert_eq!(shares.len(), 1);
+        assert_eq!(shares[0].1.id, "A01-1");
+        assert_eq!(r.unfilled(&shares), ["claude_cli"]);
+    }
+
+    #[test]
+    fn a_slot_with_no_task_in_its_range_is_named() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        r.set_difficulty("claude_cli", "5");
+        // Both agents have a free slot; no task was given to either: both are named, once each.
+        assert_eq!(r.unfilled(&[]), ["claude_cli", "codex_cli"]);
+        // Give codex its task: only claude is left without one.
+        let shares = vec![("codex_cli".to_string(), task("A01-1", State::Ready, None))];
+        assert_eq!(r.unfilled(&shares), ["claude_cli"]);
+        // A session at work takes its slot away from the free ones.
+        r.take(
+            "codex_cli",
+            &task("A01-1", State::Ready, None),
+            None,
+            None,
+            1,
+        );
+        assert_eq!(r.unfilled(&[]), ["claude_cli"]);
     }
 
     #[test]

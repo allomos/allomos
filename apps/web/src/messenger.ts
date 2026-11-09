@@ -18,7 +18,9 @@ export type MonitorRequest =
   | { action: "undo_stop" }
   | { action: "every"; minutes: number }
   | { action: "agents"; agents: string[] }
-  | { action: "sessions"; agent: string; count: number };
+  | { action: "sessions"; agent: string; count: number }
+  /** The difficulty levels an agent takes tasks from, from the next check on, as `1-3` or `4` (Task-A03-wave335). */
+  | { action: "difficulty"; agent: string; range: string };
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
@@ -122,7 +124,7 @@ export interface Messenger {
   monitorRuns(root: string): Promise<unknown[]>;
   /** Starts a run with the app's own `alm monitor start` (a background process that goes on after
    * the app is closed); resolves with its ID. Rejects with a Problem. */
-  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null, sessions: Record<string, number>): Promise<string>;
+  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null, sessions: Record<string, number>, difficulties: Record<string, string>): Promise<string>;
   /** Leaves a request for run `id`: check now, stop, undo the stop, a new frequency, these agents. */
   monitorAsk(id: string, request: MonitorRequest): Promise<void>;
   /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
@@ -485,7 +487,7 @@ export const desktopMessenger: Messenger = {
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
-  monitorStart: (root, agents, every, quiet, iteration, sessions) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions }),
+  monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties }),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
   monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
   monitorAll: () => invoke<unknown[]>("monitor_all"),
