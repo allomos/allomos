@@ -1539,6 +1539,7 @@ mod tests {
                 task_language: None,
                 handoff: None,
                 audit: None,
+                heartbeat: None,
             },
             areas: vec![],
             iterations: vec![],

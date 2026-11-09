@@ -7934,3 +7934,164 @@ fn holders_beat_and_their_changes_beat_along() {
     let (_, v) = fj(&repo, &["list"]);
     assert!(v.get("issues").is_none_or(|i| i == &json!([])), "{v}");
 }
+
+/// Lost tasks (decision 0022 § 3 and § 4, Task-A01-zero387): `alm next` lists a held task with no
+/// heartbeat for longer than the limit and no busy window running under "Lost, can be taken
+/// over", with who holds it, since when, the limit and the command to take it over (also in
+/// `--json`); it shows busy windows; waiting, blocked and released tasks are never lost; the two
+/// numbers are project settings; and `alm` takes nothing over itself.
+#[test]
+fn next_lists_lost_tasks_and_busy_windows() {
+    let repo = filled();
+    for id in ["A01-01", "A01-02", "A02-01"] {
+        ok(&repo, &["ready", id]);
+    }
+    let t0 = "2026-11-09T14:00:00Z";
+    ok_at(
+        &repo,
+        t0,
+        &["--as", "s1", "claim", "A01-01", "--branch", "claude/one"],
+    );
+    ok_at(&repo, t0, &["--as", "s2", "claim", "A01-02"]);
+    ok_at(&repo, t0, &["--as", "s3", "claim", "A02-01"]);
+    ok_at(&repo, t0, &["--as", "s2", "beat", "A01-02", "--busy", "2h"]);
+    // A02-01 waits: no holder, never lost.
+    ok_at(
+        &repo,
+        t0,
+        &["--as", "s3", "wait", "A02-01", "--on", "the approver"],
+    );
+
+    // At the limit (30 minutes): not lost yet; the busy window shows.
+    let v = ok_at(&repo, "2026-11-09T14:30:00Z", &["next"]);
+    assert_eq!(v["lost"], json!([]), "{v}");
+    assert_eq!(v["busy"][0]["id"], "A01-02");
+    assert_eq!(v["busy"][0]["busy_until"], "2026-11-09T16:00:00Z");
+    assert_eq!(v["heartbeat_settings"]["lost_after_secs"], 1800);
+
+    // Past it: A01-01 is lost; A01-02 is busy; nothing changes.
+    let events = event_count(&repo);
+    let now = "2026-11-09T14:45:00Z";
+    let v = ok_at(&repo, now, &["next"]);
+    let lost = v["lost"].as_array().unwrap();
+    assert_eq!(lost.len(), 1, "{v}");
+    assert_eq!(lost[0]["id"], "A01-01");
+    assert_eq!(lost[0]["holder"], "s1");
+    assert_eq!(lost[0]["heartbeat_at"], t0);
+    assert_eq!(lost[0]["silent_seconds"], 2700);
+    assert_eq!(lost[0]["lost_after_seconds"], 1800);
+    assert_eq!(lost[0]["working_branch"], "claude/one");
+    assert_eq!(
+        lost[0]["take_over"],
+        "alm claim A01-01 --take --as <your session name> --branch claude/one"
+    );
+    assert!(
+        v.get("changed_files")
+            .is_none_or(|f| f.as_array().is_some_and(Vec::is_empty)),
+        "{v}"
+    );
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(task_file(&repo, "A01-01")["holder"], "s1");
+    let text = String::from_utf8(alm_at(&repo, now, &["next"]).stdout).unwrap();
+    assert!(text.contains("Lost, can be taken over"), "{text}");
+    assert!(
+        text.contains(
+            "held by s1; last heartbeat 45 min ago (2026-11-09T14:00:00Z); lost after 30 min"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("Busy: A01-02 is held by s2, busy until 2026-11-09T16:00:00Z"),
+        "{text}"
+    );
+
+    // After the busy window, the limit counts from its end.
+    let v = ok_at(&repo, "2026-11-09T16:30:00Z", &["next"]);
+    let ids: Vec<&str> = v["lost"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["A01-01"]);
+    let v = ok_at(&repo, "2026-11-09T16:31:00Z", &["next"]);
+    assert_eq!(v["lost"][1]["id"], "A01-02");
+    assert_eq!(v["lost"][1]["since"], "2026-11-09T16:00:00Z");
+    assert_eq!(v["busy"], json!([]));
+
+    // A released task is never lost.
+    ok_at(
+        &repo,
+        "2026-11-09T16:31:00Z",
+        &["--as", "s2", "release", "A01-02", "--note", "n"],
+    );
+    let v = ok_at(&repo, "2026-11-09T18:00:00Z", &["next"]);
+    assert_eq!(v["lost"].as_array().unwrap().len(), 1, "{v}");
+
+    // The two numbers are project settings.
+    let v = ok(&repo, &["heartbeat-settings"]);
+    assert_eq!(
+        v["applied"],
+        json!({ "interval_secs": 600, "lost_after_secs": 1800 })
+    );
+    let v = ok(
+        &repo,
+        &[
+            "heartbeat-settings",
+            "--interval",
+            "20m",
+            "--lost-after",
+            "4h",
+        ],
+    );
+    assert_eq!(
+        v["heartbeat"],
+        json!({ "interval_minutes": 20, "lost_after_minutes": 240 })
+    );
+    assert!(
+        v["changed_files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == "project.json"),
+        "{v}"
+    );
+    let v = ok_at(&repo, "2026-11-09T18:00:00Z", &["next"]);
+    assert_eq!(v["lost"], json!([]), "{v}");
+    let v = ok_at(&repo, "2026-11-09T18:01:00Z", &["next"]);
+    assert_eq!(v["lost"][0]["lost_after_seconds"], 14_400);
+    // The interval sets when `alm beat` writes again and when the next one is due.
+    let v = ok_at(
+        &repo,
+        "2026-11-09T18:01:00Z",
+        &["--as", "s1", "beat", "A01-01"],
+    );
+    assert_eq!(v["beats"][0]["due"], "2026-11-09T18:21:00Z");
+    let v = ok_at(
+        &repo,
+        "2026-11-09T18:10:59Z",
+        &["--as", "s1", "beat", "A01-01"],
+    );
+    assert_eq!(v["beats"][0]["written"], false);
+    refused(
+        &repo,
+        &["heartbeat-settings", "--lost-after", "0m"],
+        1,
+        "heartbeat_minutes_invalid",
+    );
+    refused(
+        &repo,
+        &["heartbeat-settings", "--interval", "90s"],
+        1,
+        "heartbeat_minutes_invalid",
+    );
+    let v = ok(&repo, &["heartbeat-settings", "--clear"]);
+    assert_eq!(v["heartbeat"], Value::Null);
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(project.get("heartbeat").is_none());
+    let (_, v) = fj(&repo, &["list"]);
+    assert!(v.get("issues").is_none_or(|i| i == &json!([])), "{v}");
+}

@@ -104,6 +104,10 @@ pub struct Project {
     /// (Task-A01-frolic587). Missing: the defaults.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audit: Option<crate::audit::Audit>,
+    /// How often holding sessions beat and when a held task is lost (decision 0022 § 3,
+    /// Task-A01-zero387). Missing: the defaults (10 and 30 minutes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub heartbeat: Option<crate::heartbeat::Settings>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,

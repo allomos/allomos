@@ -652,7 +652,8 @@ enum Command {
     Note { id: String, text: Option<String> },
     /// Write a heartbeat: the session holding the task (--as) is still at work (decision 0022).
     /// Without an ID, for every task that session holds, in one change. Writes no event, and
-    /// nothing while the last heartbeat is under half the interval old (5 of 10 minutes).
+    /// nothing while the last heartbeat is under half the interval old (5 of 10 minutes by
+    /// default; `alm heartbeat-settings`).
     Beat {
         id: Option<String>,
         /// Declare a busy window: how long you will be quiet (45m, 2h, 1h30m; 0m ends it).
@@ -789,6 +790,20 @@ enum Command {
         #[arg(long, value_name = "NAME")]
         agent: Option<String>,
         /// Back to the defaults (with --agent: remove that agent's own gates).
+        #[arg(long)]
+        clear: bool,
+    },
+    /// How often holding sessions beat and after how long a held task is lost (decision 0022 § 3):
+    /// project settings, 10 and 30 minutes by default. Without options, show them.
+    #[command(name = "heartbeat-settings")]
+    HeartbeatSettings {
+        /// How often a holding session beats: 10m, 15m, 1h or a number of minutes.
+        #[arg(long, value_name = "LENGTH")]
+        interval: Option<String>,
+        /// After how long without a heartbeat (and no busy window) a held task is lost.
+        #[arg(long, value_name = "LENGTH")]
+        lost_after: Option<String>,
+        /// Back to the defaults (10 and 30 minutes); --interval or --lost-after then still apply.
         #[arg(long)]
         clear: bool,
     },
@@ -1111,6 +1126,7 @@ impl Command {
             | Command::MoveIn { .. }
             | Command::Translate { .. }
             | Command::HandoffRules { .. }
+            | Command::HeartbeatSettings { .. }
             | Command::AuditSettings { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
@@ -1143,6 +1159,14 @@ impl Command {
         } = self
         {
             return quota.is_some() || context.is_some() || write_when.is_some() || *clear;
+        }
+        if let Command::HeartbeatSettings {
+            interval,
+            lost_after,
+            clear,
+        } = self
+        {
+            return interval.is_some() || lost_after.is_some() || *clear;
         }
         if let Command::AuditSettings {
             identity,
@@ -1281,6 +1305,7 @@ impl Command {
             Command::MoveIn { .. } => "move-in",
             Command::Translate { .. } => "translate",
             Command::HandoffRules { .. } => "handoff-rules",
+            Command::HeartbeatSettings { .. } => "heartbeat-settings",
             Command::AuditSettings { .. } => "audit-settings",
             Command::Handoff { .. } => "handoff",
         }
@@ -2773,6 +2798,19 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
+        Command::HeartbeatSettings {
+            interval,
+            lost_after,
+            clear,
+        } => heartbeat::settings(
+            cli,
+            cwd,
+            &allomos_core::heartbeat::SettingsChange {
+                interval: interval.as_deref(),
+                lost_after: lost_after.as_deref(),
+                clear: *clear,
+            },
+        ),
         Command::AuditSettings {
             identity,
             reauthenticate,
@@ -3802,7 +3840,25 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(name) = &here {
                 tasks = allomos_core::folders::in_folder(tasks, name);
             }
-            let instruction = if tasks.is_empty() {
+            // Held tasks (decision 0022, Task-A01-zero387): the lost ones and the busy ones, in
+            // the same iteration and folder as the list.
+            let in_scope: Vec<&Task> = bag
+                .tasks
+                .iter()
+                .filter(|t| {
+                    iteration
+                        .as_ref()
+                        .is_none_or(|i| t.iteration.as_ref() == Some(i))
+                })
+                .collect();
+            let in_scope = match &here {
+                Some(name) => allomos_core::folders::in_folder(in_scope, name),
+                None => in_scope,
+            };
+            let held = heartbeat::held(&root, &bag, &in_scope, allomos_store::now_secs());
+            let instruction = if tasks.is_empty() && held.any_lost {
+                "No ready task is free. The tasks listed as lost could be taken over: check each one first (who holds it, its handoff note), then decide; or ask the person what to do next.".to_string()
+            } else if tasks.is_empty() {
                 match iteration {
                     Some(i) => format!(
                         "Nothing to take: no ready task in iteration {i} is free. Ask the person what to do next."
@@ -3877,6 +3933,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(rules);
                 text.push('\n');
             }
+            text.push_str(&held.text);
             text.push_str(&instruction);
             text.push('\n');
             // An approval withdrawn while a task is in progress (approver, 2026-11-08,
@@ -3941,6 +3998,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 json!({
                     "taskbag": root,
                     "tasks": listed,
+                    "lost": held.lost,
+                    "busy": held.busy,
+                    "heartbeat_settings": allomos_core::heartbeat::applied(&bag.project),
                     "instruction": instruction,
                     "taking_over": taking_over,
                     "blocked": blocked,

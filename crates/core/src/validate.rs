@@ -192,6 +192,23 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
             }
         }
     }
+    if let Some(h) = &project.heartbeat {
+        for (field, value) in [
+            ("heartbeat.interval_minutes", h.interval_minutes),
+            ("heartbeat.lost_after_minutes", h.lost_after_minutes),
+        ] {
+            if value == Some(0) {
+                issues.push(Issue::new(
+                    file,
+                    Some(field),
+                    Problem::HeartbeatMinutesInvalid {
+                        field: field.to_string(),
+                        value: "0".to_string(),
+                    },
+                ));
+            }
+        }
+    }
     if let Some(value) = &project.task_language {
         if value != crate::model::TASK_LANGUAGE_UI && !crate::model::valid_language(value) {
             issues.push(Issue::new(
@@ -360,6 +377,9 @@ pub fn validate_taskbag(
     }
     if let Some(audit) = &project.audit {
         unknown_notes("project.json", "audit.", &audit.extra, &[], &mut issues);
+    }
+    if let Some(h) = &project.heartbeat {
+        unknown_notes("project.json", "heartbeat.", &h.extra, &[], &mut issues);
     }
     for (file, area) in areas {
         unknown_notes(file, "", &area.extra, &[], &mut issues);

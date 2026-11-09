@@ -9,12 +9,184 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Extra, State, Task};
+use crate::model::{Extra, Project, State, Task};
 use crate::problem::Problem;
 
 /// How often a holding session beats, by default (decision 0022 § 3): 10 minutes. `alm beat`
 /// writes nothing while the last heartbeat is younger than half of it.
 pub const INTERVAL_SECS: i64 = 10 * 60;
+
+/// After how long without a heartbeat a held task is lost, by default (decision 0022 § 3): 30
+/// minutes.
+pub const LOST_AFTER_SECS: i64 = 30 * 60;
+
+/// `project.json`'s `heartbeat` (decision 0022 § 3, Task-A01-zero387): the project's two numbers,
+/// in whole minutes. A missing one takes its default; `alm heartbeat-settings` changes them.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct Settings {
+    /// How often a holding session beats. Missing: 10.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interval_minutes: Option<u32>,
+    /// After how long without a heartbeat (and no busy window running) a held task is lost.
+    /// Missing: 30.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lost_after_minutes: Option<u32>,
+    /// Fields this Allomos does not know, kept as they are.
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+/// The two numbers as they apply, defaults filled in, in seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Applied {
+    pub interval_secs: i64,
+    pub lost_after_secs: i64,
+}
+
+impl Default for Applied {
+    fn default() -> Self {
+        Applied {
+            interval_secs: INTERVAL_SECS,
+            lost_after_secs: LOST_AFTER_SECS,
+        }
+    }
+}
+
+/// The project's heartbeat numbers as they apply. A value of 0 (refused when written, reported by
+/// validation) is read as the default.
+pub fn applied(project: &Project) -> Applied {
+    let s = project.heartbeat.clone().unwrap_or_default();
+    let pick = |v: Option<u32>, default: i64| {
+        v.filter(|m| *m > 0)
+            .map(|m| i64::from(m) * 60)
+            .unwrap_or(default)
+    };
+    Applied {
+        interval_secs: pick(s.interval_minutes, INTERVAL_SECS),
+        lost_after_secs: pick(s.lost_after_minutes, LOST_AFTER_SECS),
+    }
+}
+
+/// A change to the heartbeat settings (`alm heartbeat-settings`): each given length (`10m`, `1h`,
+/// or a bare number of minutes) replaces that number; `clear` first goes back to the defaults.
+#[derive(Debug, Default)]
+pub struct SettingsChange<'a> {
+    pub interval: Option<&'a str>,
+    pub lost_after: Option<&'a str>,
+    pub clear: bool,
+}
+
+/// A length given for a heartbeat setting, in whole minutes (at least 1): `10m`, `1h`, `1h30m`, or
+/// a bare number of minutes. `field` names the setting in the refusal.
+pub fn parse_minutes(field: &str, text: &str) -> Result<u32, Problem> {
+    let t = text.trim();
+    let secs = if !t.is_empty() && t.chars().all(|c| c.is_ascii_digit()) {
+        t.parse::<i64>().ok().and_then(|m| m.checked_mul(60))
+    } else {
+        parse_duration(t)
+    };
+    secs.filter(|s| *s >= 60 && s % 60 == 0)
+        .and_then(|s| u32::try_from(s / 60).ok())
+        .ok_or_else(|| Problem::HeartbeatMinutesInvalid {
+            field: field.to_string(),
+            value: text.to_string(),
+        })
+}
+
+/// The project with its heartbeat settings changed; `heartbeat` goes away when both are back to
+/// their defaults and nothing unknown is kept.
+pub fn set_settings(project: &Project, change: &SettingsChange) -> Result<Project, Problem> {
+    let interval = change
+        .interval
+        .map(|v| parse_minutes("--interval", v))
+        .transpose()?;
+    let lost = change
+        .lost_after
+        .map(|v| parse_minutes("--lost-after", v))
+        .transpose()?;
+    let mut s = project.heartbeat.clone().unwrap_or_default();
+    if change.clear {
+        s.interval_minutes = None;
+        s.lost_after_minutes = None;
+    }
+    if interval.is_some() {
+        s.interval_minutes = interval;
+    }
+    if lost.is_some() {
+        s.lost_after_minutes = lost;
+    }
+    let mut project = project.clone();
+    project.heartbeat = (s != Settings::default()).then_some(s);
+    Ok(project)
+}
+
+/// A held task that is lost (decision 0022 § 3): `in_progress`, held, with no heartbeat by its
+/// holder for longer than the project's limit and no busy window still running. `alm` only lists
+/// it; the session decides whether to take it over.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Lost {
+    pub id: String,
+    pub holder: String,
+    /// The holder's last heartbeat, in UTC; `None` when it never beat (a task claimed before
+    /// heartbeats, or by an older Allomos).
+    pub heartbeat_at: Option<String>,
+    /// The end of the holder's last busy window, when it declared one (it is over).
+    pub busy_until: Option<String>,
+    /// The time the limit counts from: the later of the heartbeat and the busy window's end, or,
+    /// with neither, the task's last recorded change.
+    pub since: String,
+    /// Seconds from `since` to now.
+    pub silent_seconds: i64,
+    /// The limit that applied, in seconds.
+    pub lost_after_seconds: i64,
+}
+
+/// Whether `task` is lost at `now` (seconds since 1970, UTC). `last_change`: the time of the
+/// task's newest recorded event, used when the holder never beat. A task that is not
+/// `in_progress` or has no holder (waiting, blocked, released, ready, done, dropped) is never
+/// lost, nor one whose silence cannot be dated.
+pub fn lost(task: &Task, now: i64, lost_after: i64, last_change: Option<&str>) -> Option<Lost> {
+    if task.state != State::InProgress {
+        return None;
+    }
+    let holder = task.holder.as_deref()?;
+    // Only the holder's own heartbeat counts (one left by a former holder does not).
+    let mine = task.heartbeat.as_ref().filter(|h| h.by == holder);
+    let at = mine.and_then(|h| parse_utc(&h.at));
+    let until = mine
+        .and_then(|h| h.busy_until.as_deref())
+        .and_then(parse_utc);
+    if until.is_some_and(|u| u > now) {
+        return None;
+    }
+    let since = match at.max(until) {
+        Some(t) => t,
+        None => last_change.and_then(parse_utc)?,
+    };
+    let silent = now - since;
+    (silent > lost_after).then(|| Lost {
+        id: task.id.clone(),
+        holder: holder.to_string(),
+        heartbeat_at: mine.map(|h| h.at.clone()),
+        busy_until: mine.and_then(|h| h.busy_until.clone()),
+        since: format_utc(since),
+        silent_seconds: silent,
+        lost_after_seconds: lost_after,
+    })
+}
+
+/// The end of the busy window the holder of `task` declared, while it still runs at `now`.
+pub fn busy_until(task: &Task, now: i64) -> Option<String> {
+    if task.state != State::InProgress {
+        return None;
+    }
+    let holder = task.holder.as_deref()?;
+    let h = task.heartbeat.as_ref().filter(|h| h.by == holder)?;
+    let until = h.busy_until.as_ref()?;
+    parse_utc(until)
+        .is_some_and(|u| u > now)
+        .then(|| until.clone())
+}
 
 /// The last heartbeat of a held task, in `task.json` as `heartbeat`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -383,6 +555,151 @@ mod tests {
             panic!()
         };
         assert_eq!(t.heartbeat.unwrap().busy_until, None);
+    }
+
+    fn project(heartbeat: serde_json::Value) -> Project {
+        serde_json::from_value(serde_json::json!({
+            "format": crate::FORMAT, "id": "p", "name": "P", "heartbeat": heartbeat
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn settings_default_change_and_clear() {
+        let p: Project = serde_json::from_value(
+            serde_json::json!({ "format": crate::FORMAT, "id": "p", "name": "P" }),
+        )
+        .unwrap();
+        assert_eq!(applied(&p), Applied::default());
+        let change = SettingsChange {
+            interval: Some("15m"),
+            lost_after: Some("1h"),
+            clear: false,
+        };
+        let p2 = set_settings(&p, &change).unwrap();
+        assert_eq!(
+            applied(&p2),
+            Applied {
+                interval_secs: 900,
+                lost_after_secs: 3_600
+            }
+        );
+        let s = p2.heartbeat.clone().unwrap();
+        assert_eq!(
+            (s.interval_minutes, s.lost_after_minutes),
+            (Some(15), Some(60))
+        );
+        // A bare number is minutes.
+        let p3 = set_settings(
+            &p2,
+            &SettingsChange {
+                lost_after: Some("45"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(applied(&p3).lost_after_secs, 2_700);
+        assert_eq!(applied(&p3).interval_secs, 900);
+        let cleared = set_settings(
+            &p3,
+            &SettingsChange {
+                clear: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(cleared.heartbeat, None);
+        for bad in ["0m", "90s", "x", "", "-5"] {
+            assert!(
+                matches!(
+                    set_settings(
+                        &p,
+                        &SettingsChange {
+                            interval: Some(bad),
+                            ..Default::default()
+                        }
+                    ),
+                    Err(Problem::HeartbeatMinutesInvalid { .. })
+                ),
+                "{bad}"
+            );
+        }
+        // A 0 written by hand is read as the default; unknown fields stay.
+        let odd = project(serde_json::json!({ "interval_minutes": 0, "later": 1 }));
+        assert_eq!(applied(&odd).interval_secs, INTERVAL_SECS);
+        let kept = set_settings(
+            &odd,
+            &SettingsChange {
+                clear: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(kept.heartbeat.unwrap().extra["later"], 1);
+    }
+
+    #[test]
+    fn a_task_is_lost_after_the_limit_without_a_heartbeat_or_busy_window() {
+        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, INTERVAL_SECS) else {
+            panic!()
+        };
+        assert_eq!(
+            lost(&t, t0() + LOST_AFTER_SECS, LOST_AFTER_SECS, None),
+            None
+        );
+        let l = lost(&t, t0() + LOST_AFTER_SECS + 1, LOST_AFTER_SECS, None).unwrap();
+        assert_eq!(l.holder, "s1");
+        assert_eq!(l.heartbeat_at.as_deref(), Some(T0));
+        assert_eq!(l.since, T0);
+        assert_eq!(l.silent_seconds, LOST_AFTER_SECS + 1);
+        // The project's own limit.
+        assert!(lost(&t, t0() + 700, 600, None).is_some());
+        // A busy window still running: not lost, however old the heartbeat.
+        let Ok(Beat::Written(b)) = beat(&t, "s1", t0(), Some(7_200), INTERVAL_SECS) else {
+            panic!()
+        };
+        assert_eq!(lost(&b, t0() + 7_000, LOST_AFTER_SECS, None), None);
+        assert_eq!(
+            busy_until(&b, t0() + 7_000).as_deref(),
+            Some("2026-11-09T16:00:00Z")
+        );
+        // Once over, the limit counts from its end.
+        assert_eq!(lost(&b, t0() + 7_200 + 1_800, LOST_AFTER_SECS, None), None);
+        let l = lost(&b, t0() + 7_200 + 1_801, LOST_AFTER_SECS, None).unwrap();
+        assert_eq!(l.since, "2026-11-09T16:00:00Z");
+        assert_eq!(l.busy_until.as_deref(), Some("2026-11-09T16:00:00Z"));
+        assert_eq!(busy_until(&b, t0() + 7_201), None);
+    }
+
+    #[test]
+    fn only_held_tasks_in_progress_are_lost_and_never_beating_counts_from_the_last_change() {
+        let t = held("s1");
+        // Never beat: from the last change; with nothing to date it by, not listed.
+        assert_eq!(lost(&t, t0() + 9_999, LOST_AFTER_SECS, None), None);
+        let l = lost(&t, t0() + 1_801, LOST_AFTER_SECS, Some(T0)).unwrap();
+        assert_eq!((l.heartbeat_at, l.since.as_str()), (None, T0));
+        // A former holder's heartbeat does not count for the new one.
+        let Ok(Beat::Written(mut other)) = beat(&t, "s1", t0() + 1_700, None, INTERVAL_SECS) else {
+            panic!()
+        };
+        other.holder = Some("s2".into());
+        assert_eq!(
+            lost(&other, t0() + 1_801, LOST_AFTER_SECS, Some(T0))
+                .unwrap()
+                .heartbeat_at,
+            None
+        );
+        for state in [State::Waiting, State::Blocked, State::Ready, State::Done] {
+            let mut s = t.clone();
+            s.state = state;
+            assert_eq!(lost(&s, t0() + 9_999, LOST_AFTER_SECS, Some(T0)), None);
+        }
+        let mut released = t.clone();
+        released.holder = None;
+        assert_eq!(
+            lost(&released, t0() + 9_999, LOST_AFTER_SECS, Some(T0)),
+            None
+        );
     }
 
     #[test]

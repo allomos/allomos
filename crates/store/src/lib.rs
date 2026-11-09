@@ -1091,6 +1091,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         task_language: None,
         handoff: None,
         audit: None,
+        heartbeat: None,
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -1388,6 +1389,7 @@ pub fn init_with_labels(
         task_language: Some(allomos_core::TASK_LANGUAGE_UI.to_string()),
         handoff: None,
         audit: None,
+        heartbeat: None,
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);
@@ -2309,6 +2311,8 @@ pub fn now_secs() -> i64 {
 pub struct Beaten {
     /// One entry for each task beaten for, in ID order: written, or too soon to write again.
     pub beats: Vec<heartbeat::Beat>,
+    /// The project's heartbeat interval that applied, in seconds (Task-A01-zero387).
+    pub interval_secs: i64,
     pub issues: Vec<Issue>,
 }
 
@@ -2327,6 +2331,7 @@ pub fn beat(
     let me = actor.by.ok_or(Problem::HolderMissing)?;
     let (lock, bag, issues) = lock_for_change(root, wait)?;
     let now = now_secs();
+    let interval = heartbeat::applied(&bag.project).interval_secs;
     let tasks: Vec<&Task> = match id {
         Some(id) => vec![
             bag.tasks
@@ -2348,14 +2353,18 @@ pub fn beat(
     };
     let beats = tasks
         .into_iter()
-        .map(|t| heartbeat::beat(t, me, now, busy, heartbeat::INTERVAL_SECS))
+        .map(|t| heartbeat::beat(t, me, now, busy, interval))
         .collect::<Result<Vec<_>, _>>()?;
     for b in &beats {
         if let heartbeat::Beat::Written(task) = b {
             lock.save_task(task)?;
         }
     }
-    Ok(Beaten { beats, issues })
+    Ok(Beaten {
+        beats,
+        interval_secs: interval,
+        issues,
+    })
 }
 
 /// After a change that leaves `task` finished (done or dropped): every blocked task whose

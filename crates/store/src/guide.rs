@@ -232,10 +232,17 @@ Work a task:
 - `alm beat [<id>] [--busy <length>]` (with `--as`): a heartbeat, the sign that the session
   holding an in-progress task is still at work (decision 0022). It writes the time into the task's
   file and no event; it counts once shared, so save and share it as `alm` prints. Without an ID,
-  every task the session holds, in one change. Under half the interval (5 of 10 minutes) after the
+  every task the session holds, in one change. Under half the interval (5 of 10 minutes by default) after the
   last one it writes nothing and says when the next is due. `--busy 2h` declares a quiet stretch
   (a long build or test run), shown until it ends; `--busy 0m` ends it. Every change the holder
   makes to its task (`label`, `note`, `handoff`, …) beats along with it; reading never does.
+- `alm next` also lists the **lost** tasks (decision 0022): held, in progress, with no heartbeat
+  for longer than the project's limit (30 minutes by default) and no busy window running, each with
+  its holder, how long it has been silent, the limit and the command to take it over; and the held
+  tasks in a busy window. `alm` takes nothing over: you check the task (its holder, its handoff
+  note) and decide. Waiting, blocked and released tasks are never lost.
+  `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--clear]` shows or changes
+  the two numbers (project settings).
 - After `claim`, `session`, `label`, `wait`, `block`, `release`, `handoff` and `done`, `alm` lists
   as Fact lines what the task is missing (`--json`: `missing`, each with `code`, `fact` and `fix`):
   session details the app needs to reopen the session, the working branch of a task that was
