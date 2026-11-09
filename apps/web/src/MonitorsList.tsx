@@ -174,7 +174,6 @@ export function MonitorsList({
           {error}
         </p>
       )}
-      <p className="muted small monitors-foot">{t("monitors.footer")}</p>
     </div>
   );
 }

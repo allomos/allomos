@@ -1119,7 +1119,6 @@
   "monitors.title": "这台电脑上正在运行的监测",
   "monitors.close": "关闭",
   "monitors.none": "没有正在运行的监测。",
-  "monitors.footer": "由 alm 或这个应用开始；关掉应用后照样运行。命令行：alm monitor list",
   "monitors.open": "打开",
   "monitors.checking": "正在检查…",
   "monitors.waiting": "没有就绪任务，下次检查 {time}",
