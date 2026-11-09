@@ -221,7 +221,10 @@ Work a task:
   progress. It records the working branch (`--working`, default the branch you are on), gives a
   task without a base the branch you are on, prints the base to start from and merge into with
   the Git commands as the example (`--json`: `branches`, `branch_commands`, `branch_facts`), and says so when
-  you are not on the base. `--take` only when its holder has stopped. While card files are kept
+  you are not on the base. A task someone else holds is refused (`task_held`) unless it is lost
+  (`alm next` lists those): claiming a lost task takes it over, keeps its working branch (unless
+  `--working`), and the claim's event records the former holder (`--json`: `took_over`).
+  `--take` takes over a task that is not lost, only when its holder has stopped. While card files are kept
   outside the taskbag it refuses (`claim_cards_outside`): move them in first (`alm guide
   move-cards`). The `--session-…` options record your session, so the Allomos app can reopen it
   from the task (stored as given, never checked).
@@ -549,6 +552,19 @@ const WORKFLOW: &str = "# How to work the tasks
    Git: `git branch --show-current`; alm reads no version control), and save and share the claim
    right away with your version control tool (it prints the Git commands as the example): until
    your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
+   **Taking over a lost task** (decision 0022 § 6). A held task whose holder has sent no
+   heartbeat for longer than the project's limit, with no busy window running, is lost: `alm next`
+   lists it under \"Lost, can be taken over\" with the command. Take one over only when you mean to
+   continue its work. Claiming it is the takeover: you become the holder, the claim's event
+   records whom you took it from and when, and the work goes on on the task's working branch
+   (the claim prints the commands to start a worktree from it). The former holder's worktree may
+   still hold changes it did not save or share; the claim says where it ran when known: look,
+   but do not change, commit or remove anything there. A held task that is not lost is still
+   refused. Two sessions taking over at once: the claim you push second is refused by your
+   version control tool (in Git: the push is rejected); get the latest changes (`git pull`),
+   and `alm show <id>` shows the task has a new holder: it is not yours, so leave its branch
+   alone and take another task. Once you hold it, beat like any holder (`alm beat`): when you
+   go silent, another session can take it over from you in turn.
    When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
    <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
    reopen it. In the Claude desktop app you must also pass `--session-kind desktop

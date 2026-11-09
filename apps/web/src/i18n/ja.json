@@ -330,6 +330,7 @@
   "problem.task_changed": "タスク {id} は読んだあとに変更されたため、あなたの変更は保存されませんでした。読み直してから（今の版は {version}）保存してください。",
   "problem.task_closed": "タスク {id} は {state} のため、この方法では変更できません。",
   "problem.took_over": "タスク {id} を {previous} から引き継ぎました。",
+  "problem.took_over_lost": "タスク {id} を {previous} から引き継ぎました。{previous} は {since} から動きがなく、連絡が途絶えていました。",
   "problem.bad_usage": "{detail}",
   "problem.not_a_taskbag": "{path} はタスクバッグのフォルダーではありません。",
   "problem.link_refused": "「肩代」が開くのは Web のリンクと、このプロジェクト内のテキストファイル（.md、.txt）だけなので、「{link}」は開きませんでした。",

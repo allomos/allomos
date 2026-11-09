@@ -330,6 +330,7 @@
   "problem.task_changed": "Task {id} changed after you read it, so your change was not saved. Read it again (its version is now {version}), then save.",
   "problem.task_closed": "Task {id} is {state}, so it cannot be changed this way.",
   "problem.took_over": "Took task {id} over from {previous}.",
+  "problem.took_over_lost": "Took task {id} over from {previous}: it was lost, with no sign of work from {previous} since {since}.",
   "problem.bad_usage": "{detail}",
   "problem.not_a_taskbag": "{path} is not a taskbag folder.",
   "problem.link_refused": "Allomos opens only web links and text files (.md, .txt) inside this project, so it did not open \"{link}\".",

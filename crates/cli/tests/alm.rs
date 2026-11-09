@@ -7983,7 +7983,7 @@ fn next_lists_lost_tasks_and_busy_windows() {
     assert_eq!(lost[0]["working_branch"], "claude/one");
     assert_eq!(
         lost[0]["take_over"],
-        "alm claim A01-01 --take --as <your session name> --branch claude/one"
+        "alm claim A01-01 --as <your session name> --branch claude/one"
     );
     assert!(
         v.get("changed_files")
@@ -8094,4 +8094,180 @@ fn next_lists_lost_tasks_and_busy_windows() {
     assert!(project.get("heartbeat").is_none());
     let (_, v) = fj(&repo, &["list"]);
     assert!(v.get("issues").is_none_or(|i| i == &json!([])), "{v}");
+}
+
+/// Takeover (decision 0022 § 6 and § 7, Task-A01-sign613): a plain `alm claim` takes over a lost
+/// task, records the former holder in the claim's event, keeps the working branch and prints the
+/// commands to continue on it and where the former holder worked; a task that is not lost is
+/// still refused; the new holder beats and can be taken over in turn.
+#[test]
+fn claim_takes_over_a_lost_task() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    let wt = repo.join("wt-s1");
+    std::fs::create_dir_all(&wt).unwrap();
+    let t0 = "2026-11-09T10:00:00Z";
+    ok_at(
+        &wt,
+        t0,
+        &[
+            "--as",
+            "s1",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--working",
+            "claude/one",
+            "--session-agent",
+            "claude-code",
+            "--session-id",
+            "x",
+        ],
+    );
+
+    // Not lost yet: refused as before, and nothing changes.
+    let events = event_count(&repo);
+    let (code, v) = fj_at(
+        &repo,
+        "2026-11-09T10:30:00Z",
+        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+    );
+    assert_eq!(
+        (code, v["error"]["code"].as_str()),
+        (1, Some("task_held")),
+        "{v}"
+    );
+    assert_eq!(event_count(&repo), events);
+
+    // Lost: the claim takes it over.
+    let t1 = "2026-11-09T11:00:00Z";
+    let v = ok_at(
+        &repo,
+        t1,
+        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+    );
+    assert_eq!(v["warnings"][0]["code"], "took_over_lost", "{v}");
+    assert_eq!(v["warnings"][0]["params"]["previous"], "s1");
+    assert_eq!(v["warnings"][0]["params"]["since"], t0);
+    assert_eq!(v["took_over"]["from"], "s1");
+    assert_eq!(v["took_over"]["lost"]["silent_seconds"], 3600);
+    assert_eq!(v["took_over"]["folder"], "wt-s1");
+    assert!(
+        v["took_over"]["folder_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("wt-s1"),
+        "{v}"
+    );
+    // Work goes on on the original working branch, from the branch that exists.
+    assert_eq!(v["branches"]["working"], "claude/one");
+    assert_eq!(
+        v["branch_commands"]["start"],
+        json!([
+            "git switch main",
+            "git pull --ff-only",
+            "git worktree add <folder> claude/one"
+        ])
+    );
+    let task = task_file(&repo, "A01-01");
+    assert_eq!(task["holder"], "s2");
+    assert_eq!(task["heartbeat"]["by"], "s2");
+    assert_eq!(task["heartbeat"]["at"], t1);
+    // The claim's event records whom it was taken from, and when.
+    let h = ok(&repo, &["history", "A01-01"]);
+    let e = &h["events"][0];
+    assert_eq!(
+        (e["command"].as_str(), e["at"].as_str(), e["by"].as_str()),
+        (Some("claim"), Some(t1), Some("s2"))
+    );
+    assert_eq!(
+        e["changes"][0],
+        json!({ "field": "holder", "from": "s1", "to": "s2" })
+    );
+    let text = String::from_utf8(
+        alm_at(
+            &repo,
+            t1,
+            &[
+                "--as",
+                "s2",
+                "claim",
+                "A01-01",
+                "--branch",
+                "main",
+                "--working",
+                "claude/one",
+            ],
+        )
+        .stdout,
+    )
+    .unwrap();
+    assert!(
+        !text.contains("taken over from"),
+        "same holder again: {text}"
+    );
+
+    // The new holder is an ordinary holder: its heartbeat keeps the task, its silence loses it.
+    ok_at(
+        &repo,
+        "2026-11-09T11:20:00Z",
+        &["--as", "s2", "beat", "A01-01"],
+    );
+    refused_at(
+        &repo,
+        "2026-11-09T11:40:00Z",
+        &["--as", "s3", "claim", "A01-01", "--branch", "main"],
+        "task_held",
+    );
+    let v = ok_at(
+        &repo,
+        "2026-11-09T12:00:00Z",
+        &["--as", "s3", "claim", "A01-01", "--branch", "main"],
+    );
+    assert_eq!(v["warnings"][0]["code"], "took_over_lost", "{v}");
+    assert_eq!(v["took_over"]["from"], "s2");
+    assert_eq!(v["branches"]["working"], "claude/one");
+    let h = ok(&repo, &["history", "A01-01"]);
+    let holders: Vec<&str> = h["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["command"] == "claim")
+        .filter_map(|e| {
+            e["changes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|c| c["field"] == "holder")
+        })
+        .map(|c| c["to"].as_str().unwrap())
+        .collect();
+    assert_eq!(holders, ["s3", "s2", "s1"]);
+    // The text tells about the former holder's worktree.
+    ok_at(
+        &repo,
+        "2026-11-09T12:00:00Z",
+        &["--as", "s1", "claim", "A01-02", "--branch", "main"],
+    );
+    let out = alm_at(
+        &repo,
+        "2026-11-09T13:00:00Z",
+        &["--as", "s4", "claim", "A01-02", "--branch", "main"],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("taken over from: s1 (lost)"), "{text}");
+    assert!(
+        text.contains("do not change, commit or remove what is there"),
+        "{text}"
+    );
+}
+
+fn refused_at(dir: &Path, now: &str, args: &[&str], problem: &str) {
+    let (code, v) = fj_at(dir, now, args);
+    assert_eq!(
+        (code, v["error"]["code"].as_str()),
+        (1, Some(problem)),
+        "{args:?}: {v}"
+    );
 }
