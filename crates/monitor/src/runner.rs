@@ -107,7 +107,11 @@ pub fn new_session_id() -> String {
     }
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let hex: String = bytes.iter().fold(String::new(), |mut s, b| {
+        use std::fmt::Write;
+        let _ = write!(s, "{b:02x}");
+        s
+    });
     format!(
         "{}-{}-{}-{}-{}",
         &hex[0..8],
@@ -408,6 +412,10 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         }
     ));
     let _ = std::fs::remove_file(registry::record_path(dir, id));
+    // Only what finding and controlling a running run needs stays on this computer (approver,
+    // 2026-11-09): the log of a run that ended as asked goes too. A run that could not start, or
+    // was ended from outside, leaves its log for the person to read.
+    let _ = std::fs::remove_file(registry::log_path(dir, id));
     lp.held.release();
     // Leave the closing countdowns of done tasks' tabs time to finish.
     std::thread::sleep(Duration::from_secs(1));

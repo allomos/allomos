@@ -226,7 +226,12 @@ pub enum Entry {
     /// A run with its file.
     Running(Box<Record>),
     /// An `alm monitor run` process no run file names: running, record missing.
-    Missing { pid: u32, id: Option<String> },
+    Missing {
+        pid: u32,
+        id: Option<String>,
+        /// The taskbag its command line names, when it names one.
+        taskbag: Option<PathBuf>,
+    },
 }
 
 impl Entry {
@@ -248,7 +253,7 @@ impl Entry {
 /// process is not to be found has ended without tidying up: its files are removed. With
 /// `processes` (from [`monitor_processes`]), `alm monitor run` processes no file names are added
 /// as [`Entry::Missing`].
-pub fn list(dir: &Path, processes: Option<&[(u32, Option<String>)]>) -> Vec<Entry> {
+pub fn list(dir: &Path, processes: Option<&[Process]>) -> Vec<Entry> {
     let mut records: Vec<Record> = fs::read_dir(dir)
         .into_iter()
         .flatten()
@@ -264,7 +269,7 @@ pub fn list(dir: &Path, processes: Option<&[(u32, Option<String>)]>) -> Vec<Entr
         .collect();
     records.sort_by(|a, b| a.run.started.cmp(&b.run.started).then(a.id.cmp(&b.id)));
     let mut out = Vec::new();
-    let mut found_procs: Option<Vec<(u32, Option<String>)>> = processes.map(<[_]>::to_vec);
+    let mut found_procs: Option<Vec<Process>> = processes.map(<[_]>::to_vec);
     for r in records {
         let alive = held(&lock_path(dir, &r.id)) || {
             // The lock is not held: perhaps its file was removed and the process has not made it
@@ -272,7 +277,7 @@ pub fn list(dir: &Path, processes: Option<&[(u32, Option<String>)]>) -> Vec<Entr
             let procs = found_procs.get_or_insert_with(monitor_processes);
             procs
                 .iter()
-                .any(|(pid, id)| *pid == r.pid && id.as_deref() == Some(r.id.as_str()))
+                .any(|p| p.pid == r.pid && p.id.as_deref() == Some(r.id.as_str()))
         };
         if alive {
             out.push(Entry::Running(Box::new(r)));
@@ -284,16 +289,35 @@ pub fn list(dir: &Path, processes: Option<&[(u32, Option<String>)]>) -> Vec<Entr
             }
         }
     }
+    // A lock file left by a run whose record is gone and whose lock nobody holds.
+    for path in fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+    {
+        let Some(id) = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| n.strip_suffix(".lock"))
+        else {
+            continue;
+        };
+        if !record_path(dir, id).exists() && !held(&path) {
+            let _ = fs::remove_file(&path);
+        }
+    }
     if let Some(procs) = processes {
-        for (pid, id) in procs {
+        for p in procs {
             let known = out.iter().any(|e| match e {
-                Entry::Running(r) => r.pid == *pid || id.as_deref() == Some(r.id.as_str()),
+                Entry::Running(r) => r.pid == p.pid || p.id.as_deref() == Some(r.id.as_str()),
                 Entry::Missing { .. } => false,
             });
-            if !known && *pid != std::process::id() {
+            if !known && p.pid != std::process::id() {
                 out.push(Entry::Missing {
-                    pid: *pid,
-                    id: id.clone(),
+                    pid: p.pid,
+                    id: p.id.clone(),
+                    taskbag: p.taskbag.clone(),
                 });
             }
         }
@@ -314,8 +338,30 @@ pub fn run_words<'a>(words: &[&'a str]) -> Option<Option<&'a str>> {
     Some(words.get(at + 2).copied().filter(|w| plain_id(w)))
 }
 
-/// The `alm monitor run` processes on this computer: their process numbers and run IDs.
-pub fn monitor_processes() -> Vec<(u32, Option<String>)> {
+/// An `alm monitor run` process on this computer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Process {
+    pub pid: u32,
+    /// The run ID its command line names.
+    pub id: Option<String>,
+    /// The taskbag its command line names (`--taskbag`).
+    pub taskbag: Option<PathBuf>,
+}
+
+/// The `--taskbag` its words name: the words after it up to the next option (a path may hold
+/// spaces).
+pub fn taskbag_words(words: &[&str]) -> Option<PathBuf> {
+    let at = words.iter().position(|w| *w == "--taskbag")?;
+    let path: Vec<&str> = words[at + 1..]
+        .iter()
+        .take_while(|w| !w.starts_with("--"))
+        .copied()
+        .collect();
+    (!path.is_empty()).then(|| PathBuf::from(path.join(" ")))
+}
+
+/// The `alm monitor run` processes on this computer.
+pub fn monitor_processes() -> Vec<Process> {
     process_lines()
         .iter()
         .filter_map(|line| {
@@ -324,7 +370,11 @@ pub fn monitor_processes() -> Vec<(u32, Option<String>)> {
             let pid: u32 = pid.trim().parse().ok()?;
             let words: Vec<&str> = rest.split_whitespace().collect();
             let id = run_words(&words)?;
-            Some((pid, id.map(String::from)))
+            Some(Process {
+                pid,
+                id: id.map(String::from),
+                taskbag: taskbag_words(&words),
+            })
         })
         .collect()
 }
@@ -359,6 +409,9 @@ pub fn end_process(pid: u32) -> io::Result<()> {
     {
         // SAFETY: `kill` takes a process number and a signal; it touches no memory of ours.
         let r = unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) };
+        // A paused process ends only once it goes on.
+        // SAFETY: as above.
+        unsafe { libc::kill(pid as libc::pid_t, libc::SIGCONT) };
         if r == 0 {
             Ok(())
         } else {
@@ -441,6 +494,20 @@ mod tests {
         );
         assert_eq!(run_words(&["alm", "monitor", "status"]), None);
         assert_eq!(run_words(&["grep", "monitor", "run", "m-1"]), None);
+        assert_eq!(
+            taskbag_words(&[
+                "alm",
+                "monitor",
+                "run",
+                "m-1",
+                "--taskbag",
+                "/a",
+                "b/tb",
+                "--every",
+                "5"
+            ]),
+            Some(PathBuf::from("/a b/tb"))
+        );
     }
 
     #[test]
@@ -475,8 +542,16 @@ mod tests {
         let h = Held::take(&lock_path(&d, "m-alive")).unwrap().unwrap();
         fs::write(lock_path(&d, "m-gone"), "").unwrap();
         let procs = [
-            (4242, Some("m-lost".to_string())),
-            (999_999, Some("m-alive".to_string())),
+            Process {
+                pid: 4242,
+                id: Some("m-lost".into()),
+                taskbag: Some("/tb".into()),
+            },
+            Process {
+                pid: 999_999,
+                id: Some("m-alive".into()),
+                taskbag: None,
+            },
         ];
         let entries = list(&d, Some(&procs));
         assert_eq!(entries.len(), 2);
@@ -485,7 +560,8 @@ mod tests {
             entries[1],
             Entry::Missing {
                 pid: 4242,
-                id: Some("m-lost".into())
+                id: Some("m-lost".into()),
+                taskbag: Some("/tb".into())
             }
         );
         assert!(!record_path(&d, "m-gone").exists());
