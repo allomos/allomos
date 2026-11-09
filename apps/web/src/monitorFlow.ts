@@ -1,13 +1,12 @@
 // Monitor ready tasks (Task-A03-moth285, approver 2026-11-03/04): one button starts unattended
 // monitoring of the project's ready tasks, or one iteration's. Each ready task is worked in a new
-// agent session, one at a time; with none ready, the monitor waits and checks again at the chosen
-// frequency. Several agents can be chosen (Task-A03-fruit467): each works one task at a time, in
-// a session of its own. Every route must run unattended (approver, 2026-11-04); this first slice is the
-// route Allomos runs itself: Claude Code or Codex in a terminal, started with the request. Kept
-// apart from React so it can be tested with Node alone (`npm --prefix apps/web test`). Only type
-// imports here: Node strips them.
+// agent session; several agents can be chosen (Task-A03-fruit467). Since Task-A03-cow112
+// (approver 2026-11-09) the run itself is a background `alm monitor run` process, started by the
+// app's own `alm monitor start` or from a terminal, and goes on after the app is closed; the app
+// only reads this computer's run files and leaves requests beside them. Kept apart from React so
+// it can be tested with Node alone (`npm --prefix apps/web test`). Only type imports here: Node
+// strips them.
 
-import type { Language } from "./i18n";
 import type { Iteration, Task } from "./types";
 
 /** How often to check when no task is ready, in minutes: these seven only (approver, 2026-11-04). */
@@ -106,14 +105,13 @@ export function scopeReady(options: ScopeOptions, scope: Scope): number {
   return options.other.items.find((i) => i.id === scope.id)?.ready ?? 0;
 }
 
-/** The terminal tab Allomos opened for a session (macOS Terminal: its window and terminal device),
- * so that tab alone is closed once its task is done (Task-A03-sierra014). */
+/** The terminal tab Allomos opened for a session (macOS Terminal: its window and terminal device). */
 export interface SessionTab {
   window: number;
   tty: string;
 }
 
-/** The task a session is working for the monitor. */
+/** A session working a task for a run. */
 export interface Current {
   /** The agent whose session it is (Task-A03-fruit467: a run may have several). */
   agent: TerminalAgent;
@@ -121,63 +119,111 @@ export interface Current {
   /** The session ID Allomos gave the agent (Claude Code's `--session-id`); null when the agent
    * picks its own (Codex). */
   sessionId: string | null;
-  /** The tab it runs in, when Allomos can close it (null: it stays open whatever happens). */
   tab: SessionTab | null;
   /** When the session was started (ms). */
   at: number;
-  /** Seen held by someone since it was started: it was claimed. */
-  seenHeld: boolean;
-  /** The task as last seen (what changes when the session works it), and since when. */
-  seen: string;
+  /** When its task last changed (ms): the sign of life [`stalled`] looks at. */
   changed: number;
 }
 
-/** One monitoring run, kept by the app on this computer only, never in the taskbag. */
+/** A task the run's last sweep let go on (Task-A01-steam936): its blockers had all finished. */
+export type Unblocked = { id: string; state: string };
+
+/** One monitoring run, as its process last wrote it in its run file. */
 export interface Run {
+  /** The run's ID (`alm monitor status` shows it). */
+  id: string;
+  /** Its process. */
+  pid: number;
   scope: Scope;
-  /** The agents ready tasks are given to (Task-A03-fruit467, approver 2026-11-08): each works one
-   * task at a time, in a session of its own. Changed while the run goes on with [`setAgents`]. */
   agents: TerminalAgent[];
   /** The agents the person could choose when the run started, offered again in the status bar. */
   offered: TerminalAgent[];
   quiet: boolean;
   every: Frequency;
-  /** When it started (ms). */
   started: number;
-  /** The tasks it has started a session for, in order (those being worked included). */
+  /** The tasks it has started a session for, in order. */
   taken: string[];
-  /** The sessions working a task now, at most one per agent, in the order they were started. A
-   * session of an agent taken off the run stays here until its task is finished. */
+  /** The sessions working a task now, at most one per agent. */
   working: Current[];
   /** Stop asked while tasks are worked: the run ends when they are all finished. */
   stopping: boolean;
   /** When it last checked for a ready task (ms). */
   checked: number;
-  /** The person was told no task is ready (Task-A00-eclair542): told once per stretch without one,
-   * again only after a task has been taken. */
-  idleTold?: boolean;
+  /** When the next check is due (ms). */
+  next: number;
+  unblocked: Unblocked[];
 }
 
-/** A new run; it checks at once. `offered` defaults to the agents chosen. */
-export function startRun(
-  scope: Scope,
-  agents: TerminalAgent[],
-  quiet: boolean,
-  every: Frequency,
-  now: number,
-  offered: TerminalAgent[] = agents,
-): Run {
-  return { scope, agents, offered, quiet, every, started: now, taken: [], working: [], stopping: false, checked: now - every * 60_000 };
+/** An `alm monitor run` process this computer runs with no run file: running, record missing.
+ * It cannot see a request; Stop ends it. */
+export interface LostRun {
+  pid: number;
+  id: string | null;
 }
 
-/** The run with these agents: an agent added gets tasks from the next check on; one taken off is
- * given no more, while the session it is working finishes its task undisturbed. At least one
- * agent stays: an empty list leaves the run as it is (stopping is Stop's job). */
-export function setAgents(run: Run, agents: TerminalAgent[]): Run {
-  if (agents.length === 0) return run;
-  const offered = run.offered.filter((a) => agents.includes(a));
-  const kept = [...offered, ...agents.filter((a) => !offered.includes(a))];
-  return { ...run, agents: kept };
+const asAgent = (a: unknown): TerminalAgent | null =>
+  typeof a === "string" && TERMINAL_AGENTS.includes(a) ? (a as TerminalAgent) : null;
+const agents = (list: unknown): TerminalAgent[] =>
+  Array.isArray(list) ? list.map(asAgent).filter((a): a is TerminalAgent => a !== null) : [];
+const num = (n: unknown, or = 0): number => (typeof n === "number" ? n : or);
+
+/** One entry of `monitor_runs` (as `alm monitor status --json` lists it): a run, or a process
+ * whose record is missing. `active` is the active iteration, to name the scope "current". */
+export function readEntry(e: any, active: string | null | undefined): Run | LostRun | null {
+  if (!e || typeof e !== "object") return null;
+  if (e.record === "missing") return { pid: num(e.pid), id: typeof e.id === "string" ? e.id : null };
+  const r = e.run;
+  if (!r || typeof e.id !== "string") return null;
+  const scope: Scope =
+    r.scope?.kind === "iteration" && typeof r.scope.id === "string"
+      ? { kind: "iteration", id: r.scope.id, current: r.scope.id === active }
+      : { kind: "all" };
+  const every = (FREQUENCIES as readonly number[]).includes(r.every) ? (r.every as Frequency) : FIRST_FREQUENCY;
+  return {
+    id: e.id,
+    pid: num(e.pid),
+    scope,
+    agents: agents(r.agents),
+    offered: agents(r.offered),
+    quiet: Boolean(r.quiet),
+    every,
+    started: num(r.started),
+    taken: Array.isArray(r.taken) ? r.taken.filter((t: unknown) => typeof t === "string") : [],
+    working: (Array.isArray(r.working) ? r.working : [])
+      .map((w: any): Current | null => {
+        const agent = asAgent(w?.agent);
+        if (!agent || typeof w.id !== "string") return null;
+        return {
+          agent,
+          id: w.id,
+          sessionId: typeof w.session_id === "string" ? w.session_id : null,
+          tab: w.tab && typeof w.tab.window === "number" ? { window: w.tab.window, tty: String(w.tab.tty) } : null,
+          at: num(w.at),
+          changed: num(w.changed, num(w.at)),
+        };
+      })
+      .filter((w: Current | null): w is Current => w !== null),
+    stopping: Boolean(r.stopping),
+    checked: num(r.checked),
+    next: num(e.next_check, num(r.checked) + every * 60_000),
+    unblocked: (Array.isArray(r.unblocked) ? r.unblocked : []).filter(
+      (u: unknown): u is Unblocked => typeof (u as Unblocked)?.id === "string" && typeof (u as Unblocked)?.state === "string",
+    ),
+  };
+}
+
+export function isRun(e: Run | LostRun): e is Run {
+  return "working" in e;
+}
+
+/** The agent list after adding or taking off one in the status bar (Task-A03-fruit467): an agent
+ * added gets tasks from the next check on; one taken off finishes the task its session works. At
+ * least one agent stays: an empty list leaves it as it is. Kept in the order they were offered. */
+export function setAgents(run: Run, chosen: TerminalAgent[]): TerminalAgent[] {
+  if (chosen.length === 0) return run.agents;
+  const offered = run.offered.filter((a) => chosen.includes(a));
+  return [...offered, ...chosen.filter((a) => !offered.includes(a))];
 }
 
 /** The agents of the run with no task being worked: each can be given one at the next check. */
@@ -185,118 +231,9 @@ export function freeAgents(run: Run): TerminalAgent[] {
   return run.agents.filter((a) => !run.working.some((w) => w.agent === a));
 }
 
-/** What of a task its session changes as it works it. */
-function seenOf(task: Task | undefined): string {
-  return task ? JSON.stringify([task.state, task.holder, task.labels ?? [], task.handoff_note, task.waiting_on]) : "";
-}
-
-/** One session's task followed in the taskbag as it is now: null when it is finished (done,
- * dropped, waiting or blocked: alm keeps the last holder on those; no one holds it any more after
- * being claimed, or it left `ready` without ever being held; or it is gone). */
-function followOne(cur: Current, tasks: Task[], now: number): Current | null {
-  const task = tasks.find((t) => t.id === cur.id);
-  const seen = seenOf(task);
-  const seenHeld = cur.seenHeld || Boolean(task?.holder);
-  const stopped = task !== undefined && ["done", "dropped", "waiting", "blocked"].includes(task.state);
-  const finished = !task || stopped || (!task.holder && (seenHeld || task.state !== "ready"));
-  if (finished) return null;
-  if (seen === cur.seen && seenHeld === cur.seenHeld) return cur;
-  return { ...cur, seen, seenHeld, changed: seen === cur.seen ? cur.changed : now };
-}
-
-/** The run with every session's task followed in the taskbag as it is now, and the sessions whose
- * tasks are finished (in the order they were started). */
-export function follow(run: Run, tasks: Task[], now: number): { run: Run; finished: Current[] } {
-  if (!run.working.length) return { run, finished: [] };
-  const finished: Current[] = [];
-  let changed = false;
-  const working: Current[] = [];
-  for (const cur of run.working) {
-    const next = followOne(cur, tasks, now);
-    if (next === null) finished.push(cur);
-    else working.push(next);
-    if (next !== cur) changed = true;
-  }
-  return { run: changed ? { ...run, working } : run, finished };
-}
-
-/** The tab to close now that a session's task is finished: only when the task is **done**
- * (approver, 2026-11-08); waiting, blocked, released, dropped or gone leaves the tab open, so the
- * person can see why it stopped. */
-export function tabToClose(cur: Current, tasks: Task[]): SessionTab | null {
-  if (!cur.tab) return null;
-  return tasks.find((t) => t.id === cur.id)?.state === "done" ? cur.tab : null;
-}
-
 /** When the next check is due (ms). */
 export function nextCheck(run: Run): number {
-  return run.checked + run.every * 60_000;
-}
-
-/** The next task to start a session for: the first ready one in the scope this run has not
- * taken yet (a task its session released is not taken again in the same run), nor is in `skip`
- * (given to another agent in this same check). */
-export function pick(
-  run: Run,
-  tasks: Task[],
-  areas: { id: string }[],
-  iterations: Iteration[],
-  active: string | null | undefined,
-  skip: string[] = [],
-): Task | null {
-  const id = run.scope.kind === "iteration" ? run.scope.id : undefined;
-  return readyTasks(tasks, areas, iterations, active, id).find((t) => !run.taken.includes(t.id) && !skip.includes(t.id)) ?? null;
-}
-
-/** One check's share-out: each free agent, in the run's order, with the next ready task, while
- * there are tasks. Every session claims its task first (`alm claim` lets no one take a task
- * another holds), so two agents never work the same one. */
-export function share(
-  run: Run,
-  tasks: Task[],
-  areas: { id: string }[],
-  iterations: Iteration[],
-  active: string | null | undefined,
-): { agent: TerminalAgent; task: Task }[] {
-  const out: { agent: TerminalAgent; task: Task }[] = [];
-  for (const agent of freeAgents(run)) {
-    const task = pick(run, tasks, areas, iterations, active, out.map((o) => o.task.id));
-    if (!task) break;
-    out.push({ agent, task });
-  }
-  return out;
-}
-
-/** The run with a session of `agent` started for `task`. */
-export function take(run: Run, agent: TerminalAgent, task: Task, sessionId: string | null, now: number, tab: SessionTab | null = null): Run {
-  return {
-    ...run,
-    taken: [...run.taken, task.id],
-    working: [...run.working, { agent, id: task.id, sessionId, tab, at: now, seenHeld: Boolean(task.holder), seen: seenOf(task), changed: now }],
-    checked: now,
-    idleTold: false,
-  };
-}
-
-/** What the monitor tells the person when it is stuck (Task-A00-eclair542, approver 2026-11-09):
- * a task its session parked waiting on a person, or no task ready. */
-export type StuckAlert = { kind: "waiting"; id: string; on: string } | { kind: "idle" };
-
-/** A task that just finished (`finished`, from [`follow`]) stopped waiting on a person: tell
- * them. A task waiting on someone named (`who`) is theirs, not the person's, so it is not told. */
-export function waitingAlert(finished: string | null, tasks: Task[]): StuckAlert | null {
-  if (!finished) return null;
-  const task = tasks.find((t) => t.id === finished);
-  if (task?.state !== "waiting" || task.who) return null;
-  return { kind: "waiting", id: task.id, on: task.waiting_on ?? "" };
-}
-
-/** A check found no task to take while no session works one: tell the person once for this
- * stretch without one. Returns the run marked as told, with the alert; or the run as it is and
- * none when already told, or while a session still works a task (the monitor is not stuck). */
-export function idleAlert(run: Run): { run: Run; alert: StuckAlert | null } {
-  if (run.idleTold || run.working.length) return { run, alert: null };
-  return { run: { ...run, idleTold: true }, alert: { kind: "idle" } };
+  return run.next;
 }
 
 /** The sessions that have shown no sign of life for [`STALL_MS`]. */
@@ -331,110 +268,14 @@ export function frequencyText(every: Frequency): { unit: "minute" | "minutes" | 
   return { unit: every === 1 ? "minute" : "minutes", n: every };
 }
 
-/** The name an agent passes to `alm claim --session-agent`. */
-function sessionAgent(agent: TerminalAgent): string {
-  return agent === "claude_cli" ? "claude-code" : agent === "antigravity_cli" ? "antigravity" : "codex";
-}
-
-/** How a terminal Claude Code session reads its quota (Task-A03-folk351): it has no `get_usage`
- * (only the Claude desktop app gives its sessions that), but `claude -p /usage` prints the
- * "Current session" and "Current week" lines, answered by Claude Code itself without the model.
- * Empty for the other agents. The paragraph ends with a blank line. */
-function usageParagraph(agent: TerminalAgent, language: Language): string {
-  if (agent !== "claude_cli") return "";
-  if (language === "zh-CN") {
-    return `配额：这个终端会话没有 get_usage。AGENTS.md 或 alm 要你报告配额时，运行 claude -p /usage（Claude Code 自己回答，不问模型），按它的两行报告：“Current session” 用 alm quota --agent claude-code --left <100 减已用的百分数> --resets <它的重置时间，本地时间，例如 2026-11-09T11:20> --window 5h；“Current week” 一样，用 --window week。\n\n`;
-  }
-  if (language === "ja") {
-    return `クォータ：このターミナルのセッションには get_usage がありません。AGENTS.md や alm がクォータの報告を求めたら、claude -p /usage を実行し（Claude Code が自分で答え、モデルには聞きません）、その 2 行を報告してください：「Current session」は alm quota --agent claude-code --left <100 から使用済みの割合を引いた数> --resets <そのリセット時刻、ローカル時刻、例 2026-11-09T11:20> --window 5h、「Current week」は同じように --window week で。\n\n`;
-  }
-  return `Quota: this terminal session has no get_usage. When AGENTS.md or alm asks for your quota, run claude -p /usage (Claude Code answers it itself, without the model) and report its two lines: "Current session" with alm quota --agent claude-code --left <100 minus the percent used> --resets <its reset time, local, e.g. 2026-11-09T11:20> --window 5h, and "Current week" the same way with --window week.\n\n`;
-}
-
-/** The request a new session gets for one task, in the interface language. `taskbag` is the
- * taskbag's path as the agent, working in the project folder, passes it to `--taskbag`. */
-export function monitorRequest(
-  task: Task,
-  taskbag: string,
-  language: Language,
-  agent: TerminalAgent,
-  sessionId: string | null,
-  quiet: boolean,
-): string {
-  const id = task.id;
-  const tb = `--taskbag "${taskbag}"`;
-  const sa = sessionAgent(agent);
-  const usage = usageParagraph(agent, language);
-  if (language === "zh-CN") {
-    const sid = sessionId ?? "<你的会话 ID>";
-    const mode = quiet
-      ? `运行模式：安静模式（开始监测的人选的）。不要停下来等人：常规选择和用户看到的用词、样子都自己决定，做好、合入，并用 alm ai-decided 记下（能截图就附上），批准者在发布前审。只有数据格式、删掉东西、权限和安全、费用、对外影响、改变计划或其他任务的事才是真正的问题：带上你的提案，用 alm wait ${id} --on "<问题> 提案：<你的提案>" 搁置，然后结束这个会话；不依赖回答、已做完测完的工作先合入。工作都做完了、只剩人的亲手检查时，用 alm done ${id} --without-human-check 收尾（还有问题就用 alm ai-decided 记下，不再搁置）。`
-      : "运行模式：普通模式（开始监测的人选的）。需要人时照常问。";
-    return `请做这个项目任务袋里的任务 ${id}（“${task.title}”）。「换肩」正在自动监测就绪任务，为这一个任务开了这个会话。每条 alm 命令都加上 ${tb}。
-
-${mode}
-
-${usage}1. 阅读：alm show ${id}（它的说明和最新的交接）。
-2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim ${id} --as <你的会话名> --branch <你的分支> --session-agent ${sa} --session-id ${sid} --session-kind terminal，并把认领分享出去。
-3. 在它自己的工作树里做，工作树从认领时列出的基础分支切出。
-4. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。
-5. 用 alm handoff ${id} 写交接，然后结束这个会话。只做这一个任务，不要去取下一个：「换肩」会为下一个任务另开会话。`;
-  }
-  if (language === "ja") {
-    const sid = sessionId ?? "<あなたのセッション ID>";
-    const mode = quiet
-      ? `実行モード：静かなモード（監視を始めた人が選びました）。人を待って止まらないでください：いつもの選択も、利用者が目にする言葉や見た目も自分で決め、作ってマージし、alm ai-decided で記録してください（撮れるならスクリーンショット付き）。承認者はリリース前に見直します。本当の質問は、データの形式、何かの削除、権限とセキュリティ、費用、外部への影響、計画や他のタスクの変更だけです：あなたの案を添えて alm wait ${id} --on "<質問> 案：<あなたの案>" で保留にし、このセッションを終えてください。答えによらない、作業済みでテスト済みの部分は先にマージします。作業がすべて終わり、人の手による確認だけが残ったら alm done ${id} --without-human-check で終えてください（質問が残っていれば保留にせず alm ai-decided で記録します）。`
-      : "実行モード：通常のモード（監視を始めた人が選びました）。人が必要なときはいつもどおり聞いてください。";
-    return `このプロジェクトのタスクバッグにあるタスク ${id}（「${task.title}」）を進めてください。「肩代」が準備完了のタスクを自動で監視していて、このタスクひとつのためにこのセッションを開きました。alm コマンドはすべて ${tb} を付けて実行してください。
-
-${mode}
-
-${usage}1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
-2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim ${id} --as <あなたのセッション名> --branch <あなたのブランチ> --session-agent ${sa} --session-id ${sid} --session-kind terminal）、その引き受けを共有してください。
-3. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
-4. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。
-5. alm handoff ${id} で引き継ぎを書き、このセッションを終えてください。このタスクだけを進め、次のタスクは取らないでください：次のタスクには「肩代」が新しいセッションを開きます。`;
-  }
-  const sid = sessionId ?? "<your session's ID>";
-  const mode = quiet
-    ? `Run mode: quiet (chosen by the person who started the monitoring). Never wait for the person: decide routine choices yourself, and the wording and look users see too: build them, merge them and record them with alm ai-decided (with a screenshot when you can take one); the approver reviews them before release. Only data formats, removing things, permissions and security, cost, outside effects and changes to the plan or another task are real questions: park one with your proposal, alm wait ${id} --on "<the question> Proposal: <yours>", then end this session; merge first the work that is done and tested and does not depend on the answer. When all the work is done and only a person's hands-on check is left, finish with alm done ${id} --without-human-check (record any question left with alm ai-decided instead of parking it).`
-    : "Run mode: normal (chosen by the person who started the monitoring). Ask the person as usual when you need them.";
-  return `Work on task ${id} ("${task.title}") in this project's taskbag. Allomos is monitoring ready tasks and opened this session for this one task. Run every alm command with ${tb}.
-
-${mode}
-
-${usage}1. Read it: alm show ${id} (its description and latest handoff note).
-2. Claim it as AGENTS.md says, with this session's details: alm claim ${id} --as <your session name> --branch <your branch> --session-agent ${sa} --session-id ${sid} --session-kind terminal, and share the claim.
-3. Work it in a worktree of its own, cut from the base branch the claim prints.
-4. Report progress with alm label; finish with alm done, or stop with alm release --note.
-5. Write a handoff with alm handoff ${id}, then end this session. Work only this task; do not take another one: Allomos opens a new session for the next.`;
-}
-
-/** A task the monitor's sweep let go on (Task-A01-steam936): every blocker had finished. As
- * `release_finished` sends it. */
-export type Released = { task: Task; blockers: string[] };
-
 /** The line under the monitor's status bar after a sweep let tasks go on: one group per state they
- * went back to (ready, or in progress when someone holds them). `seen` is set once the check it
- * belongs to has run; the next check clears it. */
-export type UnblockNotice = { groups: { state: "ready" | "in_progress"; ids: string[] }[]; seen: boolean };
+ * went back to (ready, or in progress when someone holds them). */
+export type UnblockNotice = { groups: { state: "ready" | "in_progress"; ids: string[] }[] };
 
-/** What the sweep let go on, as the notice says it; null when it let nothing go on. */
-export function unblockNotice(released: Released[]): UnblockNotice | null {
+/** What the run's last sweep let go on, as the notice says it; null when it let nothing go on. */
+export function unblockNotice(unblocked: Unblocked[]): UnblockNotice | null {
   const groups = (["ready", "in_progress"] as const)
-    .map((state) => ({ state, ids: released.filter((r) => r.task.state === state).map((r) => r.task.id) }))
+    .map((state) => ({ state, ids: unblocked.filter((r) => r.state === state).map((r) => r.id) }))
     .filter((g) => g.ids.length > 0);
-  return groups.length ? { groups, seen: false } : null;
-}
-
-/** The notice after a check: the check it belongs to marks it seen; the next one clears it. */
-export function noticeAfterCheck(notice: UnblockNotice | null): UnblockNotice | null {
-  return notice && !notice.seen ? { ...notice, seen: true } : null;
-}
-
-/** The tasks as the monitor picks from them: a task the sweep let go on, while the taskbag as read
- * still shows it blocked (it is read again only when its files change), as the sweep left it. */
-export function withReleased(tasks: Task[], released: Task[]): Task[] {
-  if (!released.length) return tasks;
-  return tasks.map((t) => (t.state === "blocked" ? (released.find((r) => r.id === t.id) ?? t) : t));
+  return groups.length ? { groups } : null;
 }

@@ -8740,3 +8740,65 @@ fn a_task_has_a_difficulty_from_one_to_five() {
         "{all}"
     );
 }
+
+/// Task-A03-cow112: `alm monitor` without the app. With nothing running, status says so and
+/// check and stop are refused; an app agent and an unknown frequency are refused with the reason.
+#[test]
+fn monitor_commands_say_what_runs_and_refuse_what_cannot() {
+    let dir = tmp("monitor");
+    let settings = tmp("monitor-settings");
+    ok(&dir, &["init", "--name", "Mon"]);
+    let run = |args: &[&str]| -> (i32, Value) {
+        let mut all = vec!["--json"];
+        all.extend_from_slice(args);
+        let out = Command::new(ALM)
+            .current_dir(&dir)
+            .args(&all)
+            .env("ALLOMOS_SETTINGS_DIR", &settings)
+            .env_remove("ALLOMOS_TASKBAG")
+            .output()
+            .unwrap();
+        let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+        (out.status.code().unwrap(), v)
+    };
+    let (code, v) = run(&["monitor", "status"]);
+    assert_eq!((code, &v["monitors"]), (0, &json!([])), "{v}");
+    for words in [["monitor", "check"], ["monitor", "stop"]] {
+        let (code, v) = run(&words);
+        assert_eq!(code, 2, "{v}");
+        assert!(
+            v["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("no monitor is running"),
+            "{v}"
+        );
+    }
+    let (code, v) = run(&[
+        "monitor",
+        "start",
+        "--mode",
+        "quiet",
+        "--agent",
+        "claude-app",
+    ]);
+    assert_eq!(code, 2);
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("only agents that run in a terminal"),
+        "{v}"
+    );
+    let (code, v) = run(&["monitor", "list"]);
+    assert_eq!(code, 0, "{v}");
+    // Without --mode: the person must choose quiet or normal.
+    let out = Command::new(ALM)
+        .current_dir(&dir)
+        .args(["monitor", "start"])
+        .env("ALLOMOS_SETTINGS_DIR", &settings)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--mode"));
+}

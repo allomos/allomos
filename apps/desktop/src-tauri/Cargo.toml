@@ -17,6 +17,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 allomos-core.workspace = true
 allomos-store.workspace = true
+# Monitor ready tasks, shared with `alm monitor` (Task-A03-cow112).
+allomos-monitor.workspace = true
 # Task-A04-02-01: the "Allow devices on your network to view" server (lan.rs): self-signed HTTPS
 # (rustls with the ring crypto provider, rcgen for the certificate, sha2 for its fingerprint) and
 # the address's QR code. Pinned deliberately (AGENTS.md).

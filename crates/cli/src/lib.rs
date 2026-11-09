@@ -745,6 +745,12 @@ enum Command {
         #[arg(long, value_name = "TEXT")]
         note: String,
     },
+    /// Monitor ready tasks without the app: start, check now, stop, and see the runs
+    /// (Task-A03-cow112).
+    Monitor {
+        #[command(subcommand)]
+        what: monitor::MonitorWhat,
+    },
     /// List the ready tasks that no one holds, with the rule for choosing one.
     Next {
         /// Only tasks planned in this iteration.
@@ -1159,6 +1165,7 @@ impl Command {
             | Command::Checkpoint { .. }
             | Command::Folder { .. }
             | Command::Next { .. }
+            | Command::Monitor { .. }
             | Command::Traces { .. }
             | Command::Links { .. } => None,
         }
@@ -1238,6 +1245,7 @@ impl Command {
                 | Command::Show { .. }
                 | Command::History { .. }
                 | Command::Next { .. }
+                | Command::Monitor { .. }
                 | Command::Confirm { .. }
                 | Command::Progress { .. }
                 | Command::Brief
@@ -1328,6 +1336,7 @@ impl Command {
             Command::Drop { .. } => "drop",
             Command::Reopen { .. } => "reopen",
             Command::Next { .. } => "next",
+            Command::Monitor { what } => what.name(),
             Command::MoveIn { .. } => "move-in",
             Command::Translate { .. } => "translate",
             Command::HandoffRules { .. } => "handoff-rules",
@@ -2612,6 +2621,7 @@ mod exceptions;
 mod folders;
 mod heartbeat;
 mod links;
+mod monitor;
 mod race;
 mod redact;
 mod takeover;
@@ -2654,6 +2664,7 @@ fn task_line(t: &Task) -> String {
 fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     let me = cli.holder.as_deref();
     match &cli.command {
+        Command::Monitor { what } => monitor::execute(cli, cwd, what),
         Command::Init {
             name,
             id,

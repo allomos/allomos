@@ -10,10 +10,10 @@ pub fn show(title: &str, body: &str) {
     {
         let script = format!(
             "display notification {} with title {}",
-            crate::agents::applescript_string(body),
-            crate::agents::applescript_string(title)
+            crate::terminal::applescript_string(body),
+            crate::terminal::applescript_string(title)
         );
-        let _ = crate::agents::command("/usr/bin/osascript")
+        let _ = crate::terminal::command("/usr/bin/osascript")
             .args(["-e", &script])
             .output();
     }

@@ -23,7 +23,7 @@ pub struct SessionTab {
 }
 
 /// What the tab shows, in the interface language.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseTexts {
     /// "… closes in 30 seconds; press any key to keep it."
     pub prompt: String,
@@ -146,7 +146,7 @@ fn run(_agent: &str, _tab: &SessionTab, _texts: &CloseTexts) -> Outcome {
 
 #[cfg(target_os = "macos")]
 fn osascript(script: &str) -> Option<String> {
-    let out = crate::agents::command("/usr/bin/osascript")
+    let out = crate::terminal::command("/usr/bin/osascript")
         .args(["-e", script])
         .output()
         .ok()?;
@@ -174,7 +174,7 @@ fn busy(tab: &SessionTab) -> Option<bool> {
 fn type_in(tab: &SessionTab, text: &str) -> Option<String> {
     osascript(&format!(
         "tell application \"Terminal\" to do script {} in {}",
-        crate::agents::applescript_string(text),
+        crate::terminal::applescript_string(text),
         tab_ref(tab)
     ))
 }

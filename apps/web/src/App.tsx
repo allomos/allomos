@@ -1585,7 +1585,7 @@ function TaskbagView({
   const [proceeding, setProceeding] = useState<Task | null>(null);
   // Monitor ready tasks (Task-A03-moth285): the desktop app only, where agent sessions run. The
   // dialog opens from the top bar or the active iteration's card.
-  const monitor = useMonitor({ messenger, root: opened.root, box, active: activeIteration, onError: onFailure });
+  const monitor = useMonitor({ messenger, root: opened.root, active: activeIteration, onError: onFailure });
   const [monitorFrom, setMonitorFrom] = useState<OpenedFrom | null>(null);
   const monitorControl = (from: OpenedFrom) =>
     box && (
@@ -1645,7 +1645,7 @@ function TaskbagView({
               </span>
               {/* Task-A03-moth285: the top bar's button; the Iterations tab has it on the active
                   iteration's card instead, and its status bar here only when there is none. */}
-              {canOpenSessions && (groupBy === "area" || (!activeIteration && monitor.run)) && monitorControl("top")}
+              {canOpenSessions && (groupBy === "area" || (!activeIteration && (monitor.runs.length > 0 || monitor.lost.length > 0))) && monitorControl("top")}
             </div>
           )}
           {/* Task-A01-egg896: one band across the top of both the list and the task pane, so the pane
@@ -1768,9 +1768,9 @@ function TaskbagView({
           root={opened.root}
           options={scopeOptions(box.tasks, box.areas, iterations, activeIteration)}
           from={monitorFrom}
-          onStart={(scope, agents, quiet, every, offered) => {
+          onStart={(scope, agents, quiet, every) => {
             setMonitorFrom(null);
-            monitor.start(scope, agents, quiet, every, offered);
+            monitor.start(scope, agents, quiet, every);
           }}
           onClose={() => setMonitorFrom(null)}
         />

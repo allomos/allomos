@@ -1,5 +1,6 @@
 // Tests for monitoring ready tasks (Task-A03-moth285): the Which tasks field's counts and first
-// choice, the order tasks are taken in, when a task's session is finished, and the last run line.
+// choice, the last run line, and reading a run from its file (Task-A03-cow112: the loop itself is
+// `alm monitor run`, tested in crates/monitor).
 // Run: npm --prefix apps/web test
 
 import { test } from "node:test";
@@ -9,27 +10,18 @@ import {
   FREQUENCIES,
   STALL_MS,
   firstScope,
-  follow,
+  freeAgents,
   frequencyText,
-  idleAlert,
+  isRun,
   lastRunCounts,
-  monitorRequest,
   nextCheck,
-  noticeAfterCheck,
-  pick,
+  readEntry,
   readyTasks,
   scopeOptions,
   scopeReady,
-  freeAgents,
   setAgents,
-  share,
   stalled,
-  startRun,
-  tabToClose,
-  take,
   unblockNotice,
-  waitingAlert,
-  withReleased,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
 import type { Iteration, Task } from "../src/types.ts";
@@ -130,66 +122,6 @@ test("the frequency: seven choices, 30 minutes first; hours from 60 on", () => {
   assert.deepEqual(frequencyText(120), { unit: "hours", n: 2 });
 });
 
-test("a run checks at once, takes tasks in order and never takes one twice", () => {
-  let run = startRun({ kind: "iteration", id: "I-haul", current: false }, ["claude_cli"], true, 30, 1000);
-  assert.ok(nextCheck(run) <= 1000);
-  const first = pick(run, tasks, areas, iterations, "I-knit");
-  assert.equal(first?.id, "A02-01");
-  run = take(run, "claude_cli", first!, "s-1", 2000);
-  assert.deepEqual(run.working.map((w) => w.id), ["A02-01"]);
-  assert.equal(nextCheck(run), 2000 + 30 * 60_000);
-  // Released again by its session: ready and unheld, but not taken again in this run.
-  assert.equal(pick(run, tasks, areas, iterations, "I-knit")?.id, "A01-02");
-});
-
-test("the current task is finished once claimed and no longer held, or when it leaves ready unheld", () => {
-  const start = take(startRun({ kind: "all" }, ["claude_cli"], true, 30, 0), "claude_cli", task("A01-05"), "s-1", 0);
-  // Not claimed yet: still starting.
-  const ids = (f: { finished: { id: string }[] }) => f.finished.map((c) => c.id);
-  let r = follow(start, [task("A01-05")], 10);
-  assert.deepEqual(ids(r), []);
-  // Claimed.
-  r = follow(r.run, [task("A01-05", { holder: "moth", state: "in_progress" })], 20);
-  assert.deepEqual(ids(r), []);
-  assert.equal(r.run.working[0]?.seenHeld, true);
-  assert.equal(r.run.working[0]?.changed, 20);
-  // Released: ready again, held by no one.
-  const released = follow(r.run, [task("A01-05")], 30);
-  assert.deepEqual(ids(released), ["A01-05"]);
-  assert.deepEqual(released.run.working, []);
-  // Waiting without ever being seen held (claimed and parked between two reads).
-  assert.deepEqual(ids(follow(start, [task("A01-05", { state: "waiting", waiting_on: "a question" })], 5)), ["A01-05"]);
-  // Done, or parked, by its session: alm keeps the last holder (trial run, 2026-11-04).
-  assert.deepEqual(ids(follow(r.run, [task("A01-05", { holder: "moth", state: "done" })], 40)), ["A01-05"]);
-  assert.deepEqual(ids(follow(r.run, [task("A01-05", { holder: "moth", state: "waiting", waiting_on: "a question" })], 40)), ["A01-05"]);
-  // Gone from the taskbag.
-  assert.deepEqual(ids(follow(start, [], 5)), ["A01-05"]);
-});
-
-test("only a done task's tab is closed, and only the tab Allomos opened (Task-A03-sierra014)", () => {
-  const tab = { window: 30229, tty: "/dev/ttys032" };
-  const run = take(startRun({ kind: "all" }, ["claude_cli"], true, 30, 0), "claude_cli", task("A01-05"), "s-1", 0, tab);
-  const cur = run.working[0];
-  const held = { holder: "moth" };
-  assert.deepEqual(tabToClose(cur, [task("A01-05", { ...held, state: "done" })]), tab);
-  for (const state of ["waiting", "blocked", "dropped", "ready", "in_progress"] as const) {
-    assert.equal(tabToClose(cur, [task("A01-05", { ...held, state })]), null, state);
-  }
-  // Gone from the taskbag.
-  assert.equal(tabToClose(cur, []), null);
-  // No tab known (Windows, for now): nothing to close.
-  const noTab = take(startRun({ kind: "all" }, ["codex_cli"], true, 30, 0), "codex_cli", task("A01-05"), null, 0);
-  assert.equal(tabToClose(noTab.working[0], [task("A01-05", { state: "done" })]), null);
-});
-
-test("a session with no sign of life for 30 minutes shows as stalled", () => {
-  const run = take(startRun({ kind: "all" }, ["codex_cli"], false, 30, 0), "codex_cli", task("A01-05"), null, 0);
-  assert.deepEqual(stalled(run, STALL_MS - 1), []);
-  assert.deepEqual(stalled(run, STALL_MS).map((c) => c.id), ["A01-05"]);
-  const moved = follow(run, [task("A01-05", { holder: "codex/x", state: "in_progress" })], STALL_MS - 1).run;
-  assert.deepEqual(stalled(moved, STALL_MS), []);
-});
-
 test("the last run counts the tasks done and those that need the person now", () => {
   const last = { ended: "2026-11-04T10:00:00Z", scope: { kind: "all" as const }, taken: ["A01-01", "A01-02", "A01-03", "A01-04"] };
   const now = [
@@ -202,151 +134,77 @@ test("the last run counts the tasks done and those that need the person now", ()
   assert.deepEqual(lastRunCounts(last, now, toCheck), { done: 2, needYou: 2 });
 });
 
-test("each task's request names the session, the run mode and only that task", () => {
-  const tb = "../allomos-taskbag/.allomos/taskbag";
-  const en = monitorRequest(task("A01-05"), tb, "en", "claude_cli", "1234-abcd", true);
-  assert.match(en, /--session-agent claude-code --session-id 1234-abcd --session-kind terminal/);
-  assert.match(en, /Run mode: quiet/);
-  assert.match(en, /alm wait A01-05 --on/);
-  assert.match(en, /do not take another one/);
-  assert.match(en, /--taskbag "\.\.\/allomos-taskbag\/\.allomos\/taskbag"/);
-  const codex = monitorRequest(task("A01-05"), tb, "en", "codex_cli", null, false);
-  assert.match(codex, /--session-agent codex --session-id <your session's ID>/);
-  // Task-A03-queen969: Antigravity's agy claims under its quota id.
-  const agy = monitorRequest(task("A01-05"), tb, "en", "antigravity_cli", null, false);
-  assert.match(agy, /--session-agent antigravity --session-id <your session's ID>/);
-  assert.match(codex, /Run mode: normal/);
-  for (const language of ["zh-CN", "ja"] as const) {
-    const text = monitorRequest(task("A01-05"), tb, language, "claude_cli", "1234-abcd", true);
-    assert.match(text, /--session-id 1234-abcd/, language);
-    assert.match(text, /alm handoff A01-05/, language);
-  }
+/** A run's entry as `alm monitor status --json` lists it. */
+const entry = (over: Record<string, unknown> = {}) => ({
+  record: "present",
+  id: "m-1",
+  pid: 4242,
+  next_check: 1_900_000,
+  run: {
+    scope: { kind: "iteration", id: "I-haul" },
+    agents: ["claude_cli", "codex_cli"],
+    offered: ["claude_cli", "codex_cli", "antigravity_cli"],
+    quiet: true,
+    every: 30,
+    started: 0,
+    taken: ["A01-02"],
+    working: [{ agent: "claude_cli", id: "A01-02", session_id: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, seen_held: true, seen: "", changed: 20 }],
+    stopping: false,
+    checked: 100,
+    unblocked: [{ id: "A01-03", state: "ready" }],
+    ...over,
+  },
 });
 
-// Task-A03-folk351: a terminal Claude Code session has no get_usage, so its request says to read
-// the quota with `claude -p /usage`; the other agents' requests do not.
-test("a Claude Code session's request says how to read its quota; the others' do not", () => {
-  const tb = "../allomos-taskbag/.allomos/taskbag";
-  for (const language of ["en", "zh-CN", "ja"] as const) {
-    const claude = monitorRequest(task("A01-05"), tb, language, "claude_cli", "1234-abcd", false);
-    assert.match(claude, /claude -p \/usage/, language);
-    assert.match(claude, /alm quota --agent claude-code --left .* --window 5h/, language);
-    assert.match(claude, /--window week/, language);
-    for (const agent of ["codex_cli", "antigravity_cli"] as const) {
-      const other = monitorRequest(task("A01-05"), tb, language, agent, null, false);
-      assert.doesNotMatch(other, /claude -p \/usage|alm quota/, `${language} ${agent}`);
-    }
-  }
+test("a run is read from its file: scope, agents, sessions at work, next check", () => {
+  const r = readEntry(entry(), "I-haul");
+  assert.ok(r && isRun(r));
+  assert.deepEqual(r.scope, { kind: "iteration", id: "I-haul", current: true });
+  assert.equal(nextCheck(r), 1_900_000);
+  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20 }]);
+  assert.deepEqual(freeAgents(r), ["codex_cli"]);
+  assert.deepEqual(readEntry(entry(), "I-knit") && (readEntry(entry(), "I-knit") as { scope: unknown }).scope, { kind: "iteration", id: "I-haul", current: false });
+  // An agent alm does not know and a frequency the app does not offer are left out.
+  const odd = readEntry(entry({ agents: ["claude_cli", "gemini"], every: 7 }), null);
+  assert.ok(odd && isRun(odd));
+  assert.deepEqual(odd.agents, ["claude_cli"]);
+  assert.equal(odd.every, FIRST_FREQUENCY);
+  assert.equal(readEntry({ nonsense: true }, null), null);
 });
 
-// Task-A01-steam936: the sweep at start and on Check now. What it let go on is said in one line per
-// state, the check it belongs to keeps the line and the next clears it, and until the taskbag is
-// read again the monitor picks from the tasks as the sweep left them.
+test("a process with no run file is read as running, record missing", () => {
+  const l = readEntry({ record: "missing", pid: 77, id: "m-2", taskbag: null }, null);
+  assert.ok(l && !isRun(l));
+  assert.deepEqual(l, { pid: 77, id: "m-2" });
+});
+
+test("a session with no sign of life for 30 minutes shows as stalled", () => {
+  const r = readEntry(entry(), null);
+  assert.ok(r && isRun(r));
+  assert.deepEqual(stalled(r, 20 + STALL_MS - 1), []);
+  assert.deepEqual(stalled(r, 20 + STALL_MS).map((c) => c.id), ["A01-02"]);
+});
+
+test("agents added or taken off: in the order offered, and never none", () => {
+  const r = readEntry(entry(), null);
+  assert.ok(r && isRun(r));
+  assert.deepEqual(setAgents(r, ["antigravity_cli", "claude_cli"]), ["claude_cli", "antigravity_cli"]);
+  assert.deepEqual(setAgents(r, []), ["claude_cli", "codex_cli"]);
+});
+
 test("the sweep's line groups the tasks by the state they went back to", () => {
   assert.equal(unblockNotice([]), null, "nothing let go on: no line");
-  const n = unblockNotice([
-    { task: task("A01-02"), blockers: ["A01-01"] },
-    { task: task("A01-03", { state: "in_progress", holder: "b" }), blockers: ["A01-01"] },
-    { task: task("A01-04"), blockers: ["A02-01"] },
-  ]);
-  assert.deepEqual(n, {
-    groups: [
-      { state: "ready", ids: ["A01-02", "A01-04"] },
-      { state: "in_progress", ids: ["A01-03"] },
-    ],
-    seen: false,
-  });
-  const seen = noticeAfterCheck(n);
-  assert.equal(seen?.seen, true, "the check it belongs to keeps it");
-  assert.equal(noticeAfterCheck(seen), null, "the next check clears it");
-  assert.equal(noticeAfterCheck(null), null);
-});
-
-test("until the taskbag is read again, the monitor picks a task the sweep let go on", () => {
-  const stale = [task("A01-01", { state: "done" }), task("A01-02", { state: "blocked" })];
-  const released = [task("A01-02")];
-  const run = startRun({ kind: "all" }, ["claude_cli"], true, 30, 0);
-  const areas = [{ id: "A01" }];
-  assert.equal(pick(run, stale, areas, [], null), null, "as read: still blocked");
-  assert.equal(pick(run, withReleased(stale, released), areas, [], null)?.id, "A01-02");
-  // Read again (here: moved on since): the taskbag as read wins.
-  const read = [task("A01-01", { state: "done" }), task("A01-02", { state: "in_progress", holder: "x" })];
-  assert.equal(withReleased(read, released)[1].holder, "x");
-  assert.equal(withReleased(stale, []), stale);
-});
-
-// Task-A00-eclair542: the monitor tells the person when it is stuck.
-test("a task its session parked waiting on the person is told; one waiting on someone named is not", () => {
-  const parked = [task("A01-05", { state: "waiting", waiting_on: "Which name?" }), task("A01-06", { state: "waiting", waiting_on: "x", who: "Ann" })];
-  assert.deepEqual(waitingAlert("A01-05", parked), { kind: "waiting", id: "A01-05", on: "Which name?" });
-  assert.equal(waitingAlert("A01-06", parked), null);
-  assert.equal(waitingAlert(null, parked), null);
-  assert.equal(waitingAlert("A01-01", tasks), null);
-});
-
-test("no task ready is told once per stretch, and again after a task was taken", () => {
-  const run = startRun({ kind: "all" }, ["claude_cli"], true, 30, 0);
-  const first = idleAlert(run);
-  assert.deepEqual(first.alert, { kind: "idle" });
-  assert.equal(idleAlert(first.run).alert, null);
-  const taken = take(first.run, "claude_cli", task("A01-05"), "s-1", 0);
-  // While a session works a task, the monitor is not stuck: nothing is told.
-  assert.equal(idleAlert(taken).alert, null);
-  const after = follow(taken, [task("A01-05", { state: "done" })], 1).run;
-  assert.deepEqual(idleAlert(after).alert, { kind: "idle" });
-});
-
-// Task-A03-fruit467: several agents in one run.
-test("each free agent gets a different ready task, in the run's order, while there are tasks", () => {
-  const run = startRun({ kind: "iteration", id: "I-haul", current: false }, ["claude_cli", "codex_cli"], true, 30, 0);
-  const shares = share(run, tasks, areas, iterations, "I-knit");
   assert.deepEqual(
-    shares.map((s) => [s.agent, s.task.id]),
-    [
-      ["claude_cli", "A02-01"],
-      ["codex_cli", "A01-02"],
-    ],
+    unblockNotice([
+      { id: "A01-02", state: "ready" },
+      { id: "A01-03", state: "in_progress" },
+      { id: "A01-04", state: "ready" },
+    ]),
+    {
+      groups: [
+        { state: "ready", ids: ["A01-02", "A01-04"] },
+        { state: "in_progress", ids: ["A01-03"] },
+      ],
+    },
   );
-  // Only one ready: the second agent waits for the next check.
-  const one = share(startRun({ kind: "all" }, ["claude_cli", "codex_cli"], true, 30, 0), [task("A01-05")], [{ id: "A01" }], [], null);
-  assert.deepEqual(one.map((s) => s.agent), ["claude_cli"]);
-  // An agent working a task gets none; the other does, and not the task being worked.
-  let r = take(run, "claude_cli", shares[0].task, "s-1", 0);
-  assert.deepEqual(freeAgents(r), ["codex_cli"]);
-  assert.deepEqual(share(r, tasks, areas, iterations, "I-knit").map((s) => [s.agent, s.task.id]), [["codex_cli", "A01-02"]]);
-  r = take(r, "codex_cli", shares[1].task, null, 0);
-  assert.deepEqual(freeAgents(r), []);
-  assert.deepEqual(share(r, tasks, areas, iterations, "I-knit"), []);
-});
-
-test("each session is followed on its own: one finishing leaves the other working", () => {
-  let r = startRun({ kind: "all" }, ["claude_cli", "codex_cli"], true, 30, 0);
-  r = take(r, "claude_cli", task("A01-05"), "s-1", 0, { window: 1, tty: "/dev/ttys001" });
-  r = take(r, "codex_cli", task("A01-06"), null, 0);
-  const now = [task("A01-05", { holder: "a", state: "done" }), task("A01-06", { holder: "b", state: "in_progress" })];
-  const f = follow(r, now, 10);
-  assert.deepEqual(f.finished.map((c) => [c.agent, c.id]), [["claude_cli", "A01-05"]]);
-  assert.deepEqual(f.run.working.map((c) => c.id), ["A01-06"]);
-  assert.deepEqual(tabToClose(f.finished[0], now), { window: 1, tty: "/dev/ttys001" });
-  assert.deepEqual(freeAgents(f.run), ["claude_cli"]);
-});
-
-test("agents added or taken off while the run goes on; one taken off finishes its task", () => {
-  const offered = ["claude_cli", "codex_cli", "antigravity_cli"] as const;
-  let r = startRun({ kind: "all" }, ["claude_cli"], true, 30, 0, [...offered]);
-  assert.deepEqual(r.offered, [...offered]);
-  // Added: shown in the order offered, and free from the next check on.
-  r = setAgents(r, ["antigravity_cli", "claude_cli"]);
-  assert.deepEqual(r.agents, ["claude_cli", "antigravity_cli"]);
-  r = take(r, "claude_cli", task("A01-05"), "s-1", 0);
-  assert.deepEqual(freeAgents(r), ["antigravity_cli"]);
-  // Taken off while working: its session keeps its task; it gets no new one.
-  r = setAgents(r, ["antigravity_cli"]);
-  assert.deepEqual(r.working.map((w) => [w.agent, w.id]), [["claude_cli", "A01-05"]]);
-  assert.deepEqual(freeAgents(r), ["antigravity_cli"]);
-  assert.deepEqual(share(r, [task("A01-06")], [{ id: "A01" }], [], null).map((s) => s.agent), ["antigravity_cli"]);
-  // The last agent stays: an empty choice changes nothing.
-  assert.equal(setAgents(r, []), r);
-  // Without `offered`, the agents chosen are the ones offered.
-  assert.deepEqual(startRun({ kind: "all" }, ["codex_cli"], true, 30, 0).offered, ["codex_cli"]);
 });
