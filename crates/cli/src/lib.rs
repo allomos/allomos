@@ -1747,6 +1747,9 @@ fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::MoveIn { .. }
+            | Command::Monitor {
+                what: monitor::MonitorWhat::CloseTab { .. },
+            }
     ) {
         return Ok(Vec::new());
     }
