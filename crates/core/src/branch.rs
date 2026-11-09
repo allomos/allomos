@@ -228,6 +228,9 @@ pub struct AtClaim {
     pub why: Option<Why>,
     /// The branch the agent is on, as given.
     pub current: Option<String>,
+    /// Whether the working branch was the task's working branch already, so the work goes on on
+    /// a branch that exists (a takeover, or a claim after a release; Task-A01-sign613).
+    pub continues: bool,
     /// The event changes to record (none when nothing is new).
     pub changes: Vec<Change>,
     /// `branch_missing` when the agent did not say which branch it is on and something is unknown.
@@ -267,10 +270,12 @@ pub fn at_claim(
         }
         None => warnings.push(Problem::BranchMissing { id: id.to_string() }),
     }
+    let continues = working.is_some() && working == before.working;
     Ok(AtClaim {
         branches: after,
         why,
         current,
+        continues,
         changes,
         warnings,
     })

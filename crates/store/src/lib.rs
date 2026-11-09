@@ -22,7 +22,7 @@ use allomos_core::event::{self, Event, Kind};
 use allomos_core::heartbeat;
 use allomos_core::ops;
 use allomos_core::{
-    Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Task, Taskbag, parse_area,
+    Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, State, Task, Taskbag, parse_area,
     parse_iteration, parse_project, parse_task, validate_taskbag,
 };
 use serde::Serialize;
@@ -2487,6 +2487,24 @@ pub struct Claimed {
     pub changed: Changed,
     /// What the claim recorded, or found, about the task's branches.
     pub branches: branch::AtClaim,
+    /// Set when the claim took the task over from another holder (Task-A01-sign613).
+    pub took_over: Option<TookOver>,
+}
+
+/// A claim that took a task over from another holder (decision 0022 § 6, Task-A01-sign613): from
+/// whom, whether it was lost (and since when), and where the former holder worked, when its claim
+/// recorded that. The claim's event records the change of holder; this is what `alm claim` tells.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TookOver {
+    /// The former holder.
+    pub from: String,
+    /// Set when the task was lost; `None` when it was taken with `--take` while not lost.
+    pub lost: Option<heartbeat::Lost>,
+    /// The folder the former holder's claim ran in, relative to the folder holding `.allomos/`,
+    /// when it recorded one. It may still hold uncommitted changes.
+    pub folder: Option<String>,
+    /// The working branch the task had before the claim.
+    pub working: Option<String>,
 }
 
 /// Claim task `id` (`alm claim`, Task-A03-22): the claim rule, plus its branches. `current` is the
@@ -2506,20 +2524,67 @@ pub fn claim_task(
     session: Option<allomos_core::AgentSession>,
 ) -> Result<Claimed, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let mut outcome = ops::claim(&bag, id, actor.by, take)?;
+    // A lost task may be claimed: claiming it takes it over (decision 0022 § 6, Task-A01-sign613).
+    // One held by someone else and not lost is refused as before, unless `--take`.
+    let now = now_secs();
+    let found = bag.tasks.iter().find(|t| t.id == id);
+    let former = found
+        .filter(|t| !matches!(t.state, State::Done | State::Dropped))
+        .and_then(|t| t.holder.clone())
+        .filter(|h| Some(h.as_str()) != actor.by.map(str::trim));
+    let lost = match (found, &former) {
+        (Some(t), Some(_)) => {
+            let applied = heartbeat::applied(&bag.project);
+            let last = last_changed(root);
+            heartbeat::lost(
+                t,
+                now,
+                applied.lost_after_secs,
+                last.get(&t.id).map(String::as_str),
+            )
+        }
+        _ => None,
+    };
+    let mut outcome = ops::claim(&bag, id, actor.by, take || lost.is_some())?;
+    if let Some(l) = &lost {
+        for w in outcome.warnings.iter_mut() {
+            if let Problem::TookOver { id, previous } = w {
+                *w = Problem::TookOverLost {
+                    id: id.clone(),
+                    previous: previous.clone(),
+                    since: l.since.clone(),
+                };
+            }
+        }
+    }
+    let before = branches(root).remove(id).unwrap_or_default();
+    let took_over = former.map(|from| TookOver {
+        from,
+        lost: lost.clone(),
+        folder: found
+            .and_then(|t| t.session.as_ref())
+            .and_then(|s| s.folder.clone()),
+        working: before.working.clone(),
+    });
+    // Work goes on on the task's working branch (decision 0022 § 6): a takeover keeps it unless
+    // `--working` names another.
+    let working = match (&took_over, working) {
+        (_, Some(w)) => Some(w),
+        (Some(t), None) => t.working.as_deref().or(current),
+        (None, None) => None,
+    };
     outcome.task.session = session
         .filter(|s| !s.is_empty())
         .map(|s| allomos_core::AgentSession {
             by: outcome.task.holder.clone(),
             ..s
         });
-    let before = branches(root).remove(id).unwrap_or_default();
     let at = branch::at_claim(id, &before, current, working)?;
     let old = bag.tasks.iter().find(|t| t.id == outcome.task.id);
     let mut changes = event::changes(old, &outcome.task, event::TASK_FIELDS);
     changes.extend(at.changes.iter().cloned());
     if !changes.is_empty() {
-        heartbeat::along(&mut outcome.task, actor.by, now_secs());
+        heartbeat::along(&mut outcome.task, actor.by, now);
     }
     let event = actor.event("claim", Kind::Task, Some(&outcome.task.id), changes);
     lock.record(&event, |l| l.save_task(&outcome.task))?;
@@ -2533,6 +2598,7 @@ pub fn claim_task(
             unblocked: Vec::new(),
         },
         branches: at,
+        took_over,
     })
 }
 

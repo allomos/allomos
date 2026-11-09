@@ -234,6 +234,8 @@ problems! {
     TaskClosed { id, state } => "task_closed", "Task {id} is {state}, so it cannot be changed this way.";
     /// A warning: the task was taken over from another holder.
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
+    /// A warning: the task was lost and the claim took it over (decision 0022 § 6, Task-A01-sign613).
+    TookOverLost { id, previous, since } => "took_over_lost", "Took task {id} over from {previous}: it was lost, with no sign of work from {previous} since {since}.";
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";

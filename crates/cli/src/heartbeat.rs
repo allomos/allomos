@@ -232,7 +232,7 @@ pub(crate) fn held(root: &Path, bag: &Taskbag, tasks: &[&Task], now: i64) -> Hel
             heartbeat::plain_duration(l.lost_after_seconds)
         ));
         let take = format!(
-            "alm claim {} --take --as <your session name> --branch {}",
+            "alm claim {} --as <your session name> --branch {}",
             t.id,
             working.as_deref().unwrap_or("<its working branch>")
         );

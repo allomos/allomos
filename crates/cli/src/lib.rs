@@ -4066,6 +4066,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             )?;
             let at = &claimed.branches;
             let mut text = format!("{}\n", task_line(&claimed.changed.task));
+            if let Some(t) = &claimed.took_over {
+                text.push_str(&took_over_text(&root, t));
+            }
             let steps = branch_steps(at);
             text.push_str(&steps.text);
             let mut done = Done::new(
@@ -4076,6 +4079,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "base_why": at.why,
                     "branch_commands": { "start": steps.start, "merge": steps.merge },
                     "branch_facts": steps.facts,
+                    "took_over": claimed.took_over.as_ref().map(|t| took_over_json(&root, t)),
                 }),
                 text,
             );
@@ -4693,11 +4697,23 @@ fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
             // Always in a worktree of its own (Task-A03-38): the main checkout stays on the
             // base, so the merge runs there and the worktree is removed afterwards.
             if current != Some(w) {
+                // A branch that exists already (a takeover, a claim after a release) is
+                // continued, not started again from the base (Task-A01-sign613).
+                let add = if at.continues {
+                    format!("git worktree add <folder> {wq}")
+                } else {
+                    format!("git worktree add <folder> -b {wq} {b}")
+                };
                 steps.start = vec![
                     format!("git switch {b}"),
                     "git pull --ff-only".to_string(),
-                    format!("git worktree add <folder> -b {wq} {b}"),
+                    add,
                 ];
+                if at.continues {
+                    steps.facts.push(format!(
+                        "The work goes on on {w}, the task's working branch already: start your worktree from it (with what was shared on it), not as a new branch from {base}. If your version control tool says {w} is checked out in another worktree already, that worktree is not yours: leave it as it is and ask the person (in a quiet run, park the question with alm wait)."
+                    ));
+                }
             }
             steps.merge = vec![
                 format!("git switch {b}"),
@@ -4885,6 +4901,49 @@ fn non_blank(value: &Option<String>) -> Option<String> {
 /// The folder `alm claim` runs in, relative to the folder holding `.allomos/`
 /// (Task-A03-hive049): never absolute, so no user name is written; `None` when there is no
 /// relative way.
+/// Where the former holder of a taken-over task worked, as a path: its claim's folder, read from
+/// the folder holding `.allomos/` (Task-A01-sign613).
+fn former_folder(root: &Path, t: &allomos_store::TookOver) -> Option<String> {
+    let folder = t.folder.as_deref()?;
+    let path = allomos_store::allomos_folder(root).join(folder);
+    let path = std::fs::canonicalize(&path).unwrap_or(path);
+    Some(path.to_string_lossy().into_owned())
+}
+
+/// What `alm claim` says after taking a task over (decision 0022 § 6, Task-A01-sign613): from
+/// whom, and that the former holder's worktree may still hold uncommitted changes that are not
+/// this session's to change. alm does not look inside it (`alm` tells, the agent checks).
+fn took_over_text(root: &Path, t: &allomos_store::TookOver) -> String {
+    let mut text = format!(
+        "  taken over from: {}{}\n",
+        t.from,
+        if t.lost.is_some() {
+            " (lost)"
+        } else {
+            " (with --take)"
+        }
+    );
+    let place = match former_folder(root, t) {
+        Some(f) => format!("its claim ran in {f}"),
+        None => "alm does not know where".to_string(),
+    };
+    text.push_str(&format!(
+        "Fact: {}'s worktree may still hold changes it did not save or share ({place}; on another computer, if it ran there). Look before you redo anything, but do not change, commit or remove what is there: it is not yours. Continue from what was shared on the working branch.\n",
+        t.from
+    ));
+    text
+}
+
+fn took_over_json(root: &Path, t: &allomos_store::TookOver) -> Value {
+    json!({
+        "from": t.from,
+        "lost": t.lost,
+        "folder": t.folder,
+        "folder_path": former_folder(root, t),
+        "working_branch": t.working,
+    })
+}
+
 fn claim_folder(root: &Path, cwd: &Path) -> Option<String> {
     let from = std::fs::canonicalize(allomos_store::allomos_folder(root)).ok()?;
     let to = std::fs::canonicalize(cwd).ok()?;
