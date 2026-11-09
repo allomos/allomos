@@ -1028,6 +1028,10 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .monitor-menu button { border: none; background: none; text-align: left; padding: 4px 8px 4px 22px; border-radius: 6px; font-size: 13px; color: inherit; }
 .monitor-menu button.on { padding-left: 8px; font-weight: 600; background: var(--bg); }
 .monitor-menu button:hover { background: var(--info-bg); }
+.monitor-menu-agent { display: flex; align-items: center; gap: 6px; }
+.monitor-menu-agent > button { flex: 1; min-width: 0; }
+.monitor-sessions { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.monitor-sessions input { width: 4.5em; font-size: 13px; }
 .monitor-stalled { color: var(--warn); font-weight: 600; }
 /* The Monitors list (Task-A03-motor529): the tab bar's button at the right end, and the panel it opens. */
 .tabbar-monitors { flex: none; margin: 0 4px 6px auto; display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line)); background: var(--ok-bg); color: var(--ok); border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }

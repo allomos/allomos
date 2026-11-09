@@ -135,7 +135,10 @@ fn sweep(root: &Path) -> Vec<crate::flow::Unblocked> {
         Ok(list) => {
             if !list.is_empty() {
                 let ids: Vec<&str> = list.iter().map(|r| r.task.id.as_str()).collect();
-                log(&format!("let go on (blockers finished): {}", ids.join(", ")));
+                log(&format!(
+                    "let go on (blockers finished): {}",
+                    ids.join(", ")
+                ));
             }
             list.into_iter()
                 .map(|r| crate::flow::Unblocked {
@@ -219,6 +222,11 @@ impl Loop {
                     .collect();
                 run.set_agents(&usable);
             }
+            Request::Sessions { agent, count } => {
+                if crate::flow::TERMINAL_AGENTS.contains(&agent.as_str()) {
+                    run.set_sessions(&agent, count);
+                }
+            }
         }
         true
     }
@@ -226,6 +234,10 @@ impl Loop {
     /// Start one session per share; an agent that cannot be started is taken off the run.
     fn start_sessions(&mut self, shares: Vec<(String, Task)>) {
         for (agent, task) in shares {
+            // An agent taken off by an earlier failure gets no more sessions this check.
+            if !self.record.run.agents.contains(&agent) {
+                continue;
+            }
             let session_id = (agent == "claude_cli").then(new_session_id);
             let text = request::monitor_request(
                 &task.id,

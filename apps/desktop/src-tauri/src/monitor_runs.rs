@@ -4,6 +4,7 @@
 //! goes on after the app is closed. The status bar reads this computer's run files
 //! ([`allomos_monitor::registry`]); Stop, Check now and the menus leave a request beside them.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use allomos_core::Problem;
@@ -54,7 +55,9 @@ pub fn monitor_open(app: AppHandle, root: PathBuf) -> Result<(), Problem> {
     })
 }
 
-/// Start a run with the app's own `alm` (`monitor start`); resolves with its ID.
+/// Start a run with the app's own `alm` (`monitor start`); resolves with its ID. `sessions`: how
+/// many sessions each chosen agent may have at work at once (Task-A03-weasel276); one not listed
+/// has one.
 #[tauri::command]
 pub async fn monitor_start(
     root: PathBuf,
@@ -62,6 +65,7 @@ pub async fn monitor_start(
     every: u32,
     quiet: bool,
     iteration: Option<String>,
+    sessions: BTreeMap<String, u32>,
 ) -> Result<String, Problem> {
     let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
         detail: "the app's own alm was not found beside it".to_string(),
@@ -80,6 +84,13 @@ pub async fn monitor_start(
     for a in &agents {
         args.push("--agent".into());
         args.push(a.clone());
+    }
+    for (a, n) in sessions
+        .iter()
+        .filter(|(a, n)| agents.contains(a) && **n > 1)
+    {
+        args.push("--sessions".into());
+        args.push(format!("{a}={n}"));
     }
     if let Some(i) = iteration {
         args.push("--iteration".into());

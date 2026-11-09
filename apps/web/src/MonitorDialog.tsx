@@ -33,8 +33,16 @@ export function MonitorDialog({
   options: ScopeOptions;
   from: OpenedFrom;
   /** `agents` chosen, in the order they are shown; `offered`: every one that could be chosen,
-   * offered again in the status bar while the run goes on. */
-  onStart: (scope: Scope, agents: TerminalAgent[], quiet: boolean, every: Frequency, offered: TerminalAgent[]) => void;
+   * offered again in the status bar while the run goes on; `sessions`: how many sessions each
+   * chosen agent may have at work at once (Task-A03-weasel276). */
+  onStart: (
+    scope: Scope,
+    agents: TerminalAgent[],
+    quiet: boolean,
+    every: Frequency,
+    offered: TerminalAgent[],
+    sessions: Partial<Record<TerminalAgent, number>>,
+  ) => void;
   onClose: () => void;
 }) {
   const { t, language, problem } = useI18n();
@@ -57,6 +65,13 @@ export function MonitorDialog({
   }, [agents, first, chosen]);
   const picked = offered.filter((a) => chosen?.includes(a));
   const toggle = (a: TerminalAgent, on: boolean) => setChosen((c) => (on ? [...(c ?? []), a] : (c ?? []).filter((x) => x !== a)));
+  // How many sessions each agent may have at work at once (Task-A03-weasel276): kept as typed,
+  // read as a whole number of one or more (one when not).
+  const [sessionText, setSessionText] = useState<Partial<Record<TerminalAgent, string>>>({});
+  const countOf = (a: TerminalAgent): number => {
+    const n = Math.floor(Number(sessionText[a] ?? 1));
+    return n >= 1 ? n : 1;
+  };
   const codexChosen = picked.includes("codex_cli");
   const [scope, setScope] = useState<Scope>(() => firstScope(options, from));
   const selectable = options.other.items.filter((i) => i.ready > 0);
@@ -111,7 +126,14 @@ export function MonitorDialog({
         return;
       }
     }
-    onStart(scope, picked, quiet, every, offered);
+    onStart(
+      scope,
+      picked,
+      quiet,
+      every,
+      offered,
+      Object.fromEntries(picked.map((a) => [a, countOf(a)])) as Partial<Record<TerminalAgent, number>>,
+    );
   };
 
   const isOther = scope.kind === "iteration" && !scope.current;
@@ -211,7 +233,16 @@ export function MonitorDialog({
           <p className="muted small">{t("monitor.frequency_note")}</p>
 
           <h3>{t("monitor.agent")}</h3>
-          <AgentChecklist agents={agents} slow={slow} chosen={picked} onToggle={toggle} unavailable={unavailable} />
+          <AgentChecklist
+            agents={agents}
+            slow={slow}
+            chosen={picked}
+            onToggle={toggle}
+            unavailable={unavailable}
+            sessionText={sessionText}
+            onSessionText={(a, text) => setSessionText((s) => ({ ...s, [a]: text }))}
+            countOf={countOf}
+          />
 
           <h3>{t("monitor.mode")}</h3>
           <ul className="agent-list">
@@ -318,12 +349,18 @@ function AgentChecklist({
   chosen,
   onToggle,
   unavailable,
+  sessionText,
+  onSessionText,
+  countOf,
 }: {
   agents: Agent[] | null;
   slow: boolean;
   chosen: TerminalAgent[];
   onToggle: (agent: TerminalAgent, on: boolean) => void;
   unavailable: Unavailable;
+  sessionText: Partial<Record<TerminalAgent, string>>;
+  onSessionText: (agent: TerminalAgent, text: string) => void;
+  countOf: (agent: TerminalAgent) => number;
 }) {
   const { t } = useI18n();
   if (agents === null) {
@@ -357,6 +394,21 @@ function AgentChecklist({
                       )}
                       {why && <span className="muted small hint">{why}</span>}
                     </label>
+                    {on && (
+                      <span className="monitor-sessions small">
+                        <span className="muted">{t("monitor.sessions_label")}</span>{" "}
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          inputMode="numeric"
+                          aria-label={t("monitor.sessions_aria", { agent: t(AGENT_KEY[a.id]) })}
+                          value={sessionText[a.id as TerminalAgent] ?? "1"}
+                          onChange={(e) => onSessionText(a.id as TerminalAgent, e.target.value)}
+                          onBlur={() => onSessionText(a.id as TerminalAgent, String(countOf(a.id as TerminalAgent)))}
+                        />
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -371,6 +423,7 @@ function AgentChecklist({
           </label>
         </li>
       </ul>
+      {chosen.length > 0 && <p className="muted small">{t("monitor.sessions_note")}</p>}
     </>
   );
 }
