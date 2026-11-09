@@ -1779,6 +1779,9 @@ function TaskbagView({
           messenger={messenger}
           root={opened.root}
           task={proceeding}
+          lostAfter={lostAfter}
+          lastChange={opened.last_changed?.[proceeding.id]}
+          working={opened.branches?.[proceeding.id]?.working ?? null}
           onClose={(message) => {
             setProceeding(null);
             if (message) onNotice(message);
@@ -1904,7 +1907,8 @@ function TaskGroup({
   editForm?: ReactNode;
   /** Reopens a task's recorded session from its holder's name (Task-A01-cactus586); the desktop app only. */
   onOpenSession?: (id: string) => Promise<void>;
-  /** Opens Work on it… for a task nobody holds (Task-A03-galley051); the desktop app only. */
+  /** Opens Work on it… for a task nobody holds (Task-A03-galley051), or Take over… for a lost one
+   * (Task-A01-voyage603); the desktop app only. */
   onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
   /** The active iteration's Monitor ready tasks button, or its status bar (Task-A03-moth285). */

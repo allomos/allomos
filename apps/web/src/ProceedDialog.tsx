@@ -5,6 +5,9 @@
 // in and sends nothing; Manual shows the request to copy instead. A blocked or waiting task cannot
 // start now, so its request asks the agent to tell the person why and ask what to do. The edited
 // request is kept for this dialog only.
+// Take over… (Task-A01-voyage603) opens the same dialog from a lost task's row: it says who holds
+// the task, how long it has been silent and the working branch to go on on, and its request asks
+// the new session to claim it (the takeover) and leave the former session's worktree alone.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -12,7 +15,8 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL } from "./agentPickerFlow";
-import { edited, proceedRequest, stopped } from "./proceedFlow";
+import { edited, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
+import { agoText, heartbeatFact } from "./heartbeatFlow";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -23,17 +27,29 @@ export function ProceedDialog({
   messenger,
   root,
   task,
+  lostAfter,
+  lastChange,
+  working,
   onClose,
 }: {
   messenger: Messenger;
   /** The open taskbag. */
   root: string;
   task: Task;
+  /** The project's lost limit, in minutes (Task-A01-kernel761). */
+  lostAfter: number;
+  /** When the task last changed (UTC), for a holder that never beat. */
+  lastChange?: string;
+  /** The task's working branch, from the history; null when none is recorded. */
+  working: string | null;
   /** The dialog closes; `message` says what happened (null: Cancel or Done). */
   onClose: (message: string | null) => void;
 }) {
   const { t, rich, problem, language } = useI18n();
-  const ask = stopped(task);
+  // Take over… (Task-A01-voyage603): a held task that is lost, worked out when the dialog opens.
+  const [lost] = useState(() => (task.holder ? heartbeatFact(task, lostAfter, new Date(), lastChange) : null));
+  const takeOver = !!lost?.lost;
+  const ask = !takeOver && stopped(task);
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   /** The taskbag as the agent passes it to `--taskbag`; null while it is read. */
   const [taskbag, setTaskbag] = useState<string | null>(null);
@@ -47,7 +63,12 @@ export function ProceedDialog({
       live = false;
     };
   }, [messenger, root]);
-  const original = taskbag === null ? null : proceedRequest(task, taskbag, language);
+  const original =
+    taskbag === null
+      ? null
+      : takeOver
+        ? takeOverRequest(task, taskbag, language, { lostAfter: lost!.lostAfter, working })
+        : proceedRequest(task, taskbag, language);
   /** The person's own request, for this dialog only (null: Allomos's). */
   const [mine, setMine] = useState<string | null>(null);
   const request = mine ?? original;
@@ -74,9 +95,9 @@ export function ProceedDialog({
       await messenger.proceedWithAgent(agent, root, request);
       const name = t(AGENT_KEY[agent]);
       if (tool?.how === "paste") {
-        onClose(t(ask ? "proceed.asked_stopped_paste" : "proceed.asked_paste", { agent: name, keys: PASTE_KEYS, id: task.id }));
+        onClose(t(takeOver ? "takeover.asked_paste" : ask ? "proceed.asked_stopped_paste" : "proceed.asked_paste", { agent: name, keys: PASTE_KEYS, id: task.id }));
       } else {
-        onClose(t(ask ? "proceed.asked_stopped" : "proceed.asked", { agent: name, id: task.id }));
+        onClose(t(takeOver ? "takeover.asked" : ask ? "proceed.asked_stopped" : "proceed.asked", { agent: name, id: task.id }));
       }
     } catch (e) {
       fail(e);
@@ -100,8 +121,14 @@ export function ProceedDialog({
 
   const stateWord = <span className={`state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>;
   const named = <strong>{task.id}</strong>;
-  const found =
-    task.state === "blocked"
+  const found = takeOver
+    ? rich("takeover.found", {
+        id: named,
+        title: task.title,
+        holder: <strong>{task.holder}</strong>,
+        ago: lost!.minutes !== null ? t("takeover.silent_for", { ago: agoText(lost!.minutes, t) }) : t("takeover.never_beat"),
+      })
+    : task.state === "blocked"
       ? rich("proceed.found_blocked", { id: named, title: task.title, state: stateWord, by: (task.blocked_by ?? []).join(", ") })
       : task.state === "waiting"
         ? rich("proceed.found_waiting", { id: named, title: task.title, state: stateWord, on: task.waiting_on ?? "" })
@@ -110,7 +137,7 @@ export function ProceedDialog({
   return (
     <div className="overlay" role="presentation">
       <section className="dialog wizard move-cards proceed" role="dialog" aria-modal="true" aria-labelledby="proceed-title">
-        <h2 id="proceed-title">{t(ask ? "proceed.title_ask" : "proceed.title")}</h2>
+        <h2 id="proceed-title">{t(takeOver ? "takeover.title" : ask ? "proceed.title_ask" : "proceed.title")}</h2>
         <div className="dialog-body wizard-body">
           {manual === null ? (
             <>
@@ -121,9 +148,15 @@ export function ProceedDialog({
                 </button>
                 {mine !== null && <span className="muted small">{t("proceed.edited")}</span>}
               </p>
-              {task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
+              {takeOver && (
+                <p className="takeover-branch">
+                  {working ? rich("takeover.branch", { branch: <code>{working}</code> }) : t("takeover.branch_unknown")}
+                </p>
+              )}
+              {takeOver && <p className="banner update small">{t("takeover.worktree")}</p>}
+              {!takeOver && task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
               <p>
-                {t(task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
+                {t(takeOver ? "takeover.does" : task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
               </p>
               <p className="muted small">{t("proceed.how")}</p>
               <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />

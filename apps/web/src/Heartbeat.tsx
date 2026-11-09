@@ -3,6 +3,7 @@
 // each minute so the age keeps up while the window stays open.
 
 import { useEffect, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
 import { heartbeatFact, heartbeatText } from "./heartbeatFlow";
 import type { Task } from "./types";
@@ -37,6 +38,43 @@ export function LostTag({ task, lostAfter, lastChange }: { task: Task; lostAfter
   const now = useMinute();
   const fact = heartbeatFact(task, lostAfter, now, lastChange);
   return fact?.lost ? <LostBadge minutes={fact.lostAfter} /> : null;
+}
+
+/** Take over… (Task-A01-voyage603), after the Lost tag: opens the dialog that explains the takeover
+ * and opens a new session; nothing while the task is not lost. */
+export function TakeOverButton({
+  task,
+  lostAfter,
+  lastChange,
+  onKeyDown,
+  onTakeOver,
+}: {
+  task: Task;
+  lostAfter: number;
+  lastChange?: string;
+  onKeyDown?: (e: KeyboardEvent) => void;
+  onTakeOver: () => void;
+}) {
+  const { t } = useI18n();
+  const now = useMinute();
+  if (!heartbeatFact(task, lostAfter, now, lastChange)?.lost) return null;
+  return (
+    <button
+      type="button"
+      className="link with-icon proceed takeover"
+      title={t("takeover.button_title")}
+      onKeyDown={onKeyDown}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTakeOver();
+      }}
+    >
+      <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M6.5 4.5v11l9-5.5z" />
+      </svg>
+      {t("takeover.button")}
+    </button>
+  );
 }
 
 function LostBadge({ minutes }: { minutes: number }) {
