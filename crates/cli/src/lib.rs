@@ -1467,6 +1467,8 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     // A session coming back (decision 0022 § 8, Task-A01-castle658): the tasks taken over from
     // it are named first, and its changes to them refused.
     let taken = takeover::look(&cli, cwd);
+    // Two claims of one task that met (Task-A01-lawn320): said first, with the next ready task.
+    let races = race::look(&cli, cwd);
     // A one-time number (Task-A01-58): a repeat returns the first result; a new number marks
     // every event this change writes.
     let request = cli
@@ -1558,9 +1560,11 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 if let (Some(out), Some(fields)) = (out.as_object_mut(), done.fields.as_object()) {
                     out.extend(fields.clone());
                 }
-                out["warnings"] = taken
+                out["warnings"] = races
+                    .races
                     .iter()
-                    .map(|t| t.notice())
+                    .map(|r| r.notice())
+                    .chain(taken.iter().map(|t| t.notice()))
                     .chain(done.warnings.iter().cloned())
                     .map(|w| problem_json(&w))
                     .collect();
@@ -1568,8 +1572,10 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 if !taken.is_empty() {
                     out["taken_over"] = takeover::json(&taken);
                 }
+                race::json(&races, &mut out);
                 stdout.push_str(&format!("{out}\n"));
             } else {
+                stdout.push_str(&race::text(&races));
                 stdout.push_str(&takeover::text(&taken));
                 stdout.push_str(&done.text);
                 for w in &done.warnings {
@@ -1594,9 +1600,24 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                     .and_then(|bag| ops::find_task(&bag, id).ok()),
                 _ => None,
             };
+            // A claim refused because another session holds the task already (Task-A01-lawn320):
+            // the next ready task, for the session to choose from.
+            let next_ready = match (&cli.command, &problem) {
+                (Command::Claim { .. }, Problem::TaskHeld { id, .. }) => {
+                    locate(&cli, cwd).ok().and_then(|root| {
+                        let bag = load(&root).taskbag?;
+                        Some(race::next_ready(&root, &bag, cwd, &[id.as_str()]))
+                    })
+                }
+                _ => None,
+            };
             if cli.json {
                 let mut line: Value = serde_json::from_str(&error_line(Some(command), &problem))
                     .expect("error lines are JSON");
+                race::json(&races, &mut line);
+                if let Some(next) = &next_ready {
+                    line["next_ready"] = race::next_json(next);
+                }
                 if let Some(task) = &current {
                     line["current"] = task_json(task);
                 }
@@ -1605,12 +1626,16 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 }
                 stdout.push_str(&format!("{line}\n"));
             } else {
+                stderr.push_str(&race::text(&races));
                 stderr.push_str(&takeover::text(&taken));
                 stderr.push_str(&format!(
                     "error [{}]: {}\n",
                     problem.code(),
                     problem.english()
                 ));
+                if let Some(next) = &next_ready {
+                    stderr.push_str(&race::next_line(next));
+                }
                 if let Some(task) = &current {
                     stderr.push_str(&format!("Now:\n  title: {}\n", task.title));
                     if task.description.is_empty() {
@@ -2556,6 +2581,7 @@ mod exceptions;
 mod folders;
 mod heartbeat;
 mod links;
+mod race;
 mod redact;
 mod takeover;
 mod trail;

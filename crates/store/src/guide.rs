@@ -552,6 +552,16 @@ const WORKFLOW: &str = "# How to work the tasks
    Git: `git branch --show-current`; alm reads no version control), and save and share the claim
    right away with your version control tool (it prints the Git commands as the example): until
    your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
+   **Two sessions claiming one task at once** (Task-A01-lawn320). Each claims in its own copy;
+   only the claim shared first counts. When your version control tool refuses to share yours (in
+   Git: the push is rejected), get the latest changes before anything else (in Git:
+   `git pull --rebase`). If the other session's claim came in, the task's file holds both
+   claims (a conflict), and every `alm` command first says so (`notice [claim_lost]`): the task
+   is the other session's, with its last heartbeat. Do not work on it: drop your own claim, the
+   change that could not be shared (in Git: `git rebase --skip`; after a plain `git pull`:
+   `git merge --abort`, then `git pull --rebase` and `git rebase --skip`), and take another
+   ready task: alm names the next one in `alm next`'s order, and you choose. Claiming a task
+   that is held already is refused (`task_held`) with the same pointer to the next ready task.
    **While you hold a task: heartbeats** (decision 0022). These rules need nothing but reading
    them and running commands, so every agent follows them, whatever its tool. Pass `--as <your
    session name>` to every `alm` command (or set ALLOMOS_HOLDER), reading ones too: that is how
@@ -574,10 +584,10 @@ const WORKFLOW: &str = "# How to work the tasks
    (the claim prints the commands to start a worktree from it). The former holder's worktree may
    still hold changes it did not save or share; the claim says where it ran when known: look,
    but do not change, commit or remove anything there. A held task that is not lost is still
-   refused. Two sessions taking over at once: the claim you push second is refused by your
-   version control tool (in Git: the push is rejected); get the latest changes (`git pull`),
-   and `alm show <id>` shows the task has a new holder: it is not yours, so leave its branch
-   alone and take another task. Once you hold it, beat like any holder (`alm beat`): when you
+   refused. Two sessions taking over at once: as with two claims at once (above), the claim
+   you push second is refused by your version control tool; get the latest changes
+   (`git pull --rebase`), and `alm` says the task is the other session's (`notice
+   [claim_lost]`): drop your claim, leave its branch alone and take another task. Once you hold it, beat like any holder (`alm beat`): when you
    go silent, another session can take it over from you in turn.
    **Taken over from you** (decision 0022 § 8). Back after a pause (your quota came back, a
    restart), any `alm` command run with `--as <your session name>` first says which of your

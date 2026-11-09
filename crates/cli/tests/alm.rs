@@ -8399,3 +8399,115 @@ fn refused_at(dir: &Path, now: &str, args: &[&str], problem: &str) {
         "{args:?}: {v}"
     );
 }
+
+/// Two sessions claim the same ready task at once, each in its own clone of the taskbag's
+/// repository (Task-A01-lawn320). The first push wins; the second is rejected. After
+/// `git pull --rebase` the loser's copy holds both claims in conflict markers, and every `alm`
+/// command first says the task is the winner's, with the next ready task. Once the loser drops
+/// its claim (`git rebase --skip`), the task shows the winner, and claiming it again is refused
+/// with the same pointer.
+#[test]
+fn two_sessions_claiming_one_task_at_once() {
+    let base = tmp("race");
+    let git = |dir: &Path, args: &[&str]| {
+        Command::new("git")
+            .current_dir(dir)
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+            .args([
+                "-c",
+                "init.defaultBranch=main",
+                "-c",
+                "core.hooksPath=/dev/null",
+            ])
+            .args(args)
+            .output()
+    };
+    match git(&base, &["init", "-q", "--bare", "remote.git"]) {
+        Ok(o) if o.status.success() => {}
+        _ => return, // No Git on this machine: nothing to check.
+    }
+    let run = |dir: &Path, args: &[&str]| {
+        let o = git(dir, args).unwrap();
+        assert!(o.status.success(), "git {args:?}: {o:?}");
+    };
+    let a = base.join("a");
+    let b = base.join("b");
+    run(&base, &["clone", "-q", "remote.git", "a"]);
+    ok(&a, &["init", "--name", "Demo"]);
+    ok(&a, &["add", "area", "A01", "One"]);
+    for (id, title) in [("A01-01", "First"), ("A01-02", "Second")] {
+        ok(&a, &["add", "task", id, "--area", "A01", "--title", title]);
+        ok(&a, &["ready", id]);
+    }
+    run(&a, &["add", "-A"]);
+    run(&a, &["commit", "-qm", "start"]);
+    run(&a, &["push", "-q", "origin", "HEAD:main"]);
+    run(&base, &["clone", "-q", "-b", "main", "remote.git", "b"]);
+
+    let claim = |dir: &Path, who: &str| {
+        ok(dir, &["--as", who, "claim", "A01-01", "--branch", "main"]);
+        run(dir, &["add", "-A"]);
+        run(dir, &["commit", "-qm", "claim"]);
+    };
+    claim(&a, "s1");
+    claim(&b, "s2");
+    run(&a, &["push", "-q", "origin", "HEAD:main"]);
+    // The second push is rejected.
+    assert!(
+        !git(&b, &["push", "-q", "origin", "HEAD:main"])
+            .unwrap()
+            .status
+            .success()
+    );
+    // Getting the latest changes: the task's file holds both claims.
+    assert!(
+        !git(&b, &["pull", "-q", "--rebase", "origin", "main"])
+            .unwrap()
+            .status
+            .success()
+    );
+
+    // Every command says so first: as the loser, the task is s1's; the next ready task follows.
+    let out = alm(&b, &["--as", "s2", "next"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.starts_with("notice [claim_lost]: Task A01-01 was claimed by two sessions at once, and the claim of s1"),
+        "{text}"
+    );
+    assert!(text.contains("the task is s1's, not yours"), "{text}");
+    assert!(text.contains("`git rebase --skip`"), "{text}");
+    assert!(
+        text.contains(
+            "Next ready task (alm next's order; you choose, see `alm next`): A01-02  Second"
+        ),
+        "{text}"
+    );
+    let v = ok(&b, &["--as", "s2", "list"]);
+    assert_eq!(v["warnings"][0]["code"], "claim_lost", "{v}");
+    assert_eq!(v["warnings"][0]["params"]["holder"], "s1", "{v}");
+    assert_eq!(v["claim_races"][0]["held_by"], "s1", "{v}");
+    assert_eq!(v["next_ready"]["id"], "A01-02", "{v}");
+    assert_eq!(v["issues"][0]["problem"]["code"], "merge_conflict", "{v}");
+    // Without --as: both claims, nobody chosen.
+    let v = ok(&b, &["list"]);
+    assert_eq!(v["warnings"][0]["code"], "claim_race", "{v}");
+
+    // The loser drops its claim: the task is s1's, and claiming it is refused with the pointer.
+    run(&b, &["-c", "core.editor=true", "rebase", "--skip"]);
+    let v = ok(&b, &["--as", "s2", "show", "A01-01"]);
+    assert_eq!(v["task"]["holder"], "s1", "{v}");
+    assert!(v.get("claim_races").is_none(), "{v}");
+    let v = refused(
+        &b,
+        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+        1,
+        "task_held",
+    );
+    assert_eq!(v["next_ready"]["id"], "A01-02", "{v}");
+    let out = alm(&b, &["--as", "s2", "claim", "A01-01", "--branch", "main"]);
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("error [task_held]: Task A01-01 is held by s1.\nNext ready task (alm next's order; you choose, see `alm next`): A01-02  Second"),
+        "{err}"
+    );
+}

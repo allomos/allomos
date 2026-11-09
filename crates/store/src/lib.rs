@@ -1019,6 +1019,11 @@ pub fn load(root: &Path) -> Loaded {
             continue;
         }
         if let Some(text) = read(root, &path, &mut issues) {
+            // Two changes that met (Task-A01-lawn320): said as such, not as broken JSON.
+            if allomos_core::conflict::has_markers(&text) {
+                issues.push(Issue::new(&file, None, Problem::MergeConflict));
+                continue;
+            }
             match parse_task(&file, &text) {
                 Ok(mut t) => {
                     t.description = read_text(&dir.join("description.md")).unwrap_or_default();
@@ -1059,6 +1064,27 @@ pub fn load(root: &Path) -> Loaded {
         issues,
         active_iteration,
     }
+}
+
+/// The tasks whose `task.json` holds two claims that met (Task-A01-lawn320), in ID order. `me`:
+/// the `--as` session. Read without a lock, like everything else; nothing is written.
+pub fn claim_races(root: &Path, me: Option<&str>) -> Vec<allomos_core::conflict::ClaimRace> {
+    use allomos_core::conflict;
+    let mut out = Vec::new();
+    for dir in sorted_entries(&root.join("tasks")) {
+        let path = dir.join("task.json");
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Some((one, two)) = conflict::sides(&text) else {
+            continue;
+        };
+        let file = rel(root, &path);
+        if let (Ok(one), Ok(two)) = (parse_task(&file, &one), parse_task(&file, &two)) {
+            out.extend(conflict::ClaimRace::of(&one, &two, me));
+        }
+    }
+    out
 }
 
 fn write_json<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
