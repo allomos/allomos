@@ -279,3 +279,51 @@ export function unblockNotice(unblocked: Unblocked[]): UnblockNotice | null {
     .filter((g) => g.ids.length > 0);
   return groups.length ? { groups } : null;
 }
+
+// The Monitors list (Task-A03-motor529, approver 2026-11-09): the rows of `monitor_all`, every run
+// this computer runs in every project (see MonitorsList.tsx).
+
+/** A taskbag's project folder: the taskbag's path without its `.allomos/taskbag` (as paths.ts). */
+function taskbagFolder(root: string): string {
+  return root.replace(/[\\/]\.allomos[\\/]taskbag[\\/]?$/, "");
+}
+
+/** One row of the list: a run with its file, or a process whose record is missing. */
+export interface ListedRun {
+  /** The row's key: the run's ID, or the process number when no ID is known. */
+  key: string;
+  /** The run, when its file is there. */
+  run: Run | null;
+  /** The process whose record is missing (no file: only its process is known). */
+  lost: LostRun | null;
+  /** The project's folder name (its last folder), when the run names one. */
+  name: string | null;
+  /** The project's taskbag, which Open shows; null when the run names none. */
+  root: string | null;
+}
+
+/** The last folder of `path`, with either kind of separator; null for an empty path. */
+export function folderName(path: string): string | null {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : null;
+}
+
+/** The rows of `monitor_all` (oldest run first, as it lists them). An entry that is not a run or a
+ * process is left out. The active iteration is not needed here: each row names its iteration. */
+export function listedRuns(entries: unknown[]): ListedRun[] {
+  const rows: ListedRun[] = [];
+  for (const e of entries) {
+    const parsed = readEntry(e, null);
+    if (!parsed) continue;
+    const obj = e as { project?: unknown; taskbag?: unknown };
+    const taskbag = typeof obj.taskbag === "string" && obj.taskbag ? obj.taskbag : null;
+    const project = typeof obj.project === "string" && obj.project ? obj.project : taskbag ? taskbagFolder(taskbag) : null;
+    if (isRun(parsed)) {
+      rows.push({ key: parsed.id, run: parsed, lost: null, name: project ? folderName(project) : null, root: taskbag });
+    } else {
+      rows.push({ key: parsed.id ?? `pid:${parsed.pid}`, run: null, lost: parsed, name: taskbag ? folderName(taskbagFolder(taskbag)) : null, root: taskbag });
+    }
+  }
+  return rows;
+}
+

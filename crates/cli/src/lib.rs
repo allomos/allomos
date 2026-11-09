@@ -1737,7 +1737,7 @@ fn pack_history(cli: &Cli, cwd: &Path, done: &mut Done) {
 /// nothing is read or changed; its tasks are moved into a new taskbag). An out-of-date section
 /// gives a warning telling the agent to renew it. Commands that do not work on a taskbag (`init`,
 /// `brief`, `guide`, `confirm`) and `move-in`, which prints the request for an older one, are not
-/// checked.
+/// checked; nor is `monitor list`, which lists this computer's runs in every project (Task-A03-motor529).
 fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
     if matches!(
         cli.command,
@@ -1747,6 +1747,9 @@ fn check_versions(cli: &Cli, cwd: &Path) -> Result<Vec<Problem>, Problem> {
             | Command::Guide { .. }
             | Command::Confirm { .. }
             | Command::MoveIn { .. }
+            | Command::Monitor {
+                what: monitor::MonitorWhat::List
+            }
     ) {
         return Ok(Vec::new());
     }

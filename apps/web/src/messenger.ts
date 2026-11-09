@@ -126,6 +126,14 @@ export interface Messenger {
   monitorAsk(id: string, request: MonitorRequest): Promise<void>;
   /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
   monitorEndProcess(pid: number): Promise<void>;
+  /** The Monitors list (Task-A03-motor529): every run this computer runs, in every project, with
+   * the record-missing processes; `monitor_all` lists them. Read again every couple of seconds. */
+  monitorAll(): Promise<unknown[]>;
+  /** The list's Open: the project of the taskbag at `root` opens in a window (its tab comes to the
+   * front when a window already shows it). Rejects with a Problem. */
+  monitorOpen(root: string): Promise<void>;
+  /** Calls `handler` when the Window menu's Running Monitors item is chosen (Task-A03-motor529). */
+  onMonitorsMenu(handler: () => void): Promise<() => void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -479,6 +487,9 @@ export const desktopMessenger: Messenger = {
   monitorStart: (root, agents, every, quiet, iteration) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration }),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
   monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
+  monitorAll: () => invoke<unknown[]>("monitor_all"),
+  monitorOpen: (root) => invoke<void>("monitor_open", { root }),
+  onMonitorsMenu: (handler) => getCurrentWebviewWindow().listen("menu:monitors", () => handler()),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>
