@@ -8263,6 +8263,134 @@ fn claim_takes_over_a_lost_task() {
     );
 }
 
+/// A session coming back (decision 0022 § 8, Task-A01-castle658): with `--as`, every command
+/// first names the tasks taken over from it (by whom, when), read-only ones too; its changes to
+/// them are refused (`task_held`), claiming back included; other tasks and other sessions are
+/// not affected, and the notice ends once the task is no longer held by someone else.
+#[test]
+fn a_session_coming_back_is_told_of_the_takeover_and_refused() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    ok(&repo, &["ready", "A01-02"]);
+    let claim = |who: &str, id: &str, at: &str| {
+        ok_at(
+            &repo,
+            at,
+            &[
+                "--as",
+                who,
+                "claim",
+                id,
+                "--branch",
+                "main",
+                "--working",
+                "claude/one",
+            ],
+        )
+    };
+    claim("s1", "A01-01", "2026-11-09T10:00:00Z");
+    let t1 = "2026-11-09T11:00:00Z";
+    claim("s2", "A01-01", t1);
+    let later = "2026-11-09T11:05:00Z";
+
+    // Read-only commands: the notice comes first, in the text and in --json.
+    for args in [
+        vec!["--as", "s1", "show", "A01-01"],
+        vec!["--as", "s1", "list"],
+        vec!["--as", "s1", "next"],
+    ] {
+        let v = ok_at(&repo, later, &args);
+        assert_eq!(v["warnings"][0]["code"], "taken_over", "{args:?}: {v}");
+        assert_eq!(
+            v["warnings"][0]["params"],
+            json!({ "id": "A01-01", "by": "s2", "at": t1 })
+        );
+        assert_eq!(
+            v["taken_over"],
+            json!([{ "id": "A01-01", "by": "s2", "at": t1, "holder": "s2" }])
+        );
+        let out = alm_at(&repo, later, &args);
+        let text = String::from_utf8(out.stdout).unwrap();
+        assert!(
+            text.starts_with(&format!(
+                "notice [taken_over]: Task A01-01 was taken over by s2 at {t1}: you no longer hold it. Stop work on it"
+            )),
+            "{args:?}: {text}"
+        );
+    }
+
+    // Changes to the task are refused, the takeover named; nothing is written.
+    let events = event_count(&repo);
+    for args in [
+        vec!["--as", "s1", "label", "A01-01", "locally verified"],
+        vec!["--as", "s1", "note", "A01-01", "still here"],
+        vec!["--as", "s1", "beat", "A01-01"],
+        vec!["--as", "s1", "release", "A01-01", "--note", "n"],
+        vec![
+            "--as", "s1", "claim", "A01-01", "--branch", "main", "--take",
+        ],
+    ] {
+        let (code, v) = fj_at(&repo, later, &args);
+        assert_eq!(
+            (
+                code,
+                v["error"]["code"].as_str(),
+                v["error"]["params"]["holder"].as_str()
+            ),
+            (1, Some("task_held"), Some("s2")),
+            "{args:?}: {v}"
+        );
+        assert_eq!(v["taken_over"][0]["by"], "s2", "{args:?}: {v}");
+        let out = alm_at(&repo, later, &args);
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(
+            err.starts_with("notice [taken_over]: Task A01-01 was taken over by s2")
+                && err.contains("error [task_held]: Task A01-01 is held by s2."),
+            "{args:?}: {err}"
+        );
+    }
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(task_file(&repo, "A01-01")["holder"], "s2");
+
+    // Its other work goes on, still told first; the new holder and other sessions are told nothing.
+    let v = claim("s1", "A01-02", later);
+    assert_eq!(v["warnings"][0]["code"], "taken_over", "{v}");
+    let v = ok_at(
+        &repo,
+        later,
+        &["--as", "s2", "label", "A01-01", "locally verified"],
+    );
+    assert!(v.get("taken_over").is_none(), "{v}");
+    let v = ok_at(&repo, later, &["list"]);
+    assert!(v.get("taken_over").is_none(), "{v}");
+
+    // A chain: s3 takes it from s2; s1 is still told, and who holds it now.
+    claim("s3", "A01-01", "2026-11-09T12:00:00Z");
+    let v = ok_at(&repo, "2026-11-09T12:05:00Z", &["--as", "s1", "list"]);
+    assert_eq!(
+        v["taken_over"],
+        json!([{ "id": "A01-01", "by": "s2", "at": t1, "holder": "s3" }])
+    );
+    let text =
+        String::from_utf8(alm_at(&repo, "2026-11-09T12:05:00Z", &["--as", "s1", "list"]).stdout)
+            .unwrap();
+    assert!(text.contains("It is held by s3 now."), "{text}");
+
+    // Released by its holder: nobody holds it, so no notice, and s1 may claim it like anyone.
+    ok_at(
+        &repo,
+        "2026-11-09T12:10:00Z",
+        &[
+            "--as", "s3", "release", "A01-01", "--note", "n", "--why", "w",
+        ],
+    );
+    let v = ok_at(&repo, "2026-11-09T12:15:00Z", &["--as", "s1", "list"]);
+    assert!(v.get("taken_over").is_none(), "{v}");
+    claim("s1", "A01-01", "2026-11-09T12:20:00Z");
+    let v = ok_at(&repo, "2026-11-09T12:25:00Z", &["--as", "s1", "list"]);
+    assert!(v.get("taken_over").is_none(), "{v}");
+}
+
 fn refused_at(dir: &Path, now: &str, args: &[&str], problem: &str) {
     let (code, v) = fj_at(dir, now, args);
     assert_eq!(

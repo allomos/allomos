@@ -326,6 +326,11 @@
     "id",
     "state"
   ],
+  "taken_over": [
+    "id",
+    "by",
+    "at"
+  ],
   "task_changed": [
     "id",
     "version"

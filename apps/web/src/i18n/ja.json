@@ -331,6 +331,7 @@
   "problem.task_closed": "タスク {id} は {state} のため、この方法では変更できません。",
   "problem.took_over": "タスク {id} を {previous} から引き継ぎました。",
   "problem.took_over_lost": "タスク {id} を {previous} から引き継ぎました。{previous} は {since} から動きがなく、連絡が途絶えていました。",
+  "problem.taken_over": "タスク {id} は {at} に {by} が引き継ぎました。あなたはもう担当していません。このタスクの作業をやめてください。作業ブランチへのコミットやプッシュはせず、取り戻そうともしないでください。worktree はそのまま残し、タスクが誰に引き継がれたかを依頼した人に伝えて、ほかの準備できたタスク（`alm next`）に移るか、終了してください。",
   "problem.bad_usage": "{detail}",
   "problem.not_a_taskbag": "{path} はタスクバッグのフォルダーではありません。",
   "problem.link_refused": "「肩代」が開くのは Web のリンクと、このプロジェクト内のテキストファイル（.md、.txt）だけなので、「{link}」は開きませんでした。",
