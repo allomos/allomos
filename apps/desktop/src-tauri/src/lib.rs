@@ -11,6 +11,7 @@ mod codex_rules;
 mod heartbeat_settings;
 mod lan;
 mod monitor_menu;
+mod monitor_pause;
 mod monitor_runs;
 mod notify;
 mod pairing;
@@ -1682,11 +1683,19 @@ fn set_auto_update(app: AppHandle, on: bool) -> Result<(), Problem> {
 /// quit; the new version starts by itself. If the person cancels macOS's password prompt,
 /// nothing changes. A failure is told to every window, and this version keeps running.
 fn restart_to_update(app: AppHandle) {
-    tauri::async_runtime::spawn_blocking(move || match update::restart_to_update() {
-        Ok(update::Restart::Quit) => app.exit(0),
-        Ok(update::Restart::Cancelled) => {}
-        Err(detail) => {
-            let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+    tauri::async_runtime::spawn_blocking(move || {
+        // Task-A03-bowl641: while monitoring runs, say first that it keeps running; Cancel changes nothing.
+        if let Some(sessions) = monitor_pause::running_sessions() {
+            if !monitor_pause::confirm_blocking(&app, monitor_pause::Action::Restart, sessions) {
+                return;
+            }
+        }
+        match update::restart_to_update() {
+            Ok(update::Restart::Quit) => app.exit(0),
+            Ok(update::Restart::Cancelled) => {}
+            Err(detail) => {
+                let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+            }
         }
     });
 }
@@ -2716,6 +2725,25 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running Allomos")
         .run(|app, event| {
+            // Task-A03-bowl641: quitting by the person's own request, while monitoring runs, first
+            // says that it keeps running. The app quits only when the person confirms (which quits again,
+            // programmatically, so this reminder does not come back).
+            if let tauri::RunEvent::ExitRequested {
+                code: None, api, ..
+            } = &event
+            {
+                if let Some(sessions) = monitor_pause::running_sessions() {
+                    api.prevent_exit();
+                    let handle = app.clone();
+                    monitor_pause::confirm_then(
+                        app,
+                        monitor_pause::Action::Quit,
+                        sessions,
+                        move || handle.exit(0),
+                    );
+                    return;
+                }
+            }
             // Quitting keeps every window and tab for the next start (Task-A01-marble320).
             if matches!(
                 event,
