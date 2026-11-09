@@ -1102,6 +1102,8 @@
   "monitor.start_failed": "监测已停止：没能为 {id} 启动 {agent}。{detail}",
   "monitor.close_prompt": "「换肩」：任务已完成。这个标签页 30 秒后关闭；按任意键保留。",
   "monitor.close_kept": "「换肩」：这个标签页保留。",
+  "monitor.lost": "有一次监测在运行，但缺少记录（进程 {pid}）{id}",
+  "monitor.run_tip": "监测 {id}：alm monitor status 也能看到它",
   "label.locally_by_agent": "智能体已在本地验证",
   "label.deployed_by_agent": "智能体已部署并验证",
   "label.locally_by_human": "人已在本地验证",

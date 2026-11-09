@@ -241,6 +241,22 @@ impl Entry {
             Entry::Missing { id, .. } => id.as_deref(),
         }
     }
+    /// As `alm monitor status --json` and the app read it: the run file's fields with
+    /// `"record": "present"` and its `next_check` (ms), or `"record": "missing"` with the process.
+    pub fn json(&self) -> serde_json::Value {
+        match self {
+            Entry::Missing { pid, id, taskbag } => {
+                serde_json::json!({ "id": id, "pid": pid, "taskbag": taskbag, "record": "missing" })
+            }
+            Entry::Running(r) => {
+                let mut v = serde_json::to_value(r.as_ref()).unwrap_or_default();
+                v["record"] = serde_json::json!("present");
+                v["next_check"] = serde_json::json!(r.run.next_check());
+                v
+            }
+        }
+    }
+
     pub fn pid(&self) -> u32 {
         match self {
             Entry::Running(r) => r.pid,
@@ -323,6 +339,25 @@ pub fn list(dir: &Path, processes: Option<&[Process]>) -> Vec<Entry> {
         }
     }
     out
+}
+
+/// The same folder, however it was written.
+pub fn same_place(a: &Path, b: &Path) -> bool {
+    let tidy = |p: &Path| fs::canonicalize(p).unwrap_or_else(|_| allomos_store::tidy(p));
+    tidy(a) == tidy(b)
+}
+
+/// The runs of the taskbag at `root`, with the record-missing processes whose command line names
+/// it (or names no taskbag).
+pub fn of_project(dir: &Path, root: &Path) -> Vec<Entry> {
+    let procs = monitor_processes();
+    list(dir, Some(&procs))
+        .into_iter()
+        .filter(|e| match e {
+            Entry::Running(r) => same_place(&r.taskbag, root),
+            Entry::Missing { taskbag, .. } => taskbag.as_ref().is_none_or(|t| same_place(t, root)),
+        })
+        .collect()
 }
 
 /// The run ID in an `alm monitor run [<id>] …` command line, as its words; `None` when the words

@@ -251,12 +251,6 @@ fn language_of(root: &Path) -> Result<String, Problem> {
     Ok(allomos_store::task_language(&bag.project, &system).language)
 }
 
-/// The same folder, however it was written.
-fn same_place(a: &Path, b: &Path) -> bool {
-    let tidy = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| allomos_store::tidy(p));
-    tidy(a) == tidy(b)
-}
-
 /// One run as a line of `status` and `list`.
 fn entry_text(e: &Entry, with_project: bool) -> String {
     match e {
@@ -318,33 +312,6 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
             text
         }
     }
-}
-
-fn entry_json(e: &Entry) -> serde_json::Value {
-    match e {
-        Entry::Missing { pid, id, taskbag } => {
-            json!({ "id": id, "pid": pid, "taskbag": taskbag, "record": "missing" })
-        }
-        Entry::Running(r) => {
-            let mut v = serde_json::to_value(r.as_ref()).unwrap_or_default();
-            v["record"] = json!("present");
-            v["next_check"] = json!(r.run.next_check());
-            v
-        }
-    }
-}
-
-/// The runs of the project at `root`, with the record-missing processes whose command line names
-/// it (or names no taskbag).
-fn project_entries(dir: &Path, root: &Path) -> Vec<Entry> {
-    let procs = registry::monitor_processes();
-    registry::list(dir, Some(&procs))
-        .into_iter()
-        .filter(|e| match e {
-            Entry::Running(r) => same_place(&r.taskbag, root),
-            Entry::Missing { taskbag, .. } => taskbag.as_ref().is_none_or(|t| same_place(t, root)),
-        })
-        .collect()
 }
 
 /// The one run `given` names among `entries` (by ID or process number); with none given, the
@@ -490,7 +457,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
         }
         MonitorWhat::Check { run } => {
             let root = crate::locate(cli, cwd)?;
-            let entries = project_entries(&dir, &root);
+            let entries = registry::of_project(&dir, &root);
             let chosen = choose(&entries, run.as_deref(), "check")?;
             let Entry::Running(r) = chosen else {
                 return Err(Problem::BadUsage {
@@ -512,7 +479,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
         }
         MonitorWhat::Stop { run } => {
             let root = crate::locate(cli, cwd)?;
-            let entries = project_entries(&dir, &root);
+            let entries = registry::of_project(&dir, &root);
             let chosen = choose(&entries, run.as_deref(), "stop")?;
             match chosen {
                 Entry::Missing { pid, id, .. } => {
@@ -550,7 +517,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
         }
         MonitorWhat::Status => {
             let root = crate::locate(cli, cwd)?;
-            let entries = project_entries(&dir, &root);
+            let entries = registry::of_project(&dir, &root);
             let mut text = if entries.is_empty() {
                 "No monitor is running for this project (`alm monitor start` starts one).\n"
                     .to_string()
@@ -561,7 +528,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 text.push_str(&entry_text(e, false));
             }
             Ok(Done::new(
-                json!({ "taskbag": root, "monitors": entries.iter().map(entry_json).collect::<Vec<_>>() }),
+                json!({ "taskbag": root, "monitors": entries.iter().map(Entry::json).collect::<Vec<_>>() }),
                 text,
             ))
         }
@@ -577,7 +544,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 text.push_str(&entry_text(e, true));
             }
             Ok(Done::new(
-                json!({ "monitors": entries.iter().map(entry_json).collect::<Vec<_>>() }),
+                json!({ "monitors": entries.iter().map(Entry::json).collect::<Vec<_>>() }),
                 text,
             ))
         }

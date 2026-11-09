@@ -348,26 +348,6 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
         })
 }
 
-/// **Monitor ready tasks** (Task-A03-moth285): start a new session of a terminal agent in
-/// `project` with `request` already sent ([`allomos_monitor::terminal::start_session`]), with the
-/// app's own `alm` first in its `PATH`.
-pub fn start_session(
-    agent: &Agent,
-    project: &Path,
-    request: &str,
-    session_id: Option<&str>,
-) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
-    let own_alm = crate::alm_command::own();
-    allomos_monitor::terminal::start_session(
-        &agent.id,
-        &agent.found,
-        project,
-        request,
-        session_id,
-        own_alm.as_deref().and_then(Path::parent),
-    )
-}
-
 /// Open `url` with the app the system has for its scheme.
 pub(crate) fn open_link(url: &str) -> Result<(), String> {
     if cfg!(windows) {

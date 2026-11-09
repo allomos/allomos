@@ -11,7 +11,13 @@ import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
-import type { Released, SessionTab } from "./monitorFlow";
+/** What a running monitor can be asked (Task-A03-cow112), as `alm monitor` leaves it. */
+export type MonitorRequest =
+  | { action: "check" }
+  | { action: "stop" }
+  | { action: "undo_stop" }
+  | { action: "every"; minutes: number }
+  | { action: "agents"; agents: string[] };
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
@@ -110,19 +116,16 @@ export interface Messenger {
   proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
   /** Work on it… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
-  /** Monitor ready tasks (Task-A03-moth285): starts a new session of a terminal agent (`claude_cli`,
-   * `codex_cli`) in the project folder of the taskbag at `taskbag`, in a terminal window of its
-   * own, with `request` already sent; `sessionId` is Claude Code's `--session-id`. Rejects with a Problem. */
-  monitorStartSession(agent: string, taskbag: string, request: string, sessionId: string | null): Promise<SessionTab | null>;
-  /** When the monitor starts and on Check now (Task-A01-steam936): every blocked task whose
-   * blockers have all finished goes on, as the last blocker's Done would have let it. Resolves with
-   * the tasks it let go on; with none, nothing is written. */
-  releaseFinished(root: string): Promise<Released[]>;
-  /** The task of the session in `tab` is done: the tab closes after 30 seconds unless a key is pressed (Task-A03-sierra014). */
-  monitorCloseSession(agent: string, tab: SessionTab, texts: { prompt: string; kept: string }): Promise<void>;
-  /** Monitor ready tasks is stuck (Task-A00-eclair542): a system notification for the person, where
-   * the system has one (macOS); otherwise nothing. */
-  monitorNotify(title: string, body: string): Promise<void>;
+  /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
+   * once), as `alm monitor status --json` lists them; read again every few seconds. */
+  monitorRuns(root: string): Promise<unknown[]>;
+  /** Starts a run with the app's own `alm monitor start` (a background process that goes on after
+   * the app is closed); resolves with its ID. Rejects with a Problem. */
+  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null): Promise<string>;
+  /** Leaves a request for run `id`: check now, stop, undo the stop, a new frequency, these agents. */
+  monitorAsk(id: string, request: MonitorRequest): Promise<void>;
+  /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
+  monitorEndProcess(pid: number): Promise<void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -472,11 +475,10 @@ export const desktopMessenger: Messenger = {
   proceedTaskbag: (taskbag) => invoke<string>("proceed_taskbag", { taskbag }),
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
-  monitorStartSession: (agent, taskbag, request, sessionId) =>
-    invoke<SessionTab | null>("monitor_start_session", { agent, taskbag, request, sessionId }),
-  monitorCloseSession: (agent, tab, texts) => invoke<void>("monitor_close_session", { agent, tab, texts }),
-  monitorNotify: (title, body) => invoke<void>("monitor_notify", { title, body }),
-  releaseFinished: (root) => invoke<Released[]>("release_finished", { root }),
+  monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
+  monitorStart: (root, agents, every, quiet, iteration) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration }),
+  monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
+  monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
   connectAgents: (agents, project, taskbag, language) =>

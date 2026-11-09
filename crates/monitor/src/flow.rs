@@ -73,6 +73,18 @@ pub struct Run {
     /// The person was told no task is ready, once per stretch without one.
     #[serde(default)]
     pub idle_told: bool,
+    /// What the last sweep (at the start and on Check now) let go on because their blockers had
+    /// finished, until the next check: the app's line under the status bar.
+    #[serde(default)]
+    pub unblocked: Vec<Unblocked>,
+}
+
+/// A task a sweep let go on, and the state it went back to (`ready`, or `in_progress` when
+/// someone holds it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Unblocked {
+    pub id: String,
+    pub state: String,
 }
 
 /// What the monitor tells the person when it is stuck.
@@ -108,6 +120,7 @@ impl Run {
             stopping: false,
             checked: now - i64::from(every) * 60_000,
             idle_told: false,
+            unblocked: Vec::new(),
         }
     }
 

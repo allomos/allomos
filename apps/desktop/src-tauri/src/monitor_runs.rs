@@ -1,0 +1,111 @@
+//! **Monitor ready tasks** from the app (Task-A03-cow112, approver 2026-11-09): the app only
+//! shows and controls runs; it runs none itself. Start runs the app's own `alm monitor start`,
+//! which starts the same background `alm monitor run` a terminal would, so a run started here
+//! goes on after the app is closed. The status bar reads this computer's run files
+//! ([`allomos_monitor::registry`]); Stop, Check now and the menus leave a request beside them.
+
+use std::path::PathBuf;
+
+use allomos_core::Problem;
+use allomos_monitor::registry::{self, Entry, Request};
+
+fn no_dir() -> Problem {
+    Problem::BadUsage {
+        detail: "this computer has no settings folder for Allomos".to_string(),
+    }
+}
+
+/// The runs of the taskbag at `root` (several may run at once), oldest first, with the
+/// record-missing `alm monitor run` processes that name it.
+#[tauri::command]
+pub fn monitor_runs(root: PathBuf) -> Vec<serde_json::Value> {
+    let Some(dir) = registry::dir() else {
+        return Vec::new();
+    };
+    registry::of_project(&dir, &root)
+        .iter()
+        .map(Entry::json)
+        .collect()
+}
+
+/// Start a run with the app's own `alm` (`monitor start`); resolves with its ID.
+#[tauri::command]
+pub async fn monitor_start(
+    root: PathBuf,
+    agents: Vec<String>,
+    every: u32,
+    quiet: bool,
+    iteration: Option<String>,
+) -> Result<String, Problem> {
+    let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
+        detail: "the app's own alm was not found beside it".to_string(),
+    })?;
+    let mut args: Vec<String> = vec![
+        "--json".into(),
+        "--taskbag".into(),
+        root.display().to_string(),
+        "monitor".into(),
+        "start".into(),
+        "--mode".into(),
+        (if quiet { "quiet" } else { "normal" }).into(),
+        "--every".into(),
+        every.to_string(),
+    ];
+    for a in &agents {
+        args.push("--agent".into());
+        args.push(a.clone());
+    }
+    if let Some(i) = iteration {
+        args.push("--iteration".into());
+        args.push(i);
+    }
+    let out = crate::agents::command(&alm)
+        .args(&args)
+        .env_remove("ALLOMOS_TASKBAG")
+        .output()
+        .map_err(|e| Problem::BadUsage {
+            detail: format!("{}: {e}", alm.display()),
+        })?;
+    let v: serde_json::Value =
+        serde_json::from_slice(&out.stdout).map_err(|_| Problem::BadUsage {
+            detail: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+        })?;
+    if v["ok"] == true {
+        return Ok(v["run"].as_str().unwrap_or_default().to_string());
+    }
+    Err(Problem::BadUsage {
+        detail: v["error"]["message"]
+            .as_str()
+            .unwrap_or("the monitor did not start")
+            .to_string(),
+    })
+}
+
+/// Leave `request` (check, stop, undo_stop, every, agents) for run `id`.
+#[tauri::command]
+pub fn monitor_ask(id: String, request: Request) -> Result<(), Problem> {
+    if !registry::plain_id(&id) {
+        return Err(Problem::BadUsage {
+            detail: format!("{id}: not a run ID"),
+        });
+    }
+    let dir = registry::dir().ok_or_else(no_dir)?;
+    registry::ask(&dir, &id, &request).map_err(|e| Problem::WriteFailed {
+        path: dir.display().to_string(),
+        detail: e.to_string(),
+    })
+}
+
+/// End process `pid`, an `alm monitor run` whose record is missing (it cannot see a request).
+/// Refused for any other process.
+#[tauri::command]
+pub fn monitor_end_process(pid: u32) -> Result<(), Problem> {
+    if !registry::monitor_processes().iter().any(|p| p.pid == pid) {
+        return Err(Problem::BadUsage {
+            detail: format!("process {pid} is not a monitor"),
+        });
+    }
+    registry::end_process(pid).map_err(|e| Problem::BadUsage {
+        detail: format!("process {pid} could not be ended: {e}"),
+    })
+}

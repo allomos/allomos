@@ -1,43 +1,38 @@
-// Monitor ready tasks (Task-A03-moth285, approver 2026-11-03/04): the run itself, and what shows
-// in place of its button while it runs. Allomos starts a new terminal session of a chosen agent
-// for each ready task, one at a time per agent (several agents: Task-A03-fruit467), and follows the task in the taskbag (read again whenever its
-// files change) to see it claimed and then let go. With no task ready it waits and checks again
-// at the chosen frequency. The run is kept by this window only, on this computer, never in the
-// taskbag; the last one's summary is remembered per project for the line beside the button.
+// Monitor ready tasks (Task-A03-moth285, approver 2026-11-03/04): what shows in place of its button
+// while runs go on. Since Task-A03-cow112 (approver 2026-11-09) a run is a background `alm monitor
+// run` process of this computer, started here with the app's own `alm monitor start` or from a
+// terminal, and it goes on after the app is closed: the app runs no loop of its own. It reads the
+// project's run files every few seconds and shows a status bar for each run (a project may have
+// several); Stop, Check now and the menus leave a request for the run. The last run's summary is
+// remembered per project for the line beside the button.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
-import type { Messenger } from "./messenger";
+import type { Messenger, MonitorRequest } from "./messenger";
 import { AGENT_KEY } from "./AgentPicker";
 import { localTime } from "./timeFlow";
 import { sessionPlace } from "./sessionFlow";
 import { toCheck } from "./stopFlow";
 import {
   FREQUENCIES,
-  follow,
   freeAgents,
   frequencyText,
-  idleAlert,
+  isRun,
   lastRunCounts,
-  monitorRequest,
   nextCheck,
-  noticeAfterCheck,
+  readEntry,
   setAgents,
-  share,
   stalled,
-  startRun,
-  tabToClose,
-  take,
   unblockNotice,
-  waitingAlert,
-  withReleased,
 } from "./monitorFlow";
-import type { Frequency, LastRun, Run, Scope, StuckAlert, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import type { Frequency, LastRun, LostRun, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
 import { isProblem } from "./types";
-import type { Iteration, Task } from "./types";
+import type { Task } from "./types";
 
 /** How often the status bar's clock moves on, so the next check and a stalled session show in time. */
 const TICK_MS = 15_000;
+/** How often the runs' files are read again. */
+const READ_MS = 2_000;
 
 const LAST_KEY = "allomos.monitor.last";
 
@@ -58,198 +53,104 @@ function saveLast(root: string, last: LastRun) {
   }
 }
 
-type Box = { areas: { id: string }[]; iterations: Iteration[]; tasks: Task[] };
-
-/** One project's monitor: the run (null when not monitoring), the last run, and what the status
- * bar does. `box` is the taskbag as read now. */
+/** One project's monitors: the runs going on (none when not monitoring), the last run, and what
+ * the status bars do. */
 export function useMonitor({
   messenger,
   root,
-  box,
   active,
   onError,
 }: {
   messenger: Messenger;
   root: string;
-  box: Box | null;
   active: string | null | undefined;
   onError: (message: string) => void;
 }) {
-  const { t, problem, language } = useI18n();
-  const [run, setRun] = useState<Run | null>(null);
+  const { problem } = useI18n();
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [lost, setLost] = useState<LostRun[]>([]);
   const [last, setLast] = useState<LastRun | null>(() => readLast(root));
   const [now, setNow] = useState(() => Date.now());
-  const runRef = useRef(run);
-  runRef.current = run;
-  /** A session is being started: no second one until it is. */
-  const starting = useRef(false);
-  /** What the last sweep let go on (Task-A01-steam936): the line under the status bar, and the
-   * tasks as it left them until the taskbag is read again. */
-  const [notice, setNotice] = useState<UnblockNotice | null>(null);
-  const [released, setReleased] = useState<Task[]>([]);
+  /** The runs seen at the last read: one gone since then has ended. */
+  const seen = useRef<Map<string, Run>>(new Map());
+  /** The sweep notices the person closed, by run and check. */
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  /** When the monitor starts and on Check now: every blocked task whose blockers have all finished
-   * goes on first, so this check can take it. A failed sweep is said, and the check goes on. */
-  const sweep = useCallback(async () => {
+  const read = useCallback(async () => {
+    let list: unknown[];
     try {
-      const list = await messenger.releaseFinished(root);
-      setReleased(list.map((r) => r.task));
-      setNotice(unblockNotice(list));
-    } catch (e) {
-      setNotice(null);
-      onError(isProblem(e) ? problem(e) : String(e));
+      list = await messenger.monitorRuns(root);
+    } catch {
+      return;
     }
-  }, [messenger, root, onError, problem]);
+    const entries = list.map((e) => readEntry(e, active)).filter((e): e is Run | LostRun => e !== null);
+    const found = entries.filter(isRun);
+    for (const [id, r] of seen.current) {
+      if (!found.some((f) => f.id === id)) {
+        const summary: LastRun = { ended: new Date().toISOString(), scope: r.scope, taken: r.taken };
+        saveLast(root, summary);
+        setLast(summary);
+      }
+    }
+    seen.current = new Map(found.map((r) => [r.id, r]));
+    setRuns(found);
+    setLost(entries.filter((e): e is LostRun => !isRun(e)));
+  }, [messenger, root, active]);
 
-  const end = useCallback(
-    (r: Run) => {
-      const summary: LastRun = { ended: new Date().toISOString(), scope: r.scope, taken: r.taken };
-      saveLast(root, summary);
-      setLast(summary);
-      setRun(null);
-      setNotice(null);
-    },
-    [root],
-  );
-
-  // Another project opened in this window, or the window closes: the run ends.
+  // Another project opened in this window: its own runs and last run.
   useEffect(() => {
+    seen.current = new Map();
+    setRuns([]);
+    setLost([]);
     setLast(readLast(root));
-    return () => {
-      const r = runRef.current;
-      if (r) saveLast(root, { ended: new Date().toISOString(), scope: r.scope, taken: r.taken });
-      runRef.current = null;
-      setRun(null);
-    };
-  }, [root]);
+    void read();
+    const timer = window.setInterval(() => void read(), READ_MS);
+    return () => window.clearInterval(timer);
+  }, [root, read]);
 
   // The clock runs only while monitoring.
-  const running = run !== null;
+  const running = runs.length > 0;
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => setNow(Date.now()), TICK_MS);
     return () => window.clearInterval(timer);
   }, [running]);
 
-  /** Tells the person the monitor is stuck (Task-A00-eclair542): a system notification. */
-  const tell = useCallback(
-    (alert: StuckAlert, r: Run, at: number) => {
-      const body =
-        alert.kind === "waiting"
-          ? t("monitor.notify_waiting", { id: alert.id, on: alert.on })
-          : t("monitor.notify_idle", {
-              time: new Date(at + r.every * 60_000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            });
-      void messenger.monitorNotify(t("monitor.notify_title"), body).catch(() => {});
-    },
-    [messenger, t],
-  );
-
-  /** Starts one session per agent and task, one after another; a failure is said, and that agent
-   * is taken off the run (the run ends when it was the last one and nothing else is worked). */
-  const startSessions = useCallback(
-    async (r: Run, shares: { agent: TerminalAgent; task: Task }[]) => {
-      starting.current = true;
-      try {
-        const taskbag = await messenger.proceedTaskbag(root).catch(() => root);
-        for (const { agent, task } of shares) {
-          const sessionId = agent === "claude_cli" ? crypto.randomUUID() : null;
-          try {
-            const request = monitorRequest(task, taskbag, language, agent, sessionId, r.quiet);
-            const tab = await messenger.monitorStartSession(agent, root, request, sessionId);
-            setRun((now) => (now && now.started === r.started ? take(now, agent, task, sessionId, Date.now(), tab) : now));
-          } catch (e) {
-            const detail = isProblem(e) ? problem(e) : String(e);
-            onError(t("monitor.start_failed", { agent: t(AGENT_KEY[agent]), id: task.id, detail }));
-            const current = runRef.current;
-            if (!current || current.started !== r.started) return;
-            const left = current.agents.filter((x) => x !== agent);
-            if (left.length === 0 && current.working.length === 0) {
-              end(current);
-              return;
-            }
-            const next = left.length ? setAgents(current, left) : { ...current, stopping: true };
-            runRef.current = next;
-            setRun(next);
-          }
-        }
-      } finally {
-        starting.current = false;
-      }
-    },
-    [messenger, root, language, t, problem, onError, end],
-  );
-
-  // Each time the taskbag is read, the clock moves on or the run changes: follow every session's
-  // task; when one is finished, end the run if a stop was asked and nothing else is worked, else
-  // give the free agents the next ready tasks at once; with none, check again when the frequency
-  // says.
-  useEffect(() => {
-    if (!run || !box) return;
-    // The taskbag read again shows what the sweep let go on: no need to keep its copies.
-    if (released.length && released.every((r) => box.tasks.find((t) => t.id === r.id)?.state !== "blocked")) {
-      setReleased([]);
-    }
-    const tasks = withReleased(box.tasks, released);
-    const at = Date.now();
-    const followed = follow(run, box.tasks, at);
-    for (const cur of followed.finished) {
-      // Its task done, the session's tab closes after 30 seconds unless a key is pressed in it.
-      const tab = tabToClose(cur, box.tasks);
-      if (tab) {
-        const texts = { prompt: t("monitor.close_prompt"), kept: t("monitor.close_kept") };
-        void messenger.monitorCloseSession(cur.agent, tab, texts).catch(() => {});
-      }
-      // Its session parked a question for the person: tell them.
-      const waiting = waitingAlert(cur.id, box.tasks);
-      if (waiting) tell(waiting, run, at);
-    }
-    let r = followed.run;
-    if (r.stopping) {
-      if (!r.working.length) return end(r);
-      if (r !== run) setRun(r);
-      return;
-    }
-    const free = freeAgents(r);
-    if (free.length && !starting.current && (followed.finished.length > 0 || at >= nextCheck(r))) {
-      setNotice(noticeAfterCheck);
-      const shares = share(r, tasks, box.areas, box.iterations, active);
-      if (shares.length) {
-        if (r !== run) setRun(r);
-        void startSessions(r, shares);
-        return;
-      }
-      r = { ...r, checked: at };
-      // Nothing to take and no session at work: tell the person once, until a task is taken again.
-      const idle = idleAlert(r);
-      if (idle.alert) tell(idle.alert, idle.run, at);
-      r = idle.run;
-    }
-    if (r !== run) setRun(r);
-  }, [run, box, released, now, active, end, startSessions, tell, messenger, t]);
+  const ask = (run: Run, request: MonitorRequest) => {
+    messenger
+      .monitorAsk(run.id, request)
+      .then(() => window.setTimeout(() => void read(), 1_200))
+      .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
+  };
 
   return {
-    run,
+    runs,
+    lost,
     last,
     now,
-    notice,
-    dismissNotice: () => setNotice(null),
-    start: (scope: Scope, agents: TerminalAgent[], quiet: boolean, every: Frequency, offered?: TerminalAgent[]) => {
-      void sweep().then(() => setRun(startRun(scope, agents, quiet, every, Date.now(), offered)));
+    /** The line under a run's status bar after its sweep let blocked tasks go on, until the next
+     * check or until closed. */
+    notice: (run: Run): UnblockNotice | null => (dismissed.has(`${run.id}:${run.checked}`) ? null : unblockNotice(run.unblocked)),
+    dismissNotice: (run: Run) => setDismissed((d) => new Set(d).add(`${run.id}:${run.checked}`)),
+    start: (scope: Scope, agents: TerminalAgent[], quiet: boolean, every: Frequency) => {
+      messenger
+        .monitorStart(root, agents, every, quiet, scope.kind === "iteration" ? scope.id : null)
+        .then(() => read())
+        .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
     },
-    stop: () => {
-      if (!run) return;
-      if (run.working.length) setRun({ ...run, stopping: true });
-      else end(run);
-    },
-    undoStop: () => run && setRun({ ...run, stopping: false }),
-    checkNow: () => {
-      if (!run) return;
-      void sweep().then(() => setRun((now) => (now ? { ...now, checked: 0 } : now)));
-    },
-    setEvery: (every: Frequency) => run && setRun({ ...run, every }),
+    stop: (run: Run) => ask(run, { action: "stop" }),
+    undoStop: (run: Run) => ask(run, { action: "undo_stop" }),
+    checkNow: (run: Run) => ask(run, { action: "check" }),
+    setEvery: (run: Run, every: Frequency) => ask(run, { action: "every", minutes: every }),
     /** Adds or takes off agents while the run goes on (Task-A03-fruit467). */
-    setAgents: (agents: TerminalAgent[]) => setRun((now) => (now ? setAgents(now, agents) : now)),
+    setAgents: (run: Run, agents: TerminalAgent[]) => ask(run, { action: "agents", agents: setAgents(run, agents) }),
+    /** Ends a run whose record is missing. */
+    endLost: (l: LostRun) => {
+      messenger
+        .monitorEndProcess(l.pid)
+        .then(() => read())
+        .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
+    },
   };
 }
 
@@ -287,10 +188,14 @@ export function MonitorControl({
   onNeedYou?: () => void;
 }) {
   const { t } = useI18n();
-  const { run, last, now } = monitor;
-  const [menu, setMenu] = useState(false);
+  const { runs, lost, last, now } = monitor;
 
-  if (!run) {
+  const button = (
+    <button type="button" className="monitor-button" onClick={onOpen} title={ready === 0 ? t("monitor.button_none_tip") : undefined}>
+      {t("monitor.button")}
+    </button>
+  );
+  if (!runs.length && !lost.length) {
     const counts = last ? lastRunCounts(last, tasks, toCheck) : null;
     return (
       <span className="monitor">
@@ -311,13 +216,63 @@ export function MonitorControl({
             )}
           </span>
         )}
-        <button type="button" className="monitor-button" onClick={onOpen} title={ready === 0 ? t("monitor.button_none_tip") : undefined}>
-          {t("monitor.button")}
-        </button>
+        {button}
       </span>
     );
   }
 
+  return (
+    <span className="monitor-stack">
+      {runs.map((run) => (
+        <RunBar
+          key={run.id}
+          run={run}
+          monitor={monitor}
+          tasks={tasks}
+          now={now}
+          showScope={showScope || runs.length > 1}
+          onOpenSession={onOpenSession}
+          onOpenTask={onOpenTask}
+          onError={onError}
+        />
+      ))}
+      {lost.map((l) => (
+        <span key={l.pid} className="monitor-bar stopping" role="status">
+          <span className="dot" aria-hidden="true" />
+          <span>{t("monitor.lost", { pid: l.pid, id: l.id ?? "" })}</span>
+          <button type="button" className="small stop" onClick={() => monitor.endLost(l)}>
+            {t("monitor.stop")}
+          </button>
+        </span>
+      ))}
+      <span className="monitor">{button}</span>
+    </span>
+  );
+}
+
+/** One run's status bar: what it is doing, Check now, its frequency and agents, the sessions at
+ * work (each a link to its session), and Stop. */
+function RunBar({
+  run,
+  monitor,
+  tasks,
+  now,
+  showScope,
+  onOpenSession,
+  onOpenTask,
+  onError,
+}: {
+  run: Run;
+  monitor: Monitor;
+  tasks: Task[];
+  now: number;
+  showScope?: boolean;
+  onOpenSession: (id: string) => Promise<void>;
+  onOpenTask?: (id: string) => void;
+  onError: (e: unknown) => void;
+}) {
+  const { t } = useI18n();
+  const [menu, setMenu] = useState(false);
   const working = run.working;
   const ids = working.map((w) => w.id).join(", ");
   const free = freeAgents(run);
@@ -334,14 +289,15 @@ export function MonitorControl({
         ? t("monitor.on_starting")
         : t("monitor.on_waiting", { time: nextAt });
   const late = stalled(run, now);
+  const notice = monitor.notice(run);
   return (
-    <span className="monitor-stack">
-    <span className={run.stopping ? "monitor-bar stopping" : "monitor-bar"} role="status">
+    <>
+    <span className={run.stopping ? "monitor-bar stopping" : "monitor-bar"} role="status" title={t("monitor.run_tip", { id: run.id })}>
       <span className="dot" aria-hidden="true" />
       {showScope && <span className="monitor-scope">{scopeName(run.scope, t)} ·</span>}
       <span>{status}</span>
       {free.length > 0 && !run.stopping && (
-        <button type="button" className="link small" onClick={monitor.checkNow}>
+        <button type="button" className="link small" onClick={() => monitor.checkNow(run)}>
           {t("monitor.check_now")}
         </button>
       )}
@@ -364,7 +320,7 @@ export function MonitorControl({
                   aria-checked={f === run.every}
                   className={f === run.every ? "on" : undefined}
                   onClick={() => {
-                    monitor.setEvery(f);
+                    monitor.setEvery(run, f);
                     setMenu(false);
                   }}
                 >
@@ -376,7 +332,7 @@ export function MonitorControl({
           </div>
         )}
       </span>
-      <AgentsMenu run={run} onChange={monitor.setAgents} />
+      <AgentsMenu run={run} onChange={(agents) => monitor.setAgents(run, agents)} />
       {working.map((cur) => {
         const task = tasks.find((x) => x.id === cur.id);
         const place = task ? sessionPlace(task) : null;
@@ -407,17 +363,17 @@ export function MonitorControl({
         </span>
       ))}
       {run.stopping ? (
-        <button type="button" className="small" onClick={monitor.undoStop}>
+        <button type="button" className="small" onClick={() => monitor.undoStop(run)}>
           {t("monitor.undo_stop")}
         </button>
       ) : (
-        <button type="button" className="small stop" onClick={monitor.stop}>
+        <button type="button" className="small stop" onClick={() => monitor.stop(run)}>
           {t("monitor.stop")}
         </button>
       )}
     </span>
-    {monitor.notice && <UnblockLine notice={monitor.notice} onOpenTask={onOpenTask} onClose={monitor.dismissNotice} />}
-    </span>
+    {notice && <UnblockLine notice={notice} onOpenTask={onOpenTask} onClose={() => monitor.dismissNotice(run)} />}
+    </>
   );
 }
 

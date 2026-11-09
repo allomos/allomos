@@ -10,9 +10,8 @@ mod audit;
 mod codex_rules;
 mod heartbeat_settings;
 mod lan;
-mod notify;
+mod monitor_runs;
 mod pairing;
-mod session_tab;
 mod sessions;
 mod tab_drag;
 mod update;
@@ -1945,35 +1944,6 @@ async fn proceed_with_agent(
     agents::ask(chosen, &project, &request)
 }
 
-/// **Monitor ready tasks** (Task-A03-moth285): start a new session of a terminal agent (Claude
-/// Code or Codex) in the project folder for one task, with `request` (written by the interface)
-/// already sent; `session_id` is the ID Allomos made for Claude Code's `--session-id`.
-#[tauri::command]
-async fn monitor_start_session(
-    agent: String,
-    taskbag: PathBuf,
-    request: String,
-    session_id: Option<String>,
-) -> Result<Option<session_tab::SessionTab>, Problem> {
-    let project = allomos_store::versions::project_folder(&taskbag);
-    if !project.is_dir() {
-        return Err(Problem::StartupNotAFolder {
-            path: project.display().to_string(),
-        });
-    }
-    let found = agents::find_agents();
-    let Some(chosen) = found.iter().find(|a| {
-        a.id == agent
-            && matches!(
-                a.id.as_str(),
-                "claude_cli" | "codex_cli" | "antigravity_cli"
-            )
-    }) else {
-        return Err(Problem::AgentNotFound { agent });
-    };
-    agents::start_session(chosen, &project, &request, session_id.as_deref())
-}
-
 /// **Monitor ready tasks**, when the monitor starts and on Check now (Task-A01-steam936): every
 /// blocked task whose blockers have all finished goes on, as the last blocker's Done would have let
 /// it, made as the person's saved name (or as the app, when none is saved yet). Returns the tasks
@@ -1983,25 +1953,6 @@ fn release_finished(root: PathBuf) -> Result<Vec<allomos_store::Released>, Probl
     let name = allomos_store::saved_owner_name();
     let actor = app_actor(name.as_deref()).unwrap_or(allomos_store::Actor::APP);
     allomos_store::release_finished(&root, actor, LOCK_WAIT)
-}
-
-/// **Monitor ready tasks** (Task-A03-sierra014): the task of the session in `tab` is done: the tab
-/// says it closes in 30 seconds unless a key is pressed, then the agent is ended with its exit
-/// command and the tab closed. Returns at once; the countdown runs in the background.
-#[tauri::command]
-fn monitor_close_session(
-    agent: String,
-    tab: session_tab::SessionTab,
-    texts: session_tab::CloseTexts,
-) {
-    session_tab::close_when_done(agent, tab, texts);
-}
-
-/// Monitor ready tasks is stuck (Task-A00-eclair542): a task parked a question, or no task is
-/// ready. Shown as a system notification where the system has one (macOS).
-#[tauri::command]
-fn monitor_notify(title: String, body: String) {
-    notify::show(&title, &body);
 }
 
 /// **Work on it…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
@@ -2688,9 +2639,10 @@ pub fn run() {
             proceed_taskbag,
             proceed_with_agent,
             proceed_manual_request,
-            monitor_start_session,
-            monitor_close_session,
-            monitor_notify,
+            monitor_runs::monitor_runs,
+            monitor_runs::monitor_start,
+            monitor_runs::monitor_ask,
+            monitor_runs::monitor_end_process,
             release_finished,
             run_modes_text,
             codex_rules::codex_rules_status,
