@@ -16,6 +16,7 @@ pub mod effect;
 pub mod event;
 pub mod exception;
 pub mod folders;
+pub mod heartbeat;
 pub mod ids;
 pub mod labels;
 pub mod link;

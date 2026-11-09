@@ -19,6 +19,7 @@ use fs4::{FileExt, TryLockError};
 use allomos_core::branch;
 use allomos_core::decision;
 use allomos_core::event::{self, Event, Kind};
+use allomos_core::heartbeat;
 use allomos_core::ops;
 use allomos_core::{
     Area, FORMAT, Issue, Iteration, Loaded, Problem, Project, Task, Taskbag, parse_area,
@@ -1135,6 +1136,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         let task = Task {
             folders: Default::default(),
             session: None,
+            heartbeat: None,
             extra: Default::default(),
             id: id.into(),
             title: title.into(),
@@ -2270,6 +2272,11 @@ pub fn change_task(
     let described = before.is_some_and(|b| b.description != outcome.task.description);
     let mut changes = event::changes(before, &outcome.task, event::TASK_FIELDS);
     changes.extend(outcome.recorded.iter().cloned());
+    // The holder's change is a heartbeat too (decision 0022 § 5): no extra commit, no event. A
+    // change that changes nothing writes none either.
+    if !changes.is_empty() {
+        heartbeat::along(&mut outcome.task, actor.by, now_secs());
+    }
     let event = actor.event(command, Kind::Task, Some(&outcome.task.id), changes);
     lock.record(&event, |l| {
         l.save_task(&outcome.task)?;
@@ -2285,6 +2292,70 @@ pub fn change_task(
         issues,
         unblocked,
     })
+}
+
+/// Now, in seconds since 1970 (UTC); `ALLOMOS_NOW` fixes it in tests, as for events.
+pub fn now_secs() -> i64 {
+    heartbeat::parse_utc(&events::now_utc()).unwrap_or_else(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0)
+    })
+}
+
+/// What `alm beat` did ([`beat`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Beaten {
+    /// One entry for each task beaten for, in ID order: written, or too soon to write again.
+    pub beats: Vec<heartbeat::Beat>,
+    pub issues: Vec<Issue>,
+}
+
+/// `alm beat` (decision 0022, Task-A01-nurse164): write the heartbeat of task `id`, or with no
+/// `id` of every task the session `actor.by` holds (in progress), in one change under the lock.
+/// `busy`: a busy window of that many seconds. No event is written, and a task whose heartbeat is
+/// younger than half the interval is left as it is. Refused without a session name
+/// (`holder_missing`), for a task the session does not hold (`task_held`, `not_held`).
+pub fn beat(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: Option<&str>,
+    busy: Option<i64>,
+) -> Result<Beaten, Problem> {
+    let me = actor.by.ok_or(Problem::HolderMissing)?;
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let now = now_secs();
+    let tasks: Vec<&Task> = match id {
+        Some(id) => vec![
+            bag.tasks
+                .iter()
+                .find(|t| t.id == id)
+                .ok_or_else(|| Problem::TaskNotFound { id: id.to_string() })?,
+        ],
+        None => {
+            let mut held: Vec<&Task> = bag
+                .tasks
+                .iter()
+                .filter(|t| {
+                    t.state == allomos_core::State::InProgress && t.holder.as_deref() == Some(me)
+                })
+                .collect();
+            held.sort_by(|a, b| a.id.cmp(&b.id));
+            held
+        }
+    };
+    let beats = tasks
+        .into_iter()
+        .map(|t| heartbeat::beat(t, me, now, busy, heartbeat::INTERVAL_SECS))
+        .collect::<Result<Vec<_>, _>>()?;
+    for b in &beats {
+        if let heartbeat::Beat::Written(task) = b {
+            lock.save_task(task)?;
+        }
+    }
+    Ok(Beaten { beats, issues })
 }
 
 /// After a change that leaves `task` finished (done or dropped): every blocked task whose
@@ -2438,6 +2509,9 @@ pub fn claim_task(
     let old = bag.tasks.iter().find(|t| t.id == outcome.task.id);
     let mut changes = event::changes(old, &outcome.task, event::TASK_FIELDS);
     changes.extend(at.changes.iter().cloned());
+    if !changes.is_empty() {
+        heartbeat::along(&mut outcome.task, actor.by, now_secs());
+    }
     let event = actor.event("claim", Kind::Task, Some(&outcome.task.id), changes);
     lock.record(&event, |l| l.save_task(&outcome.task))?;
     let mut warnings = outcome.warnings;
@@ -2537,6 +2611,7 @@ pub fn record_ai_decision(
     // The task carries `AI decisions to review` until `alm reviewed` (decision 0020).
     let mut task = before.clone();
     task.add_label(allomos_core::labels::AI_DECISIONS);
+    heartbeat::along(&mut task, actor.by, now_secs());
     changes.extend(event::changes(Some(&before), &task, event::TASK_FIELDS));
     let event = actor.event(decision::DECIDED, Kind::Task, Some(&task.id), changes);
     lock.record(&event, |l| {
@@ -2599,6 +2674,7 @@ pub fn review_ai_decisions(
     let decisions = ai_decisions(root).remove(&before.id).unwrap_or_default();
     let mut task = before.clone();
     let had_label = task.remove_label(allomos_core::labels::AI_DECISIONS);
+    heartbeat::along(&mut task, actor.by, now_secs());
     // A task carrying the label with nothing left in its history is cleared too (decision 0020).
     let mut changes = if decisions.is_empty() && had_label {
         Vec::new()

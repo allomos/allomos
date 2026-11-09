@@ -121,6 +121,7 @@ mod tests {
             tasks: vec![Task {
                 folders: Default::default(),
                 session: None,
+                heartbeat: None,
                 extra: Default::default(),
                 id: "A01-01".into(),
                 title: "First".into(),

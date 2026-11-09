@@ -229,6 +229,13 @@ Work a task:
   [--app-session-id <id>]`: fill in or correct the session a task records, afterwards: each option
   given replaces that part, the others stay. Any state, by the holder or after done
   (`session_missing` when nothing is given).
+- `alm beat [<id>] [--busy <length>]` (with `--as`): a heartbeat, the sign that the session
+  holding an in-progress task is still at work (decision 0022). It writes the time into the task's
+  file and no event; it counts once shared, so save and share it as `alm` prints. Without an ID,
+  every task the session holds, in one change. Under half the interval (5 of 10 minutes) after the
+  last one it writes nothing and says when the next is due. `--busy 2h` declares a quiet stretch
+  (a long build or test run), shown until it ends; `--busy 0m` ends it. Every change the holder
+  makes to its task (`label`, `note`, `handoff`, …) beats along with it; reading never does.
 - After `claim`, `session`, `label`, `wait`, `block`, `release`, `handoff` and `done`, `alm` lists
   as Fact lines what the task is missing (`--json`: `missing`, each with `code`, `fact` and `fix`):
   session details the app needs to reopen the session, the working branch of a task that was

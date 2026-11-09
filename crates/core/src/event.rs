@@ -236,6 +236,10 @@ fn present(value: Option<&Value>) -> Option<Value> {
     }
 }
 
+/// Fields no event records: a task's `heartbeat` (decision 0022 § 2), which would flood the
+/// history and change nothing a burndown or timeline reads (R7).
+pub const UNRECORDED: &[&str] = &["heartbeat"];
+
 /// The fields that differ between `before` (`None`: the item is new) and `after`, listed in
 /// `order` first and then by name. A new item's `id` is not listed: the event names the item.
 /// A changed `id` (the project's, or an iteration's with `alm rename iteration`) is.
@@ -255,6 +259,7 @@ pub fn changes<T: Serialize>(before: Option<&T>, after: &T, order: &[&str]) -> V
     fields
         .into_iter()
         .filter(|f| before.is_some() || *f != "id")
+        .filter(|f| !UNRECORDED.contains(f))
         .filter_map(|field| {
             let from = present(old.get(field));
             let to = present(new.get(field));
@@ -366,6 +371,7 @@ mod tests {
         Task {
             folders: Default::default(),
             session: None,
+            heartbeat: None,
             extra: Default::default(),
             id: "A01-01".into(),
             title: "First".into(),

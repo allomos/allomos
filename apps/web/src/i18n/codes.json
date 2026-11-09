@@ -43,6 +43,9 @@
   "branch_missing": [
     "id"
   ],
+  "busy_invalid": [
+    "value"
+  ],
   "cannot_back_to_backlog": [
     "id",
     "state"
@@ -250,6 +253,10 @@
     "state"
   ],
   "not_done": [
+    "id",
+    "state"
+  ],
+  "not_held": [
     "id",
     "state"
   ],
