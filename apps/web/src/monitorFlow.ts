@@ -240,6 +240,21 @@ function sessionAgent(agent: TerminalAgent): string {
   return agent === "claude_cli" ? "claude-code" : agent === "antigravity_cli" ? "antigravity" : "codex";
 }
 
+/** How a terminal Claude Code session reads its quota (Task-A03-folk351): it has no `get_usage`
+ * (only the Claude desktop app gives its sessions that), but `claude -p /usage` prints the
+ * "Current session" and "Current week" lines, answered by Claude Code itself without the model.
+ * Empty for the other agents. The paragraph ends with a blank line. */
+function usageParagraph(agent: TerminalAgent, language: Language): string {
+  if (agent !== "claude_cli") return "";
+  if (language === "zh-CN") {
+    return `配额：这个终端会话没有 get_usage。AGENTS.md 或 alm 要你报告配额时，运行 claude -p /usage（Claude Code 自己回答，不问模型），按它的两行报告：“Current session” 用 alm quota --agent claude-code --left <100 减已用的百分数> --resets <它的重置时间，本地时间，例如 2026-11-09T11:20> --window 5h；“Current week” 一样，用 --window week。\n\n`;
+  }
+  if (language === "ja") {
+    return `クォータ：このターミナルのセッションには get_usage がありません。AGENTS.md や alm がクォータの報告を求めたら、claude -p /usage を実行し（Claude Code が自分で答え、モデルには聞きません）、その 2 行を報告してください：「Current session」は alm quota --agent claude-code --left <100 から使用済みの割合を引いた数> --resets <そのリセット時刻、ローカル時刻、例 2026-11-09T11:20> --window 5h、「Current week」は同じように --window week で。\n\n`;
+  }
+  return `Quota: this terminal session has no get_usage. When AGENTS.md or alm asks for your quota, run claude -p /usage (Claude Code answers it itself, without the model) and report its two lines: "Current session" with alm quota --agent claude-code --left <100 minus the percent used> --resets <its reset time, local, e.g. 2026-11-09T11:20> --window 5h, and "Current week" the same way with --window week.\n\n`;
+}
+
 /** The request a new session gets for one task, in the interface language. `taskbag` is the
  * taskbag's path as the agent, working in the project folder, passes it to `--taskbag`. */
 export function monitorRequest(
@@ -253,6 +268,7 @@ export function monitorRequest(
   const id = task.id;
   const tb = `--taskbag "${taskbag}"`;
   const sa = sessionAgent(agent);
+  const usage = usageParagraph(agent, language);
   if (language === "zh-CN") {
     const sid = sessionId ?? "<你的会话 ID>";
     const mode = quiet
@@ -262,7 +278,7 @@ export function monitorRequest(
 
 ${mode}
 
-1. 阅读：alm show ${id}（它的说明和最新的交接）。
+${usage}1. 阅读：alm show ${id}（它的说明和最新的交接）。
 2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim ${id} --as <你的会话名> --branch <你的分支> --session-agent ${sa} --session-id ${sid} --session-kind terminal，并把认领分享出去。
 3. 在它自己的工作树里做，工作树从认领时列出的基础分支切出。
 4. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。
@@ -277,7 +293,7 @@ ${mode}
 
 ${mode}
 
-1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
+${usage}1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
 2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim ${id} --as <あなたのセッション名> --branch <あなたのブランチ> --session-agent ${sa} --session-id ${sid} --session-kind terminal）、その引き受けを共有してください。
 3. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
 4. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。
@@ -291,7 +307,7 @@ ${mode}
 
 ${mode}
 
-1. Read it: alm show ${id} (its description and latest handoff note).
+${usage}1. Read it: alm show ${id} (its description and latest handoff note).
 2. Claim it as AGENTS.md says, with this session's details: alm claim ${id} --as <your session name> --branch <your branch> --session-agent ${sa} --session-id ${sid} --session-kind terminal, and share the claim.
 3. Work it in a worktree of its own, cut from the base branch the claim prints.
 4. Report progress with alm label; finish with alm done, or stop with alm release --note.
