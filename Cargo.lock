@@ -37,6 +37,7 @@ name = "allomos-cli"
 version = "0.1.47"
 dependencies = [
  "allomos-core",
+ "allomos-monitor",
  "allomos-store",
  "clap",
  "serde",
@@ -58,6 +59,7 @@ name = "allomos-desktop"
 version = "0.1.47"
 dependencies = [
  "allomos-core",
+ "allomos-monitor",
  "allomos-store",
  "objc2",
  "qrcode",
@@ -70,6 +72,18 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+]
+
+[[package]]
+name = "allomos-monitor"
+version = "0.1.47"
+dependencies = [
+ "allomos-core",
+ "allomos-store",
+ "fs4",
+ "libc",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
