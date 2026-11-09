@@ -144,6 +144,9 @@ export interface Run {
   stopping: boolean;
   /** When it last checked for a ready task (ms). */
   checked: number;
+  /** The person was told no task is ready (Task-A00-eclair542): told once per stretch without one,
+   * again only after a task has been taken. */
+  idleTold?: boolean;
 }
 
 /** A new run; it checks at once. */
@@ -200,7 +203,28 @@ export function take(run: Run, task: Task, sessionId: string | null, now: number
     taken: [...run.taken, task.id],
     current: { id: task.id, sessionId, tab, at: now, seenHeld: Boolean(task.holder), seen: seenOf(task), changed: now },
     checked: now,
+    idleTold: false,
   };
+}
+
+/** What the monitor tells the person when it is stuck (Task-A00-eclair542, approver 2026-11-09):
+ * a task its session parked waiting on a person, or no task ready. */
+export type StuckAlert = { kind: "waiting"; id: string; on: string } | { kind: "idle" };
+
+/** The task that just finished (`finished`, from [`follow`]) stopped waiting on a person: tell
+ * them. A task waiting on someone named (`who`) is theirs, not the person's, so it is not told. */
+export function waitingAlert(finished: string | null, tasks: Task[]): StuckAlert | null {
+  if (!finished) return null;
+  const task = tasks.find((t) => t.id === finished);
+  if (task?.state !== "waiting" || task.who) return null;
+  return { kind: "waiting", id: task.id, on: task.waiting_on ?? "" };
+}
+
+/** A check found no task to take: tell the person once for this stretch without one. Returns the
+ * run marked as told, with the alert; or the run as it is and none when already told. */
+export function idleAlert(run: Run): { run: Run; alert: StuckAlert | null } {
+  if (run.idleTold) return { run, alert: null };
+  return { run: { ...run, idleTold: true }, alert: { kind: "idle" } };
 }
 
 /** The current task's session has shown no sign of life for [`STALL_MS`]. */
@@ -272,7 +296,7 @@ export function monitorRequest(
   if (language === "zh-CN") {
     const sid = sessionId ?? "<你的会话 ID>";
     const mode = quiet
-      ? `运行模式：安静模式（开始监测的人选的）。不要停下来等人：常规选择自己决定并用 alm ai-decided 记下；真正的问题用 alm wait ${id} --on "<问题>" 搁置，然后结束这个会话。只剩人的亲手检查时，用 alm done ${id} --without-human-check。`
+      ? `运行模式：安静模式（开始监测的人选的）。不要停下来等人：常规选择和用户看到的用词、样子都自己决定，做好、合入，并用 alm ai-decided 记下（能截图就附上），批准者在发布前审。只有数据格式、删掉东西、权限和安全、费用、对外影响、改变计划或其他任务的事才是真正的问题：带上你的提案，用 alm wait ${id} --on "<问题> 提案：<你的提案>" 搁置，然后结束这个会话；不依赖回答、已做完测完的工作先合入。工作都做完了、只剩人的亲手检查时，用 alm done ${id} --without-human-check 收尾（还有问题就用 alm ai-decided 记下，不再搁置）。`
       : "运行模式：普通模式（开始监测的人选的）。需要人时照常问。";
     return `请做这个项目任务袋里的任务 ${id}（“${task.title}”）。「换肩」正在自动监测就绪任务，为这一个任务开了这个会话。每条 alm 命令都加上 ${tb}。
 
@@ -287,7 +311,7 @@ ${usage}1. 阅读：alm show ${id}（它的说明和最新的交接）。
   if (language === "ja") {
     const sid = sessionId ?? "<あなたのセッション ID>";
     const mode = quiet
-      ? `実行モード：静かなモード（監視を始めた人が選びました）。人を待って止まらないでください：いつもの選択は自分で決めて alm ai-decided で記録し、本当の質問は alm wait ${id} --on "<質問>" で保留にして、このセッションを終えてください。人の手による確認だけが残ったら alm done ${id} --without-human-check を使ってください。`
+      ? `実行モード：静かなモード（監視を始めた人が選びました）。人を待って止まらないでください：いつもの選択も、利用者が目にする言葉や見た目も自分で決め、作ってマージし、alm ai-decided で記録してください（撮れるならスクリーンショット付き）。承認者はリリース前に見直します。本当の質問は、データの形式、何かの削除、権限とセキュリティ、費用、外部への影響、計画や他のタスクの変更だけです：あなたの案を添えて alm wait ${id} --on "<質問> 案：<あなたの案>" で保留にし、このセッションを終えてください。答えによらない、作業済みでテスト済みの部分は先にマージします。作業がすべて終わり、人の手による確認だけが残ったら alm done ${id} --without-human-check で終えてください（質問が残っていれば保留にせず alm ai-decided で記録します）。`
       : "実行モード：通常のモード（監視を始めた人が選びました）。人が必要なときはいつもどおり聞いてください。";
     return `このプロジェクトのタスクバッグにあるタスク ${id}（「${task.title}」）を進めてください。「肩代」が準備完了のタスクを自動で監視していて、このタスクひとつのためにこのセッションを開きました。alm コマンドはすべて ${tb} を付けて実行してください。
 
@@ -301,7 +325,7 @@ ${usage}1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
   }
   const sid = sessionId ?? "<your session's ID>";
   const mode = quiet
-    ? `Run mode: quiet (chosen by the person who started the monitoring). Never wait for the person: decide routine choices yourself and record them with alm ai-decided; park a real question with alm wait ${id} --on "<the question>", then end this session. When only a person's hands-on check is left, finish with alm done ${id} --without-human-check.`
+    ? `Run mode: quiet (chosen by the person who started the monitoring). Never wait for the person: decide routine choices yourself, and the wording and look users see too: build them, merge them and record them with alm ai-decided (with a screenshot when you can take one); the approver reviews them before release. Only data formats, removing things, permissions and security, cost, outside effects and changes to the plan or another task are real questions: park one with your proposal, alm wait ${id} --on "<the question> Proposal: <yours>", then end this session; merge first the work that is done and tested and does not depend on the answer. When all the work is done and only a person's hands-on check is left, finish with alm done ${id} --without-human-check (record any question left with alm ai-decided instead of parking it).`
     : "Run mode: normal (chosen by the person who started the monitoring). Ask the person as usual when you need them.";
   return `Work on task ${id} ("${task.title}") in this project's taskbag. Allomos is monitoring ready tasks and opened this session for this one task. Run every alm command with ${tb}.
 

@@ -10,6 +10,7 @@ mod audit;
 mod codex_rules;
 mod heartbeat_settings;
 mod lan;
+mod notify;
 mod pairing;
 mod session_tab;
 mod sessions;
@@ -1996,6 +1997,13 @@ fn monitor_close_session(
     session_tab::close_when_done(agent, tab, texts);
 }
 
+/// Monitor ready tasks is stuck (Task-A00-eclair542): a task parked a question, or no task is
+/// ready. Shown as a system notification where the system has one (macOS).
+#[tauri::command]
+fn monitor_notify(title: String, body: String) {
+    notify::show(&title, &body);
+}
+
 /// **Work on it…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
 /// the other Manual requests are).
 #[tauri::command]
@@ -2682,6 +2690,7 @@ pub fn run() {
             proceed_manual_request,
             monitor_start_session,
             monitor_close_session,
+            monitor_notify,
             release_finished,
             run_modes_text,
             codex_rules::codex_rules_status,
