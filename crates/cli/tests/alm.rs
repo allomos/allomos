@@ -8391,6 +8391,122 @@ fn a_session_coming_back_is_told_of_the_takeover_and_refused() {
     assert!(v.get("taken_over").is_none(), "{v}");
 }
 
+/// Task-A01-heart358: the takeover notice and refusal last after the taker has finished the task
+/// (done or dropped); and `alm release` of a finished task is refused for every session
+/// (`cannot_release`, pointing to `alm reopen`), so it can no longer erase who finished it.
+#[test]
+fn a_session_coming_back_is_refused_after_the_taker_finished() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    ok(&repo, &["ready", "A01-02"]);
+    let claim = |who: &str, id: &str, at: &str| {
+        ok_at(
+            &repo,
+            at,
+            &[
+                "--as",
+                who,
+                "claim",
+                id,
+                "--branch",
+                "main",
+                "--working",
+                "claude/one",
+            ],
+        )
+    };
+    let t1 = "2026-11-09T11:00:00Z";
+    for id in ["A01-01", "A01-02"] {
+        claim("s1", id, "2026-11-09T10:00:00Z");
+        claim("s2", id, t1);
+    }
+    let later = "2026-11-09T11:30:00Z";
+    ok_at(
+        &repo,
+        "2026-11-09T11:10:00Z",
+        &["--as", "s2", "label", "A01-01", "locally verified by human"],
+    );
+    ok_at(
+        &repo,
+        "2026-11-09T11:15:00Z",
+        &["--as", "s2", "done", "A01-01"],
+    );
+    ok_at(
+        &repo,
+        "2026-11-09T11:20:00Z",
+        &["--as", "s2", "drop", "A01-02"],
+    );
+
+    // Both are named first, finished, by whom.
+    let v = ok_at(&repo, later, &["--as", "s1", "list"]);
+    assert_eq!(
+        v["taken_over"],
+        json!([
+            { "id": "A01-01", "by": "s2", "at": t1, "holder": "s2", "finished": "done" },
+            { "id": "A01-02", "by": "s2", "at": t1, "holder": "s2", "finished": "dropped" },
+        ]),
+        "{v}"
+    );
+    let text = String::from_utf8(alm_at(&repo, later, &["--as", "s1", "list"]).stdout).unwrap();
+    assert!(
+        text.starts_with("notice [taken_over]: Task A01-01 was taken over by s2")
+            && text.contains("It is done now, finished by s2.")
+            && text.contains("It is dropped now, finished by s2."),
+        "{text}"
+    );
+
+    // The old holder's changes are refused; nothing is written.
+    let events = event_count(&repo);
+    for id in ["A01-01", "A01-02"] {
+        for args in [
+            vec!["--as", "s1", "note", id, "still here"],
+            vec!["--as", "s1", "label", id, "locally verified by agent"],
+            vec!["--as", "s1", "release", id, "--note", "n"],
+        ] {
+            let (code, v) = fj_at(&repo, later, &args);
+            assert_eq!(
+                (code, v["error"]["code"].as_str()),
+                (1, Some("task_held")),
+                "{args:?}: {v}"
+            );
+            assert_eq!(v["taken_over"][0]["by"], "s2", "{args:?}: {v}");
+        }
+    }
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(task_file(&repo, "A01-01")["holder"], "s2");
+
+    // Releasing a finished task is refused for everyone else too: the taker and anyone.
+    for args in [
+        vec!["--as", "s2", "release", "A01-01", "--note", "n"],
+        vec!["--as", "s9", "release", "A01-02"],
+        vec!["release", "A01-01"],
+    ] {
+        let (code, v) = fj_at(&repo, later, &args);
+        assert_eq!(
+            (code, v["error"]["code"].as_str()),
+            (1, Some("cannot_release")),
+            "{args:?}: {v}"
+        );
+        assert!(
+            v["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("alm reopen"),
+            "{v}"
+        );
+    }
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(task_file(&repo, "A01-01")["holder"], "s2");
+
+    // Other sessions are told nothing; reopened, nobody holds it and the notice ends.
+    let v = ok_at(&repo, later, &["--as", "s2", "list"]);
+    assert!(v.get("taken_over").is_none(), "{v}");
+    ok_at(&repo, later, &["reopen", "A01-02", "--note", "more to do"]);
+    let v = ok_at(&repo, later, &["--as", "s1", "list"]);
+    assert_eq!(v["taken_over"].as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v["taken_over"][0]["id"], "A01-01", "{v}");
+}
+
 fn refused_at(dir: &Path, now: &str, args: &[&str], problem: &str) {
     let (code, v) = fj_at(dir, now, args);
     assert_eq!(

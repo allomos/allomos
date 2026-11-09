@@ -56,8 +56,10 @@ pub(crate) fn text(taken: &[TakenOver]) -> String {
     for t in taken {
         let n = t.notice();
         out.push_str(&format!("notice [{}]: {}", n.code(), n.english()));
-        if t.holder != t.by {
-            out.push_str(&format!(" It is held by {} now.", t.holder));
+        match &t.finished {
+            Some(state) => out.push_str(&format!(" It is {state} now, finished by {}.", t.holder)),
+            None if t.holder != t.by => out.push_str(&format!(" It is held by {} now.", t.holder)),
+            None => {}
         }
         out.push('\n');
     }

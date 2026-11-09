@@ -54,6 +54,10 @@
     "id",
     "state"
   ],
+  "cannot_release": [
+    "id",
+    "state"
+  ],
   "cannot_reopen": [
     "id",
     "state"

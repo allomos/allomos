@@ -1006,6 +1006,14 @@ pub fn release(
     note: Option<&str>,
 ) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
+    // A finished task is held by nobody (A00-30): releasing it would only erase who finished it
+    // (Task-A01-heart358, approver 2026-11-09). Refused for every session.
+    if matches!(task.state, State::Done | State::Dropped) {
+        return Err(Problem::CannotRelease {
+            id: task.id.clone(),
+            state: task.state.as_str().to_string(),
+        });
+    }
     check_holder(&task, me)?;
     task.holder = None;
     if task.state == State::InProgress {

@@ -718,6 +718,7 @@
   "pane.reopen_placeholder": "Why it is reopened, for example what failed in the check",
   "pane.reopen_save": "Reopen",
   "problem.cannot_reopen": "Task {id} is {state}: only a done or dropped task can be reopened. It is still open, so carry on with it as it is.",
+  "problem.cannot_release": "Task {id} is {state}: a finished task is held by no working session, so there is nothing to release. To work on it again, reopen it: `alm reopen {id} --note \"<why>\"`.",
   "problem.reopen_note_missing": "Say why the task is reopened.",
   "search.label": "Search tasks and handoffs",
   "search.placeholder": "Search tasks and handoffs ({keys})",

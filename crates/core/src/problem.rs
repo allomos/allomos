@@ -146,6 +146,9 @@ problems! {
     NotDone { id, state } => "not_done", "Task {id} is {state}, not done: only a finished task is human-checked.";
     /// `alm reopen` (or the app's Reopen…) on a task that is not done or dropped (Task-A01-50).
     CannotReopen { id, state } => "cannot_reopen", "Task {id} is {state}: only a done or dropped task can be reopened. It is still open, so carry on with it as it is.";
+    /// `alm release` of a done or dropped task (Task-A01-heart358, approver 2026-11-09): a
+    /// finished task is held by nobody, so there is nothing to let go of.
+    CannotRelease { id, state } => "cannot_release", "Task {id} is {state}: a finished task is held by no working session, so there is nothing to release. To work on it again, reopen it: `alm reopen {id} --note \"<why>\"`.";
     /// `alm reopen` (or the app's Reopen…) without saying why (Task-A01-50).
     ReopenNoteMissing => "reopen_note_missing", "Say why the task is reopened: `alm reopen <id> --note \"<why>\"`.";
     /// `alm ai-decided` with no text (Task-A03-19).

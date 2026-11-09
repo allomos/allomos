@@ -19,8 +19,13 @@ pub struct TakenOver {
     pub by: String,
     /// When, in UTC: the time of that claim.
     pub at: String,
-    /// Who holds it now (the same as `by` unless it was taken over again).
+    /// Who holds it now (the same as `by` unless it was taken over again). For a task finished
+    /// since (done or dropped), the last session that held it: the one that finished it.
     pub holder: String,
+    /// `done` or `dropped` when the taker has finished it since (Task-A01-heart358); absent while
+    /// it is still being worked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished: Option<String>,
 }
 
 impl TakenOver {
@@ -35,15 +40,20 @@ impl TakenOver {
 }
 
 /// The tasks `me` held that another session took over, in ID order. A task counts while someone
-/// else holds it (it is not done, dropped or released) and `me` has not held it again since the
-/// takeover. `events`: the taskbag's history, oldest first.
+/// else holds it, or once the taker has finished it (done or dropped, Task-A01-heart358), and
+/// `me` has not held it again since the takeover. A task released since, and so held by nobody
+/// and open to anyone, does not count. `events`: the taskbag's history, oldest first.
 pub fn taken_over(tasks: &[Task], events: &[Event], me: &str) -> Vec<TakenOver> {
     let mut out: Vec<TakenOver> = tasks
         .iter()
-        .filter(|t| !matches!(t.state, State::Done | State::Dropped))
         .filter_map(|t| {
-            let holder = t.holder.as_deref().filter(|h| *h != me)?;
+            let finished = matches!(t.state, State::Done | State::Dropped);
+            if !finished && t.holder.as_deref().is_none_or(|h| h == me) {
+                return None;
+            }
+            // `last`: who took it from `me`, and when; `latest`: who held it last since then.
             let mut last: Option<(String, String)> = None;
+            let mut latest: Option<String> = None;
             for e in events
                 .iter()
                 .filter(|e| e.id.as_deref() == Some(t.id.as_str()))
@@ -53,17 +63,27 @@ pub fn taken_over(tasks: &[Task], events: &[Event], me: &str) -> Vec<TakenOver> 
                     let to = ch.to.as_ref().and_then(|v| v.as_str());
                     if to == Some(me) {
                         last = None;
+                        latest = None;
                     } else if from == Some(me) {
                         last = to.map(|to| (to.to_string(), e.at.clone()));
+                        latest = to.map(str::to_string);
+                    } else if let Some(to) = to.filter(|_| last.is_some()) {
+                        latest = Some(to.to_string());
                     }
                 }
             }
             let (by, at) = last?;
+            let holder = match t.holder.as_deref() {
+                Some(h) if h == me => return None,
+                Some(h) => h.to_string(),
+                None => latest.unwrap_or_else(|| by.clone()),
+            };
             Some(TakenOver {
                 id: t.id.clone(),
                 by,
                 at,
-                holder: holder.to_string(),
+                holder,
+                finished: finished.then(|| t.state.as_str().to_string()),
             })
         })
         .collect();
@@ -114,6 +134,7 @@ mod tests {
                 by: "s2".into(),
                 at: "2026-11-09T11:00:00Z".into(),
                 holder: "s2".into(),
+                finished: None,
             }]
         );
         assert_eq!(got[0].notice().code(), "taken_over");
@@ -142,20 +163,55 @@ mod tests {
         assert!(taken_over(&tasks, &events, "s1").is_empty());
     }
 
+    /// Task-A01-heart358: finishing the task does not end the takeover for the old holder.
     #[test]
-    fn released_finished_and_own_releases_are_no_takeover() {
+    fn a_task_the_taker_finished_is_still_named() {
+        let mut events = vec![
+            moved("A01-01", "2026-11-09T10:00:00Z", None, Some("s1")),
+            moved("A01-01", "2026-11-09T11:00:00Z", Some("s1"), Some("s2")),
+        ];
+        // Done keeps its holder.
+        let got = taken_over(&[task("A01-01", "done", Some("s2"))], &events, "s1");
+        assert_eq!(
+            (
+                got[0].by.as_str(),
+                got[0].holder.as_str(),
+                got[0].finished.as_deref()
+            ),
+            ("s2", "s2", Some("done"))
+        );
+        assert!(taken_over(&[task("A01-01", "done", Some("s2"))], &events, "s2").is_empty());
+        // Dropped clears it: the last holder is named, here after a second takeover.
+        events.push(moved(
+            "A01-01",
+            "2026-11-09T12:00:00Z",
+            Some("s2"),
+            Some("s3"),
+        ));
+        events.push(moved("A01-01", "2026-11-09T12:30:00Z", Some("s3"), None));
+        let got = taken_over(&[task("A01-01", "dropped", None)], &events, "s1");
+        assert_eq!(
+            (
+                got[0].by.as_str(),
+                got[0].holder.as_str(),
+                got[0].finished.as_deref()
+            ),
+            ("s2", "s3", Some("dropped"))
+        );
+        // A task s1 finished itself is no takeover.
+        let own = vec![moved("A01-01", "2026-11-09T10:00:00Z", None, Some("s1"))];
+        assert!(taken_over(&[task("A01-01", "done", Some("s1"))], &own, "s1").is_empty());
+        assert!(taken_over(&[task("A01-01", "dropped", None)], &own, "s1").is_empty());
+    }
+
+    #[test]
+    fn released_and_own_releases_are_no_takeover() {
         let events = vec![
             moved("A01-01", "2026-11-09T10:00:00Z", None, Some("s1")),
             moved("A01-01", "2026-11-09T11:00:00Z", Some("s1"), Some("s2")),
         ];
-        // Released by the new holder, or finished: nobody holds it any more.
-        for t in [
-            task("A01-01", "ready", None),
-            task("A01-01", "done", Some("s2")),
-            task("A01-01", "dropped", Some("s2")),
-        ] {
-            assert!(taken_over(&[t], &events, "s1").is_empty());
-        }
+        // Released by the new holder: nobody holds it, anyone may claim it.
+        assert!(taken_over(&[task("A01-01", "ready", None)], &events, "s1").is_empty());
         // s1 released it itself, then s2 claimed it as a ready task: no takeover.
         let events = vec![
             moved("A01-01", "2026-11-09T10:00:00Z", None, Some("s1")),

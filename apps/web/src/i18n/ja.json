@@ -718,6 +718,7 @@
   "pane.reopen_placeholder": "再開する理由（例：確認で何がおかしかったか）",
   "pane.reopen_save": "再開",
   "problem.cannot_reopen": "タスク {id} は {state} です。再開できるのは完了または中止したタスクだけです。まだ終わっていないので、そのまま続けてください。",
+  "problem.cannot_release": "タスク {id} は {state} です。終わったタスクはどの作業セッションも担当していないため、手放すものはありません。もう一度取り組むには再開してください：`alm reopen {id} --note \"<理由>\"`。",
   "problem.reopen_note_missing": "タスクを再開する理由を書いてください。",
   "search.label": "タスクと引き継ぎを検索",
   "search.placeholder": "タスクと引き継ぎを検索（{keys}）",

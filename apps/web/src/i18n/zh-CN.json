@@ -718,6 +718,7 @@
   "pane.reopen_placeholder": "为什么重新打开，例如检查时哪里不对",
   "pane.reopen_save": "重新打开",
   "problem.cannot_reopen": "任务 {id} 的状态是 {state}：只有已完成或已放弃的任务才能重新打开。它还没有结束，照常继续做即可。",
+  "problem.cannot_release": "任务 {id} 的状态是 {state}：已结束的任务不由任何工作会话担当，没有什么可放下的。要再做它，先重新打开：`alm reopen {id} --note \"<原因>\"`。",
   "problem.reopen_note_missing": "请说明为什么重新打开这个任务。",
   "search.label": "搜索任务和交接",
   "search.placeholder": "搜索任务和交接（{keys}）",
