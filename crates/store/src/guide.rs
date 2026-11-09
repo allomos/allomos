@@ -565,6 +565,13 @@ const WORKFLOW: &str = "# How to work the tasks
    and `alm show <id>` shows the task has a new holder: it is not yours, so leave its branch
    alone and take another task. Once you hold it, beat like any holder (`alm beat`): when you
    go silent, another session can take it over from you in turn.
+   **Taken over from you** (decision 0022 § 8). Back after a pause (your quota came back, a
+   restart), any `alm` command run with `--as <your session name>` first says which of your
+   tasks another session has taken over, by whom and when (`notice [taken_over]`); it refuses
+   your changes to them (`task_held`). Give such a task up: stop work on it at once (no more
+   commits or pushes to its working branch, and do not claim it back), leave your worktree as it
+   is, tell the person in your conversation that it was taken over and by whom, and go on with
+   another ready task (`alm next`) or end.
    When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
    <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
    reopen it. In the Claude desktop app you must also pass `--session-kind desktop

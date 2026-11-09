@@ -331,6 +331,7 @@
   "problem.task_closed": "任务 {id} 的状态是 {state}，不能这样修改。",
   "problem.took_over": "已从 {previous} 接手任务 {id}。",
   "problem.took_over_lost": "已从 {previous} 接手任务 {id}：它已失联，{previous} 自 {since} 起再没有动静。",
+  "problem.taken_over": "任务 {id} 已于 {at} 被 {by} 接手：你不再担当它。请停止做这个任务：不再向它的工作分支提交或推送，也不要把它领回来。你的 worktree 原样留下，告诉你为之工作的人：任务已被谁接手，然后去做别的就绪任务（`alm next`）或结束。",
   "problem.bad_usage": "{detail}",
   "problem.not_a_taskbag": "{path} 不是任务包文件夹。",
   "problem.link_refused": "「换肩」只打开网页链接和此项目内的文本文件（.md、.txt），所以没有打开“{link}”。",

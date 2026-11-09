@@ -25,6 +25,7 @@ pub mod ops;
 mod problem;
 pub mod request;
 pub mod retention;
+pub mod takeover;
 pub mod traces;
 mod validate;
 pub mod witness;

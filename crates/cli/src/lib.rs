@@ -1464,6 +1464,9 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     // Before the change: which changes made in the app has no agent been told to share yet
     // (decision 0017, row 9)?
     let before = Before::look(&cli, cwd);
+    // A session coming back (decision 0022 § 8, Task-A01-castle658): the tasks taken over from
+    // it are named first, and its changes to them refused.
+    let taken = takeover::look(&cli, cwd);
     // A one-time number (Task-A01-58): a repeat returns the first result; a new number marks
     // every event this change writes.
     let request = cli
@@ -1479,6 +1482,7 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
         });
     let (result, written) = with_written_files(|| {
         check_versions(&cli, cwd).and_then(|outdated| {
+            takeover::refuse(&cli, &taken)?;
             if let Some((id, input)) = &request {
                 if let Some(first) = repeated(&cli, cwd, id, input) {
                     return first;
@@ -1554,10 +1558,19 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 if let (Some(out), Some(fields)) = (out.as_object_mut(), done.fields.as_object()) {
                     out.extend(fields.clone());
                 }
-                out["warnings"] = done.warnings.iter().map(problem_json).collect();
+                out["warnings"] = taken
+                    .iter()
+                    .map(|t| t.notice())
+                    .chain(done.warnings.iter().cloned())
+                    .map(|w| problem_json(&w))
+                    .collect();
                 out["issues"] = done.issues.iter().map(issue_json).collect();
+                if !taken.is_empty() {
+                    out["taken_over"] = takeover::json(&taken);
+                }
                 stdout.push_str(&format!("{out}\n"));
             } else {
+                stdout.push_str(&takeover::text(&taken));
                 stdout.push_str(&done.text);
                 for w in &done.warnings {
                     stderr.push_str(&format!("warning [{}]: {}\n", w.code(), w.english()));
@@ -1587,8 +1600,12 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 if let Some(task) = &current {
                     line["current"] = task_json(task);
                 }
+                if !taken.is_empty() {
+                    line["taken_over"] = takeover::json(&taken);
+                }
                 stdout.push_str(&format!("{line}\n"));
             } else {
+                stderr.push_str(&takeover::text(&taken));
                 stderr.push_str(&format!(
                     "error [{}]: {}\n",
                     problem.code(),
@@ -2540,6 +2557,7 @@ mod folders;
 mod heartbeat;
 mod links;
 mod redact;
+mod takeover;
 mod trail;
 
 /// A task's traces in one line (Task-A01-fennel617): "R77, 0021", or "none".

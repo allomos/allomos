@@ -331,6 +331,7 @@
   "problem.task_closed": "Task {id} is {state}, so it cannot be changed this way.",
   "problem.took_over": "Took task {id} over from {previous}.",
   "problem.took_over_lost": "Took task {id} over from {previous}: it was lost, with no sign of work from {previous} since {since}.",
+  "problem.taken_over": "Task {id} was taken over by {by} at {at}: you no longer hold it. Stop work on it: no more commits or pushes to its working branch, and do not claim it back. Leave your worktree as it is, tell the person the task was taken over and by whom, and go on with another ready task (`alm next`) or end.",
   "problem.bad_usage": "{detail}",
   "problem.not_a_taskbag": "{path} is not a taskbag folder.",
   "problem.link_refused": "Allomos opens only web links and text files (.md, .txt) inside this project, so it did not open \"{link}\".",

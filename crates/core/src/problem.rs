@@ -236,6 +236,9 @@ problems! {
     TookOver { id, previous } => "took_over", "Took task {id} over from {previous}.";
     /// A warning: the task was lost and the claim took it over (decision 0022 § 6, Task-A01-sign613).
     TookOverLost { id, previous, since } => "took_over_lost", "Took task {id} over from {previous}: it was lost, with no sign of work from {previous} since {since}.";
+    /// A notice given first to a session coming back (decision 0022 § 8, Task-A01-castle658): a
+    /// task it held was taken over by another session. Its changes to the task are refused.
+    TakenOver { id, by, at } => "taken_over", "Task {id} was taken over by {by} at {at}: you no longer hold it. Stop work on it: no more commits or pushes to its working branch, and do not claim it back. Leave your worktree as it is, tell the person the task was taken over and by whom, and go on with another ready task (`alm next`) or end.";
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";
