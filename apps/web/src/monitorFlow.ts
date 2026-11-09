@@ -1,7 +1,8 @@
 // Monitor ready tasks (Task-A03-moth285, approver 2026-11-03/04): one button starts unattended
 // monitoring of the project's ready tasks, or one iteration's. Each ready task is worked in a new
 // agent session, one at a time; with none ready, the monitor waits and checks again at the chosen
-// frequency. Every route must run unattended (approver, 2026-11-04); this first slice is the
+// frequency. Several agents can be chosen (Task-A03-fruit467): each works one task at a time, in
+// a session of its own. Every route must run unattended (approver, 2026-11-04); this first slice is the
 // route Allomos runs itself: Claude Code or Codex in a terminal, started with the request. Kept
 // apart from React so it can be tested with Node alone (`npm --prefix apps/web test`). Only type
 // imports here: Node strips them.
@@ -114,6 +115,8 @@ export interface SessionTab {
 
 /** The task a session is working for the monitor. */
 export interface Current {
+  /** The agent whose session it is (Task-A03-fruit467: a run may have several). */
+  agent: TerminalAgent;
   id: string;
   /** The session ID Allomos gave the agent (Claude Code's `--session-id`); null when the agent
    * picks its own (Codex). */
@@ -132,15 +135,21 @@ export interface Current {
 /** One monitoring run, kept by the app on this computer only, never in the taskbag. */
 export interface Run {
   scope: Scope;
-  agent: TerminalAgent;
+  /** The agents ready tasks are given to (Task-A03-fruit467, approver 2026-11-08): each works one
+   * task at a time, in a session of its own. Changed while the run goes on with [`setAgents`]. */
+  agents: TerminalAgent[];
+  /** The agents the person could choose when the run started, offered again in the status bar. */
+  offered: TerminalAgent[];
   quiet: boolean;
   every: Frequency;
   /** When it started (ms). */
   started: number;
-  /** The tasks it has started a session for, in order (the current one last while it works). */
+  /** The tasks it has started a session for, in order (those being worked included). */
   taken: string[];
-  current: Current | null;
-  /** Stop asked while a task is worked: the run ends when that task is finished. */
+  /** The sessions working a task now, at most one per agent, in the order they were started. A
+   * session of an agent taken off the run stays here until its task is finished. */
+  working: Current[];
+  /** Stop asked while tasks are worked: the run ends when they are all finished. */
   stopping: boolean;
   /** When it last checked for a ready task (ms). */
   checked: number;
@@ -149,9 +158,31 @@ export interface Run {
   idleTold?: boolean;
 }
 
-/** A new run; it checks at once. */
-export function startRun(scope: Scope, agent: TerminalAgent, quiet: boolean, every: Frequency, now: number): Run {
-  return { scope, agent, quiet, every, started: now, taken: [], current: null, stopping: false, checked: now - every * 60_000 };
+/** A new run; it checks at once. `offered` defaults to the agents chosen. */
+export function startRun(
+  scope: Scope,
+  agents: TerminalAgent[],
+  quiet: boolean,
+  every: Frequency,
+  now: number,
+  offered: TerminalAgent[] = agents,
+): Run {
+  return { scope, agents, offered, quiet, every, started: now, taken: [], working: [], stopping: false, checked: now - every * 60_000 };
+}
+
+/** The run with these agents: an agent added gets tasks from the next check on; one taken off is
+ * given no more, while the session it is working finishes its task undisturbed. At least one
+ * agent stays: an empty list leaves the run as it is (stopping is Stop's job). */
+export function setAgents(run: Run, agents: TerminalAgent[]): Run {
+  if (agents.length === 0) return run;
+  const offered = run.offered.filter((a) => agents.includes(a));
+  const kept = [...offered, ...agents.filter((a) => !offered.includes(a))];
+  return { ...run, agents: kept };
+}
+
+/** The agents of the run with no task being worked: each can be given one at the next check. */
+export function freeAgents(run: Run): TerminalAgent[] {
+  return run.agents.filter((a) => !run.working.some((w) => w.agent === a));
 }
 
 /** What of a task its session changes as it works it. */
@@ -159,28 +190,41 @@ function seenOf(task: Task | undefined): string {
   return task ? JSON.stringify([task.state, task.holder, task.labels ?? [], task.handoff_note, task.waiting_on]) : "";
 }
 
-/** The run with its current task followed in the taskbag as it is now. The task is finished when
- * it is done, dropped, waiting or blocked (alm keeps the last holder on those), when no one holds
- * it any more after being claimed or without ever leaving `ready` unheld, or when it is gone. */
-export function follow(run: Run, tasks: Task[], now: number): { run: Run; finished: string | null } {
-  const cur = run.current;
-  if (!cur) return { run, finished: null };
+/** One session's task followed in the taskbag as it is now: null when it is finished (done,
+ * dropped, waiting or blocked: alm keeps the last holder on those; no one holds it any more after
+ * being claimed, or it left `ready` without ever being held; or it is gone). */
+function followOne(cur: Current, tasks: Task[], now: number): Current | null {
   const task = tasks.find((t) => t.id === cur.id);
   const seen = seenOf(task);
   const seenHeld = cur.seenHeld || Boolean(task?.holder);
   const stopped = task !== undefined && ["done", "dropped", "waiting", "blocked"].includes(task.state);
   const finished = !task || stopped || (!task.holder && (seenHeld || task.state !== "ready"));
-  if (finished) return { run: { ...run, current: null }, finished: cur.id };
-  const next = seen === cur.seen && seenHeld === cur.seenHeld ? cur : { ...cur, seen, seenHeld, changed: seen === cur.seen ? cur.changed : now };
-  return { run: next === cur ? run : { ...run, current: next }, finished: null };
+  if (finished) return null;
+  if (seen === cur.seen && seenHeld === cur.seenHeld) return cur;
+  return { ...cur, seen, seenHeld, changed: seen === cur.seen ? cur.changed : now };
 }
 
-/** The tab to close now that the run's current task is finished: only when the task is **done**
+/** The run with every session's task followed in the taskbag as it is now, and the sessions whose
+ * tasks are finished (in the order they were started). */
+export function follow(run: Run, tasks: Task[], now: number): { run: Run; finished: Current[] } {
+  if (!run.working.length) return { run, finished: [] };
+  const finished: Current[] = [];
+  let changed = false;
+  const working: Current[] = [];
+  for (const cur of run.working) {
+    const next = followOne(cur, tasks, now);
+    if (next === null) finished.push(cur);
+    else working.push(next);
+    if (next !== cur) changed = true;
+  }
+  return { run: changed ? { ...run, working } : run, finished };
+}
+
+/** The tab to close now that a session's task is finished: only when the task is **done**
  * (approver, 2026-11-08); waiting, blocked, released, dropped or gone leaves the tab open, so the
- * person can see why it stopped. `run` is the run before [`follow`] let the task go. */
-export function tabToClose(run: Run, tasks: Task[]): SessionTab | null {
-  const cur = run.current;
-  if (!cur?.tab) return null;
+ * person can see why it stopped. */
+export function tabToClose(cur: Current, tasks: Task[]): SessionTab | null {
+  if (!cur.tab) return null;
   return tasks.find((t) => t.id === cur.id)?.state === "done" ? cur.tab : null;
 }
 
@@ -190,18 +234,45 @@ export function nextCheck(run: Run): number {
 }
 
 /** The next task to start a session for: the first ready one in the scope this run has not
- * taken yet (a task its session released is not taken again in the same run). */
-export function pick(run: Run, tasks: Task[], areas: { id: string }[], iterations: Iteration[], active: string | null | undefined): Task | null {
+ * taken yet (a task its session released is not taken again in the same run), nor is in `skip`
+ * (given to another agent in this same check). */
+export function pick(
+  run: Run,
+  tasks: Task[],
+  areas: { id: string }[],
+  iterations: Iteration[],
+  active: string | null | undefined,
+  skip: string[] = [],
+): Task | null {
   const id = run.scope.kind === "iteration" ? run.scope.id : undefined;
-  return readyTasks(tasks, areas, iterations, active, id).find((t) => !run.taken.includes(t.id)) ?? null;
+  return readyTasks(tasks, areas, iterations, active, id).find((t) => !run.taken.includes(t.id) && !skip.includes(t.id)) ?? null;
 }
 
-/** The run with a session started for `task`. */
-export function take(run: Run, task: Task, sessionId: string | null, now: number, tab: SessionTab | null = null): Run {
+/** One check's share-out: each free agent, in the run's order, with the next ready task, while
+ * there are tasks. Every session claims its task first (`alm claim` lets no one take a task
+ * another holds), so two agents never work the same one. */
+export function share(
+  run: Run,
+  tasks: Task[],
+  areas: { id: string }[],
+  iterations: Iteration[],
+  active: string | null | undefined,
+): { agent: TerminalAgent; task: Task }[] {
+  const out: { agent: TerminalAgent; task: Task }[] = [];
+  for (const agent of freeAgents(run)) {
+    const task = pick(run, tasks, areas, iterations, active, out.map((o) => o.task.id));
+    if (!task) break;
+    out.push({ agent, task });
+  }
+  return out;
+}
+
+/** The run with a session of `agent` started for `task`. */
+export function take(run: Run, agent: TerminalAgent, task: Task, sessionId: string | null, now: number, tab: SessionTab | null = null): Run {
   return {
     ...run,
     taken: [...run.taken, task.id],
-    current: { id: task.id, sessionId, tab, at: now, seenHeld: Boolean(task.holder), seen: seenOf(task), changed: now },
+    working: [...run.working, { agent, id: task.id, sessionId, tab, at: now, seenHeld: Boolean(task.holder), seen: seenOf(task), changed: now }],
     checked: now,
     idleTold: false,
   };
@@ -211,7 +282,7 @@ export function take(run: Run, task: Task, sessionId: string | null, now: number
  * a task its session parked waiting on a person, or no task ready. */
 export type StuckAlert = { kind: "waiting"; id: string; on: string } | { kind: "idle" };
 
-/** The task that just finished (`finished`, from [`follow`]) stopped waiting on a person: tell
+/** A task that just finished (`finished`, from [`follow`]) stopped waiting on a person: tell
  * them. A task waiting on someone named (`who`) is theirs, not the person's, so it is not told. */
 export function waitingAlert(finished: string | null, tasks: Task[]): StuckAlert | null {
   if (!finished) return null;
@@ -220,16 +291,17 @@ export function waitingAlert(finished: string | null, tasks: Task[]): StuckAlert
   return { kind: "waiting", id: task.id, on: task.waiting_on ?? "" };
 }
 
-/** A check found no task to take: tell the person once for this stretch without one. Returns the
- * run marked as told, with the alert; or the run as it is and none when already told. */
+/** A check found no task to take while no session works one: tell the person once for this
+ * stretch without one. Returns the run marked as told, with the alert; or the run as it is and
+ * none when already told, or while a session still works a task (the monitor is not stuck). */
 export function idleAlert(run: Run): { run: Run; alert: StuckAlert | null } {
-  if (run.idleTold) return { run, alert: null };
+  if (run.idleTold || run.working.length) return { run, alert: null };
   return { run: { ...run, idleTold: true }, alert: { kind: "idle" } };
 }
 
-/** The current task's session has shown no sign of life for [`STALL_MS`]. */
-export function stalled(run: Run, now: number): boolean {
-  return run.current !== null && now - run.current.changed >= STALL_MS;
+/** The sessions that have shown no sign of life for [`STALL_MS`]. */
+export function stalled(run: Run, now: number): Current[] {
+  return run.working.filter((w) => now - w.changed >= STALL_MS);
 }
 
 /** What the line beside the button keeps of a finished run. */

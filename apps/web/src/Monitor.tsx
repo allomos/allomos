@@ -1,6 +1,6 @@
 // Monitor ready tasks (Task-A03-moth285, approver 2026-11-03/04): the run itself, and what shows
-// in place of its button while it runs. Allomos starts a new terminal session of the chosen agent
-// for each ready task, one at a time, and follows the task in the taskbag (read again whenever its
+// in place of its button while it runs. Allomos starts a new terminal session of a chosen agent
+// for each ready task, one at a time per agent (several agents: Task-A03-fruit467), and follows the task in the taskbag (read again whenever its
 // files change) to see it claimed and then let go. With no task ready it waits and checks again
 // at the chosen frequency. The run is kept by this window only, on this computer, never in the
 // taskbag; the last one's summary is remembered per project for the line beside the button.
@@ -15,13 +15,15 @@ import { toCheck } from "./stopFlow";
 import {
   FREQUENCIES,
   follow,
+  freeAgents,
   frequencyText,
   idleAlert,
   lastRunCounts,
   monitorRequest,
   nextCheck,
   noticeAfterCheck,
-  pick,
+  setAgents,
+  share,
   stalled,
   startRun,
   tabToClose,
@@ -143,20 +145,34 @@ export function useMonitor({
     [messenger, t],
   );
 
-  const startSession = useCallback(
-    async (r: Run, task: Task) => {
+  /** Starts one session per agent and task, one after another; a failure is said, and that agent
+   * is taken off the run (the run ends when it was the last one and nothing else is worked). */
+  const startSessions = useCallback(
+    async (r: Run, shares: { agent: TerminalAgent; task: Task }[]) => {
       starting.current = true;
-      const sessionId = r.agent === "claude_cli" ? crypto.randomUUID() : null;
       try {
         const taskbag = await messenger.proceedTaskbag(root).catch(() => root);
-        const request = monitorRequest(task, taskbag, language, r.agent, sessionId, r.quiet);
-        const tab = await messenger.monitorStartSession(r.agent, root, request, sessionId);
-        setRun((now) => (now && now.started === r.started ? take(now, task, sessionId, Date.now(), tab) : now));
-      } catch (e) {
-        const detail = isProblem(e) ? problem(e) : String(e);
-        onError(t("monitor.start_failed", { agent: t(AGENT_KEY[r.agent]), id: task.id, detail }));
-        const current = runRef.current;
-        if (current && current.started === r.started) end(current);
+        for (const { agent, task } of shares) {
+          const sessionId = agent === "claude_cli" ? crypto.randomUUID() : null;
+          try {
+            const request = monitorRequest(task, taskbag, language, agent, sessionId, r.quiet);
+            const tab = await messenger.monitorStartSession(agent, root, request, sessionId);
+            setRun((now) => (now && now.started === r.started ? take(now, agent, task, sessionId, Date.now(), tab) : now));
+          } catch (e) {
+            const detail = isProblem(e) ? problem(e) : String(e);
+            onError(t("monitor.start_failed", { agent: t(AGENT_KEY[agent]), id: task.id, detail }));
+            const current = runRef.current;
+            if (!current || current.started !== r.started) return;
+            const left = current.agents.filter((x) => x !== agent);
+            if (left.length === 0 && current.working.length === 0) {
+              end(current);
+              return;
+            }
+            const next = left.length ? setAgents(current, left) : { ...current, stopping: true };
+            runRef.current = next;
+            setRun(next);
+          }
+        }
       } finally {
         starting.current = false;
       }
@@ -164,9 +180,10 @@ export function useMonitor({
     [messenger, root, language, t, problem, onError, end],
   );
 
-  // Each time the taskbag is read, the clock moves on or the run changes: follow the current
-  // task; when it is finished, end the run if a stop was asked, else take the next ready task at
-  // once; with none, check again when the frequency says.
+  // Each time the taskbag is read, the clock moves on or the run changes: follow every session's
+  // task; when one is finished, end the run if a stop was asked and nothing else is worked, else
+  // give the free agents the next ready tasks at once; with none, check again when the frequency
+  // says.
   useEffect(() => {
     if (!run || !box) return;
     // The taskbag read again shows what the sweep let go on: no need to keep its copies.
@@ -176,32 +193,40 @@ export function useMonitor({
     const tasks = withReleased(box.tasks, released);
     const at = Date.now();
     const followed = follow(run, box.tasks, at);
-    // Its task done, the session's tab closes after 30 seconds unless a key is pressed in it.
-    const tab = followed.finished ? tabToClose(run, box.tasks) : null;
-    if (tab) {
-      const texts = { prompt: t("monitor.close_prompt"), kept: t("monitor.close_kept") };
-      void messenger.monitorCloseSession(run.agent, tab, texts).catch(() => {});
+    for (const cur of followed.finished) {
+      // Its task done, the session's tab closes after 30 seconds unless a key is pressed in it.
+      const tab = tabToClose(cur, box.tasks);
+      if (tab) {
+        const texts = { prompt: t("monitor.close_prompt"), kept: t("monitor.close_kept") };
+        void messenger.monitorCloseSession(cur.agent, tab, texts).catch(() => {});
+      }
+      // Its session parked a question for the person: tell them.
+      const waiting = waitingAlert(cur.id, box.tasks);
+      if (waiting) tell(waiting, run, at);
     }
-    // Its session parked a question for the person: tell them.
-    const waiting = waitingAlert(followed.finished, box.tasks);
-    if (waiting) tell(waiting, run, at);
     let r = followed.run;
-    if (followed.finished && r.stopping) return end(r);
-    if (!r.current && !r.stopping && !starting.current && (followed.finished || at >= nextCheck(r))) {
+    if (r.stopping) {
+      if (!r.working.length) return end(r);
+      if (r !== run) setRun(r);
+      return;
+    }
+    const free = freeAgents(r);
+    if (free.length && !starting.current && (followed.finished.length > 0 || at >= nextCheck(r))) {
       setNotice(noticeAfterCheck);
-      const task = pick(r, tasks, box.areas, box.iterations, active);
-      if (task) {
+      const shares = share(r, tasks, box.areas, box.iterations, active);
+      if (shares.length) {
         if (r !== run) setRun(r);
-        void startSession(r, task);
+        void startSessions(r, shares);
         return;
       }
-      // Nothing to take: tell the person once, until a task is taken again.
-      const idle = idleAlert({ ...r, checked: at });
+      r = { ...r, checked: at };
+      // Nothing to take and no session at work: tell the person once, until a task is taken again.
+      const idle = idleAlert(r);
       if (idle.alert) tell(idle.alert, idle.run, at);
       r = idle.run;
     }
     if (r !== run) setRun(r);
-  }, [run, box, released, now, active, end, startSession, tell, messenger, t]);
+  }, [run, box, released, now, active, end, startSessions, tell, messenger, t]);
 
   return {
     run,
@@ -209,12 +234,12 @@ export function useMonitor({
     now,
     notice,
     dismissNotice: () => setNotice(null),
-    start: (scope: Scope, agent: TerminalAgent, quiet: boolean, every: Frequency) => {
-      void sweep().then(() => setRun(startRun(scope, agent, quiet, every, Date.now())));
+    start: (scope: Scope, agents: TerminalAgent[], quiet: boolean, every: Frequency, offered?: TerminalAgent[]) => {
+      void sweep().then(() => setRun(startRun(scope, agents, quiet, every, Date.now(), offered)));
     },
     stop: () => {
       if (!run) return;
-      if (run.current) setRun({ ...run, stopping: true });
+      if (run.working.length) setRun({ ...run, stopping: true });
       else end(run);
     },
     undoStop: () => run && setRun({ ...run, stopping: false }),
@@ -223,6 +248,8 @@ export function useMonitor({
       void sweep().then(() => setRun((now) => (now ? { ...now, checked: 0 } : now)));
     },
     setEvery: (every: Frequency) => run && setRun({ ...run, every }),
+    /** Adds or takes off agents while the run goes on (Task-A03-fruit467). */
+    setAgents: (agents: TerminalAgent[]) => setRun((now) => (now ? setAgents(now, agents) : now)),
   };
 }
 
@@ -291,26 +318,29 @@ export function MonitorControl({
     );
   }
 
-  const cur = run.current;
-  const task = cur ? tasks.find((x) => x.id === cur.id) : undefined;
-  const place = task ? sessionPlace(task) : null;
+  const working = run.working;
+  const ids = working.map((w) => w.id).join(", ");
+  const free = freeAgents(run);
   const { unit, n } = frequencyText(run.every);
   const nextAt = new Date(nextCheck(run)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const status = run.stopping && cur
-    ? t("monitor.stopping", { id: cur.id })
-    : cur
-      ? t("monitor.on_working", { id: cur.id, n: run.taken.length })
-      : nextCheck(run) <= now
+  const due = nextCheck(run) <= now;
+  const status = run.stopping && working.length
+    ? t("monitor.stopping", { id: ids })
+    : working.length
+      ? free.length
+        ? t(due ? "monitor.on_working_starting" : "monitor.on_working_waiting", { id: ids, n: run.taken.length, time: nextAt })
+        : t("monitor.on_working", { id: ids, n: run.taken.length })
+      : due
         ? t("monitor.on_starting")
         : t("monitor.on_waiting", { time: nextAt });
-  const agentName = t(AGENT_KEY[run.agent]);
+  const late = stalled(run, now);
   return (
     <span className="monitor-stack">
     <span className={run.stopping ? "monitor-bar stopping" : "monitor-bar"} role="status">
       <span className="dot" aria-hidden="true" />
       {showScope && <span className="monitor-scope">{scopeName(run.scope, t)} ·</span>}
       <span>{status}</span>
-      {!cur && (
+      {free.length > 0 && !run.stopping && (
         <button type="button" className="link small" onClick={monitor.checkNow}>
           {t("monitor.check_now")}
         </button>
@@ -346,26 +376,36 @@ export function MonitorControl({
           </div>
         )}
       </span>
-      {cur &&
-        (place ? (
+      <AgentsMenu run={run} onChange={monitor.setAgents} />
+      {working.map((cur) => {
+        const task = tasks.find((x) => x.id === cur.id);
+        const place = task ? sessionPlace(task) : null;
+        const label = `${t(AGENT_KEY[cur.agent])} · ${cur.id}`;
+        return place ? (
           <button
+            key={cur.id}
             type="button"
             className="link with-icon holder-open"
             title={t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
             onClick={() => onOpenSession(cur.id).catch(onError)}
           >
-            {agentName} · {cur.id}
+            {label}
             <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
               <path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11" />
               <path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5" />
             </svg>
           </button>
         ) : (
-          <span className="muted">
-            {agentName} · {cur.id}
+          <span key={cur.id} className="muted">
+            {label}
           </span>
-        ))}
-      {stalled(run, now) && cur && <span className="monitor-stalled">{t("monitor.stalled", { id: cur.id })}</span>}
+        );
+      })}
+      {late.map((cur) => (
+        <span key={cur.id} className="monitor-stalled">
+          {t("monitor.stalled", { id: cur.id })}
+        </span>
+      ))}
       {run.stopping ? (
         <button type="button" className="small" onClick={monitor.undoStop}>
           {t("monitor.undo_stop")}
@@ -377,6 +417,58 @@ export function MonitorControl({
       )}
     </span>
     {monitor.notice && <UnblockLine notice={monitor.notice} onOpenTask={onOpenTask} onClose={monitor.dismissNotice} />}
+    </span>
+  );
+}
+
+/** The status bar's agents (Task-A03-fruit467, approver 2026-11-08): the agents the run gives
+ * tasks to, with a menu to add one offered at the start or take one off. One taken off finishes
+ * the task its session works; the last one cannot be taken off (Stop ends the run). */
+function AgentsMenu({ run, onChange }: { run: Run; onChange: (agents: TerminalAgent[]) => void }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const names = run.agents.map((a) => t(AGENT_KEY[a])).join(", ");
+  return (
+    <span className="monitor-every-wrap">
+      <button
+        type="button"
+        className="every"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("monitor.agents_aria")}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {names} ✎
+      </button>
+      {open && (
+        <div className="monitor-menu" role="menu">
+          <p className="small">
+            <strong>{t("monitor.agents_menu_title")}</strong>
+          </p>
+          {run.offered.map((a) => {
+            const on = run.agents.includes(a);
+            const last = on && run.agents.length === 1;
+            const busy = run.working.find((w) => w.agent === a);
+            return (
+              <button
+                key={a}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={on}
+                className={on ? "on" : undefined}
+                disabled={last}
+                title={last ? t("monitor.agents_last") : undefined}
+                onClick={() => onChange(on ? run.agents.filter((x) => x !== a) : [...run.agents, a])}
+              >
+                {on ? "✓ " : ""}
+                {t(AGENT_KEY[a])}
+                {!on && busy && <span className="muted small"> · {t("monitor.agents_finishing", { id: busy.id })}</span>}
+              </button>
+            );
+          })}
+          <p className="muted small">{t("monitor.agents_menu_note")}</p>
+        </div>
+      )}
     </span>
   );
 }
