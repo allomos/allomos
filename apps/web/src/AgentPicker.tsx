@@ -171,14 +171,14 @@ export function AgentPicker({
                       {/* How it will open: only for the chosen tool (owner, 2026-10-12). */}
                       {picked && (
                         <span className="muted">
-                          — {how?.[a.id] ?? t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
+                          — {how?.[a.id] ?? t(a.how === "link" ? "agents.how_link" : a.id === "antigravity_cli" ? "agents.how_sent" : "agents.how_paste")} ({a.found})
                         </span>
                       )}
                       {why && <span className="muted small hint">{why}</span>}
                       {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
                       {a.id === "claude_app" && !why && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
-                      {/* The chosen tool takes the request from the clipboard: say how, right here. */}
-                      {picked && a.how === "paste" && !how?.[a.id] && (
+                      {/* The chosen tool takes the request from the clipboard: say how, right here (Antigravity's agy sends it itself). */}
+                      {picked && a.how === "paste" && a.id !== "antigravity_cli" && !how?.[a.id] && (
                         <span className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</span>
                       )}
                     </label>

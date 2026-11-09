@@ -179,12 +179,15 @@ export function AgentsPanel({
       if (chosen[0]) saveOpened(taskbag, chosen[0]);
       onDone({
         // One agent (owner, 2026-10-12); a terminal that takes the request from the clipboard is told so.
-        message: (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")
-          ? t(updating === "move" ? "move.asked_paste" : updating ? "update.asked_paste" : "connect.asked_paste", {
-              agent: t(AGENT_KEY[chosen[0]]),
-              keys: PASTE_KEYS,
-            })
-          : t(updating === "move" ? "move.asked" : updating ? "update.asked" : "connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
+        // Antigravity's agy takes the request on its command line and sends it at once (2026-11-09).
+        message: !updating && chosen[0] === "antigravity_cli"
+          ? t("connect.asked_sent", { agent: t(AGENT_KEY[chosen[0]]) })
+          : (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")
+            ? t(updating === "move" ? "move.asked_paste" : updating ? "update.asked_paste" : "connect.asked_paste", {
+                agent: t(AGENT_KEY[chosen[0]]),
+                keys: PASTE_KEYS,
+              })
+            : t(updating === "move" ? "move.asked" : updating ? "update.asked" : "connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
         watch: { project, before },
       });
     } catch (e) {
