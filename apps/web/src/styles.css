@@ -1018,6 +1018,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 @keyframes monitor-pulse { 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .monitor-bar .dot { animation: none; } }
 .monitor-bar .every { border: none; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; }
+/* The global `button.link` sits at the top (align-self: start); in the status bar every item is centred on one line (Task-A03-quiz554). */
+.monitor-bar button.link { align-self: center; }
 .monitor-bar button.small { padding: 2px 9px; font-size: 12px; }
 .monitor-bar button.stop { border-color: color-mix(in srgb, var(--err) 35%, var(--line)); color: var(--err); }
 .monitor-every-wrap { position: relative; }
