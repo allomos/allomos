@@ -85,3 +85,62 @@ pub(crate) fn set_heartbeat_settings(
     }
     Ok(of_project(&project))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_settings_are_shown_changed_refused_and_put_back_like_alm_heartbeat_settings() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-heartbeat-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "p", "P").unwrap();
+
+        // Nothing written: the defaults, 10 and 30 minutes.
+        let s = heartbeat_settings(root.clone()).unwrap();
+        assert_eq!((s.interval_minutes, s.lost_after_minutes), (None, None));
+        assert_eq!(
+            (s.applied_interval_minutes, s.applied_lost_after_minutes),
+            (10, 30)
+        );
+        assert_eq!(
+            (s.default_interval_minutes, s.default_lost_after_minutes),
+            (10, 30)
+        );
+
+        // A change is saved in project.json and read back by the task list's rule.
+        let s = set_heartbeat_settings(root.clone(), None, Some("15".into()), false).unwrap();
+        assert_eq!((s.interval_minutes, s.lost_after_minutes), (None, Some(15)));
+        let bag = allomos_store::load(&root).taskbag.unwrap();
+        assert_eq!(heartbeat::applied(&bag.project).lost_after_secs, 15 * 60);
+
+        // A value that is not whole minutes of at least 1 is refused; nothing changes.
+        for bad in ["0", "1.5", "abc"] {
+            let e =
+                set_heartbeat_settings(root.clone(), Some(bad.into()), None, false).unwrap_err();
+            assert!(
+                matches!(e, Problem::HeartbeatMinutesInvalid { .. }),
+                "{bad}"
+            );
+        }
+        assert_eq!(
+            heartbeat_settings(root.clone()).unwrap().interval_minutes,
+            None
+        );
+
+        // Restore Defaults: both go, and `heartbeat` leaves project.json.
+        let s = set_heartbeat_settings(root.clone(), None, None, true).unwrap();
+        assert_eq!((s.interval_minutes, s.lost_after_minutes), (None, None));
+        assert!(
+            allomos_store::load(&root)
+                .taskbag
+                .unwrap()
+                .project
+                .heartbeat
+                .is_none()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
