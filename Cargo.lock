@@ -34,7 +34,7 @@ dependencies = [
 
 [[package]]
 name = "allomos-cli"
-version = "0.1.46"
+version = "0.1.47"
 dependencies = [
  "allomos-core",
  "allomos-store",
@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "allomos-core"
-version = "0.1.46"
+version = "0.1.47"
 dependencies = [
  "serde",
  "serde_json",
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "allomos-desktop"
-version = "0.1.46"
+version = "0.1.47"
 dependencies = [
  "allomos-core",
  "allomos-store",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "allomos-store"
-version = "0.1.46"
+version = "0.1.47"
 dependencies = [
  "allomos-core",
  "allomos-store",
