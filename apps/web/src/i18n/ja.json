@@ -1079,7 +1079,6 @@
   "monitor.unblocked_close": "この行を閉じる",
   "monitor.notify_title": "「肩代」· 準備完了のタスクを自動で監視",
   "monitor.notify_waiting": "{id} があなたを待っています：{on}",
-  "monitor.notify_idle": "準備完了のタスクがありません。次の確認 {time}。",
   "monitor.freq_menu_title": "確認の間隔（すぐに反映）",
   "monitor.freq_aria": "確認の間隔を変える",
   "monitor.stop": "■ 停止",

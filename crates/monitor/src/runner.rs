@@ -159,14 +159,13 @@ fn read(root: &Path) -> Result<Taskbag, Problem> {
     allomos_store::taskbag_of(root, allomos_store::load(root)).map(|(bag, _)| bag)
 }
 
-/// Tell the person the run is stuck: a system notification.
-fn tell(stuck: &Stuck, run: &Run, language: &str) {
+/// Tell the person a task waits on them: a notification the app shows (see [`notify`]).
+fn tell(dir: &Path, run_id: &str, stuck: &Stuck, language: &str) {
     let body = match stuck {
         Stuck::Waiting { id, on } => request::notify_waiting(language, id, on),
-        Stuck::Idle => request::notify_idle(language, &local_hhmm(run.next_check())),
     };
     log(&format!("told the person: {body}"));
-    notify::show(request::notify_title(language), &body);
+    notify::show(dir, run_id, request::notify_title(language), &body);
 }
 
 /// The running loop's state besides the run itself.
@@ -268,7 +267,12 @@ impl Loop {
                         &p.english(),
                     );
                     log(&line);
-                    notify::show(request::notify_title(&self.record.language), &line);
+                    notify::show(
+                        &self.dir,
+                        &self.id,
+                        request::notify_title(&self.record.language),
+                        &line,
+                    );
                     let run = &mut self.record.run;
                     let left: Vec<String> = run
                         .agents
@@ -302,7 +306,7 @@ impl Loop {
                 );
             }
             if let Some(stuck) = waiting_alert(&cur.id, &bag.tasks) {
-                tell(&stuck, &self.record.run, &self.record.language);
+                tell(&self.dir, &self.id, &stuck, &self.record.language);
             }
         }
         let run = &self.record.run;
@@ -318,11 +322,8 @@ impl Loop {
             let run = &self.record.run;
             let shares = run.share(bag);
             if shares.is_empty() {
-                let run = &mut self.record.run;
-                run.checked = now;
-                if let Some(stuck) = run.idle_alert() {
-                    tell(&stuck, run, &self.record.language);
-                }
+                // Nothing to take: the status bar says so; the person is not told (A03-stork103).
+                self.record.run.checked = now;
             } else {
                 self.start_sessions(shares);
             }

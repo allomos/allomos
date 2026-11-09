@@ -70,9 +70,6 @@ pub struct Run {
     pub stopping: bool,
     /// When it last checked for a ready task (ms).
     pub checked: i64,
-    /// The person was told no task is ready, once per stretch without one.
-    #[serde(default)]
-    pub idle_told: bool,
     /// What the last sweep (at the start and on Check now) let go on because their blockers had
     /// finished, until the next check: the app's line under the status bar.
     #[serde(default)]
@@ -87,13 +84,12 @@ pub struct Unblocked {
     pub state: String,
 }
 
-/// What the monitor tells the person when it is stuck.
+/// What the monitor tells the person when it is stuck: a task waiting on them. (A quiet monitor
+/// with no ready task says nothing: its status bar shows it, A03-stork103.)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stuck {
     /// A task its session parked waiting on the person.
     Waiting { id: String, on: String },
-    /// No task is ready and no session works one.
-    Idle,
 }
 
 impl Run {
@@ -119,7 +115,6 @@ impl Run {
             working: Vec::new(),
             stopping: false,
             checked: now - i64::from(every) * 60_000,
-            idle_told: false,
             unblocked: Vec::new(),
         }
     }
@@ -219,17 +214,6 @@ impl Run {
             changed: now,
         });
         self.checked = now;
-        self.idle_told = false;
-    }
-
-    /// A check found nothing to take: tell the person once for this stretch without a task, and
-    /// only while no session works one.
-    pub fn idle_alert(&mut self) -> Option<Stuck> {
-        if self.idle_told || !self.working.is_empty() {
-            return None;
-        }
-        self.idle_told = true;
-        Some(Stuck::Idle)
     }
 
     /// The sessions that have shown no sign of life for [`STALL_MS`].
@@ -412,23 +396,6 @@ mod tests {
         );
         waiting.who = Some("the designer".into());
         assert_eq!(waiting_alert("A01-1", &[waiting]), None);
-    }
-
-    #[test]
-    fn idle_is_told_once_per_stretch() {
-        let mut r = run(&["claude_cli"]);
-        assert_eq!(r.idle_alert(), Some(Stuck::Idle));
-        assert_eq!(r.idle_alert(), None);
-        r.take(
-            "claude_cli",
-            &task("A01-1", State::Ready, None),
-            None,
-            None,
-            0,
-        );
-        assert_eq!(r.idle_alert(), None);
-        r.working.clear();
-        assert_eq!(r.idle_alert(), Some(Stuck::Idle));
     }
 
     #[test]

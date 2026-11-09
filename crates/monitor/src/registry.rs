@@ -10,7 +10,9 @@
 //!   guessed from how old its file is;
 //! - `<run>.log`: what the process printed;
 //! - `<run>.req-<n>.json`: a request (check now, stop…) left for the process, which takes it within
-//!   about a second.
+//!   about a second;
+//! - `<run>.note-<n>.json`: a notification the process leaves for the app to show under its own
+//!   name (A03-stork103); the app takes and removes each one ([`take_notes`]).
 //!
 //! `alm monitor status` and `list`, and the app, only read these files. As a last resort the
 //! system's process list is searched for `alm monitor run` processes that no file names ("running,
@@ -219,6 +221,49 @@ pub fn take_requests(dir: &Path, id: &str) -> Vec<Request> {
         .collect()
 }
 
+/// A notification for the person, left by a run for the app to show (A03-stork103).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Note {
+    pub title: String,
+    pub body: String,
+}
+
+/// Leave `note` for the app, from run `id` in `dir`. The app shows it and removes it; while no
+/// app runs, it waits there.
+pub fn leave_note(dir: &Path, id: &str, note: &Note) -> io::Result<()> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let path = dir.join(format!("{id}.note-{stamp:032}.json"));
+    write_whole(&path, &serde_json::to_string(note).unwrap_or_default())
+}
+
+/// The notifications left in `dir` by any run, oldest first, each removed as it is taken. One
+/// that cannot be read is removed and left out.
+pub fn take_notes(dir: &Path) -> Vec<Note> {
+    let mut paths: Vec<PathBuf> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.contains(".note-") && n.ends_with(".json"))
+        })
+        .collect();
+    paths.sort();
+    paths
+        .into_iter()
+        .filter_map(|p| {
+            let text = fs::read_to_string(&p).ok();
+            let _ = fs::remove_file(&p);
+            serde_json::from_str(&text?).ok()
+        })
+        .collect()
+}
+
 /// One run this computer is running.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -279,7 +324,7 @@ pub fn list(dir: &Path, processes: Option<&[Process]>) -> Vec<Entry> {
             p.extension().is_some_and(|x| x == "json")
                 && p.file_name()
                     .and_then(|n| n.to_str())
-                    .is_some_and(|n| !n.contains(".req-"))
+                    .is_some_and(|n| !n.contains(".req-") && !n.contains(".note-"))
         })
         .filter_map(|p| serde_json::from_str::<Record>(&fs::read_to_string(&p).ok()?).ok())
         .collect();
@@ -507,6 +552,25 @@ mod tests {
         );
         assert!(take_requests(&d, "m-1").is_empty());
         assert_eq!(take_requests(&d, "m-2"), [Request::Stop]);
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn notes_are_taken_once_in_order_and_are_no_run() {
+        let d = temp("note");
+        let note = |body: &str| Note {
+            title: "t".into(),
+            body: body.into(),
+        };
+        leave_note(&d, "m-1", &note("first")).unwrap();
+        leave_note(&d, "m-2", &note("second")).unwrap();
+        ask(&d, "m-1", &Request::Check).unwrap();
+        assert_eq!(take_notes(&d), [note("first"), note("second")]);
+        assert!(take_notes(&d).is_empty());
+        // A note is not a run, and a request is not one either.
+        leave_note(&d, "m-1", &note("third")).unwrap();
+        assert!(list(&d, Some(&[])).is_empty());
+        assert_eq!(take_requests(&d, "m-1"), [Request::Check]);
         fs::remove_dir_all(&d).unwrap();
     }
 

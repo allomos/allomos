@@ -11,6 +11,7 @@ mod codex_rules;
 mod heartbeat_settings;
 mod lan;
 mod monitor_runs;
+mod notify;
 mod pairing;
 mod sessions;
 mod tab_drag;
@@ -2460,6 +2461,7 @@ fn recent_folder(texts: &MenuTexts, id: &str) -> Option<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .menu(build_menu)
         .manage(Windows::default())
         .manage(tab_drag::Drag::default())
@@ -2468,6 +2470,8 @@ pub fn run() {
         .setup(|app| {
             // Reopen windows and tabs (Task-A01-marble320): the other windows open again.
             windows::restore(app.handle());
+            // The monitor's notifications, shown under the app's name (Task-A03-stork103).
+            notify::start(app.handle().clone());
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_screen(&window);
             }
