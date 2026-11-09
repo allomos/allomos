@@ -335,6 +335,7 @@ mod tests {
             task_language: language.map(String::from),
             handoff: None,
             audit: None,
+            heartbeat: None,
         }
     }
 

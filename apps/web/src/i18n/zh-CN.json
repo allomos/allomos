@@ -324,6 +324,7 @@
   "problem.session_missing": "请说明要记录什么：--session-agent、--session-id、--session-kind 或 --app-session-id。",
   "problem.task_held": "任务 {id} 由 {holder} 担当。",
   "problem.not_held": "任务 {id} 现在是 {state}，没有正在工作的会话担当它，所以不写心跳。只有担当进行中任务的会话才写心跳（先 `alm claim` 它）。",
+  "problem.heartbeat_minutes_invalid": "“{value}”不是 {field} 能用的整分钟时长。请写成 10m、30m、1h 或 45（分钟）这样，至少 1 分钟。",
   "problem.busy_invalid": "“{value}”不是一段时长。请写成 45m、2h 或 1h30m 这样（0m 结束忙碌窗口）。",
   "problem.request_reused": "一次性编号 {id} 已经用于另一项改动，所以什么也没做。新的改动请用新的编号。",
   "problem.task_changed": "你读取任务 {id} 之后，它被改动过，所以你的改动没有保存。请重新读取（它现在的版本是 {version}），再保存。",

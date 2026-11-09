@@ -324,6 +324,7 @@
   "problem.session_missing": "Say what to record: --session-agent, --session-id, --session-kind or --app-session-id.",
   "problem.task_held": "Task {id} is held by {holder}.",
   "problem.not_held": "Task {id} is {state} and held by no working session, so it gets no heartbeat. Only the session holding an in-progress task beats (`alm claim` it first).",
+  "problem.heartbeat_minutes_invalid": "\"{value}\" is not a length of whole minutes for {field}. Write it like 10m, 30m, 1h or 45 (minutes); at least 1 minute.",
   "problem.busy_invalid": "\"{value}\" is not a length of time. Write it like 45m, 2h or 1h30m (0m ends a busy window).",
   "problem.request_reused": "The one-time number {id} was already used for a different change, so nothing was done. Use a new number for a new change.",
   "problem.task_changed": "Task {id} changed after you read it, so your change was not saved. Read it again (its version is now {version}), then save.",

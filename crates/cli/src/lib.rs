@@ -652,7 +652,8 @@ enum Command {
     Note { id: String, text: Option<String> },
     /// Write a heartbeat: the session holding the task (--as) is still at work (decision 0022).
     /// Without an ID, for every task that session holds, in one change. Writes no event, and
-    /// nothing while the last heartbeat is under half the interval old (5 of 10 minutes).
+    /// nothing while the last heartbeat is under half the interval old (5 of 10 minutes by
+    /// default; `alm heartbeat-settings`).
     Beat {
         id: Option<String>,
         /// Declare a busy window: how long you will be quiet (45m, 2h, 1h30m; 0m ends it).
@@ -789,6 +790,20 @@ enum Command {
         #[arg(long, value_name = "NAME")]
         agent: Option<String>,
         /// Back to the defaults (with --agent: remove that agent's own gates).
+        #[arg(long)]
+        clear: bool,
+    },
+    /// How often holding sessions beat and after how long a held task is lost (decision 0022 § 3):
+    /// project settings, 10 and 30 minutes by default. Without options, show them.
+    #[command(name = "heartbeat-settings")]
+    HeartbeatSettings {
+        /// How often a holding session beats: 10m, 15m, 1h or a number of minutes.
+        #[arg(long, value_name = "LENGTH")]
+        interval: Option<String>,
+        /// After how long without a heartbeat (and no busy window) a held task is lost.
+        #[arg(long, value_name = "LENGTH")]
+        lost_after: Option<String>,
+        /// Back to the defaults (10 and 30 minutes); --interval or --lost-after then still apply.
         #[arg(long)]
         clear: bool,
     },
@@ -1111,6 +1126,7 @@ impl Command {
             | Command::MoveIn { .. }
             | Command::Translate { .. }
             | Command::HandoffRules { .. }
+            | Command::HeartbeatSettings { .. }
             | Command::AuditSettings { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
@@ -1143,6 +1159,14 @@ impl Command {
         } = self
         {
             return quota.is_some() || context.is_some() || write_when.is_some() || *clear;
+        }
+        if let Command::HeartbeatSettings {
+            interval,
+            lost_after,
+            clear,
+        } = self
+        {
+            return interval.is_some() || lost_after.is_some() || *clear;
         }
         if let Command::AuditSettings {
             identity,
@@ -1281,6 +1305,7 @@ impl Command {
             Command::MoveIn { .. } => "move-in",
             Command::Translate { .. } => "translate",
             Command::HandoffRules { .. } => "handoff-rules",
+            Command::HeartbeatSettings { .. } => "heartbeat-settings",
             Command::AuditSettings { .. } => "audit-settings",
             Command::Handoff { .. } => "handoff",
         }
@@ -2512,6 +2537,7 @@ mod classify;
 mod effects;
 mod exceptions;
 mod folders;
+mod heartbeat;
 mod links;
 mod redact;
 mod trail;
@@ -2772,6 +2798,19 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
+        Command::HeartbeatSettings {
+            interval,
+            lost_after,
+            clear,
+        } => heartbeat::settings(
+            cli,
+            cwd,
+            &allomos_core::heartbeat::SettingsChange {
+                interval: interval.as_deref(),
+                lost_after: lost_after.as_deref(),
+                clear: *clear,
+            },
+        ),
         Command::AuditSettings {
             identity,
             reauthenticate,
@@ -3643,7 +3682,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let heartbeat_text = task
                 .heartbeat
                 .as_ref()
-                .map(|h| heartbeat_line(h, allomos_store::now_secs()));
+                .map(|h| heartbeat::heartbeat_line(h, allomos_store::now_secs()));
             let fields = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
@@ -3801,7 +3840,25 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(name) = &here {
                 tasks = allomos_core::folders::in_folder(tasks, name);
             }
-            let instruction = if tasks.is_empty() {
+            // Held tasks (decision 0022, Task-A01-zero387): the lost ones and the busy ones, in
+            // the same iteration and folder as the list.
+            let in_scope: Vec<&Task> = bag
+                .tasks
+                .iter()
+                .filter(|t| {
+                    iteration
+                        .as_ref()
+                        .is_none_or(|i| t.iteration.as_ref() == Some(i))
+                })
+                .collect();
+            let in_scope = match &here {
+                Some(name) => allomos_core::folders::in_folder(in_scope, name),
+                None => in_scope,
+            };
+            let held = heartbeat::held(&root, &bag, &in_scope, allomos_store::now_secs());
+            let instruction = if tasks.is_empty() && held.any_lost {
+                "No ready task is free. The tasks listed as lost could be taken over: check each one first (who holds it, its handoff note), then decide; or ask the person what to do next.".to_string()
+            } else if tasks.is_empty() {
                 match iteration {
                     Some(i) => format!(
                         "Nothing to take: no ready task in iteration {i} is free. Ask the person what to do next."
@@ -3876,6 +3933,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(rules);
                 text.push('\n');
             }
+            text.push_str(&held.text);
             text.push_str(&instruction);
             text.push('\n');
             // An approval withdrawn while a task is in progress (approver, 2026-11-08,
@@ -3940,6 +3998,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 json!({
                     "taskbag": root,
                     "tasks": listed,
+                    "lost": held.lost,
+                    "busy": held.busy,
+                    "heartbeat_settings": allomos_core::heartbeat::applied(&bag.project),
                     "instruction": instruction,
                     "taking_over": taking_over,
                     "blocked": blocked,
@@ -4543,7 +4604,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = m.issues;
             Ok(done)
         }
-        Command::Beat { id, busy } => beat(cli, cwd, id.as_deref(), busy.as_deref()),
+        Command::Beat { id, busy } => heartbeat::beat(cli, cwd, id.as_deref(), busy.as_deref()),
         Command::Note { id, text } => change(cli, cwd, |bag| {
             ops::set_handoff_note(bag, id, me, text.as_deref())
         }),
@@ -4739,89 +4800,6 @@ fn change(
     let mut done = Done::new(fields, text);
     done.warnings = changed.warnings;
     done.issues = changed.issues;
-    Ok(done)
-}
-
-/// One heartbeat in plain words (decision 0022): how long ago, when, by whom, and the busy window
-/// while it runs.
-fn heartbeat_line(h: &allomos_core::heartbeat::Heartbeat, now: i64) -> String {
-    use allomos_core::heartbeat::{parse_utc, plain_duration};
-    let mut line = match parse_utc(&h.at) {
-        Some(at) => format!("{} ago ({}, by {})", plain_duration(now - at), h.at, h.by),
-        None => format!("{} (by {})", h.at, h.by),
-    };
-    if let Some(until) = &h.busy_until {
-        if parse_utc(until).is_some_and(|u| u > now) {
-            line.push_str(&format!("; busy until {until}"));
-        }
-    }
-    line
-}
-
-/// `alm beat` (decision 0022, Task-A01-nurse164): write the heartbeat of one task, or of every
-/// task the session holds, and say what was written and when the next one is due.
-fn beat(cli: &Cli, cwd: &Path, id: Option<&str>, busy: Option<&str>) -> Result<Done, Problem> {
-    use allomos_core::heartbeat::{self, Beat};
-    let busy = busy
-        .map(|b| {
-            heartbeat::parse_duration(b).ok_or_else(|| Problem::BusyInvalid {
-                value: b.to_string(),
-            })
-        })
-        .transpose()?;
-    let root = locate(cli, cwd)?;
-    let me = cli.holder.as_deref();
-    let beaten = allomos_store::beat(&root, Actor::alm(me), lock_wait(), id, busy)?;
-    let mut text = String::new();
-    let mut list = Vec::new();
-    let mut written = false;
-    for b in &beaten.beats {
-        match b {
-            Beat::Written(task) => {
-                written = true;
-                let h = task
-                    .heartbeat
-                    .as_ref()
-                    .expect("a written beat has its heartbeat");
-                let due = heartbeat::parse_utc(&h.at)
-                    .map(|at| heartbeat::format_utc(at + heartbeat::INTERVAL_SECS))
-                    .unwrap_or_default();
-                text.push_str(&format!("{}: heartbeat written at {}", task.id, h.at));
-                if let Some(until) = &h.busy_until {
-                    text.push_str(&format!(", busy until {until}"));
-                }
-                text.push_str(&format!("; the next one is due by {due}.\n"));
-                list.push(json!({
-                    "id": task.id, "written": true, "heartbeat": h, "due": due,
-                }));
-            }
-            Beat::TooSoon { task, ago, due } => {
-                text.push_str(&format!(
-                    "{}: the last heartbeat was {} ago, under half the interval ({}), so nothing was written. The next one is due by {due}.\n",
-                    task.id,
-                    heartbeat::plain_duration(*ago),
-                    heartbeat::plain_duration(heartbeat::INTERVAL_SECS / 2),
-                ));
-                list.push(json!({
-                    "id": task.id, "written": false, "heartbeat": task.heartbeat,
-                    "ago_seconds": ago, "due": due,
-                }));
-            }
-        }
-    }
-    if beaten.beats.is_empty() {
-        text.push_str(&format!(
-            "{} holds no task in progress, so nothing was written.\n",
-            me.unwrap_or("?")
-        ));
-    }
-    if written {
-        text.push_str(
-            "A heartbeat counts only once it is shared: save and share it now (other sessions judge from what they pulled).\n",
-        );
-    }
-    let mut done = Done::new(json!({ "taskbag": root, "beats": list }), text);
-    done.issues = beaten.issues;
     Ok(done)
 }
 

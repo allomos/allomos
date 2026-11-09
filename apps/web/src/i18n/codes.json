@@ -148,6 +148,10 @@
     "folders"
   ],
   "handoff_empty": [],
+  "heartbeat_minutes_invalid": [
+    "field",
+    "value"
+  ],
   "holder_missing": [],
   "human_check_label_missing": [
     "id"
