@@ -11,6 +11,7 @@ import {
   firstScope,
   follow,
   frequencyText,
+  idleAlert,
   lastRunCounts,
   monitorRequest,
   nextCheck,
@@ -24,6 +25,7 @@ import {
   tabToClose,
   take,
   unblockNotice,
+  waitingAlert,
   withReleased,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
@@ -266,4 +268,22 @@ test("until the taskbag is read again, the monitor picks a task the sweep let go
   const read = [task("A01-01", { state: "done" }), task("A01-02", { state: "in_progress", holder: "x" })];
   assert.equal(withReleased(read, released)[1].holder, "x");
   assert.equal(withReleased(stale, []), stale);
+});
+
+// Task-A00-eclair542: the monitor tells the person when it is stuck.
+test("a task its session parked waiting on the person is told; one waiting on someone named is not", () => {
+  const parked = [task("A01-05", { state: "waiting", waiting_on: "Which name?" }), task("A01-06", { state: "waiting", waiting_on: "x", who: "Ann" })];
+  assert.deepEqual(waitingAlert("A01-05", parked), { kind: "waiting", id: "A01-05", on: "Which name?" });
+  assert.equal(waitingAlert("A01-06", parked), null);
+  assert.equal(waitingAlert(null, parked), null);
+  assert.equal(waitingAlert("A01-01", tasks), null);
+});
+
+test("no task ready is told once per stretch, and again after a task was taken", () => {
+  const run = startRun({ kind: "all" }, "claude_cli", true, 30, 0);
+  const first = idleAlert(run);
+  assert.deepEqual(first.alert, { kind: "idle" });
+  assert.equal(idleAlert(first.run).alert, null);
+  const taken = take(first.run, task("A01-05"), "s-1", 0);
+  assert.deepEqual(idleAlert(taken).alert, { kind: "idle" });
 });

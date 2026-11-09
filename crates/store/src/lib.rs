@@ -337,9 +337,15 @@ the project notes (below).
   `alm human`); say so in your handoff. Do not leave such a task waiting: `alm wait` is only for
   a real question, an approval or an outside effect.
   In an automatic or loop run the person set up to go on without them (a quiet run), never
-  stop to wait for the person: decide a routine choice yourself (below); park a real question
-  with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`, To answer) and go on
-  with the next ready task; do not use `alm confirm` (it would wait until it times out).
+  stop to wait for the person: decide a routine choice yourself, wording and look included
+  (below); park a real question with `alm wait <id> --on \"<the question> Proposal: <yours>\"`
+  (it shows in `alm human`, To answer) and go on with the next ready task; do not use
+  `alm confirm` (it would wait until it times out). A parked question never holds back finished
+  work: what is done and tested and does not depend on the answer is merged first, and a task
+  whose work is all done ends with `alm done <id> --without-human-check`, its question recorded
+  with `alm ai-decided` for review. A question about something cheap to undo, still unanswered
+  when the run ends, is settled by your proposal, recorded with `alm ai-decided`. Details:
+  `alm guide workflow`, step 8.
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason \"<what changed>\"`.
@@ -351,9 +357,16 @@ the project notes (below).
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each one with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it
   later (`alm human`, To review: AI decisions). When they say they reviewed them:
-  `alm reviewed <id>`. What users will see and get used to, anything hard to undo (data formats,
-  removing things), anything that changes the plan or another task, and anything with a cost or
-  an outside effect goes to the approver first.
+  `alm reviewed <id>`. Wording and look (what users see) are reviewed before release, not
+  before the work: in a quiet run decide them, build and merge, and record them with
+  `alm ai-decided` (with a screenshot when your agent can take one, saying where it is); the
+  approver reviews them under To review and reopens the task to change them. What still goes to
+  the approver first: data formats, removing things, permissions and security, anything with a
+  cost or an outside effect, and anything that changes the plan or another task; a release still
+  needs the approver's approval.
+- Ask questions while planning, not while running: whoever makes a task ready first asks its
+  open questions, so a ready task carries none. Write \"show the approver first\" into a task only
+  when the approver asks for it.
 - Adding a task: every new piece of work (a new card, a new outcome) gets its own task. Read
   `alm guide tasks` first, then `alm add task --area <area> --title \"<outcome>\" --branch
   <the branch you are on>`: on a task's working branch, the new task shares that task's base;

@@ -2623,7 +2623,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v33)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v34)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2633,7 +2633,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v33)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v34)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -2827,7 +2827,7 @@ fn add_task_tells_the_next_steps() {
         "{text}"
     );
     assert!(
-        after.contains("name each open question in the description's Notes"),
+        after.contains("name each open question with your proposal in the description's Notes"),
         "{text}"
     );
 

@@ -120,6 +120,9 @@ export interface Messenger {
   releaseFinished(root: string): Promise<Released[]>;
   /** The task of the session in `tab` is done: the tab closes after 30 seconds unless a key is pressed (Task-A03-sierra014). */
   monitorCloseSession(agent: string, tab: SessionTab, texts: { prompt: string; kept: string }): Promise<void>;
+  /** Monitor ready tasks is stuck (Task-A00-eclair542): a system notification for the person, where
+   * the system has one (macOS); otherwise nothing. */
+  monitorNotify(title: string, body: string): Promise<void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
@@ -472,6 +475,7 @@ export const desktopMessenger: Messenger = {
   monitorStartSession: (agent, taskbag, request, sessionId) =>
     invoke<SessionTab | null>("monitor_start_session", { agent, taskbag, request, sessionId }),
   monitorCloseSession: (agent, tab, texts) => invoke<void>("monitor_close_session", { agent, tab, texts }),
+  monitorNotify: (title, body) => invoke<void>("monitor_notify", { title, body }),
   releaseFinished: (root) => invoke<Released[]>("release_finished", { root }),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),

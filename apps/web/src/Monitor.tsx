@@ -16,6 +16,7 @@ import {
   FREQUENCIES,
   follow,
   frequencyText,
+  idleAlert,
   lastRunCounts,
   monitorRequest,
   nextCheck,
@@ -26,9 +27,10 @@ import {
   tabToClose,
   take,
   unblockNotice,
+  waitingAlert,
   withReleased,
 } from "./monitorFlow";
-import type { Frequency, LastRun, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import type { Frequency, LastRun, Run, Scope, StuckAlert, TerminalAgent, UnblockNotice } from "./monitorFlow";
 import { isProblem } from "./types";
 import type { Iteration, Task } from "./types";
 
@@ -127,6 +129,20 @@ export function useMonitor({
     return () => window.clearInterval(timer);
   }, [running]);
 
+  /** Tells the person the monitor is stuck (Task-A00-eclair542): a system notification. */
+  const tell = useCallback(
+    (alert: StuckAlert, r: Run, at: number) => {
+      const body =
+        alert.kind === "waiting"
+          ? t("monitor.notify_waiting", { id: alert.id, on: alert.on })
+          : t("monitor.notify_idle", {
+              time: new Date(at + r.every * 60_000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            });
+      void messenger.monitorNotify(t("monitor.notify_title"), body).catch(() => {});
+    },
+    [messenger, t],
+  );
+
   const startSession = useCallback(
     async (r: Run, task: Task) => {
       starting.current = true;
@@ -166,6 +182,9 @@ export function useMonitor({
       const texts = { prompt: t("monitor.close_prompt"), kept: t("monitor.close_kept") };
       void messenger.monitorCloseSession(run.agent, tab, texts).catch(() => {});
     }
+    // Its session parked a question for the person: tell them.
+    const waiting = waitingAlert(followed.finished, box.tasks);
+    if (waiting) tell(waiting, run, at);
     let r = followed.run;
     if (followed.finished && r.stopping) return end(r);
     if (!r.current && !r.stopping && !starting.current && (followed.finished || at >= nextCheck(r))) {
@@ -176,10 +195,13 @@ export function useMonitor({
         void startSession(r, task);
         return;
       }
-      r = { ...r, checked: at };
+      // Nothing to take: tell the person once, until a task is taken again.
+      const idle = idleAlert({ ...r, checked: at });
+      if (idle.alert) tell(idle.alert, idle.run, at);
+      r = idle.run;
     }
     if (r !== run) setRun(r);
-  }, [run, box, released, now, active, end, startSession, messenger, t]);
+  }, [run, box, released, now, active, end, startSession, tell, messenger, t]);
 
   return {
     run,

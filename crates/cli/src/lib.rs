@@ -323,8 +323,9 @@ enum Command {
         #[arg(long, value_name = "FILE")]
         steps: Option<PathBuf>,
     },
-    /// Record a decision you made on your own in a task (a routine choice: a name, a file layout,
-    /// a small detail with an obvious default): what you decided and why, in one line. It is kept
+    /// Record a decision you made on your own in a task (a routine choice: a name, wording and
+    /// look, a file layout, a small detail with an obvious default): what you decided and why, in
+    /// one line. It is kept
     /// in the task's history; `alm human` lists it under To review: AI decisions until a person
     /// has reviewed it.
     #[command(name = "ai-decided")]

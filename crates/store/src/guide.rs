@@ -126,11 +126,13 @@ Read this before you add a task, so it fits this project.
    - **Outcome.** One or two plain sentences.
    - **Done means.** The checks or demonstrations that prove it.
    - **Notes.** Anything the next person needs: links, open questions, who must decide. Mark as
-     open for the person only what is theirs to decide: what users will see and get used to,
-     anything hard to undo (data formats, removing things), anything that changes the plan or
-     another task, anything with a cost or an outside effect. A routine choice (a name, a file
-     layout, how it is built, a small detail with an obvious default) is not an open question:
-     whoever works the task decides it and records it with `alm ai-decided`.
+     open for the person only what is theirs to decide first: data formats, removing things,
+     permissions and security, anything that changes the plan or another task, anything with a
+     cost or an outside effect. A routine choice (a name, a file layout, how it is built, a small
+     detail with an obvious default) is not an open question, and neither are wording and look
+     (what users see): whoever works the task decides them and records them with
+     `alm ai-decided`, and the approver reviews them before release (approver, 2026-11-09). Write
+     \"show the approver first\" into a task only when the approver asks for it.
    The description is the task's record. A project that keeps a card file per task keeps it
    beside the task, as `tasks/<id>/card.md` (`alm card <id> --from <file>`), linked from the
    description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
@@ -147,10 +149,12 @@ Read this before you add a task, so it fits this project.
    left, in none). `alm add task` then prints the next steps
    (Task-A03-33, A01-root343): plan it elsewhere if it belongs there (`alm plan <id>
    <iteration>`), or in one at all when no iteration is active, then check it for anything that
-   is the person's to decide (what users will see and get used to, anything hard to undo, anything that
-   changes the plan or another task, anything with a cost or an outside effect). Nothing: make it
-   ready (`alm ready <id>`). Something: leave it in backlog, name each open question in the
-   description's Notes, and tell the person. A ready task that turns out to need rethinking goes
+   is the person's to decide first (data formats, removing things, permissions and security,
+   anything that changes the plan or another task, anything with a cost or an outside effect).
+   Nothing: make it ready (`alm ready <id>`). Something: leave it in backlog, name each open
+   question in the description's Notes with your proposal, and tell the person. **Questions are
+   asked while planning, not while running:** whoever makes a task ready asks its open questions
+   first, so a ready task carries none. A ready task that turns out to need rethinking goes
    back the same way: `alm backlog <id>` (unheld only: release a held one first), with the open
    questions in its Notes.
 8. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
@@ -701,11 +705,26 @@ const WORKFLOW: &str = "# How to work the tasks
    \"Run mode: normal\", who chose it and when) and follow it until the run ends. Both modes
    finish a task the same way (step 7); they differ only in what you do when you need the
    person during the run. In normal mode you stop and ask. In quiet mode (a quiet run),
-   never stop to wait for the person. A routine choice: decide it,
-   record it with `alm ai-decided <id> \"<what and why>\"`, and carry on. A real question for the
-   person: park that task with `alm wait <id> --on \"<the question>\"` (it shows in `alm human`
-   under To answer) and go on with the next ready task. Do not use `alm confirm` in such a run: it
-   would wait until it times out.
+   never stop to wait for the person (approver, 2026-11-09, Task-A00-eclair542):
+   - **Wording and look are reviewed before release, not before the work.** Decide them
+     yourself, build and merge, and record them with `alm ai-decided <id> \"<what and why>\"`,
+     with a screenshot when your agent can take one (say where it is). The approver reviews them
+     under To review and reopens the task to change them. So does every other routine choice.
+   - **Only these go to the approver first:** data formats, removing things, permissions and
+     security, anything with a cost or an outside effect, and anything that changes the plan or
+     another task. A release still needs the approver's approval.
+   - **Every question carries your proposal:** park the task with
+     `alm wait <id> --on \"<the question> Proposal: <what you would do>\"` (it shows in
+     `alm human` under To answer) and go on with the next ready task. A question about something
+     cheap to undo, still unanswered when the run ends, is settled by your proposal: do it and
+     record it with `alm ai-decided`.
+   - **A parked question never holds back finished work.** What is done and tested and does not
+     depend on the answer is merged into the base first. When all the task's work is done, finish
+     it with `alm done <id> --without-human-check` (step 7) and record the question with
+     `alm ai-decided` for review, instead of leaving the task waiting.
+   - Do not use `alm confirm` in such a run: it would wait until it times out.
+   Questions are asked while planning, not while running: whoever makes a task ready asks its
+   open questions first (`alm guide tasks`, step 7), so a quiet run meets as few as possible.
 9. **A goal run** (`alm guide goal`): when the person gives you a goal, an app to build from their
    description, follow the goal prompt `alm guide goal` prints (in the task language). It is the
    one exception to asking the person before planning (approver, 2026-10-16): submitting the goal
@@ -738,10 +757,11 @@ Rules:
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
-  `alm human`. What users will see and get used to, anything hard to undo (data formats, removing
-  things), anything that changes the plan or another task, and anything with a cost or an outside
-  effect goes to the approver first (`alm wait`). In a goal run (step 9) the plan was approved in
-  advance; outside effects still go to the approver.
+  `alm human`. Wording and look (what users see) are reviewed before release, not before the
+  work (step 8). Data formats, removing things, permissions and security, anything that changes
+  the plan or another task, and anything with a cost or an outside effect go to the approver
+  first (`alm wait`). In a goal run (step 9) the plan was approved in advance; outside effects
+  still go to the approver.
 - After every `alm` change, save and share the files it lists with your version control tool (it
   prints the Git commands as the example): only that change's files. Your other work is saved as
   usual.
@@ -767,13 +787,20 @@ stop and ask, or park the question and go on.
 ## Quiet mode: I go on without you
 
 - **What I do:** I work the tasks one after another and never stop to ask you. I make routine
-  choices myself (a name, a file layout, a small detail with an obvious default) and record each
-  one (`alm ai-decided`), so you can review it later.
-- **What I don't do:** I don't decide what is yours to decide: what users will see and get used
-  to, anything hard to undo, anything that changes the plan or another task, anything with a cost
-  or an outside effect. Such a question parks its task as waiting (`alm wait`), and I go on with
-  the next ready task without waiting for an answer.
-- **When you are interrupted:** not at all until the run is over.
+  choices myself (a name, a file layout, a small detail with an obvious default), and the wording
+  and look of what users see too: I build it, merge it and record each choice
+  (`alm ai-decided`, with a screenshot when I can take one), so you review it before it is
+  released and reopen the task to change it.
+- **What I don't do:** I don't decide what is yours to decide first: data formats, removing
+  things, permissions and security, anything with a cost or an outside effect, anything that
+  changes the plan or another task. Such a question, with my proposal, parks its task as waiting
+  (`alm wait`), and I go on with the next ready task without waiting for an answer. Work already
+  done and tested that does not depend on the answer is merged first, never held back. A question
+  about something cheap to undo that is still unanswered when the run ends is settled by my
+  proposal, recorded for your review. Releases still wait for your approval.
+- **When you are interrupted:** not at all until the run is over. When Monitor ready tasks parks
+  a question or finds no ready task, the Allomos app sends a notification, so you know it is
+  stuck without watching it.
 - **How long it can run unattended:** until no ready task is left, or until my session's quota or
   context runs out. I keep my handoff up to date, so anyone can pick the work up.
 
@@ -825,12 +852,18 @@ const RUN_MODES_JA: &str = "# 実行モード：静かモードか通常モー�
 ## 静かモード：あなたを待たずに進めます
 
 - **すること：** タスクを一つずつ続けて進め、あなたに聞くために止まることはありません。決まりきった
-  選択（名前、ファイルの配置、自然な既定がある小さな点）は私が決め、あとで見直せるよう一つずつ記録
-  します（`alm ai-decided`）。
-- **しないこと：** あなたが決めるべきことは決めません。利用者が目にして慣れていくもの、元に戻しにくい
-  こと、計画や他のタスクを変えること、費用や外部への影響があること。そうした質問があれば、その
-  タスクを待機中にして（`alm wait`）、答えを待たずに次の準備完了のタスクへ進みます。
-- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。
+  選択（名前、ファイルの配置、自然な既定がある小さな点）も、利用者が目にする言葉や見た目も私が決め、
+  作ってマージし、一つずつ記録します（`alm ai-decided`、撮れるときはスクリーンショット付き）。
+  あなたはリリースの前にそれを見直し、変えたければタスクを再開します。
+- **しないこと：** あなたが先に決めるべきことは決めません。データの形式、何かを削除すること、権限と
+  セキュリティ、費用や外部への影響があること、計画や他のタスクを変えること。そうした質問は私の案を
+  添えてそのタスクを待機中にし（`alm wait`）、答えを待たずに次の準備完了のタスクへ進みます。答えに
+  よらない、作業済みでテスト済みの部分は先にマージし、止めておきません。元に戻しやすいことについての
+  質問が実行の終わりまで答えられなければ、私の案で決め、見直せるよう記録します。リリースは今までどおり
+  あなたの承認を待ちます。
+- **あなたが呼ばれるとき：** 実行が終わるまで一度もありません。「準備完了のタスクを自動で監視」が質問を
+  保留にしたときや、準備完了のタスクが見つからないときは、「肩代」アプリが通知を出すので、見張って
+  いなくても止まっていることがわかります。
 - **無人で続けられる長さ：** 準備完了のタスクがなくなるまで、またはこのセッションの利用枠や
   コンテキストが尽きるまで。誰でも引き継げるよう、ハンドオフは常に最新にしておきます。
 
@@ -880,11 +913,14 @@ const RUN_MODES_ZH_CN: &str = "# 运行模式：安静模式还是普通模式
 ## 安静模式：我不等你，继续往下做
 
 - **我会做的：** 一个接一个地处理任务，从不停下来问你。常规的选择（名称、文件布局、有明显默认值的
-  小细节）由我自己决定，并逐条记录（`alm ai-decided`），方便你之后审阅。
-- **我不会做的：** 不替你决定该由你决定的事：用户会看到并习惯的东西、难以撤销的事、会改变计划或
-  其他任务的事、有费用或对外有影响的事。遇到这类问题，我把那个任务设为等待中（`alm wait`），
-  不等回答，接着做下一个就绪的任务。
-- **什么时候打扰你：** 运行结束之前一次也不会。
+  小细节），以及用户看到的用词和样子，都由我自己决定：做好、合入，并逐条记录（`alm ai-decided`，
+  能截图时附上截图）。你在发布之前审阅，要改就重新打开那个任务。
+- **我不会做的：** 不替你决定该由你先定的事：数据格式、删掉东西、权限和安全、有费用或对外有影响的事、
+  会改变计划或其他任务的事。遇到这类问题，我附上我的提案，把那个任务设为等待中（`alm wait`），
+  不等回答，接着做下一个就绪的任务。不依赖这个回答、已经做完测完的工作先合入，不会被挡住。关于容易
+  撤销的事的问题，运行结束时还没人回答，就按我的提案办，并记下来供你审阅。发布仍然等你批准。
+- **什么时候打扰你：** 运行结束之前一次也不会。「自动监测就绪任务」搁置一个问题、或找不到就绪任务时，
+  「换肩」应用会发一个通知，你不用盯着也知道它停住了。
 - **能无人值守运行多久：** 直到没有就绪的任务，或者我这个会话的额度或上下文用完为止。我会让交接
   一直保持最新，谁都可以接着做。
 
@@ -1662,7 +1698,7 @@ pub fn added_task_steps(
             };
             format!(
                 "接下来（给添加它的智能体）：
-{step1}2. 检查任务里有没有该由人决定的事：用户会看到并习惯的东西、难以撤销的事、改变计划或其他任务的事、有花费或对外影响的事。没有：把它设为就绪，`alm ready {id}`。有：留在储备，在描述的备注里写明每个待定问题，并告诉那个人。
+{step1}2. 检查任务里有没有该由人先定的事：数据格式、删掉东西、权限和安全、改变计划或其他任务的事、有花费或对外影响的事（用词和样子不算：做的人决定，发布前审）。没有：把它设为就绪，`alm ready {id}`。有：留在储备，在描述的备注里写明每个待定问题和你的提案，并告诉那个人。就绪的任务不带未决问题。
 "
             )
         }
@@ -1683,7 +1719,7 @@ pub fn added_task_steps(
             };
             format!(
                 "次に（追加したエージェントへ）：
-{step1}2. 人が決めるべきことがタスクにないか確かめます：ユーザーが目にして慣れていくもの、元に戻しにくいこと、計画やほかのタスクを変えること、費用や外への影響があること。なければ準備完了にします：`alm ready {id}`。あれば backlog のまま残し、説明の備考に未決の問いを一つずつ書いて、その人に伝えます。
+{step1}2. 人が先に決めるべきことがタスクにないか確かめます：データの形式、何かを削除すること、権限とセキュリティ、計画やほかのタスクを変えること、費用や外への影響があること（言葉や見た目は含みません：作る人が決め、リリース前に見直します）。なければ準備完了にします：`alm ready {id}`。あれば backlog のまま残し、説明の備考に未決の問いとあなたの案を一つずつ書いて、その人に伝えます。準備完了のタスクは未決の問いを持ちません。
 "
             )
         }
@@ -1704,7 +1740,7 @@ pub fn added_task_steps(
             };
             format!(
                 "Next, for the agent who added it:
-{step1}2. Check the task for anything that is the person's to decide: what users will see and get used to, anything hard to undo, anything that changes the plan or another task, anything with a cost or an outside effect. Nothing: make it ready, `alm ready {id}`. Something: leave it in backlog, name each open question in the description's Notes, and tell the person.
+{step1}2. Check the task for anything that is the person's to decide first: data formats, removing things, permissions and security, anything that changes the plan or another task, anything with a cost or an outside effect (wording and look are not: whoever works it decides them, reviewed before release). Nothing: make it ready, `alm ready {id}`. Something: leave it in backlog, name each open question with your proposal in the description's Notes, and tell the person. A ready task carries no open questions.
 "
             )
         }
@@ -2000,7 +2036,7 @@ mod tests {
         assert!(
             guide(Some("tasks"))
                 .unwrap()
-                .contains("Nothing: make it\n   ready (`alm ready <id>`)")
+                .contains("Nothing: make it ready (`alm ready <id>`)")
         );
         assert!(guide(Some("tasks")).unwrap().contains("alm task-language"));
         assert!(crate::agent_section().contains("run `alm task-language`"));
@@ -2022,9 +2058,14 @@ mod tests {
             let text = flat(text);
             assert!(text.contains("never stop to wait for the person"), "{text}");
             assert!(
-                text.contains("alm wait <id> --on \"<the question>\""),
+                text.contains("alm wait <id> --on \"<the question> Proposal:"),
                 "{text}"
             );
+            // Wording and look are reviewed before release; a parked question never holds back
+            // finished work (Task-A00-eclair542).
+            assert!(text.contains("reviewed before release, not before the work"), "{text}");
+            assert!(text.contains("permissions and security"), "{text}");
+            assert!(text.contains("never holds back finished work"), "{text}");
             assert!(text.contains("go on with the next ready task"), "{text}");
             assert!(text.contains("it would wait until it times out"), "{text}");
             assert!(text.contains("changes the plan or another task"), "{text}");
