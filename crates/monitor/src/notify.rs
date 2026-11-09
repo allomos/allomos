@@ -1,24 +1,24 @@
-//! A notification for the person (Task-A00-eclair542, approver 2026-11-09): Monitor ready tasks
-//! tells them when it is stuck, because a task parked a question or no task is ready. On macOS it
-//! is a system notification through `osascript` (`display notification`), with no new dependency;
-//! elsewhere nothing is shown yet and the call does nothing.
+//! A notification for the person (Task-A00-eclair542; Task-A03-stork103, approver 2026-11-09).
+//!
+//! The run does not show a system notification itself: `osascript` would make it the script
+//! editor's, and a click would open the script editor. So the run leaves the notification as a note
+//! in the monitors folder ([`registry::leave_note`]); the app, which shows it under its own name and
+//! icon with the notification plugin, takes it from there. With no app running, the note waits
+//! there until the app next runs. Never fails: a note that cannot be left is left out (the status
+//! bar says the same thing).
 
-/// Shows `body` under `title` as a system notification. Never fails: a notification that cannot
-/// be shown is left out (the Monitor's status bar says the same thing).
-pub fn show(title: &str, body: &str) {
-    #[cfg(target_os = "macos")]
-    {
-        let script = format!(
-            "display notification {} with title {}",
-            crate::terminal::applescript_string(body),
-            crate::terminal::applescript_string(title)
-        );
-        let _ = crate::terminal::command("/usr/bin/osascript")
-            .args(["-e", &script])
-            .output();
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = (title, body);
-    }
+use std::path::Path;
+
+use crate::registry::{self, Note};
+
+/// Leaves `body` under `title` for the app to show, from run `id` in `dir`.
+pub fn show(dir: &Path, id: &str, title: &str, body: &str) {
+    let _ = registry::leave_note(
+        dir,
+        id,
+        &Note {
+            title: title.to_string(),
+            body: body.to_string(),
+        },
+    );
 }

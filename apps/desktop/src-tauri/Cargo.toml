@@ -31,6 +31,10 @@ sha2 = "=0.10.9"
 sys-locale = "=0.3.2"
 tauri = { version = "~2.11", features = [] }
 tauri-plugin-dialog = "2"
+# Task-A03-stork103: the monitor's "waiting for you" notifications are shown under the app's own name
+# and icon, not the script editor's (osascript), and a click brings the app forward. The app shows
+# them (src/notify.rs); the plugin is the one Tauri ships for that. Pinned deliberately (AGENTS.md).
+tauri-plugin-notification = "=2.4.0"
 
 # Task-A01-jungle176: a dragged tab's window turns see-through on macOS (`setAlphaValue:`), since
 # it cannot move off every screen there. Already in Cargo.lock through Tauri; pinned deliberately.

@@ -1079,7 +1079,6 @@
   "monitor.unblocked_close": "Close this line",
   "monitor.notify_title": "Allomos · Monitor ready tasks",
   "monitor.notify_waiting": "{id} is waiting for you: {on}",
-  "monitor.notify_idle": "No task is ready. Next check {time}.",
   "monitor.freq_menu_title": "Check frequency (takes effect now)",
   "monitor.freq_aria": "Change the check frequency",
   "monitor.stop": "■ Stop",

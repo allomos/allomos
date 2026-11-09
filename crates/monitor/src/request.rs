@@ -188,15 +188,6 @@ pub fn notify_waiting(language: &str, id: &str, on: &str) -> String {
     }
 }
 
-/// No task is ready; `time` is the next check, as the person reads it (`11:20`).
-pub fn notify_idle(language: &str, time: &str) -> String {
-    match lang(language) {
-        "zh-CN" => format!("没有就绪的任务。下次检查 {time}。"),
-        "ja" => format!("準備完了のタスクがありません。次の確認 {time}。"),
-        _ => format!("No task is ready. Next check {time}."),
-    }
-}
-
 /// An agent could not be started for a task: it is taken off the run.
 pub fn start_failed(language: &str, agent: &str, id: &str, detail: &str) -> String {
     match lang(language) {

@@ -1079,7 +1079,6 @@
   "monitor.unblocked_close": "关闭这一行",
   "monitor.notify_title": "「换肩」· 自动监测就绪任务",
   "monitor.notify_waiting": "{id} 在等你：{on}",
-  "monitor.notify_idle": "没有就绪的任务。下次检查 {time}。",
   "monitor.freq_menu_title": "检查频率（立即生效）",
   "monitor.freq_aria": "改检查频率",
   "monitor.stop": "■ 停止",
