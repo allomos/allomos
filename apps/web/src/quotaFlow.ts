@@ -94,9 +94,24 @@ export function chips(reports: QuotaReport[], setup: { codex: boolean; claude: b
   });
 }
 
-/** The popup's rows: every report, the current agent's first, then the newest first. */
+/**
+ * The popup's rows: one per agent, account and window, the newest report (Task-A03-beetle605:
+ * reports saved under a session name before Task-A03-39 fold into the same agent and no longer
+ * show as extra rows); the current agent's first, then the newest first.
+ */
 export function popupRows(reports: QuotaReport[]): QuotaReport[] {
-  const newest = folded(reports);
+  const seen = new Set<string>();
+  const newest = folded(reports).filter((r) => {
+    const key = rowKey(r);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   const current = newest[0]?.agent;
   return [...newest.filter((r) => r.agent === current), ...newest.filter((r) => r.agent !== current)];
+}
+
+/** A popup row's identity: agent, account and window, unique among `popupRows`. */
+export function rowKey(r: QuotaReport): string {
+  return JSON.stringify([r.agent, r.account ?? null, r.window]);
 }

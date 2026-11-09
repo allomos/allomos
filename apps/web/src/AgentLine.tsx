@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import { localTime } from "./timeFlow";
 import type { Messenger } from "./messenger";
-import { ageText, agentName, chips, freshness, popupRows, tone } from "./quotaFlow";
+import { ageText, agentName, chips, freshness, popupRows, rowKey, tone } from "./quotaFlow";
 import type { AgentStatus, QuotaReport } from "./types";
 
 /** How often the line checks again: the instruction files are outside the taskbag. */
@@ -74,7 +74,7 @@ export function AgentLine({
           {popupRows(reports).map((r) => {
             const stale = freshness(r, now).state === "stale";
             return (
-              <li key={`${r.agent}/${r.account ?? ""}/${r.window}`} className={stale ? "stale" : undefined}>
+              <li key={rowKey(r)} className={stale ? "stale" : undefined}>
                 <span>
                   {agentName(r.agent)}
                   {r.account ? ` · ${r.account}` : ""}
