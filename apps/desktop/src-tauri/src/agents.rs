@@ -12,7 +12,7 @@ pub use allomos_monitor::terminal::{
     applescript_string, command, new_console, powershell_quote, shell_quote,
 };
 use allomos_monitor::terminal::{
-    ask_failed, find_tool, home, name, powershell_script, terminal_script, tool_dirs,
+    ask_failed, find_tool, home, name, powershell_script, session_command, terminal_script, tool_dirs,
 };
 
 /// One agent the person can ask.
@@ -319,12 +319,22 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     }
     let alm_dir = own_alm.as_deref().and_then(Path::parent);
     let program = match id {
-        "claude_cli" => "claude",
-        "codex_cli" => "codex",
-        "antigravity_cli" => "agy",
+        "claude_cli" => "claude".to_string(),
+        "codex_cli" => "codex".to_string(),
+        "antigravity_cli" => "agy".to_string(),
         _ => return Err(ask_failed(id, "no way to open it")),
     };
-    copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
+    // Antigravity's `agy` takes the request on its command line and sends it at once (the person
+    // chose this, 2026-11-09). On macOS it goes through a file, as the monitor does, so the
+    // clipboard is not used. Other agents, and Windows, still put it on the clipboard to paste.
+    let program = if id == "antigravity_cli" && !cfg!(windows) {
+        let file = std::env::temp_dir().join(format!("allomos-request-{}.md", std::process::id()));
+        std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
+        session_command(id, &file, None).ok_or_else(|| ask_failed(id, "no way to open it"))?
+    } else {
+        copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
+        program
+    };
     if cfg!(windows) {
         let script = powershell_script(project, &agent.found, alm_dir);
         return new_console("powershell.exe")
@@ -335,7 +345,7 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     }
     let script = format!(
         "tell application \"Terminal\"\nactivate\ndo script {}\nend tell",
-        applescript_string(&terminal_script(project, program, alm_dir))
+        applescript_string(&terminal_script(project, &program, alm_dir))
     );
     command("/usr/bin/osascript")
         .args(["-e", &script])
