@@ -152,15 +152,13 @@ pub fn new_report(
     })
 }
 
-/// Keep `report`, replacing the earlier one for the same agent, account and window. Returns
-/// every report, newest first.
+/// Keep `report`, replacing the earlier one for the same agent, account and window. The agent is
+/// compared by [`agent_id`], so a report saved under a session name before Task-A03-39
+/// (`claude/i03-loop`) is replaced by the agent's new one (Task-A03-beetle605). Returns every
+/// report, newest first.
 pub fn save_quota(report: QuotaReport) -> io::Result<Vec<QuotaReport>> {
     let path = path().ok_or_else(|| io::Error::other("no settings folder"))?;
-    let mut reports = quota_reports();
-    reports.retain(|r| {
-        (&r.agent, &r.account, &r.window) != (&report.agent, &report.account, &report.window)
-    });
-    reports.insert(0, report);
+    let reports = replaced(quota_reports(), report);
     let dir = path.parent().expect("a file in the settings folder");
     fs::create_dir_all(dir)?;
     let text = serde_json::to_string_pretty(&QuotaFile {
@@ -171,6 +169,18 @@ pub fn save_quota(report: QuotaReport) -> io::Result<Vec<QuotaReport>> {
     fs::write(&tmp, text + "\n")?;
     crate::replace_file(&tmp, &path)?;
     Ok(reports)
+}
+
+/// `reports` with `report` first, in place of every earlier report for the same agent (by
+/// [`agent_id`]), account and window.
+fn replaced(mut reports: Vec<QuotaReport>, report: QuotaReport) -> Vec<QuotaReport> {
+    let agent = agent_id(&report.agent);
+    reports.retain(|r| {
+        (agent_id(&r.agent), &r.account, &r.window)
+            != (agent.clone(), &report.account, &report.window)
+    });
+    reports.insert(0, report);
+    reports
 }
 
 /// How old an agent's newest 5-hour report may be before a command that moves a task on asks for
@@ -376,6 +386,38 @@ mod tests {
         // Another agent's id given as the session agent is kept as given.
         let ask = quota_ask(Some("gemini"), Some("run-3"), &[], now).unwrap();
         assert_eq!(ask.agent.as_deref(), Some("gemini"));
+    }
+
+    /// Task-A03-beetle605: a `claude-code` report replaces the agent's old reports saved under a
+    /// session name, for the same account and window only.
+    #[test]
+    fn a_new_report_replaces_old_session_name_reports_of_the_same_agent() {
+        let old = vec![
+            report("claude/i03-loop", "5h", "2026-10-21T05:23:45Z"),
+            report("claude/a09-28-kanto-picker", "5h", "2026-10-21T04:00:00Z"),
+            report("claude/i03-loop", "week", "2026-10-21T05:23:45Z"),
+            report("codex", "5h", "2026-10-21T05:00:00Z"),
+            QuotaReport {
+                account: Some("work".into()),
+                ..report("claude/x", "5h", "2026-10-21T03:00:00Z")
+            },
+        ];
+        let new = report("claude-code", "5h", "2026-11-09T08:46:00Z");
+        let kept = replaced(old, new.clone());
+        let shown: Vec<_> = kept
+            .iter()
+            .map(|r| (r.agent.as_str(), r.account.as_deref(), r.window.as_str()))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("claude-code", None, "5h"),
+                ("claude/i03-loop", None, "week"),
+                ("codex", None, "5h"),
+                ("claude/x", Some("work"), "5h"),
+            ]
+        );
+        assert_eq!(kept[0], new);
     }
 
     #[test]

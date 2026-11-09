@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ageText, agentId, chips, freshness, popupRows, tone } from "../src/quotaFlow.ts";
+import { ageText, agentId, chips, freshness, popupRows, rowKey, tone } from "../src/quotaFlow.ts";
 import type { QuotaReport } from "../src/types.ts";
 
 const r = (agent: string, left: number, at: string, more: Partial<QuotaReport> = {}): QuotaReport => ({
@@ -103,4 +103,22 @@ test("an old report reads in hours or days, not hundreds of minutes (A03-flour05
   assert.deepEqual(ageText(24 * 60 - 1), { key: "agentline.age_hours", n: 23 });
   assert.deepEqual(ageText(24 * 60), { key: "agentline.age_days", n: 1 });
   assert.deepEqual(ageText(3 * 24 * 60 + 5), { key: "agentline.age_days", n: 3 });
+});
+
+test("the popup shows one row per agent, account and window: the newest report (A03-beetle605)", () => {
+  const reports = [
+    r("claude/i03-loop", 72, "2026-10-21T05:23:45Z"),
+    r("claude/a09-28-kanto-picker", 72, "2026-10-21T04:10:00Z"),
+    r("claude-code", 64, "2026-11-09T09:30:00Z"),
+    r("claude-code", 40, "2026-11-09T09:30:00Z", { window: "week" }),
+    r("claude/i03-loop", 90, "2026-10-21T05:23:45Z", { window: "week" }),
+    r("claude-code", 55, "2026-10-21T03:00:00Z", { account: "work" }),
+    r("codex", 30, "2026-11-08T12:00:00Z"),
+  ];
+  const rows = popupRows(reports);
+  assert.deepEqual(
+    rows.map((x) => `${x.agent}/${x.account ?? ""}/${x.window}/${x.left}`),
+    ["claude-code//5h/64", "claude-code//week/40", "claude-code/work/5h/55", "codex//5h/30"],
+  );
+  assert.equal(new Set(rows.map(rowKey)).size, rows.length);
 });
