@@ -227,6 +227,11 @@ impl Loop {
                     run.set_sessions(&agent, count);
                 }
             }
+            Request::Difficulty { agent, range } => {
+                if crate::flow::TERMINAL_AGENTS.contains(&agent.as_str()) {
+                    run.set_difficulty(&agent, &range);
+                }
+            }
         }
         true
     }
@@ -333,12 +338,17 @@ impl Loop {
             }
             let run = &self.record.run;
             let shares = run.share(bag);
+            // An agent with a free slot and no task in its range gets no session; the status bar
+            // says so (Task-A03-wave335).
+            self.record.run.no_task = run.unfilled(&shares);
             if shares.is_empty() {
                 // Nothing to take: the status bar says so; the person is not told (A03-stork103).
                 self.record.run.checked = now;
             } else {
                 self.start_sessions(shares);
             }
+        } else if self.record.run.free_agents().is_empty() {
+            self.record.run.no_task.clear();
         }
         let run = &self.record.run;
         let over = run.stopping && run.working.is_empty();

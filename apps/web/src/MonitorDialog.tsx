@@ -10,18 +10,32 @@ import type { Messenger } from "./messenger";
 import { AGENT_KEY, useAgents } from "./AgentPicker";
 import type { Unavailable } from "./AgentPicker";
 import { MANUAL, foundGroups } from "./agentPickerFlow";
-import type { Agent } from "./types";
+import type { Agent, Iteration, Task } from "./types";
 import { Markdown } from "./Markdown";
 import { codexActionAtStart, codexFirstChecked, codexOffer, ruleText, rulesList } from "./codexRulesFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import { isProblem } from "./types";
-import { FIRST_FREQUENCY, FREQUENCIES, TERMINAL_AGENTS, firstScope, frequencyText } from "./monitorFlow";
-import type { Frequency, OpenedFrom, Scope, ScopeOptions, TerminalAgent } from "./monitorFlow";
+import { ALL_LEVELS, FIRST_FREQUENCY, FREQUENCIES, TERMINAL_AGENTS, firstScope, frequencyText, scopeOptions } from "./monitorFlow";
+import { levelsHold } from "./difficultyFlow";
+import type { Frequency, Levels, OpenedFrom, Scope, TerminalAgent } from "./monitorFlow";
+
+/** The difficulty levels a range can start or end at, with their names (Task-A03-wave335). */
+const LEVEL_NUMBERS = [1, 2, 3, 4, 5] as const;
+const LEVEL_KEYS = {
+  1: "difficulty.level.1",
+  2: "difficulty.level.2",
+  3: "difficulty.level.3",
+  4: "difficulty.level.4",
+  5: "difficulty.level.5",
+} as const;
 
 export function MonitorDialog({
   messenger,
   root,
-  options,
+  tasks,
+  areas,
+  iterations,
+  activeIteration,
   from,
   onStart,
   onClose,
@@ -29,12 +43,17 @@ export function MonitorDialog({
   messenger: Messenger;
   /** The taskbag, where a change to Codex's rules is recorded (Task-A03-pier032). */
   root: string;
-  /** The Which tasks field's choices, counted from the taskbag as it is now. */
-  options: ScopeOptions;
+  /** The taskbag as it is now: the Which tasks field's choices are counted from it, and only the
+   * tasks the chosen agents' difficulty levels take are counted (Task-A03-wave335). */
+  tasks: Task[];
+  areas: { id: string }[];
+  iterations: Iteration[];
+  activeIteration: string | null | undefined;
   from: OpenedFrom;
   /** `agents` chosen, in the order they are shown; `offered`: every one that could be chosen,
    * offered again in the status bar while the run goes on; `sessions`: how many sessions each
-   * chosen agent may have at work at once (Task-A03-weasel276). */
+   * chosen agent may have at work at once (Task-A03-weasel276); `difficulties`: the levels each
+   * chosen agent takes tasks from (Task-A03-wave335). */
   onStart: (
     scope: Scope,
     agents: TerminalAgent[],
@@ -42,6 +61,7 @@ export function MonitorDialog({
     every: Frequency,
     offered: TerminalAgent[],
     sessions: Partial<Record<TerminalAgent, number>>,
+    difficulties: Partial<Record<TerminalAgent, Levels>>,
   ) => void;
   onClose: () => void;
 }) {
@@ -72,6 +92,14 @@ export function MonitorDialog({
     const n = Math.floor(Number(sessionText[a] ?? 1));
     return n >= 1 ? n : 1;
   };
+  // The difficulty levels each agent takes tasks from (Task-A03-wave335): every level unless set.
+  const [levels, setLevels] = useState<Partial<Record<TerminalAgent, Levels>>>({});
+  const levelsOfAgent = (a: TerminalAgent): Levels => levels[a] ?? ALL_LEVELS;
+  // The counts of the Which tasks choices: the ready tasks any chosen agent may take (all when
+  // none is chosen yet).
+  const options = scopeOptions(tasks, areas, iterations, activeIteration, (task) =>
+    picked.length === 0 || picked.some((a) => levelsHold(levelsOfAgent(a), task)),
+  );
   const codexChosen = picked.includes("codex_cli");
   const [scope, setScope] = useState<Scope>(() => firstScope(options, from));
   const selectable = options.other.items.filter((i) => i.ready > 0);
@@ -133,6 +161,7 @@ export function MonitorDialog({
       every,
       offered,
       Object.fromEntries(picked.map((a) => [a, countOf(a)])) as Partial<Record<TerminalAgent, number>>,
+      Object.fromEntries(picked.map((a) => [a, levelsOfAgent(a)])) as Partial<Record<TerminalAgent, Levels>>,
     );
   };
 
@@ -242,6 +271,8 @@ export function MonitorDialog({
             sessionText={sessionText}
             onSessionText={(a, text) => setSessionText((s) => ({ ...s, [a]: text }))}
             countOf={countOf}
+            levelsOf={levelsOfAgent}
+            onLevels={(a, l) => setLevels((s) => ({ ...s, [a]: l }))}
           />
 
           <h3>{t("monitor.mode")}</h3>
@@ -352,6 +383,8 @@ function AgentChecklist({
   sessionText,
   onSessionText,
   countOf,
+  levelsOf,
+  onLevels,
 }: {
   agents: Agent[] | null;
   slow: boolean;
@@ -361,6 +394,8 @@ function AgentChecklist({
   sessionText: Partial<Record<TerminalAgent, string>>;
   onSessionText: (agent: TerminalAgent, text: string) => void;
   countOf: (agent: TerminalAgent) => number;
+  levelsOf: (agent: TerminalAgent) => Levels;
+  onLevels: (agent: TerminalAgent, levels: Levels) => void;
 }) {
   const { t } = useI18n();
   if (agents === null) {
@@ -409,6 +444,14 @@ function AgentChecklist({
                         />
                       </span>
                     )}
+                    {on && (
+                      <LevelsPicker
+                        agent={a.id as TerminalAgent}
+                        name={t(AGENT_KEY[a.id])}
+                        levels={levelsOf(a.id as TerminalAgent)}
+                        onChange={(l) => onLevels(a.id as TerminalAgent, l)}
+                      />
+                    )}
                   </li>
                 );
               })}
@@ -424,6 +467,57 @@ function AgentChecklist({
         </li>
       </ul>
       {chosen.length > 0 && <p className="muted small">{t("monitor.sessions_note")}</p>}
+      {chosen.length > 0 && <p className="muted small">{t("monitor.levels_note")}</p>}
     </>
+  );
+}
+
+/** One agent's difficulty range: the easiest and the hardest level it takes tasks from, each
+ * 1 to 5; the hardest is never below the easiest (Task-A03-wave335). */
+export function LevelsPicker({
+  agent,
+  name,
+  levels,
+  onChange,
+}: {
+  agent: TerminalAgent;
+  name: string;
+  levels: Levels;
+  onChange: (levels: Levels) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <span className="monitor-sessions monitor-levels small" data-agent={agent}>
+      <span className="muted">{t("monitor.levels_label")}</span>{" "}
+      <select
+        aria-label={t("monitor.levels_from_aria", { agent: name })}
+        value={levels.low}
+        onChange={(e) => {
+          const low = Number(e.target.value);
+          onChange({ low, high: Math.max(low, levels.high) });
+        }}
+      >
+        {LEVEL_NUMBERS.map((n) => (
+          <option key={n} value={n}>
+            {t(LEVEL_KEYS[n])}
+          </option>
+        ))}
+      </select>{" "}
+      <span className="muted">–</span>{" "}
+      <select
+        aria-label={t("monitor.levels_to_aria", { agent: name })}
+        value={levels.high}
+        onChange={(e) => {
+          const high = Number(e.target.value);
+          onChange({ low: Math.min(levels.low, high), high });
+        }}
+      >
+        {LEVEL_NUMBERS.map((n) => (
+          <option key={n} value={n}>
+            {t(LEVEL_KEYS[n])}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }

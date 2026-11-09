@@ -62,7 +62,7 @@ import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlo
 import { iterationPlaces } from "./iterationPlace";
 import { MonitorControl, useMonitor } from "./Monitor";
 import { MonitorDialog } from "./MonitorDialog";
-import { readyTasks, scopeOptions, type OpenedFrom } from "./monitorFlow";
+import { readyTasks, type OpenedFrom } from "./monitorFlow";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
 import { isProblem } from "./types";
 import { lostAfterMinutes } from "./heartbeatFlow";
@@ -1766,11 +1766,14 @@ function TaskbagView({
         <MonitorDialog
           messenger={messenger}
           root={opened.root}
-          options={scopeOptions(box.tasks, box.areas, iterations, activeIteration)}
+          tasks={box.tasks}
+          areas={box.areas}
+          iterations={iterations}
+          activeIteration={activeIteration}
           from={monitorFrom}
-          onStart={(scope, agents, quiet, every, _offered, sessions) => {
+          onStart={(scope, agents, quiet, every, _offered, sessions, difficulties) => {
             setMonitorFrom(null);
-            monitor.start(scope, agents, quiet, every, sessions);
+            monitor.start(scope, agents, quiet, every, sessions, difficulties);
           }}
           onClose={() => setMonitorFrom(null)}
         />

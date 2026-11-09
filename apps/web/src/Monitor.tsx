@@ -19,6 +19,8 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  levelsOf,
+  levelsText,
   nextCheck,
   readEntry,
   setAgents,
@@ -26,7 +28,8 @@ import {
   stalled,
   unblockNotice,
 } from "./monitorFlow";
-import type { Frequency, LastRun, LostRun, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import type { Frequency, LastRun, LostRun, Levels, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import { LevelsPicker } from "./MonitorDialog";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -133,9 +136,24 @@ export function useMonitor({
      * check or until closed. */
     notice: (run: Run): UnblockNotice | null => (dismissed.has(`${run.id}:${run.checked}`) ? null : unblockNotice(run.unblocked)),
     dismissNotice: (run: Run) => setDismissed((d) => new Set(d).add(`${run.id}:${run.checked}`)),
-    start: (scope: Scope, agents: TerminalAgent[], quiet: boolean, every: Frequency, sessions: Partial<Record<TerminalAgent, number>>) => {
+    start: (
+      scope: Scope,
+      agents: TerminalAgent[],
+      quiet: boolean,
+      every: Frequency,
+      sessions: Partial<Record<TerminalAgent, number>>,
+      difficulties: Partial<Record<TerminalAgent, Levels>>,
+    ) => {
       messenger
-        .monitorStart(root, agents, every, quiet, scope.kind === "iteration" ? scope.id : null, sessions)
+        .monitorStart(
+          root,
+          agents,
+          every,
+          quiet,
+          scope.kind === "iteration" ? scope.id : null,
+          sessions,
+          Object.fromEntries(Object.entries(difficulties).map(([a, l]) => [a, levelsText(l as Levels)])),
+        )
         .then(() => read())
         .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
     },
@@ -147,6 +165,8 @@ export function useMonitor({
     setAgents: (run: Run, agents: TerminalAgent[]) => ask(run, { action: "agents", agents: setAgents(run, agents) }),
     /** How many sessions an agent may have at work at once, from the next check on (Task-A03-weasel276). */
     setSessions: (run: Run, agent: TerminalAgent, count: number) => ask(run, { action: "sessions", agent, count }),
+    /** The difficulty levels an agent takes tasks from, from the next check on (Task-A03-wave335). */
+    setLevels: (run: Run, agent: TerminalAgent, levels: Levels) => ask(run, { action: "difficulty", agent, range: levelsText(levels) }),
     /** Ends a run whose record is missing. */
     endLost: (l: LostRun) => {
       messenger
@@ -339,7 +359,17 @@ function RunBar({
           </div>
         )}
       </span>
-      <AgentsMenu run={run} onChange={(agents) => monitor.setAgents(run, agents)} onSessions={(a, n) => monitor.setSessions(run, a, n)} />
+      <AgentsMenu
+        run={run}
+        onChange={(agents) => monitor.setAgents(run, agents)}
+        onSessions={(a, n) => monitor.setSessions(run, a, n)}
+        onLevels={(a, l) => monitor.setLevels(run, a, l)}
+      />
+      {run.noTask.length > 0 && (
+        <span className="muted small">
+          {t("monitor.no_task_in_levels", { agents: run.noTask.map((a) => t(AGENT_KEY[a])).join(", ") })}
+        </span>
+      )}
       {working.map((cur) => {
         const task = tasks.find((x) => x.id === cur.id);
         const place = task ? sessionPlace(task) : null;
@@ -392,16 +422,25 @@ function AgentsMenu({
   run,
   onChange,
   onSessions,
+  onLevels,
 }: {
   run: Run;
   onChange: (agents: TerminalAgent[]) => void;
   onSessions: (agent: TerminalAgent, count: number) => void;
+  onLevels: (agent: TerminalAgent, levels: Levels) => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   /** What the person is typing into a count, until it is left (the run's count shows otherwise). */
   const [draft, setDraft] = useState<Partial<Record<TerminalAgent, string>>>({});
-  const names = run.agents.map((a) => (sessionsOf(run, a) > 1 ? `${t(AGENT_KEY[a])} ×${sessionsOf(run, a)}` : t(AGENT_KEY[a]))).join(", ");
+  const names = run.agents
+    .map((a) => {
+      const count = sessionsOf(run, a) > 1 ? ` ×${sessionsOf(run, a)}` : "";
+      const levels = levelsOf(run, a);
+      const range = levels.low === 1 && levels.high === 5 ? "" : ` (${levelsText(levels)})`;
+      return `${t(AGENT_KEY[a])}${count}${range}`;
+    })
+    .join(", ");
   return (
     <span className="monitor-every-wrap">
       <button
@@ -456,11 +495,13 @@ function AgentsMenu({
                     />
                   </label>
                 )}
+                {on && <LevelsPicker agent={a} name={t(AGENT_KEY[a])} levels={levelsOf(run, a)} onChange={(l) => onLevels(a, l)} />}
               </div>
             );
           })}
           <p className="muted small">{t("monitor.agents_menu_note")}</p>
           <p className="muted small">{t("monitor.sessions_menu_note")}</p>
+          <p className="muted small">{t("monitor.levels_menu_note")}</p>
         </div>
       )}
     </span>

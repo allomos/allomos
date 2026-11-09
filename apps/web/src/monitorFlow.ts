@@ -40,6 +40,7 @@ export function readyTasks(
   iterations: Iteration[],
   active: string | null | undefined,
   iteration?: string,
+  holds: (task: Task) => boolean = () => true,
 ): Task[] {
   const planned = inPlanOrder(iterations).map((i) => i.id);
   const iterationRank = (t: Task) => {
@@ -54,6 +55,7 @@ export function readyTasks(
   return tasks
     .filter((t) => t.state === "ready" && !t.holder)
     .filter((t) => iteration === undefined || t.iteration === iteration)
+    .filter(holds)
     .sort((a, b) => iterationRank(a) - iterationRank(b) || areaRank(a) - areaRank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -73,8 +75,9 @@ export function scopeOptions(
   areas: { id: string }[],
   iterations: Iteration[],
   active: string | null | undefined,
+  holds: (task: Task) => boolean = () => true,
 ): ScopeOptions {
-  const count = (id?: string) => readyTasks(tasks, areas, iterations, active, id).length;
+  const count = (id?: string) => readyTasks(tasks, areas, iterations, active, id, holds).length;
   const current = active && iterations.some((i) => i.id === active) ? { id: active, ready: count(active) } : null;
   const items = inPlanOrder(iterations)
     .map((it, i) => ({ place: i + 1, id: it.id, ready: count(it.id) }))
@@ -139,6 +142,11 @@ export interface Run {
   agents: TerminalAgent[];
   /** How many sessions each agent may have at work at once; one when not listed (Task-A03-weasel276). */
   sessions: Partial<Record<TerminalAgent, number>>;
+  /** The difficulty levels each agent takes tasks from; every level (1–5) when not listed (Task-A03-wave335). */
+  difficulties: Partial<Record<TerminalAgent, Levels>>;
+  /** The agents with a free session slot that no ready task in their levels fitted at the last
+   * check: they got no session (Task-A03-wave335). */
+  noTask: TerminalAgent[];
   /** The agents the person could choose when the run started, offered again in the status bar. */
   offered: TerminalAgent[];
   quiet: boolean;
@@ -182,6 +190,34 @@ const sessionCounts = (list: unknown): Partial<Record<TerminalAgent, number>> =>
   }
   return out;
 };
+/** A difficulty range, as the run file writes it: `1-3`, or one level `4` (Task-A03-wave335). */
+export interface Levels {
+  low: number;
+  high: number;
+}
+/** Every level, 1 to 5: the range an agent has when none is chosen. */
+export const ALL_LEVELS: Levels = { low: 1, high: 5 };
+/** The levels of a range as text, as `alm monitor` and the run file write them: `1-5`, or `4`. */
+export const levelsText = (l: Levels): string => (l.low === l.high ? String(l.low) : `${l.low}-${l.high}`);
+/** Reads a range the run file lists; null when it is not `low-high` (or one level) of 1 to 5. */
+export const parseLevels = (text: unknown): Levels | null => {
+  const m = typeof text === "string" ? /^([1-5])(?:-([1-5]))?$/.exec(text.trim()) : null;
+  if (!m) return null;
+  const low = Number(m[1]);
+  const high = m[2] === undefined ? low : Number(m[2]);
+  return low <= high ? { low, high } : null;
+};
+const difficultyRanges = (map: unknown): Partial<Record<TerminalAgent, Levels>> => {
+  const out: Partial<Record<TerminalAgent, Levels>> = {};
+  if (map && typeof map === "object") {
+    for (const [a, text] of Object.entries(map)) {
+      const agent = asAgent(a);
+      const levels = parseLevels(text);
+      if (agent && levels) out[agent] = levels;
+    }
+  }
+  return out;
+};
 const takenByAgent = (map: unknown): Record<string, TerminalAgent> => {
   const out: Record<string, TerminalAgent> = {};
   if (map && typeof map === "object") {
@@ -211,6 +247,8 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     scope,
     agents: agents(r.agents),
     sessions: sessionCounts(r.sessions),
+    difficulties: difficultyRanges(r.difficulties),
+    noTask: agents(r.no_task),
     offered: agents(r.offered),
     quiet: Boolean(r.quiet),
     every,
@@ -256,6 +294,11 @@ export function setAgents(run: Run, chosen: TerminalAgent[]): TerminalAgent[] {
 /** How many sessions an agent may have at work at once: one unless the person set more. */
 export function sessionsOf(run: Run, agent: TerminalAgent): number {
   return Math.max(1, run.sessions[agent] ?? 1);
+}
+
+/** The difficulty levels an agent takes tasks from: every level unless the person chose some. */
+export function levelsOf(run: Run, agent: TerminalAgent): Levels {
+  return run.difficulties[agent] ?? ALL_LEVELS;
 }
 
 /** The free session slots: each agent once for every session it may still start (its count less

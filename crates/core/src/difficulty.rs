@@ -85,9 +85,26 @@ impl Range {
         Ok(Range { low, high })
     }
 
+    /// Every level, 1 to 5: the range an agent has when none is chosen (Task-A03-wave335).
+    pub fn all() -> Range {
+        Range {
+            low: MIN,
+            high: MAX,
+        }
+    }
+
     /// Whether the task's level (the default one included) is in the range.
     pub fn holds(&self, task: &Task) -> bool {
         (self.low..=self.high).contains(&of(task).0)
+    }
+
+    /// The range as `alm next --difficulty` takes it: `1-5`, or `4` for one level.
+    pub fn text(&self) -> String {
+        if self.low == self.high {
+            self.low.to_string()
+        } else {
+            format!("{}-{}", self.low, self.high)
+        }
     }
 }
 
