@@ -1745,6 +1745,7 @@ function TaskbagView({
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 folders={folders}
                 onOpenSession={canOpenSessions ? () => messenger.openAgentSession(opened.root, selected.id) : undefined}
+                onTakeOver={canOpenSessions ? () => setProceeding(selected) : undefined}
                 lostAfter={lostAfter}
                 lastChange={opened.last_changed?.[selected.id]}
               />
