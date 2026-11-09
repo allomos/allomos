@@ -13,6 +13,9 @@ export interface Project {
   task_language?: string;
   /** `allomos/6`: the project folders, the first the main one (decision 0019). */
   project_folders?: { name: string; path: string }[];
+  /** How often holding sessions beat and when a held task is lost, in whole minutes (decision
+   * 0022 § 3, Task-A01-zero387); a missing number takes its default (10 and 30). */
+  heartbeat?: { interval_minutes?: number; lost_after_minutes?: number };
 }
 
 /** One label of the project's label table (decision 0020): its name, an optional meaning, and
@@ -58,6 +61,16 @@ export interface AgentSession {
   folder?: string;
 }
 
+/** A held task's last heartbeat as task.json keeps it (crates/core/src/heartbeat.rs). */
+export interface Heartbeat {
+  /** When, in UTC. */
+  at: string;
+  /** The session that beat (its `--as` name). */
+  by: string;
+  /** The end of a busy window it declared (`alm beat --busy`), in UTC. */
+  busy_until?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -86,6 +99,9 @@ export interface Task {
   human_check_steps: string | null;
   /** The agent session that holds it or last held it, as passed at `alm claim` (Task-A03-hive049). */
   session?: AgentSession | null;
+  /** The holding session's last heartbeat (decision 0022, Task-A01-nurse164): `alm beat` and every
+   * change the holder makes write it; gone once the task is no longer held and in progress. */
+  heartbeat?: Heartbeat | null;
   description: string;
   /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
    * a field of task.json: worked out from the history and added when the taskbag is opened. */

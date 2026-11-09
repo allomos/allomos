@@ -1128,5 +1128,15 @@
   "problem.self_check": "このプロジェクトでは職務の分離がオンです。{who} はタスク {id} を作業したので、確認はできません。別の人が確認するか、理由を書いてこのスイッチをオフにしてください。",
   "problem.self_approve": "このプロジェクトでは職務の分離がオンです。{who} はタスク {id} を作業したので、承認はできません。別の人が承認するか、理由を書いてこのスイッチをオフにしてください。",
   "problem.work_after_signing": "このプロジェクトでは職務の分離がオンです。{who} はタスク {id} を承認または確認したので、作業はできません。別の人が作業するか、理由を書いてこのスイッチをオフにしてください。",
-  "problem.checker_unknown": "このプロジェクトでは職務の分離がオンですが、タスク {id} の確認に確認者の名前がないため、「肩代」は作業した人と別の人かどうか判断できません。"
+  "problem.checker_unknown": "このプロジェクトでは職務の分離がオンですが、タスク {id} の確認に確認者の名前がないため、「肩代」は作業した人と別の人かどうか判断できません。",
+  "pane.heartbeat": "最終ハートビート",
+  "heartbeat.ago": "{ago}（{time}）",
+  "heartbeat.just_now": "たった今",
+  "heartbeat.minutes_ago": "{n} 分前",
+  "heartbeat.hours_ago": "{n} 時間前",
+  "heartbeat.days_ago": "{n} 日前",
+  "heartbeat.none": "記録なし",
+  "heartbeat.busy": "作業中（{time}まで）",
+  "heartbeat.lost": "応答なし",
+  "heartbeat.lost_title": "{minutes} 分を超えてハートビートがなく、作業中の時間帯もありません。別のセッションが引き継げます（引き継ぎのコマンドは alm next に表示されます）。"
 }

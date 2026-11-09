@@ -65,6 +65,7 @@ import { MonitorDialog } from "./MonitorDialog";
 import { readyTasks, scopeOptions, type OpenedFrom } from "./monitorFlow";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
 import { isProblem } from "./types";
+import { lostAfterMinutes } from "./heartbeatFlow";
 import { TabActive } from "./tabActive";
 import type { TabStart } from "./tabsFlow";
 import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
@@ -1223,6 +1224,7 @@ function TaskbagView({
   // Collapsed groups, remembered per project (Task-A01-26).
   const [collapsed, setCollapsed] = useFold(opened.root, "groups");
   const iterations = box?.iterations ?? [];
+  const lostAfter = lostAfterMinutes(box?.project);
   // Project folders (Task-A01-sketch327): read again whenever the taskbag is, so binding a second
   // folder shows the chips and the Folder filter without reopening the window.
   const [folders, setFolders] = useState<FolderInfo[]>([]);
@@ -1685,6 +1687,7 @@ function TaskbagView({
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
                   modified={opened.last_changed}
+                  lostAfter={lostAfter}
                   collapsed={folded.includes(g.key)}
                   onToggle={() => setCollapsed((keys) => toggleKey(keys, g.key))}
                   onNewTask={
@@ -1742,6 +1745,8 @@ function TaskbagView({
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 folders={folders}
                 onOpenSession={canOpenSessions ? () => messenger.openAgentSession(opened.root, selected.id) : undefined}
+                lostAfter={lostAfter}
+                lastChange={opened.last_changed?.[selected.id]}
               />
             )}
           </div>
@@ -1848,6 +1853,7 @@ function TaskGroup({
   onSelect,
   terms,
   modified,
+  lostAfter,
   collapsed,
   onToggle,
   onNewTask,
@@ -1878,6 +1884,8 @@ function TaskGroup({
   stop?: (task: Task) => StopFact | null;
   /** When each task last changed (UTC), by task ID (Task-A01-52), one of each row's facts. */
   modified?: Record<string, string>;
+  /** The project's lost limit, in minutes (Task-A01-kernel761). */
+  lostAfter: number;
   selectedId: string | null;
   /** Clicking a task opens it in the task pane; clicking it again closes the pane. */
   onSelect: (id: string) => void;
@@ -1953,6 +1961,7 @@ function TaskGroup({
               terms={terms}
               stop={stop?.(task) ?? null}
               modified={modified?.[task.id]}
+              lostAfter={lostAfter}
               onOpenSession={onOpenSession}
               onProceed={onProceed}
               onError={onError}

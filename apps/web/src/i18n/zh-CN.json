@@ -1128,5 +1128,15 @@
   "problem.self_check": "这个项目打开了职责分离：{who} 做过任务 {id}，所以不能再验证它。请换别人验证，或写明原因后关掉这个开关。",
   "problem.self_approve": "这个项目打开了职责分离：{who} 做过任务 {id}，所以不能再批准它。请换别人批准，或写明原因后关掉这个开关。",
   "problem.work_after_signing": "这个项目打开了职责分离：{who} 批准或验证过任务 {id}，所以不能再做它。请换别人来做，或写明原因后关掉这个开关。",
-  "problem.checker_unknown": "这个项目打开了职责分离，而任务 {id} 的这次验证没写验证人，「换肩」无法判断验证的人和做事的人不是同一个。"
+  "problem.checker_unknown": "这个项目打开了职责分离，而任务 {id} 的这次验证没写验证人，「换肩」无法判断验证的人和做事的人不是同一个。",
+  "pane.heartbeat": "最近心跳",
+  "heartbeat.ago": "{ago}（{time}）",
+  "heartbeat.just_now": "刚刚",
+  "heartbeat.minutes_ago": "{n} 分钟前",
+  "heartbeat.hours_ago": "{n} 小时前",
+  "heartbeat.days_ago": "{n} 天前",
+  "heartbeat.none": "没有记录",
+  "heartbeat.busy": "忙碌到 {time}",
+  "heartbeat.lost": "失联",
+  "heartbeat.lost_title": "超过 {minutes} 分钟没有心跳，也没有未到期的忙碌窗口；别的会话可以接手（alm next 列出接手命令）。"
 }
