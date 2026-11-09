@@ -239,6 +239,15 @@ problems! {
     /// A notice given first to a session coming back (decision 0022 § 8, Task-A01-castle658): a
     /// task it held was taken over by another session. Its changes to the task are refused.
     TakenOver { id, by, at } => "taken_over", "Task {id} was taken over by {by} at {at}: you no longer hold it. Stop work on it: no more commits or pushes to its working branch, and do not claim it back. Leave your worktree as it is, tell the person the task was taken over and by whom, and go on with another ready task (`alm next`) or end.";
+    /// A taskbag file with a version control tool's conflict markers in it: two changes to it met
+    /// (Task-A01-lawn320).
+    MergeConflict => "merge_conflict", "This file has conflict markers from your version control tool: two changes to it met when you got the latest changes. alm cannot read it until the conflict is resolved.";
+    /// A notice given first (Task-A01-lawn320): this session's claim met another session's claim
+    /// of the same task, and the other one was shared first.
+    ClaimLost { id, holder, at } => "claim_lost", "Task {id} was claimed by two sessions at once, and the claim of {holder} (last heartbeat {at}) was shared first: the task is {holder}'s, not yours. Do not work on it. Drop your own claim, the change your version control tool could not share (in Git, during `git pull --rebase`: `git rebase --skip`; after a plain `git pull`: `git merge --abort`, then `git pull --rebase` and `git rebase --skip`), then take another ready task (`alm next`).";
+    /// A notice given first (Task-A01-lawn320): two claims of one task met, and `--as` names
+    /// neither of them.
+    ClaimRace { id, first, first_at, second, second_at } => "claim_race", "Task {id} was claimed by two sessions at once: {first} (last heartbeat {first_at}) and {second} (last heartbeat {second_at}). The claim that was shared first, the one that came in with the latest changes, holds the task; the session whose push was refused drops its own claim (`git rebase --skip` during `git pull --rebase`) and takes another ready task.";
     NotATaskbag { path } => "not_a_taskbag", "{path} is not a taskbag folder.";
     /// The file manager could not be started. `detail` is the system's own text.
     OpenFailed { path, detail } => "open_failed", "Could not open {path} in the file manager: {detail}.";

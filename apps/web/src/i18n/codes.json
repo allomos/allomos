@@ -84,6 +84,18 @@
     "count",
     "tasks"
   ],
+  "claim_lost": [
+    "id",
+    "holder",
+    "at"
+  ],
+  "claim_race": [
+    "id",
+    "first",
+    "first_at",
+    "second",
+    "second_at"
+  ],
   "classify_invalid": [
     "field",
     "value",
@@ -245,6 +257,7 @@
   "link_url_invalid": [
     "url"
   ],
+  "merge_conflict": [],
   "no_session": [
     "id"
   ],
