@@ -1119,7 +1119,6 @@
   "monitors.title": "Monitors running on this computer",
   "monitors.close": "Close",
   "monitors.none": "No monitors are running.",
-  "monitors.footer": "Started by alm or this app; they keep running after the app is closed. Command line: alm monitor list",
   "monitors.open": "Open",
   "monitors.checking": "checking…",
   "monitors.waiting": "no task is ready; next check {time}",

@@ -1119,7 +1119,6 @@
   "monitors.title": "このコンピューターで実行中の監視",
   "monitors.close": "閉じる",
   "monitors.none": "実行中の監視はありません。",
-  "monitors.footer": "alm またはこのアプリで開始。アプリを閉じても動き続けます。コマンドライン：alm monitor list",
   "monitors.open": "開く",
   "monitors.checking": "確認中…",
   "monitors.waiting": "準備完了のタスクなし、次の確認 {time}",
