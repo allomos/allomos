@@ -4,12 +4,13 @@
 // three lines with Show all. Clicking the row (or Enter / Space on it) opens the task pane; clicking
 // it again closes it. The holder's link and Show all do not select the task. Held by always shows
 // (Nobody when no session holds the task), and a task nobody holds that is not finished gets
-// Work on it… after it (Task-A03-galley051).
+// Work on it… after it (Task-A03-galley051); a lost task gets Take over… after its Lost tag
+// (Task-A01-voyage603).
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useI18n } from "./i18n";
-import { HeartbeatLine, LostTag } from "./Heartbeat";
+import { HeartbeatLine, LostTag, TakeOverButton } from "./Heartbeat";
 import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
@@ -46,7 +47,7 @@ export function TaskRow({
   lostAfter: number;
   /** Reopens the session the task records, as the task pane's button does (the desktop app only). */
   onOpenSession?: (id: string) => Promise<void>;
-  /** Opens Work on it… for the task (the desktop app only, where agents run). */
+  /** Opens Work on it… for the task, or Take over… for a lost one (the desktop app only, where agents run). */
   onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
 }) {
@@ -75,6 +76,9 @@ export function TaskRow({
     <span className="held-by">
       {task.holder ? <Holder task={task} onOpenSession={onOpenSession} onError={onError} /> : <span className="muted">{t("row.nobody")}</span>}
       {task.holder && <LostTag task={task} lostAfter={lostAfter} lastChange={modified} />}
+      {onProceed && task.holder && (
+        <TakeOverButton task={task} lostAfter={lostAfter} lastChange={modified} onKeyDown={ownKeys} onTakeOver={() => onProceed(task)} />
+      )}
       {onProceed && canProceed(task) && (
         <button
           type="button"

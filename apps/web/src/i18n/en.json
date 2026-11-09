@@ -1151,5 +1151,17 @@
   "heartbeat.none": "No record",
   "heartbeat.busy": "busy until {time}",
   "heartbeat.lost": "Lost",
-  "heartbeat.lost_title": "No heartbeat for more than {minutes} minutes and no busy window running: another session can take it over (alm next lists the command)."
+  "heartbeat.lost_title": "No heartbeat for more than {minutes} minutes and no busy window running: another session can take it over (alm next lists the command).",
+  "takeover.button": "Take over…",
+  "takeover.button_title": "Open a new AI agent session to take this lost task over and go on on its working branch",
+  "takeover.title": "Take over a lost task",
+  "takeover.found": "{id} {title} is held by {holder}, which {ago}: the task is lost.",
+  "takeover.silent_for": "last sent a heartbeat {ago}",
+  "takeover.never_beat": "has never sent a heartbeat",
+  "takeover.branch": "The new session goes on on its working branch, {branch}.",
+  "takeover.branch_unknown": "No working branch is recorded; the new session goes on on the one the claim prints.",
+  "takeover.worktree": "The former session's worktree may hold changes it never committed. The new session may look at them but changes nothing there.",
+  "takeover.does": "A new AI agent session claims the task, which takes it over from the former holder, and goes on with the work in a worktree of its own.",
+  "takeover.asked": "Opened {agent}. Read the request there and send it. The row shows the new holder of {id} once the agent claims it.",
+  "takeover.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The row shows the new holder of {id} once the agent claims it."
 }

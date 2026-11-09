@@ -1151,5 +1151,17 @@
   "heartbeat.none": "没有记录",
   "heartbeat.busy": "忙碌到 {time}",
   "heartbeat.lost": "失联",
-  "heartbeat.lost_title": "超过 {minutes} 分钟没有心跳，也没有未到期的忙碌窗口；别的会话可以接手（alm next 列出接手命令）。"
+  "heartbeat.lost_title": "超过 {minutes} 分钟没有心跳，也没有未到期的忙碌窗口；别的会话可以接手（alm next 列出接手命令）。",
+  "takeover.button": "接手…",
+  "takeover.button_title": "开一个新的 AI 智能体会话接手这个失联的任务，在它原来的工作分支上继续",
+  "takeover.title": "接手失联的任务",
+  "takeover.found": "{id} {title} 由 {holder} 持有，{ago}：这个任务失联了。",
+  "takeover.silent_for": "最近一次心跳在 {ago}",
+  "takeover.never_beat": "它从没发过心跳",
+  "takeover.branch": "新会话会在它原来的工作分支 {branch} 上继续。",
+  "takeover.branch_unknown": "没有记下工作分支；新会话会在认领时列出的分支上继续。",
+  "takeover.worktree": "前一个会话的工作树里可能有它没提交的改动。新会话可以去看，但不会改动那里的东西。",
+  "takeover.does": "新的 AI 智能体会话会认领这个任务（即从前一个持有者手里接过它），在它自己的工作树里继续做。",
+  "takeover.asked": "已打开 {agent}。请在那里阅读请求并发送。智能体认领 {id} 后，这一行会显示新的持有者。",
+  "takeover.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体认领 {id} 后，这一行会显示新的持有者。"
 }
