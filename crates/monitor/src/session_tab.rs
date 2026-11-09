@@ -88,12 +88,17 @@ pub enum Outcome {
     NotAvailable,
 }
 
-/// Start the countdown in the background; the result goes to the log only.
-pub fn close_when_done(agent: String, tab: SessionTab, texts: CloseTexts) {
+/// Start the countdown in the background; the result goes to the log only. The run waits for it
+/// before it ends (A03-pocket537), so the handle is kept by the caller.
+pub fn close_when_done(
+    agent: String,
+    tab: SessionTab,
+    texts: CloseTexts,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let outcome = run(&agent, &tab, &texts);
         eprintln!("allomos: monitored session tab {tab:?}: {outcome:?}");
-    });
+    })
 }
 
 #[cfg(target_os = "macos")]

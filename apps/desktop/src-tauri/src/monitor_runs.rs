@@ -149,9 +149,60 @@ pub fn monitor_end_process(pid: u32) -> Result<(), Problem> {
             detail: format!("process {pid} is not a monitor"),
         });
     }
+    // Ended by hand: it is not started again when the project opens (A03-pocket537).
+    if let Some(dir) = registry::dir() {
+        registry::forget_process(&dir, pid);
+    }
     registry::end_process(pid).map_err(|e| Problem::BadUsage {
         detail: format!("process {pid} could not be ended: {e}"),
     })
+}
+
+/// The runs of the project at `root` that stopped without ending, started again by the CLI's
+/// `monitor resume` from their saved settings (A03-pocket537). The app calls it when the project
+/// opens; it returns the IDs of the runs it started.
+#[tauri::command]
+pub async fn monitor_resume(root: PathBuf) -> Result<Vec<String>, Problem> {
+    let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
+        detail: "the app's own alm was not found beside it".to_string(),
+    })?;
+    let out = crate::agents::command(&alm)
+        .args(["--json", "--taskbag"])
+        .arg(&root)
+        .args(["monitor", "resume"])
+        .env_remove("ALLOMOS_TASKBAG")
+        .output()
+        .map_err(|e| Problem::BadUsage {
+            detail: format!("{}: {e}", alm.display()),
+        })?;
+    let v: serde_json::Value =
+        serde_json::from_slice(&out.stdout).map_err(|_| Problem::BadUsage {
+            detail: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+        })?;
+    if v["ok"] != true {
+        return Err(Problem::BadUsage {
+            detail: v["error"]["message"]
+                .as_str()
+                .unwrap_or("the monitor did not start again")
+                .to_string(),
+        });
+    }
+    Ok(v["resumed"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// The last run of the project at `root` as the app's line reads it (`ended` in ms, `scope`,
+/// `taken`, `takenBy`), when one ended on this computer (A03-pocket537).
+#[tauri::command]
+pub fn monitor_last(root: PathBuf) -> Option<serde_json::Value> {
+    let dir = registry::dir()?;
+    registry::read_last(&dir, &root).and_then(|l| serde_json::to_value(l).ok())
 }
 
 /// The extra accounts of the terminal agents on this computer (Task-A03-oven548), in the order

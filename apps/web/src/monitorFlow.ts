@@ -391,6 +391,28 @@ export interface LastRun {
   takenBy?: Record<string, TerminalAgent>;
 }
 
+/** A last run as this computer keeps it in its file (A03-pocket537): `ended` in ms, the rest as
+ * the app's line reads it. `null` when the file does not fit. */
+export function lastRunFromFile(v: unknown): LastRun | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as { ended?: unknown; scope?: unknown; taken?: unknown; takenBy?: unknown };
+  if (typeof o.ended !== "number" || !Number.isFinite(o.ended) || !Array.isArray(o.taken) || !o.scope) return null;
+  return {
+    ended: new Date(o.ended).toISOString(),
+    scope: o.scope as Scope,
+    taken: o.taken.filter((x): x is string => typeof x === "string"),
+    takenBy: (o.takenBy && typeof o.takenBy === "object" ? o.takenBy : undefined) as Record<string, TerminalAgent> | undefined,
+  };
+}
+
+/** The later of two last runs (the one remembered by the window and the one kept on this
+ * computer, which also counts a run that ended while the app was closed). */
+export function newerLast(a: LastRun | null, b: LastRun | null): LastRun | null {
+  if (!a) return b;
+  if (!b) return a;
+  return Date.parse(b.ended) > Date.parse(a.ended) ? b : a;
+}
+
 /** The tasks of the last run that are done, and those that need the person now: waiting on them,
  * or done but for a person's check (`toCheck`: stopFlow's, a done task with no "by human" label,
  * decision 0020). Counted from the taskbag as it is now. */

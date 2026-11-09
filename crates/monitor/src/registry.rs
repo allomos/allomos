@@ -13,6 +13,12 @@
 //!   about a second;
 //! - `<run>.note-<n>.json`: a notification the process leaves for the app to show under its own
 //!   name (A03-stork103); the app takes and removes each one ([`take_notes`]).
+//! - `resume/<run>.json`: the run's last record, kept while the run goes on and after its process
+//!   died without ending (a log-out, a restart, a crash); the app and `alm monitor resume` start
+//!   such a run again from its saved settings when the project opens (A03-pocket537). Removed
+//!   when the run ends as asked, or when it is ended by hand ([`forget_process`]).
+//! - `last/<hash>.json`: the last run of one taskbag ([`LastSummary`]), kept when it ends, so the
+//!   app's "last run" line counts a run that ended while the app was closed (A03-pocket537).
 //!
 //! `alm monitor status` and `list`, and the app, only read these files. As a last resort the
 //! system's process list is searched for `alm monitor run` processes that no file names ("running,
@@ -489,6 +495,115 @@ fn process_lines() -> Vec<String> {
     .unwrap_or_default()
 }
 
+/// The folder of the runs' resume files (A03-pocket537): each run's last record, kept while the
+/// run is alive and after its process died without ending, so the app can start it again from
+/// its saved settings when the project is opened. Removed when the run ends as asked.
+fn resume_dir(dir: &Path) -> PathBuf {
+    dir.join("resume")
+}
+
+/// The resume file of run `id`.
+pub fn resume_path(dir: &Path, id: &str) -> PathBuf {
+    resume_dir(dir).join(format!("{id}.json"))
+}
+
+/// Keep `record` as run `id`'s resume file.
+pub fn write_resume(dir: &Path, record: &Record) -> io::Result<()> {
+    fs::create_dir_all(resume_dir(dir))?;
+    let text = serde_json::to_string_pretty(record).map_err(io::Error::other)?;
+    write_whole(&resume_path(dir, &record.id), &text)
+}
+
+/// Run `id`'s resume file, when it has one.
+pub fn read_resume(dir: &Path, id: &str) -> Option<Record> {
+    if !plain_id(id) {
+        return None;
+    }
+    serde_json::from_str(&fs::read_to_string(resume_path(dir, id)).ok()?).ok()
+}
+
+/// Forget run `id` for good: its resume file goes, so the app does not start it again.
+pub fn remove_resume(dir: &Path, id: &str) {
+    if plain_id(id) {
+        let _ = fs::remove_file(resume_path(dir, id));
+    }
+}
+
+/// Forget the run of process `pid` for good, when a run file names it (a run ended by hand).
+pub fn forget_process(dir: &Path, pid: u32) {
+    if let Some(id) = monitor_processes()
+        .into_iter()
+        .find(|p| p.pid == pid)
+        .and_then(|p| p.id)
+    {
+        remove_resume(dir, &id);
+    }
+}
+
+/// The runs of the taskbag at `root` that stopped without ending (their process was ended by a
+/// log-out, a restart or a crash) and can be started again from their resume files. A run whose
+/// lock is held, or whose process is alive, is not one of them.
+pub fn resumable(dir: &Path, root: &Path, processes: &[Process]) -> Vec<Record> {
+    let mut out: Vec<Record> = fs::read_dir(resume_dir(dir))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .filter_map(|p| serde_json::from_str::<Record>(&fs::read_to_string(&p).ok()?).ok())
+        .filter(|r| {
+            same_place(&r.taskbag, root)
+                && plain_id(&r.id)
+                && !held(&lock_path(dir, &r.id))
+                && !processes
+                    .iter()
+                    .any(|p| p.id.as_deref() == Some(r.id.as_str()))
+        })
+        .collect();
+    out.sort_by(|a, b| a.run.started.cmp(&b.run.started).then(a.id.cmp(&b.id)));
+    out
+}
+
+/// What a finished run leaves for the app's "last run" line (A03-pocket537): kept per taskbag, so
+/// a run that ended while the app was closed still counts. Field names as the app reads them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastSummary {
+    /// When it ended (ms since 1970).
+    pub ended: i64,
+    pub scope: crate::flow::Scope,
+    pub taken: Vec<String>,
+    #[serde(default)]
+    pub taken_by: std::collections::BTreeMap<String, String>,
+}
+
+/// The file of the last run of the taskbag at `root`: a name made from its folder's path.
+fn last_path(dir: &Path, root: &Path) -> PathBuf {
+    let place = fs::canonicalize(root).unwrap_or_else(|_| allomos_store::tidy(root));
+    // FNV-1a: a fixed hash, so the name is the same in every build of alm and the app.
+    let hash = place
+        .display()
+        .to_string()
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+        });
+    dir.join("last").join(format!("{hash:016x}.json"))
+}
+
+/// Keep `last` as the last run of the taskbag at `root`.
+pub fn write_last(dir: &Path, root: &Path, last: &LastSummary) -> io::Result<()> {
+    let path = last_path(dir, root);
+    fs::create_dir_all(path.parent().unwrap_or(dir))?;
+    let text = serde_json::to_string_pretty(last).map_err(io::Error::other)?;
+    write_whole(&path, &text)
+}
+
+/// The last run of the taskbag at `root`, when one ended on this computer.
+pub fn read_last(dir: &Path, root: &Path) -> Option<LastSummary> {
+    serde_json::from_str(&fs::read_to_string(last_path(dir, root)).ok()?).ok()
+}
+
 /// End process `pid` (a run whose record is missing).
 pub fn end_process(pid: u32) -> io::Result<()> {
     #[cfg(unix)]
@@ -527,6 +642,89 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    fn a_run(id: &str, root: &Path, dir: &Path) -> Record {
+        Record {
+            format: FORMAT,
+            id: id.to_string(),
+            pid: 999_999_999,
+            taskbag: root.to_path_buf(),
+            project: dir.to_path_buf(),
+            language: "en".to_string(),
+            log: log_path(dir, id),
+            alive: 1,
+            run: Run::start(
+                crate::flow::Scope::All,
+                vec!["claude_cli".to_string()],
+                vec!["claude_cli".to_string()],
+                true,
+                30,
+                1_000,
+            ),
+        }
+    }
+
+    #[test]
+    fn a_run_that_stopped_without_ending_resumes_until_it_is_forgotten() {
+        let d = temp("resume");
+        let root = d.join("tb");
+        fs::create_dir_all(&root).unwrap();
+        let record = a_run("m-1", &root, &d);
+        write_resume(&d, &record).unwrap();
+        let found = resumable(&d, &root, &[]);
+        assert_eq!(found, [record.clone()]);
+        // Another project's run is not this project's.
+        assert!(resumable(&d, &d.join("other"), &[]).is_empty());
+        // A run whose process is still alive is left alone.
+        let alive = [Process {
+            pid: 5,
+            id: Some("m-1".to_string()),
+            taskbag: None,
+        }];
+        assert!(resumable(&d, &root, &alive).is_empty());
+        // Ended by hand: not started again.
+        remove_resume(&d, "m-1");
+        assert!(resumable(&d, &root, &[]).is_empty());
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn a_held_lock_keeps_a_run_out_of_the_resumable_ones() {
+        let d = temp("resume-lock");
+        let root = d.join("tb");
+        fs::create_dir_all(&root).unwrap();
+        write_resume(&d, &a_run("m-2", &root, &d)).unwrap();
+        let h = Held::take(&lock_path(&d, "m-2")).unwrap().unwrap();
+        assert!(resumable(&d, &root, &[]).is_empty());
+        h.release();
+        assert_eq!(resumable(&d, &root, &[]).len(), 1);
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn the_last_run_is_kept_per_taskbag_in_the_app_s_names() {
+        let d = temp("last");
+        let root = d.join("tb");
+        fs::create_dir_all(&root).unwrap();
+        assert!(read_last(&d, &root).is_none());
+        let last = LastSummary {
+            ended: 42,
+            scope: crate::flow::Scope::All,
+            taken: vec!["A1".to_string()],
+            taken_by: std::collections::BTreeMap::from([(
+                "A1".to_string(),
+                "claude_cli".to_string(),
+            )]),
+        };
+        write_last(&d, &root, &last).unwrap();
+        assert_eq!(read_last(&d, &root), Some(last.clone()));
+        assert_eq!(
+            serde_json::to_value(&last).unwrap()["takenBy"]["A1"],
+            "claude_cli"
+        );
+        assert!(read_last(&d, &d.join("other")).is_none());
+        fs::remove_dir_all(&d).unwrap();
     }
 
     #[test]

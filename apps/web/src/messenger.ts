@@ -131,6 +131,11 @@ export interface Messenger {
   monitorAsk(id: string, request: MonitorRequest): Promise<void>;
   /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
   monitorEndProcess(pid: number): Promise<void>;
+  /** Starts again the project's runs that stopped without ending, from their saved settings
+   * (A03-pocket537); resolves with their IDs (none when all are going on or were ended). */
+  monitorResume(root: string): Promise<string[]>;
+  /** The project's last run as its file on this computer keeps it (`ended` in ms), or null. */
+  monitorLast(root: string): Promise<unknown | null>;
   /** The Monitors list (Task-A03-motor529): every run this computer runs, in every project, with
    * the record-missing processes; `monitor_all` lists them. Read again every couple of seconds. */
   monitorAll(): Promise<unknown[]>;
@@ -497,6 +502,8 @@ export const desktopMessenger: Messenger = {
   monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties }),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
   monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
+  monitorResume: (root) => invoke<string[]>("monitor_resume", { root }),
+  monitorLast: (root) => invoke<unknown | null>("monitor_last", { root }),
   monitorAll: () => invoke<unknown[]>("monitor_all"),
   monitorOpen: (root) => invoke<void>("monitor_open", { root }),
   onMonitorsMenu: (handler) => getCurrentWebviewWindow().listen("menu:monitors", () => handler()),

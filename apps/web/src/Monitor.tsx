@@ -19,8 +19,10 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  lastRunFromFile,
   levelsOf,
   levelsText,
+  newerLast,
   nextCheck,
   readEntry,
   setAgents,
@@ -114,6 +116,49 @@ export function useMonitor({
     const timer = window.setInterval(() => void read(), READ_MS);
     return () => window.clearInterval(timer);
   }, [root, read]);
+
+  // The read a resume effect uses: it runs once per opening of the project, not per change of
+  // `active`.
+  const readRef = useRef(read);
+  useEffect(() => {
+    readRef.current = read;
+  }, [read]);
+
+  // Opening the project starts again the runs that stopped without ending (a restart, an update,
+  // a log-out) from the settings they saved, with the sessions they had at work (A03-pocket537).
+  // Nothing is shown when there is nothing to start: the status bar is what the person sees.
+  useEffect(() => {
+    let current = true;
+    messenger
+      .monitorResume(root)
+      .then((ids) => {
+        if (current && ids.length > 0) void readRef.current();
+      })
+      .catch(() => {
+        /* the monitor is optional here: a project opens without it */
+      });
+    return () => {
+      current = false;
+    };
+  }, [messenger, root]);
+
+  // The last run kept on this computer, which counts a run that ended while the app was closed
+  // (A03-pocket537). The later of it and the window's own is shown.
+  useEffect(() => {
+    let current = true;
+    messenger
+      .monitorLast(root)
+      .then((v) => {
+        const kept = lastRunFromFile(v);
+        if (current && kept) setLast((cur) => newerLast(cur, kept));
+      })
+      .catch(() => {
+        /* no file: the window's own last run stays */
+      });
+    return () => {
+      current = false;
+    };
+  }, [messenger, root]);
 
   // The clock runs only while monitoring.
   const running = runs.length > 0;

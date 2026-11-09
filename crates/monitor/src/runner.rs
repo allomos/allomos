@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use allomos_core::{Problem, Task, Taskbag};
 
-use crate::flow::{Run, Stuck, tab_to_close, waiting_alert};
+use crate::flow::{Closing, Run, Stuck, tab_to_close, waiting_alert};
 use crate::registry::{self, Held, Record, Request};
 use crate::{accounts, notify, request, session_tab, terminal};
 
@@ -182,12 +182,18 @@ struct Loop {
     alm_dir: Option<PathBuf>,
     taskbag_arg: String,
     last_written: Instant,
+    /// The closing countdowns of finished tasks' tabs, each with its thread (A03-pocket537).
+    countdowns: Vec<(Closing, std::thread::JoinHandle<()>)>,
 }
 
 impl Loop {
     fn write(&mut self) {
         self.record.alive = now_ms();
         self.held.keep();
+        // The countdowns still running are kept in the run's file: a run that stops before they
+        // end starts them again when it resumes.
+        self.countdowns.retain(|(_, h)| !h.is_finished());
+        self.record.run.closing = self.countdowns.iter().map(|(c, _)| c.clone()).collect();
         let path = registry::record_path(&self.dir, &self.id);
         match serde_json::to_string_pretty(&self.record) {
             Ok(text) => {
@@ -196,6 +202,9 @@ impl Loop {
                 }
             }
             Err(e) => log(&format!("could not write the run file: {e}")),
+        }
+        if let Err(e) = registry::write_resume(&self.dir, &self.record) {
+            log(&format!("could not write the run's resume file: {e}"));
         }
         self.last_written = Instant::now();
     }
@@ -330,11 +339,18 @@ impl Loop {
         for cur in &finished {
             log(&format!("{} finished ({})", cur.id, cur.agent));
             if let Some(tab) = tab_to_close(cur, &bag.tasks) {
-                session_tab::close_when_done(
+                let handle = session_tab::close_when_done(
                     cur.agent.clone(),
                     tab.clone(),
                     request::close_texts(&self.record.language),
                 );
+                self.countdowns.push((
+                    Closing {
+                        agent: cur.agent.clone(),
+                        tab: tab.clone(),
+                    },
+                    handle,
+                ));
             }
             if let Some(stuck) = waiting_alert(&cur.id, &bag.tasks) {
                 tell(&self.dir, &self.id, &stuck, &self.record.language);
@@ -371,7 +387,8 @@ impl Loop {
 }
 
 /// Run `options` as run `id` until it ends; its files live in `dir`. Refused when another process
-/// already runs `id`.
+/// already runs `id`. A run resumed from its resume file (A03-pocket537) carries on with the
+/// sessions it had at work and starts again the closing countdowns it had not finished.
 pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
     let failed = |e: std::io::Error| Problem::WriteFailed {
         path: dir.display().to_string(),
@@ -383,6 +400,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
             detail: format!("monitor run {id} is already running"),
         });
     };
+    let mut options = options;
     let root = options.taskbag.clone();
     let project = project_of(&root);
     let bag = read(&root)?;
@@ -392,6 +410,22 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         .as_deref()
         .and_then(Path::parent)
         .map(Path::to_path_buf);
+    // A resumed run: the sessions at work are timed again from now, and the countdowns come back.
+    let now = now_ms();
+    for w in &mut options.run.working {
+        w.changed = now;
+    }
+    let countdowns = std::mem::take(&mut options.run.closing)
+        .into_iter()
+        .map(|c| {
+            let handle = session_tab::close_when_done(
+                c.agent.clone(),
+                c.tab.clone(),
+                request::close_texts(&options.language),
+            );
+            (c, handle)
+        })
+        .collect();
     let mut lp = Loop {
         dir: dir.to_path_buf(),
         id: id.to_string(),
@@ -411,6 +445,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         alm_dir,
         taskbag_arg: taskbag_arg(&project, &root),
         last_written: Instant::now(),
+        countdowns,
     };
     log(&format!(
         "monitor {id} started: {} ({:?}, agents {}, every {} min, {})",
@@ -461,14 +496,28 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
             lp.record.run.taken.join(", ")
         }
     ));
+    // The last run's line counts it, even when the app is closed (A03-pocket537).
+    let last = registry::LastSummary {
+        ended: now_ms(),
+        scope: lp.record.run.scope.clone(),
+        taken: lp.record.run.taken.clone(),
+        taken_by: lp.record.run.taken_by.clone(),
+    };
+    if let Err(e) = registry::write_last(dir, &root, &last) {
+        log(&format!("could not write the last run: {e}"));
+    }
+    // The countdowns of done tasks' tabs finish before the run is gone: it stays listed (stopping)
+    // until then, and a stop in the meantime finds it still there.
+    for (_, handle) in lp.countdowns.drain(..) {
+        let _ = handle.join();
+    }
     let _ = std::fs::remove_file(registry::record_path(dir, id));
     // Only what finding and controlling a running run needs stays on this computer (approver,
     // 2026-11-09): the log of a run that ended as asked goes too. A run that could not start, or
     // was ended from outside, leaves its log for the person to read.
     let _ = std::fs::remove_file(registry::log_path(dir, id));
+    registry::remove_resume(dir, id);
     lp.held.release();
-    // Leave the closing countdowns of done tasks' tabs time to finish.
-    std::thread::sleep(Duration::from_secs(1));
     Ok(())
 }
 

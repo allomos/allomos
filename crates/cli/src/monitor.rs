@@ -23,10 +23,13 @@ use crate::{Cli, Done};
 pub(crate) enum MonitorWhat {
     /// Start monitoring this project's ready tasks in the background: each ready task is worked
     /// in a new terminal session of a chosen agent, which claims it first. Keeps running after
-    /// this terminal is closed; ends with `alm monitor stop`, or at log-out or restart.
+    /// this terminal is closed; ends with `alm monitor stop`. A log-out or restart ends it, and
+    /// `alm monitor resume` (the app does it when the project opens) starts it again from its
+    /// saved settings.
     Start(StartArgs),
     /// Run a monitor in this terminal, in the foreground, until it is stopped (what `start` runs
-    /// in the background; for tests).
+    /// in the background; for tests). With `--resume`, it carries on the run `id` that stopped
+    /// without ending (its settings and sessions are those it saved).
     Run {
         /// The run's ID (`start` makes one). Default: a new one.
         id: Option<String>,
@@ -36,7 +39,14 @@ pub(crate) enum MonitorWhat {
         /// language.
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
+        /// Carry on run `id` from its resume file, with the settings and sessions it saved.
+        #[arg(long)]
+        resume: bool,
     },
+    /// Start again the runs of this project that stopped without ending (a log-out, a restart or
+    /// a crash), from the settings they saved, with the sessions they had at work. Runs that are
+    /// going on, and runs that were ended as asked, are left alone (A03-pocket537).
+    Resume,
     /// Check now: let tasks whose blockers have finished go on, then give each free agent a ready
     /// task (as the app's Check now).
     Check {
@@ -90,6 +100,7 @@ impl MonitorWhat {
         match self {
             MonitorWhat::Start(_) => "monitor start",
             MonitorWhat::Run { .. } => "monitor run",
+            MonitorWhat::Resume => "monitor resume",
             MonitorWhat::Check { .. } => "monitor check",
             MonitorWhat::Stop { .. } => "monitor stop",
             MonitorWhat::Status => "monitor status",
@@ -566,9 +577,40 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 text,
             ))
         }
-        MonitorWhat::Run { id, args, language } => {
+        MonitorWhat::Run {
+            id,
+            args,
+            language,
+            resume,
+        } => {
             let root = crate::locate(cli, cwd)?;
             let now = runner::now_ms();
+            let alm = std::env::current_exe().ok();
+            if *resume {
+                // The settings and sessions the run saved (A03-pocket537), not the flags given.
+                let id = id.clone().ok_or_else(|| Problem::BadUsage {
+                    detail: "--resume needs the run's ID".to_string(),
+                })?;
+                let saved = registry::read_resume(&dir, &id).ok_or_else(|| Problem::BadUsage {
+                    detail: format!(
+                        "{id}: no run of this computer has a resume file under that ID"
+                    ),
+                })?;
+                runner::run(
+                    &dir,
+                    &id,
+                    runner::Options {
+                        taskbag: saved.taskbag.clone(),
+                        language: saved.language.clone(),
+                        run: saved.run,
+                        alm,
+                    },
+                )?;
+                return Ok(Done::new(
+                    json!({ "taskbag": saved.taskbag, "run": id, "resumed": true }),
+                    format!("Monitor {id} ended.\n"),
+                ));
+            }
             let run = new_run(&root, args, now)?;
             let language = match language {
                 Some(l) => l.clone(),
@@ -580,7 +622,6 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                     detail: format!("{id}: a run ID has only letters, digits and -"),
                 });
             }
-            let alm = std::env::current_exe().ok();
             runner::run(
                 &dir,
                 &id,
@@ -594,6 +635,64 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             Ok(Done::new(
                 json!({ "taskbag": root, "run": id }),
                 format!("Monitor {id} ended.\n"),
+            ))
+        }
+        MonitorWhat::Resume => {
+            let root = crate::locate(cli, cwd)?;
+            let procs = registry::monitor_processes();
+            let alm = std::env::current_exe().map_err(|e| Problem::BadUsage {
+                detail: format!("cannot tell where this alm is: {e}"),
+            })?;
+            let mut resumed: Vec<String> = Vec::new();
+            for saved in registry::resumable(&dir, &root, &procs) {
+                let id = saved.id.clone();
+                let log = registry::log_path(&dir, &id);
+                // `run` takes the flags `start` takes (its mode is required); the settings come from
+                // the resume file, so these only satisfy the parser.
+                let words = vec![
+                    "monitor".to_string(),
+                    "run".to_string(),
+                    id.clone(),
+                    "--resume".to_string(),
+                    "--taskbag".to_string(),
+                    root.display().to_string(),
+                    "--mode".to_string(),
+                    (if saved.run.quiet { "quiet" } else { "normal" }).to_string(),
+                    "--every".to_string(),
+                    saved.run.every.to_string(),
+                ];
+                let pid = runner::spawn_detached(&alm, &words, &log).map_err(|e| {
+                    Problem::WriteFailed {
+                        path: alm.display().to_string(),
+                        detail: e.to_string(),
+                    }
+                })?;
+                // Started once its run file is there (as `start` waits for it). A run that already
+                // ended (its resume file is gone) counts as started too.
+                let start = Instant::now();
+                let record = registry::record_path(&dir, &id);
+                while !record.exists() && start.elapsed() < Duration::from_secs(20) {
+                    if !registry::monitor_processes().iter().any(|p| p.pid == pid) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                if record.exists() || !registry::resume_path(&dir, &id).exists() {
+                    resumed.push(id);
+                }
+            }
+            let text = if resumed.is_empty() {
+                "No monitor of this project needed starting again.\n".to_string()
+            } else {
+                format!(
+                    "Started again {} monitor(s) of this project from their saved settings: {}.\n",
+                    resumed.len(),
+                    resumed.join(", ")
+                )
+            };
+            Ok(Done::new(
+                json!({ "taskbag": root, "resumed": resumed }),
+                text,
             ))
         }
         MonitorWhat::Check { run } => {
@@ -624,6 +723,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             let chosen = choose(&entries, run.as_deref(), "stop")?;
             match chosen {
                 Entry::Missing { pid, id, .. } => {
+                    registry::forget_process(&dir, *pid);
                     registry::end_process(*pid).map_err(|e| Problem::BadUsage {
                         detail: format!("process {pid} could not be ended: {e}"),
                     })?;

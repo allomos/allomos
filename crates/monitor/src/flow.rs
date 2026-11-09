@@ -88,6 +88,19 @@ pub struct Run {
     /// finished, until the next check: the app's line under the status bar.
     #[serde(default)]
     pub unblocked: Vec<Unblocked>,
+    /// Tabs of finished tasks whose 30-second countdown to close them has not ended yet. Kept in
+    /// the run's file so a run that resumes after it was ended early starts the countdown again
+    /// (A03-pocket537).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closing: Vec<Closing>,
+}
+
+/// A finished task's tab waiting to be closed (see [`Run::closing`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Closing {
+    /// The agent whose session the tab shows.
+    pub agent: String,
+    pub tab: SessionTab,
 }
 
 /// A task a sweep let go on, and the state it went back to (`ready`, or `in_progress` when
@@ -132,6 +145,7 @@ impl Run {
             stopping: false,
             checked: now - i64::from(every) * 60_000,
             unblocked: Vec::new(),
+            closing: Vec::new(),
         }
     }
 

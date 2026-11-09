@@ -15,6 +15,8 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  lastRunFromFile,
+  newerLast,
   levelsOf,
   levelsText,
   nextCheck,
@@ -276,4 +278,22 @@ test("the sweep's line groups the tasks by the state they went back to", () => {
       ],
     },
   );
+});
+
+test("a last run kept on this computer reads in the app's shape, and the later one is shown (A03-pocket537)", () => {
+  const kept = lastRunFromFile({ ended: Date.UTC(2026, 10, 9, 1, 0), scope: { kind: "all" }, taken: ["A1", 7], takenBy: { A1: "claude_cli" } });
+  assert.deepEqual(kept, {
+    ended: "2026-11-09T01:00:00.000Z",
+    scope: { kind: "all" },
+    taken: ["A1"],
+    takenBy: { A1: "claude_cli" },
+  });
+  assert.equal(lastRunFromFile({ ended: "2026-11-09", scope: { kind: "all" }, taken: [] }), null);
+  assert.equal(lastRunFromFile(null), null);
+
+  const window = { ended: "2026-11-09T00:00:00.000Z", scope: { kind: "all" as const }, taken: ["A1"] };
+  assert.equal(newerLast(null, kept), kept);
+  assert.equal(newerLast(window, null), window);
+  assert.equal(newerLast(window, kept), kept);
+  assert.equal(newerLast(kept, window), kept);
 });
