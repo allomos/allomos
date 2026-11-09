@@ -1126,5 +1126,15 @@
   "problem.self_check": "Separation of duties is on in this project: {who} worked on task {id}, so they may not also check it. Someone else checks it, or the switch is turned off with a reason.",
   "problem.self_approve": "Separation of duties is on in this project: {who} worked on task {id}, so they may not also approve it. Someone else approves it, or the switch is turned off with a reason.",
   "problem.work_after_signing": "Separation of duties is on in this project: {who} approved or checked task {id}, so they may not also work on it. Someone else works on it, or the switch is turned off with a reason.",
-  "problem.checker_unknown": "Separation of duties is on in this project, and the check of task {id} names no checker, so Allomos cannot tell it is someone other than who did the work."
+  "problem.checker_unknown": "Separation of duties is on in this project, and the check of task {id} names no checker, so Allomos cannot tell it is someone other than who did the work.",
+  "pane.heartbeat": "Last heartbeat",
+  "heartbeat.ago": "{ago} ({time})",
+  "heartbeat.just_now": "just now",
+  "heartbeat.minutes_ago": "{n} min ago",
+  "heartbeat.hours_ago": "{n} h ago",
+  "heartbeat.days_ago": "{n} d ago",
+  "heartbeat.none": "No record",
+  "heartbeat.busy": "busy until {time}",
+  "heartbeat.lost": "Lost",
+  "heartbeat.lost_title": "No heartbeat for more than {minutes} minutes and no busy window running: another session can take it over (alm next lists the command)."
 }

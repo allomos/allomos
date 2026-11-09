@@ -42,6 +42,7 @@ import {
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
 import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
+import { HeartbeatLine } from "./Heartbeat";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
@@ -71,6 +72,8 @@ export function TaskPane({
   onOpenSession,
   onApprove,
   onWithdraw,
+  lostAfter,
+  lastChange,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -111,6 +114,10 @@ export function TaskPane({
   onApprove?: (shown: string, expires: string | null, ready: boolean) => Promise<void>;
   /** Withdraws approval `id`, with why (Task-A01-baker800). Desktop only. Rejects with a Problem. */
   onWithdraw?: (id: string, reason: string) => Promise<void>;
+  /** The project's lost limit, in minutes (Task-A01-kernel761). */
+  lostAfter: number;
+  /** When the task last changed (UTC): where its holder never beat, the lost limit counts from it. */
+  lastChange?: string;
 }) {
   const { t, problem } = useI18n();
   const ref = useRef<HTMLElement>(null);
@@ -599,6 +606,12 @@ export function TaskPane({
     [t("pane.agent"), agentText, null],
     [t("pane.check"), t(`check.${check(task)}`), null],
     [t("pane.session"), sessionText, null, t("pane.session_title", { minutes: ACTIVE_MINUTES }), sessionButton],
+    // Task-A01-kernel761: a held, in-progress task's last heartbeat, busy window and Lost tag.
+    [
+      t("pane.heartbeat"),
+      task.state === "in_progress" && task.holder ? <HeartbeatLine task={task} lostAfter={lostAfter} lastChange={lastChange} withTag /> : null,
+      null,
+    ],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],
     [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
     [

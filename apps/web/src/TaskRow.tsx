@@ -9,6 +9,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useI18n } from "./i18n";
+import { HeartbeatLine, LostTag } from "./Heartbeat";
 import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
@@ -27,6 +28,7 @@ export function TaskRow({
   terms,
   stop,
   modified,
+  lostAfter,
   onOpenSession,
   onProceed,
   onError,
@@ -40,6 +42,8 @@ export function TaskRow({
   stop: StopFact | null;
   /** When the task last changed (UTC) (Task-A01-52). */
   modified?: string;
+  /** The project's lost limit, in minutes (Task-A01-kernel761). */
+  lostAfter: number;
   /** Reopens the session the task records, as the task pane's button does (the desktop app only). */
   onOpenSession?: (id: string) => Promise<void>;
   /** Opens Work on it… for the task (the desktop app only, where agents run). */
@@ -70,6 +74,7 @@ export function TaskRow({
     t("row.held_by"),
     <span className="held-by">
       {task.holder ? <Holder task={task} onOpenSession={onOpenSession} onError={onError} /> : <span className="muted">{t("row.nobody")}</span>}
+      {task.holder && <LostTag task={task} lostAfter={lostAfter} lastChange={modified} />}
       {onProceed && canProceed(task) && (
         <button
           type="button"
@@ -89,6 +94,9 @@ export function TaskRow({
       )}
     </span>,
   ]);
+  // Task-A01-kernel761: a held, in-progress task's last heartbeat and busy window.
+  if (task.state === "in_progress" && task.holder)
+    facts.push([t("pane.heartbeat"), <HeartbeatLine task={task} lostAfter={lostAfter} lastChange={modified} />]);
   return (
     <li
       id={`task-${task.id}`}
