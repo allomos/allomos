@@ -1,4 +1,5 @@
-//! The Window menu's **Running Monitors** item (Task-A03-motor529, approver 2026-11-09): it opens
+//! The View menu's **Running Monitors** item (Task-A03-motor529, approver 2026-11-09; moved from
+//! the Window menu by Task-A03-chair577): it opens
 //! the list of this computer's running monitors in the window in front, and says how many run.
 //! With none it stays in the menu but is greyed out. The count is read from the run files every
 //! couple of seconds, on a thread of its own, so the item is right whichever window is open (and

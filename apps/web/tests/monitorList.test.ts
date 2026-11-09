@@ -1,5 +1,5 @@
 // Tests for the Monitors list (Task-A03-motor529): rows from `monitor_all`, the project's name and
-// taskbag, and the count the button and the Window menu show.
+// taskbag, and the count the button and the View menu show.
 // Run: npm --prefix apps/web test
 
 import { test } from "node:test";

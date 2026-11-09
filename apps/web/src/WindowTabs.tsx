@@ -71,7 +71,7 @@ export function WindowTabs({ messenger, tabs: api, settings }: { messenger: Mess
   const [front, setFront] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
   // The Monitors list (Task-A03-motor529): this computer's runs, in every project. The button
-  // shows while there are any; the Window menu's item opens the list too.
+  // shows while there are any; the View menu's item opens the list too.
   const monitors = useListedRuns(messenger);
   const [listOpen, setListOpen] = useState(false);
   const [listAnchor, setListAnchor] = useState<DOMRect | null>(null);

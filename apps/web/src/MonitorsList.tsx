@@ -1,6 +1,6 @@
 // The Monitors list (Task-A03-motor529, approver 2026-11-09): the button at the right end of the tab
 // bar, shown only while a monitoring run goes on on this computer, and the list it opens, or the
-// Window menu's Running Monitors item opens. Each run is one row, in any project: Open shows its
+// View menu's Running Monitors item opens. Each run is one row, in any project: Open shows its
 // project, Check now and Stop act on it as its status bar does, and a run whose record is missing
 // can only be stopped (by its process). The list reads the run files every couple of seconds.
 

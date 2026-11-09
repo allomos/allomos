@@ -2278,24 +2278,46 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     } else {
         menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
     }
-    // Task-A03-motor529: the Window menu's Running Monitors item, after Close Window (on every
-    // platform). It is added before the Windows list counts its fixed items, so the list keeps it.
-    if let Some(submenu) = menu
-        .get(tauri::menu::WINDOW_SUBMENU_ID)
-        .and_then(|item| item.as_submenu().cloned())
+    // Task-A03-chair577 (moved from the Window menu, where Task-A03-motor529 put it): the Running
+    // Monitors item is in the View menu, after the View menu's own items (on macOS, Enter Full
+    // Screen). Windows and Linux have no View menu by default, so one is made before the Window
+    // menu.
+    let monitors = MenuItem::with_id(
+        app,
+        monitor_menu::ID,
+        monitor_menu::text(0),
+        false,
+        None::<&str>,
+    )?;
+    let view = match menu
+        .items()?
+        .into_iter()
+        .filter_map(|item| item.as_submenu().cloned())
+        .find(|s| s.text().is_ok_and(|t| t == "View"))
     {
-        let monitors = MenuItem::with_id(
-            app,
-            monitor_menu::ID,
-            monitor_menu::text(0),
-            false,
-            None::<&str>,
-        )?;
-        submenu.append(&PredefinedMenuItem::separator(app)?)?;
-        submenu.append(&monitors)?;
-        app.manage(monitor_menu::MonitorMenu { item: monitors });
-        // Task-A07-mitten556: on Windows the app lists the open windows in the Window menu itself.
-        if !cfg!(target_os = "macos") {
+        Some(view) => {
+            view.append(&PredefinedMenuItem::separator(app)?)?;
+            view
+        }
+        None => {
+            let view = Submenu::new(app, "View", true)?;
+            let window_at = menu
+                .items()?
+                .iter()
+                .position(|item| item.id() == tauri::menu::WINDOW_SUBMENU_ID)
+                .unwrap_or(0);
+            menu.insert(&view, window_at)?;
+            view
+        }
+    };
+    view.append(&monitors)?;
+    app.manage(monitor_menu::MonitorMenu { item: monitors });
+    // Task-A07-mitten556: on Windows the app lists the open windows in the Window menu itself.
+    if !cfg!(target_os = "macos") {
+        if let Some(submenu) = menu
+            .get(tauri::menu::WINDOW_SUBMENU_ID)
+            .and_then(|item| item.as_submenu().cloned())
+        {
             let fixed = submenu.items()?.len();
             app.manage(window_list::WindowMenu { submenu, fixed });
         }
@@ -2485,7 +2507,7 @@ pub fn run() {
             windows::restore(app.handle());
             // The monitor's notifications, shown under the app's name (Task-A03-stork103).
             notify::start(app.handle().clone());
-            // The Window menu's Running Monitors item follows the runs (Task-A03-motor529).
+            // The View menu's Running Monitors item follows the runs (Task-A03-motor529).
             monitor_menu::start(app.handle().clone());
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_screen(&window);

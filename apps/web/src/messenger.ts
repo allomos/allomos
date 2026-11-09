@@ -135,7 +135,7 @@ export interface Messenger {
   /** The list's Open: the project of the taskbag at `root` opens in a window (its tab comes to the
    * front when a window already shows it). Rejects with a Problem. */
   monitorOpen(root: string): Promise<void>;
-  /** Calls `handler` when the Window menu's Running Monitors item is chosen (Task-A03-motor529). */
+  /** Calls `handler` when the View menu's Running Monitors item is chosen (Task-A03-motor529). */
   onMonitorsMenu(handler: () => void): Promise<() => void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
