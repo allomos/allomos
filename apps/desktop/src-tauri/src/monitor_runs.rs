@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use allomos_core::Problem;
 use allomos_monitor::registry::{self, Entry, Request};
+use tauri::AppHandle;
 
 fn no_dir() -> Problem {
     Problem::BadUsage {
@@ -26,6 +27,31 @@ pub fn monitor_runs(root: PathBuf) -> Vec<serde_json::Value> {
         .iter()
         .map(Entry::json)
         .collect()
+}
+
+/// Every run this computer runs, oldest first, for the Monitors list (Task-A03-motor529): all
+/// projects', with the record-missing processes; `project` and `taskbag` name each one.
+#[tauri::command]
+pub fn monitor_all() -> Vec<serde_json::Value> {
+    let Some(dir) = registry::dir() else {
+        return Vec::new();
+    };
+    let procs = registry::monitor_processes();
+    registry::list(&dir, Some(&procs))
+        .iter()
+        .map(Entry::json)
+        .collect()
+}
+
+/// The list's Open: the project of the taskbag at `root` opens in a window (its tab comes to the
+/// front when a window already shows it).
+#[tauri::command]
+pub fn monitor_open(app: AppHandle, root: PathBuf) -> Result<(), Problem> {
+    crate::windows::open_recent_in_window(&app, &root.display().to_string()).map_err(|e| {
+        Problem::BadUsage {
+            detail: e.to_string(),
+        }
+    })
 }
 
 /// Start a run with the app's own `alm` (`monitor start`); resolves with its ID.

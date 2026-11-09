@@ -17,6 +17,7 @@ import { useI18n } from "./i18n";
 import type { AppSettingsMessenger, Messenger, TabsMessenger } from "./messenger";
 import { projectFolder } from "./paths";
 import { TabActive } from "./tabActive";
+import { MonitorsButton, MonitorsList, useListedRuns } from "./MonitorsList";
 import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startEntries, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
 
 /** What a tab's view needs from its window. */
@@ -69,6 +70,33 @@ export function WindowTabs({ messenger, tabs: api, settings }: { messenger: Mess
   const [tabs, setTabs] = useState<TabEntry[]>([]);
   const [front, setFront] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
+  // The Monitors list (Task-A03-motor529): this computer's runs, in every project. The button
+  // shows while there are any; the Window menu's item opens the list too.
+  const monitors = useListedRuns(messenger);
+  const [listOpen, setListOpen] = useState(false);
+  const [listAnchor, setListAnchor] = useState<DOMRect | null>(null);
+  const monitorsButton = useRef<HTMLButtonElement>(null);
+  const toggleList = () => {
+    if (!listOpen) setListAnchor(monitorsButton.current?.getBoundingClientRect() ?? null);
+    setListOpen((open) => !open);
+  };
+  useEffect(() => {
+    let stop: (() => void) | undefined;
+    let gone = false;
+    void messenger.onMonitorsMenu(() => {
+      setListAnchor(monitorsButton.current?.getBoundingClientRect() ?? null);
+      setListOpen(true);
+      void monitors.read();
+    }).then((off) => {
+      if (gone) off();
+      else stop = off;
+    });
+    return () => {
+      gone = true;
+      stop?.();
+    };
+    // The listener belongs to this window's messenger alone; `monitors.read` does not change.
+  }, [messenger]);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const frontRef = useRef(front);
@@ -499,7 +527,22 @@ export function WindowTabs({ messenger, tabs: api, settings }: { messenger: Mess
         >
           +
         </button>
+        {/* Task-A03-motor529: at the right end, only while monitoring runs on this computer. */}
+        {monitors.rows.length > 0 && (
+          <MonitorsButton count={monitors.rows.length} open={listOpen} buttonRef={monitorsButton} onToggle={toggleList} />
+        )}
       </div>
+      {listOpen && (
+        <MonitorsList
+          rows={monitors.rows}
+          now={monitors.now}
+          anchor={listAnchor}
+          buttonRef={monitorsButton}
+          messenger={messenger}
+          onClose={() => setListOpen(false)}
+          onChanged={() => void monitors.read()}
+        />
+      )}
       {/* The views in the order the tabs opened, so reordering the tabs moves nothing on the page; a
           tab that has not been in front yet has none. */}
       {[...tabs]
