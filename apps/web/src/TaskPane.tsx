@@ -42,7 +42,7 @@ import {
 } from "./editFlow";
 import { canReopen, reopenEdit } from "./reopenFlow";
 import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
-import { HeartbeatLine } from "./Heartbeat";
+import { HeartbeatLine, TakeOverButton } from "./Heartbeat";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
@@ -71,6 +71,7 @@ export function TaskPane({
   onNewIteration,
   folders,
   onOpenSession,
+  onTakeOver,
   onApprove,
   onWithdraw,
   lostAfter,
@@ -109,6 +110,9 @@ export function TaskPane({
   /** Reopens the session the task records (Task-A03-hive049): only on the desktop app, where the
    * session is; the companions show the Session row's text only. Rejects with a Problem. */
   onOpenSession?: () => Promise<void>;
+  /** Take over… (Task-A03-flock345): opens the takeover dialog (pick an agent, a new session claims the
+   * task). The button shows only while the task is lost; desktop only. */
+  onTakeOver?: () => void;
   /** Approves the task's plan, as `alm approve` (channel app): `shown` is the description the
    * person read; `ready` also makes a backlog task ready (Task-A01-baker800). Desktop only.
    * Rejects with a Problem. */
@@ -657,6 +661,7 @@ export function TaskPane({
         ) : (
           <h2>
             <span className="id">{task.id}</span> {task.title} {changeButton("title")} {topButton}
+            {onTakeOver && <> <TakeOverButton task={task} lostAfter={lostAfter} lastChange={lastChange} onTakeOver={onTakeOver} /></>}
           </h2>
         )}
         <button type="button" className="close" onClick={onClose} title={t("pane.close")} aria-label={t("pane.close")}>

@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use allomos_core::{State, Task, Taskbag, difficulty::Range, ops};
+use allomos_core::{State, Task, Taskbag, difficulty::Range, heartbeat, ops};
 use serde::{Deserialize, Serialize};
 
 use crate::session_tab::SessionTab;
@@ -222,16 +222,29 @@ impl Run {
     /// task in the scope this run has not taken yet that is in its agent's difficulty range; a
     /// slot with no such task gets none (see [`Run::unfilled`]). Every session claims its task
     /// first, so two sessions never work the same one.
-    pub fn share(&self, bag: &Taskbag) -> Vec<(String, Task)> {
+    pub fn share(&self, bag: &Taskbag, now_secs: i64) -> Vec<(String, Task)> {
         let iteration = match &self.scope {
             Scope::All => None,
             Scope::Iteration { id } => Some(id.as_str()),
         };
-        let ready: Vec<&Task> = ops::next(bag, iteration)
+        let mut ready: Vec<&Task> = ops::next(bag, iteration)
             .unwrap_or_default()
             .into_iter()
             .filter(|t| !self.taken.contains(&t.id))
             .collect();
+        // A task whose session went quiet (its account ran out, or it was switched) is lost
+        // (decision 0022): a new session takes it over, after the ready tasks.
+        let lost_after = heartbeat::applied(&bag.project).lost_after_secs;
+        for t in &bag.tasks {
+            if self.taken.contains(&t.id)
+                || iteration.is_some_and(|i| t.iteration.as_deref() != Some(i))
+            {
+                continue;
+            }
+            if heartbeat::lost(t, now_secs, lost_after, None).is_some() {
+                ready.push(t);
+            }
+        }
         let mut given = vec![false; ready.len()];
         let mut shares = Vec::new();
         for agent in self.free_agents() {
@@ -376,6 +389,32 @@ mod tests {
     fn run(agents: &[&str]) -> Run {
         let agents: Vec<String> = agents.iter().map(|a| a.to_string()).collect();
         Run::start(Scope::All, agents.clone(), agents, true, 30, 1_000_000)
+    }
+
+    /// Task-A03 (account switch): a task its old session held, last heartbeat at `at` (UTC).
+    fn held_since(id: &str, holder: &str, at: &str) -> Task {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "title": id, "area": "A01", "state": "in_progress",
+            "holder": holder, "heartbeat": { "at": at, "by": holder }
+        }))
+        .unwrap()
+    }
+
+    /// A task held by a quiet session (its heartbeat is over the limit) is offered again, so a
+    /// new session takes it over; one still beating is not.
+    #[test]
+    fn a_lost_task_is_offered_to_a_new_session() {
+        let r = run(&["claude_cli"]);
+        let beat = heartbeat::parse_utc("2026-11-09T10:00:00Z").unwrap();
+        let bag = bag_of(vec![held_since(
+            "A01-9",
+            "old/session",
+            "2026-11-09T10:00:00Z",
+        )]);
+        let quiet = r.share(&bag, beat + 2 * 3600);
+        assert_eq!(quiet.len(), 1);
+        assert_eq!(quiet[0].1.id, "A01-9");
+        assert!(r.share(&bag, beat + 5 * 60).is_empty());
     }
 
     #[test]
@@ -573,8 +612,11 @@ mod tests {
             leveled("A01-2", 5),
             leveled("A01-3", 2),
         ]);
-        let shares: Vec<(String, String)> =
-            r.share(&bag).into_iter().map(|(a, t)| (a, t.id)).collect();
+        let shares: Vec<(String, String)> = r
+            .share(&bag, 0)
+            .into_iter()
+            .map(|(a, t)| (a, t.id))
+            .collect();
         // Claude takes the first task of 4-5 (A01-2); codex the first of 1-2 (A01-1).
         assert_eq!(
             shares,
@@ -585,7 +627,7 @@ mod tests {
         );
         // No task is in claude's 4-5: it gets none and is named; codex takes the first of 1-2.
         let bag = bag_of(vec![leveled("A01-1", 1), leveled("A01-3", 2)]);
-        let shares = r.share(&bag);
+        let shares = r.share(&bag, 0);
         assert_eq!(shares.len(), 1);
         assert_eq!(shares[0].1.id, "A01-1");
         assert_eq!(r.unfilled(&shares), ["claude_cli"]);

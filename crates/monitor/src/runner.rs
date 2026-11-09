@@ -337,7 +337,7 @@ impl Loop {
                 self.record.run.unblocked.clear();
             }
             let run = &self.record.run;
-            let shares = run.share(bag);
+            let shares = run.share(bag, now / 1000);
             // An agent with a free slot and no task in its range gets no session; the status bar
             // says so (Task-A03-wave335).
             self.record.run.no_task = run.unfilled(&shares);
