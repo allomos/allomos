@@ -15,7 +15,7 @@ fn lang(language: &str) -> &'static str {
 
 /// The name an agent passes to `alm claim --session-agent`.
 pub fn session_agent(agent: &str) -> &'static str {
-    match agent {
+    match crate::accounts::base_agent(agent) {
         "claude_cli" => "claude-code",
         "antigravity_cli" => "antigravity",
         _ => "codex",
@@ -25,7 +25,7 @@ pub fn session_agent(agent: &str) -> &'static str {
 /// How a terminal Claude Code session reads its quota (Task-A03-folk351): `claude -p /usage`.
 /// Empty for the other agents. The paragraph ends with a blank line.
 fn usage_paragraph(agent: &str, language: &str) -> String {
-    if agent != "claude_cli" {
+    if crate::accounts::base_agent(agent) != "claude_cli" {
         return String::new();
     }
     let text = match lang(language) {

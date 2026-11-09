@@ -8,9 +8,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
-import { AGENT_KEY } from "./AgentPicker";
+import { monitorAgentName } from "./AgentPicker";
 import { freeAgents, listedRuns, nextCheck, type ListedRun, type Run } from "./monitorFlow";
 import { isProblem } from "./types";
+import { useAgentAccounts } from "./useAgentAccounts";
 
 /** How often the runs are read again. */
 const READ_MS = 2_000;
@@ -19,6 +20,8 @@ const TICK_MS = 15_000;
 
 /** The runs on this computer, read every couple of seconds, with the time for the rows. */
 export function useListedRuns(messenger: Messenger) {
+  // The extra accounts' names for the labels (Task-A03-oven548).
+  useAgentAccounts(messenger);
   const [rows, setRows] = useState<ListedRun[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const last = useRef("");
@@ -205,7 +208,7 @@ function RunRow({
   } else {
     for (const a of run.agents) {
       const w = run.working.find((x) => x.agent === a);
-      const agent = t(AGENT_KEY[a]);
+      const agent = monitorAgentName(a, t);
       if (w) lines.push(`${agent} · ${w.id}`);
       else if (nextCheck(run) <= now) lines.push(`${agent}：${t("monitors.checking")}`);
       else lines.push(`${agent}：${t("monitors.waiting", { time: timeOf(nextCheck(run)) })}`);

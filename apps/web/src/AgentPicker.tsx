@@ -10,6 +10,8 @@ import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import type { Agent } from "./types";
+import { baseAgent } from "./monitorFlow";
+import { labelOf } from "./agentAccounts";
 import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf } from "./agentPickerFlow";
 import type { Choice } from "./agentPickerFlow";
 import { offer as offerFor, offered } from "./updateTaskbagFlow";
@@ -22,6 +24,12 @@ export const AGENT_KEY: Record<Agent["id"], Key> = {
   codex_app: "agents.codex_app",
   antigravity_cli: "agents.antigravity_cli",
 };
+
+/** The name of a monitor agent (Task-A03-oven548): its agent's name, with its account's name after
+ * a dot when it is an extra account. */
+export function monitorAgentName(key: string, t: (k: Key) => string): string {
+  return labelOf(key, t(AGENT_KEY[baseAgent(key) as Agent["id"]]));
+}
 
 /** The keys that paste in a terminal on this computer. */
 export const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";

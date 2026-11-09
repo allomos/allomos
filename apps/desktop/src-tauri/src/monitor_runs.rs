@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use allomos_core::Problem;
+use allomos_monitor::accounts::{self, Account};
 use allomos_monitor::registry::{self, Entry, Request};
 use tauri::AppHandle;
 
@@ -151,4 +152,54 @@ pub fn monitor_end_process(pid: u32) -> Result<(), Problem> {
     registry::end_process(pid).map_err(|e| Problem::BadUsage {
         detail: format!("process {pid} could not be ended: {e}"),
     })
+}
+
+/// The extra accounts of the terminal agents on this computer (Task-A03-oven548), in the order
+/// they were added, and each agent's default folder (where the folder picker starts). The default
+/// account of an agent is not listed: it is always there.
+#[derive(serde::Serialize)]
+pub struct AgentAccounts {
+    accounts: Vec<Account>,
+    defaults: BTreeMap<String, String>,
+}
+
+#[tauri::command]
+pub fn agent_accounts() -> AgentAccounts {
+    let home = allomos_monitor::terminal::home();
+    let defaults = ["claude_cli", "codex_cli"]
+        .into_iter()
+        .filter_map(|agent| {
+            accounts::default_dir(agent, &home)
+                .map(|d| (agent.to_string(), d.display().to_string()))
+        })
+        .collect();
+    AgentAccounts {
+        accounts: accounts::load(),
+        defaults,
+    }
+}
+
+/// Add an account of an agent: the folder the person picked (its settings and login folder) and
+/// the name they gave it. The folder is checked first (`accounts::check_new`); only the path and
+/// the name are saved, in `agent-accounts.json`, never the login files.
+#[tauri::command]
+pub fn add_agent_account(agent: String, path: PathBuf, name: String) -> Result<Account, Problem> {
+    let file = accounts::file_path().ok_or_else(no_dir)?;
+    let mut listed = accounts::load_at(&file);
+    let home = allomos_monitor::terminal::home();
+    let account = accounts::check_new(
+        &listed,
+        &agent,
+        &path,
+        &name,
+        &home,
+        allomos_monitor::runner::now_ms(),
+    )
+    .map_err(|detail| Problem::BadUsage { detail })?;
+    listed.push(account.clone());
+    accounts::save_at(&file, &listed).map_err(|e| Problem::WriteFailed {
+        path: file.display().to_string(),
+        detail: e.to_string(),
+    })?;
+    Ok(account)
 }

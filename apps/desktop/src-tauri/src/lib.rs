@@ -2695,6 +2695,8 @@ pub fn run() {
             proceed_manual_request,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
+            monitor_runs::agent_accounts,
+            monitor_runs::add_agent_account,
             monitor_runs::monitor_ask,
             monitor_runs::monitor_end_process,
             monitor_runs::monitor_all,

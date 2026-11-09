@@ -4,6 +4,7 @@
 //! own, apart from any terminal or window; this computer keeps one small file per run in one fixed
 //! folder ([`registry`]), never in the taskbag.
 
+pub mod accounts;
 pub mod flow;
 pub mod notify;
 pub mod registry;

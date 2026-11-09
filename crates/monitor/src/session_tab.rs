@@ -98,7 +98,8 @@ pub fn close_when_done(agent: String, tab: SessionTab, texts: CloseTexts) {
 
 #[cfg(target_os = "macos")]
 fn run(agent: &str, tab: &SessionTab, texts: &CloseTexts) -> Outcome {
-    let Some(exit) = exit_command(agent) else {
+    // An extra account's session (`claude_cli:<account>`) exits like its agent's (Task-A03-oven548).
+    let Some(exit) = exit_command(crate::accounts::base_agent(agent)) else {
         return Outcome::NotAvailable;
     };
     if !plain_tty(&tab.tty) || busy(tab).is_none() {

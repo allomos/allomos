@@ -13,7 +13,7 @@ use allomos_core::{Problem, Task, Taskbag};
 
 use crate::flow::{Run, Stuck, tab_to_close, waiting_alert};
 use crate::registry::{self, Held, Record, Request};
-use crate::{notify, request, session_tab, terminal};
+use crate::{accounts, notify, request, session_tab, terminal};
 
 /// How often requests are looked for.
 const TICK: Duration = Duration::from_secs(1);
@@ -216,19 +216,25 @@ impl Loop {
                 }
             }
             Request::Agents { agents } => {
+                let accounts = accounts::load();
                 let usable: Vec<String> = agents
                     .into_iter()
-                    .filter(|a| self.found.iter().any(|(id, _)| id == a))
+                    .filter(|a| {
+                        self.found
+                            .iter()
+                            .any(|(id, _)| id == accounts::base_agent(a))
+                            && accounts::usable(a, &accounts)
+                    })
                     .collect();
                 run.set_agents(&usable);
             }
             Request::Sessions { agent, count } => {
-                if crate::flow::TERMINAL_AGENTS.contains(&agent.as_str()) {
+                if crate::flow::TERMINAL_AGENTS.contains(&accounts::base_agent(&agent)) {
                     run.set_sessions(&agent, count);
                 }
             }
             Request::Difficulty { agent, range } => {
-                if crate::flow::TERMINAL_AGENTS.contains(&agent.as_str()) {
+                if crate::flow::TERMINAL_AGENTS.contains(&accounts::base_agent(&agent)) {
                     run.set_difficulty(&agent, &range);
                 }
             }
@@ -238,36 +244,44 @@ impl Loop {
 
     /// Start one session per share; an agent that cannot be started is taken off the run.
     fn start_sessions(&mut self, shares: Vec<(String, Task)>) {
+        // The accounts as they are now: an account added or removed in the app counts from here
+        // (Task-A03-oven548).
+        let accounts = accounts::load();
         for (agent, task) in shares {
             // An agent taken off by an earlier failure gets no more sessions this check.
             if !self.record.run.agents.contains(&agent) {
                 continue;
             }
-            let session_id = (agent == "claude_cli").then(new_session_id);
+            // The agent's command and its settings (`claude_cli:<account>` runs `claude`, in the
+            // account's folder).
+            let base = accounts::base_agent(&agent).to_string();
+            let session_id = (base == "claude_cli").then(new_session_id);
             let text = request::monitor_request(
                 &task.id,
                 &task.title,
                 &self.taskbag_arg,
                 &self.record.language,
-                &agent,
+                &base,
                 session_id.as_deref(),
                 self.record.run.quiet,
             );
             let found = self
                 .found
                 .iter()
-                .find(|(id, _)| *id == agent)
+                .find(|(id, _)| *id == base)
                 .map(|(_, p)| p.display().to_string());
-            let started = match found {
-                Some(found) => terminal::start_session(
-                    &agent,
+            let started = match (found, accounts::config_of(&agent, &accounts)) {
+                (Some(found), Ok(config)) => terminal::start_session(
+                    &base,
                     &found,
                     &self.record.project,
                     &text,
                     session_id.as_deref(),
                     self.alm_dir.as_deref(),
+                    config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
                 ),
-                None => Err(terminal::ask_failed(&agent, "not found on this computer")),
+                (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
+                (_, Err(why)) => Err(terminal::ask_failed(&agent, why)),
             };
             match started {
                 Ok(tab) => {

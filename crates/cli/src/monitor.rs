@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use allomos_core::Problem;
+use allomos_monitor::accounts;
 use allomos_monitor::flow::{FIRST_FREQUENCY, FREQUENCIES, Run, Scope, TERMINAL_AGENTS};
 use allomos_monitor::registry::{self, Entry, Request};
 use allomos_monitor::runner;
@@ -138,14 +139,41 @@ fn agents_text(run: &Run) -> Vec<String> {
             } else {
                 format!(" ({})", range.text())
             };
-            format!("{}{count}{levels}", agent_word(a))
+            // An extra account is named as `--agent` takes it: `claude-code:<account ID>`.
+            let word = match a.split_once(':') {
+                Some((base, account)) => format!("{}:{account}", agent_word(base)),
+                None => agent_word(a).to_string(),
+            };
+            format!("{word}{count}{levels}")
         })
         .collect()
 }
 
-/// The command's name for an agent ID.
+/// An agent as the person names it, or an extra account of one (`claude-code:<account ID>`, the
+/// account's ID as the app lists it in `agent-accounts.json`), as the monitor's ID. The account
+/// must be listed (Task-A03-oven548).
+fn agent_key(given: &str) -> Result<String, Problem> {
+    let Some((name, account)) = given.split_once(':') else {
+        return Ok(agent_id(given)?.to_string());
+    };
+    let base = agent_id(name)?;
+    if accounts::load()
+        .iter()
+        .any(|a| a.agent == base && a.id == account)
+    {
+        return Ok(accounts::key(base, account));
+    }
+    Err(Problem::BadUsage {
+        detail: format!(
+            "--agent {given}: {} has no account {account}; the app's Monitor ready tasks dialog lists the accounts",
+            agent_word(base)
+        ),
+    })
+}
+
+/// The command's name for an agent ID (an extra account's ID names its agent's command).
 fn agent_word(id: &str) -> &'static str {
-    match id {
+    match accounts::base_agent(id) {
         "claude_cli" => "claude-code",
         "codex_cli" => "codex",
         "antigravity_cli" => "antigravity",
@@ -162,17 +190,24 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         .collect();
     let mut agents: Vec<String> = Vec::new();
     for given in &args.agents {
-        let id = agent_id(given)?;
-        if !found.iter().any(|f| f == id) {
+        let id = agent_key(given)?;
+        if !found.iter().any(|f| f == accounts::base_agent(&id)) {
             return Err(Problem::BadUsage {
                 detail: format!(
                     "--agent {given}: {} was not found on this computer (its command answers no `--version` in PATH or the usual folders)",
-                    allomos_monitor::terminal::name(id)
+                    allomos_monitor::terminal::name(&id)
                 ),
             });
         }
-        if !agents.iter().any(|a| a == id) {
-            agents.push(id.to_string());
+        if !accounts::usable(&id, &accounts::load()) {
+            return Err(Problem::BadUsage {
+                detail: format!(
+                    "--agent {given}: its account's folder is not there any more (add the account again in the app)"
+                ),
+            });
+        }
+        if !agents.iter().any(|a| *a == id) {
+            agents.push(id);
         }
     }
     if agents.is_empty() {
@@ -212,10 +247,20 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         }
         None => Scope::All,
     };
+    // Each agent found, then its extra accounts that can be used (Task-A03-oven548).
+    let listed = accounts::load();
     let offered: Vec<String> = TERMINAL_AGENTS
         .iter()
         .filter(|a| found.iter().any(|f| f == *a))
-        .map(|a| a.to_string())
+        .flat_map(|a| {
+            std::iter::once(a.to_string()).chain(
+                listed
+                    .iter()
+                    .filter(|x| x.agent == *a)
+                    .map(|x| accounts::key(a, &x.id))
+                    .filter(|k| accounts::usable(k, &listed)),
+            )
+        })
         .collect();
     let mut run = Run::start(scope, agents, offered, quiet, args.every, now);
     for (agent, count) in sessions {
@@ -248,16 +293,16 @@ fn difficulties_of(
     for g in given {
         let (agent, range) = match g.split_once('=') {
             Some((name, range)) => {
-                let id = agent_id(name)?;
-                if !agents.iter().any(|a| a == id) {
+                let id = agent_key(name)?;
+                if !agents.iter().any(|a| *a == id) {
                     return Err(Problem::BadUsage {
                         detail: format!(
                             "--difficulty {g}: {} is not one of the run's agents (give it with --agent)",
-                            agent_word(id)
+                            agent_word(&id)
                         ),
                     });
                 }
-                (Some(id.to_string()), range)
+                (Some(id), range)
             }
             None => (None, g.as_str()),
         };
@@ -280,20 +325,20 @@ fn sessions_of(given: &[String], agents: &[String]) -> Result<Vec<(String, u32)>
             ),
         };
         let (name, count) = g.split_once('=').ok_or_else(|| bad("no count given"))?;
-        let id = agent_id(name)?;
+        let id = agent_key(name)?;
         let count: u32 = count
             .trim()
             .parse()
             .ok()
             .filter(|n| *n >= 1)
             .ok_or_else(|| bad("the count is a whole number, one or more"))?;
-        if !agents.iter().any(|a| a == id) {
+        if !agents.iter().any(|a| *a == id) {
             return Err(bad(&format!(
                 "{} is not one of the run's agents (give it with --agent)",
-                agent_word(id)
+                agent_word(&id)
             )));
         }
-        out.push((id.to_string(), count));
+        out.push((id, count));
     }
     Ok(out)
 }
