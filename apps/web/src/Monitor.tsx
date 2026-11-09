@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
-import { AGENT_KEY } from "./AgentPicker";
+import { monitorAgentName } from "./AgentPicker";
 import { localTime } from "./timeFlow";
 import { sessionPlace } from "./sessionFlow";
 import { toCheck } from "./stopFlow";
@@ -30,6 +30,7 @@ import {
 } from "./monitorFlow";
 import type { Frequency, LastRun, LostRun, Levels, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
 import { LevelsPicker } from "./MonitorDialog";
+import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -71,6 +72,8 @@ export function useMonitor({
   onError: (message: string) => void;
 }) {
   const { problem } = useI18n();
+  // The extra accounts' names for the labels (Task-A03-oven548).
+  useAgentAccounts(messenger);
   const [runs, setRuns] = useState<Run[]>([]);
   const [lost, setLost] = useState<LostRun[]>([]);
   const [last, setLast] = useState<LastRun | null>(() => readLast(root));
@@ -221,7 +224,7 @@ export function MonitorControl({
   if (!runs.length && !lost.length) {
     const counts = last ? lastRunCounts(last, tasks, toCheck) : null;
     // Per agent when more than one agent gave out tasks (Task-A03-weasel276).
-    const split = counts && counts.byAgent.length > 1 ? counts.byAgent.map((b) => `${t(AGENT_KEY[b.agent])} ${b.done}`).join(" · ") : null;
+    const split = counts && counts.byAgent.length > 1 ? counts.byAgent.map((b) => `${monitorAgentName(b.agent, t)} ${b.done}`).join(" · ") : null;
     return (
       <span className="monitor">
         {last && counts && (
@@ -367,13 +370,13 @@ function RunBar({
       />
       {run.noTask.length > 0 && (
         <span className="muted small">
-          {t("monitor.no_task_in_levels", { agents: run.noTask.map((a) => t(AGENT_KEY[a])).join(", ") })}
+          {t("monitor.no_task_in_levels", { agents: run.noTask.map((a) => monitorAgentName(a, t)).join(", ") })}
         </span>
       )}
       {working.map((cur) => {
         const task = tasks.find((x) => x.id === cur.id);
         const place = task ? sessionPlace(task) : null;
-        const label = `${t(AGENT_KEY[cur.agent])} · ${cur.id}`;
+        const label = `${monitorAgentName(cur.agent, t)} · ${cur.id}`;
         return place ? (
           <button
             key={cur.id}
@@ -438,7 +441,7 @@ function AgentsMenu({
       const count = sessionsOf(run, a) > 1 ? ` ×${sessionsOf(run, a)}` : "";
       const levels = levelsOf(run, a);
       const range = levels.low === 1 && levels.high === 5 ? "" : ` (${levelsText(levels)})`;
-      return `${t(AGENT_KEY[a])}${count}${range}`;
+      return `${monitorAgentName(a, t)}${count}${range}`;
     })
     .join(", ");
   return (
@@ -474,7 +477,7 @@ function AgentsMenu({
                   onClick={() => onChange(on ? run.agents.filter((x) => x !== a) : [...run.agents, a])}
                 >
                   {on ? "✓ " : ""}
-                  {t(AGENT_KEY[a])}
+                  {monitorAgentName(a, t)}
                   {!on && busy && <span className="muted small"> · {t("monitor.agents_finishing", { id: busy.id })}</span>}
                 </button>
                 {on && (
@@ -484,7 +487,7 @@ function AgentsMenu({
                       min={1}
                       step={1}
                       inputMode="numeric"
-                      aria-label={t("monitor.sessions_aria", { agent: t(AGENT_KEY[a]) })}
+                      aria-label={t("monitor.sessions_aria", { agent: monitorAgentName(a, t) })}
                       value={draft[a] ?? String(sessionsOf(run, a))}
                       onChange={(e) => {
                         setDraft((d) => ({ ...d, [a]: e.target.value }));
@@ -495,7 +498,7 @@ function AgentsMenu({
                     />
                   </label>
                 )}
-                {on && <LevelsPicker agent={a} name={t(AGENT_KEY[a])} levels={levelsOf(run, a)} onChange={(l) => onLevels(a, l)} />}
+                {on && <LevelsPicker agent={a} name={monitorAgentName(a, t)} levels={levelsOf(run, a)} onChange={(l) => onLevels(a, l)} />}
               </div>
             );
           })}

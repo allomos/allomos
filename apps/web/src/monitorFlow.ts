@@ -19,8 +19,69 @@ export const FIRST_FREQUENCY: Frequency = 30;
 export const STALL_MS = 30 * 60 * 1000;
 
 /** The agents whose sessions Allomos starts itself, in a terminal. */
-export type TerminalAgent = "claude_cli" | "codex_cli" | "antigravity_cli";
 export const TERMINAL_AGENTS: readonly string[] = ["claude_cli", "codex_cli", "antigravity_cli"];
+
+/** A monitor agent: an agent (`claude_cli`), or one of its extra accounts (`claude_cli:<account
+ * ID>`, Task-A03-oven548). Each one is a row of its own in the dialog and gets its own sessions
+ * and difficulty range. */
+export type TerminalAgent = string;
+
+/** An extra account of an agent, as the app lists it: its name and the folder it keeps its
+ * settings and login in (never the login itself). */
+export interface AgentAccount {
+  id: string;
+  agent: string;
+  name: string;
+  dir: string;
+}
+
+/** The app's accounts list: the extra accounts, and each agent's default folder. */
+export interface AgentAccounts {
+  accounts: AgentAccount[];
+  defaults: Record<string, string>;
+}
+
+/** The agent of a monitor agent: `claude_cli` for `claude_cli:<account>` too. */
+export function baseAgent(key: string): string {
+  const at = key.indexOf(":");
+  return at < 0 ? key : key.slice(0, at);
+}
+
+/** A monitor agent of an account: `<agent>:<account ID>`. */
+export function accountKey(agent: string, id: string): string {
+  return `${agent}:${id}`;
+}
+
+/** Whether a monitor agent is one Allomos starts in a terminal (an account of one counts too). */
+export function isTerminalAgent(key: string): boolean {
+  return TERMINAL_AGENTS.includes(baseAgent(key));
+}
+
+/** One row of an agent's accounts in the dialog: the monitor agent, and the account's name when
+ * the agent has extra accounts (`null`: the agent alone, as before accounts existed). */
+export interface AccountRow {
+  key: TerminalAgent;
+  name: string | null;
+}
+
+/** The rows for an agent: one when it has no extra account; otherwise the default account first
+ * (named `firstName`, the person's `Account 1`), then each extra account in the order added. */
+export function accountRows(agent: string, accounts: AgentAccount[], firstName: string): AccountRow[] {
+  const extra = accounts.filter((a) => a.agent === agent);
+  if (extra.length === 0) return [{ key: agent, name: null }];
+  return [{ key: agent, name: firstName }, ...extra.map((a) => ({ key: accountKey(agent, a.id), name: a.name }))];
+}
+
+/** The name suggested for a new account: `Account 2` for the first one beside the default, then
+ * one more each time (`Account 3`, …). */
+export function suggestedAccountName(accounts: AgentAccount[], agent: string): string {
+  return `Account ${accounts.filter((a) => a.agent === agent).length + 2}`;
+}
+
+/** The label of a monitor agent: its agent's name, and the account's name after a dot. */
+export function agentLabel(agentName: string, accountName: string | null): string {
+  return accountName ? `${agentName} · ${accountName}` : agentName;
+}
 
 /** Which tasks the monitor takes: every ready one, or one iteration's (`current`: it was the
  * active iteration when the run started, shown as "current iteration"). */
@@ -174,8 +235,7 @@ export interface LostRun {
   id: string | null;
 }
 
-const asAgent = (a: unknown): TerminalAgent | null =>
-  typeof a === "string" && TERMINAL_AGENTS.includes(a) ? (a as TerminalAgent) : null;
+const asAgent = (a: unknown): TerminalAgent | null => (typeof a === "string" && isTerminalAgent(a) ? a : null);
 const agents = (list: unknown): TerminalAgent[] =>
   Array.isArray(list) ? list.map(asAgent).filter((a): a is TerminalAgent => a !== null) : [];
 const num = (n: unknown, or = 0): number => (typeof n === "number" ? n : or);
