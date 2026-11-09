@@ -1765,6 +1765,7 @@ function TaskbagView({
       {monitorFrom && box && (
         <MonitorDialog
           messenger={messenger}
+          root={opened.root}
           options={scopeOptions(box.tasks, box.areas, iterations, activeIteration)}
           from={monitorFrom}
           onStart={(scope, agent, quiet, every) => {

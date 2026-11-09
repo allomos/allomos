@@ -9,6 +9,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
+import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
 import type { Released, SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
@@ -142,6 +143,11 @@ export interface Messenger {
   buildAppRequest(project: string, taskbag: string, language: string, description: string, quiet: boolean, discuss: boolean): Promise<string>;
   /** The explanation of quiet and normal mode (`alm guide run-modes`, the person's part), as Markdown. */
   runModesText(language: string): Promise<string>;
+  /** Allomos's rules for Codex on this computer (Task-A03-pier032): read only, for Monitor ready tasks…. */
+  codexRulesStatus(): Promise<CodexRules>;
+  /** Start in Monitor ready tasks…: add, update or remove Allomos's rules for Codex, recorded in the
+   * taskbag at `root`. Rejects with a Problem. */
+  codexRulesApply(root: string, action: "install" | "remove"): Promise<CodexRules>;
   /** Whether `project` has AGENTS.md and CLAUDE.md. */
   instructionFiles(project: string): Promise<InstructionFiles>;
   /** The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24): which agents
@@ -478,6 +484,8 @@ export const desktopMessenger: Messenger = {
   buildAppRequest: (project, taskbag, language, description, quiet, discuss) =>
     invoke<string>("build_app_request", { project, taskbag, language, description, quiet, discuss }),
   runModesText: (language) => invoke<string>("run_modes_text", { language }),
+  codexRulesStatus: () => invoke<CodexRules>("codex_rules_status"),
+  codexRulesApply: (root, action) => invoke<CodexRules>("codex_rules_apply", { root, action }),
   instructionFiles: (project) => invoke<InstructionFiles>("instruction_files", { project }),
   agentsSetUp: (taskbag) => invoke<string[]>("agents_set_up", { taskbag }),
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),

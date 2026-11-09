@@ -12,24 +12,30 @@ import type { Unavailable } from "./AgentPicker";
 import { MANUAL } from "./agentPickerFlow";
 import type { Choice } from "./agentPickerFlow";
 import { Markdown } from "./Markdown";
+import { codexActionAtStart, codexFirstChecked, codexOffer, ruleText, rulesList } from "./codexRulesFlow";
+import type { CodexRules } from "./codexRulesFlow";
+import { isProblem } from "./types";
 import { FIRST_FREQUENCY, FREQUENCIES, TERMINAL_AGENTS, firstScope, frequencyText } from "./monitorFlow";
 import type { Frequency, OpenedFrom, Scope, ScopeOptions, TerminalAgent } from "./monitorFlow";
 
 export function MonitorDialog({
   messenger,
+  root,
   options,
   from,
   onStart,
   onClose,
 }: {
   messenger: Messenger;
+  /** The taskbag, where a change to Codex's rules is recorded (Task-A03-pier032). */
+  root: string;
   /** The Which tasks field's choices, counted from the taskbag as it is now. */
   options: ScopeOptions;
   from: OpenedFrom;
   onStart: (scope: Scope, agent: TerminalAgent, quiet: boolean, every: Frequency) => void;
   onClose: () => void;
 }) {
-  const { t, language } = useI18n();
+  const { t, language, problem } = useI18n();
   // Every choice must run unattended (approver, 2026-11-04): this step runs only the agents
   // Allomos starts itself; the others are shown with why not.
   const unavailable = useMemo<Unavailable>(
@@ -58,6 +64,45 @@ export function MonitorDialog({
       live = false;
     };
   }, [messenger, language]);
+
+  // Allomos's rules for Codex (Task-A03-pier032): read when Codex is chosen; written only at Start.
+  const [codex, setCodex] = useState<CodexRules | null>(null);
+  const [codexOn, setCodexOn] = useState(true);
+  const [codexError, setCodexError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  useEffect(() => {
+    if (agent !== "codex_cli") return;
+    let live = true;
+    messenger
+      .codexRulesStatus()
+      .then((r) => {
+        if (!live) return;
+        setCodex(r);
+        setCodexOn(codexFirstChecked(codexOffer(r)));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [messenger, agent]);
+  const offer = agent === "codex_cli" && codex ? codexOffer(codex) : null;
+  const never = t("monitor.codex_rules_never");
+  const nothing = t("monitor.codex_rules_none");
+  const start = async () => {
+    if (!canStart || starting) return;
+    const action = offer ? codexActionAtStart(offer, codexOn) : null;
+    if (action) {
+      setStarting(true);
+      try {
+        await messenger.codexRulesApply(root, action);
+      } catch (e) {
+        setCodexError(t("monitor.codex_rules_failed", { problem: isProblem(e) ? problem(e) : String(e) }));
+        setStarting(false);
+        return;
+      }
+    }
+    onStart(scope, agent as TerminalAgent, quiet, every);
+  };
 
   const isOther = scope.kind === "iteration" && !scope.current;
   const chooseOther = (id: string | null = otherId) => {
@@ -180,6 +225,56 @@ export function MonitorDialog({
           <p className="banner update">
             {t(agent === "claude_cli" || agent === "codex_cli" || agent === "antigravity_cli" ? `monitor.permissions_${agent}` : "build.auto_mode")}
           </p>
+          {offer && codex && (
+            <div className="codex-rules">
+              {offer === "newer" ? (
+                <p className="small hint">{t("monitor.codex_rules_newer", { path: codex.path, version: codex.state === "newer" ? codex.version : codex.shipped })}</p>
+              ) : (
+                <>
+                  {codex.state === "older" && (
+                    <p className="small hint">
+                      {t("monitor.codex_rules_changed_by", {
+                        from: codex.version,
+                        to: codex.shipped,
+                        added: rulesList(codex.changes.added, never, nothing),
+                        removed: rulesList(codex.changes.removed, never, nothing),
+                      })}
+                    </p>
+                  )}
+                  {codex.state === "changed" && (
+                    <p className="small hint">
+                      {t("monitor.codex_rules_edited", {
+                        path: codex.path,
+                        version: codex.shipped,
+                        added: rulesList(codex.changes.added, never, nothing),
+                        removed: rulesList(codex.changes.removed, never, nothing),
+                      })}
+                    </p>
+                  )}
+                  <label>
+                    <input type="checkbox" checked={codexOn} onChange={(e) => setCodexOn(e.target.checked)} />{" "}
+                    <strong>
+                      {offer === "changed"
+                        ? t("monitor.codex_rules_replace", { version: codex.shipped })
+                        : t(`monitor.codex_rules_${offer}`, { path: codex.path, version: codex.shipped })}
+                    </strong>
+                  </label>
+                  <p className="muted small">{t("monitor.codex_rules_note")}</p>
+                  <details>
+                    <summary>{t("monitor.codex_rules_show")}</summary>
+                    <ul className="small">
+                      {codex.rules.map((r) => (
+                        <li key={`${r.decision} ${r.command}`}>
+                          <code>{ruleText(r, never)}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </>
+              )}
+              {codexError && <p className="error small">{codexError}</p>}
+            </div>
+          )}
           <p className="muted small">{t("monitor.backlog_note")}</p>
         </div>
 
@@ -190,8 +285,8 @@ export function MonitorDialog({
           <button
             type="button"
             className="primary"
-            disabled={!canStart}
-            onClick={() => canStart && onStart(scope, agent as TerminalAgent, quiet, every)}
+            disabled={!canStart || starting}
+            onClick={() => void start()}
           >
             {t("monitor.start")}
           </button>

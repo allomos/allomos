@@ -7,6 +7,7 @@
 mod agents;
 mod alm_command;
 mod audit;
+mod codex_rules;
 mod heartbeat_settings;
 mod lan;
 mod pairing;
@@ -2683,6 +2684,8 @@ pub fn run() {
             monitor_close_session,
             release_finished,
             run_modes_text,
+            codex_rules::codex_rules_status,
+            codex_rules::codex_rules_apply,
             copy_text,
             instruction_files,
             agents_set_up,
