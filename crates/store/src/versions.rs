@@ -92,7 +92,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// Task-A01-moth111).
 /// 32: a blocked task goes on by itself when its last blocker finishes; `alm unblock` lets it go
 /// earlier (Task-A01-tuna668).
-pub const SECTION_VERSION: u32 = 32;
+/// 33: while holding a task the agent passes `--as` to every command, beats at least every
+/// 10 minutes (`alm beat`), declares long steps with `--busy`, takes over lost tasks from
+/// `alm next` and gives up a task taken over from it (decision 0022, Task-A03-brain042).
+pub const SECTION_VERSION: u32 = 33;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

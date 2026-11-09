@@ -552,6 +552,20 @@ const WORKFLOW: &str = "# How to work the tasks
    Git: `git branch --show-current`; alm reads no version control), and save and share the claim
    right away with your version control tool (it prints the Git commands as the example): until
    your claim is shared, other sessions do not see it and may take the task too. A task someone else holds is not yours to change.
+   **While you hold a task: heartbeats** (decision 0022). These rules need nothing but reading
+   them and running commands, so every agent follows them, whatever its tool. Pass `--as <your
+   session name>` to every `alm` command (or set ALLOMOS_HOLDER), reading ones too: that is how
+   `alm` tells you when a task was taken over from you. Send a heartbeat at least every 10
+   minutes (the project's interval; `alm heartbeat-settings` shows it): `alm beat --as <your
+   session name>` beats every task you hold in one change; save and share it as `alm` prints,
+   since a heartbeat counts only once shared. Under half the interval after the last one it
+   writes nothing, so running it often costs nothing. Any change you make to your task (`label`,
+   `note`, `handoff`, …) beats along with it; reading never does. Before a long step that runs
+   no `alm` command for longer than the interval (a long build, a long test run, waiting for a
+   slow tool), declare it first: `alm beat <id> --busy <length>`, as long as you judge it needs
+   (no upper limit; `alm next` shows it to everyone), and `alm beat <id> --busy 0m` when it ends
+   early. Without heartbeats or a busy window, after the project's limit (30 minutes by default)
+   your task is lost and another session may take it over.
    **Taking over a lost task** (decision 0022 § 6). A held task whose holder has sent no
    heartbeat for longer than the project's limit, with no busy window running, is lost: `alm next`
    lists it under \"Lost, can be taken over\" with the command. Take one over only when you mean to
@@ -1932,6 +1946,37 @@ mod tests {
             assert!(text.contains("until your claim is shared"), "{text}");
             assert!(text.contains("version control tool"), "{text}");
             assert!(text.contains("Git commands as the example"), "{text}");
+        }
+    }
+
+    /// The shared rules for heartbeats and takeovers (decision 0022, Task-A03-brain042): the brief
+    /// (AGENTS.md) and `alm guide workflow` both tell every agent, with commands only, to pass
+    /// `--as`, beat every 10 minutes and share it, declare long steps with `--busy`, find and take
+    /// over lost tasks, and stop when a task was taken over from it.
+    #[test]
+    fn brief_and_workflow_carry_the_heartbeat_rules() {
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        for text in [
+            flat(&crate::agent_section()),
+            flat(guide(Some("workflow")).unwrap().as_str()),
+        ] {
+            for words in [
+                "decision 0022",
+                "`--as <your session name>` to every `alm` command",
+                "every 10 minutes",
+                "`alm heartbeat-settings`",
+                "`alm beat --as <your session name>`",
+                "counts only once shared",
+                "`alm beat <id> --busy <length>`",
+                "--busy 0m`",
+                "30 minutes by default",
+                "Lost, can be taken over",
+                "`notice [taken_over]`",
+                "stop work on it at once",
+                "do not claim it back",
+            ] {
+                assert!(text.contains(words), "{words}: {text}");
+            }
         }
     }
 

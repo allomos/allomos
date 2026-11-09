@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v32)
+## Tasks: Allomos (v33)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -67,6 +67,19 @@ the project notes (below).
   branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
   prints), never in the main checkout: the main checkout stays on the base branch. Merge from
   the main checkout; once merged, remove your worktree and the merged branch.
+- While you hold a task (decision 0022): pass `--as <your session name>` to every `alm` command.
+  Send a heartbeat at least every 10 minutes (the project's interval, `alm heartbeat-settings`):
+  `alm beat --as <your session name>` (every task you hold, in one change), and save and share it
+  like any change: a heartbeat counts only once shared. A change you make to your task beats
+  along with it; reading never does. Before a long step that runs no `alm` command (a long build
+  or test run), declare it: `alm beat <id> --busy <length>`, as long as you judge it needs
+  (`--busy 0m` ends it early). A held task silent past the project's limit (30 minutes by
+  default) with no busy window is lost: `alm next` lists it under "Lost, can be taken over" with
+  the command. Take one over only to continue its work: claiming it is the takeover; go on on its
+  working branch, and look at the former holder's worktree but change nothing there. When `alm`
+  says one of your tasks was taken over (`notice [taken_over]`), stop work on it at once (no more
+  commits or pushes to its branch, do not claim it back), leave your worktree as it is, tell the
+  person, and go on with another ready task or end. Details: `alm guide workflow`, step 2.
 - Report progress: `alm label <id> "<label>"`.
 - Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
   another task: `alm block <id> --by <task-id>`. When its last blocker finishes (done or
