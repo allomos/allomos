@@ -236,7 +236,9 @@ impl Run {
         // (decision 0022): a new session takes it over, after the ready tasks.
         let lost_after = heartbeat::applied(&bag.project).lost_after_secs;
         for t in &bag.tasks {
-            if self.taken.contains(&t.id) || iteration.is_some_and(|i| t.iteration.as_deref() != Some(i)) {
+            if self.taken.contains(&t.id)
+                || iteration.is_some_and(|i| t.iteration.as_deref() != Some(i))
+            {
                 continue;
             }
             if heartbeat::lost(t, now_secs, lost_after, None).is_some() {
@@ -404,7 +406,11 @@ mod tests {
     fn a_lost_task_is_offered_to_a_new_session() {
         let r = run(&["claude_cli"]);
         let beat = heartbeat::parse_utc("2026-11-09T10:00:00Z").unwrap();
-        let bag = bag_of(vec![held_since("A01-9", "old/session", "2026-11-09T10:00:00Z")]);
+        let bag = bag_of(vec![held_since(
+            "A01-9",
+            "old/session",
+            "2026-11-09T10:00:00Z",
+        )]);
         let quiet = r.share(&bag, beat + 2 * 3600);
         assert_eq!(quiet.len(), 1);
         assert_eq!(quiet[0].1.id, "A01-9");
@@ -606,8 +612,11 @@ mod tests {
             leveled("A01-2", 5),
             leveled("A01-3", 2),
         ]);
-        let shares: Vec<(String, String)> =
-            r.share(&bag, 0).into_iter().map(|(a, t)| (a, t.id)).collect();
+        let shares: Vec<(String, String)> = r
+            .share(&bag, 0)
+            .into_iter()
+            .map(|(a, t)| (a, t.id))
+            .collect();
         // Claude takes the first task of 4-5 (A01-2); codex the first of 1-2 (A01-1).
         assert_eq!(
             shares,
