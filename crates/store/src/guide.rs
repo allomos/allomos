@@ -11,7 +11,7 @@
 //! so far written only in English ([`github_release`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 10] = [
+pub const GUIDE_TOPICS: [&str; 11] = [
     "terms",
     "customize",
     "tasks",
@@ -22,6 +22,7 @@ pub const GUIDE_TOPICS: [&str; 10] = [
     "goal",
     "github-release",
     "move-cards",
+    "codex-rules",
 ];
 
 /// The topics written in every language of [`RUN_MODES_LANGUAGES`], printed in the task language.
@@ -532,6 +533,33 @@ until the person says Go ahead.
 6. Tell the person what moved, what did not and why, and the card files without a task.
 ";
 
+/// `alm guide codex-rules` (Task-A03-pier032, approver 2026-11-09): Allomos's rules for Codex,
+/// so an unattended Codex session can pull, commit and push; [`guide`] adds the file itself.
+const CODEX_RULES: &str = "# Allomos's rules for Codex
+
+Codex runs each command in its sandbox. In `workspace-write` the checkout's `.git` is read-only
+and the network is closed, so a Codex session with nobody there to approve (an unattended run,
+such as one Monitor ready tasks… starts) cannot pull, commit or push. Allomos's rules for Codex
+let Codex run Git and `alm` without asking; every other command stays in Codex's sandbox.
+
+- **Once per computer, not once per project.** The file below goes in Codex's rules folder as
+  `~/.codex/rules/allomos.rules` (`$CODEX_HOME/rules/allomos.rules` when `CODEX_HOME` is set).
+  In the Allomos app, the option in Monitor ready tasks… adds it, updates it and removes it.
+  Adding it changes what Codex may do on this computer: ask the person first.
+- **Allomos writes only `allomos.rules`.** Your own rules go in Codex's `default.rules` in the
+  same folder, which Allomos never changes. Changes made in `allomos.rules` are replaced on
+  update (the app shows them and asks first).
+- **How Codex matches a rule:** a command that starts with the rule's words, run on its own.
+  Run each Git and `alm` command on its own (no `&&`, `;` or pipes): a command joined with others
+  runs in the sandbox. `git -C <folder> …` does not match: run `git …` in that folder instead.
+  The commands `alm` prints are examples; write them in this form.
+- **Which `alm`:** the rules name no path for `alm`, so they cover the one in the installed
+  Allomos app and a development build alike. Use the `alm` the person or the request names, and
+  when a command or field is unknown, check `alm --version` (or `which alm`) first.
+- A forced push written right after `push` is refused (`git push --force`, `-f`,
+  `--force-with-lease`); never force-push in any form.
+";
+
 const WORKFLOW: &str = "# How to work the tasks
 
 1. Start with `alm next` (or `alm list`). Choose by its rule: the task the person named, if any;
@@ -596,6 +624,15 @@ const WORKFLOW: &str = "# How to work the tasks
    commits or pushes to its working branch, and do not claim it back), leave your worktree as it
    is, tell the person in your conversation that it was taken over and by whom, and go on with
    another ready task (`alm next`) or end.
+   **When Git cannot write the checkout** (Task-A03-pier032): `Operation not permitted` on
+   `.git/…` (as in Codex's sandbox) means your agent may not change the repository from where
+   it runs. Stop and say so: the agent needs Allomos's rules for Codex (`alm guide
+   codex-rules`; in the app, the option in Monitor ready tasks). Do not make another copy of the
+   repository to get around it: the other sessions would go on reading the stale one. Run each
+   Git and `alm` command on its own (no `&&`, `;` or pipes): a command joined with others runs
+   in the sandbox. Unattended Codex does not use `git -C <folder>`: it runs `git …` in that
+   folder. **Which `alm`:** use the one the person or the request names; when a command or
+   field is unknown, check `alm --version` (or `which alm`) first.
    When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
    <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
    reopen it. In the Claude desktop app you must also pass `--session-kind desktop
@@ -953,7 +990,16 @@ contradictions.
    sharing on its own is an outside effect: set it up only when the person has approved it, and
    record the hook beside the agent under `## Agents set up` (for example
    `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`).
-6. **Tell the person** what moved, which files now point to AGENTS.md, the automatic heartbeat you
+6. **Codex: Allomos's rules, once per computer.** If you are Codex, or set Codex up, Codex needs
+   Allomos's rules for Codex to pull, commit and push when nobody is there to approve: they let
+   it run Git and `alm` without asking, every other command staying in its sandbox. They go in
+   `~/.codex/rules/allomos.rules`, once per computer, not once per project; `alm guide
+   codex-rules` prints them and says how. Adding them is an outside effect on this computer: do
+   it only when the person has approved it (in the app, the option in Monitor ready tasks… adds
+   them). The person's own rules go in Codex's `default.rules`, never in `allomos.rules`. Record
+   it on Codex's line under `## Agents set up` (for example
+   `- Codex: reads AGENTS.md directly; Allomos's rules in ~/.codex/rules/allomos.rules (version 1), 2026-11-09`).
+7. **Tell the person** what moved, which files now point to AGENTS.md, the automatic heartbeat you
    set up (or why not), and the contradictions waiting for their answer.
 
 From then on:
@@ -1016,7 +1062,14 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
    还长的一步仍要先声明忙碌时段。自己保存并分享是一种外部影响：只在用户批准后才设置，并在
    `## Agents set up` 里这个智能体的一行写上这个 hook（例如
    `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`）。
-6. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，设置了什么自动心跳（或为什么没有设置），
+6. **Codex：「换肩」给 Codex 的规则，每台电脑一次。** 你是 Codex，或在为 Codex 设置时：Codex
+   要在没人批准时拉取、提交和推送，需要「换肩」给 Codex 的规则：它们让 Codex 不问就运行 Git 和
+   `alm`，其余命令照旧在沙箱里。规则放在 `~/.codex/rules/allomos.rules`，每台电脑一次，不是每个项目
+   一次；`alm guide codex-rules` 打印它们并说明做法。加上规则是对这台电脑的对外影响：只在用户批准后做
+   （在应用里，「自动监测就绪任务」对话框里的选项会加上）。用户自己的规则放在 Codex 的 `default.rules`，
+   不放在 `allomos.rules`。在 `## Agents set up` 的 Codex 一行写上（例如
+   `- Codex: reads AGENTS.md directly; Allomos's rules in ~/.codex/rules/allomos.rules (version 1), 2026-11-09`）。
+7. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，设置了什么自动心跳（或为什么没有设置），
    以及哪些矛盾在等他们回答。
 
 此后：
@@ -1093,7 +1146,16 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
    自分で保存して共有するのは外への影響です。ユーザーが承認したときだけ設定し、`## Agents set up`
    のそのエージェントの行に hook を書きます（たとえば
    `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`）。
-6. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どんな
+6. **Codex：「換肩」の Codex 用ルール、コンピューターごとに一度。** あなたが Codex のとき、または
+   Codex を設定するとき：承認する人がいないときにも Codex がプル、コミット、プッシュするには、「換肩」の
+   Codex 用ルールが要ります。Codex は Git と `alm` を尋ねずに実行でき、ほかのコマンドはこれまでどおり
+   サンドボックスの中です。ルールは `~/.codex/rules/allomos.rules` に置きます。プロジェクトごとではなく、
+   コンピューターごとに一度です。`alm guide codex-rules` がルールとその置き方を出力します。ルールを加える
+   のはこのコンピューターへの外への影響です：ユーザーが承認したときだけ行います（アプリでは「準備完了の
+   タスクを監視」ダイアログの選項が加えます）。ユーザー自身のルールは Codex の `default.rules` に置き、
+   `allomos.rules` には置きません。`## Agents set up` の Codex の行に書きます（例：
+   `- Codex: reads AGENTS.md directly; Allomos's rules in ~/.codex/rules/allomos.rules (version 1), 2026-11-09`）。
+7. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どんな
    自動のハートビートを設定したか（しなかったならその理由）、どの食い違いが答えを待っているか。
 
 これから先：
@@ -1867,14 +1929,26 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "goal" => Some(GOAL_EN),
         "github-release" => Some(GITHUB_RELEASE_EN),
         "move-cards" => Some(MOVE_CARDS),
+        "codex-rules" => Some(CODEX_RULES),
         _ => None,
     };
+    let full = |t: &str| {
+        text(t).map(|x| match t {
+            // The file itself follows its explanation (Task-A03-pier032).
+            "codex-rules" => format!(
+                "{x}\nThe file (version {}):\n\n```\n{}```\n",
+                crate::codex_rules::VERSION,
+                crate::codex_rules::text()
+            ),
+            _ => x.to_string(),
+        })
+    };
     match topic {
-        Some(t) => text(t).map(String::from),
+        Some(t) => full(t),
         None => Some(
             GUIDE_TOPICS
                 .iter()
-                .filter_map(|t| text(t))
+                .filter_map(|t| full(t))
                 .collect::<Vec<_>>()
                 .join("\n"),
         ),
@@ -1892,10 +1966,22 @@ mod tests {
                 guide(Some(topic)).is_some_and(|t| t.starts_with("# ")),
                 "{topic}"
             );
-            assert!(
-                crate::agent_section().contains(&format!("alm guide {topic}")),
-                "{topic}"
-            );
+            // `codex-rules` is named by `workflow` and `agent-files` instead, so the brief (and
+            // every project's AGENTS.md section) stays as it is (Task-A03-pier032).
+            if topic != "codex-rules" {
+                assert!(
+                    crate::agent_section().contains(&format!("alm guide {topic}")),
+                    "{topic}"
+                );
+            }
+        }
+        for topic in ["workflow", "agent-files"] {
+            let words = guide(Some(topic))
+                .unwrap()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            assert!(words.contains("`alm guide codex-rules`"), "{topic}");
         }
         assert_eq!(guide(Some("nope")), None);
         let all = guide(None).unwrap();
@@ -2111,14 +2197,18 @@ mod tests {
             ] {
                 assert!(text.contains(words), "{language}: {words}");
             }
-            // Six numbered steps, then two standing rules.
-            for step in 1..=6 {
+            // Seven numbered steps, then two standing rules.
+            for step in 1..=7 {
                 assert!(
                     text.contains(&format!("\n{step}. **")),
                     "{language}: {step}"
                 );
             }
-            assert!(!text.contains("\n7. "), "{language}");
+            assert!(!text.contains("\n8. "), "{language}");
+            // Codex's rules, once per computer (Task-A03-pier032).
+            assert!(text.contains("~/.codex/rules/allomos.rules"), "{language}");
+            assert!(text.contains("codex-rules"), "{language}");
+            assert!(text.contains("default.rules"), "{language}");
             assert_eq!(text.matches("\n- ").count(), 2, "{language}");
             // Two in step 2 (what an agent's own file keeps), four in step 5 (the hook's script).
             assert_eq!(text.matches("\n   - ").count(), 6, "{language}");

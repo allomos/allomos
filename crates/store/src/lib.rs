@@ -32,6 +32,7 @@ pub mod cadence;
 pub mod cards;
 pub mod checkpoint;
 pub mod classify;
+pub mod codex_rules;
 mod confirm;
 mod convert;
 pub mod effects;
