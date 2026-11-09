@@ -928,8 +928,33 @@ contradictions.
    (in Git: `git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
    Leave every other change as it is. Share (push) as the project's rules say; when they say
    nothing, only when the person asks.
-5. **Tell the person** what moved, which files now point to AGENTS.md, and the contradictions
-   waiting for their answer.
+5. **Set up an automatic heartbeat, if your tool can run commands by itself.** A session holding
+   a task beats at least every 10 minutes and shares each beat. A tool that runs a command after
+   each step or on a timer does it without anyone remembering: Claude Code with a hook in the
+   project's `.claude/settings.json` (for example on `PostToolUse`), Codex with a hook or its
+   `notify` program where your version has one, any other tool with what it offers. Set it up in
+   the project's own settings for that tool, not in the person's home folder, as a small script
+   kept in the project that:
+   - finds the session name: the task in progress whose recorded session is this one
+     (`alm list --state in_progress --json`: its `session.id` is this session's ID, which Claude
+     Code gives as `CLAUDE_CODE_SESSION_ID` and Codex as `CODEX_THREAD_ID`; its `holder` is the
+     name), or `ALLOMOS_HOLDER` when it is set; with neither, it does nothing;
+   - runs `alm beat --as <that name> --json` (with `--taskbag` where the project's rules use it);
+     alm writes nothing while the last beat is under half the interval old, so running it after
+     every step costs little;
+   - when the result's `changed_files` is not empty, saves only those files in the taskbag and
+     shares them to `origin` (in Git: `git -C <taskbag> commit -m \"alm: beat\" -- <those files>`,
+     then `git -C <taskbag> push origin`); a refused push is pulled once (`git -C <taskbag> pull
+     --rebase --autostash`) and pushed again, never forced;
+   - never stops the agent: on any failure it exits quietly, and the agent beats by hand as
+     before.
+   The hook only beats: claiming, releasing and busy windows (`alm beat <id> --busy <length>`)
+   stay the agent's, and a step longer than the interval still needs a busy window. Saving and
+   sharing on its own is an outside effect: set it up only when the person has approved it, and
+   record the hook beside the agent under `## Agents set up` (for example
+   `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`).
+6. **Tell the person** what moved, which files now point to AGENTS.md, the automatic heartbeat you
+   set up (or why not), and the contradictions waiting for their answer.
 
 From then on:
 - Shared rules live only in AGENTS.md; never add a shared rule to one agent's own file.
@@ -972,7 +997,27 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
    在任务包里：`project-notes.md`
    （用 Git 时：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
    其他改动保持原样。按项目规则共享（推送）；规则没说时，只在用户要求时共享。
-5. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，以及哪些矛盾在等他们回答。
+5. **你的工具能自己运行命令时，设置自动心跳。** 持有任务的会话至少每 10 分钟写一次心跳，并把
+   每次心跳分享出去。能在每一步之后或按定时运行命令的工具，可以不靠谁记得就做到：Claude Code 用
+   项目的 `.claude/settings.json` 里的 hook（例如挂在 `PostToolUse` 上），Codex 在你的版本支持时用
+   hook 或它的 `notify` 程序，其他工具用它提供的办法。设置在项目里这个工具自己的设置中，不要放在
+   用户的主文件夹；做成项目里的一个小脚本，它：
+   - 找出会话名：记录的会话就是本会话的那个进行中任务（`alm list --state in_progress --json`：
+     它的 `session.id` 是本会话的 ID，Claude Code 给的是 `CLAUDE_CODE_SESSION_ID`，Codex 给的是
+     `CODEX_THREAD_ID`；它的 `holder` 就是会话名），或者设了 `ALLOMOS_HOLDER` 时用它；两者都没有
+     就什么也不做；
+   - 运行 `alm beat --as <那个名字> --json`（项目规则用 `--taskbag` 时也带上）；上次心跳不到
+     间隔的一半时 alm 什么都不写，所以每一步之后都运行也不费事；
+   - 结果的 `changed_files` 不为空时，只把这些文件保存到任务包，并分享到 `origin`（用 Git 时：
+     `git -C <taskbag> commit -m \"alm: beat\" -- <those files>`，再 `git -C <taskbag> push origin`）；
+     推送被拒时拉取一次（`git -C <taskbag> pull --rebase --autostash`）再推送，绝不强推；
+   - 从不让 agent 停下：出任何错都安静退出，agent 照旧手动写心跳。
+   hook 只写心跳：认领、释放和忙碌时段（`alm beat <id> --busy <length>`）仍由 agent 来做，比间隔
+   还长的一步仍要先声明忙碌时段。自己保存并分享是一种外部影响：只在用户批准后才设置，并在
+   `## Agents set up` 里这个智能体的一行写上这个 hook（例如
+   `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`）。
+6. **告诉用户**移动了什么，哪些文件现在指向 AGENTS.md，设置了什么自动心跳（或为什么没有设置），
+   以及哪些矛盾在等他们回答。
 
 此后：
 - 共用规则只放在 AGENTS.md；不要把共用规则加到某个智能体自己的文件里。
@@ -1023,8 +1068,33 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
    （Git なら：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
    ほかの変更はそのままにします。共有（プッシュ）はプロジェクトのルールに従い、ルールに何もなければ
    ユーザーに頼まれたときだけにします。
-5. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どの
-   食い違いが答えを待っているか。
+5. **ツールが自分でコマンドを実行できるなら、自動のハートビートを設定します。** タスクを持つ
+   セッションは少なくとも 10 分ごとにハートビートを書き、そのたびに共有します。一歩ごとや時間を
+   決めてコマンドを実行できるツールなら、だれかが覚えていなくてもできます。Claude Code ならプロ
+   ジェクトの `.claude/settings.json` の hook（たとえば `PostToolUse`）、Codex なら使っている版に
+   あれば hook か `notify` のプログラム、ほかのツールはそのツールにある方法で。設定するのはその
+   ツールのプロジェクト内の設定で、ユーザーのホームフォルダーではありません。プロジェクトに置く
+   小さなスクリプトにして、次のことをさせます。
+   - セッション名を見つけます：記録されたセッションがこのセッションである進行中のタスク
+     （`alm list --state in_progress --json`：その `session.id` がこのセッションの ID で、Claude
+     Code では `CLAUDE_CODE_SESSION_ID`、Codex では `CODEX_THREAD_ID`。その `holder` が名前）、
+     または `ALLOMOS_HOLDER` が設定されていればそれ。どちらもなければ何もしません。
+   - `alm beat --as <その名前> --json` を実行します（プロジェクトのルールが `--taskbag` を使うなら
+     付けます）。前のハートビートから間隔の半分たっていなければ alm は何も書かないので、一歩ごとに
+     実行しても負担はわずかです。
+   - 結果の `changed_files` が空でなければ、そのファイルだけをタスクバッグに保存し、`origin` に
+     共有します（Git なら：`git -C <taskbag> commit -m \"alm: beat\" -- <those files>`、続けて
+     `git -C <taskbag> push origin`）。プッシュが断られたら一度だけ取り込み（`git -C <taskbag> pull
+     --rebase --autostash`）、もう一度プッシュします。強制プッシュはしません。
+   - エージェントを止めません：何か失敗しても黙って終わり、エージェントはこれまでどおり手で
+     ハートビートを書きます。
+   hook はハートビートを書くだけです。取ること、手放すこと、忙しい時間（`alm beat <id> --busy
+   <length>`）はエージェントの仕事のままで、間隔より長い一歩には今までどおり忙しい時間を宣言します。
+   自分で保存して共有するのは外への影響です。ユーザーが承認したときだけ設定し、`## Agents set up`
+   のそのエージェントの行に hook を書きます（たとえば
+   `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`）。
+6. **ユーザーに伝えます：** 何を移したか、どのファイルが AGENTS.md を指すようになったか、どんな
+   自動のハートビートを設定したか（しなかったならその理由）、どの食い違いが答えを待っているか。
 
 これから先：
 - 共通ルールは AGENTS.md にだけ置きます。共通ルールをあるエージェント自身のファイルに足しません。
@@ -2019,19 +2089,39 @@ mod tests {
                 "-- <those files>`",
                 "`alm list --state in_progress`",
                 "`git worktree list`",
+                // Step 5, the automatic heartbeat (Task-A03-dough395).
+                "`.claude/settings.json`",
+                "`PostToolUse`",
+                "`notify`",
+                "`alm list --state in_progress --json`",
+                "`session.id`",
+                "`CLAUDE_CODE_SESSION_ID`",
+                "`CODEX_THREAD_ID`",
+                "`holder`",
+                "`ALLOMOS_HOLDER`",
+                "`alm beat --as <",
+                "--json`",
+                "`changed_files`",
+                "`origin`",
+                "`git -C <taskbag> commit -m \"alm: beat\" -- <those files>`",
+                "`git -C <taskbag> push origin`",
+                "--rebase --autostash`",
+                "`alm beat <id> --busy",
+                "automatic heartbeat in .claude/settings.json",
             ] {
                 assert!(text.contains(words), "{language}: {words}");
             }
-            // Five numbered steps, then two standing rules.
-            for step in 1..=5 {
+            // Six numbered steps, then two standing rules.
+            for step in 1..=6 {
                 assert!(
                     text.contains(&format!("\n{step}. **")),
                     "{language}: {step}"
                 );
             }
-            assert!(!text.contains("\n6. "), "{language}");
+            assert!(!text.contains("\n7. "), "{language}");
             assert_eq!(text.matches("\n- ").count(), 2, "{language}");
-            assert_eq!(text.matches("\n   - ").count(), 2, "{language}");
+            // Two in step 2 (what an agent's own file keeps), four in step 5 (the hook's script).
+            assert_eq!(text.matches("\n   - ").count(), 6, "{language}");
             assert_eq!(localized("agent-files", language), Some(text));
         }
         let en = flat(agent_files("en").unwrap());
