@@ -216,6 +216,22 @@ test("each task's request names the session, the run mode and only that task", (
   }
 });
 
+// Task-A03-folk351: a terminal Claude Code session has no get_usage, so its request says to read
+// the quota with `claude -p /usage`; the other agents' requests do not.
+test("a Claude Code session's request says how to read its quota; the others' do not", () => {
+  const tb = "../allomos-taskbag/.allomos/taskbag";
+  for (const language of ["en", "zh-CN", "ja"] as const) {
+    const claude = monitorRequest(task("A01-05"), tb, language, "claude_cli", "1234-abcd", false);
+    assert.match(claude, /claude -p \/usage/, language);
+    assert.match(claude, /alm quota --agent claude-code --left .* --window 5h/, language);
+    assert.match(claude, /--window week/, language);
+    for (const agent of ["codex_cli", "antigravity_cli"] as const) {
+      const other = monitorRequest(task("A01-05"), tb, language, agent, null, false);
+      assert.doesNotMatch(other, /claude -p \/usage|alm quota/, `${language} ${agent}`);
+    }
+  }
+});
+
 // Task-A01-steam936: the sweep at start and on Check now. What it let go on is said in one line per
 // state, the check it belongs to keeps the line and the next clears it, and until the taskbag is
 // read again the monitor picks from the tasks as the sweep left them.
