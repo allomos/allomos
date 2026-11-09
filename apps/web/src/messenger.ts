@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
+import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
 import type { LadderStep } from "./ladderFlow";
 import type { Released, SessionTab } from "./monitorFlow";
 import { withDecisions } from "./stopFlow";
@@ -178,6 +179,10 @@ export interface Messenger {
     root: string,
     change: { quota?: string; context?: string; writeWhen?: string; agent?: string; clear?: boolean },
   ): Promise<HandoffSettings>;
+  /** Project settings → Heartbeat (Task-A01-osprey500): the heartbeat interval and the lost limit, as `alm heartbeat-settings`. */
+  heartbeatSettings(root: string): Promise<HeartbeatSettings>;
+  /** Changes them (whole minutes), or puts both back to their defaults (`clear`); resolves to the settings as saved. Rejects with a Problem. */
+  setHeartbeatSettings(root: string, change: { interval?: string; lostAfter?: string; clear?: boolean }): Promise<HeartbeatSettings>;
   /** Project settings → Audit (Task-A01-frolic587): the identity level. */
   auditSettings(root: string): Promise<AuditSettings>;
   /** Changes the identity level, as `alm audit-settings`; resolves to the settings as saved. Rejects with a Problem. */
@@ -503,6 +508,14 @@ export const desktopMessenger: Messenger = {
       context: c.context ?? null,
       writeWhen: c.writeWhen ?? null,
       agent: c.agent ?? null,
+      clear: c.clear ?? false,
+    }),
+  heartbeatSettings: (root) => invoke<HeartbeatSettings>("heartbeat_settings", { root }),
+  setHeartbeatSettings: (root, c) =>
+    invoke<HeartbeatSettings>("set_heartbeat_settings", {
+      root,
+      interval: c.interval ?? null,
+      lostAfter: c.lostAfter ?? null,
       clear: c.clear ?? false,
     }),
   auditSettings: (root) => invoke<AuditSettings>("audit_settings", { root }),
