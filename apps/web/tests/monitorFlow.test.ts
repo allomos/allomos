@@ -3,6 +3,8 @@
 // `alm monitor run`, tested in crates/monitor).
 // Run: npm --prefix apps/web test
 
+import { test } from "node:test";
+import assert from "node:assert/strict";
 import {
   FIRST_FREQUENCY,
   FREQUENCIES,
