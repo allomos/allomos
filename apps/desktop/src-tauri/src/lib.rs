@@ -7,6 +7,7 @@
 mod agents;
 mod alm_command;
 mod audit;
+mod heartbeat_settings;
 mod lan;
 mod pairing;
 mod session_tab;
@@ -2613,6 +2614,8 @@ pub fn run() {
             set_update_item,
             handoff_settings,
             set_handoff_rules,
+            heartbeat_settings::heartbeat_settings,
+            heartbeat_settings::set_heartbeat_settings,
             audit_settings,
             set_separation,
             set_witness,
