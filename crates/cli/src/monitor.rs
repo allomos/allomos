@@ -55,6 +55,19 @@ pub(crate) enum MonitorWhat {
     Status,
     /// Every monitor running on this computer, whatever its project.
     List,
+    /// The countdown after a done task's tab, run in its own process by a monitor (not for
+    /// people): the tab closes unless a key is pressed.
+    #[command(hide = true)]
+    CloseTab {
+        #[arg(long)]
+        agent: String,
+        #[arg(long)]
+        window: i64,
+        #[arg(long)]
+        tty: String,
+        #[arg(long)]
+        language: String,
+    },
 }
 
 #[derive(Args, Clone)]
@@ -87,6 +100,7 @@ impl MonitorWhat {
             MonitorWhat::Stop { .. } => "monitor stop",
             MonitorWhat::Status => "monitor status",
             MonitorWhat::List => "monitor list",
+            MonitorWhat::CloseTab { .. } => "monitor close-tab",
         }
     }
 }
@@ -453,6 +467,22 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             Ok(Done::new(
                 json!({ "taskbag": root, "run": id }),
                 format!("Monitor {id} ended.\n"),
+            ))
+        }
+        MonitorWhat::CloseTab {
+            agent,
+            window,
+            tty,
+            language,
+        } => {
+            let tab = allomos_monitor::session_tab::SessionTab {
+                window: *window,
+                tty: tty.clone(),
+            };
+            let outcome = allomos_monitor::session_tab::countdown(agent, &tab, language);
+            Ok(Done::new(
+                json!({ "window": window, "tty": tty, "outcome": format!("{outcome:?}") }),
+                format!("Tab countdown: {outcome:?}\n"),
             ))
         }
         MonitorWhat::Check { run } => {

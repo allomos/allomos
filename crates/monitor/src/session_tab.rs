@@ -10,7 +10,9 @@
 
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
+use crate::request;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::time::{Duration, Instant, SystemTime};
 
 /// The tab Allomos opened: its window and its terminal device (`/dev/ttys…`). Both must still
@@ -88,12 +90,51 @@ pub enum Outcome {
     NotAvailable,
 }
 
-/// Start the countdown in the background; the result goes to the log only.
-pub fn close_when_done(agent: String, tab: SessionTab, texts: CloseTexts) {
+/// Start the countdown for a done task's tab in a process of its own: `alm monitor close-tab`,
+/// started detached as the monitor itself is (Task-A03-bride850). The monitor may end, be stopped
+/// or be started again, and the countdown still runs to its end; its result goes to the log the
+/// monitor writes to. Only when that process cannot be started does the countdown run in a thread
+/// of this one, which the monitor's end would cut short.
+pub fn close_when_done(
+    alm: Option<&Path>,
+    log: &Path,
+    agent: &str,
+    tab: &SessionTab,
+    language: &str,
+) {
+    if let Some(alm) = alm {
+        match crate::runner::spawn_detached(alm, &close_args(agent, tab, language), log) {
+            Ok(_) => return,
+            Err(e) => eprintln!("allomos: the tab countdown could not start its process: {e}"),
+        }
+    }
+    let (agent, tab) = (agent.to_string(), tab.clone());
+    let texts = request::close_texts(language);
     std::thread::spawn(move || {
         let outcome = run(&agent, &tab, &texts);
         eprintln!("allomos: monitored session tab {tab:?}: {outcome:?}");
     });
+}
+
+/// The arguments of the countdown process: `alm monitor close-tab …` (see [`countdown`]).
+pub fn close_args(agent: &str, tab: &SessionTab, language: &str) -> Vec<String> {
+    vec![
+        "monitor".to_string(),
+        "close-tab".to_string(),
+        "--agent".to_string(),
+        agent.to_string(),
+        "--window".to_string(),
+        tab.window.to_string(),
+        "--tty".to_string(),
+        tab.tty.clone(),
+        "--language".to_string(),
+        language.to_string(),
+    ]
+}
+
+/// The whole countdown on the tab, for `alm monitor close-tab` to run in its own process.
+pub fn countdown(agent: &str, tab: &SessionTab, language: &str) -> Outcome {
+    run(agent, tab, &request::close_texts(language))
 }
 
 #[cfg(target_os = "macos")]
@@ -239,6 +280,29 @@ mod tests {
         assert_eq!(exit_command("codex_cli"), Some("/exit"));
         assert_eq!(exit_command("antigravity_cli"), Some("/exit"));
         assert_eq!(exit_command("claude_app"), None);
+    }
+
+    #[test]
+    fn the_countdown_process_gets_the_tab_and_the_language() {
+        let tab = SessionTab {
+            window: 30229,
+            tty: "/dev/ttys032".into(),
+        };
+        assert_eq!(
+            close_args("claude_cli", &tab, "zh-CN"),
+            [
+                "monitor",
+                "close-tab",
+                "--agent",
+                "claude_cli",
+                "--window",
+                "30229",
+                "--tty",
+                "/dev/ttys032",
+                "--language",
+                "zh-CN",
+            ]
+        );
     }
 
     /// Runs the whole countdown on a real tab: `ALLOMOS_PROBE_TAB="<window>, <tty>"` and

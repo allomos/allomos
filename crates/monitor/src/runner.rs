@@ -178,6 +178,8 @@ struct Loop {
     /// The agents' commands, found once when the run starts.
     found: Vec<(String, PathBuf)>,
     alm_dir: Option<PathBuf>,
+    /// This `alm`, which starts the tab countdowns.
+    alm: Option<PathBuf>,
     taskbag_arg: String,
     last_written: Instant,
 }
@@ -296,9 +298,11 @@ impl Loop {
             log(&format!("{} finished ({})", cur.id, cur.agent));
             if let Some(tab) = tab_to_close(cur, &bag.tasks) {
                 session_tab::close_when_done(
-                    cur.agent.clone(),
-                    tab.clone(),
-                    request::close_texts(&self.record.language),
+                    self.alm.as_deref(),
+                    &registry::log_path(&self.dir, &self.id),
+                    &cur.agent,
+                    tab,
+                    &self.record.language,
                 );
             }
             if let Some(stuck) = waiting_alert(&cur.id, &bag.tasks) {
@@ -372,6 +376,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         held,
         found,
         alm_dir,
+        alm: options.alm.clone(),
         taskbag_arg: taskbag_arg(&project, &root),
         last_written: Instant::now(),
     };
@@ -430,8 +435,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
     // was ended from outside, leaves its log for the person to read.
     let _ = std::fs::remove_file(registry::log_path(dir, id));
     lp.held.release();
-    // Leave the closing countdowns of done tasks' tabs time to finish.
-    std::thread::sleep(Duration::from_secs(1));
+    // The countdowns of done tasks' tabs run in processes of their own: they finish after this.
     Ok(())
 }
 
