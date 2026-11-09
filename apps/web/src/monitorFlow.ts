@@ -137,6 +137,8 @@ export interface Run {
   pid: number;
   scope: Scope;
   agents: TerminalAgent[];
+  /** How many sessions each agent may have at work at once; one when not listed (Task-A03-weasel276). */
+  sessions: Partial<Record<TerminalAgent, number>>;
   /** The agents the person could choose when the run started, offered again in the status bar. */
   offered: TerminalAgent[];
   quiet: boolean;
@@ -144,7 +146,9 @@ export interface Run {
   started: number;
   /** The tasks it has started a session for, in order. */
   taken: string[];
-  /** The sessions working a task now, at most one per agent. */
+  /** The agent each of those tasks was given to (task ID → agent). */
+  takenBy: Record<string, TerminalAgent>;
+  /** The sessions working a task now. */
   working: Current[];
   /** Stop asked while tasks are worked: the run ends when they are all finished. */
   stopping: boolean;
@@ -167,6 +171,27 @@ const asAgent = (a: unknown): TerminalAgent | null =>
 const agents = (list: unknown): TerminalAgent[] =>
   Array.isArray(list) ? list.map(asAgent).filter((a): a is TerminalAgent => a !== null) : [];
 const num = (n: unknown, or = 0): number => (typeof n === "number" ? n : or);
+/** The sessions an agent may have at once, as the run file lists them: whole numbers of one or more. */
+const sessionCounts = (list: unknown): Partial<Record<TerminalAgent, number>> => {
+  const out: Partial<Record<TerminalAgent, number>> = {};
+  if (list && typeof list === "object") {
+    for (const [a, n] of Object.entries(list)) {
+      const agent = asAgent(a);
+      if (agent && typeof n === "number" && n >= 1) out[agent] = Math.floor(n);
+    }
+  }
+  return out;
+};
+const takenByAgent = (map: unknown): Record<string, TerminalAgent> => {
+  const out: Record<string, TerminalAgent> = {};
+  if (map && typeof map === "object") {
+    for (const [task, a] of Object.entries(map)) {
+      const agent = asAgent(a);
+      if (agent) out[task] = agent;
+    }
+  }
+  return out;
+};
 
 /** One entry of `monitor_runs` (as `alm monitor status --json` lists it): a run, or a process
  * whose record is missing. `active` is the active iteration, to name the scope "current". */
@@ -185,11 +210,13 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     pid: num(e.pid),
     scope,
     agents: agents(r.agents),
+    sessions: sessionCounts(r.sessions),
     offered: agents(r.offered),
     quiet: Boolean(r.quiet),
     every,
     started: num(r.started),
     taken: Array.isArray(r.taken) ? r.taken.filter((t: unknown) => typeof t === "string") : [],
+    takenBy: takenByAgent(r.taken_by),
     working: (Array.isArray(r.working) ? r.working : [])
       .map((w: any): Current | null => {
         const agent = asAgent(w?.agent);
@@ -226,9 +253,18 @@ export function setAgents(run: Run, chosen: TerminalAgent[]): TerminalAgent[] {
   return [...offered, ...chosen.filter((a) => !offered.includes(a))];
 }
 
-/** The agents of the run with no task being worked: each can be given one at the next check. */
+/** How many sessions an agent may have at work at once: one unless the person set more. */
+export function sessionsOf(run: Run, agent: TerminalAgent): number {
+  return Math.max(1, run.sessions[agent] ?? 1);
+}
+
+/** The free session slots: each agent once for every session it may still start (its count less
+ * the sessions at work). Each can be given one task at the next check. */
 export function freeAgents(run: Run): TerminalAgent[] {
-  return run.agents.filter((a) => !run.working.some((w) => w.agent === a));
+  return run.agents.flatMap((a) => {
+    const atWork = run.working.filter((w) => w.agent === a).length;
+    return Array.from({ length: Math.max(0, sessionsOf(run, a) - atWork) }, () => a);
+  });
 }
 
 /** When the next check is due (ms). */
@@ -248,16 +284,30 @@ export interface LastRun {
   scope: Scope;
   /** The tasks it started sessions for. */
   taken: string[];
+  /** The agent each of those tasks was given to. */
+  takenBy?: Record<string, TerminalAgent>;
 }
 
 /** The tasks of the last run that are done, and those that need the person now: waiting on them,
  * or done but for a person's check (`toCheck`: stopFlow's, a done task with no "by human" label,
  * decision 0020). Counted from the taskbag as it is now. */
-export function lastRunCounts(last: LastRun, tasks: Task[], toCheck: (task: Task) => boolean): { done: number; needYou: number } {
+export function lastRunCounts(
+  last: LastRun,
+  tasks: Task[],
+  toCheck: (task: Task) => boolean,
+): { done: number; needYou: number; byAgent: { agent: TerminalAgent; done: number }[] } {
   const mine = tasks.filter((t) => last.taken.includes(t.id));
+  const done = mine.filter((t) => t.state === "done");
+  // The done tasks per agent that gave them out (Task-A03-weasel276), in the order they were taken.
+  const byAgent = new Map<TerminalAgent, number>();
+  for (const id of last.taken) {
+    const agent = last.takenBy?.[id];
+    if (agent && done.some((t) => t.id === id)) byAgent.set(agent, (byAgent.get(agent) ?? 0) + 1);
+  }
   return {
-    done: mine.filter((t) => t.state === "done").length,
+    done: done.length,
     needYou: mine.filter((t) => (t.state === "waiting" && !t.who) || toCheck(t)).length,
+    byAgent: [...byAgent].map(([agent, n]) => ({ agent, done: n })),
   };
 }
 

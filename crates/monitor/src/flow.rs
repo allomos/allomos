@@ -3,6 +3,8 @@
 //! task in the taskbag until it is finished, and when to tell the person the run is stuck. No
 //! input or output here: the loop ([`crate::runner`]) reads the taskbag and starts sessions.
 
+use std::collections::BTreeMap;
+
 use allomos_core::{State, Task, Taskbag, difficulty::Range, ops};
 use serde::{Deserialize, Serialize};
 
@@ -53,8 +55,12 @@ pub struct Run {
     /// Only tasks of these difficulties (`1-3`, `4`), as `alm next --difficulty` takes them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub difficulty: Option<String>,
-    /// The agents ready tasks are given to: each works one task at a time.
+    /// The agents ready tasks are given to.
     pub agents: Vec<String>,
+    /// How many sessions each agent may have at work at once (agent ID → count, at least 1). An
+    /// agent not listed has one (Task-A03-weasel276).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub sessions: BTreeMap<String, u32>,
     /// The agents that could be chosen when the run started (the app offers them again).
     pub offered: Vec<String>,
     pub quiet: bool,
@@ -64,7 +70,10 @@ pub struct Run {
     pub started: i64,
     /// The tasks it started a session for, in order.
     pub taken: Vec<String>,
-    /// The sessions working a task now, at most one per agent.
+    /// The agent each of those tasks was given to (task ID → agent ID).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub taken_by: BTreeMap<String, String>,
+    /// The sessions working a task now.
     pub working: Vec<Working>,
     /// Stop asked while tasks are worked: the run ends when they are all finished.
     pub stopping: bool,
@@ -111,7 +120,9 @@ impl Run {
             quiet,
             every,
             started: now,
+            sessions: BTreeMap::new(),
             taken: Vec::new(),
+            taken_by: BTreeMap::new(),
             working: Vec::new(),
             stopping: false,
             checked: now - i64::from(every) * 60_000,
@@ -124,13 +135,30 @@ impl Run {
         self.checked + i64::from(self.every) * 60_000
     }
 
-    /// The agents with no task being worked.
+    /// How many sessions `agent` may have at work at once: one unless the person set more.
+    pub fn sessions_of(&self, agent: &str) -> u32 {
+        self.sessions.get(agent).copied().unwrap_or(1).max(1)
+    }
+
+    /// The count for `agent` from the next check on (Task-A03-weasel276): at least one, with no
+    /// upper limit. A lower count lets the sessions at work finish; none is interrupted.
+    pub fn set_sessions(&mut self, agent: &str, count: u32) {
+        if count >= 1 {
+            self.sessions.insert(agent.to_string(), count);
+        }
+    }
+
+    /// The free session slots: each agent once for every session it may still start (its count
+    /// less the sessions at work), in the run's order.
     pub fn free_agents(&self) -> Vec<String> {
-        self.agents
-            .iter()
-            .filter(|a| !self.working.iter().any(|w| &w.agent == *a))
-            .cloned()
-            .collect()
+        let mut free = Vec::new();
+        for agent in &self.agents {
+            let at_work = self.working.iter().filter(|w| &w.agent == agent).count() as u32;
+            for _ in at_work..self.sessions_of(agent) {
+                free.push(agent.clone());
+            }
+        }
+        free
     }
 
     /// These agents from now on: one added gets tasks from the next check; one taken off is
@@ -168,9 +196,9 @@ impl Run {
         finished
     }
 
-    /// One check's share-out: each free agent, in the run's order, with the next ready task in
-    /// the scope this run has not taken yet, while there are tasks. Every session claims its task
-    /// first, so two agents never work the same one.
+    /// One check's share-out: each free session slot, in the run's order, with the next ready task
+    /// in the scope this run has not taken yet, while there are tasks. Every session claims its
+    /// task first, so two sessions never work the same one.
     pub fn share(&self, bag: &Taskbag) -> Vec<(String, Task)> {
         let iteration = match &self.scope {
             Scope::All => None,
@@ -203,6 +231,7 @@ impl Run {
         now: i64,
     ) {
         self.taken.push(task.id.clone());
+        self.taken_by.insert(task.id.clone(), agent.to_string());
         self.working.push(Working {
             agent: agent.to_string(),
             id: task.id.clone(),
@@ -366,6 +395,47 @@ mod tests {
         );
         assert!(r.follow(&[], 60).len() == 1);
         assert_eq!(r.free_agents(), ["claude_cli", "codex_cli"]);
+    }
+
+    #[test]
+    fn an_agent_may_have_several_sessions_at_once() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        assert_eq!(r.sessions_of("claude_cli"), 1);
+        r.set_sessions("claude_cli", 2);
+        assert_eq!(r.free_agents(), ["claude_cli", "claude_cli", "codex_cli"]);
+        r.take(
+            "claude_cli",
+            &task("A01-1", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        assert_eq!(r.free_agents(), ["claude_cli", "codex_cli"]);
+        r.take(
+            "claude_cli",
+            &task("A01-2", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        assert_eq!(r.free_agents(), ["codex_cli"]);
+        assert_eq!(
+            r.taken_by.get("A01-2").map(String::as_str),
+            Some("claude_cli")
+        );
+        // Lowered to one: the two at work are not interrupted, and no new one starts until fewer
+        // than one is at work.
+        r.set_sessions("claude_cli", 1);
+        assert_eq!(r.free_agents(), ["codex_cli"]);
+        let tasks = [
+            task("A01-1", State::Done, Some("s1")),
+            task("A01-2", State::InProgress, Some("s2")),
+        ];
+        assert_eq!(r.follow(&tasks, 20).len(), 1);
+        assert_eq!(r.free_agents(), ["codex_cli"]);
+        // A count below one is ignored.
+        r.set_sessions("claude_cli", 0);
+        assert_eq!(r.sessions_of("claude_cli"), 1);
     }
 
     #[test]

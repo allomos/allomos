@@ -183,6 +183,9 @@ pub enum Request {
     Every { minutes: u32 },
     /// These agents from now on.
     Agents { agents: Vec<String> },
+    /// How many sessions one agent may have at work at once, from the next check on
+    /// (Task-A03-weasel276): at least one.
+    Sessions { agent: String, count: u32 },
 }
 
 /// Leave `request` for run `id` in `dir`; its process takes it within about a second.

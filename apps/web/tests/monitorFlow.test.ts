@@ -19,6 +19,7 @@ import {
   readyTasks,
   scopeOptions,
   scopeReady,
+  sessionsOf,
   setAgents,
   stalled,
   unblockNotice,
@@ -131,7 +132,35 @@ test("the last run counts the tasks done and those that need the person now", ()
     task("A01-04", { state: "waiting", waiting_on: "a reply", who: "the designer" }),
     task("A01-05", { state: "waiting", waiting_on: "not in this run" }),
   ];
-  assert.deepEqual(lastRunCounts(last, now, toCheck), { done: 2, needYou: 2 });
+  assert.deepEqual(lastRunCounts(last, now, toCheck), { done: 2, needYou: 2, byAgent: [] });
+});
+
+test("the last run counts the done tasks per agent that gave them out", () => {
+  const last = {
+    ended: "2026-11-09T10:00:00Z",
+    scope: { kind: "all" as const },
+    taken: ["A01-01", "A01-02", "A01-03"],
+    takenBy: { "A01-01": "claude_cli" as const, "A01-02": "codex_cli" as const, "A01-03": "claude_cli" as const },
+  };
+  const now = [
+    task("A01-01", { state: "done", labels: ["locally verified by agent"] }),
+    task("A01-02", { state: "done", labels: ["locally verified by agent"] }),
+    task("A01-03", { state: "done", labels: ["locally verified by agent"] }),
+  ];
+  assert.deepEqual(lastRunCounts(last, now, toCheck).byAgent, [
+    { agent: "claude_cli", done: 2 },
+    { agent: "codex_cli", done: 1 },
+  ]);
+});
+
+test("a run's sessions per agent: one unless set, and a free slot for each session it may still start", () => {
+  const r = readEntry(entry({ agents: ["claude_cli", "codex_cli"], sessions: { claude_cli: 2, codex_cli: 0, gemini: 3 } }), null);
+  assert.ok(r && isRun(r));
+  assert.deepEqual(r.sessions, { claude_cli: 2 }, "a count below one and an unknown agent are left out");
+  assert.equal(sessionsOf(r, "claude_cli"), 2);
+  assert.equal(sessionsOf(r, "codex_cli"), 1);
+  // claude_cli has one session at work (the entry's): one more slot for it, and one for codex.
+  assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
 });
 
 /** A run's entry as `alm monitor status --json` lists it. */

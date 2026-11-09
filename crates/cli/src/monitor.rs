@@ -66,6 +66,10 @@ pub(crate) struct StartArgs {
     /// Repeat for several; each works one task at a time. Default: the first one found.
     #[arg(long = "agent", value_name = "AGENT")]
     agents: Vec<String>,
+    /// How many sessions an agent may have at work at once, as AGENT=N (for example
+    /// claude-code=2). Repeat for several agents. Default: one each. No upper limit.
+    #[arg(long = "sessions", value_name = "AGENT=N")]
+    sessions: Vec<String>,
     /// How often to check when no task is ready, in minutes: 1, 5, 10, 30, 60, 90 or 120.
     #[arg(long, value_name = "MINUTES", default_value_t = FIRST_FREQUENCY)]
     every: u32,
@@ -114,6 +118,18 @@ fn agent_id(given: &str) -> Result<&'static str, Problem> {
         }
     };
     Ok(id)
+}
+
+/// The agents of `run` as the command names them, with a count where it is more than one
+/// (`claude-code ×2`).
+fn agents_text(run: &Run) -> Vec<String> {
+    run.agents
+        .iter()
+        .map(|a| match run.sessions_of(a) {
+            1 => agent_word(a).to_string(),
+            n => format!("{} ×{n}", agent_word(a)),
+        })
+        .collect()
 }
 
 /// The command's name for an agent ID.
@@ -174,6 +190,7 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
     if let Some(d) = &args.difficulty {
         allomos_core::difficulty::Range::parse(d)?;
     }
+    let sessions = sessions_of(&args.sessions, &agents)?;
     let (bag, _) = allomos_store::taskbag_of(root, allomos_store::load(root))?;
     let scope = match &args.iteration {
         Some(id) => {
@@ -191,7 +208,7 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         .filter(|a| found.iter().any(|f| f == *a))
         .map(|a| a.to_string())
         .collect();
-    Ok(Run::start(
+    let mut run = Run::start(
         scope,
         args.difficulty.clone(),
         agents,
@@ -199,17 +216,44 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         quiet,
         args.every,
         now,
-    ))
+    );
+    for (agent, count) in sessions {
+        run.set_sessions(&agent, count);
+    }
+    Ok(run)
+}
+
+/// The `--sessions AGENT=N` values as (agent ID, count): each agent must be one of `agents` (the
+/// run's), and the count at least one.
+fn sessions_of(given: &[String], agents: &[String]) -> Result<Vec<(String, u32)>, Problem> {
+    let mut out = Vec::new();
+    for g in given {
+        let bad = |why: &str| Problem::BadUsage {
+            detail: format!(
+                "--sessions {g}: {why}; write it as AGENT=N, for example claude-code=2"
+            ),
+        };
+        let (name, count) = g.split_once('=').ok_or_else(|| bad("no count given"))?;
+        let id = agent_id(name)?;
+        let count: u32 = count
+            .trim()
+            .parse()
+            .ok()
+            .filter(|n| *n >= 1)
+            .ok_or_else(|| bad("the count is a whole number, one or more"))?;
+        if !agents.iter().any(|a| a == id) {
+            return Err(bad(&format!(
+                "{} is not one of the run's agents (give it with --agent)",
+                agent_word(id)
+            )));
+        }
+        out.push((id.to_string(), count));
+    }
+    Ok(out)
 }
 
 /// The words that start the same run in a process of its own.
-fn run_words(
-    id: &str,
-    root: &Path,
-    args: &StartArgs,
-    language: &str,
-    agents: &[String],
-) -> Vec<String> {
+fn run_words(id: &str, root: &Path, args: &StartArgs, language: &str, run: &Run) -> Vec<String> {
     let mut w = vec![
         "monitor".to_string(),
         "run".to_string(),
@@ -223,9 +267,13 @@ fn run_words(
         "--language".to_string(),
         language.to_string(),
     ];
-    for a in agents {
+    for a in &run.agents {
         w.push("--agent".to_string());
         w.push(agent_word(a).to_string());
+    }
+    for (a, n) in &run.sessions {
+        w.push("--sessions".to_string());
+        w.push(format!("{}={n}", agent_word(a)));
     }
     if let Some(i) = &args.iteration {
         w.push("--iteration".to_string());
@@ -269,7 +317,7 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                 .as_ref()
                 .map(|d| format!(", difficulty {d}"))
                 .unwrap_or_default();
-            let agents: Vec<&str> = run.agents.iter().map(|a| agent_word(a)).collect();
+            let agents = agents_text(run);
             let working: Vec<String> = run
                 .working
                 .iter()
@@ -381,7 +429,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             let alm = std::env::current_exe().map_err(|e| Problem::BadUsage {
                 detail: format!("cannot tell where this alm is: {e}"),
             })?;
-            let words = run_words(&id, &root, args, &language, &run.agents);
+            let words = run_words(&id, &root, args, &language, &run);
             let pid =
                 runner::spawn_detached(&alm, &words, &log).map_err(|e| Problem::WriteFailed {
                     path: alm.display().to_string(),
@@ -408,7 +456,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                     ),
                 });
             }
-            let agents: Vec<&str> = run.agents.iter().map(|a| agent_word(a)).collect();
+            let agents = agents_text(&run);
             let text = format!(
                 "Monitor {id} started (process {pid}): {}, agents {}, every {} min, {} mode. It checks now, then at that frequency, and keeps running after this terminal is closed.\n  alm monitor status    what it is doing\n  alm monitor check --run {id}    check now\n  alm monitor stop --run {id}     start no new session; those at work finish\n  Log: {}\n",
                 match &run.scope {
@@ -561,6 +609,18 @@ fn ask(dir: &Path, id: &str, request: &Request) -> Result<(), Problem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sessions_are_counts_of_the_runs_agents() {
+        let agents = vec!["claude_cli".to_string()];
+        assert_eq!(
+            sessions_of(&["claude-code=2".to_string()], &agents).unwrap(),
+            vec![("claude_cli".to_string(), 2)]
+        );
+        assert!(sessions_of(&["claude-code=0".to_string()], &agents).is_err());
+        assert!(sessions_of(&["claude-code".to_string()], &agents).is_err());
+        assert!(sessions_of(&["codex=2".to_string()], &agents).is_err());
+    }
 
     #[test]
     fn app_agents_are_refused_with_the_reason() {
