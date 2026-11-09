@@ -1,6 +1,6 @@
 //! The reminder before a restart or an update (Task-A03-bowl641): while **Monitor ready tasks**
 //! runs on this computer, Restart to Update and quitting the app first say that the automatic
-//! monitoring of ready tasks pauses, and that the sessions already open finish their tasks as
+//! monitoring of ready tasks keeps running in the background, and that the sessions already open finish their tasks as
 //! usual. The person can cancel. With no monitoring running, nothing is asked.
 //!
 //! The reminder only asks; it stops and saves nothing. The words come in the interface language
@@ -62,9 +62,9 @@ pub fn words(language: &str, action: Action, sessions: usize) -> Words {
             Action::Quit => ("退出", "退出"),
         };
         Words {
-            title: "自动监测就绪任务会暂停".into(),
+            title: "自动监测就绪任务会继续运行".into(),
             body: format!(
-                "应用将{verb}。「自动监测就绪任务」会暂停；已开的 {sessions} 个会话会照常做完各自的任务。"
+                "应用将{verb}。「自动监测就绪任务」会继续在后台运行；已开的 {sessions} 个会话照常做完各自的任务。要先停掉它，可以在状态栏里操作。"
             ),
             confirm,
             cancel: "取消",
@@ -75,9 +75,9 @@ pub fn words(language: &str, action: Action, sessions: usize) -> Words {
             Action::Quit => ("終了します", "終了"),
         };
         Words {
-            title: "準備完了のタスクの自動監視が一時停止します".into(),
+            title: "準備完了のタスクの自動監視は続きます".into(),
             body: format!(
-                "「肩代」を{verb}。「準備完了のタスクを自動で監視」は一時停止し、開いている {sessions} 件のセッションは、それぞれのタスクをいつも通り最後まで進めます。"
+                "「肩代」を{verb}。「準備完了のタスクを自動で監視」はバックグラウンドで動き続け、開いている {sessions} 件のセッションは、それぞれのタスクをいつも通り最後まで進めます。止めてから行う場合は、ステータスバーから停止できます。"
             ),
             confirm,
             cancel: "キャンセル",
@@ -93,9 +93,9 @@ pub fn words(language: &str, action: Action, sessions: usize) -> Words {
             format!("{sessions} open sessions")
         };
         Words {
-            title: "Automatic monitoring of ready tasks will pause".into(),
+            title: "Automatic monitoring of ready tasks keeps running".into(),
             body: format!(
-                "Allomos will {verb}. Monitor ready tasks will pause; the {open} will finish their tasks as usual."
+                "Allomos will {verb}. Monitor ready tasks keeps running in the background; the {open} will finish their tasks as usual. To stop it first, use the status bar."
             ),
             confirm,
             cancel: "Cancel",
@@ -165,10 +165,11 @@ mod tests {
     }
 
     #[test]
-    fn the_reminder_names_the_pause_and_the_sessions_in_english() {
+    fn the_reminder_names_the_running_monitor_and_the_sessions_in_english() {
         let w = words("en", Action::Restart, 2);
-        assert_eq!(w.title, "Automatic monitoring of ready tasks will pause");
-        assert!(w.body.contains("Monitor ready tasks will pause"));
+        assert_eq!(w.title, "Automatic monitoring of ready tasks keeps running");
+        assert!(w.body.contains("Monitor ready tasks keeps running"));
+        assert!(!w.body.contains("will pause"));
         assert!(w.body.contains("2 open sessions"));
         assert_eq!((w.confirm, w.cancel), ("Restart", "Cancel"));
     }
@@ -186,13 +187,13 @@ mod tests {
     #[test]
     fn the_reminder_is_in_chinese_and_japanese() {
         let zh = words("zh-CN", Action::Restart, 3);
-        assert!(zh.body.contains("「自动监测就绪任务」会暂停"));
+        assert!(zh.body.contains("「自动监测就绪任务」会继续在后台运行"));
         assert!(zh.body.contains("已开的 3 个会话"));
         assert_eq!((zh.confirm, zh.cancel), ("重新启动", "取消"));
         let ja = words("ja", Action::Quit, 3);
         assert!(
             ja.body
-                .contains("「準備完了のタスクを自動で監視」は一時停止")
+                .contains("「準備完了のタスクを自動で監視」はバックグラウンドで動き続け")
         );
         assert!(ja.body.contains("3 件のセッション"));
         assert_eq!((ja.confirm, ja.cancel), ("終了", "キャンセル"));

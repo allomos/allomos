@@ -1684,7 +1684,7 @@ fn set_auto_update(app: AppHandle, on: bool) -> Result<(), Problem> {
 /// nothing changes. A failure is told to every window, and this version keeps running.
 fn restart_to_update(app: AppHandle) {
     tauri::async_runtime::spawn_blocking(move || {
-        // Task-A03-bowl641: while monitoring runs, say first that it pauses; Cancel changes nothing.
+        // Task-A03-bowl641: while monitoring runs, say first that it keeps running; Cancel changes nothing.
         if let Some(sessions) = monitor_pause::running_sessions() {
             if !monitor_pause::confirm_blocking(&app, monitor_pause::Action::Restart, sessions) {
                 return;
@@ -2704,7 +2704,7 @@ pub fn run() {
         .expect("error while running Allomos")
         .run(|app, event| {
             // Task-A03-bowl641: quitting by the person's own request, while monitoring runs, first
-            // says that it pauses. The app quits only when the person confirms (which quits again,
+            // says that it keeps running. The app quits only when the person confirms (which quits again,
             // programmatically, so this reminder does not come back).
             if let tauri::RunEvent::ExitRequested {
                 code: None, api, ..
