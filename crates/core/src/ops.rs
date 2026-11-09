@@ -643,6 +643,7 @@ pub fn new_task(
         blocked_by: Vec::new(),
         next_dependency: None,
         iteration: None,
+        difficulty: None,
         handoff_note: None,
         without_human_check: None,
         human_check_steps: None,
@@ -1292,6 +1293,12 @@ pub enum Edit {
         #[serde(default)]
         folders: Vec<String>,
     },
+    /// How hard it is, 1 to 5, like `alm difficulty` (Task-A01-actor813); `null`: none, it counts
+    /// as 3.
+    Difficulty {
+        #[serde(default)]
+        difficulty: Option<u8>,
+    },
 }
 
 /// Apply one [`Edit`] by `me`, through the rule `alm` uses for it. Returns the changed task and
@@ -1374,6 +1381,9 @@ pub fn edit(
         Edit::Reopen { note } => reopen(taskbag, id, note).map(|o| (o, "reopen")),
         Edit::Folders { folders } => {
             crate::folders::set(taskbag, id, me, folders).map(|o| (o, "folders"))
+        }
+        Edit::Difficulty { difficulty } => {
+            crate::difficulty::set(taskbag, id, me, *difficulty).map(|o| (o, "difficulty"))
         }
     }
 }

@@ -49,6 +49,7 @@ import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote,
 import { LabelChips } from "./LabelChips";
 import { checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
+import { LEVELS, difficultyOf, difficultyText, levelText } from "./difficultyFlow";
 import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 
 export function TaskPane({
@@ -384,6 +385,18 @@ export function TaskPane({
         return picker();
       case "folders":
         return folderPicker();
+      case "difficulty":
+        // 1 to 5, or none (it then counts as 3; Task-A01-actor813).
+        return (
+          <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
+            <option value="">{t("edit.difficulty_none")}</option>
+            {LEVELS.map((n) => (
+              <option key={n} value={String(n)}>
+                {levelText(n, t)}
+              </option>
+            ))}
+          </select>
+        );
       case "label":
         // Every label in the table, ticked when the task carries it (decision 0020).
         return labels.length === 0 ? (
@@ -601,6 +614,13 @@ export function TaskPane({
     [t("pane.state"), stop ?? t(`state.${task.state}`), "state"],
     // Always shown (approver, 2026-10-25), whatever the number of bound folders.
     [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
+    // Always shown: a task with none counts as 3, marked as the default (Task-A01-actor813).
+    [
+      t("pane.difficulty"),
+      <span className={difficultyOf(task).isDefault ? "muted" : undefined}>{difficultyText(task, t)}</span>,
+      "difficulty",
+      t("pane.difficulty_title"),
+    ],
     [t("pane.label"), chipLabels(task).length > 0 ? <LabelChips task={task} /> : null, "label"],
     [t("pane.responsible"), ownerName ?? t("task.you"), null, t("pane.responsible_title")],
     [t("pane.agent"), agentText, null],

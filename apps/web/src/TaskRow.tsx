@@ -17,6 +17,7 @@ import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
 import { chipLabels, humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
+import { difficultyOf, difficultyText } from "./difficultyFlow";
 import type { Task } from "./types";
 
 /** Keeps a key on a control inside the row from selecting the task (its click stops itself). */
@@ -60,6 +61,12 @@ export function TaskRow({
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
   ];
+  // Task-A01-actor813: how hard it is; a task with none counts as 3, shown greyed as the default.
+  facts.push([
+    t("pane.difficulty"),
+    <span className={difficultyOf(task).isDefault ? "muted" : undefined}>{difficultyText(task, t)}</span>,
+    t("pane.difficulty_title"),
+  ]);
   // Labels only when the task has some (Task-A01-cell542): every label it carries (decision 0020);
   // "AI decisions to review" as its own fact below. The details pane always shows them.
   if (chipLabels(task).length > 0) facts.push([t("pane.label"), <LabelChips task={task} />]);

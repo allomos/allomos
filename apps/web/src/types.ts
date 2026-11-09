@@ -77,6 +77,8 @@ export interface Task {
   area: string;
   /** The project folders it belongs to (`allomos/6`, decision 0019); missing: none in particular. */
   folders?: string[];
+  /** How hard it is, 1 to 5 (Task-A01-actor813); missing: none given, it counts as 3. */
+  difficulty?: number | null;
   state: State;
   /** The labels the task carries (`allomos/7`, decision 0020), in the order they were added;
    * left out when none. */
@@ -192,7 +194,8 @@ export type Edit =
   | { field: "description"; text: string; expected_version?: string | null }
   | { field: "checked" }
   | { field: "reopen"; note: string }
-  | { field: "folders"; folders: string[] };
+  | { field: "folders"; folders: string[] }
+  | { field: "difficulty"; difficulty: number | null };
 
 /**
  * A new task from the New task form (Task-A01-19), as `crates/store` `NewTask` reads it. No ID

@@ -119,6 +119,12 @@
     "path",
     "detail"
   ],
+  "difficulty_invalid": [
+    "value"
+  ],
+  "difficulty_range_invalid": [
+    "value"
+  ],
   "duplicate_area_id": [
     "id"
   ],

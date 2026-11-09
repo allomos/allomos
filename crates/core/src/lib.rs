@@ -12,6 +12,7 @@ pub mod card;
 pub mod classify;
 pub mod conflict;
 pub mod decision;
+pub mod difficulty;
 pub mod duties;
 pub mod effect;
 pub mod event;

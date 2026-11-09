@@ -138,13 +138,20 @@ Read this before you add a task, so it fits this project.
    description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
    goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
    checked, with numbers and logs, under an **Evidence** heading).
-6. **Branch.** Say which branch you are on: `--branch <name>` (as your version control tool
+6. **Difficulty.** Say how hard it is, from 1 to 5: `--difficulty <1-5>` (Task-A01-actor813).
+   1: one small change in one place, nothing to decide. 2: a small change across a few files, or
+   one well-known step. 3: an ordinary task, one feature or fix with its tests and a few routine
+   choices. 4: several parts change together (for example core, command and app), or something
+   risky to get right. 5: needs design decisions, crosses many parts, or is hard to get right.
+   Without it the task counts as 3, and alm says so; change it later with
+   `alm difficulty <id> <1-5>`. A monitor can take only some levels (`alm next --difficulty 1-3`).
+7. **Branch.** Say which branch you are on: `--branch <name>` (as your version control tool
    shows it; in Git: `git branch --show-current`; alm reads no version control). The new task gets a base branch, by its real name: the branch it starts
    from and merges back into. When the branch you are on is a task's working branch, the new
    task shares that task's base; otherwise its base is the branch you are on. alm prints which
    and why; `--base <name>` chooses another. When you hold a task on another base, alm says so:
    decide which is right, and change it with `alm base <id> <branch>` if needed.
-7. **State.** A new task starts in backlog, in the active iteration: the one marked active, or
+8. **State.** A new task starts in backlog, in the active iteration: the one marked active, or
    else the first planned one (`--iteration <id>` names another; with no planned iteration
    left, in none). `alm add task` then prints the next steps
    (Task-A03-33, A01-root343): plan it elsewhere if it belongs there (`alm plan <id>
@@ -157,7 +164,7 @@ Read this before you add a task, so it fits this project.
    first, so a ready task carries none. A ready task that turns out to need rethinking goes
    back the same way: `alm backlog <id>` (unheld only: release a held one first), with the open
    questions in its Notes.
-8. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
+9. **One outcome per task.** If it is really two outcomes, add two tasks. More work on the
    outcome of a done or dropped task is not a new task: reopen that one
    (`alm reopen <id> --note \"<why>\"`).
 
@@ -203,10 +210,11 @@ and not shared yet come with their own files and commands, to save as the person
 prints none: save the new taskbag yourself.
 
 See:
-- `alm next [--iteration <id>]`: every ready task no one holds (in that iteration), each with its
+- `alm next [--iteration <id>] [--difficulty <range>]`: every ready task no one holds (in that
+  iteration; of those difficulties, `1-3` or `4`, a task with none counting as 3), each with its
   handoff note, and the rule for choosing one; then the blocked tasks whose blockers are all
   done. `alm` chooses and moves nothing; you do.
-- `alm list [--area <id>] [--iteration <id>] [--state <state>] [--mine] [--by area|iteration]`
+- `alm list [--area <id>] [--iteration <id>] [--state <state>] [--difficulty <range>] [--mine] [--by area|iteration]`
   (`--state blocked`, `--state waiting`, …);
   `--without-human-check`: only tasks finished without the human check, not checked since.
   `--by iteration` lists every iteration, empty ones too, each starting with its place in the
@@ -368,8 +376,12 @@ Plan:
 - `alm delete area <id>`, `alm delete iteration <id>`: refused while any task is in it, done and
   dropped ones too (plan them elsewhere first).
 - `alm add task [<id>] --area <id> --title \"<title>\" [--description \"<markdown>\"]
-  --branch <the branch you are on> [--base <name>]`: without an ID, a new word ID in the
-  area (`A01-tiger042`); the base branch as `alm guide tasks` says. Read `alm guide tasks` first.
+  --branch <the branch you are on> [--base <name>] --difficulty <1-5>`: without an ID, a new
+  word ID in the area (`A01-tiger042`); the base branch as `alm guide tasks` says. Read
+  `alm guide tasks` first.
+- `alm difficulty <id> <1-5>` (or `--none`): how hard a task is, 1 very easy to 5 very hard
+  (`alm guide tasks`, step 6); a task with none counts as 3, shown as `3 (default)` in `alm show`
+  and as `difficulty_default` in `--json`.
 - `alm base <id> <branch>`: change the branch a task starts from and merges into.
 - `alm trace <id> <ref>… [--remove]`: record which requirements (their REQUIREMENTS.md IDs, like
   R77) and decisions (their numbers, like 0021) a task serves, in its history; done tasks too.
@@ -2063,7 +2075,10 @@ mod tests {
             );
             // Wording and look are reviewed before release; a parked question never holds back
             // finished work (Task-A00-eclair542).
-            assert!(text.contains("reviewed before release, not before the work"), "{text}");
+            assert!(
+                text.contains("reviewed before release, not before the work"),
+                "{text}"
+            );
             assert!(text.contains("permissions and security"), "{text}");
             assert!(text.contains("never holds back finished work"), "{text}");
             assert!(text.contains("go on with the next ready task"), "{text}");

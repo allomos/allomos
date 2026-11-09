@@ -476,6 +476,16 @@ pub fn validate_taskbag(
                 },
             ));
         }
+        // A difficulty outside 1–5 (Task-A01-actor813): kept, counted as 3, and listed.
+        if let Some(n) = task.difficulty.filter(|n| !crate::difficulty::valid(*n)) {
+            issues.push(Issue::new(
+                file,
+                Some("difficulty"),
+                Problem::DifficultyInvalid {
+                    value: n.to_string(),
+                },
+            ));
+        }
         if !task_ids.insert(task.id.as_str()) {
             issues.push(Issue::new(
                 file,

@@ -1203,6 +1203,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             blocked_by: Vec::new(),
             next_dependency: None,
             iteration: None,
+            difficulty: None,
             handoff_note: None,
             without_human_check: None,
             human_check_steps: None,
@@ -2189,6 +2190,10 @@ pub struct NewTask {
     /// particular. Each must be one of the taskbag's folders.
     #[serde(default)]
     pub folders: Vec<String>,
+    /// How hard it is, 1 to 5 (`alm add task --difficulty`, Task-A01-actor813); `None`: not given,
+    /// it counts as 3.
+    #[serde(default)]
+    pub difficulty: Option<u8>,
 }
 
 /// What [`add_task_with_base`] did: the task, the base it got and why, and warnings.
@@ -2235,6 +2240,9 @@ pub fn add_task_with_base(
     };
     let mut task = ops::new_task(&bag, &id, &new.area, &new.title, new.description.as_deref())?;
     task.folders = allomos_core::folders::check(&bag.project, &new.folders)?;
+    if let Some(n) = new.difficulty {
+        task.difficulty = Some(i64::from(allomos_core::difficulty::level(&n.to_string())?));
+    }
     let recorded = branches(root);
     let filled = |v: &Option<String>| v.clone().filter(|b| !b.trim().is_empty());
     let base = branch::choose_base(

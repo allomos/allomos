@@ -8627,3 +8627,116 @@ fn two_sessions_claiming_one_task_at_once() {
         "{err}"
     );
 }
+
+/// Task-A01-actor813: a task's difficulty, 1 to 5; none counts as 3 and is not written.
+#[test]
+fn a_task_has_a_difficulty_from_one_to_five() {
+    let repo = filled();
+    // Added without one: alm says so with the command, refuses nothing, writes nothing.
+    let added = ok(
+        &repo,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Plain"],
+    );
+    assert_eq!(added["missing"][0]["code"], "difficulty");
+    assert_eq!(added["missing"][0]["fix"], "alm difficulty A01-03 <1-5>");
+    assert!(task_file(&repo, "A01-03").get("difficulty").is_none());
+    assert_eq!(added["task"]["difficulty"], 3);
+    assert_eq!(added["task"]["difficulty_default"], true);
+    // Given when added: written, and nothing missing.
+    let hard = ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "A01-04",
+            "--area",
+            "A01",
+            "--title",
+            "Hard",
+            "--difficulty",
+            "5",
+        ],
+    );
+    assert!(hard.get("missing").is_none_or(Value::is_null), "{hard}");
+    assert_eq!(task_file(&repo, "A01-04")["difficulty"], 5);
+    // Outside 1–5: wrong usage, nothing added.
+    let out = alm(
+        &repo,
+        &[
+            "add",
+            "task",
+            "A01-05",
+            "--area",
+            "A01",
+            "--title",
+            "X",
+            "--difficulty",
+            "6",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("not a difficulty"));
+    assert!(!repo.join(".allomos/taskbag/tasks/A01-05").exists());
+    let out = alm(&repo, &["difficulty", "A01-01", "0"]);
+    assert_eq!(out.status.code(), Some(2));
+    // Changed, shown, recorded in the history; --none takes it off.
+    ok(&repo, &["difficulty", "A01-01", "1"]);
+    assert_eq!(task_file(&repo, "A01-01")["difficulty"], 1);
+    let shown = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(shown.contains("difficulty: 1\n"), "{shown}");
+    let shown = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
+    assert!(shown.contains("difficulty: 3 (default)\n"), "{shown}");
+    let history = ok(&repo, &["history", "A01-01"]);
+    assert!(
+        history["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["command"] == "difficulty"),
+        "{history}"
+    );
+    ok(&repo, &["difficulty", "A01-01", "--none"]);
+    assert!(task_file(&repo, "A01-01").get("difficulty").is_none());
+    // Filters: list and next, a task with none counting as 3.
+    ok(&repo, &["difficulty", "A01-02", "2"]);
+    let ids = |v: &Value| -> Vec<String> {
+        v["areas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|a| a["tasks"].as_array().unwrap().clone())
+            .map(|t| t["id"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let low = ok(&repo, &["list", "--difficulty", "1-2"]);
+    assert_eq!(ids(&low), ["A01-02"]);
+    let three = ok(&repo, &["list", "--difficulty", "3"]);
+    assert_eq!(ids(&three), ["A01-01", "A01-03", "A02-01"]);
+    let out = alm(&repo, &["list", "--difficulty", "4-2"]);
+    assert_eq!(out.status.code(), Some(2));
+    for id in ["A01-02", "A01-04"] {
+        ok(&repo, &["ready", id]);
+    }
+    let next = ok(&repo, &["next", "--difficulty", "4-5"]);
+    let listed: Vec<&str> = next["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(listed, ["A01-04"]);
+    // A value outside 1–5 written by hand is kept, counts as 3 and is listed as a problem.
+    let path = repo.join(".allomos/taskbag/tasks/A01-03/task.json");
+    let mut file = task_file(&repo, "A01-03");
+    file["difficulty"] = serde_json::json!(9);
+    fs::write(&path, serde_json::to_string_pretty(&file).unwrap()).unwrap();
+    let all = ok(&repo, &["list"]);
+    assert!(
+        all["issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["problem"]["code"] == "difficulty_invalid"),
+        "{all}"
+    );
+}

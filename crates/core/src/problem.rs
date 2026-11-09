@@ -63,6 +63,10 @@ problems! {
     CompanionDesktopOnly { op } => "companion_desktop_only", "This can only be done on the computer itself, in the Allomos desktop app ({op}).";
     /// Task-A01-dime494 (decision 0019): a folder name that is not one of the taskbag's folders.
     FolderUnknown { folder, folders } => "folder_unknown", "{folder} is not one of this taskbag's project folders ({folders}).";
+    /// A difficulty that is not a whole number from 1 to 5 (Task-A01-actor813).
+    DifficultyInvalid { value } => "difficulty_invalid", "{value} is not a difficulty: use a whole number from 1 (very easy) to 5 (very hard).";
+    /// A difficulty range that is not `<low>-<high>` or one level (`alm next --difficulty`).
+    DifficultyRangeInvalid { value } => "difficulty_range_invalid", "{value} is not a difficulty range: use two levels from 1 to 5 with a dash, the lower first (1-3), or one level (4).";
     /// A folder's short name must be lowercase letters, digits and `-`.
     FolderNameInvalid { name } => "folder_name_invalid", "{name} is not a valid folder name: use lowercase letters, digits and -, at most 40.";
     FolderNameTaken { name } => "folder_name_taken", "Two project folders are named {name}; each needs its own name.";

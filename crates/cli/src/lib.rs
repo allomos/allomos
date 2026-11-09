@@ -273,6 +273,10 @@ enum Command {
         /// Only tasks that belong to this project folder (its short name).
         #[arg(long, value_name = "NAME")]
         folder: Option<String>,
+        /// Only tasks of these difficulties: 1-3, or one level such as 4 (no difficulty counts
+        /// as 3).
+        #[arg(long, value_name = "RANGE", value_parser = difficulty_range)]
+        difficulty: Option<allomos_core::difficulty::Range>,
     },
     /// What needs a person: To check (done tasks with neither "by human" label, each with why),
     /// To answer (tasks waiting on a person, each with what) and To review (tasks with the label
@@ -670,6 +674,15 @@ enum Command {
         #[arg(long, conflicts_with = "names")]
         none: bool,
     },
+    /// Set how hard a task is, from 1 (very easy) to 5 (very hard); --none takes it off (it then
+    /// counts as 3). `alm guide tasks` says what each level means.
+    Difficulty {
+        id: String,
+        #[arg(required_unless_present = "none", value_parser = difficulty_level)]
+        level: Option<u8>,
+        #[arg(long, conflicts_with = "level")]
+        none: bool,
+    },
     /// The taskbag's project folders (decision 0019): list, add, rename, locate, remove.
     Folder {
         #[command(subcommand)]
@@ -741,6 +754,10 @@ enum Command {
         /// only that folder's tasks are listed).
         #[arg(long)]
         all_folders: bool,
+        /// Only tasks of these difficulties: 1-3, or one level such as 4 (no difficulty counts
+        /// as 3).
+        #[arg(long, value_name = "RANGE", value_parser = difficulty_range)]
+        difficulty: Option<allomos_core::difficulty::Range>,
     },
     /// Print the request the app's Update the taskbag… gives an AI agent: for a taskbag written by
     /// an older Allomos, moving its tasks into a new taskbag, like another task system; otherwise,
@@ -950,6 +967,12 @@ enum Add {
         /// It belongs to no particular folder (planning, naming, decisions).
         #[arg(long)]
         no_folder: bool,
+        /// How hard it is, from 1 to 5: 1 one small change in one place; 2 a small change across
+        /// a few files; 3 an ordinary feature or fix with its tests; 4 several parts change
+        /// together, or risky; 5 needs design decisions or crosses many parts. Give it when you add
+        /// a task (without it the task counts as 3).
+        #[arg(long, value_name = "1-5", value_parser = difficulty_level)]
+        difficulty: Option<u8>,
     },
 }
 
@@ -1099,6 +1122,7 @@ impl Command {
             | Command::Describe { id, .. }
             | Command::Note { id, .. }
             | Command::Folders { id, .. }
+            | Command::Difficulty { id, .. }
             | Command::Handoff { id, .. }
             | Command::Card { id, .. }
             | Command::Drop { id }
@@ -1248,6 +1272,7 @@ impl Command {
             Command::Delete(Delete::Iteration { .. }) => "delete iteration",
             Command::List { .. } => "list",
             Command::Folders { .. } => "folders",
+            Command::Difficulty { .. } => "difficulty",
             Command::Upgrade { .. } => "upgrade",
             Command::Audit => "audit",
             Command::Checkpoint { .. } => "checkpoint",
@@ -2250,6 +2275,11 @@ fn task_json(t: &Task) -> Value {
     let mut v = serde_json::to_value(t).expect("tasks serialize");
     // The version an agent passes back with `--expected-version` (Task-A01-57).
     v["version"] = json!(ops::task_version(t));
+    // The level it counts as, and whether that is the default 3 (Task-A01-actor813). The file
+    // keeps no difficulty when none was given.
+    let (level, default) = allomos_core::difficulty::of(t);
+    v["difficulty"] = json!(level);
+    v["difficulty_default"] = json!(default);
     v
 }
 
@@ -2594,6 +2624,16 @@ fn traces_text(traces: &[String]) -> String {
     } else {
         traces.join(", ")
     }
+}
+
+/// `--difficulty` and `alm difficulty`'s level, checked by the core rule (1 to 5).
+fn difficulty_level(given: &str) -> Result<u8, String> {
+    allomos_core::difficulty::level(given).map_err(|p| p.english())
+}
+
+/// `--difficulty <range>` for `alm next` and `alm list`.
+fn difficulty_range(given: &str) -> Result<allomos_core::difficulty::Range, String> {
+    allomos_core::difficulty::Range::parse(given).map_err(|p| p.english())
 }
 
 fn task_line(t: &Task) -> String {
@@ -3337,6 +3377,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     iteration,
                     folders,
                     no_folder,
+                    difficulty,
                 } => {
                     let current = taskbag_of(&root, load(&root)).ok();
                     // While the taskbag has folders, the agent decides one, several or none
@@ -3366,6 +3407,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         branch: branch.clone(),
                         base: base.clone(),
                         folders: folders.clone(),
+                        difficulty: *difficulty,
                     };
                     let added = allomos_store::add_task_with_base(&root, actor, lock_wait(), &new)?;
                     let task = added.task;
@@ -3397,10 +3439,24 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         &iterations,
                         task.iteration.as_deref(),
                     );
+                    // No difficulty given (Task-A01-actor813): alm says so and how to give it; it
+                    // refuses nothing (the task counts as 3).
+                    let no_difficulty = task.difficulty.is_none().then(|| {
+                        let fact = format!(
+                            "Task {}: no difficulty is given, so it counts as 3 (an ordinary task). Give it, from 1 (very easy) to 5 (very hard); `alm guide tasks` says what each level means.",
+                            task.id
+                        );
+                        let fix = format!("alm difficulty {} <1-5>", task.id);
+                        text.push_str(&format!("\nFact: {fact} Fix: `{fix}`\n"));
+                        json!({ "code": "difficulty", "fact": fact, "fix": fix })
+                    });
                     let mut done = Done::new(
                         json!({ "taskbag": root, "task": task_json(&task), "base": added.base, "next_steps": steps }),
                         text,
                     );
+                    if let Some(m) = &no_difficulty {
+                        done.fields["missing"] = json!([m]);
+                    }
                     done.after = steps;
                     done.warnings = added.warnings;
                     (done, added.issues)
@@ -3588,6 +3644,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             mine,
             without_human_check,
             folder,
+            difficulty,
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
@@ -3618,6 +3675,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     && (!*mine || t.holder.as_deref() == me)
                     && (!*without_human_check || t.to_check())
                     && folder.as_ref().is_none_or(|f| t.folders.contains(f))
+                    && difficulty.is_none_or(|r| r.holds(t))
             };
             // In the taskbag's order: numbered IDs, then word IDs as they were made (A01-54).
             let tasks: Vec<&Task> = bag.tasks.iter().filter(keep).collect();
@@ -3723,6 +3781,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     .join(", ")
             });
             let folders_text = (!task.folders.is_empty()).then(|| task.folders.join(", "));
+            let difficulty_text = allomos_core::difficulty::text(&task);
             let labels_text = (!task.labels.is_empty()).then(|| task.labels.join(", "));
             let heartbeat_text = task
                 .heartbeat
@@ -3734,6 +3793,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("area", Some(task.area.as_str())),
                 ("iteration", task.iteration.as_deref()),
                 ("folders", folders_text.as_deref()),
+                ("difficulty", Some(difficulty_text.as_str())),
                 ("state", Some(task.state.as_str())),
                 ("labels", labels_text.as_deref()),
                 ("holder", task.holder.as_deref()),
@@ -3860,6 +3920,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Next {
             iteration,
             all_folders,
+            difficulty,
         } => {
             let root = locate(cli, cwd)?;
             // First, every blocked task whose blockers have all finished goes on, as the last
@@ -3884,6 +3945,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .flatten();
             if let Some(name) = &here {
                 tasks = allomos_core::folders::in_folder(tasks, name);
+            }
+            // Only the difficulties asked for (Task-A01-actor813), as a monitor chooses them.
+            if let Some(range) = difficulty {
+                tasks.retain(|t| range.holds(t));
             }
             // Held tasks (decision 0022, Task-A01-zero387): the lost ones and the busy ones, in
             // the same iteration and folder as the list.
@@ -4659,6 +4724,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }),
         Command::Folders { id, names, .. } => change(cli, cwd, |bag| {
             allomos_core::folders::set(bag, id, me, names)
+        }),
+        Command::Difficulty { id, level, .. } => change(cli, cwd, |bag| {
+            allomos_core::difficulty::set(bag, id, me, *level)
         }),
         Command::Upgrade { confirm } => folders::upgrade(&locate(cli, cwd)?, me, *confirm),
         Command::Audit => trail::audit(&locate(cli, cwd)?),

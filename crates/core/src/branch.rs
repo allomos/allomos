@@ -321,6 +321,7 @@ mod tests {
             blocked_by: Vec::new(),
             next_dependency: None,
             iteration: None,
+            difficulty: None,
             handoff_note: None,
             without_human_check: None,
             human_check_steps: None,

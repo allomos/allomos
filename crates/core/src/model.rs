@@ -485,6 +485,11 @@ pub struct Task {
     /// The iteration the task is planned in, if any.
     #[serde(default)]
     pub iteration: Option<String>,
+    /// How hard it is, from 1 (very easy) to 5 (very hard), as the agent that added it judged
+    /// (Task-A01-actor813). Not written when none was given: it then counts as 3
+    /// ([`crate::difficulty::of`]). A number outside 1–5 is kept and listed as a problem.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub difficulty: Option<i64>,
     /// A short note left on release for whoever picks the task up next.
     #[serde(default)]
     pub handoff_note: Option<String>,

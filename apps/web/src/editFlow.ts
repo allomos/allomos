@@ -15,7 +15,8 @@ export type EditField =
   | "iteration"
   | "title"
   | "description"
-  | "folders";
+  | "folders"
+  | "difficulty";
 
 /**
  * What the person typed or chose. `waitingOn` and `who` go with the state `waiting`; `blockedBy`
@@ -63,6 +64,8 @@ export function startDraft(task: Task, field: EditField): Draft {
       ? task.state
       : field === "description"
         ? task.description
+        : field === "difficulty"
+          ? task.difficulty == null ? "" : String(task.difficulty)
         : field === "blocked_by" || field === "folders" || field === "label"
           ? ""
           : (task[field] ?? "");
@@ -123,6 +126,8 @@ export function toEdit(field: EditField, draft: Draft, version: string | null = 
       return { field, text: draft.value, expected_version: version };
     case "folders":
       return { field, folders: draft.folders };
+    case "difficulty":
+      return { field, difficulty: text ? Number(text) : null };
   }
 }
 
