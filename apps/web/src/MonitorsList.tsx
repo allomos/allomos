@@ -1,7 +1,8 @@
 // The Monitors list (Task-A03-motor529, approver 2026-11-09): the button at the right end of the tab
 // bar, shown only while a monitoring run goes on on this computer, and the list it opens, or the
-// View menu's Running Monitors item opens. Each run is one row, in any project: Open shows its
-// project, Check now and Stop act on it as its status bar does, and a run whose record is missing
+// View menu's Running Monitors item opens. Each run is one row, in any project: its iteration's
+// name is a link to that iteration in its project, Check now and Stop act on it as its status bar
+// does, and a run whose record is missing
 // can only be stopped (by its process). The list reads the run files every couple of seconds.
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
 import { monitorAgentName } from "./AgentPicker";
 import { freeAgents, listedRuns, nextCheck, type ListedRun, type Run } from "./monitorFlow";
+import { askJump } from "./iterationJumpFlow";
 import { isProblem } from "./types";
 import { useAgentAccounts } from "./useAgentAccounts";
 
@@ -157,7 +159,7 @@ export function MonitorsList({
           {rows.map((row) => (
             <li key={row.key} className={`monitors-row${row.run?.stopping ? " stopping" : ""}${row.lost ? " lost" : ""}`}>
               {row.run ? (
-                <RunRow run={row.run} name={row.name} now={now} hasProject={row.root !== null} onOpen={() => messenger.monitorOpen(row.root ?? "").then(onClose).catch(fail)} onCheck={() => ask(row.run!.id, { action: "check" })} onStop={() => ask(row.run!.id, { action: row.run!.stopping ? "undo_stop" : "stop" })} />
+                <RunRow run={row.run} name={row.name} now={now} onIteration={row.root ? (id) => askJump({ root: row.root!, id }, () => messenger.monitorOpen(row.root ?? "")).then(onClose).catch(fail) : undefined} onCheck={() => ask(row.run!.id, { action: "check" })} onStop={() => ask(row.run!.id, { action: row.run!.stopping ? "undo_stop" : "stop" })} />
               ) : (
                 <div className="monitors-lines">
                   <strong>{t("monitors.missing", { pid: row.lost?.pid ?? 0 })}</strong>
@@ -181,27 +183,26 @@ export function MonitorsList({
   );
 }
 
-/** One run: its project and what it covers, a line per agent, and its actions. */
+/** One run: its project and what it covers (an iteration's name is a link to it), a line per agent, and its actions. */
 function RunRow({
   run,
   name,
   now,
-  hasProject,
-  onOpen,
+  onIteration,
   onCheck,
   onStop,
 }: {
   run: Run;
   name: string | null;
   now: number;
-  hasProject: boolean;
-  onOpen: () => void;
+  /** Shows the run's iteration in its project; not given when the project is not known. */
+  onIteration?: (iteration: string) => void;
   onCheck: () => void;
   onStop: () => void;
 }) {
   const { t } = useI18n();
-  const scope = run.scope.kind === "all" ? t("monitor.scope_all") : t("monitor.scope_label", { id: run.scope.id });
   const free = freeAgents(run);
+  const iterationName = run.scope.kind === "iteration" ? run.scope.id : null;
   const lines: string[] = [];
   if (run.stopping && run.working.length) {
     lines.push(t("monitor.stopping", { id: run.working.map((w) => w.id).join(", ") }));
@@ -217,7 +218,21 @@ function RunRow({
   return (
     <div className="monitors-lines">
       <div>
-        <strong>{name ?? ""}</strong> <span className="muted">· {scope}</span>
+        <strong>{name ?? ""}</strong>{" "}
+        <span className="muted">
+          · {run.scope.kind === "all" ? t("monitor.scope_all") : t("monitors.iteration_word")}{" "}
+          {iterationName !== null &&
+            (onIteration ? (
+              <button type="button" className="link monitors-iteration" title={t("monitors.iteration_show", { id: iterationName })} onClick={() => onIteration(iterationName)}>
+                {iterationName}
+                <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+                  <path d="M6 4h6v6M12 4 4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : (
+              iterationName
+            ))}
+        </span>
       </div>
       {lines.map((line) => (
         <div key={line} className="muted small">
@@ -225,11 +240,6 @@ function RunRow({
         </div>
       ))}
       <div className="row-actions">
-        {hasProject && (
-          <button type="button" className="small" onClick={onOpen}>
-            {t("monitors.open")}
-          </button>
-        )}
         {!run.stopping && free.length > 0 && (
           <button type="button" className="small" onClick={onCheck}>
             {t("monitor.check_now")}

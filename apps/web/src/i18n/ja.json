@@ -1140,6 +1140,8 @@
   "monitors.close": "閉じる",
   "monitors.none": "実行中の監視はありません。",
   "monitors.open": "開く",
+  "monitors.iteration_word": "イテレーション",
+  "monitors.iteration_show": "計画でイテレーション {id} を表示",
   "monitors.checking": "確認中…",
   "monitors.waiting": "準備完了のタスクなし、次の確認 {time}",
   "monitors.missing": "実行中（記録なし）· プロセス {pid}",
