@@ -15,6 +15,7 @@ import type { InstructionFiles } from "./types";
 import { movingTasks, updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
+import { requestWay } from "./agentPickerFlow";
 import { agentOpened } from "./ProgressDialog";
 import { saveOpened } from "./updateTaskbagFlow";
 import type { Seen } from "./manualFlow";
@@ -180,14 +181,14 @@ export function AgentsPanel({
       onDone({
         // One agent (owner, 2026-10-12); a terminal that takes the request from the clipboard is told so.
         // Antigravity's agy takes the request on its command line and sends it at once (2026-11-09).
-        message: !updating && chosen[0] === "antigravity_cli"
-          ? t("connect.asked_sent", { agent: t(AGENT_KEY[chosen[0]]) })
-          : (agents ?? []).some((x) => x.id === chosen[0] && x.how === "paste")
-            ? t(updating === "move" ? "move.asked_paste" : updating ? "update.asked_paste" : "connect.asked_paste", {
-                agent: t(AGENT_KEY[chosen[0]]),
-                keys: PASTE_KEYS,
-              })
-            : t(updating === "move" ? "move.asked" : updating ? "update.asked" : "connect.asked", { agent: t(AGENT_KEY[chosen[0]]) }),
+        message: (() => {
+          const way = requestWay((agents ?? []).find((x) => x.id === chosen[0]));
+          const base = updating === "move" ? "move" : updating ? "update" : "connect";
+          const agent = t(AGENT_KEY[chosen[0]]);
+          return way === "typed"
+            ? t(`${base}.asked`, { agent })
+            : t(`${base}.asked_${way}`, { agent, keys: PASTE_KEYS });
+        })(),
         watch: { project, before },
       });
     } catch (e) {

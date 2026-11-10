@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
+import { requestWay } from "./agentPickerFlow";
 import { Markdown } from "./Markdown";
 import { agentOpened } from "./ProgressDialog";
 import { saveOpened } from "./updateTaskbagFlow";
@@ -128,7 +129,8 @@ export function BuildAppDialog({
       // The agent used last, for Update the taskbag… (Task-A03-27).
       saveOpened(o.root, agent);
       const name = t(AGENT_KEY[agent]);
-      const asked = tool?.how === "paste" ? t("build.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("build.asked", { agent: name });
+      const way = requestWay(tool);
+      const asked = way === "typed" ? t("build.asked", { agent: name }) : t(`build.asked_${way}`, { agent: name, keys: PASTE_KEYS });
       onClose(discuss ? `${asked} ${t("build.asked_discuss")}` : asked);
     } catch (e) {
       fail(e);
