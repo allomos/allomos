@@ -343,6 +343,10 @@ button.link:hover { text-decoration: underline; }
 .welcome-start { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 8px; }
 .welcome .start { font-size: 15px; padding: 11px 28px; border-radius: 999px; }
 .welcome-start .muted { font-size: 13px; }
+/* Task-A05-road243: Create a new project… and Set up an existing project side by side; they stack
+   on a narrow window. */
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 10px 12px; }
+@media (max-width: 520px) { .welcome-actions { flex-direction: column; align-items: stretch; width: 100%; } }
 /* Open recent… under the start page's card, at its left edge, and its dialog (Task-A01-43). The card
    itself is unchanged; the wrapper takes its width and centring. */
 /* The card and the buttons under it fill the page's height, the card's content centred inside it,
@@ -795,8 +799,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .refresh-line { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .refresh-line button.link { align-self: baseline; font-size: inherit; }
 .refresh-line button.link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
-/* Build a new app… (Task-A03-25-02): under the start page's card, right of Open recent…, and its
-   dialog. */
+/* Under the start page's card, Open recent… (Task-A01-43); the Create a new project… dialog
+   (Task-A03-25-02). */
 .welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
 .build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; min-height: 7.5em; }
 .build-app .banner code { overflow-wrap: anywhere; }

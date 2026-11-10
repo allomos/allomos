@@ -1091,9 +1091,10 @@ function LanguagePicker() {
 }
 
 /** The first screen with nothing open: the road show's opening slide (slogan, a task shifting
- * between agents and a teammate around the taskbag), with one button, Start, which opens the setup
- * wizard (Task-A05-03). Under the card, Open recent… (Task-A01-43) and Build a new app…
- * (Task-A03-25-02). */
+ * between agents and a teammate around the taskbag), with two buttons side by side
+ * (Task-A05-road243): Create a new project…, which opens the Build a new app dialog
+ * (Task-A03-25-02), then Set up an existing project, which opens the setup wizard (Task-A05-03).
+ * Under the card, Open recent… (Task-A01-43). */
 function Welcome({
   onOpen,
   onBuild,
@@ -1120,23 +1121,24 @@ function Welcome({
             </h1>
             <p className="lede">{t("welcome.lede")}</p>
             <div className="welcome-start">
-              <button type="button" className="primary start" onClick={onOpen}>
-                {t("welcome.open")}
-              </button>
+              <div className="welcome-actions">
+                <button type="button" className="start welcome-build" onClick={onBuild}>
+                  {t("build.button")}
+                </button>
+                <button type="button" className="primary start" onClick={onOpen}>
+                  {t("welcome.open")}
+                </button>
+              </div>
               <span className="muted">{t("welcome.hint")}</span>
             </div>
           </div>
           <HopFigure />
         </div>
       </section>
-      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43); to its right, start
-          from a description instead (owner, 2026-10-17; Task-A03-25-02). */}
+      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43). */}
       <div className="welcome-under">
         <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
           {t("welcome.open_recent")}
-        </button>
-        <button type="button" className="welcome-build" onClick={onBuild}>
-          {t("build.button")}
         </button>
       </div>
     </div>
