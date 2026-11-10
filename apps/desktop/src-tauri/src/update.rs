@@ -13,10 +13,13 @@
 //! the new version. The hash proves only that the download is intact: whoever can upload to the
 //! release could upload a matching hash too (the approver knows and accepted this).
 //!
-//! **Settings… › General › Automatic updates** (Task-A07-meter647, on by default) turns both off:
-//! the app no longer asks GitHub by itself nor downloads in the background, and a remembered newer
-//! version is not offered until the person chooses **Check for Updates…**. An installer already
-//! downloaded and checked stays, and the menu still offers **Restart to Update**.
+//! **Settings… › General** has two switches (Task-A07-meter647, split by Task-A07-trunk220, both on
+//! by default). **Check for updates automatically** off: the app no longer asks GitHub by itself,
+//! and a remembered newer version is not offered until the person chooses **Check for Updates…**.
+//! **Download updates automatically** off (only under a check that is on): a newer version found
+//! by a check is not downloaded in the background; **Check for Updates…** still downloads and
+//! checks its installer, because the person asked. An installer already downloaded and checked
+//! stays, and the menu still offers **Restart to Update**.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -139,10 +142,10 @@ pub fn fetch_latest(current: &str) -> Option<String> {
     latest_from_json(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// What is offered while **Automatic updates** is off and the person did not ask (Task-A07-meter647):
-/// no notice, and the menu names a newer version only when its installer is already downloaded
-/// and checked (**Restart to Update**); otherwise it shows **Check for Updates…**.
-pub fn without_auto_update(mut status: UpdateStatus) -> UpdateStatus {
+/// What is offered while **Check for updates automatically** is off and the person did not ask
+/// (Task-A07-meter647): no notice, and the menu names a newer version only when its installer is
+/// already downloaded and checked (**Restart to Update**); otherwise it shows **Check for Updates…**.
+pub fn without_auto_check(mut status: UpdateStatus) -> UpdateStatus {
     status.newer = None;
     if status.ready.is_none() {
         status.available = None;
@@ -152,14 +155,15 @@ pub fn without_auto_update(mut status: UpdateStatus) -> UpdateStatus {
 }
 
 /// The whole check: ask GitHub if due, remember the answer, and say what to offer. With
-/// **Automatic updates** off (`auto` false), GitHub is asked only when the person asked.
-pub fn check(asked: bool, auto: bool) -> UpdateStatus {
+/// **Check for updates automatically** off (`auto_check` false), GitHub is asked only when the
+/// person asked.
+pub fn check(asked: bool, auto_check: bool) -> UpdateStatus {
     let current = env!("CARGO_PKG_VERSION");
     let mut memory = allomos_store::update_memory();
     let mut failed = false;
     let mut fetched = false;
     let now = now();
-    if (asked || auto) && due(memory.checked_at, now, asked) {
+    if (asked || auto_check) && due(memory.checked_at, now, asked) {
         match fetch_latest(current) {
             Some(latest) => {
                 let _ = allomos_store::save_update_check(now, &latest);
@@ -182,11 +186,25 @@ pub fn check(asked: bool, auto: bool) -> UpdateStatus {
     );
     status.ready = ready_version().filter(|r| status.available.as_ref() == Some(r));
     status.preparing = preparing_version().filter(|p| status.available.as_ref() == Some(p));
-    if auto || asked {
+    if auto_check || asked {
         status
     } else {
-        without_auto_update(status)
+        without_auto_check(status)
     }
+}
+
+/// Whether the installer of `available` should be downloaded in the background now
+/// (Task-A07-trunk220). It is, when **Download updates automatically** is on, or when the person
+/// asked from the menu: **Check for Updates…** always downloads and checks for that check. It is
+/// not started again for an installer that is downloaded or downloading (`prepare_in_background`
+/// keeps those as they are).
+pub fn should_download(
+    asked: bool,
+    download: bool,
+    available: Option<&str>,
+    ready: Option<&str>,
+) -> bool {
+    available.is_some() && ready.is_none() && (asked || download)
 }
 
 // ---- Downloading and installing (Task-A07-17) ----
@@ -877,9 +895,9 @@ mod tests {
     }
 
     #[test]
-    fn with_automatic_updates_off_only_a_ready_installer_is_offered() {
+    fn with_automatic_check_off_only_a_ready_installer_is_offered() {
         let known = decide("0.1.5", Some("0.1.6"), None, false, false);
-        let quiet = without_auto_update(known.clone());
+        let quiet = without_auto_check(known.clone());
         assert_eq!((quiet.newer, quiet.available), (None, None));
         assert_eq!(quiet.latest.as_deref(), Some("0.1.6"));
 
@@ -887,7 +905,7 @@ mod tests {
             ready: Some("0.1.6".into()),
             ..known
         };
-        let quiet = without_auto_update(ready);
+        let quiet = without_auto_check(ready);
         assert_eq!(quiet.newer, None);
         assert_eq!(quiet.available.as_deref(), Some("0.1.6"));
         assert_eq!(quiet.ready.as_deref(), Some("0.1.6"));
@@ -934,12 +952,25 @@ mod tests {
     }
 
     #[test]
-    fn with_automatic_updates_off_a_download_that_is_not_ready_is_not_waited_for() {
+    fn a_newer_installer_is_downloaded_in_the_background_only_when_download_is_on_or_asked() {
+        // Download on: a background check that finds a newer version downloads it.
+        assert!(should_download(false, true, Some("0.1.6"), None));
+        // Download off: nothing starts in the background...
+        assert!(!should_download(false, false, Some("0.1.6"), None));
+        // ...but Check for Updates... always downloads and checks for that check.
+        assert!(should_download(true, false, Some("0.1.6"), None));
+        // Nothing to download without a newer version, and nothing again once it is kept.
+        assert!(!should_download(true, true, None, None));
+        assert!(!should_download(true, true, Some("0.1.6"), Some("0.1.6")));
+    }
+
+    #[test]
+    fn with_automatic_check_off_a_download_that_is_not_ready_is_not_waited_for() {
         let downloading = UpdateStatus {
             preparing: Some("0.1.6".into()),
             ..decide("0.1.5", Some("0.1.6"), None, true, false)
         };
-        let quiet = without_auto_update(downloading);
+        let quiet = without_auto_check(downloading);
         assert_eq!(quiet.available, None);
         assert_eq!(quiet.preparing, None);
     }

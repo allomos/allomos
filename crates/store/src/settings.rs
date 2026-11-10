@@ -44,10 +44,15 @@ struct Settings {
     /// Missing or unknown: `reopen`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     start_with: Option<String>,
-    /// **Automatic updates** (Task-A07-meter647, approver 2026-11-08: on by default). Kept only
-    /// when off (`false`); missing: on.
+    /// **Check for updates automatically** (Task-A07-meter647, split by Task-A07-trunk220; on by
+    /// default). Stored under the key the one **Automatic updates** switch used. Kept only when
+    /// off (`false`); missing: on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     auto_update: Option<bool>,
+    /// **Download updates automatically** (Task-A07-trunk220, on by default). Kept only when off
+    /// (`false`); missing: on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auto_download: Option<bool>,
 }
 
 /// What Allomos opens when it starts again (Task-A01-marble320, approver 2026-10-29), the app's
@@ -226,16 +231,29 @@ pub fn save_start_with(choice: StartWith) -> io::Result<()> {
     write_settings(&settings)
 }
 
-/// Whether **Automatic updates** is on: the app asks GitHub once a day by itself and downloads a
-/// newer version in the background (Task-A07-meter647). On until the person turns it off.
-pub fn auto_update() -> bool {
+/// Whether **Check for updates automatically** is on: the app asks GitHub once a day by itself
+/// (Task-A07-meter647, split by Task-A07-trunk220). On until the person turns it off.
+pub fn auto_check() -> bool {
     read_settings().auto_update != Some(false)
 }
 
-/// Remember **Automatic updates** on or off.
-pub fn save_auto_update(on: bool) -> io::Result<()> {
+/// Remember **Check for updates automatically** on or off.
+pub fn save_auto_check(on: bool) -> io::Result<()> {
     let mut settings = read_settings();
     settings.auto_update = (!on).then_some(false);
+    write_settings(&settings)
+}
+
+/// Whether **Download updates automatically** is on: after a check finds a newer version, its
+/// installer is downloaded and checked in the background (Task-A07-trunk220). On until turned off.
+pub fn auto_download() -> bool {
+    read_settings().auto_download != Some(false)
+}
+
+/// Remember **Download updates automatically** on or off.
+pub fn save_auto_download(on: bool) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.auto_download = (!on).then_some(false);
     write_settings(&settings)
 }
 
@@ -442,22 +460,34 @@ mod tests {
         assert_eq!(StartWith::parse("tabs"), None);
         assert_eq!(saved_ui_language().as_deref(), Some("ja"));
 
-        // Automatic updates (Task-A07-meter647): on until turned off, then remembered; the
-        // update check beside it is kept.
-        assert!(auto_update());
-        save_auto_update(false).unwrap();
-        assert!(!auto_update());
+        // Check and download for updates (Task-A07-meter647, Task-A07-trunk220): on until turned
+        // off, then remembered on their own; the update check beside them is kept.
+        assert!(auto_check());
+        assert!(auto_download());
+        save_auto_check(false).unwrap();
+        assert!(!auto_check());
+        assert!(auto_download());
         assert!(
             fs::read_to_string(dir.join(SETTINGS_FILE))
                 .unwrap()
                 .contains("\"auto_update\": false")
         );
-        save_auto_update(true).unwrap();
-        assert!(auto_update());
+        save_auto_download(false).unwrap();
+        assert!(!auto_download());
+        save_auto_check(true).unwrap();
+        assert!(auto_check());
+        assert!(!auto_download());
+        save_auto_download(true).unwrap();
+        assert!(auto_download());
         assert!(
             !fs::read_to_string(dir.join(SETTINGS_FILE))
                 .unwrap()
                 .contains("auto_update")
+        );
+        assert!(
+            !fs::read_to_string(dir.join(SETTINGS_FILE))
+                .unwrap()
+                .contains("auto_download")
         );
         assert_eq!(update_memory().latest.as_deref(), Some("0.1.6"));
 

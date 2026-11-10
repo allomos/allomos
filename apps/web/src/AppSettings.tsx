@@ -1,9 +1,11 @@
 // The settings dialog's **Allomos** group (Task-A01-marble320, Task-A05-cookie962): settings for
 // the whole app on this computer, apart from each taskbag's own. Its General section has **When
 // Allomos starts**: reopen the windows and tabs (the default), open the last taskbag, or open a
-// blank window. A choice is saved at once. Then **Automatic updates** (Task-A07-meter647, on by
-// default): off, the app no longer asks GitHub by itself nor downloads in the background; Check for
-// Updates… still works. **This computer** (Task-A01-tail719, decision 0021 § 6): this computer's
+// blank window. A choice is saved at once. Then the updates switches (Task-A07-meter647, split by
+// Task-A07-trunk220, both on by default): **Check for updates automatically** off, the app no
+// longer asks GitHub by itself; **Download updates automatically** (nested, disabled while the check
+// is off) off, nothing is downloaded in the background; Check for Updates… still works and still
+// downloads. **This computer** (Task-A01-tail719, decision 0021 § 6): this computer's
 // signing key (its ID and public key, Export public key…) and the Last seen history, the last
 // checkpoint this computer saw of each project and whether that taskbag still has it. **Replace
 // key…** (Task-A01-ring220) makes a new key after an inline confirmation; the old one is retired in
@@ -30,22 +32,25 @@ function errorText(e: unknown, problem: ReturnType<typeof useI18n>["problem"]) {
   return isProblem(e) ? problem(e) : String(e);
 }
 
-/** Allomos → General: When Allomos starts, and Automatic updates. */
+/** Allomos → General: When Allomos starts, and the two update switches. */
 export function AppGeneralSection({ settings }: { settings: Settings }) {
   const { t, problem } = useI18n();
   const [startWith, setStartWith] = useState<StartWith | null>(null);
-  const [autoUpdate, setAutoUpdate] = useState<boolean | null>(null);
+  const [autoCheck, setAutoCheck] = useState<boolean | null>(null);
+  const [autoDownload, setAutoDownload] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     settings
       .appSettings()
       .then((s) => {
         setStartWith(s.start_with);
-        setAutoUpdate(s.auto_update);
+        setAutoCheck(s.auto_check);
+        setAutoDownload(s.auto_download);
       })
       .catch(() => {
         setStartWith("reopen");
-        setAutoUpdate(true);
+        setAutoCheck(true);
+        setAutoDownload(true);
       });
   }, [settings]);
   const choose = (value: StartWith) => {
@@ -57,12 +62,21 @@ export function AppGeneralSection({ settings }: { settings: Settings }) {
       setError(errorText(e, problem));
     });
   };
-  const switchAutoUpdate = (on: boolean) => {
-    const before = autoUpdate;
-    setAutoUpdate(on);
+  const switchAutoCheck = (on: boolean) => {
+    const before = autoCheck;
+    setAutoCheck(on);
     setError(null);
-    settings.setAutoUpdate(on).catch((e: unknown) => {
-      setAutoUpdate(before);
+    settings.setAutoCheck(on).catch((e: unknown) => {
+      setAutoCheck(before);
+      setError(errorText(e, problem));
+    });
+  };
+  const switchAutoDownload = (on: boolean) => {
+    const before = autoDownload;
+    setAutoDownload(on);
+    setError(null);
+    settings.setAutoDownload(on).catch((e: unknown) => {
+      setAutoDownload(before);
       setError(errorText(e, problem));
     });
   };
@@ -80,10 +94,18 @@ export function AppGeneralSection({ settings }: { settings: Settings }) {
       <fieldset className="settings-choice">
         <legend>{t("app_settings.updates")}</legend>
         <label>
-          <input type="checkbox" name="auto_update" checked={autoUpdate ?? true} disabled={autoUpdate === null} onChange={(e) => switchAutoUpdate(e.target.checked)} />
-          {t("app_settings.auto_update")}
+          <input type="checkbox" name="auto_check" checked={autoCheck ?? true} disabled={autoCheck === null} onChange={(e) => switchAutoCheck(e.target.checked)} />
+          {t("app_settings.auto_check")}
         </label>
-        <p className="muted small">{t("app_settings.auto_update_help")}</p>
+        <p className="muted small">{t("app_settings.auto_check_help")}</p>
+        {/* Nested under the check: disabled while the check is off (Task-A07-trunk220). */}
+        <div style={{ marginInlineStart: "1.5rem" }}>
+          <label>
+            <input type="checkbox" name="auto_download" checked={autoDownload ?? true} disabled={autoCheck !== true} onChange={(e) => switchAutoDownload(e.target.checked)} />
+            {t("app_settings.auto_download")}
+          </label>
+          <p className="muted small">{t("app_settings.auto_download_help")}</p>
+        </div>
       </fieldset>
       {error && (
         <p className="banner error" role="alert">

@@ -1639,29 +1639,48 @@ fn open_download_page() -> Result<(), Problem> {
 /// and asks again. While it downloads, the menu's **Download Allomos <version>…** waits
 /// (A07-glove300); once it has failed, that item opens the release page.
 ///
-/// With **Automatic updates** off (Task-A07-meter647), GitHub is asked only from the menu, and
-/// nothing is downloaded in the background, not even after the menu's check.
+/// With **Check for updates automatically** off (Task-A07-meter647), GitHub is asked only from
+/// the menu. With **Download updates automatically** off (Task-A07-trunk220), a check does not
+/// download in the background; the menu's **Check for Updates…** still does, because the person asked.
 #[tauri::command]
 async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
-    let auto = allomos_store::auto_update();
-    let mut status = update::check(asked, auto);
-    if let (true, Some(version), None) = (auto, &status.available, &status.ready) {
-        let version = version.clone();
-        if update::prepare_in_background(version.clone(), move || {
-            let _ = app.emit(UPDATE_READY_EVENT, ());
-        }) {
-            status.preparing = Some(version);
+    let mut status = update::check(asked, allomos_store::auto_check());
+    if update::should_download(
+        asked,
+        allomos_store::auto_download(),
+        status.available.as_deref(),
+        status.ready.as_deref(),
+    ) {
+        if let Some(version) = status.available.clone() {
+            if update::prepare_in_background(version.clone(), move || {
+                let _ = app.emit(UPDATE_READY_EVENT, ());
+            }) {
+                status.preparing = Some(version);
+            }
         }
     }
     status
 }
 
-/// **Settings… › General › Automatic updates** on or off (Task-A07-meter647). Every window looks
-/// at updates again at once (the `update:ready` event), so the change shows without waiting
-/// for the hourly look: turned off, a notice goes away; turned on, a day-old check runs now.
+/// **Settings… › General › Check for updates automatically** on or off (Task-A07-meter647). Every
+/// window looks at updates again at once (the `update:ready` event), so the change shows without
+/// waiting for the hourly look: turned off, a notice goes away; turned on, a day-old check runs now.
 #[tauri::command]
-fn set_auto_update(app: AppHandle, on: bool) -> Result<(), Problem> {
-    allomos_store::save_auto_update(on).map_err(|e| Problem::WriteFailed {
+fn set_auto_check(app: AppHandle, on: bool) -> Result<(), Problem> {
+    allomos_store::save_auto_check(on).map_err(|e| Problem::WriteFailed {
+        path: "settings.json".into(),
+        detail: e.to_string(),
+    })?;
+    let _ = app.emit(UPDATE_READY_EVENT, ());
+    Ok(())
+}
+
+/// **Settings… › General › Download updates automatically** on or off (Task-A07-trunk220). The
+/// window looks again at once (the `update:ready` event): turned on, a newer version the last
+/// check found is downloaded now.
+#[tauri::command]
+fn set_auto_download(app: AppHandle, on: bool) -> Result<(), Problem> {
+    allomos_store::save_auto_download(on).map_err(|e| Problem::WriteFailed {
         path: "settings.json".into(),
         detail: e.to_string(),
     })?;
@@ -2606,7 +2625,8 @@ pub fn run() {
             tab_drag::drag_cancel,
             windows::app_settings,
             windows::set_start_with,
-            set_auto_update,
+            set_auto_check,
+            set_auto_download,
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
