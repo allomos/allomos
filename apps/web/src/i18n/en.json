@@ -1140,6 +1140,8 @@
   "monitors.close": "Close",
   "monitors.none": "No monitors are running.",
   "monitors.open": "Open",
+  "monitors.iteration_word": "Iteration",
+  "monitors.iteration_show": "Show iteration {id} in the plan",
   "monitors.checking": "checking…",
   "monitors.waiting": "no task is ready; next check {time}",
   "monitors.missing": "Running (record missing) · process {pid}",

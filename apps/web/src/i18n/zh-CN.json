@@ -1140,6 +1140,8 @@
   "monitors.close": "关闭",
   "monitors.none": "没有正在运行的监测。",
   "monitors.open": "打开",
+  "monitors.iteration_word": "迭代",
+  "monitors.iteration_show": "在计划中显示迭代 {id}",
   "monitors.checking": "正在检查…",
   "monitors.waiting": "没有就绪任务，下次检查 {time}",
   "monitors.missing": "运行中（缺少记录）· 进程 {pid}",

@@ -20,6 +20,7 @@ import { UPDATE_LOOK_MS, updateMenuItem, updateNote } from "./updateFlow";
 import { SettingsDialog } from "./SettingsDialog";
 import { LanDialog } from "./LanDialog";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
+import { JUMP_EVENT, JUMP_KEY, jumpIsFor, takeJump, type IterationJump } from "./iterationJumpFlow";
 import { groupCount } from "./groupCountFlow";
 import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
@@ -1224,6 +1225,50 @@ function TaskbagView({
   // Collapsed groups, remembered per project (Task-A01-26).
   const [collapsed, setCollapsed] = useFold(opened.root, "groups");
   const iterations = box?.iterations ?? [];
+  // A link from the Monitors list to one of this project's iterations (Task-A03-meteor649): the plan
+  // view opens with that iteration's group unfolded and brought into view. The request comes from
+  // the same window (an event) or from another one (the storage event), or is kept until this
+  // project's window opens.
+  const [jumpTo, setJumpTo] = useState<IterationJump | null>(null);
+  const [reveal, setReveal] = useState<string | null>(null);
+  useEffect(() => {
+    const root = opened.root;
+    const take = () => {
+      const jump = takeJump(root);
+      if (jump) setJumpTo(jump);
+    };
+    const onEvent = (e: Event) => {
+      const jump = (e as CustomEvent<IterationJump>).detail;
+      if (jumpIsFor(jump, root)) {
+        takeJump(root); // cleared here too, in case the storage did not keep it
+        setJumpTo(jump);
+      }
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === JUMP_KEY) take();
+    };
+    take();
+    window.addEventListener(JUMP_EVENT, onEvent);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(JUMP_EVENT, onEvent);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [opened.root]);
+  useEffect(() => {
+    if (!jumpTo || !box) return; // wait until the taskbag is read
+    if (iterations.some((i) => i.id === jumpTo.id)) {
+      if (groupBy !== "iteration") choose("iteration");
+      setCollapsed((keys) => setKeys(keys, [`i-${jumpTo.id}`], false));
+      setReveal(jumpTo.id);
+    }
+    setJumpTo(null);
+  }, [jumpTo, box, groupBy]);
+  useEffect(() => {
+    if (!reveal) return;
+    document.getElementById(`group-i-${reveal}`)?.scrollIntoView({ block: "start" });
+    setReveal(null);
+  }, [reveal, groupBy]);
   const lostAfter = lostAfterMinutes(box?.project);
   // Project folders (Task-A01-sketch327): read again whenever the taskbag is, so binding a second
   // folder shows the chips and the Folder filter without reopening the window.
@@ -1669,6 +1714,7 @@ function TaskbagView({
               {found.map((g) => (
                 <TaskGroup
                   key={g.key}
+                  anchor={`group-${g.key}`}
                   id={g.id}
                   name={g.name}
                   sub={g.sub}
@@ -1846,6 +1892,7 @@ function Issues({ issues, onDownload }: { issues: Issue[]; onDownload: () => voi
 
 /** One group of the task list: an area or an iteration, with its progress and its tasks. */
 function TaskGroup({
+  anchor,
   id,
   name,
   sub,
@@ -1873,6 +1920,8 @@ function TaskGroup({
   onError,
   monitor,
 }: {
+  /** The section's element ID, so a link can bring it into view (Task-A03-meteor649). */
+  anchor?: string;
   id: string;
   name: string;
   sub?: string;
@@ -1923,7 +1972,7 @@ function TaskGroup({
   const all = counted ?? tasks;
   const { done, total, pct } = groupCount(all.map((t) => t.state));
   return (
-    <section className={["area", collapsed ? "collapsed" : "", iterationState ? `${iterationState}-iteration` : ""].filter(Boolean).join(" ")}>
+    <section id={anchor} className={["area", collapsed ? "collapsed" : "", iterationState ? `${iterationState}-iteration` : ""].filter(Boolean).join(" ")}>
       <header className="area-head">
         {/* Edit sits on the title line, after the name and badge, beside the fold button and
             outside the heading, so it never folds the group (Task-A01-sorbet602). */}
