@@ -1635,18 +1635,23 @@ fn open_download_page() -> Result<(), Problem> {
 /// Otherwise GitHub is asked only when the last answer is a day old.
 ///
 /// When a newer version is known, its installer is downloaded and checked in the background
-/// (Task-A07-17); once it is ready every window hears `update:ready` and asks again.
+/// (Task-A07-17); when the download has ended, kept or not, every window hears `update:ready`
+/// and asks again. While it downloads, the menu's **Download Allomos <version>…** waits
+/// (A07-glove300); once it has failed, that item opens the release page.
 ///
 /// With **Automatic updates** off (Task-A07-meter647), GitHub is asked only from the menu, and
 /// nothing is downloaded in the background, not even after the menu's check.
 #[tauri::command]
 async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
     let auto = allomos_store::auto_update();
-    let status = update::check(asked, auto);
+    let mut status = update::check(asked, auto);
     if let (true, Some(version), None) = (auto, &status.available, &status.ready) {
-        update::prepare_in_background(version.clone(), move || {
+        let version = version.clone();
+        if update::prepare_in_background(version.clone(), move || {
             let _ = app.emit(UPDATE_READY_EVENT, ());
-        });
+        }) {
+            status.preparing = Some(version);
+        }
     }
     status
 }
@@ -2457,9 +2462,11 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
 /// (`check`); **Download Allomos <version>…** once a newer version is known, which opens the
 /// download page (`download`, Task-A07-16); **Restart to Update to Allomos <version>** once its
 /// installer is downloaded and checked, as the Claude app has it (`restart`, Task-A07-17).
+/// `enabled` is false while the installer downloads (A07-glove300): the item waits, greyed out.
 #[tauri::command]
-fn set_update_item(texts: tauri::State<MenuTexts>, text: String, action: String) {
+fn set_update_item(texts: tauri::State<MenuTexts>, text: String, action: String, enabled: bool) {
     let _ = texts.check_updates.set_text(text);
+    let _ = texts.check_updates.set_enabled(enabled);
     let action = match action.as_str() {
         "download" => UpdateAction::Download,
         "restart" => UpdateAction::Restart,

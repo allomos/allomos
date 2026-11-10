@@ -949,6 +949,8 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
   // Restart to Update to Allomos <version> once its installer is downloaded and checked.
   const item = updateMenuItem(status);
   const itemLatest = item.action === "check" ? null : item.latest;
+  // Download waits, greyed out, while the installer downloads (A07-glove300).
+  const itemEnabled = !(item.action === "download" && item.waiting);
   useEffect(() => {
     const text =
       item.action === "restart"
@@ -956,8 +958,8 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
         : item.action === "download"
           ? t("menu.download_update", { latest: itemLatest ?? "" })
           : t("menu.check_updates");
-    void messenger.setUpdateItem(text, item.action).catch(() => undefined);
-  }, [messenger, t, item.action, itemLatest]);
+    void messenger.setUpdateItem(text, item.action, itemEnabled).catch(() => undefined);
+  }, [messenger, t, item.action, itemLatest, itemEnabled]);
   const note = updateNote(status, asked, hidden);
   if (!note) return null;
   const close = () => {
@@ -989,13 +991,19 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
       </svg>
       <span>{t("update.available", { latest: note.latest, current: note.current })}</span>
       {/* The same step as the menu item: Restart to Update once the installer is downloaded and
-          checked, otherwise Download (approver, 2026-10-23: the two disagreed). */}
+          checked, otherwise Download (approver, 2026-10-23: the two disagreed). While the installer
+          downloads, Download waits, greyed out, as the menu item does (A07-glove300). */}
       {note.ready ? (
         <button type="button" className="primary" onClick={() => messenger.restartToUpdate().catch(onError)}>
           {t("menu.restart_update", { latest: note.latest })}
         </button>
       ) : (
-        <button type="button" className="primary" onClick={() => messenger.openDownloadPage().catch(onError)}>
+        <button
+          type="button"
+          className="primary"
+          disabled={note.waiting}
+          onClick={() => messenger.openDownloadPage().catch(onError)}
+        >
           {t("update.download")}
         </button>
       )}

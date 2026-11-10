@@ -304,8 +304,9 @@ export interface Messenger {
   skipUpdate(version: string): Promise<void>;
   /** Calls `handler` when Check for Updates… is chosen. */
   onCheckUpdatesMenu(handler: () => void): Promise<() => void>;
-  /** The update menu item's words and what it does when chosen. */
-  setUpdateItem(text: string, action: "check" | "download" | "restart"): Promise<void>;
+  /** The update menu item's words, what it does when chosen, and whether it can be chosen now
+   * (`enabled` false while the installer downloads: Download waits, A07-glove300). */
+  setUpdateItem(text: string, action: "check" | "download" | "restart", enabled: boolean): Promise<void>;
   /** Calls `handler` when a newer version's installer is downloaded and checked (Task-A07-17). */
   onUpdateReady(handler: () => void): Promise<() => void>;
   /** **Restart to Update** on the update notice: the same as the menu item (Task-A07-17). */
@@ -536,7 +537,7 @@ export const desktopMessenger: Messenger = {
   closeWindow: () => invoke<void>("close_window"),
   updateStatus: (asked) => invoke<UpdateStatus>("update_status", { asked }),
   skipUpdate: (version) => invoke<void>("skip_update", { version }),
-  setUpdateItem: (text, action) => invoke<void>("set_update_item", { text, action }),
+  setUpdateItem: (text, action, enabled) => invoke<void>("set_update_item", { text, action, enabled }),
   restartToUpdate: () => invoke<void>("restart_to_update_now"),
   onUpdateReady: (handler) => getCurrentWebviewWindow().listen("update:ready", () => handler()),
   onUpdateFailed: (handler) => getCurrentWebviewWindow().listen<Problem>("update:failed", (e) => handler(e.payload)),

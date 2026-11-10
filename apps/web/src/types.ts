@@ -589,6 +589,8 @@ export interface UpdateStatus {
   failed: boolean;
   /** `available`'s installer is downloaded and its hash matched (Task-A07-17). */
   ready: string | null;
+  /** `available`'s installer is downloading now: the menu's Download waits (A07-glove300). */
+  preparing: string | null;
 }
 
 /** How much of an agent account's quota is left, as the agent reported it (`alm quota`, Task-A03-02). */

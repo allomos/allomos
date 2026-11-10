@@ -52,6 +52,9 @@ pub struct UpdateStatus {
     /// `available`'s installer is downloaded and its hash matched: the menu offers **Restart to
     /// Update to Allomos <version>** (Task-A07-17).
     pub ready: Option<String>,
+    /// `available`'s installer is being downloaded now. The menu's **Download Allomos <version>…**
+    /// waits (greyed out) until it is ready, or until the download fails (A07-glove300).
+    pub preparing: Option<String>,
 }
 
 /// `0.1.5` or `v0.1.5` as numbers; `None` for anything else (`0.2.0-beta`, `nightly`).
@@ -104,6 +107,7 @@ pub fn decide(
         available: available.map(String::from),
         failed,
         ready: None,
+        preparing: None,
     }
 }
 
@@ -142,6 +146,7 @@ pub fn without_auto_update(mut status: UpdateStatus) -> UpdateStatus {
     status.newer = None;
     if status.ready.is_none() {
         status.available = None;
+        status.preparing = None;
     }
     status
 }
@@ -152,15 +157,21 @@ pub fn check(asked: bool, auto: bool) -> UpdateStatus {
     let current = env!("CARGO_PKG_VERSION");
     let mut memory = allomos_store::update_memory();
     let mut failed = false;
+    let mut fetched = false;
     let now = now();
     if (asked || auto) && due(memory.checked_at, now, asked) {
         match fetch_latest(current) {
             Some(latest) => {
                 let _ = allomos_store::save_update_check(now, &latest);
                 memory.latest = Some(latest);
+                fetched = true;
             }
             None => failed = true,
         }
+    }
+    // A download that failed is tried again at the next answer from GitHub, or at once from the menu.
+    if asked || fetched {
+        forget_failed_download();
     }
     let mut status = decide(
         current,
@@ -170,6 +181,7 @@ pub fn check(asked: bool, auto: bool) -> UpdateStatus {
         failed,
     );
     status.ready = ready_version().filter(|r| status.available.as_ref() == Some(r));
+    status.preparing = preparing_version().filter(|p| status.available.as_ref() == Some(p));
     if auto || asked {
         status
     } else {
@@ -296,16 +308,21 @@ pub struct Ready {
     pub sha256: String,
 }
 
-/// What this run of the app has downloaded, and whether a download is going on.
+/// What this run of the app has downloaded, which download is going on, and which one failed.
 #[derive(Default)]
 struct Downloads {
     ready: Option<Ready>,
-    busy: bool,
+    /// The version whose installer is downloading now.
+    busy: Option<String>,
+    /// The version whose last download failed (no installer published, or it did not check).
+    /// It is not tried again until GitHub is asked again (`forget_failed_download`).
+    failed: Option<String>,
 }
 
 static DOWNLOADS: Mutex<Downloads> = Mutex::new(Downloads {
     ready: None,
-    busy: false,
+    busy: None,
+    failed: None,
 });
 
 fn downloads() -> std::sync::MutexGuard<'static, Downloads> {
@@ -317,6 +334,42 @@ pub fn ready_version() -> Option<String> {
     downloads().ready.as_ref().map(|r| r.version.clone())
 }
 
+/// The version whose installer is downloading now.
+pub fn preparing_version() -> Option<String> {
+    downloads().busy.clone()
+}
+
+/// Let the next answer from GitHub, or the menu's **Check for Updates…**, try a failed download again.
+pub fn forget_failed_download() {
+    downloads().failed = None;
+}
+
+/// What starting a download of one version comes to.
+#[derive(Debug, PartialEq, Eq)]
+enum Start {
+    /// Nothing is going on for it: the download starts now.
+    Started,
+    /// It is downloading already.
+    Running,
+    /// It is not downloaded, and not started: it is ready, it failed, or another version is downloading.
+    Refused,
+}
+
+/// Mark `version` as downloading, unless the state says it should not be.
+fn start_download(state: &mut Downloads, version: &str) -> Start {
+    if state.ready.as_ref().is_some_and(|r| r.version == version) {
+        return Start::Refused;
+    }
+    if state.busy.as_deref() == Some(version) {
+        return Start::Running;
+    }
+    if state.busy.is_some() || state.failed.as_deref() == Some(version) {
+        return Start::Refused;
+    }
+    state.busy = Some(version.to_string());
+    Start::Started
+}
+
 /// The folder downloads go to: the system's temporary folder, as an installer is needed only
 /// until it has run.
 fn download_dir() -> PathBuf {
@@ -324,30 +377,32 @@ fn download_dir() -> PathBuf {
 }
 
 /// Start downloading `version`'s installer in the background, unless it is downloaded already,
-/// a download is going on, or no installer is published for this system. `on_ready` runs once
-/// the download is kept. A failed or refused download is quiet: the menu keeps offering the
-/// download page, and the next check tries again.
-pub fn prepare_in_background(version: String, on_ready: impl FnOnce() + Send + 'static) {
+/// a download is going on, the last one failed, or no installer is published for this system.
+/// Returns whether `version` is downloading now (A07-glove300: the menu's Download item waits
+/// for it). `on_settled` runs once the download has ended, kept or not, so every window asks
+/// again: a kept installer is offered as **Restart to Update**, a failed one as **Download**
+/// (the release page). A failed download is quiet and is not repeated until GitHub is asked again.
+pub fn prepare_in_background(version: String, on_settled: impl FnOnce() + Send + 'static) -> bool {
     let Some(platform) = Platform::current() else {
-        return;
+        return false;
     };
-    {
-        let mut state = downloads();
-        if state.busy || state.ready.as_ref().is_some_and(|r| r.version == version) {
-            return;
-        }
-        state.busy = true;
+    match start_download(&mut downloads(), &version) {
+        Start::Started => {}
+        Start::Running => return true,
+        Start::Refused => return false,
     }
     std::thread::spawn(move || {
         let result = download(platform, &version);
         let mut state = downloads();
-        state.busy = false;
-        if let Ok(ready) = result {
-            state.ready = Some(ready);
-            drop(state);
-            on_ready();
+        state.busy = None;
+        match result {
+            Ok(ready) => state.ready = Some(ready),
+            Err(_) => state.failed = Some(version),
         }
+        drop(state);
+        on_settled();
     });
+    true
 }
 
 /// Download `version`'s hash file and installer, and keep the installer if its hash matches.
@@ -850,5 +905,42 @@ mod tests {
         // A version newer than the skipped one is offered again.
         let next = decide("0.1.5", Some("0.1.7"), Some("0.1.6"), false, false);
         assert_eq!(next.newer.as_deref(), Some("0.1.7"));
+    }
+
+    #[test]
+    fn download_waits_while_it_runs_and_is_refused_once_ready_failed_or_busy() {
+        let mut state = Downloads::default();
+        // Starts for the first version; it is then downloading.
+        assert_eq!(start_download(&mut state, "0.1.6"), Start::Started);
+        assert_eq!(state.busy.as_deref(), Some("0.1.6"));
+        // The same version is already running: it still counts as downloading, nothing new starts.
+        assert_eq!(start_download(&mut state, "0.1.6"), Start::Running);
+        // Another version does not start while one is running.
+        assert_eq!(start_download(&mut state, "0.1.7"), Start::Refused);
+        // Once it has failed, that version is not tried again until forgotten.
+        state.busy = None;
+        state.failed = Some("0.1.6".into());
+        assert_eq!(start_download(&mut state, "0.1.6"), Start::Refused);
+        state.failed = None;
+        assert_eq!(start_download(&mut state, "0.1.6"), Start::Started);
+        // A kept installer is not downloaded again.
+        state.busy = None;
+        state.ready = Some(Ready {
+            version: "0.1.6".into(),
+            path: PathBuf::from("x.pkg"),
+            sha256: String::new(),
+        });
+        assert_eq!(start_download(&mut state, "0.1.6"), Start::Refused);
+    }
+
+    #[test]
+    fn with_automatic_updates_off_a_download_that_is_not_ready_is_not_waited_for() {
+        let downloading = UpdateStatus {
+            preparing: Some("0.1.6".into()),
+            ..decide("0.1.5", Some("0.1.6"), None, true, false)
+        };
+        let quiet = without_auto_update(downloading);
+        assert_eq!(quiet.available, None);
+        assert_eq!(quiet.preparing, None);
     }
 }
