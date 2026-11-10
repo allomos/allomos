@@ -1,8 +1,8 @@
 // "Connect with the agents" (Task-A05-03; before it, Task-A03-03 and Task-A05-02 were two
 // panels): lists the AI agents on this computer, lets the person pick one (owner, 2026-10-12) and
-// the project folder, then opens it with the request typed in: add Allomos's instructions, then
-// look for the project's existing tasks and, if it finds some, ask with `alm confirm` before
-// moving them. Allomos never sends a request; the person does. **Manual** (Task-A05-06), offered
+// the project folder, then opens it with the request typed in: add Allomos's instructions, and
+// nothing else (finding existing tasks and out-of-date files is Update the Taskbag…, Task-A03-radish933).
+// Allomos never sends a request; the person does. **Manual** (Task-A05-06), offered
 // even when no known agent is found, shows the same request with Copy, for any other AI. The
 // agent choice is the shared picker (`AgentPicker`, Task-A05-07), which other features use too.
 
@@ -12,7 +12,7 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { isProblem } from "./types";
 import type { InstructionFiles } from "./types";
-import { movingTasks, updateNotice } from "./versionFlow";
+import { updateNotice } from "./versionFlow";
 import { COPIED_MS, MANUAL, MANUAL_LOOK_MS, connectActions, manualWritten } from "./manualFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { requestWay } from "./agentPickerFlow";
@@ -55,10 +55,10 @@ export function AgentsPanel({
   const [project, setProject] = useState(startProject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Something is out of date with this Allomos (Task-A01-25): the request is the update request,
-   * and Allomos offers no "write the files for me" (owner, 2026-10-12: the agent updates them).
-   * `move`: an older Allomos's taskbag, whose tasks the agent moves in (Task-A01-45). */
-  const [updating, setUpdating] = useState<"section" | "move" | null>(null);
+  /** Something is out of date with this Allomos (Task-A01-25), so Allomos offers no "write the
+   * files for me" (owner, 2026-10-12: the agent updates them). The request is the same connect
+   * request; the notice itself is Update the Taskbag…'s (Task-A03-radish933). */
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -67,7 +67,7 @@ export function AgentsPanel({
       .then((c) => {
         if (!live) return;
         const notice = updateNotice(c);
-        setUpdating(notice === null ? null : movingTasks(notice) ? "move" : "section");
+        setUpdating(notice !== null);
       })
       .catch(() => undefined);
     return () => {
@@ -78,7 +78,7 @@ export function AgentsPanel({
   // One agent (owner, 2026-10-12).
   const chosen = choice && choice !== MANUAL ? [choice] : [];
   const manual = choice === MANUAL;
-  const buttons = connectActions(agents === null ? null : choice, agents?.length ?? 0, updating !== null);
+  const buttons = connectActions(agents === null ? null : choice, agents?.length ?? 0, updating);
 
   // Manual: the request (the same automatic sending types in), what the project looked like when
   // it was shown, and what the AI has written since.
@@ -175,7 +175,7 @@ export function AgentsPanel({
     try {
       const before = await filesNow();
       await messenger.connectAgents(chosen, project, taskbag, language);
-      agentOpened(taskbag, updating === "move" ? "move_in" : updating ? "update" : "connect");
+      agentOpened(taskbag, "connect");
       // The agent used last, for Update the taskbag… (Task-A03-27).
       if (chosen[0]) saveOpened(taskbag, chosen[0]);
       onDone({
@@ -183,11 +183,10 @@ export function AgentsPanel({
         // Antigravity's agy takes the request on its command line and sends it at once (2026-11-09).
         message: (() => {
           const way = requestWay((agents ?? []).find((x) => x.id === chosen[0]));
-          const base = updating === "move" ? "move" : updating ? "update" : "connect";
           const agent = t(AGENT_KEY[chosen[0]]);
           return way === "typed"
-            ? t(`${base}.asked`, { agent })
-            : t(`${base}.asked_${way}`, { agent, keys: PASTE_KEYS });
+            ? t("connect.asked", { agent })
+            : t(`connect.asked_${way}`, { agent, keys: PASTE_KEYS });
         })(),
         watch: { project, before },
       });
@@ -241,9 +240,8 @@ export function AgentsPanel({
 
   return (
     <section className="card agents">
-      <h2>{t(updating === "move" ? "move.title" : updating ? "update.title" : "connect.title")}</h2>
-      <p>{t(updating === "move" ? "move.body" : updating ? "update.body" : "connect.body")}</p>
-      {!updating && <p>{t("connect.tasks")}</p>}
+      <h2>{t("connect.title")}</h2>
+      <p>{t("connect.body")}</p>
       <div className="row project-row">
         <span>{rich("project.line", { path: <code>{project}</code> })}</span>
         {!projectFixed && (

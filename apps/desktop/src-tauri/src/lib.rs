@@ -885,10 +885,10 @@ async fn find_agents() -> Vec<agents::Agent> {
 }
 
 /// Which request each chosen agent gets from **Connect with the agents** (Task-A05-03), in the
-/// order chosen: the first gets the connect request (add Allomos's instructions, then find the
-/// project's tasks and offer to move them), the others only the instructions request, because
-/// two agents moving tasks would add every task twice. With several agents, each request starts
-/// with a note naming the others.
+/// order chosen: every agent gets the instructions request only (Task-A03-radish933). Finding the
+/// project's tasks and out-of-date files are **Update the Taskbag…**'s job. The first agent's
+/// request is the connect request; with several agents, each request starts with a note naming
+/// the others.
 fn connect_plan(
     agents: &[String],
     language: &str,
@@ -917,27 +917,12 @@ fn connect_plan_with(
         }
     };
     let note = agents::shared_note(agents, language);
-    // Tasks from an older Allomos's taskbag to move in (Task-A01-45), or an out-of-date section
-    // (Task-A01-25): the first agent is asked to do that instead.
-    let check = versions::check_connected(taskbag);
-    let move_in = check.as_ref().and_then(|c| c.move_in.clone());
-    let update = check.filter(|c| !c.outdated_files().is_empty());
     agents
         .iter()
         .enumerate()
         .map(|(i, id)| {
             // The first agent does the job and reports its progress to the app (Task-A05-08).
-            let request = if let (0, Some(m)) = (i, &move_in) {
-                job(
-                    Job::MoveIn,
-                    allomos_store::agent_move_in_request_in(language, project, taskbag, m),
-                )
-            } else if let (0, Some(check)) = (i, &update) {
-                job(
-                    Job::Update,
-                    versions::agent_update_request_in(language, project, taskbag, check),
-                )
-            } else if i == 0 {
+            let request = if i == 0 {
                 job(
                     Job::Connect,
                     agent_connect_request_with(language, project, taskbag, git),
@@ -2971,7 +2956,7 @@ mod tests {
     }
 
     #[test]
-    fn an_out_of_date_project_gets_the_update_request() {
+    fn an_out_of_date_project_still_gets_the_connect_request() {
         let dir =
             std::env::temp_dir().join(format!("allomos-desktop-update-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -2980,16 +2965,21 @@ mod tests {
         allomos_store::init(&taskbag, "p", "P").unwrap();
         // A section from before versions: connected, but out of date.
         std::fs::write(dir.join("AGENTS.md"), "## Tasks: Allomos\n\nalm next\n").unwrap();
+        // Connect only tells the agent about Allomos (Task-A03-radish933); the out-of-date
+        // notice is Update the Taskbag…'s, so the connect request is the same.
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
-        assert!(
-            plan[0]
-                .1
-                .starts_with("This project was set up by an older Allomos")
+        assert_eq!(
+            plan[0].1,
+            with_progress_in(
+                "en",
+                Job::Connect,
+                &agent_connect_request_in("en", &dir, &taskbag)
+            )
         );
-        assert!(plan[0].1.contains("brief`"));
+        assert!(!plan[0].1.contains("older Allomos"));
         assert!(version_check(taskbag.clone()).unwrap().needs_update());
 
-        // Renewed: the usual connect request again.
+        // Renewed: still the usual connect request.
         std::fs::write(dir.join("AGENTS.md"), allomos_store::agent_section()).unwrap();
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
         assert_eq!(
@@ -3019,12 +3009,12 @@ mod tests {
         let text = std::fs::read_to_string(&project).unwrap();
         std::fs::write(&project, text.replace(allomos_core::FORMAT, "allomos/2")).unwrap();
 
-        // Not renamed yet: the agent is asked to do it after the Go ahead.
+        // Not renamed yet. Connect asks for the instructions only, not for the move-in.
         let check = version_check(taskbag.clone()).unwrap();
         assert!(!check.move_in.as_ref().unwrap().prepared);
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
-        assert!(plan[0].1.starts_with("Please move the tasks of a taskbag"));
-        assert!(plan[0].1.contains(" init --id "));
+        assert!(!plan[0].1.starts_with("Please move the tasks of a taskbag"));
+        assert!(!plan[0].1.contains(" init --id "));
         assert_eq!(manual_plan("en", &dir, &taskbag), plan[0].1);
         // The wizard can reach the Connect step: the project folder is known without reading.
         let setup = project_setup(taskbag.clone()).unwrap();
@@ -3040,11 +3030,7 @@ mod tests {
             text.replace(allomos_core::FORMAT, "allomos/2")
         );
         let plan = connect_plan(&["claude_app".into()], "en", &dir, &taskbag);
-        assert!(
-            plan[0]
-                .1
-                .contains("Allomos renamed the old taskbag (format allomos/2;")
-        );
+        assert!(!plan[0].1.contains("Allomos renamed the old taskbag"));
         assert!(!plan[0].1.contains(" init --id "));
         assert!(version_check(taskbag.clone()).unwrap().needs_update());
         // Update the taskbag… asks for the move-in, reported as that job (Task-A01-45); once the
@@ -3109,12 +3095,12 @@ mod tests {
                 &agent_connect_request_in("en", &dir, &taskbag)
             )
         );
-        // Out of date: the update request, as automatic sending.
+        // Out of date: still the connect request, as automatic sending.
         std::fs::write(dir.join("AGENTS.md"), "## Tasks: Allomos\n\nalm next\n").unwrap();
         let auto = connect_plan(&["codex_cli".into()], "en", &dir, &taskbag);
         let manual = manual_plan("en", &dir, &taskbag);
         assert_eq!(manual, auto[0].1);
-        assert!(manual.starts_with("This project was set up by an older Allomos"));
+        assert!(!manual.starts_with("This project was set up by an older Allomos"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -3249,7 +3235,7 @@ mod tests {
     }
 
     #[test]
-    fn the_first_agent_also_looks_for_tasks() {
+    fn connect_asks_only_for_the_instructions() {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(allomos_store::DEFAULT_DIR);
         // Only the first agent does the job, so only it reports progress (Task-A05-08).
@@ -3264,8 +3250,8 @@ mod tests {
         let one = connect_plan(&["claude_app".into()], "en", &project, &taskbag);
         assert_eq!(one, [("claude_app".to_string(), connect.clone())]);
 
-        // Two: the first chosen gets the connect request, the other only the instructions; both
-        // are told about each other.
+        // Two: the first chosen gets the connect request, the other the same instructions; both
+        // are told about each other, and neither is asked to look for tasks (Task-A03-radish933).
         let two = connect_plan(
             &["claude_app".into(), "codex_cli".into()],
             "en",
@@ -3275,6 +3261,7 @@ mod tests {
         assert_eq!(two.len(), 2);
         assert_eq!(two[0].0, "claude_app");
         assert!(two[0].1.ends_with(&connect) && two[0].1.starts_with("Note: "));
+        assert!(!two[0].1.contains("alm confirm"));
         assert_eq!(two[1].0, "codex_cli");
         assert!(two[1].1.ends_with(&setup) && two[1].1.starts_with("Note: "));
         assert!(!two[1].1.contains("alm confirm"));

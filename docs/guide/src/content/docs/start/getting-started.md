@@ -43,12 +43,9 @@ A project folder holds your code and the instruction files AI agents read when a
 
 Choose one AI agent and press **Connect**. Allomos opens that agent in your project folder with a request already typed in. **Nothing is sent until you send it yourself.**
 
-The request asks the agent to:
+The request asks the agent only to add a short section about Allomos to `AGENTS.md` and `CLAUDE.md`, so every new session knows how to use the taskbag.
 
-- add a short section about Allomos to `AGENTS.md` and `CLAUDE.md`, so every new session knows how to use the taskbag;
-- look for tasks the project already keeps, such as a task board or a to-do list.
-
-If the agent finds tasks, it shows its plan in Allomos. Choose **Go ahead** to move them into the taskbag, or **Cancel** to leave them where they are.
+To find the tasks the project already keeps, such as a task board or a to-do list, use **File → Update the Taskbag…**. The agent shows its plan in Allomos, and nothing moves until you choose **Go ahead**.
 
 You can skip this step with **Not now**, and do it later with **File › Connect with the Agents…**.
 

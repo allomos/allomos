@@ -46,7 +46,9 @@ pub const MOVE_IN_REQUEST_VERSION: u32 = 4;
 /// Changes when the connect request's parts change (Task-A05-03).
 /// 2: the setup part asks the person before setting up Git, and commits the taskbag itself (the
 /// app no longer runs Git, decision 0017).
-pub const CONNECT_REQUEST_VERSION: u32 = 2;
+/// 3: the request is the setup part only: it no longer asks the agent to find the project's tasks
+/// (Update the Taskbag… does that, Task-A03-radish933).
+pub const CONNECT_REQUEST_VERSION: u32 = 3;
 
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
@@ -356,11 +358,11 @@ pub fn agent_move_tasks_in_request_in(language: &str, project: &Path, taskbag: &
     }
 }
 
-/// What **Connect with the agents** asks the first chosen agent (Task-A05-03): first the setup
-/// request (add Allomos's section to `AGENTS.md` and `CLAUDE.md`), then the conversion request
-/// (find the project's tasks; if there are some, offer to move them with `alm confirm`, so the
-/// person still decides). Other agents chosen at the same time get only the setup request: two
-/// agents moving tasks would add every task twice.
+/// What **Connect with the agents** asks the first chosen agent (Task-A03-radish933): only the
+/// setup request, which adds Allomos's section to `AGENTS.md` and `CLAUDE.md`. Finding the
+/// project's existing tasks and out-of-date files are **Update the Taskbag…**'s job, so the
+/// connect request never asks the agent to look for tasks. Other agents chosen at the same time
+/// get the same setup request (see `connect_plan`).
 pub fn agent_connect_request_in(
     language: &str,
     project_path: &Path,
@@ -379,34 +381,20 @@ pub fn agent_connect_request_with(
 ) -> String {
     let version = CONNECT_REQUEST_VERSION;
     let setup = crate::setup_steps_with(language, project_path, taskbag_path, git);
-    let convert = convert_steps_in(language, project_path, taskbag_path);
     let source = section_source(language, taskbag_path);
-    let (intro, one, two) = match language {
-        "zh-CN" => (
-            format!(
-                "请按顺序完成两部分（连接请求 v{version}）：第一部分把 Allomos 告诉以后的 AI 智能体；第二部分找出这个项目已有的任务，并询问用户是否把它们搬进 Allomos。"
-            ),
-            "第一部分：告诉 AI 智能体",
-            "第二部分：已有的任务（第一部分完成后再做）",
+    let intro = match language {
+        "zh-CN" => {
+            format!("请按下面的步骤操作（连接请求 v{version}）：把 Allomos 告诉以后的 AI 智能体。")
+        }
+        "ja" => format!(
+            "次の手順に従ってください（接続の依頼 v{version}）。これからの AI エージェントに Allomos を伝えます。"
         ),
-        "ja" => (
-            format!(
-                "二つの部分を順に進めてください（接続の依頼 v{version}）。第一部では、これからの AI エージェントに Allomos を伝えます。第二部では、このプロジェクトにすでにあるタスクを探し、Allomos に移すかどうかをユーザーに尋ねます。"
-            ),
-            "第一部：AI エージェントに伝える",
-            "第二部：すでにあるタスク（第一部が終わってから）",
-        ),
-        _ => (
-            format!(
-                "Please do two parts, in order (connect request v{version}). Part 1 tells future AI \
-agents about Allomos. Part 2 finds the tasks this project already keeps and asks the person \
-whether to move them into Allomos."
-            ),
-            "Part 1: tell AI agents",
-            "Part 2: existing tasks (after part 1 is done)",
+        _ => format!(
+            "Please follow these steps (connect request v{version}). They tell future AI agents \
+about Allomos."
         ),
     };
-    format!("{intro}\n\n## {one}\n\n{setup}\n\n## {two}\n\n{convert}\n\n{source}\n")
+    format!("{intro}\n\n{setup}\n\n{source}\n")
 }
 
 #[cfg(test)]
@@ -571,22 +559,22 @@ mod tests {
     }
 
     #[test]
-    fn connect_request_tells_agents_then_offers_to_move_tasks() {
+    fn connect_request_only_tells_agents() {
         let project = PathBuf::from("/work/bakery");
         let taskbag = project.join(DEFAULT_DIR);
         for language in ["en", "zh-CN", "ja"] {
             let r = agent_connect_request_in(language, &project, &taskbag);
             let setup = crate::setup_steps_in(language, &project, &taskbag);
+            // The instructions request, and nothing else: no looking for tasks (Task-A03-radish933).
+            assert!(r.contains(&setup), "{language}");
             let convert = convert_steps_in(language, &project, &taskbag);
-            // Both requests, in order: instructions first, then the tasks.
-            let (a, b) = (r.find(&setup).unwrap(), r.find(&convert).unwrap());
-            assert!(a < b, "{language}");
+            assert!(!r.contains(&convert), "{language}");
+            assert!(!r.contains("alm confirm --title"), "{language}");
+            assert!(!r.contains("alm card <id>"), "{language}");
             assert!(
                 r.contains(&format!("v{CONNECT_REQUEST_VERSION}")),
                 "{language}"
             );
-            // The person still decides whether tasks move: the plan goes through `alm confirm`.
-            assert!(r.contains("alm confirm --title"), "{language}");
             // The app runs no Git (decision 0017): the agent asks before `git init`, then commits
             // the taskbag (with the README Allomos left) itself, and never pushes it.
             assert!(r.contains("`git init`"), "{language}");
@@ -600,10 +588,6 @@ mod tests {
             // Starting again names the one menu item.
             assert!(!r.contains("Move Tasks Into"), "{language}");
         }
-        assert!(
-            agent_connect_request_in("en", &project, &taskbag)
-                .contains("File → Connect with the Agents…")
-        );
     }
 
     /// A quiet goal run creates the Git repository itself and records it as an AI decision;
