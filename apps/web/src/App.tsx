@@ -915,6 +915,8 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
   const { t } = useI18n();
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [asked, setAsked] = useState(false);
+  // How much of the installer is downloaded, in percent, while it downloads (A07-fact210).
+  const [percent, setPercent] = useState<number | null>(null);
   const [hidden, setHiddenNow] = useState<string | null>(updateHidden);
   const setHidden = (h: string | null) => {
     updateHidden = h;
@@ -945,27 +947,61 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
       for (const stop of [stopMenu, stopReady, stopFailed]) void stop.then((f) => f()).catch(() => undefined);
     };
   }, [messenger]);
-  // The menu item: Check for Updates…, Download Allomos <version>… once one is known, or
-  // Restart to Update to Allomos <version> once its installer is downloaded and checked.
-  const item = updateMenuItem(status);
+  // While the installer downloads, its percentage is read every second (A07-fact210). Only the
+  // progress is asked for: `updateStatus` would ask GitHub again after Check for Updates….
+  const downloading = status?.preparing ?? null;
+  useEffect(() => {
+    if (!downloading) {
+      setPercent(null);
+      return;
+    }
+    let live = true;
+    const tick = () =>
+      messenger
+        .updateProgress()
+        .then((p) => {
+          if (live) setPercent(p);
+        })
+        .catch(() => undefined);
+    void tick();
+    const timer = window.setInterval(() => void tick(), 1000);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [messenger, downloading]);
+  // The menu item: Check for Updates…, Download Allomos <version>… once one is known (with its
+  // percentage while it downloads), or Restart to Update to Allomos <version> once its installer
+  // is downloaded and checked.
+  const item = updateMenuItem(status, percent);
   const itemLatest = item.action === "check" ? null : item.latest;
   // Download waits, greyed out, while the installer downloads (A07-glove300).
   const itemEnabled = !(item.action === "download" && item.waiting);
+  const itemPercent = item.action === "download" ? item.percent : null;
   useEffect(() => {
     const text =
       item.action === "restart"
         ? t("menu.restart_update", { latest: itemLatest ?? "" })
         : item.action === "download"
-          ? t("menu.download_update", { latest: itemLatest ?? "" })
+          ? itemPercent !== null
+            ? t("menu.downloading_update", { latest: itemLatest ?? "", percent: itemPercent })
+            : t("menu.download_update", { latest: itemLatest ?? "" })
           : t("menu.check_updates");
     void messenger.setUpdateItem(text, item.action, itemEnabled).catch(() => undefined);
-  }, [messenger, t, item.action, itemLatest, itemEnabled]);
-  const note = updateNote(status, asked, hidden);
+  }, [messenger, t, item.action, itemLatest, itemEnabled, itemPercent]);
+  const note = updateNote(status, asked, hidden, percent);
   if (!note) return null;
   const close = () => {
     setAsked(false);
-    if (note.kind === "offer") setHidden(note.latest);
+    if (note.kind === "offer" || note.kind === "downloading") setHidden(note.latest);
   };
+  if (note.kind === "preparing") {
+    return (
+      <Banner kind="ok" onClose={close}>
+        {t("update.preparing", { latest: note.latest })}
+      </Banner>
+    );
+  }
   if (note.kind === "current") {
     return (
       <Banner kind="ok" onClose={close}>
@@ -989,27 +1025,30 @@ function UpdateOffer({ messenger, onError }: { messenger: Messenger; onError: (e
       <svg className="banner-icon" viewBox="0 0 20 20" aria-hidden="true">
         <path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12" />
       </svg>
-      <span>{t("update.available", { latest: note.latest, current: note.current })}</span>
-      {/* The same step as the menu item: Restart to Update once the installer is downloaded and
-          checked, otherwise Download (approver, 2026-10-23: the two disagreed). While the installer
-          downloads, Download waits, greyed out, as the menu item does (A07-glove300). */}
-      {note.ready ? (
+      <span>
+        {note.kind === "downloading"
+          ? note.percent === null
+            ? t("update.preparing", { latest: note.latest })
+            : t("update.downloading", { latest: note.latest, percent: note.percent })
+          : t("update.available", { latest: note.latest, current: note.current })}
+      </span>
+      {/* Restart to Update only once the installer is downloaded and checked, as the menu item has
+          it: a version whose installer is not ready is never offered (Task-A07-fact210). While it
+          downloads, the notice shows the percentage, with Cancel. */}
+      {note.kind === "offer" ? (
         <button type="button" className="primary" onClick={() => messenger.restartToUpdate().catch(onError)}>
           {t("menu.restart_update", { latest: note.latest })}
         </button>
       ) : (
-        <button
-          type="button"
-          className="primary"
-          disabled={note.waiting}
-          onClick={() => messenger.openDownloadPage().catch(onError)}
-        >
-          {t("update.download")}
+        <button type="button" onClick={() => messenger.cancelUpdateDownload().catch(onError)}>
+          {t("update.cancel_download")}
         </button>
       )}
-      <button type="button" onClick={skip}>
-        {t("update.skip")}
-      </button>
+      {note.kind === "offer" && (
+        <button type="button" onClick={skip}>
+          {t("update.skip")}
+        </button>
+      )}
       <button type="button" className="banner-close" aria-label={t("banner.close")} title={t("banner.close")} onClick={close}>
         ×
       </button>

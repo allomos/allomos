@@ -7,46 +7,56 @@ import type { UpdateStatus } from "./types";
 export const UPDATE_LOOK_MS = 60 * 60 * 1000;
 
 export type UpdateNote =
-  /** The notice with Download (or Restart to Update once `ready`, as the menu item has it),
-   * Skip this version and ×. `waiting`: the installer is downloading, so Download waits, greyed
-   * out, as the menu item does (A07-glove300). */
-  | { kind: "offer"; latest: string; current: string; ready: boolean; waiting: boolean }
+  /** The installer is downloaded and checked: Restart to Update, Skip this version and ×. The
+   * notice never offers a version whose installer is not ready (Task-A07-fact210). */
+  | { kind: "offer"; latest: string; current: string }
+  /** The installer is downloading: its percentage (`null` while its size is not known), Cancel
+   * and ×. Shown for a background download, and for Check for Updates… (A07-fact210). */
+  | { kind: "downloading"; latest: string; current: string; percent: number | null }
+  /** Only after Check for Updates…, while the installer is not ready and nothing is downloading
+   * yet, or once its download has failed (A07-fact210). */
+  | { kind: "preparing"; latest: string; current: string }
   /** Only after Check for Updates…: nothing newer. */
   | { kind: "current"; current: string }
   /** Only after Check for Updates…: GitHub did not answer. */
   | { kind: "failed" };
 
-/** What the update menu item does: Check for Updates…; Download Allomos <version>… (opens the
- * download page, Task-A07-16; it waits, greyed out, while the installer downloads, A07-glove300);
+/** What the update menu item does: Check for Updates…; Download Allomos <version>… (greyed out
+ * while the installer downloads, with its percentage when known, A07-glove300 and A07-fact210);
  * Restart to Update to Allomos <version> (Task-A07-17). */
 export type UpdateMenuItem =
   | { action: "check" }
-  | { action: "download"; latest: string; waiting: boolean }
+  | { action: "download"; latest: string; waiting: boolean; percent: number | null }
   | { action: "restart"; latest: string };
 
-export function updateMenuItem(status: UpdateStatus | null): UpdateMenuItem {
+/** `percent` is how much of the installer is downloaded now (`update_progress`), or `null`. */
+export function updateMenuItem(status: UpdateStatus | null, percent: number | null = null): UpdateMenuItem {
   const available = status?.available ?? null;
   if (!available) return { action: "check" };
   if (status?.ready === available) return { action: "restart", latest: available };
-  return { action: "download", latest: available, waiting: status?.preparing === available };
+  const waiting = status?.preparing === available;
+  return { action: "download", latest: available, waiting, percent: waiting ? percent : null };
 }
 
 /**
- * What to show. A check on its own (at start, then once a day) shows only an offer and stays
- * quiet otherwise; Check for Updates… (`asked`) always answers. `hidden` is the version the
- * person closed with × in this window.
+ * What to show. An offer appears only once the installer is ready. While it downloads, the
+ * notice shows the progress (a check on its own shows it too, as the download is going on).
+ * A check on its own (at start, then once a day) stays quiet otherwise; Check for Updates…
+ * (`asked`) always answers. `hidden` is the version the person closed with × in this window.
  */
-export function updateNote(status: UpdateStatus | null, asked: boolean, hidden: string | null): UpdateNote | null {
+export function updateNote(
+  status: UpdateStatus | null,
+  asked: boolean,
+  hidden: string | null,
+  percent: number | null = null,
+): UpdateNote | null {
   if (!status) return null;
   if (status.newer && (asked || status.newer !== hidden)) {
-    return {
-      kind: "offer",
-      latest: status.newer,
-      current: status.current,
-      ready: status.ready === status.newer,
-      waiting: status.preparing === status.newer,
-    };
+    const base = { latest: status.newer, current: status.current };
+    if (status.ready === status.newer) return { kind: "offer", ...base };
+    if (status.preparing === status.newer) return { kind: "downloading", ...base, percent };
   }
+  if (status.newer && asked) return { kind: "preparing", latest: status.newer, current: status.current };
   if (!asked) return null;
   if (status.failed) return { kind: "failed" };
   return { kind: "current", current: status.current };
