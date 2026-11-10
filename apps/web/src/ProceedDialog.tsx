@@ -14,7 +14,7 @@ import { createPortal } from "react-dom";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
-import { MANUAL } from "./agentPickerFlow";
+import { MANUAL, requestWay } from "./agentPickerFlow";
 import { edited, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
 import { agoText, heartbeatFact } from "./heartbeatFlow";
 import { isProblem } from "./types";
@@ -94,10 +94,11 @@ export function ProceedDialog({
       }
       await messenger.proceedWithAgent(agent, root, request);
       const name = t(AGENT_KEY[agent]);
-      if (tool?.how === "paste") {
-        onClose(t(takeOver ? "takeover.asked_paste" : ask ? "proceed.asked_stopped_paste" : "proceed.asked_paste", { agent: name, keys: PASTE_KEYS, id: task.id }));
-      } else {
+      const way = requestWay(tool);
+      if (way === "typed") {
         onClose(t(takeOver ? "takeover.asked" : ask ? "proceed.asked_stopped" : "proceed.asked", { agent: name, id: task.id }));
+      } else {
+        onClose(t(takeOver ? `takeover.asked_${way}` : ask ? `proceed.asked_stopped_${way}` : `proceed.asked_${way}`, { agent: name, keys: PASTE_KEYS, id: task.id }));
       }
     } catch (e) {
       fail(e);

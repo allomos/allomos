@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
-import { MANUAL } from "./agentPickerFlow";
+import { MANUAL, requestWay } from "./agentPickerFlow";
 import { LanguageMenu } from "./LanguageMenu";
 import { agentOpened } from "./ProgressDialog";
 import { COPIED_MS } from "./manualFlow";
@@ -58,7 +58,8 @@ export function TranslateDialog({
       await messenger.translateTaskbag(agent, root, language, target.code, target.name);
       agentOpened(root, "translate");
       const name = t(AGENT_KEY[agent]);
-      onClose(tool?.how === "paste" ? t("translate.asked_paste", { agent: name, keys: PASTE_KEYS }) : t("translate.asked", { agent: name }));
+      const way = requestWay(tool);
+      onClose(way === "typed" ? t("translate.asked", { agent: name }) : t(`translate.asked_${way}`, { agent: name, keys: PASTE_KEYS }));
     } catch (e) {
       fail(e);
     } finally {

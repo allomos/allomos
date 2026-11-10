@@ -48,3 +48,14 @@ export function chooseGroup(found: Agent[], group: string, last: Partial<Record<
   const kept = tools.find((a) => a.id === last[group]);
   return (kept ?? tools[0])?.id ?? MANUAL;
 }
+
+/** How the request reaches the tool chosen: `sent` (Antigravity's `agy` takes it on its command
+ * line and sends it at once, approver 2026-11-09, so nothing is pasted), `paste` (a terminal
+ * opens and the person pastes it), or `typed` (the app opens the agent with the request typed in,
+ * or no tool was chosen). The dialogs' "opened …" messages follow this. */
+export type RequestWay = "sent" | "paste" | "typed";
+
+export function requestWay(tool: Pick<Agent, "id" | "how"> | null | undefined): RequestWay {
+  if (tool?.id === "antigravity_cli") return "sent";
+  return tool?.how === "paste" ? "paste" : "typed";
+}
