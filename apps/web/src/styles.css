@@ -435,7 +435,10 @@ button.link:hover { text-decoration: underline; }
 /* Task-A01-sorbet602: Edit follows the name and badge on the title line; on a narrow list the
    name wraps and Edit stays beside it, on its first line. */
 .area-head .title-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.area-head .title-line h2 { min-width: 0; }
+.area-head .title-line h2 { min-width: 0; max-width: 100%; }
+/* A name too long for its line (one long word, a narrow list) breaks inside the name button, so the
+   name never runs under Edit (Task-A01-mint787). */
+.area-head .title-line .fold { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
 .area-head .group-edit { align-self: baseline; flex-shrink: 0; white-space: nowrap; }
 .area-head .count, .area-head .fold > .place, .area-head .fold > .id { white-space: nowrap; flex-shrink: 0; }
 @container (max-width: 360px) {
