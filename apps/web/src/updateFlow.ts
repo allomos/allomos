@@ -8,25 +8,27 @@ export const UPDATE_LOOK_MS = 60 * 60 * 1000;
 
 export type UpdateNote =
   /** The notice with Download (or Restart to Update once `ready`, as the menu item has it),
-   * Skip this version and ×. */
-  | { kind: "offer"; latest: string; current: string; ready: boolean }
+   * Skip this version and ×. `waiting`: the installer is downloading, so Download waits, greyed
+   * out, as the menu item does (A07-glove300). */
+  | { kind: "offer"; latest: string; current: string; ready: boolean; waiting: boolean }
   /** Only after Check for Updates…: nothing newer. */
   | { kind: "current"; current: string }
   /** Only after Check for Updates…: GitHub did not answer. */
   | { kind: "failed" };
 
 /** What the update menu item does: Check for Updates…; Download Allomos <version>… (opens the
- * download page, Task-A07-16); Restart to Update to Allomos <version> (Task-A07-17). */
+ * download page, Task-A07-16; it waits, greyed out, while the installer downloads, A07-glove300);
+ * Restart to Update to Allomos <version> (Task-A07-17). */
 export type UpdateMenuItem =
   | { action: "check" }
-  | { action: "download"; latest: string }
+  | { action: "download"; latest: string; waiting: boolean }
   | { action: "restart"; latest: string };
 
 export function updateMenuItem(status: UpdateStatus | null): UpdateMenuItem {
   const available = status?.available ?? null;
   if (!available) return { action: "check" };
   if (status?.ready === available) return { action: "restart", latest: available };
-  return { action: "download", latest: available };
+  return { action: "download", latest: available, waiting: status?.preparing === available };
 }
 
 /**
@@ -37,7 +39,13 @@ export function updateMenuItem(status: UpdateStatus | null): UpdateMenuItem {
 export function updateNote(status: UpdateStatus | null, asked: boolean, hidden: string | null): UpdateNote | null {
   if (!status) return null;
   if (status.newer && (asked || status.newer !== hidden)) {
-    return { kind: "offer", latest: status.newer, current: status.current, ready: status.ready === status.newer };
+    return {
+      kind: "offer",
+      latest: status.newer,
+      current: status.current,
+      ready: status.ready === status.newer,
+      waiting: status.preparing === status.newer,
+    };
   }
   if (!asked) return null;
   if (status.failed) return { kind: "failed" };
