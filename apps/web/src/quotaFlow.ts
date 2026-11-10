@@ -72,14 +72,17 @@ export interface Chip {
   told: boolean | null;
 }
 
-/** The chips, current first, then Claude Code and Codex, then other agents that reported. */
+/**
+ * The chips, current first, then Claude Code, Codex and Antigravity (always shown, reported or not),
+ * then other agents that reported.
+ */
 export function chips(reports: QuotaReport[], setup: { codex: boolean; claude: boolean }): Chip[] {
   const newest = folded(reports);
   const current = newest[0]?.agent ?? null;
   // Antigravity reads AGENTS.md by itself, as Codex does (Task-A03-queen969).
   const told = (agent: string) =>
     agent === "claude-code" ? setup.claude : agent === "codex" || agent === "antigravity" ? setup.codex : null;
-  const order = [current, "claude-code", "codex", ...newest.map((r) => r.agent)].filter(
+  const order = [current, "claude-code", "codex", "antigravity", ...newest.map((r) => r.agent)].filter(
     (a, i, all): a is string => a !== null && all.indexOf(a) === i,
   );
   return order.map((agent) => {

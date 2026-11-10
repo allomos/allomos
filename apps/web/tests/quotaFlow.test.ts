@@ -40,6 +40,7 @@ test("the agent that reported last comes first with its last account's 5-hour qu
     [
       ["Codex", true, 30, true],
       ["Claude Code", false, null, false],
+      ["Antigravity", false, null, true],
     ],
   );
   assert.deepEqual(
@@ -48,12 +49,13 @@ test("the agent that reported last comes first with its last account's 5-hour qu
   );
 });
 
-test("no reports: the two known agents, none current; another agent that reported gets a chip", () => {
+test("no reports: the three known agents, none current; another agent that reported gets a chip", () => {
   assert.deepEqual(
     chips([], { codex: true, claude: true }).map((c) => [c.name, c.current]),
     [
       ["Claude Code", false],
       ["Codex", false],
+      ["Antigravity", false],
     ],
   );
   assert.deepEqual(
@@ -62,6 +64,7 @@ test("no reports: the two known agents, none current; another agent that reporte
       ["gemini", true, null],
       ["Claude Code", false, true],
       ["Codex", false, false],
+      ["Antigravity", false, false],
     ],
   );
 });
@@ -90,6 +93,7 @@ test("a report under a session name or short form counts for its agent, not as a
     [
       ["Claude Code", true, 86],
       ["Codex", false, null],
+      ["Antigravity", false, null],
     ],
   );
   assert.deepEqual(popupRows(reports).map((x) => x.agent), ["claude-code", "codex"]);
