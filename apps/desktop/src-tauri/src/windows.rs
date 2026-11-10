@@ -538,15 +538,18 @@ pub(crate) fn take_settings_request() -> bool {
 #[derive(Serialize)]
 pub(crate) struct AppSettings {
     start_with: &'static str,
-    /// **Automatic updates** (Task-A07-meter647).
-    auto_update: bool,
+    /// **Check for updates automatically** (Task-A07-meter647).
+    auto_check: bool,
+    /// **Download updates automatically** (Task-A07-trunk220).
+    auto_download: bool,
 }
 
 #[tauri::command]
 pub(crate) fn app_settings() -> AppSettings {
     AppSettings {
         start_with: allomos_store::start_with().as_str(),
-        auto_update: allomos_store::auto_update(),
+        auto_check: allomos_store::auto_check(),
+        auto_download: allomos_store::auto_download(),
     }
 }
 
