@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 
 use allomos_core::{Problem, Task, Taskbag};
 
-use crate::flow::{Run, Stuck, tab_to_close, waiting_alert};
+use crate::flow::{Closing, Run, Stuck, tab_to_close, waiting_alert};
 use crate::registry::{self, Held, Record, Request};
-use crate::{notify, request, session_tab, terminal};
+use crate::{accounts, notify, request, session_tab, terminal};
 
 /// How often requests are looked for.
 const TICK: Duration = Duration::from_secs(1);
@@ -135,7 +135,10 @@ fn sweep(root: &Path) -> Vec<crate::flow::Unblocked> {
         Ok(list) => {
             if !list.is_empty() {
                 let ids: Vec<&str> = list.iter().map(|r| r.task.id.as_str()).collect();
-                log(&format!("let go on (blockers finished): {}", ids.join(", ")));
+                log(&format!(
+                    "let go on (blockers finished): {}",
+                    ids.join(", ")
+                ));
             }
             list.into_iter()
                 .map(|r| crate::flow::Unblocked {
@@ -159,14 +162,13 @@ fn read(root: &Path) -> Result<Taskbag, Problem> {
     allomos_store::taskbag_of(root, allomos_store::load(root)).map(|(bag, _)| bag)
 }
 
-/// Tell the person the run is stuck: a system notification.
-fn tell(stuck: &Stuck, run: &Run, language: &str) {
+/// Tell the person a task waits on them: a notification the app shows (see [`notify`]).
+fn tell(dir: &Path, run_id: &str, stuck: &Stuck, language: &str) {
     let body = match stuck {
         Stuck::Waiting { id, on } => request::notify_waiting(language, id, on),
-        Stuck::Idle => request::notify_idle(language, &local_hhmm(run.next_check())),
     };
     log(&format!("told the person: {body}"));
-    notify::show(request::notify_title(language), &body);
+    notify::show(dir, run_id, request::notify_title(language), &body);
 }
 
 /// The running loop's state besides the run itself.
@@ -182,12 +184,18 @@ struct Loop {
     alm: Option<PathBuf>,
     taskbag_arg: String,
     last_written: Instant,
+    /// The closing countdowns of finished tasks' tabs, each with its thread (A03-pocket537).
+    countdowns: Vec<(Closing, std::thread::JoinHandle<()>)>,
 }
 
 impl Loop {
     fn write(&mut self) {
         self.record.alive = now_ms();
         self.held.keep();
+        // The countdowns still running are kept in the run's file: a run that stops before they
+        // end starts them again when it resumes.
+        self.countdowns.retain(|(_, h)| !h.is_finished());
+        self.record.run.closing = self.countdowns.iter().map(|(c, _)| c.clone()).collect();
         let path = registry::record_path(&self.dir, &self.id);
         match serde_json::to_string_pretty(&self.record) {
             Ok(text) => {
@@ -196,6 +204,9 @@ impl Loop {
                 }
             }
             Err(e) => log(&format!("could not write the run file: {e}")),
+        }
+        if let Err(e) = registry::write_resume(&self.dir, &self.record) {
+            log(&format!("could not write the run's resume file: {e}"));
         }
         self.last_written = Instant::now();
     }
@@ -216,11 +227,27 @@ impl Loop {
                 }
             }
             Request::Agents { agents } => {
+                let accounts = accounts::load();
                 let usable: Vec<String> = agents
                     .into_iter()
-                    .filter(|a| self.found.iter().any(|(id, _)| id == a))
+                    .filter(|a| {
+                        self.found
+                            .iter()
+                            .any(|(id, _)| id == accounts::base_agent(a))
+                            && accounts::usable(a, &accounts)
+                    })
                     .collect();
                 run.set_agents(&usable);
+            }
+            Request::Sessions { agent, count } => {
+                if crate::flow::TERMINAL_AGENTS.contains(&accounts::base_agent(&agent)) {
+                    run.set_sessions(&agent, count);
+                }
+            }
+            Request::Difficulty { agent, range } => {
+                if crate::flow::TERMINAL_AGENTS.contains(&accounts::base_agent(&agent)) {
+                    run.set_difficulty(&agent, &range);
+                }
             }
         }
         true
@@ -228,32 +255,44 @@ impl Loop {
 
     /// Start one session per share; an agent that cannot be started is taken off the run.
     fn start_sessions(&mut self, shares: Vec<(String, Task)>) {
+        // The accounts as they are now: an account added or removed in the app counts from here
+        // (Task-A03-oven548).
+        let accounts = accounts::load();
         for (agent, task) in shares {
-            let session_id = (agent == "claude_cli").then(new_session_id);
+            // An agent taken off by an earlier failure gets no more sessions this check.
+            if !self.record.run.agents.contains(&agent) {
+                continue;
+            }
+            // The agent's command and its settings (`claude_cli:<account>` runs `claude`, in the
+            // account's folder).
+            let base = accounts::base_agent(&agent).to_string();
+            let session_id = (base == "claude_cli").then(new_session_id);
             let text = request::monitor_request(
                 &task.id,
                 &task.title,
                 &self.taskbag_arg,
                 &self.record.language,
-                &agent,
+                &base,
                 session_id.as_deref(),
                 self.record.run.quiet,
             );
             let found = self
                 .found
                 .iter()
-                .find(|(id, _)| *id == agent)
+                .find(|(id, _)| *id == base)
                 .map(|(_, p)| p.display().to_string());
-            let started = match found {
-                Some(found) => terminal::start_session(
-                    &agent,
+            let started = match (found, accounts::config_of(&agent, &accounts)) {
+                (Some(found), Ok(config)) => terminal::start_session(
+                    &base,
                     &found,
                     &self.record.project,
                     &text,
                     session_id.as_deref(),
                     self.alm_dir.as_deref(),
+                    config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
                 ),
-                None => Err(terminal::ask_failed(&agent, "not found on this computer")),
+                (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
+                (_, Err(why)) => Err(terminal::ask_failed(&agent, why)),
             };
             match started {
                 Ok(tab) => {
@@ -270,7 +309,12 @@ impl Loop {
                         &p.english(),
                     );
                     log(&line);
-                    notify::show(request::notify_title(&self.record.language), &line);
+                    notify::show(
+                        &self.dir,
+                        &self.id,
+                        request::notify_title(&self.record.language),
+                        &line,
+                    );
                     let run = &mut self.record.run;
                     let left: Vec<String> = run
                         .agents
@@ -297,16 +341,26 @@ impl Loop {
         for cur in &finished {
             log(&format!("{} finished ({})", cur.id, cur.agent));
             if let Some(tab) = tab_to_close(cur, &bag.tasks) {
-                session_tab::close_when_done(
+                // Its own process unless that cannot start (then a thread, kept for the run to wait for).
+                let handle = session_tab::close_when_done(
                     self.alm.as_deref(),
                     &registry::log_path(&self.dir, &self.id),
                     &cur.agent,
                     tab,
                     &self.record.language,
                 );
+                if let Some(handle) = handle {
+                    self.countdowns.push((
+                        Closing {
+                            agent: cur.agent.clone(),
+                            tab: tab.clone(),
+                        },
+                        handle,
+                    ));
+                }
             }
             if let Some(stuck) = waiting_alert(&cur.id, &bag.tasks) {
-                tell(&stuck, &self.record.run, &self.record.language);
+                tell(&self.dir, &self.id, &stuck, &self.record.language);
             }
         }
         let run = &self.record.run;
@@ -320,16 +374,18 @@ impl Loop {
                 self.record.run.unblocked.clear();
             }
             let run = &self.record.run;
-            let shares = run.share(bag);
+            let shares = run.share(bag, now / 1000);
+            // An agent with a free slot and no task in its range gets no session; the status bar
+            // says so (Task-A03-wave335).
+            self.record.run.no_task = run.unfilled(&shares);
             if shares.is_empty() {
-                let run = &mut self.record.run;
-                run.checked = now;
-                if let Some(stuck) = run.idle_alert() {
-                    tell(&stuck, run, &self.record.language);
-                }
+                // Nothing to take: the status bar says so; the person is not told (A03-stork103).
+                self.record.run.checked = now;
             } else {
                 self.start_sessions(shares);
             }
+        } else if self.record.run.free_agents().is_empty() {
+            self.record.run.no_task.clear();
         }
         let run = &self.record.run;
         let over = run.stopping && run.working.is_empty();
@@ -338,7 +394,8 @@ impl Loop {
 }
 
 /// Run `options` as run `id` until it ends; its files live in `dir`. Refused when another process
-/// already runs `id`.
+/// already runs `id`. A run resumed from its resume file (A03-pocket537) carries on with the
+/// sessions it had at work and starts again the closing countdowns it had not finished.
 pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
     let failed = |e: std::io::Error| Problem::WriteFailed {
         path: dir.display().to_string(),
@@ -350,6 +407,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
             detail: format!("monitor run {id} is already running"),
         });
     };
+    let mut options = options;
     let root = options.taskbag.clone();
     let project = project_of(&root);
     let bag = read(&root)?;
@@ -359,6 +417,24 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         .as_deref()
         .and_then(Path::parent)
         .map(Path::to_path_buf);
+    // A resumed run: the sessions at work are timed again from now, and the countdowns come back.
+    let now = now_ms();
+    for w in &mut options.run.working {
+        w.changed = now;
+    }
+    let countdowns = std::mem::take(&mut options.run.closing)
+        .into_iter()
+        .filter_map(|c| {
+            let handle = session_tab::close_when_done(
+                options.alm.as_deref(),
+                &registry::log_path(dir, id),
+                &c.agent,
+                &c.tab,
+                &options.language,
+            )?;
+            Some((c, handle))
+        })
+        .collect();
     let mut lp = Loop {
         dir: dir.to_path_buf(),
         id: id.to_string(),
@@ -379,6 +455,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         alm: options.alm.clone(),
         taskbag_arg: taskbag_arg(&project, &root),
         last_written: Instant::now(),
+        countdowns,
     };
     log(&format!(
         "monitor {id} started: {} ({:?}, agents {}, every {} min, {})",
@@ -429,13 +506,28 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
             lp.record.run.taken.join(", ")
         }
     ));
+    // The last run's line counts it, even when the app is closed (A03-pocket537).
+    let last = registry::LastSummary {
+        ended: now_ms(),
+        scope: lp.record.run.scope.clone(),
+        taken: lp.record.run.taken.clone(),
+        taken_by: lp.record.run.taken_by.clone(),
+    };
+    if let Err(e) = registry::write_last(dir, &root, &last) {
+        log(&format!("could not write the last run: {e}"));
+    }
+    // The countdowns of done tasks' tabs finish before the run is gone: it stays listed (stopping)
+    // until then, and a stop in the meantime finds it still there.
+    for (_, handle) in lp.countdowns.drain(..) {
+        let _ = handle.join();
+    }
     let _ = std::fs::remove_file(registry::record_path(dir, id));
     // Only what finding and controlling a running run needs stays on this computer (approver,
     // 2026-11-09): the log of a run that ended as asked goes too. A run that could not start, or
     // was ended from outside, leaves its log for the person to read.
     let _ = std::fs::remove_file(registry::log_path(dir, id));
+    registry::remove_resume(dir, id);
     lp.held.release();
-    // The countdowns of done tasks' tabs run in processes of their own: they finish after this.
     Ok(())
 }
 

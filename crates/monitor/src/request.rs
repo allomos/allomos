@@ -15,7 +15,7 @@ fn lang(language: &str) -> &'static str {
 
 /// The name an agent passes to `alm claim --session-agent`.
 pub fn session_agent(agent: &str) -> &'static str {
-    match agent {
+    match crate::accounts::base_agent(agent) {
         "claude_cli" => "claude-code",
         "antigravity_cli" => "antigravity",
         _ => "codex",
@@ -25,7 +25,7 @@ pub fn session_agent(agent: &str) -> &'static str {
 /// How a terminal Claude Code session reads its quota (Task-A03-folk351): `claude -p /usage`.
 /// Empty for the other agents. The paragraph ends with a blank line.
 fn usage_paragraph(agent: &str, language: &str) -> String {
-    if agent != "claude_cli" {
+    if crate::accounts::base_agent(agent) != "claude_cli" {
         return String::new();
     }
     let text = match lang(language) {
@@ -185,15 +185,6 @@ pub fn notify_waiting(language: &str, id: &str, on: &str) -> String {
         "zh-CN" => format!("{id} 在等你：{on}"),
         "ja" => format!("{id} があなたを待っています：{on}"),
         _ => format!("{id} is waiting for you: {on}"),
-    }
-}
-
-/// No task is ready; `time` is the next check, as the person reads it (`11:20`).
-pub fn notify_idle(language: &str, time: &str) -> String {
-    match lang(language) {
-        "zh-CN" => format!("没有就绪的任务。下次检查 {time}。"),
-        "ja" => format!("準備完了のタスクがありません。次の確認 {time}。"),
-        _ => format!("No task is ready. Next check {time}."),
     }
 }
 

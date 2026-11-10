@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use allomos_core::Problem;
+use allomos_monitor::accounts;
 use allomos_monitor::flow::{FIRST_FREQUENCY, FREQUENCIES, Run, Scope, TERMINAL_AGENTS};
 use allomos_monitor::registry::{self, Entry, Request};
 use allomos_monitor::runner;
@@ -22,10 +23,13 @@ use crate::{Cli, Done};
 pub(crate) enum MonitorWhat {
     /// Start monitoring this project's ready tasks in the background: each ready task is worked
     /// in a new terminal session of a chosen agent, which claims it first. Keeps running after
-    /// this terminal is closed; ends with `alm monitor stop`, or at log-out or restart.
+    /// this terminal is closed; ends with `alm monitor stop`. A log-out or restart ends it, and
+    /// `alm monitor resume` (the app does it when the project opens) starts it again from its
+    /// saved settings.
     Start(StartArgs),
     /// Run a monitor in this terminal, in the foreground, until it is stopped (what `start` runs
-    /// in the background; for tests).
+    /// in the background; for tests). With `--resume`, it carries on the run `id` that stopped
+    /// without ending (its settings and sessions are those it saved).
     Run {
         /// The run's ID (`start` makes one). Default: a new one.
         id: Option<String>,
@@ -35,7 +39,14 @@ pub(crate) enum MonitorWhat {
         /// language.
         #[arg(long, value_name = "CODE")]
         language: Option<String>,
+        /// Carry on run `id` from its resume file, with the settings and sessions it saved.
+        #[arg(long)]
+        resume: bool,
     },
+    /// Start again the runs of this project that stopped without ending (a log-out, a restart or
+    /// a crash), from the settings they saved, with the sessions they had at work. Runs that are
+    /// going on, and runs that were ended as asked, are left alone (A03-pocket537).
+    Resume,
     /// Check now: let tasks whose blockers have finished go on, then give each free agent a ready
     /// task (as the app's Check now).
     Check {
@@ -79,6 +90,10 @@ pub(crate) struct StartArgs {
     /// Repeat for several; each works one task at a time. Default: the first one found.
     #[arg(long = "agent", value_name = "AGENT")]
     agents: Vec<String>,
+    /// How many sessions an agent may have at work at once, as AGENT=N (for example
+    /// claude-code=2). Repeat for several agents. Default: one each. No upper limit.
+    #[arg(long = "sessions", value_name = "AGENT=N")]
+    sessions: Vec<String>,
     /// How often to check when no task is ready, in minutes: 1, 5, 10, 30, 60, 90 or 120.
     #[arg(long, value_name = "MINUTES", default_value_t = FIRST_FREQUENCY)]
     every: u32,
@@ -86,9 +101,11 @@ pub(crate) struct StartArgs {
     /// (ask as usual). The person chooses (`alm guide run-modes`).
     #[arg(long, value_name = "quiet|normal")]
     mode: String,
-    /// Only tasks of these difficulties: 1-3, or one level such as 4 (no difficulty counts as 3).
-    #[arg(long, value_name = "RANGE")]
-    difficulty: Option<String>,
+    /// The difficulties an agent takes tasks from: 1-3, or one level such as 4 (no difficulty
+    /// counts as 3). Without an agent, every chosen agent; AGENT=RANGE for one, for example
+    /// codex=1-2. Repeat for several. Default: every level, 1-5 (Task-A03-wave335).
+    #[arg(long = "difficulty", value_name = "[AGENT=]RANGE")]
+    difficulty: Vec<String>,
 }
 
 impl MonitorWhat {
@@ -96,6 +113,7 @@ impl MonitorWhat {
         match self {
             MonitorWhat::Start(_) => "monitor start",
             MonitorWhat::Run { .. } => "monitor run",
+            MonitorWhat::Resume => "monitor resume",
             MonitorWhat::Check { .. } => "monitor check",
             MonitorWhat::Stop { .. } => "monitor stop",
             MonitorWhat::Status => "monitor status",
@@ -130,9 +148,57 @@ fn agent_id(given: &str) -> Result<&'static str, Problem> {
     Ok(id)
 }
 
-/// The command's name for an agent ID.
+/// The agents of `run` as the command names them, with a count where it is more than one
+/// (`claude-code ×2`).
+fn agents_text(run: &Run) -> Vec<String> {
+    run.agents
+        .iter()
+        .map(|a| {
+            let count = match run.sessions_of(a) {
+                1 => String::new(),
+                n => format!(" ×{n}"),
+            };
+            let range = run.range_of(a);
+            let levels = if range == allomos_core::difficulty::Range::all() {
+                String::new()
+            } else {
+                format!(" ({})", range.text())
+            };
+            // An extra account is named as `--agent` takes it: `claude-code:<account ID>`.
+            let word = match a.split_once(':') {
+                Some((base, account)) => format!("{}:{account}", agent_word(base)),
+                None => agent_word(a).to_string(),
+            };
+            format!("{word}{count}{levels}")
+        })
+        .collect()
+}
+
+/// An agent as the person names it, or an extra account of one (`claude-code:<account ID>`, the
+/// account's ID as the app lists it in `agent-accounts.json`), as the monitor's ID. The account
+/// must be listed (Task-A03-oven548).
+fn agent_key(given: &str) -> Result<String, Problem> {
+    let Some((name, account)) = given.split_once(':') else {
+        return Ok(agent_id(given)?.to_string());
+    };
+    let base = agent_id(name)?;
+    if accounts::load()
+        .iter()
+        .any(|a| a.agent == base && a.id == account)
+    {
+        return Ok(accounts::key(base, account));
+    }
+    Err(Problem::BadUsage {
+        detail: format!(
+            "--agent {given}: {} has no account {account}; the app's Monitor ready tasks dialog lists the accounts",
+            agent_word(base)
+        ),
+    })
+}
+
+/// The command's name for an agent ID (an extra account's ID names its agent's command).
 fn agent_word(id: &str) -> &'static str {
-    match id {
+    match accounts::base_agent(id) {
         "claude_cli" => "claude-code",
         "codex_cli" => "codex",
         "antigravity_cli" => "antigravity",
@@ -149,17 +215,24 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         .collect();
     let mut agents: Vec<String> = Vec::new();
     for given in &args.agents {
-        let id = agent_id(given)?;
-        if !found.iter().any(|f| f == id) {
+        let id = agent_key(given)?;
+        if !found.iter().any(|f| f == accounts::base_agent(&id)) {
             return Err(Problem::BadUsage {
                 detail: format!(
                     "--agent {given}: {} was not found on this computer (its command answers no `--version` in PATH or the usual folders)",
-                    allomos_monitor::terminal::name(id)
+                    allomos_monitor::terminal::name(&id)
                 ),
             });
         }
-        if !agents.iter().any(|a| a == id) {
-            agents.push(id.to_string());
+        if !accounts::usable(&id, &accounts::load()) {
+            return Err(Problem::BadUsage {
+                detail: format!(
+                    "--agent {given}: its account's folder is not there any more (add the account again in the app)"
+                ),
+            });
+        }
+        if !agents.iter().any(|a| *a == id) {
+            agents.push(id);
         }
     }
     if agents.is_empty() {
@@ -185,9 +258,8 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
             });
         }
     };
-    if let Some(d) = &args.difficulty {
-        allomos_core::difficulty::Range::parse(d)?;
-    }
+    let difficulties = difficulties_of(&args.difficulty, &agents)?;
+    let sessions = sessions_of(&args.sessions, &agents)?;
     let (bag, _) = allomos_store::taskbag_of(root, allomos_store::load(root))?;
     let scope = match &args.iteration {
         Some(id) => {
@@ -200,30 +272,104 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         }
         None => Scope::All,
     };
+    // Each agent found, then its extra accounts that can be used (Task-A03-oven548).
+    let listed = accounts::load();
     let offered: Vec<String> = TERMINAL_AGENTS
         .iter()
         .filter(|a| found.iter().any(|f| f == *a))
-        .map(|a| a.to_string())
+        .flat_map(|a| {
+            std::iter::once(a.to_string()).chain(
+                listed
+                    .iter()
+                    .filter(|x| x.agent == *a)
+                    .map(|x| accounts::key(a, &x.id))
+                    .filter(|k| accounts::usable(k, &listed)),
+            )
+        })
         .collect();
-    Ok(Run::start(
-        scope,
-        args.difficulty.clone(),
-        agents,
-        offered,
-        quiet,
-        args.every,
-        now,
-    ))
+    let mut run = Run::start(scope, agents, offered, quiet, args.every, now);
+    for (agent, count) in sessions {
+        run.set_sessions(&agent, count);
+    }
+    // A range without an agent is every chosen agent's; one naming an agent is that agent's, so
+    // it is set after them.
+    let chosen = run.agents.clone();
+    for (_, range) in difficulties.iter().filter(|(a, _)| a.is_none()) {
+        for a in &chosen {
+            run.set_difficulty(a, range);
+        }
+    }
+    for (agent, range) in &difficulties {
+        if let Some(a) = agent {
+            run.set_difficulty(a, range);
+        }
+    }
+    Ok(run)
+}
+
+/// The `--difficulty` values as (agent ID, or none for every chosen agent; range text). Each
+/// range must read as `alm next --difficulty` does, and an agent must be one of `agents` (the
+/// run's).
+fn difficulties_of(
+    given: &[String],
+    agents: &[String],
+) -> Result<Vec<(Option<String>, String)>, Problem> {
+    let mut out = Vec::new();
+    for g in given {
+        let (agent, range) = match g.split_once('=') {
+            Some((name, range)) => {
+                let id = agent_key(name)?;
+                if !agents.iter().any(|a| *a == id) {
+                    return Err(Problem::BadUsage {
+                        detail: format!(
+                            "--difficulty {g}: {} is not one of the run's agents (give it with --agent)",
+                            agent_word(&id)
+                        ),
+                    });
+                }
+                (Some(id), range)
+            }
+            None => (None, g.as_str()),
+        };
+        out.push((
+            agent,
+            allomos_core::difficulty::Range::parse(range.trim())?.text(),
+        ));
+    }
+    Ok(out)
+}
+
+/// The `--sessions AGENT=N` values as (agent ID, count): each agent must be one of `agents` (the
+/// run's), and the count at least one.
+fn sessions_of(given: &[String], agents: &[String]) -> Result<Vec<(String, u32)>, Problem> {
+    let mut out = Vec::new();
+    for g in given {
+        let bad = |why: &str| Problem::BadUsage {
+            detail: format!(
+                "--sessions {g}: {why}; write it as AGENT=N, for example claude-code=2"
+            ),
+        };
+        let (name, count) = g.split_once('=').ok_or_else(|| bad("no count given"))?;
+        let id = agent_key(name)?;
+        let count: u32 = count
+            .trim()
+            .parse()
+            .ok()
+            .filter(|n| *n >= 1)
+            .ok_or_else(|| bad("the count is a whole number, one or more"))?;
+        if !agents.iter().any(|a| *a == id) {
+            return Err(bad(&format!(
+                "{} is not one of the run's agents (give it with --agent)",
+                agent_word(&id)
+            )));
+        }
+        out.push((id, count));
+    }
+    Ok(out)
 }
 
 /// The words that start the same run in a process of its own.
-fn run_words(
-    id: &str,
-    root: &Path,
-    args: &StartArgs,
-    language: &str,
-    agents: &[String],
-) -> Vec<String> {
+fn run_words(id: &str, root: &Path, args: &StartArgs, language: &str, run: &Run) -> Vec<String> {
     let mut w = vec![
         "monitor".to_string(),
         "run".to_string(),
@@ -237,17 +383,21 @@ fn run_words(
         "--language".to_string(),
         language.to_string(),
     ];
-    for a in agents {
+    for a in &run.agents {
         w.push("--agent".to_string());
         w.push(agent_word(a).to_string());
+    }
+    for (a, n) in &run.sessions {
+        w.push("--sessions".to_string());
+        w.push(format!("{}={n}", agent_word(a)));
     }
     if let Some(i) = &args.iteration {
         w.push("--iteration".to_string());
         w.push(i.clone());
     }
-    if let Some(d) = &args.difficulty {
+    for (a, range) in &run.difficulties {
         w.push("--difficulty".to_string());
-        w.push(d.clone());
+        w.push(format!("{}={range}", agent_word(a)));
     }
     w
 }
@@ -278,12 +428,7 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                 Scope::All => "every ready task".to_string(),
                 Scope::Iteration { id } => format!("iteration {id}"),
             };
-            let difficulty = run
-                .difficulty
-                .as_ref()
-                .map(|d| format!(", difficulty {d}"))
-                .unwrap_or_default();
-            let agents: Vec<&str> = run.agents.iter().map(|a| agent_word(a)).collect();
+            let agents = agents_text(run);
             let working: Vec<String> = run
                 .working
                 .iter()
@@ -300,7 +445,7 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                 )
             };
             let mut text = format!(
-                "{}  running  process {}{}\n  tasks: {scope}{difficulty}; agents: {}; every {} min; {} mode\n  working: {}; {state}\n",
+                "{}  running  process {}{}\n  tasks: {scope}; agents: {}; every {} min; {} mode\n  working: {}; {state}\n",
                 r.id,
                 r.pid,
                 if with_project {
@@ -317,6 +462,13 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                     working.join(", ")
                 },
             );
+            if !run.no_task.is_empty() {
+                let words: Vec<&str> = run.no_task.iter().map(|a| agent_word(a)).collect();
+                text.push_str(&format!(
+                    "  no ready task in the levels of: {} (no session starts for them)\n",
+                    words.join(", ")
+                ));
+            }
             if !run.taken.is_empty() {
                 text.push_str(&format!(
                     "  sessions started for: {}\n",
@@ -395,7 +547,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             let alm = std::env::current_exe().map_err(|e| Problem::BadUsage {
                 detail: format!("cannot tell where this alm is: {e}"),
             })?;
-            let words = run_words(&id, &root, args, &language, &run.agents);
+            let words = run_words(&id, &root, args, &language, &run);
             let pid =
                 runner::spawn_detached(&alm, &words, &log).map_err(|e| Problem::WriteFailed {
                     path: alm.display().to_string(),
@@ -422,7 +574,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                     ),
                 });
             }
-            let agents: Vec<&str> = run.agents.iter().map(|a| agent_word(a)).collect();
+            let agents = agents_text(&run);
             let text = format!(
                 "Monitor {id} started (process {pid}): {}, agents {}, every {} min, {} mode. It checks now, then at that frequency, and keeps running after this terminal is closed.\n  alm monitor status    what it is doing\n  alm monitor check --run {id}    check now\n  alm monitor stop --run {id}     start no new session; those at work finish\n  Log: {}\n",
                 match &run.scope {
@@ -439,9 +591,40 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 text,
             ))
         }
-        MonitorWhat::Run { id, args, language } => {
+        MonitorWhat::Run {
+            id,
+            args,
+            language,
+            resume,
+        } => {
             let root = crate::locate(cli, cwd)?;
             let now = runner::now_ms();
+            let alm = std::env::current_exe().ok();
+            if *resume {
+                // The settings and sessions the run saved (A03-pocket537), not the flags given.
+                let id = id.clone().ok_or_else(|| Problem::BadUsage {
+                    detail: "--resume needs the run's ID".to_string(),
+                })?;
+                let saved = registry::read_resume(&dir, &id).ok_or_else(|| Problem::BadUsage {
+                    detail: format!(
+                        "{id}: no run of this computer has a resume file under that ID"
+                    ),
+                })?;
+                runner::run(
+                    &dir,
+                    &id,
+                    runner::Options {
+                        taskbag: saved.taskbag.clone(),
+                        language: saved.language.clone(),
+                        run: saved.run,
+                        alm,
+                    },
+                )?;
+                return Ok(Done::new(
+                    json!({ "taskbag": saved.taskbag, "run": id, "resumed": true }),
+                    format!("Monitor {id} ended.\n"),
+                ));
+            }
             let run = new_run(&root, args, now)?;
             let language = match language {
                 Some(l) => l.clone(),
@@ -453,7 +636,6 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                     detail: format!("{id}: a run ID has only letters, digits and -"),
                 });
             }
-            let alm = std::env::current_exe().ok();
             runner::run(
                 &dir,
                 &id,
@@ -485,6 +667,64 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 format!("Tab countdown: {outcome:?}\n"),
             ))
         }
+        MonitorWhat::Resume => {
+            let root = crate::locate(cli, cwd)?;
+            let procs = registry::monitor_processes();
+            let alm = std::env::current_exe().map_err(|e| Problem::BadUsage {
+                detail: format!("cannot tell where this alm is: {e}"),
+            })?;
+            let mut resumed: Vec<String> = Vec::new();
+            for saved in registry::resumable(&dir, &root, &procs) {
+                let id = saved.id.clone();
+                let log = registry::log_path(&dir, &id);
+                // `run` takes the flags `start` takes (its mode is required); the settings come from
+                // the resume file, so these only satisfy the parser.
+                let words = vec![
+                    "monitor".to_string(),
+                    "run".to_string(),
+                    id.clone(),
+                    "--resume".to_string(),
+                    "--taskbag".to_string(),
+                    root.display().to_string(),
+                    "--mode".to_string(),
+                    (if saved.run.quiet { "quiet" } else { "normal" }).to_string(),
+                    "--every".to_string(),
+                    saved.run.every.to_string(),
+                ];
+                let pid = runner::spawn_detached(&alm, &words, &log).map_err(|e| {
+                    Problem::WriteFailed {
+                        path: alm.display().to_string(),
+                        detail: e.to_string(),
+                    }
+                })?;
+                // Started once its run file is there (as `start` waits for it). A run that already
+                // ended (its resume file is gone) counts as started too.
+                let start = Instant::now();
+                let record = registry::record_path(&dir, &id);
+                while !record.exists() && start.elapsed() < Duration::from_secs(20) {
+                    if !registry::monitor_processes().iter().any(|p| p.pid == pid) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                if record.exists() || !registry::resume_path(&dir, &id).exists() {
+                    resumed.push(id);
+                }
+            }
+            let text = if resumed.is_empty() {
+                "No monitor of this project needed starting again.\n".to_string()
+            } else {
+                format!(
+                    "Started again {} monitor(s) of this project from their saved settings: {}.\n",
+                    resumed.len(),
+                    resumed.join(", ")
+                )
+            };
+            Ok(Done::new(
+                json!({ "taskbag": root, "resumed": resumed }),
+                text,
+            ))
+        }
         MonitorWhat::Check { run } => {
             let root = crate::locate(cli, cwd)?;
             let entries = registry::of_project(&dir, &root);
@@ -513,6 +753,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             let chosen = choose(&entries, run.as_deref(), "stop")?;
             match chosen {
                 Entry::Missing { pid, id, .. } => {
+                    registry::forget_process(&dir, *pid);
                     registry::end_process(*pid).map_err(|e| Problem::BadUsage {
                         detail: format!("process {pid} could not be ended: {e}"),
                     })?;
@@ -591,6 +832,39 @@ fn ask(dir: &Path, id: &str, request: &Request) -> Result<(), Problem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sessions_are_counts_of_the_runs_agents() {
+        let agents = vec!["claude_cli".to_string()];
+        assert_eq!(
+            sessions_of(&["claude-code=2".to_string()], &agents).unwrap(),
+            vec![("claude_cli".to_string(), 2)]
+        );
+        assert!(sessions_of(&["claude-code=0".to_string()], &agents).is_err());
+        assert!(sessions_of(&["claude-code".to_string()], &agents).is_err());
+        assert!(sessions_of(&["codex=2".to_string()], &agents).is_err());
+    }
+
+    #[test]
+    fn difficulties_are_ranges_of_the_runs_agents() {
+        let agents = vec!["claude_cli".to_string(), "codex_cli".to_string()];
+        assert_eq!(
+            difficulties_of(&["3-5".to_string()], &agents).unwrap(),
+            vec![(None, "3-5".to_string())]
+        );
+        assert_eq!(
+            difficulties_of(&["codex=1-2".to_string(), "4".to_string()], &agents).unwrap(),
+            vec![
+                (Some("codex_cli".to_string()), "1-2".to_string()),
+                (None, "4".to_string())
+            ]
+        );
+        assert!(difficulties_of(&["0-3".to_string()], &agents).is_err());
+        assert!(difficulties_of(&["4-2".to_string()], &agents).is_err());
+        assert!(
+            difficulties_of(&["claude-code=1-2".to_string()], &["codex_cli".to_string()]).is_err()
+        );
+    }
 
     #[test]
     fn app_agents_are_refused_with_the_reason() {

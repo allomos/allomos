@@ -10,6 +10,8 @@ import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import type { Messenger } from "./messenger";
 import type { Agent } from "./types";
+import { baseAgent } from "./monitorFlow";
+import { labelOf } from "./agentAccounts";
 import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf } from "./agentPickerFlow";
 import type { Choice } from "./agentPickerFlow";
 import { offer as offerFor, offered } from "./updateTaskbagFlow";
@@ -22,6 +24,12 @@ export const AGENT_KEY: Record<Agent["id"], Key> = {
   codex_app: "agents.codex_app",
   antigravity_cli: "agents.antigravity_cli",
 };
+
+/** The name of a monitor agent (Task-A03-oven548): its agent's name, with its account's name after
+ * a dot when it is an extra account. */
+export function monitorAgentName(key: string, t: (k: Key) => string): string {
+  return labelOf(key, t(AGENT_KEY[baseAgent(key) as Agent["id"]]));
+}
 
 /** The keys that paste in a terminal on this computer. */
 export const PASTE_KEYS = /Mac/.test(navigator.userAgent) ? "⌘V" : "Ctrl+V";
@@ -163,14 +171,14 @@ export function AgentPicker({
                       {/* How it will open: only for the chosen tool (owner, 2026-10-12). */}
                       {picked && (
                         <span className="muted">
-                          — {how?.[a.id] ?? t(a.how === "link" ? "agents.how_link" : "agents.how_paste")} ({a.found})
+                          — {how?.[a.id] ?? t(a.how === "link" ? "agents.how_link" : a.id === "antigravity_cli" ? "agents.how_sent" : "agents.how_paste")} ({a.found})
                         </span>
                       )}
                       {why && <span className="muted small hint">{why}</span>}
                       {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
                       {a.id === "claude_app" && !why && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
-                      {/* The chosen tool takes the request from the clipboard: say how, right here. */}
-                      {picked && a.how === "paste" && !how?.[a.id] && (
+                      {/* The chosen tool takes the request from the clipboard: say how, right here (Antigravity's agy sends it itself). */}
+                      {picked && a.how === "paste" && a.id !== "antigravity_cli" && !how?.[a.id] && (
                         <span className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</span>
                       )}
                     </label>

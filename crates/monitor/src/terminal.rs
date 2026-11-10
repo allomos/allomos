@@ -117,7 +117,7 @@ fn runs(program: &Path) -> bool {
 
 /// An agent's name, as messages say it.
 pub fn name(agent: &str) -> &'static str {
-    match agent {
+    match crate::accounts::base_agent(agent) {
         "claude_cli" => "Claude Code (terminal)",
         "claude_app" => "Claude (app)",
         "codex_cli" => "Codex (terminal)",
@@ -219,6 +219,7 @@ pub fn powershell_session(
     file: &Path,
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
+    config: Option<(&str, &Path)>,
 ) -> String {
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
@@ -231,12 +232,32 @@ pub fn powershell_session(
         powershell_quote(&project.display().to_string()),
         powershell_quote(found)
     );
+    // An extra account: its folder variable is set for this window only (Task-A03-oven548).
+    let start = match config {
+        Some((var, dir)) => format!(
+            "${{env:{var}}} = {}; {start}",
+            powershell_quote(&dir.display().to_string())
+        ),
+        None => start,
+    };
     match alm_dir {
         Some(dir) => format!(
             "$env:PATH = {} + $env:PATH; {start}",
             powershell_quote(&format!("{};", dir.display()))
         ),
         None => start,
+    }
+}
+
+/// The command with an extra account's folder variable in front of it: `CLAUDE_CONFIG_DIR='<dir>'
+/// claude …` (zsh, bash), for that command only. None: the command as it is.
+pub fn with_config(program: &str, config: Option<(&str, &Path)>) -> String {
+    match config {
+        Some((var, dir)) => format!(
+            "{var}={} {program}",
+            shell_quote(&dir.display().to_string())
+        ),
+        None => program.to_string(),
     }
 }
 
@@ -257,6 +278,7 @@ pub fn start_session(
     request: &str,
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
+    config: Option<(&str, &Path)>,
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -272,9 +294,11 @@ pub fn start_session(
     let Some(program) = session_command(id, &file, session_id) else {
         return Err(ask_failed(id, "no way to start it"));
     };
+    // An extra account's folder variable goes in front of the command, for that command only.
+    let program = with_config(&program, config);
     std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
-        let script = powershell_session(id, project, found, &file, session_id, alm_dir);
+        let script = powershell_session(id, project, found, &file, session_id, alm_dir, config);
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
@@ -375,6 +399,7 @@ mod tests {
                 r"C:\agy\bin\agy.exe",
                 Path::new(r"C:\t\r.txt"),
                 None,
+                None,
                 None
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
@@ -391,11 +416,35 @@ mod tests {
                 found,
                 Path::new(r"C:\t\r.txt"),
                 Some("ab-12"),
+                None,
                 None
             ),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
             )
+        );
+    }
+
+    #[test]
+    fn an_extra_account_runs_the_command_in_its_own_folder() {
+        let dir = Path::new("/Users/me/claude 2");
+        assert_eq!(
+            with_config("claude --session-id 'ab'", Some(("CLAUDE_CONFIG_DIR", dir))),
+            "CLAUDE_CONFIG_DIR='/Users/me/claude 2' claude --session-id 'ab'"
+        );
+        assert_eq!(with_config("codex x", None), "codex x");
+        assert_eq!(
+            powershell_session(
+                "codex_cli",
+                Path::new(r"C:\p"),
+                r"C:\npm\codex.cmd",
+                Path::new(r"C:\t\r.txt"),
+                None,
+                None,
+                Some(("CODEX_HOME", Path::new(r"C:\acct")))
+            )
+            .starts_with(r"${env:CODEX_HOME} = 'C:\acct'; Set-Location -LiteralPath 'C:\p';"),
+            true
         );
     }
 

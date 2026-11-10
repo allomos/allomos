@@ -17,9 +17,13 @@ export type MonitorRequest =
   | { action: "stop" }
   | { action: "undo_stop" }
   | { action: "every"; minutes: number }
-  | { action: "agents"; agents: string[] };
+  | { action: "agents"; agents: string[] }
+  | { action: "sessions"; agent: string; count: number }
+  /** The difficulty levels an agent takes tasks from, from the next check on, as `1-3` or `4` (Task-A03-wave335). */
+  | { action: "difficulty"; agent: string; range: string };
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
+import type { AgentAccount, AgentAccounts } from "./monitorFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
@@ -42,7 +46,8 @@ export interface Messenger {
   /** Saves the interface language, so `alm task-language` can tell agents which language to write tasks in. */
   saveUiLanguage(language: string): Promise<void>;
   /** Ask the user to pick a folder. Returns null if they cancel. */
-  pickFolder(title: string): Promise<string | null>;
+  /** A folder picker; `defaultPath` is where it starts (Task-A03-oven548). */
+  pickFolder(title: string, defaultPath?: string): Promise<string | null>;
   inspectFolder(path: string): Promise<FolderInfo>;
   openTaskbag(root: string): Promise<Opened>;
   /** A fingerprint of the taskbag's files; it changes whenever a file is written. */
@@ -121,15 +126,33 @@ export interface Messenger {
   monitorRuns(root: string): Promise<unknown[]>;
   /** Starts a run with the app's own `alm monitor start` (a background process that goes on after
    * the app is closed); resolves with its ID. Rejects with a Problem. */
-  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null): Promise<string>;
+  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null, sessions: Partial<Record<string, number>>, difficulties: Record<string, string>): Promise<string>;
   /** Leaves a request for run `id`: check now, stop, undo the stop, a new frequency, these agents. */
   monitorAsk(id: string, request: MonitorRequest): Promise<void>;
   /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
   monitorEndProcess(pid: number): Promise<void>;
+  /** Starts again the project's runs that stopped without ending, from their saved settings
+   * (A03-pocket537); resolves with their IDs (none when all are going on or were ended). */
+  monitorResume(root: string): Promise<string[]>;
+  /** The project's last run as its file on this computer keeps it (`ended` in ms), or null. */
+  monitorLast(root: string): Promise<unknown | null>;
+  /** The Monitors list (Task-A03-motor529): every run this computer runs, in every project, with
+   * the record-missing processes; `monitor_all` lists them. Read again every couple of seconds. */
+  monitorAll(): Promise<unknown[]>;
+  /** The list's Open: the project of the taskbag at `root` opens in a window (its tab comes to the
+   * front when a window already shows it). Rejects with a Problem. */
+  monitorOpen(root: string): Promise<void>;
+  /** Calls `handler` when the View menu's Running Monitors item is chosen (Task-A03-motor529). */
+  onMonitorsMenu(handler: () => void): Promise<() => void>;
   /** The agent `alm` last ran under for a task in the taskbag at `root`, from its events (Task-A03-27). */
   lastAgent(root: string): Promise<LastAgent | null>;
   /** The AI agents on this computer that can be asked to add Allomos's instructions. */
   findAgents(): Promise<Agent[]>;
+  /** The extra accounts of the terminal agents, and each agent's default folder (Task-A03-oven548). */
+  agentAccounts(): Promise<AgentAccounts>;
+  /** Adds an account of an agent: the folder it keeps its settings in, and the name given to it.
+   * Rejects with a Problem when the folder cannot be an account. */
+  addAgentAccount(agent: string, path: string, name: string): Promise<AgentAccount>;
   /**
    * Opens each agent in `project` with its request typed in: the first also looks for the
    * project's tasks and offers to move them; the others only add Allomos's instructions.
@@ -434,8 +457,8 @@ export const desktopMessenger: Messenger = {
   startupFolder: () => invoke<string | null>("startup_folder"),
   systemLanguages: () => invoke<string[]>("system_languages"),
   saveUiLanguage: (language) => invoke<void>("save_ui_language", { language }),
-  async pickFolder(title) {
-    const picked = await open({ directory: true, multiple: false, title });
+  async pickFolder(title, defaultPath) {
+    const picked = await open({ directory: true, multiple: false, title, defaultPath });
     return typeof picked === "string" ? picked : null;
   },
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
@@ -476,11 +499,18 @@ export const desktopMessenger: Messenger = {
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
-  monitorStart: (root, agents, every, quiet, iteration) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration }),
+  monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties }),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
   monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
+  monitorResume: (root) => invoke<string[]>("monitor_resume", { root }),
+  monitorLast: (root) => invoke<unknown | null>("monitor_last", { root }),
+  monitorAll: () => invoke<unknown[]>("monitor_all"),
+  monitorOpen: (root) => invoke<void>("monitor_open", { root }),
+  onMonitorsMenu: (handler) => getCurrentWebviewWindow().listen("menu:monitors", () => handler()),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
   findAgents: () => invoke<Agent[]>("find_agents"),
+  agentAccounts: () => invoke<AgentAccounts>("agent_accounts"),
+  addAgentAccount: (agent, path, name) => invoke<AgentAccount>("add_agent_account", { agent, path, name }),
   connectAgents: (agents, project, taskbag, language) =>
     invoke<string[]>("connect_agents", { agents, project, taskbag, language }),
   manualRequest: (project, taskbag, language) => invoke<string>("manual_request", { project, taskbag, language }),

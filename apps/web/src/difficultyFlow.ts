@@ -4,6 +4,7 @@
 
 import type { Key } from "./i18n";
 import type { Task } from "./types";
+import type { Levels } from "./monitorFlow";
 
 /** The levels, lowest first. */
 export const LEVELS = [1, 2, 3, 4, 5] as const;
@@ -28,4 +29,11 @@ export function levelText(level: number, t: T): string {
 export function difficultyText(task: Pick<Task, "difficulty">, t: T): string {
   const { level, isDefault } = difficultyOf(task);
   return isDefault ? t("difficulty.default", { level: levelText(level, t) }) : levelText(level, t);
+}
+
+/** Whether a task's level (the default one included) is in a range of levels: the difficulty
+ * range an agent takes tasks from (Task-A03-wave335). */
+export function levelsHold(levels: Levels, task: Pick<Task, "difficulty">): boolean {
+  const { level } = difficultyOf(task);
+  return level >= levels.low && level <= levels.high;
 }

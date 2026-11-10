@@ -19,8 +19,69 @@ export const FIRST_FREQUENCY: Frequency = 30;
 export const STALL_MS = 30 * 60 * 1000;
 
 /** The agents whose sessions Allomos starts itself, in a terminal. */
-export type TerminalAgent = "claude_cli" | "codex_cli" | "antigravity_cli";
 export const TERMINAL_AGENTS: readonly string[] = ["claude_cli", "codex_cli", "antigravity_cli"];
+
+/** A monitor agent: an agent (`claude_cli`), or one of its extra accounts (`claude_cli:<account
+ * ID>`, Task-A03-oven548). Each one is a row of its own in the dialog and gets its own sessions
+ * and difficulty range. */
+export type TerminalAgent = string;
+
+/** An extra account of an agent, as the app lists it: its name and the folder it keeps its
+ * settings and login in (never the login itself). */
+export interface AgentAccount {
+  id: string;
+  agent: string;
+  name: string;
+  dir: string;
+}
+
+/** The app's accounts list: the extra accounts, and each agent's default folder. */
+export interface AgentAccounts {
+  accounts: AgentAccount[];
+  defaults: Record<string, string>;
+}
+
+/** The agent of a monitor agent: `claude_cli` for `claude_cli:<account>` too. */
+export function baseAgent(key: string): string {
+  const at = key.indexOf(":");
+  return at < 0 ? key : key.slice(0, at);
+}
+
+/** A monitor agent of an account: `<agent>:<account ID>`. */
+export function accountKey(agent: string, id: string): string {
+  return `${agent}:${id}`;
+}
+
+/** Whether a monitor agent is one Allomos starts in a terminal (an account of one counts too). */
+export function isTerminalAgent(key: string): boolean {
+  return TERMINAL_AGENTS.includes(baseAgent(key));
+}
+
+/** One row of an agent's accounts in the dialog: the monitor agent, and the account's name when
+ * the agent has extra accounts (`null`: the agent alone, as before accounts existed). */
+export interface AccountRow {
+  key: TerminalAgent;
+  name: string | null;
+}
+
+/** The rows for an agent: one when it has no extra account; otherwise the default account first
+ * (named `firstName`, the person's `Account 1`), then each extra account in the order added. */
+export function accountRows(agent: string, accounts: AgentAccount[], firstName: string): AccountRow[] {
+  const extra = accounts.filter((a) => a.agent === agent);
+  if (extra.length === 0) return [{ key: agent, name: null }];
+  return [{ key: agent, name: firstName }, ...extra.map((a) => ({ key: accountKey(agent, a.id), name: a.name }))];
+}
+
+/** The name suggested for a new account: `Account 2` for the first one beside the default, then
+ * one more each time (`Account 3`, …). */
+export function suggestedAccountName(accounts: AgentAccount[], agent: string): string {
+  return `Account ${accounts.filter((a) => a.agent === agent).length + 2}`;
+}
+
+/** The label of a monitor agent: its agent's name, and the account's name after a dot. */
+export function agentLabel(agentName: string, accountName: string | null): string {
+  return accountName ? `${agentName} · ${accountName}` : agentName;
+}
 
 /** Which tasks the monitor takes: every ready one, or one iteration's (`current`: it was the
  * active iteration when the run started, shown as "current iteration"). */
@@ -40,6 +101,7 @@ export function readyTasks(
   iterations: Iteration[],
   active: string | null | undefined,
   iteration?: string,
+  holds: (task: Task) => boolean = () => true,
 ): Task[] {
   const planned = inPlanOrder(iterations).map((i) => i.id);
   const iterationRank = (t: Task) => {
@@ -54,6 +116,7 @@ export function readyTasks(
   return tasks
     .filter((t) => t.state === "ready" && !t.holder)
     .filter((t) => iteration === undefined || t.iteration === iteration)
+    .filter(holds)
     .sort((a, b) => iterationRank(a) - iterationRank(b) || areaRank(a) - areaRank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -73,8 +136,9 @@ export function scopeOptions(
   areas: { id: string }[],
   iterations: Iteration[],
   active: string | null | undefined,
+  holds: (task: Task) => boolean = () => true,
 ): ScopeOptions {
-  const count = (id?: string) => readyTasks(tasks, areas, iterations, active, id).length;
+  const count = (id?: string) => readyTasks(tasks, areas, iterations, active, id, holds).length;
   const current = active && iterations.some((i) => i.id === active) ? { id: active, ready: count(active) } : null;
   const items = inPlanOrder(iterations)
     .map((it, i) => ({ place: i + 1, id: it.id, ready: count(it.id) }))
@@ -137,6 +201,13 @@ export interface Run {
   pid: number;
   scope: Scope;
   agents: TerminalAgent[];
+  /** How many sessions each agent may have at work at once; one when not listed (Task-A03-weasel276). */
+  sessions: Partial<Record<TerminalAgent, number>>;
+  /** The difficulty levels each agent takes tasks from; every level (1–5) when not listed (Task-A03-wave335). */
+  difficulties: Partial<Record<TerminalAgent, Levels>>;
+  /** The agents with a free session slot that no ready task in their levels fitted at the last
+   * check: they got no session (Task-A03-wave335). */
+  noTask: TerminalAgent[];
   /** The agents the person could choose when the run started, offered again in the status bar. */
   offered: TerminalAgent[];
   quiet: boolean;
@@ -144,7 +215,9 @@ export interface Run {
   started: number;
   /** The tasks it has started a session for, in order. */
   taken: string[];
-  /** The sessions working a task now, at most one per agent. */
+  /** The agent each of those tasks was given to (task ID → agent). */
+  takenBy: Record<string, TerminalAgent>;
+  /** The sessions working a task now. */
   working: Current[];
   /** Stop asked while tasks are worked: the run ends when they are all finished. */
   stopping: boolean;
@@ -162,11 +235,59 @@ export interface LostRun {
   id: string | null;
 }
 
-const asAgent = (a: unknown): TerminalAgent | null =>
-  typeof a === "string" && TERMINAL_AGENTS.includes(a) ? (a as TerminalAgent) : null;
+const asAgent = (a: unknown): TerminalAgent | null => (typeof a === "string" && isTerminalAgent(a) ? a : null);
 const agents = (list: unknown): TerminalAgent[] =>
   Array.isArray(list) ? list.map(asAgent).filter((a): a is TerminalAgent => a !== null) : [];
 const num = (n: unknown, or = 0): number => (typeof n === "number" ? n : or);
+/** The sessions an agent may have at once, as the run file lists them: whole numbers of one or more. */
+const sessionCounts = (list: unknown): Partial<Record<TerminalAgent, number>> => {
+  const out: Partial<Record<TerminalAgent, number>> = {};
+  if (list && typeof list === "object") {
+    for (const [a, n] of Object.entries(list)) {
+      const agent = asAgent(a);
+      if (agent && typeof n === "number" && n >= 1) out[agent] = Math.floor(n);
+    }
+  }
+  return out;
+};
+/** A difficulty range, as the run file writes it: `1-3`, or one level `4` (Task-A03-wave335). */
+export interface Levels {
+  low: number;
+  high: number;
+}
+/** Every level, 1 to 5: the range an agent has when none is chosen. */
+export const ALL_LEVELS: Levels = { low: 1, high: 5 };
+/** The levels of a range as text, as `alm monitor` and the run file write them: `1-5`, or `4`. */
+export const levelsText = (l: Levels): string => (l.low === l.high ? String(l.low) : `${l.low}-${l.high}`);
+/** Reads a range the run file lists; null when it is not `low-high` (or one level) of 1 to 5. */
+export const parseLevels = (text: unknown): Levels | null => {
+  const m = typeof text === "string" ? /^([1-5])(?:-([1-5]))?$/.exec(text.trim()) : null;
+  if (!m) return null;
+  const low = Number(m[1]);
+  const high = m[2] === undefined ? low : Number(m[2]);
+  return low <= high ? { low, high } : null;
+};
+const difficultyRanges = (map: unknown): Partial<Record<TerminalAgent, Levels>> => {
+  const out: Partial<Record<TerminalAgent, Levels>> = {};
+  if (map && typeof map === "object") {
+    for (const [a, text] of Object.entries(map)) {
+      const agent = asAgent(a);
+      const levels = parseLevels(text);
+      if (agent && levels) out[agent] = levels;
+    }
+  }
+  return out;
+};
+const takenByAgent = (map: unknown): Record<string, TerminalAgent> => {
+  const out: Record<string, TerminalAgent> = {};
+  if (map && typeof map === "object") {
+    for (const [task, a] of Object.entries(map)) {
+      const agent = asAgent(a);
+      if (agent) out[task] = agent;
+    }
+  }
+  return out;
+};
 
 /** One entry of `monitor_runs` (as `alm monitor status --json` lists it): a run, or a process
  * whose record is missing. `active` is the active iteration, to name the scope "current". */
@@ -185,11 +306,15 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     pid: num(e.pid),
     scope,
     agents: agents(r.agents),
+    sessions: sessionCounts(r.sessions),
+    difficulties: difficultyRanges(r.difficulties),
+    noTask: agents(r.no_task),
     offered: agents(r.offered),
     quiet: Boolean(r.quiet),
     every,
     started: num(r.started),
     taken: Array.isArray(r.taken) ? r.taken.filter((t: unknown) => typeof t === "string") : [],
+    takenBy: takenByAgent(r.taken_by),
     working: (Array.isArray(r.working) ? r.working : [])
       .map((w: any): Current | null => {
         const agent = asAgent(w?.agent);
@@ -226,9 +351,23 @@ export function setAgents(run: Run, chosen: TerminalAgent[]): TerminalAgent[] {
   return [...offered, ...chosen.filter((a) => !offered.includes(a))];
 }
 
-/** The agents of the run with no task being worked: each can be given one at the next check. */
+/** How many sessions an agent may have at work at once: one unless the person set more. */
+export function sessionsOf(run: Run, agent: TerminalAgent): number {
+  return Math.max(1, run.sessions[agent] ?? 1);
+}
+
+/** The difficulty levels an agent takes tasks from: every level unless the person chose some. */
+export function levelsOf(run: Run, agent: TerminalAgent): Levels {
+  return run.difficulties[agent] ?? ALL_LEVELS;
+}
+
+/** The free session slots: each agent once for every session it may still start (its count less
+ * the sessions at work). Each can be given one task at the next check. */
 export function freeAgents(run: Run): TerminalAgent[] {
-  return run.agents.filter((a) => !run.working.some((w) => w.agent === a));
+  return run.agents.flatMap((a) => {
+    const atWork = run.working.filter((w) => w.agent === a).length;
+    return Array.from({ length: Math.max(0, sessionsOf(run, a) - atWork) }, () => a);
+  });
 }
 
 /** When the next check is due (ms). */
@@ -248,16 +387,52 @@ export interface LastRun {
   scope: Scope;
   /** The tasks it started sessions for. */
   taken: string[];
+  /** The agent each of those tasks was given to. */
+  takenBy?: Record<string, TerminalAgent>;
+}
+
+/** A last run as this computer keeps it in its file (A03-pocket537): `ended` in ms, the rest as
+ * the app's line reads it. `null` when the file does not fit. */
+export function lastRunFromFile(v: unknown): LastRun | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as { ended?: unknown; scope?: unknown; taken?: unknown; takenBy?: unknown };
+  if (typeof o.ended !== "number" || !Number.isFinite(o.ended) || !Array.isArray(o.taken) || !o.scope) return null;
+  return {
+    ended: new Date(o.ended).toISOString(),
+    scope: o.scope as Scope,
+    taken: o.taken.filter((x): x is string => typeof x === "string"),
+    takenBy: (o.takenBy && typeof o.takenBy === "object" ? o.takenBy : undefined) as Record<string, TerminalAgent> | undefined,
+  };
+}
+
+/** The later of two last runs (the one remembered by the window and the one kept on this
+ * computer, which also counts a run that ended while the app was closed). */
+export function newerLast(a: LastRun | null, b: LastRun | null): LastRun | null {
+  if (!a) return b;
+  if (!b) return a;
+  return Date.parse(b.ended) > Date.parse(a.ended) ? b : a;
 }
 
 /** The tasks of the last run that are done, and those that need the person now: waiting on them,
  * or done but for a person's check (`toCheck`: stopFlow's, a done task with no "by human" label,
  * decision 0020). Counted from the taskbag as it is now. */
-export function lastRunCounts(last: LastRun, tasks: Task[], toCheck: (task: Task) => boolean): { done: number; needYou: number } {
+export function lastRunCounts(
+  last: LastRun,
+  tasks: Task[],
+  toCheck: (task: Task) => boolean,
+): { done: number; needYou: number; byAgent: { agent: TerminalAgent; done: number }[] } {
   const mine = tasks.filter((t) => last.taken.includes(t.id));
+  const done = mine.filter((t) => t.state === "done");
+  // The done tasks per agent that gave them out (Task-A03-weasel276), in the order they were taken.
+  const byAgent = new Map<TerminalAgent, number>();
+  for (const id of last.taken) {
+    const agent = last.takenBy?.[id];
+    if (agent && done.some((t) => t.id === id)) byAgent.set(agent, (byAgent.get(agent) ?? 0) + 1);
+  }
   return {
-    done: mine.filter((t) => t.state === "done").length,
+    done: done.length,
     needYou: mine.filter((t) => (t.state === "waiting" && !t.who) || toCheck(t)).length,
+    byAgent: [...byAgent].map(([agent, n]) => ({ agent, done: n })),
   };
 }
 
@@ -279,3 +454,51 @@ export function unblockNotice(unblocked: Unblocked[]): UnblockNotice | null {
     .filter((g) => g.ids.length > 0);
   return groups.length ? { groups } : null;
 }
+
+// The Monitors list (Task-A03-motor529, approver 2026-11-09): the rows of `monitor_all`, every run
+// this computer runs in every project (see MonitorsList.tsx).
+
+/** A taskbag's project folder: the taskbag's path without its `.allomos/taskbag` (as paths.ts). */
+function taskbagFolder(root: string): string {
+  return root.replace(/[\\/]\.allomos[\\/]taskbag[\\/]?$/, "");
+}
+
+/** One row of the list: a run with its file, or a process whose record is missing. */
+export interface ListedRun {
+  /** The row's key: the run's ID, or the process number when no ID is known. */
+  key: string;
+  /** The run, when its file is there. */
+  run: Run | null;
+  /** The process whose record is missing (no file: only its process is known). */
+  lost: LostRun | null;
+  /** The project's folder name (its last folder), when the run names one. */
+  name: string | null;
+  /** The project's taskbag, which Open shows; null when the run names none. */
+  root: string | null;
+}
+
+/** The last folder of `path`, with either kind of separator; null for an empty path. */
+export function folderName(path: string): string | null {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : null;
+}
+
+/** The rows of `monitor_all` (oldest run first, as it lists them). An entry that is not a run or a
+ * process is left out. The active iteration is not needed here: each row names its iteration. */
+export function listedRuns(entries: unknown[]): ListedRun[] {
+  const rows: ListedRun[] = [];
+  for (const e of entries) {
+    const parsed = readEntry(e, null);
+    if (!parsed) continue;
+    const obj = e as { project?: unknown; taskbag?: unknown };
+    const taskbag = typeof obj.taskbag === "string" && obj.taskbag ? obj.taskbag : null;
+    const project = typeof obj.project === "string" && obj.project ? obj.project : taskbag ? taskbagFolder(taskbag) : null;
+    if (isRun(parsed)) {
+      rows.push({ key: parsed.id, run: parsed, lost: null, name: project ? folderName(project) : null, root: taskbag });
+    } else {
+      rows.push({ key: parsed.id ?? `pid:${parsed.pid}`, run: null, lost: parsed, name: taskbag ? folderName(taskbagFolder(taskbag)) : null, root: taskbag });
+    }
+  }
+  return rows;
+}
+

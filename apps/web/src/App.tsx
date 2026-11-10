@@ -62,7 +62,7 @@ import { toIterationChange, type Editing, type GroupDraft } from "./groupEditFlo
 import { iterationPlaces } from "./iterationPlace";
 import { MonitorControl, useMonitor } from "./Monitor";
 import { MonitorDialog } from "./MonitorDialog";
-import { readyTasks, scopeOptions, type OpenedFrom } from "./monitorFlow";
+import { readyTasks, type OpenedFrom } from "./monitorFlow";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
 import { isProblem } from "./types";
 import { lostAfterMinutes } from "./heartbeatFlow";
@@ -1745,6 +1745,7 @@ function TaskbagView({
                 onNewIteration={(iteration) => planInNewIteration(selected.id, iteration)}
                 folders={folders}
                 onOpenSession={canOpenSessions ? () => messenger.openAgentSession(opened.root, selected.id) : undefined}
+                onTakeOver={canOpenSessions ? () => setProceeding(selected) : undefined}
                 lostAfter={lostAfter}
                 lastChange={opened.last_changed?.[selected.id]}
               />
@@ -1766,11 +1767,14 @@ function TaskbagView({
         <MonitorDialog
           messenger={messenger}
           root={opened.root}
-          options={scopeOptions(box.tasks, box.areas, iterations, activeIteration)}
+          tasks={box.tasks}
+          areas={box.areas}
+          iterations={iterations}
+          activeIteration={activeIteration}
           from={monitorFrom}
-          onStart={(scope, agents, quiet, every) => {
+          onStart={(scope, agents, quiet, every, _offered, sessions, difficulties) => {
             setMonitorFrom(null);
-            monitor.start(scope, agents, quiet, every);
+            monitor.start(scope, agents, quiet, every, sessions, difficulties);
           }}
           onClose={() => setMonitorFrom(null)}
         />

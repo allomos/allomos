@@ -24,7 +24,7 @@ import { useI18n } from "./i18n";
 import { LanguageMenu } from "./LanguageMenu";
 import type { Messenger, TranslateTo } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
-import { MANUAL } from "./agentPickerFlow";
+import { MANUAL, requestWay } from "./agentPickerFlow";
 import type { OfferFacts } from "./AgentPicker";
 import { lastUsed, readOpened, saveOpened } from "./updateTaskbagFlow";
 import { agentOpened } from "./ProgressDialog";
@@ -164,10 +164,11 @@ export function MoveCardsPanel({
       agentOpened(root, moveIn ? "move_in" : section ? "update" : "cards");
       const name = t(AGENT_KEY[agent]);
       const kind = moveIn ? "move" : upgrade ? "upgrade" : section ? "update" : cardsPart ? "cards" : handoffs.length > 0 ? "old_handoffs" : "empty";
-      if (tool?.how === "paste") {
-        onClose(t(`${kind}.asked_paste`, { agent: name, keys: PASTE_KEYS }));
-      } else {
+      const way = requestWay(tool);
+      if (way === "typed") {
         onClose(t(`${kind}.asked`, { agent: name }));
+      } else {
+        onClose(t(`${kind}.asked_${way}`, { agent: name, keys: PASTE_KEYS }));
       }
     } catch (e) {
       fail(e);

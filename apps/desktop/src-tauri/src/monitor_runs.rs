@@ -4,10 +4,13 @@
 //! goes on after the app is closed. The status bar reads this computer's run files
 //! ([`allomos_monitor::registry`]); Stop, Check now and the menus leave a request beside them.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use allomos_core::Problem;
+use allomos_monitor::accounts::{self, Account};
 use allomos_monitor::registry::{self, Entry, Request};
+use tauri::AppHandle;
 
 fn no_dir() -> Problem {
     Problem::BadUsage {
@@ -28,7 +31,35 @@ pub fn monitor_runs(root: PathBuf) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// Start a run with the app's own `alm` (`monitor start`); resolves with its ID.
+/// Every run this computer runs, oldest first, for the Monitors list (Task-A03-motor529): all
+/// projects', with the record-missing processes; `project` and `taskbag` name each one.
+#[tauri::command]
+pub fn monitor_all() -> Vec<serde_json::Value> {
+    let Some(dir) = registry::dir() else {
+        return Vec::new();
+    };
+    let procs = registry::monitor_processes();
+    registry::list(&dir, Some(&procs))
+        .iter()
+        .map(Entry::json)
+        .collect()
+}
+
+/// The list's Open: the project of the taskbag at `root` opens in a window (its tab comes to the
+/// front when a window already shows it).
+#[tauri::command]
+pub fn monitor_open(app: AppHandle, root: PathBuf) -> Result<(), Problem> {
+    crate::windows::open_recent_in_window(&app, &root.display().to_string()).map_err(|e| {
+        Problem::BadUsage {
+            detail: e.to_string(),
+        }
+    })
+}
+
+/// Start a run with the app's own `alm` (`monitor start`); resolves with its ID. `sessions`: how
+/// many sessions each chosen agent may have at work at once (Task-A03-weasel276); one not listed
+/// has one. `difficulties`: the difficulty range each chosen agent takes tasks from, as `1-3`
+/// (Task-A03-wave335); one not listed takes every level.
 #[tauri::command]
 pub async fn monitor_start(
     root: PathBuf,
@@ -36,6 +67,8 @@ pub async fn monitor_start(
     every: u32,
     quiet: bool,
     iteration: Option<String>,
+    sessions: BTreeMap<String, u32>,
+    difficulties: BTreeMap<String, String>,
 ) -> Result<String, Problem> {
     let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
         detail: "the app's own alm was not found beside it".to_string(),
@@ -54,6 +87,17 @@ pub async fn monitor_start(
     for a in &agents {
         args.push("--agent".into());
         args.push(a.clone());
+    }
+    for (a, n) in sessions
+        .iter()
+        .filter(|(a, n)| agents.contains(a) && **n > 1)
+    {
+        args.push("--sessions".into());
+        args.push(format!("{a}={n}"));
+    }
+    for (a, range) in difficulties.iter().filter(|(a, _)| agents.contains(a)) {
+        args.push("--difficulty".into());
+        args.push(format!("{a}={range}"));
     }
     if let Some(i) = iteration {
         args.push("--iteration".into());
@@ -105,7 +149,108 @@ pub fn monitor_end_process(pid: u32) -> Result<(), Problem> {
             detail: format!("process {pid} is not a monitor"),
         });
     }
+    // Ended by hand: it is not started again when the project opens (A03-pocket537).
+    if let Some(dir) = registry::dir() {
+        registry::forget_process(&dir, pid);
+    }
     registry::end_process(pid).map_err(|e| Problem::BadUsage {
         detail: format!("process {pid} could not be ended: {e}"),
     })
+}
+
+/// The runs of the project at `root` that stopped without ending, started again by the CLI's
+/// `monitor resume` from their saved settings (A03-pocket537). The app calls it when the project
+/// opens; it returns the IDs of the runs it started.
+#[tauri::command]
+pub async fn monitor_resume(root: PathBuf) -> Result<Vec<String>, Problem> {
+    let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
+        detail: "the app's own alm was not found beside it".to_string(),
+    })?;
+    let out = crate::agents::command(&alm)
+        .args(["--json", "--taskbag"])
+        .arg(&root)
+        .args(["monitor", "resume"])
+        .env_remove("ALLOMOS_TASKBAG")
+        .output()
+        .map_err(|e| Problem::BadUsage {
+            detail: format!("{}: {e}", alm.display()),
+        })?;
+    let v: serde_json::Value =
+        serde_json::from_slice(&out.stdout).map_err(|_| Problem::BadUsage {
+            detail: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+        })?;
+    if v["ok"] != true {
+        return Err(Problem::BadUsage {
+            detail: v["error"]["message"]
+                .as_str()
+                .unwrap_or("the monitor did not start again")
+                .to_string(),
+        });
+    }
+    Ok(v["resumed"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// The last run of the project at `root` as the app's line reads it (`ended` in ms, `scope`,
+/// `taken`, `takenBy`), when one ended on this computer (A03-pocket537).
+#[tauri::command]
+pub fn monitor_last(root: PathBuf) -> Option<serde_json::Value> {
+    let dir = registry::dir()?;
+    registry::read_last(&dir, &root).and_then(|l| serde_json::to_value(l).ok())
+}
+
+/// The extra accounts of the terminal agents on this computer (Task-A03-oven548), in the order
+/// they were added, and each agent's default folder (where the folder picker starts). The default
+/// account of an agent is not listed: it is always there.
+#[derive(serde::Serialize)]
+pub struct AgentAccounts {
+    accounts: Vec<Account>,
+    defaults: BTreeMap<String, String>,
+}
+
+#[tauri::command]
+pub fn agent_accounts() -> AgentAccounts {
+    let home = allomos_monitor::terminal::home();
+    let defaults = ["claude_cli", "codex_cli"]
+        .into_iter()
+        .filter_map(|agent| {
+            accounts::default_dir(agent, &home)
+                .map(|d| (agent.to_string(), d.display().to_string()))
+        })
+        .collect();
+    AgentAccounts {
+        accounts: accounts::load(),
+        defaults,
+    }
+}
+
+/// Add an account of an agent: the folder the person picked (its settings and login folder) and
+/// the name they gave it. The folder is checked first (`accounts::check_new`); only the path and
+/// the name are saved, in `agent-accounts.json`, never the login files.
+#[tauri::command]
+pub fn add_agent_account(agent: String, path: PathBuf, name: String) -> Result<Account, Problem> {
+    let file = accounts::file_path().ok_or_else(no_dir)?;
+    let mut listed = accounts::load_at(&file);
+    let home = allomos_monitor::terminal::home();
+    let account = accounts::check_new(
+        &listed,
+        &agent,
+        &path,
+        &name,
+        &home,
+        allomos_monitor::runner::now_ms(),
+    )
+    .map_err(|detail| Problem::BadUsage { detail })?;
+    listed.push(account.clone());
+    accounts::save_at(&file, &listed).map_err(|e| Problem::WriteFailed {
+        path: file.display().to_string(),
+        detail: e.to_string(),
+    })?;
+    Ok(account)
 }

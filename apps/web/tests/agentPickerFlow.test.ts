@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf } from "../src/agentPickerFlow.ts";
+import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf, requestWay } from "../src/agentPickerFlow.ts";
 import type { Agent } from "../src/types.ts";
 
 const agent = (id: Agent["id"]): Agent => ({ id, found: id, how: id.endsWith("app") ? "link" : "paste" });
@@ -46,4 +46,12 @@ test("choosing a group keeps the tool last chosen in it", () => {
   assert.equal(groupOf("codex_app"), "Codex");
   assert.equal(groupOf(MANUAL), MANUAL);
   assert.equal(groupOf(null), null);
+});
+
+test("the request is sent at once for Antigravity, pasted for other terminals, typed in for apps", () => {
+  assert.equal(requestWay({ id: "antigravity_cli", how: "paste" }), "sent");
+  assert.equal(requestWay(agent("codex_cli")), "paste");
+  assert.equal(requestWay(agent("claude_cli")), "paste");
+  assert.equal(requestWay(agent("claude_app")), "typed");
+  assert.equal(requestWay(undefined), "typed");
 });

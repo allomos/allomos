@@ -90,30 +90,31 @@ pub enum Outcome {
     NotAvailable,
 }
 
-/// Start the countdown for a done task's tab in a process of its own: `alm monitor close-tab`,
-/// started detached as the monitor itself is (Task-A03-bride850). The monitor may end, be stopped
-/// or be started again, and the countdown still runs to its end; its result goes to the log the
-/// monitor writes to. Only when that process cannot be started does the countdown run in a thread
-/// of this one, which the monitor's end would cut short.
+/// Start the countdown for a done task's tab. It runs in a process of its own: `alm monitor
+/// close-tab`, started detached as the monitor itself is (Task-A03-bride850), so the monitor may
+/// end, be stopped or be started again and the countdown still runs to its end. Then nothing is
+/// returned: the monitor has nothing to wait for or to resume. Only when that process cannot be
+/// started does the countdown run in a thread, returned as its handle: the monitor waits for it
+/// before it ends and keeps it in the run's file (Task-A03-pocket537).
 pub fn close_when_done(
     alm: Option<&Path>,
     log: &Path,
     agent: &str,
     tab: &SessionTab,
     language: &str,
-) {
+) -> Option<std::thread::JoinHandle<()>> {
     if let Some(alm) = alm {
         match crate::runner::spawn_detached(alm, &close_args(agent, tab, language), log) {
-            Ok(_) => return,
+            Ok(_) => return None,
             Err(e) => eprintln!("allomos: the tab countdown could not start its process: {e}"),
         }
     }
     let (agent, tab) = (agent.to_string(), tab.clone());
     let texts = request::close_texts(language);
-    std::thread::spawn(move || {
+    Some(std::thread::spawn(move || {
         let outcome = run(&agent, &tab, &texts);
         eprintln!("allomos: monitored session tab {tab:?}: {outcome:?}");
-    });
+    }))
 }
 
 /// The arguments of the countdown process: `alm monitor close-tab …` (see [`countdown`]).
@@ -139,7 +140,8 @@ pub fn countdown(agent: &str, tab: &SessionTab, language: &str) -> Outcome {
 
 #[cfg(target_os = "macos")]
 fn run(agent: &str, tab: &SessionTab, texts: &CloseTexts) -> Outcome {
-    let Some(exit) = exit_command(agent) else {
+    // An extra account's session (`claude_cli:<account>`) exits like its agent's (Task-A03-oven548).
+    let Some(exit) = exit_command(crate::accounts::base_agent(agent)) else {
         return Outcome::NotAvailable;
     };
     if !plain_tty(&tab.tty) || busy(tab).is_none() {

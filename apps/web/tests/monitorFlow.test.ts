@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ALL_LEVELS,
   FIRST_FREQUENCY,
   FREQUENCIES,
   STALL_MS,
@@ -14,16 +15,23 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  lastRunFromFile,
+  newerLast,
+  levelsOf,
+  levelsText,
   nextCheck,
+  parseLevels,
   readEntry,
   readyTasks,
   scopeOptions,
   scopeReady,
+  sessionsOf,
   setAgents,
   stalled,
   unblockNotice,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
+import { levelsHold } from "../src/difficultyFlow.ts";
 import type { Iteration, Task } from "../src/types.ts";
 
 const task = (id: string, over: Partial<Task> = {}): Task =>
@@ -131,7 +139,70 @@ test("the last run counts the tasks done and those that need the person now", ()
     task("A01-04", { state: "waiting", waiting_on: "a reply", who: "the designer" }),
     task("A01-05", { state: "waiting", waiting_on: "not in this run" }),
   ];
-  assert.deepEqual(lastRunCounts(last, now, toCheck), { done: 2, needYou: 2 });
+  assert.deepEqual(lastRunCounts(last, now, toCheck), { done: 2, needYou: 2, byAgent: [] });
+});
+
+test("the last run counts the done tasks per agent that gave them out", () => {
+  const last = {
+    ended: "2026-11-09T10:00:00Z",
+    scope: { kind: "all" as const },
+    taken: ["A01-01", "A01-02", "A01-03"],
+    takenBy: { "A01-01": "claude_cli" as const, "A01-02": "codex_cli" as const, "A01-03": "claude_cli" as const },
+  };
+  const now = [
+    task("A01-01", { state: "done", labels: ["locally verified by agent"] }),
+    task("A01-02", { state: "done", labels: ["locally verified by agent"] }),
+    task("A01-03", { state: "done", labels: ["locally verified by agent"] }),
+  ];
+  assert.deepEqual(lastRunCounts(last, now, toCheck).byAgent, [
+    { agent: "claude_cli", done: 2 },
+    { agent: "codex_cli", done: 1 },
+  ]);
+});
+
+test("a run's sessions per agent: one unless set, and a free slot for each session it may still start", () => {
+  const r = readEntry(entry({ agents: ["claude_cli", "codex_cli"], sessions: { claude_cli: 2, codex_cli: 0, gemini: 3 } }), null);
+  assert.ok(r && isRun(r));
+  assert.deepEqual(r.sessions, { claude_cli: 2 }, "a count below one and an unknown agent are left out");
+  assert.equal(sessionsOf(r, "claude_cli"), 2);
+  assert.equal(sessionsOf(r, "codex_cli"), 1);
+  // claude_cli has one session at work (the entry's): one more slot for it, and one for codex.
+  assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
+});
+
+test("each agent's difficulty range: every level unless set; a range the run file does not read is left out", () => {
+  const r = readEntry(
+    entry({ agents: ["claude_cli", "codex_cli"], difficulties: { claude_cli: "3-5", codex_cli: "4", antigravity_cli: "1-2", gemini: "1-2" }, no_task: ["claude_cli", "gemini"] }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  assert.deepEqual(r.difficulties, {
+    claude_cli: { low: 3, high: 5 },
+    codex_cli: { low: 4, high: 4 },
+    antigravity_cli: { low: 1, high: 2 },
+  }, "an agent that is not a terminal agent is left out");
+  assert.deepEqual(levelsOf(r, "claude_cli"), { low: 3, high: 5 });
+  assert.deepEqual(levelsOf(r, "gemini" as never), ALL_LEVELS);
+  assert.deepEqual(r.noTask, ["claude_cli"], "an agent that is not a terminal agent is left out of the list too");
+  assert.equal(levelsText({ low: 4, high: 4 }), "4");
+  assert.equal(levelsText({ low: 1, high: 5 }), "1-5");
+});
+
+test("a task is in an agent's range when its level (the default 3 included) is", () => {
+  const leveled = (difficulty?: number) => ({ difficulty: difficulty ?? null }) as Pick<Task, "difficulty">;
+  assert.equal(levelsHold({ low: 1, high: 2 }, leveled(2)), true);
+  assert.equal(levelsHold({ low: 1, high: 2 }, leveled(3)), false);
+  assert.equal(levelsHold({ low: 3, high: 5 }, leveled()), true, "no level counts as 3");
+  assert.equal(levelsHold({ low: 4, high: 5 }, leveled()), false);
+});
+
+test("a difficulty range reads as low-high or one level, both ends from 1 to 5, the low not above the high", () => {
+  assert.deepEqual(parseLevels("1-5"), { low: 1, high: 5 });
+  assert.deepEqual(parseLevels(" 2 "), { low: 2, high: 2 });
+  assert.equal(parseLevels("4-2"), null);
+  assert.equal(parseLevels("0-3"), null);
+  assert.equal(parseLevels("6"), null);
+  assert.equal(parseLevels(3), null);
 });
 
 /** A run's entry as `alm monitor status --json` lists it. */
@@ -207,4 +278,22 @@ test("the sweep's line groups the tasks by the state they went back to", () => {
       ],
     },
   );
+});
+
+test("a last run kept on this computer reads in the app's shape, and the later one is shown (A03-pocket537)", () => {
+  const kept = lastRunFromFile({ ended: Date.UTC(2026, 10, 9, 1, 0), scope: { kind: "all" }, taken: ["A1", 7], takenBy: { A1: "claude_cli" } });
+  assert.deepEqual(kept, {
+    ended: "2026-11-09T01:00:00.000Z",
+    scope: { kind: "all" },
+    taken: ["A1"],
+    takenBy: { A1: "claude_cli" },
+  });
+  assert.equal(lastRunFromFile({ ended: "2026-11-09", scope: { kind: "all" }, taken: [] }), null);
+  assert.equal(lastRunFromFile(null), null);
+
+  const window = { ended: "2026-11-09T00:00:00.000Z", scope: { kind: "all" as const }, taken: ["A1"] };
+  assert.equal(newerLast(null, kept), kept);
+  assert.equal(newerLast(window, null), window);
+  assert.equal(newerLast(window, kept), kept);
+  assert.equal(newerLast(kept, window), kept);
 });

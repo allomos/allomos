@@ -10,7 +10,10 @@ mod audit;
 mod codex_rules;
 mod heartbeat_settings;
 mod lan;
+mod monitor_menu;
+mod monitor_pause;
 mod monitor_runs;
+mod notify;
 mod pairing;
 mod sessions;
 mod tab_drag;
@@ -1680,11 +1683,19 @@ fn set_auto_update(app: AppHandle, on: bool) -> Result<(), Problem> {
 /// quit; the new version starts by itself. If the person cancels macOS's password prompt,
 /// nothing changes. A failure is told to every window, and this version keeps running.
 fn restart_to_update(app: AppHandle) {
-    tauri::async_runtime::spawn_blocking(move || match update::restart_to_update() {
-        Ok(update::Restart::Quit) => app.exit(0),
-        Ok(update::Restart::Cancelled) => {}
-        Err(detail) => {
-            let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+    tauri::async_runtime::spawn_blocking(move || {
+        // Task-A03-bowl641: while monitoring runs, say first that it keeps running; Cancel changes nothing.
+        if let Some(sessions) = monitor_pause::running_sessions() {
+            if !monitor_pause::confirm_blocking(&app, monitor_pause::Action::Restart, sessions) {
+                return;
+            }
+        }
+        match update::restart_to_update() {
+            Ok(update::Restart::Quit) => app.exit(0),
+            Ok(update::Restart::Cancelled) => {}
+            Err(detail) => {
+                let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
+            }
         }
     });
 }
@@ -2276,6 +2287,40 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     } else {
         menu.append(&Submenu::with_items(app, "Help", true, &[&check_updates])?)?;
     }
+    // Task-A03-chair577 (moved from the Window menu, where Task-A03-motor529 put it): the Running
+    // Monitors item is in the View menu, after the View menu's own items (on macOS, Enter Full
+    // Screen). Windows and Linux have no View menu by default, so one is made before the Window
+    // menu.
+    let monitors = MenuItem::with_id(
+        app,
+        monitor_menu::ID,
+        monitor_menu::text(0),
+        false,
+        None::<&str>,
+    )?;
+    let view = match menu
+        .items()?
+        .into_iter()
+        .filter_map(|item| item.as_submenu().cloned())
+        .find(|s| s.text().is_ok_and(|t| t == "View"))
+    {
+        Some(view) => {
+            view.append(&PredefinedMenuItem::separator(app)?)?;
+            view
+        }
+        None => {
+            let view = Submenu::new(app, "View", true)?;
+            let window_at = menu
+                .items()?
+                .iter()
+                .position(|item| item.id() == tauri::menu::WINDOW_SUBMENU_ID)
+                .unwrap_or(0);
+            menu.insert(&view, window_at)?;
+            view
+        }
+    };
+    view.append(&monitors)?;
+    app.manage(monitor_menu::MonitorMenu { item: monitors });
     // Task-A07-mitten556: on Windows the app lists the open windows in the Window menu itself.
     if !cfg!(target_os = "macos") {
         if let Some(submenu) = menu
@@ -2460,6 +2505,7 @@ fn recent_folder(texts: &MenuTexts, id: &str) -> Option<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .menu(build_menu)
         .manage(Windows::default())
         .manage(tab_drag::Drag::default())
@@ -2468,6 +2514,10 @@ pub fn run() {
         .setup(|app| {
             // Reopen windows and tabs (Task-A01-marble320): the other windows open again.
             windows::restore(app.handle());
+            // The monitor's notifications, shown under the app's name (Task-A03-stork103).
+            notify::start(app.handle().clone());
+            // The View menu's Running Monitors item follows the runs (Task-A03-motor529).
+            monitor_menu::start(app.handle().clone());
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_screen(&window);
             }
@@ -2496,6 +2546,10 @@ pub fn run() {
                 return;
             }
             if window_list::choose(app, id) {
+                return;
+            }
+            if id == monitor_menu::ID {
+                monitor_menu::chosen(app, target.as_deref());
                 return;
             }
             if id == NEW_WINDOW_ID {
@@ -2641,8 +2695,14 @@ pub fn run() {
             proceed_manual_request,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
+            monitor_runs::monitor_resume,
+            monitor_runs::monitor_last,
+            monitor_runs::agent_accounts,
+            monitor_runs::add_agent_account,
             monitor_runs::monitor_ask,
             monitor_runs::monitor_end_process,
+            monitor_runs::monitor_all,
+            monitor_runs::monitor_open,
             release_finished,
             run_modes_text,
             codex_rules::codex_rules_status,
@@ -2669,6 +2729,25 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running Allomos")
         .run(|app, event| {
+            // Task-A03-bowl641: quitting by the person's own request, while monitoring runs, first
+            // says that it keeps running. The app quits only when the person confirms (which quits again,
+            // programmatically, so this reminder does not come back).
+            if let tauri::RunEvent::ExitRequested {
+                code: None, api, ..
+            } = &event
+            {
+                if let Some(sessions) = monitor_pause::running_sessions() {
+                    api.prevent_exit();
+                    let handle = app.clone();
+                    monitor_pause::confirm_then(
+                        app,
+                        monitor_pause::Action::Quit,
+                        sessions,
+                        move || handle.exit(0),
+                    );
+                    return;
+                }
+            }
             // Quitting keeps every window and tab for the next start (Task-A01-marble320).
             if matches!(
                 event,

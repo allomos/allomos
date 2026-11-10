@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
-import { AGENT_KEY } from "./AgentPicker";
+import { monitorAgentName } from "./AgentPicker";
 import { localTime } from "./timeFlow";
 import { sessionPlace } from "./sessionFlow";
 import { toCheck } from "./stopFlow";
@@ -19,13 +19,20 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  lastRunFromFile,
+  levelsOf,
+  levelsText,
+  newerLast,
   nextCheck,
   readEntry,
   setAgents,
+  sessionsOf,
   stalled,
   unblockNotice,
 } from "./monitorFlow";
-import type { Frequency, LastRun, LostRun, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import type { Frequency, LastRun, LostRun, Levels, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import { LevelsPicker } from "./MonitorDialog";
+import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -67,6 +74,8 @@ export function useMonitor({
   onError: (message: string) => void;
 }) {
   const { problem } = useI18n();
+  // The extra accounts' names for the labels (Task-A03-oven548).
+  useAgentAccounts(messenger);
   const [runs, setRuns] = useState<Run[]>([]);
   const [lost, setLost] = useState<LostRun[]>([]);
   const [last, setLast] = useState<LastRun | null>(() => readLast(root));
@@ -87,7 +96,7 @@ export function useMonitor({
     const found = entries.filter(isRun);
     for (const [id, r] of seen.current) {
       if (!found.some((f) => f.id === id)) {
-        const summary: LastRun = { ended: new Date().toISOString(), scope: r.scope, taken: r.taken };
+        const summary: LastRun = { ended: new Date().toISOString(), scope: r.scope, taken: r.taken, takenBy: r.takenBy };
         saveLast(root, summary);
         setLast(summary);
       }
@@ -107,6 +116,49 @@ export function useMonitor({
     const timer = window.setInterval(() => void read(), READ_MS);
     return () => window.clearInterval(timer);
   }, [root, read]);
+
+  // The read a resume effect uses: it runs once per opening of the project, not per change of
+  // `active`.
+  const readRef = useRef(read);
+  useEffect(() => {
+    readRef.current = read;
+  }, [read]);
+
+  // Opening the project starts again the runs that stopped without ending (a restart, an update,
+  // a log-out) from the settings they saved, with the sessions they had at work (A03-pocket537).
+  // Nothing is shown when there is nothing to start: the status bar is what the person sees.
+  useEffect(() => {
+    let current = true;
+    messenger
+      .monitorResume(root)
+      .then((ids) => {
+        if (current && ids.length > 0) void readRef.current();
+      })
+      .catch(() => {
+        /* the monitor is optional here: a project opens without it */
+      });
+    return () => {
+      current = false;
+    };
+  }, [messenger, root]);
+
+  // The last run kept on this computer, which counts a run that ended while the app was closed
+  // (A03-pocket537). The later of it and the window's own is shown.
+  useEffect(() => {
+    let current = true;
+    messenger
+      .monitorLast(root)
+      .then((v) => {
+        const kept = lastRunFromFile(v);
+        if (current && kept) setLast((cur) => newerLast(cur, kept));
+      })
+      .catch(() => {
+        /* no file: the window's own last run stays */
+      });
+    return () => {
+      current = false;
+    };
+  }, [messenger, root]);
 
   // The clock runs only while monitoring.
   const running = runs.length > 0;
@@ -132,9 +184,24 @@ export function useMonitor({
      * check or until closed. */
     notice: (run: Run): UnblockNotice | null => (dismissed.has(`${run.id}:${run.checked}`) ? null : unblockNotice(run.unblocked)),
     dismissNotice: (run: Run) => setDismissed((d) => new Set(d).add(`${run.id}:${run.checked}`)),
-    start: (scope: Scope, agents: TerminalAgent[], quiet: boolean, every: Frequency) => {
+    start: (
+      scope: Scope,
+      agents: TerminalAgent[],
+      quiet: boolean,
+      every: Frequency,
+      sessions: Partial<Record<TerminalAgent, number>>,
+      difficulties: Partial<Record<TerminalAgent, Levels>>,
+    ) => {
       messenger
-        .monitorStart(root, agents, every, quiet, scope.kind === "iteration" ? scope.id : null)
+        .monitorStart(
+          root,
+          agents,
+          every,
+          quiet,
+          scope.kind === "iteration" ? scope.id : null,
+          sessions,
+          Object.fromEntries(Object.entries(difficulties).map(([a, l]) => [a, levelsText(l as Levels)])),
+        )
         .then(() => read())
         .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
     },
@@ -144,6 +211,10 @@ export function useMonitor({
     setEvery: (run: Run, every: Frequency) => ask(run, { action: "every", minutes: every }),
     /** Adds or takes off agents while the run goes on (Task-A03-fruit467). */
     setAgents: (run: Run, agents: TerminalAgent[]) => ask(run, { action: "agents", agents: setAgents(run, agents) }),
+    /** How many sessions an agent may have at work at once, from the next check on (Task-A03-weasel276). */
+    setSessions: (run: Run, agent: TerminalAgent, count: number) => ask(run, { action: "sessions", agent, count }),
+    /** The difficulty levels an agent takes tasks from, from the next check on (Task-A03-wave335). */
+    setLevels: (run: Run, agent: TerminalAgent, levels: Levels) => ask(run, { action: "difficulty", agent, range: levelsText(levels) }),
     /** Ends a run whose record is missing. */
     endLost: (l: LostRun) => {
       messenger
@@ -197,11 +268,15 @@ export function MonitorControl({
   );
   if (!runs.length && !lost.length) {
     const counts = last ? lastRunCounts(last, tasks, toCheck) : null;
+    // Per agent when more than one agent gave out tasks (Task-A03-weasel276).
+    const split = counts && counts.byAgent.length > 1 ? counts.byAgent.map((b) => `${monitorAgentName(b.agent, t)} ${b.done}`).join(" · ") : null;
     return (
       <span className="monitor">
         {last && counts && (
           <span className="monitor-last muted small">
-            {t("monitor.last_run", { time: localTime(last.ended), scope: scopeName(last.scope, t), done: counts.done })}
+            {split
+              ? t("monitor.last_run_split", { time: localTime(last.ended), scope: scopeName(last.scope, t), done: counts.done, split })
+              : t("monitor.last_run", { time: localTime(last.ended), scope: scopeName(last.scope, t), done: counts.done })}
             {counts.needYou > 0 && (
               <>
                 {" · "}
@@ -332,11 +407,21 @@ function RunBar({
           </div>
         )}
       </span>
-      <AgentsMenu run={run} onChange={(agents) => monitor.setAgents(run, agents)} />
+      <AgentsMenu
+        run={run}
+        onChange={(agents) => monitor.setAgents(run, agents)}
+        onSessions={(a, n) => monitor.setSessions(run, a, n)}
+        onLevels={(a, l) => monitor.setLevels(run, a, l)}
+      />
+      {run.noTask.length > 0 && (
+        <span className="muted small">
+          {t("monitor.no_task_in_levels", { agents: run.noTask.map((a) => monitorAgentName(a, t)).join(", ") })}
+        </span>
+      )}
       {working.map((cur) => {
         const task = tasks.find((x) => x.id === cur.id);
         const place = task ? sessionPlace(task) : null;
-        const label = `${t(AGENT_KEY[cur.agent])} · ${cur.id}`;
+        const label = `${monitorAgentName(cur.agent, t)} · ${cur.id}`;
         return place ? (
           <button
             key={cur.id}
@@ -378,12 +463,32 @@ function RunBar({
 }
 
 /** The status bar's agents (Task-A03-fruit467, approver 2026-11-08): the agents the run gives
- * tasks to, with a menu to add one offered at the start or take one off. One taken off finishes
- * the task its session works; the last one cannot be taken off (Stop ends the run). */
-function AgentsMenu({ run, onChange }: { run: Run; onChange: (agents: TerminalAgent[]) => void }) {
+ * tasks to, with a menu to add one offered at the start or take one off, and for each chosen one
+ * how many sessions it may have at work at once (Task-A03-weasel276). One taken off finishes the
+ * task its session works; the last one cannot be taken off (Stop ends the run). */
+function AgentsMenu({
+  run,
+  onChange,
+  onSessions,
+  onLevels,
+}: {
+  run: Run;
+  onChange: (agents: TerminalAgent[]) => void;
+  onSessions: (agent: TerminalAgent, count: number) => void;
+  onLevels: (agent: TerminalAgent, levels: Levels) => void;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const names = run.agents.map((a) => t(AGENT_KEY[a])).join(", ");
+  /** What the person is typing into a count, until it is left (the run's count shows otherwise). */
+  const [draft, setDraft] = useState<Partial<Record<TerminalAgent, string>>>({});
+  const names = run.agents
+    .map((a) => {
+      const count = sessionsOf(run, a) > 1 ? ` ×${sessionsOf(run, a)}` : "";
+      const levels = levelsOf(run, a);
+      const range = levels.low === 1 && levels.high === 5 ? "" : ` (${levelsText(levels)})`;
+      return `${monitorAgentName(a, t)}${count}${range}`;
+    })
+    .join(", ");
   return (
     <span className="monitor-every-wrap">
       <button
@@ -406,23 +511,45 @@ function AgentsMenu({ run, onChange }: { run: Run; onChange: (agents: TerminalAg
             const last = on && run.agents.length === 1;
             const busy = run.working.find((w) => w.agent === a);
             return (
-              <button
-                key={a}
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={on}
-                className={on ? "on" : undefined}
-                disabled={last}
-                title={last ? t("monitor.agents_last") : undefined}
-                onClick={() => onChange(on ? run.agents.filter((x) => x !== a) : [...run.agents, a])}
-              >
-                {on ? "✓ " : ""}
-                {t(AGENT_KEY[a])}
-                {!on && busy && <span className="muted small"> · {t("monitor.agents_finishing", { id: busy.id })}</span>}
-              </button>
+              <div key={a} className="monitor-menu-agent">
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={on}
+                  className={on ? "on" : undefined}
+                  disabled={last}
+                  title={last ? t("monitor.agents_last") : undefined}
+                  onClick={() => onChange(on ? run.agents.filter((x) => x !== a) : [...run.agents, a])}
+                >
+                  {on ? "✓ " : ""}
+                  {monitorAgentName(a, t)}
+                  {!on && busy && <span className="muted small"> · {t("monitor.agents_finishing", { id: busy.id })}</span>}
+                </button>
+                {on && (
+                  <label className="small monitor-sessions" title={t("monitor.sessions_label")}>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      aria-label={t("monitor.sessions_aria", { agent: monitorAgentName(a, t) })}
+                      value={draft[a] ?? String(sessionsOf(run, a))}
+                      onChange={(e) => {
+                        setDraft((d) => ({ ...d, [a]: e.target.value }));
+                        const n = Math.floor(Number(e.target.value));
+                        if (n >= 1 && n !== sessionsOf(run, a)) onSessions(a, n);
+                      }}
+                      onBlur={() => setDraft((d) => ({ ...d, [a]: undefined }))}
+                    />
+                  </label>
+                )}
+                {on && <LevelsPicker agent={a} name={monitorAgentName(a, t)} levels={levelsOf(run, a)} onChange={(l) => onLevels(a, l)} />}
+              </div>
             );
           })}
           <p className="muted small">{t("monitor.agents_menu_note")}</p>
+          <p className="muted small">{t("monitor.sessions_menu_note")}</p>
+          <p className="muted small">{t("monitor.levels_menu_note")}</p>
         </div>
       )}
     </span>
