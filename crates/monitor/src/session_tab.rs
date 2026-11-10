@@ -1,8 +1,9 @@
 //! The terminal tab a monitored session runs in (Task-A03-sierra014, approver 2026-11-08): Allomos
-//! remembers the tab it opened for a task, and once the task is **done** shows a line in it saying
-//! the tab closes in 30 seconds unless a key is pressed; nobody presses one, Allomos ends the
-//! agent the way a person would (types its exit command) and closes that tab. Every other ending
-//! (waiting, blocked, released, dropped, the agent quitting on its own) leaves the tab as it is.
+//! remembers the tab it opened for a task, and once the task is **done** and its agent is idle
+//! (or has exited; never while it is still working, A03-birch179) shows a line in it saying the
+//! tab closes in 30 seconds unless a key is pressed; nobody presses one, Allomos ends the agent the
+//! way a person would (types its exit command) and closes that tab. Every other ending (waiting,
+//! blocked, released, dropped, the agent quitting on its own) leaves the tab as it is.
 //!
 //! macOS Terminal only so far. A key press is seen as the tab's terminal device being read: its
 //! access time moves only when input arrives (output moves the modification time), so the agent
@@ -38,6 +39,147 @@ pub const WAIT: Duration = Duration::from_secs(30);
 /// How long the agent gets to end after its exit command before the tab is left open.
 const END_WAIT: Duration = Duration::from_secs(30);
 const POLL: Duration = Duration::from_millis(250);
+/// How long a tab's output must stay still before its agent counts as idle. A working agent keeps
+/// printing (a spinner, a timer); an idle one sits at its prompt and prints nothing (A03-birch179).
+pub const QUIET: Duration = Duration::from_secs(10);
+
+/// The timings of one countdown: the real ones ([`Timing::default`]), or shorter ones in tests.
+#[derive(Debug, Clone, Copy)]
+struct Timing {
+    wait: Duration,
+    end_wait: Duration,
+    quiet: Duration,
+    poll: Duration,
+    /// The pause between the exit command and its Return.
+    typing: Duration,
+}
+
+impl Default for Timing {
+    fn default() -> Self {
+        Timing {
+            wait: WAIT,
+            end_wait: END_WAIT,
+            quiet: QUIET,
+            poll: POLL,
+            typing: Duration::from_secs(1),
+        }
+    }
+}
+
+/// What the tab's agent is doing, as the countdown reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Settled {
+    /// The tab is gone (or no longer the one Allomos opened).
+    Gone,
+    /// The agent is working: the countdown waits.
+    Working,
+    /// The agent is at its prompt, or has exited: the countdown may run.
+    Idle,
+}
+
+/// The agent's state from what the tab shows. `busy` says whether something besides the shell runs
+/// in the tab (none: the tab is gone); `output` is when its output last moved. Busy and still
+/// printing is working; busy and quiet is idle at the prompt; not busy is idle (exited). An unknown
+/// output time counts as working, so a countdown never starts on a guess.
+pub fn settled(
+    busy: Option<bool>,
+    output: Option<SystemTime>,
+    now: SystemTime,
+    quiet: Duration,
+) -> Settled {
+    match busy {
+        None => Settled::Gone,
+        Some(false) => Settled::Idle,
+        Some(true) => {
+            let printing = match output {
+                None => true,
+                Some(at) => match now.duration_since(at) {
+                    Ok(age) => age < quiet,
+                    // A time after now (the clock was set back) counts as printing.
+                    Err(_) => true,
+                },
+            };
+            if printing {
+                Settled::Working
+            } else {
+                Settled::Idle
+            }
+        }
+    }
+}
+
+/// The tab as the countdown sees it: the macOS calls ([`MacTab`]), or a fake in tests.
+trait TabIo {
+    /// Whether something besides the shell runs in the tab; none when the tab is gone.
+    fn busy(&mut self) -> Option<bool>;
+    /// When the tab's output last moved (its terminal device's modification time).
+    fn output_at(&mut self) -> Option<SystemTime>;
+    /// When the tab's input last arrived (its terminal device's access time).
+    fn input_at(&mut self) -> Option<SystemTime>;
+    /// Writes raw text into the tab; false when it cannot be written to.
+    fn write_raw(&mut self, text: &str) -> bool;
+    /// Types text into the tab, then Return.
+    fn type_text(&mut self, text: &str);
+    /// Closes the tab.
+    fn close_tab(&mut self) -> Outcome;
+}
+
+/// Waits while the agent works. Returns the busy flag once it is idle; none when the tab is gone.
+fn wait_until_idle(io: &mut impl TabIo, timing: &Timing) -> Option<bool> {
+    loop {
+        let busy = io.busy();
+        match settled(busy, io.output_at(), SystemTime::now(), timing.quiet) {
+            Settled::Gone => return None,
+            Settled::Idle => return busy,
+            Settled::Working => std::thread::sleep(timing.poll),
+        }
+    }
+}
+
+/// The countdown for a done task's tab. It starts only once the agent is idle, so a working agent
+/// gets no line and no exit command. Then a key press keeps the tab; otherwise the exit command is
+/// typed (when the agent is still running) and the tab closes.
+fn countdown_on(io: &mut impl TabIo, exit: &str, texts: &CloseTexts, timing: &Timing) -> Outcome {
+    if wait_until_idle(io, timing).is_none() {
+        return Outcome::NotFound;
+    }
+    let before = io.input_at();
+    if !io.write_raw(&banner(&texts.prompt)) {
+        return Outcome::NotFound;
+    }
+    let start = Instant::now();
+    while start.elapsed() < timing.wait {
+        std::thread::sleep(timing.poll);
+        if io.input_at() != before {
+            io.write_raw(&banner(&texts.kept));
+            return Outcome::Kept;
+        }
+    }
+    // The agent may have started work during the countdown: wait for it again, so the exit command
+    // never reaches a working agent.
+    match wait_until_idle(io, timing) {
+        None => return Outcome::NotFound,
+        Some(true) => {
+            io.type_text(exit);
+            std::thread::sleep(timing.typing);
+            io.type_text("");
+            let start = Instant::now();
+            loop {
+                std::thread::sleep(timing.poll);
+                match io.busy() {
+                    None => return Outcome::NotFound,
+                    Some(false) => break,
+                    Some(true) if start.elapsed() >= timing.end_wait => {
+                        return Outcome::StillRunning;
+                    }
+                    Some(true) => {}
+                }
+            }
+        }
+        Some(false) => {}
+    }
+    io.close_tab()
+}
 
 /// The tab's details from what the opening script returned (`30229, /dev/ttys032`).
 pub fn parse_opened(out: &str) -> Option<SessionTab> {
@@ -144,42 +286,43 @@ fn run(agent: &str, tab: &SessionTab, texts: &CloseTexts) -> Outcome {
     let Some(exit) = exit_command(crate::accounts::base_agent(agent)) else {
         return Outcome::NotAvailable;
     };
-    if !plain_tty(&tab.tty) || busy(tab).is_none() {
+    if !plain_tty(&tab.tty) {
         return Outcome::NotFound;
     }
-    let before = read_at(&tab.tty);
-    if write_tty(&tab.tty, &banner(&texts.prompt)).is_err() {
-        return Outcome::NotFound;
+    countdown_on(&mut MacTab { tab }, exit, texts, &Timing::default())
+}
+
+/// The macOS tab: Terminal's busy flag, and the tab's terminal device for output and input.
+#[cfg(target_os = "macos")]
+struct MacTab<'a> {
+    tab: &'a SessionTab,
+}
+
+#[cfg(target_os = "macos")]
+impl TabIo for MacTab<'_> {
+    fn busy(&mut self) -> Option<bool> {
+        busy(self.tab)
     }
-    let start = Instant::now();
-    while start.elapsed() < WAIT {
-        std::thread::sleep(POLL);
-        if read_at(&tab.tty) != before {
-            let _ = write_tty(&tab.tty, &banner(&texts.kept));
-            return Outcome::Kept;
-        }
+
+    fn output_at(&mut self) -> Option<SystemTime> {
+        modified_at(&self.tab.tty)
     }
-    match busy(tab) {
-        None => return Outcome::NotFound,
-        Some(true) => {
-            // The agent is still running: type its exit command, then Return.
-            let _ = type_in(tab, exit);
-            std::thread::sleep(Duration::from_secs(1));
-            let _ = type_in(tab, "");
-            let start = Instant::now();
-            loop {
-                std::thread::sleep(Duration::from_millis(500));
-                match busy(tab) {
-                    None => return Outcome::NotFound,
-                    Some(false) => break,
-                    Some(true) if start.elapsed() >= END_WAIT => return Outcome::StillRunning,
-                    Some(true) => {}
-                }
-            }
-        }
-        Some(false) => {}
+
+    fn input_at(&mut self) -> Option<SystemTime> {
+        read_at(&self.tab.tty)
     }
-    close(tab)
+
+    fn write_raw(&mut self, text: &str) -> bool {
+        write_tty(&self.tab.tty, text).is_ok()
+    }
+
+    fn type_text(&mut self, text: &str) {
+        let _ = type_in(self.tab, text);
+    }
+
+    fn close_tab(&mut self) -> Outcome {
+        close(self.tab)
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -240,6 +383,12 @@ fn close(tab: &SessionTab) -> Outcome {
 /// When the terminal device was last read: it moves when input arrives.
 fn read_at(tty: &str) -> Option<SystemTime> {
     std::fs::metadata(tty).and_then(|m| m.accessed()).ok()
+}
+
+/// When the terminal device was last written to: output moves it.
+#[cfg(target_os = "macos")]
+fn modified_at(tty: &str) -> Option<SystemTime> {
+    std::fs::metadata(tty).and_then(|m| m.modified()).ok()
 }
 
 fn write_tty(tty: &str, text: &str) -> std::io::Result<()> {
@@ -305,6 +454,190 @@ mod tests {
                 "zh-CN",
             ]
         );
+    }
+
+    /// A tab the countdown runs on in tests. `scene` gives, for the busy checks so far and whether
+    /// the exit command was typed, the busy flag and whether output is moving. A key press lands
+    /// once the prompt is on screen when `key` is set.
+    struct FakeTab {
+        scene: fn(u32, bool) -> (Option<bool>, bool),
+        key: bool,
+        calls: u32,
+        shown: Vec<String>,
+        first_shown_at: Option<u32>,
+        typed: Vec<String>,
+        closed: bool,
+    }
+
+    impl FakeTab {
+        fn new(scene: fn(u32, bool) -> (Option<bool>, bool), key: bool) -> FakeTab {
+            FakeTab {
+                scene,
+                key,
+                calls: 0,
+                shown: Vec::new(),
+                first_shown_at: None,
+                typed: Vec::new(),
+                closed: false,
+            }
+        }
+
+        fn now_state(&self) -> (Option<bool>, bool) {
+            (self.scene)(self.calls, self.typed.iter().any(|t| t == "/exit"))
+        }
+    }
+
+    impl TabIo for FakeTab {
+        fn busy(&mut self) -> Option<bool> {
+            self.calls += 1;
+            self.now_state().0
+        }
+
+        fn output_at(&mut self) -> Option<SystemTime> {
+            let now = SystemTime::now();
+            if self.now_state().1 {
+                Some(now)
+            } else {
+                Some(now.checked_sub(Duration::from_secs(3600)).unwrap_or(now))
+            }
+        }
+
+        fn input_at(&mut self) -> Option<SystemTime> {
+            let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
+            if self.key && !self.shown.is_empty() {
+                Some(base + Duration::from_secs(1))
+            } else {
+                Some(base)
+            }
+        }
+
+        fn write_raw(&mut self, text: &str) -> bool {
+            if self.first_shown_at.is_none() {
+                self.first_shown_at = Some(self.calls);
+            }
+            self.shown.push(text.to_string());
+            true
+        }
+
+        fn type_text(&mut self, text: &str) {
+            self.typed.push(text.to_string());
+        }
+
+        fn close_tab(&mut self) -> Outcome {
+            self.closed = true;
+            Outcome::Closed
+        }
+    }
+
+    /// Timings short enough for tests; output counts as moving for 50 ms after it moved.
+    fn quick() -> Timing {
+        Timing {
+            wait: Duration::from_millis(30),
+            end_wait: Duration::from_millis(300),
+            quiet: Duration::from_millis(50),
+            poll: Duration::from_millis(1),
+            typing: Duration::from_millis(1),
+        }
+    }
+
+    fn texts() -> CloseTexts {
+        CloseTexts {
+            prompt: "prompt".into(),
+            kept: "kept".into(),
+        }
+    }
+
+    /// Working (output moving) for five checks, then the tab is closed by the person.
+    fn working_then_closed(calls: u32, _exited: bool) -> (Option<bool>, bool) {
+        if calls < 5 {
+            (Some(true), true)
+        } else {
+            (None, false)
+        }
+    }
+
+    /// Working for three checks, then idle at its prompt until the exit command is typed.
+    fn idle_at_prompt(calls: u32, exited: bool) -> (Option<bool>, bool) {
+        match (calls < 3, exited) {
+            (true, _) => (Some(true), true),
+            (false, false) => (Some(true), false),
+            (false, true) => (Some(false), false),
+        }
+    }
+
+    /// Working for four checks, then the agent exits on its own.
+    fn working_then_exits(calls: u32, _exited: bool) -> (Option<bool>, bool) {
+        if calls < 4 {
+            (Some(true), true)
+        } else {
+            (Some(false), false)
+        }
+    }
+
+    /// Idle at its prompt for ever.
+    fn idle_forever(_calls: u32, _exited: bool) -> (Option<bool>, bool) {
+        (Some(true), false)
+    }
+
+    /// A done task whose agent is still working gets no countdown line and no exit command.
+    #[test]
+    fn a_working_agent_gets_no_countdown_line_or_exit_command() {
+        let mut tab = FakeTab::new(working_then_closed, false);
+        let outcome = countdown_on(&mut tab, "/exit", &texts(), &quick());
+        assert_eq!(outcome, Outcome::NotFound);
+        assert!(tab.shown.is_empty());
+        assert!(tab.typed.is_empty());
+        assert!(!tab.closed);
+    }
+
+    /// The countdown starts once the agent is idle; with nothing pressed, the exit command is
+    /// typed and the tab closes. The line never shows while the agent was still working.
+    #[test]
+    fn the_countdown_starts_once_the_agent_is_idle() {
+        let mut tab = FakeTab::new(idle_at_prompt, false);
+        let outcome = countdown_on(&mut tab, "/exit", &texts(), &quick());
+        assert_eq!(outcome, Outcome::Closed);
+        assert_eq!(tab.shown, vec![banner("prompt")]);
+        assert!(tab.first_shown_at.unwrap() >= 3);
+        assert_eq!(tab.typed, ["/exit", ""]);
+        assert!(tab.closed);
+    }
+
+    /// An agent that exits on its own while working: the line shows only after it stopped, and no
+    /// exit command is typed.
+    #[test]
+    fn an_agent_that_exits_by_itself_gets_no_exit_command() {
+        let mut tab = FakeTab::new(working_then_exits, false);
+        let outcome = countdown_on(&mut tab, "/exit", &texts(), &quick());
+        assert_eq!(outcome, Outcome::Closed);
+        assert!(tab.typed.is_empty());
+        assert!(tab.first_shown_at.unwrap() >= 4);
+    }
+
+    /// A key press during the countdown keeps the tab: the kept line shows and nothing is typed.
+    #[test]
+    fn a_key_press_keeps_the_tab() {
+        let mut tab = FakeTab::new(idle_forever, true);
+        let outcome = countdown_on(&mut tab, "/exit", &texts(), &quick());
+        assert_eq!(outcome, Outcome::Kept);
+        assert_eq!(tab.shown, vec![banner("prompt"), banner("kept")]);
+        assert!(tab.typed.is_empty());
+        assert!(!tab.closed);
+    }
+
+    #[test]
+    fn a_tab_is_working_while_its_agent_prints_and_idle_when_quiet() {
+        let now = SystemTime::now();
+        let quiet = Duration::from_secs(10);
+        let recent = Some(now - Duration::from_secs(2));
+        let old = Some(now - Duration::from_secs(60));
+        assert_eq!(settled(None, recent, now, quiet), Settled::Gone);
+        assert_eq!(settled(Some(false), recent, now, quiet), Settled::Idle);
+        assert_eq!(settled(Some(true), recent, now, quiet), Settled::Working);
+        assert_eq!(settled(Some(true), old, now, quiet), Settled::Idle);
+        assert_eq!(settled(Some(true), None, now, quiet), Settled::Working);
+        let ahead = Some(now + Duration::from_secs(5));
+        assert_eq!(settled(Some(true), ahead, now, quiet), Settled::Working);
     }
 
     /// Runs the whole countdown on a real tab: `ALLOMOS_PROBE_TAB="<window>, <tty>"` and
