@@ -27,7 +27,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
@@ -335,12 +335,22 @@ struct Downloads {
     /// The version whose last download failed (no installer published, or it did not check).
     /// It is not tried again until GitHub is asked again (`forget_failed_download`).
     failed: Option<String>,
+    /// How much of the downloading installer is downloaded, in percent, once its size is known.
+    percent: Option<u8>,
+    /// **Cancel** was chosen: the download stops at its next look (Task-A07-fact210).
+    cancel: bool,
+    /// What the check that started this download remembered before it ran. A cancelled check
+    /// never happened, so this is put back (`allomos_store::restore_update_check`).
+    before: Option<allomos_store::UpdateMemory>,
 }
 
 static DOWNLOADS: Mutex<Downloads> = Mutex::new(Downloads {
     ready: None,
     busy: None,
     failed: None,
+    percent: None,
+    cancel: false,
+    before: None,
 });
 
 fn downloads() -> std::sync::MutexGuard<'static, Downloads> {
@@ -362,6 +372,36 @@ pub fn forget_failed_download() {
     downloads().failed = None;
 }
 
+/// How much of the downloading installer is downloaded, in percent, once its size is known.
+pub fn download_percent() -> Option<u8> {
+    downloads().percent
+}
+
+/// **Cancel** on the update notice (Task-A07-fact210): the download stops at its next look, its
+/// partial file is removed, and the check that found it is undone. `false` when nothing is downloading.
+pub fn cancel_download() -> bool {
+    request_cancel(&mut downloads())
+}
+
+/// Mark the download going on as cancelled. Pure, so it can be tested without the shared state.
+fn request_cancel(state: &mut Downloads) -> bool {
+    if state.busy.is_none() {
+        return false;
+    }
+    state.cancel = true;
+    true
+}
+
+/// Whether **Cancel** was chosen for the download going on.
+fn cancel_requested() -> bool {
+    downloads().cancel
+}
+
+/// The error a cancelled download ends with. The thread that ran it recognises it by its kind.
+fn cancelled() -> io::Error {
+    io::Error::new(io::ErrorKind::Interrupted, "download cancelled")
+}
+
 /// What starting a download of one version comes to.
 #[derive(Debug, PartialEq, Eq)]
 enum Start {
@@ -373,8 +413,13 @@ enum Start {
     Refused,
 }
 
-/// Mark `version` as downloading, unless the state says it should not be.
-fn start_download(state: &mut Downloads, version: &str) -> Start {
+/// Mark `version` as downloading, unless the state says it should not be. `before` is what the
+/// check that asked for it remembered first.
+fn start_download(
+    state: &mut Downloads,
+    version: &str,
+    before: &allomos_store::UpdateMemory,
+) -> Start {
     if state.ready.as_ref().is_some_and(|r| r.version == version) {
         return Start::Refused;
     }
@@ -385,6 +430,9 @@ fn start_download(state: &mut Downloads, version: &str) -> Start {
         return Start::Refused;
     }
     state.busy = Some(version.to_string());
+    state.percent = None;
+    state.cancel = false;
+    state.before = Some(before.clone());
     Start::Started
 }
 
@@ -397,24 +445,44 @@ fn download_dir() -> PathBuf {
 /// Start downloading `version`'s installer in the background, unless it is downloaded already,
 /// a download is going on, the last one failed, or no installer is published for this system.
 /// Returns whether `version` is downloading now (A07-glove300: the menu's Download item waits
-/// for it). `on_settled` runs once the download has ended, kept or not, so every window asks
-/// again: a kept installer is offered as **Restart to Update**, a failed one as **Download**
-/// (the release page). A failed download is quiet and is not repeated until GitHub is asked again.
-pub fn prepare_in_background(version: String, on_settled: impl FnOnce() + Send + 'static) -> bool {
+/// for it). `before` is what the check remembered before it ran, put back if the person cancels
+/// (A07-fact210). `on_settled` runs once the download has ended, kept, failed or cancelled, so
+/// every window asks again: a kept installer is offered as **Restart to Update**. A failed
+/// download is quiet and is not repeated until GitHub is asked again.
+pub fn prepare_in_background(
+    version: String,
+    before: allomos_store::UpdateMemory,
+    on_settled: impl FnOnce() + Send + 'static,
+) -> bool {
     let Some(platform) = Platform::current() else {
         return false;
     };
-    match start_download(&mut downloads(), &version) {
+    let start = start_download(&mut downloads(), &version, &before);
+    match start {
         Start::Started => {}
         Start::Running => return true,
         Start::Refused => return false,
     }
     std::thread::spawn(move || {
         let result = download(platform, &version);
+        let before = {
+            let mut state = downloads();
+            state.busy = None;
+            state.percent = None;
+            state.cancel = false;
+            state.before.take()
+        };
+        let cancelled = matches!(&result, Err(e) if e.kind() == io::ErrorKind::Interrupted);
+        if cancelled {
+            if let Some(before) = before {
+                let _ = allomos_store::restore_update_check(&before);
+            }
+        }
         let mut state = downloads();
-        state.busy = None;
         match result {
             Ok(ready) => state.ready = Some(ready),
+            // Cancelled is not a failure: the next check asks GitHub as normal.
+            Err(_) if cancelled => {}
             Err(_) => state.failed = Some(version),
         }
         drop(state);
@@ -424,6 +492,8 @@ pub fn prepare_in_background(version: String, on_settled: impl FnOnce() + Send +
 }
 
 /// Download `version`'s hash file and installer, and keep the installer if its hash matches.
+/// While it downloads, the percentage is kept for the window; **Cancel** stops it, and the
+/// partial file is removed (A07-fact210).
 fn download(platform: Platform, version: &str) -> io::Result<Ready> {
     let installer = installer_for(platform, version);
     let hash_file = curl_text(&installer.hash_url)?;
@@ -445,7 +515,11 @@ fn download(platform: Platform, version: &str) -> io::Result<Ready> {
         }
     }
     let part = dir.join(format!("{}.part", installer.name));
-    let status = crate::agents::command("curl")
+    if cancel_requested() {
+        return Err(cancelled());
+    }
+    let total = installer_size(&installer.url);
+    let mut child = crate::agents::command("curl")
         .args(["--silent", "--fail", "--location"])
         .args(["--max-time", DOWNLOAD_TIMEOUT_SECS])
         .args([
@@ -455,7 +529,30 @@ fn download(platform: Platform, version: &str) -> io::Result<Ready> {
         .arg("--output")
         .arg(&part)
         .arg(&installer.url)
-        .status()?;
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .spawn()?;
+    let status = loop {
+        if cancel_requested() {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = fs::remove_file(&part);
+            return Err(cancelled());
+        }
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if let Some(total) = total.filter(|t| *t > 0) {
+            let got = fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
+            // 100 only once the file is complete and checked, so the banner never reads 100 early.
+            downloads().percent = Some((got.saturating_mul(100) / total).min(99) as u8);
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    };
+    if cancel_requested() {
+        let _ = fs::remove_file(&part);
+        return Err(cancelled());
+    }
     if !status.success() {
         let _ = fs::remove_file(&part);
         return Err(io::Error::other(format!("curl stopped with {status}")));
@@ -467,6 +564,35 @@ fn download(platform: Platform, version: &str) -> io::Result<Ready> {
         path,
         sha256,
     })
+}
+
+/// The installer's size in bytes, from GitHub's answer to a HEAD request. `None` when it is not
+/// known: the banner then says only that the installer is being prepared.
+fn installer_size(url: &str) -> Option<u64> {
+    let output = crate::agents::command("curl")
+        .args(["--silent", "--head", "--location", "--max-time", "30"])
+        .arg(url)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    content_length(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// The last `Content-Length` in a list of response headers. After redirects there is one set of
+/// headers per response, and the last is the file's own.
+fn content_length(headers: &str) -> Option<u64> {
+    headers
+        .lines()
+        .filter_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.trim()
+                .eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse::<u64>().ok())
+                .flatten()
+        })
+        .last()
 }
 
 /// A small text file from the web.
@@ -928,19 +1054,20 @@ mod tests {
     #[test]
     fn download_waits_while_it_runs_and_is_refused_once_ready_failed_or_busy() {
         let mut state = Downloads::default();
+        let before = allomos_store::UpdateMemory::default();
         // Starts for the first version; it is then downloading.
-        assert_eq!(start_download(&mut state, "0.1.6"), Start::Started);
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Started);
         assert_eq!(state.busy.as_deref(), Some("0.1.6"));
         // The same version is already running: it still counts as downloading, nothing new starts.
-        assert_eq!(start_download(&mut state, "0.1.6"), Start::Running);
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Running);
         // Another version does not start while one is running.
-        assert_eq!(start_download(&mut state, "0.1.7"), Start::Refused);
+        assert_eq!(start_download(&mut state, "0.1.7", &before), Start::Refused);
         // Once it has failed, that version is not tried again until forgotten.
         state.busy = None;
         state.failed = Some("0.1.6".into());
-        assert_eq!(start_download(&mut state, "0.1.6"), Start::Refused);
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Refused);
         state.failed = None;
-        assert_eq!(start_download(&mut state, "0.1.6"), Start::Started);
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Started);
         // A kept installer is not downloaded again.
         state.busy = None;
         state.ready = Some(Ready {
@@ -948,7 +1075,43 @@ mod tests {
             path: PathBuf::from("x.pkg"),
             sha256: String::new(),
         });
-        assert_eq!(start_download(&mut state, "0.1.6"), Start::Refused);
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Refused);
+    }
+
+    #[test]
+    fn cancel_stops_only_a_download_that_is_going_on_and_starts_clean_again() {
+        let mut state = Downloads::default();
+        let before = allomos_store::UpdateMemory {
+            checked_at: Some(7),
+            latest: Some("0.1.5".into()),
+            skipped: None,
+        };
+        // Nothing is downloading: nothing to cancel.
+        assert!(!request_cancel(&mut state));
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Started);
+        state.percent = Some(40);
+        assert!(request_cancel(&mut state));
+        assert!(state.cancel);
+        // The check it belongs to is kept for the thread that undoes it.
+        assert_eq!(state.before, Some(before.clone()));
+        // The next download starts with no cancel and no percentage left over.
+        state.busy = None;
+        state.cancel = false;
+        state.before = None;
+        assert_eq!(start_download(&mut state, "0.1.6", &before), Start::Started);
+        assert!(!state.cancel);
+        assert_eq!(state.percent, None);
+    }
+
+    #[test]
+    fn the_installer_size_is_the_last_content_length_after_redirects() {
+        let headers = "HTTP/2 302\r\ncontent-length: 0\r\nlocation: https://x\r\n\r\nHTTP/2 200\r\nContent-Length: 41234567\r\n\r\n";
+        assert_eq!(content_length(headers), Some(41_234_567));
+        assert_eq!(
+            content_length("HTTP/2 200\r\ncontent-type: text/plain\r\n"),
+            None
+        );
+        assert_eq!(content_length("content-length: soon\r\n"), None);
     }
 
     #[test]

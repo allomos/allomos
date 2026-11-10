@@ -1644,6 +1644,9 @@ fn open_download_page() -> Result<(), Problem> {
 /// download in the background; the menu's **Check for Updates…** still does, because the person asked.
 #[tauri::command]
 async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
+    // What the check remembers before it runs: put back if the person cancels its download
+    // (Task-A07-fact210).
+    let before = allomos_store::update_memory();
     let mut status = update::check(asked, allomos_store::auto_check());
     if update::should_download(
         asked,
@@ -1652,7 +1655,7 @@ async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
         status.ready.as_deref(),
     ) {
         if let Some(version) = status.available.clone() {
-            if update::prepare_in_background(version.clone(), move || {
+            if update::prepare_in_background(version.clone(), before, move || {
                 let _ = app.emit(UPDATE_READY_EVENT, ());
             }) {
                 status.preparing = Some(version);
@@ -1660,6 +1663,21 @@ async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
         }
     }
     status
+}
+
+/// How much of the newer Allomos's installer is downloaded, in percent, while it downloads
+/// (Task-A07-fact210): the banner and the menu item show it. `None` when it is not known.
+#[tauri::command]
+fn update_progress() -> Option<u8> {
+    update::download_percent()
+}
+
+/// **Cancel** on the update notice while the installer downloads (Task-A07-fact210): the download
+/// stops, the check that found it is undone, and every window looks again. `false` when nothing
+/// was downloading.
+#[tauri::command]
+fn cancel_update_download() -> bool {
+    update::cancel_download()
 }
 
 /// **Settings… › General › Check for updates automatically** on or off (Task-A07-meter647). Every
@@ -2635,6 +2653,8 @@ pub fn run() {
             taskbag_format,
             open_download_page,
             update_status,
+            update_progress,
+            cancel_update_download,
             skip_update,
             restart_to_update_now,
             set_update_item,

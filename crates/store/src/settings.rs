@@ -195,6 +195,15 @@ pub fn save_update_check(checked_at: u64, latest: &str) -> io::Result<()> {
     write_settings(&settings)
 }
 
+/// Put the update check back as `before` was (Task-A07-fact210): a check whose download was
+/// cancelled never happened, so no last-check time and no remembered version is kept for it.
+pub fn restore_update_check(before: &UpdateMemory) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.update_checked_at = before.checked_at;
+    settings.update_latest = before.latest.clone();
+    write_settings(&settings)
+}
+
 /// Remember "Skip this version" for `version`.
 pub fn skip_update(version: &str) -> io::Result<()> {
     let mut settings = read_settings();
@@ -490,6 +499,23 @@ mod tests {
                 .contains("auto_download")
         );
         assert_eq!(update_memory().latest.as_deref(), Some("0.1.6"));
+
+        // A cancelled check is put back as it was (Task-A07-fact210): the answer and its time go,
+        // and the skipped version stays.
+        restore_update_check(&UpdateMemory {
+            checked_at: None,
+            latest: None,
+            skipped: Some("0.1.6".into()),
+        })
+        .unwrap();
+        assert_eq!(
+            update_memory(),
+            UpdateMemory {
+                checked_at: None,
+                latest: None,
+                skipped: Some("0.1.6".into()),
+            }
+        );
 
         // SAFETY: as above.
         unsafe { std::env::remove_var("ALLOMOS_SETTINGS_DIR") };

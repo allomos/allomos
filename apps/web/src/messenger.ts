@@ -300,6 +300,10 @@ export interface Messenger {
   closeWindow(): Promise<void>;
   /** Whether a newer Allomos is on GitHub (Task-A07-16); `asked` from Check for Updates…. */
   updateStatus(asked: boolean): Promise<UpdateStatus>;
+  /** How much of the newer installer is downloaded, in percent, while it downloads (A07-fact210). */
+  updateProgress(): Promise<number | null>;
+  /** **Cancel** while the installer downloads (A07-fact210); `false` when nothing was downloading. */
+  cancelUpdateDownload(): Promise<boolean>;
   /** "Skip this version" on the update notice. */
   skipUpdate(version: string): Promise<void>;
   /** Calls `handler` when Check for Updates… is chosen. */
@@ -539,6 +543,8 @@ export const desktopMessenger: Messenger = {
   openWebsite: () => invoke<void>("open_website"),
   closeWindow: () => invoke<void>("close_window"),
   updateStatus: (asked) => invoke<UpdateStatus>("update_status", { asked }),
+  updateProgress: () => invoke<number | null>("update_progress"),
+  cancelUpdateDownload: () => invoke<boolean>("cancel_update_download"),
   skipUpdate: (version) => invoke<void>("skip_update", { version }),
   setUpdateItem: (text, action, enabled) => invoke<void>("set_update_item", { text, action, enabled }),
   restartToUpdate: () => invoke<void>("restart_to_update_now"),
