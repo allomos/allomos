@@ -4,7 +4,7 @@ import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
 import { usePaced } from "./usePaced";
-import { FOLLOW_IDLE_MS, FOLLOW_MS } from "./paceFlow";
+import { followPace } from "./paceFlow";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ProgressDialog } from "./ProgressDialog";
@@ -356,37 +356,74 @@ export function App({
     if (opening) return;
     void messenger.setWindowProject(root ?? null, shownName).catch(() => undefined);
   }, [messenger, root, shownName, opening]);
+  // The app hears from the system when a file of the taskbag changes and tells the window
+  // (Task-A03-spider528); the window then compares the taskbag's fingerprint and reads it again
+  // when it changed. It also compares once a minute, in case a notice was missed; where nothing
+  // tells (a companion page), every second or so.
   const followBusy = useRef(false);
+  /** A notice came while a comparison was going on: compare again after it. */
+  const followAgain = useRef(false);
+  /** Goes up each time a comparison found the taskbag changed. */
+  const [taskbagChanges, setTaskbagChanges] = useState(0);
+  const [pushed, setPushed] = useState(false);
   useEffect(() => {
     stampRef.current = null;
   }, [root]);
-  usePaced(
-    () => {
-      if (!root || followBusy.current) return;
-      followBusy.current = true;
-      void (async () => {
-        try {
-          const now = await messenger.taskbagStamp(root);
-          if (stampRef.current !== null && now !== stampRef.current) {
-            const fresh = await messenger.openTaskbag(root);
-            if (openedRef.current?.root === root) {
-              setOpened(fresh);
-              // "Automatically" only when the check found a change and read again (Task-A01-47).
-              setRefreshed({ how: "auto", at: new Date() });
-            }
+  const follow = useCallback(() => {
+    if (!root) return;
+    if (followBusy.current) {
+      followAgain.current = true;
+      return;
+    }
+    followBusy.current = true;
+    void (async () => {
+      try {
+        const now = await messenger.taskbagStamp(root);
+        if (stampRef.current !== null && now !== stampRef.current) {
+          const fresh = await messenger.openTaskbag(root);
+          if (openedRef.current?.root === root) {
+            setOpened(fresh);
+            // "Automatically" only when the check found a change and read again (Task-A01-47).
+            setRefreshed({ how: "auto", at: new Date() });
+            setTaskbagChanges((n) => n + 1);
           }
-          stampRef.current = now;
-        } catch {
-          /* the folder may be gone for a moment; try again next time */
-        } finally {
-          followBusy.current = false;
         }
-      })();
-    },
-    FOLLOW_MS,
-    FOLLOW_IDLE_MS,
-    [messenger, root],
-  );
+        stampRef.current = now;
+      } catch {
+        /* the folder may be gone for a moment; try again next time */
+      } finally {
+        followBusy.current = false;
+        if (followAgain.current) {
+          followAgain.current = false;
+          follow();
+        }
+      }
+    })();
+  }, [messenger, root]);
+  const followRef = useRef(follow);
+  useEffect(() => {
+    followRef.current = follow;
+  }, [follow]);
+  useEffect(() => {
+    if (!root) return;
+    let live = true;
+    let stop: (() => void) | undefined;
+    messenger.followTaskbag(root, () => followRef.current()).then(
+      (un) => {
+        if (live) {
+          stop = un;
+          setPushed(true);
+        } else un();
+      },
+      () => live && setPushed(false),
+    );
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [messenger, root]);
+  const pace = followPace(pushed);
+  usePaced(follow, pace.awakeMs, pace.idleMs, [follow]);
 
   // On start, as the tab says (Task-A01-marble320): the start page (New Tab, New Window…); a
   // folder from File → Open Recent (A01-deck174); a tab of the last session, or one dragged from
@@ -652,6 +689,7 @@ export function App({
             handoffs={oldHandoffs(opened).length}
             onUpdate={openTasksIn}
             onOlder={setOlderShown}
+            changes={taskbagChanges}
           />
         )}
         {opened && movingCards && (

@@ -3,7 +3,8 @@
 // View menu's Running Monitors item opens. Each run is one row, in any project: its iteration's
 // name is a link to that iteration in its project, Check now and Stop act on it as its status bar
 // does, and a run whose record is missing
-// can only be stopped (by its process). The list reads the run files every couple of seconds.
+// can only be stopped (by its process). The app's monitor loop sends the runs whenever they change
+// (Task-A03-spider528).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
@@ -14,13 +15,11 @@ import { freeAgents, listedRuns, nextCheck, type ListedRun, type Run } from "./m
 import { askJump } from "./iterationJumpFlow";
 import { isProblem } from "./types";
 import { useAgentAccounts } from "./useAgentAccounts";
-import { usePaced } from "./usePaced";
-import { MONITOR_IDLE_MS, MONITOR_MS } from "./paceFlow";
 
 /** How often the clock on the rows moves on. */
 const TICK_MS = 15_000;
 
-/** The runs on this computer, read every couple of seconds, with the time for the rows. */
+/** The runs on this computer, read once and then as the app sends them, with the time for the rows. */
 export function useListedRuns(messenger: Messenger) {
   // The extra accounts' names for the labels (Task-A03-oven548).
   useAgentAccounts(messenger);
@@ -28,23 +27,40 @@ export function useListedRuns(messenger: Messenger) {
   const [now, setNow] = useState(() => Date.now());
   const last = useRef("");
 
-  const read = useCallback(async () => {
-    let list: unknown[];
-    try {
-      list = await messenger.monitorAll();
-    } catch {
-      return;
-    }
-    // Only a change re-renders the bar: the list is read often.
+  const take = useCallback((list: unknown[]) => {
+    // Only a change re-renders the bar.
     const text = JSON.stringify(list);
     if (text === last.current) return;
     last.current = text;
     setRows(listedRuns(list));
     setNow(Date.now());
-  }, [messenger]);
+  }, []);
 
-  // Read often while the window is in use, slowly in the background (Task-A03-reef286).
-  usePaced(() => void read(), MONITOR_MS, MONITOR_IDLE_MS, [read]);
+  const read = useCallback(async () => {
+    try {
+      take(await messenger.monitorAll());
+    } catch {
+      /* the app sends them again when they change */
+    }
+  }, [messenger, take]);
+
+  // Once when the window opens, then as the app's monitor loop sends them (Task-A03-spider528).
+  useEffect(() => {
+    void read();
+    let live = true;
+    let stop: (() => void) | undefined;
+    void messenger
+      .onMonitorsChanged(take)
+      .then((un) => {
+        if (live) stop = un;
+        else un();
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [messenger, read, take]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), TICK_MS);

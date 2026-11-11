@@ -76,6 +76,10 @@ export interface Messenger {
   /** Tells the window which project this tab shows (null: none), so the window is named after it
    * (Task-A01-27; each tab's own messenger, Task-A01-marble320). */
   setWindowProject(root: string | null, name: string | null): Promise<void>;
+  /** Calls `handler` soon after a file of the taskbag at `root` changes (the system tells the app;
+   * Task-A03-spider528), until the returned function is called. Rejects where nothing tells (a
+   * companion page): then the window asks for the fingerprint more often. */
+  followTaskbag(root: string, handler: () => void): Promise<() => void>;
   /** When another tab or window already shows `root`, brings it forward and resolves to true. */
   showProjectElsewhere(root: string): Promise<boolean>;
   /** Calls `handler` when this window comes to the front. */
@@ -126,7 +130,7 @@ export interface Messenger {
   /** Work on it… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
   /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
-   * once), as `alm monitor status --json` lists them; read again every few seconds. */
+   * once), as `alm monitor status --json` lists them; read again when `onMonitorsChanged` says. */
   monitorRuns(root: string): Promise<unknown[]>;
   /** Starts a run with the app's own `alm monitor start` (a background process that goes on after
    * the app is closed); resolves with its ID. Rejects with a Problem. */
@@ -141,8 +145,11 @@ export interface Messenger {
   /** The project's last run as its file on this computer keeps it (`ended` in ms), or null. */
   monitorLast(root: string): Promise<unknown | null>;
   /** The Monitors list (Task-A03-motor529): every run this computer runs, in every project, with
-   * the record-missing processes; `monitor_all` lists them. Read again every couple of seconds. */
+   * the record-missing processes; `monitor_all` lists them. */
   monitorAll(): Promise<unknown[]>;
+  /** Calls `handler` with the runs as `monitorAll` lists them whenever they change: the app reads
+   * them for every window (Task-A03-spider528), every few seconds while one is in use. */
+  onMonitorsChanged(handler: (runs: unknown[]) => void): Promise<() => void>;
   /** The list's Open: the project of the taskbag at `root` opens in a window (its tab comes to the
    * front when a window already shows it). Rejects with a Problem. */
   monitorOpen(root: string): Promise<void>;
@@ -484,6 +491,21 @@ export const desktopMessenger: Messenger = {
   createTaskbag: (root, name, language) => invoke<Opened>("create_taskbag", { root, name, language }),
   // Each tab's messenger reports it to its window, which tells the app (`WindowTabs`).
   setWindowProject: () => Promise.resolve(),
+  async followTaskbag(root, handler) {
+    const unlisten = await getCurrentWebviewWindow().listen<string>("taskbag:changed", (e) => {
+      if (e.payload === root) handler();
+    });
+    try {
+      await invoke<void>("follow_taskbag", { root });
+    } catch (e) {
+      unlisten();
+      throw e;
+    }
+    return () => {
+      unlisten();
+      void invoke<void>("unfollow_taskbag", { root }).catch(() => undefined);
+    };
+  },
   showProjectElsewhere: (root) => invoke<boolean>("show_project_elsewhere", { root }),
   onWindowFocus: (handler) =>
     getCurrentWebviewWindow().onFocusChanged(({ payload }) => {
@@ -519,6 +541,8 @@ export const desktopMessenger: Messenger = {
   monitorResume: (root) => invoke<string[]>("monitor_resume", { root }),
   monitorLast: (root) => invoke<unknown | null>("monitor_last", { root }),
   monitorAll: () => invoke<unknown[]>("monitor_all"),
+  // Every window hears it (Task-A03-spider528).
+  onMonitorsChanged: (handler) => getCurrentWebviewWindow().listen<unknown[]>("monitors:changed", (e) => handler(e.payload)),
   monitorOpen: (root) => invoke<void>("monitor_open", { root }),
   onMonitorsMenu: (handler) => getCurrentWebviewWindow().listen("menu:monitors", () => handler()),
   lastAgent: (root) => invoke<LastAgent | null>("last_agent", { root }),
