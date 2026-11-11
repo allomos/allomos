@@ -172,7 +172,7 @@ export function ProceedDialog({
                   {working ? rich("takeover.branch", { branch: <code>{working}</code> }) : t("takeover.branch_unknown")}
                 </p>
               )}
-              {takeOver && fact.doing && <p className="takeover-doing">{t("takeover.doing", { doing: doingText(fact, now, t)! })}</p>}
+              {takeOver && fact.doing && <p className="takeover-doing">{doingText(fact, now, t)}</p>}
               {held && <p className="banner update small">{t("takeover.held_warning", { minutes: interval })}</p>}
               {takeOver && <p className="banner update small">{t("takeover.worktree")}</p>}
               {!takeOver && task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}

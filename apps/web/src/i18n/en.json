@@ -1250,7 +1250,6 @@
   "takeover.branch": "The new session goes on on its working branch, {branch}.",
   "takeover.branch_unknown": "No working branch is recorded; the new session goes on on the one the claim prints.",
   "takeover.worktree": "Only what was pushed counts: the new session goes on from the commits on the working branch and the handoff note. The former session's worktree may hold changes it never committed, but that folder is of use only on its own computer: there the new session may look at them but changes nothing; on another computer it goes by the working branch and the handoff note.",
-  "takeover.doing": "Last said: {doing}",
   "takeover.does": "A new AI agent session claims the task, which takes it over from the former holder, and goes on with the work in a worktree of its own.",
   "takeover.asked": "Opened {agent}. Read the request there and send it. The row shows the new holder of {id} once the agent claims it.",
   "takeover.asked_sent": "Opened {agent} in a terminal, and the request was sent to it at once. The row shows the new holder of {id} once the agent claims it.",
