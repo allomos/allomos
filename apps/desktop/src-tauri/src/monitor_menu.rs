@@ -2,7 +2,7 @@
 //! the Window menu by Task-A03-chair577): it opens
 //! the list of this computer's running monitors in the window in front, and says how many run.
 //! With none it stays in the menu but is greyed out. The count is read from the run files every
-//! couple of seconds, on a thread of its own, so the item is right whichever window is open (and
+//! ten seconds, on a thread of its own, so the item is right whichever window is open (and
 //! with none). The item's words are English like the app's other native menu items.
 
 use std::time::Duration;
@@ -15,8 +15,9 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 pub const ID: &str = "running_monitors";
 /// The event sent to the window in front when the item is chosen; the window opens its list.
 pub const EVENT: &str = "menu:monitors";
-/// How often the count is read again.
-const EVERY: Duration = Duration::from_secs(2);
+/// How often the count is read again. Ten seconds (Task-A03-reef286): reading it starts `ps`, and
+/// an idle app should cost next to nothing; the window's own reads share their reading with it.
+const EVERY: Duration = Duration::from_secs(10);
 
 /// The item kept in the app's state, so its words and whether it is enabled can change.
 pub struct MonitorMenu {
@@ -37,7 +38,7 @@ pub fn count() -> usize {
     let Some(dir) = registry::dir() else {
         return 0;
     };
-    let procs = registry::monitor_processes();
+    let procs = registry::recent_processes(crate::monitor_runs::PROCESSES_AGE);
     registry::list(&dir, Some(&procs)).len()
 }
 

@@ -3,6 +3,8 @@ import type { CSSProperties, ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
+import { usePaced } from "./usePaced";
+import { FOLLOW_IDLE_MS, FOLLOW_MS } from "./paceFlow";
 import type { ConnectResult } from "./AgentsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ProgressDialog } from "./ProgressDialog";
@@ -98,8 +100,6 @@ function saveRecent(list: string[]) {
   }
   saveRecentInfo(keepListed(readRecentInfo(), list));
 }
-/** How often the window checks whether the taskbag's files changed, for example through `alm`. */
-const FOLLOW_MS = 1000;
 /** After agents are connected: how often, and for how long, the window looks for a new AGENTS.md
  * or CLAUDE.md, to say that running agent sessions have not read it (Task-A05-03). */
 const WATCH_FILES_MS = 2000;
@@ -356,34 +356,37 @@ export function App({
     if (opening) return;
     void messenger.setWindowProject(root ?? null, shownName).catch(() => undefined);
   }, [messenger, root, shownName, opening]);
+  const followBusy = useRef(false);
   useEffect(() => {
-    if (!root) return;
     stampRef.current = null;
-    let busy = false;
-    const check = async () => {
-      if (busy) return;
-      busy = true;
-      try {
-        const now = await messenger.taskbagStamp(root);
-        if (stampRef.current !== null && now !== stampRef.current) {
-          const fresh = await messenger.openTaskbag(root);
-          if (openedRef.current?.root === root) {
-            setOpened(fresh);
-            // "Automatically" only when the check found a change and read again (Task-A01-47).
-            setRefreshed({ how: "auto", at: new Date() });
+  }, [root]);
+  usePaced(
+    () => {
+      if (!root || followBusy.current) return;
+      followBusy.current = true;
+      void (async () => {
+        try {
+          const now = await messenger.taskbagStamp(root);
+          if (stampRef.current !== null && now !== stampRef.current) {
+            const fresh = await messenger.openTaskbag(root);
+            if (openedRef.current?.root === root) {
+              setOpened(fresh);
+              // "Automatically" only when the check found a change and read again (Task-A01-47).
+              setRefreshed({ how: "auto", at: new Date() });
+            }
           }
+          stampRef.current = now;
+        } catch {
+          /* the folder may be gone for a moment; try again next time */
+        } finally {
+          followBusy.current = false;
         }
-        stampRef.current = now;
-      } catch {
-        /* the folder may be gone for a moment; try again next time */
-      } finally {
-        busy = false;
-      }
-    };
-    void check();
-    const timer = window.setInterval(() => void check(), FOLLOW_MS);
-    return () => window.clearInterval(timer);
-  }, [messenger, root]);
+      })();
+    },
+    FOLLOW_MS,
+    FOLLOW_IDLE_MS,
+    [messenger, root],
+  );
 
   // On start, as the tab says (Task-A01-marble320): the start page (New Tab, New Window…); a
   // folder from File → Open Recent (A01-deck174); a tab of the last session, or one dragged from

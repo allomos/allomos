@@ -33,13 +33,13 @@ import {
 import type { Frequency, LastRun, LostRun, Levels, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
 import { LevelsPicker } from "./MonitorDialog";
 import { useAgentAccounts } from "./useAgentAccounts";
+import { usePaced } from "./usePaced";
+import { MONITOR_IDLE_MS, MONITOR_MS } from "./paceFlow";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
 /** How often the status bar's clock moves on, so the next check and a stalled session show in time. */
 const TICK_MS = 15_000;
-/** How often the runs' files are read again. */
-const READ_MS = 2_000;
 
 const LAST_KEY = "allomos.monitor.last";
 
@@ -112,10 +112,10 @@ export function useMonitor({
     setRuns([]);
     setLost([]);
     setLast(readLast(root));
-    void read();
-    const timer = window.setInterval(() => void read(), READ_MS);
-    return () => window.clearInterval(timer);
-  }, [root, read]);
+  }, [root]);
+  // The runs' files are read again often while the window is in use, slowly in the background
+  // (Task-A03-reef286).
+  usePaced(() => void read(), MONITOR_MS, MONITOR_IDLE_MS, [read]);
 
   // The read a resume effect uses: it runs once per opening of the project, not per change of
   // `active`.

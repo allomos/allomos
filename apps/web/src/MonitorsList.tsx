@@ -14,9 +14,9 @@ import { freeAgents, listedRuns, nextCheck, type ListedRun, type Run } from "./m
 import { askJump } from "./iterationJumpFlow";
 import { isProblem } from "./types";
 import { useAgentAccounts } from "./useAgentAccounts";
+import { usePaced } from "./usePaced";
+import { MONITOR_IDLE_MS, MONITOR_MS } from "./paceFlow";
 
-/** How often the runs are read again. */
-const READ_MS = 2_000;
 /** How often the clock on the rows moves on. */
 const TICK_MS = 15_000;
 
@@ -43,11 +43,8 @@ export function useListedRuns(messenger: Messenger) {
     setNow(Date.now());
   }, [messenger]);
 
-  useEffect(() => {
-    void read();
-    const timer = window.setInterval(() => void read(), READ_MS);
-    return () => window.clearInterval(timer);
-  }, [read]);
+  // Read often while the window is in use, slowly in the background (Task-A03-reef286).
+  usePaced(() => void read(), MONITOR_MS, MONITOR_IDLE_MS, [read]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), TICK_MS);
