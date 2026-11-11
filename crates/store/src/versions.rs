@@ -99,7 +99,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// data formats, removing things, permissions and security, cost, outside effects and plan changes
 /// go to the approver first; questions are asked while planning; a parked question carries the
 /// agent's proposal and never holds back finished work (Task-A00-eclair542).
-pub const SECTION_VERSION: u32 = 34;
+/// 35: `--take` only when the holder has stopped or a person asks for the takeover; on its own an
+/// agent takes over only lost tasks (decision 0022 § 6, Task-A01-rocket260).
+pub const SECTION_VERSION: u32 = 35;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LOST_AFTER_MINUTES, agoText, clockText, heartbeatFact, heartbeatText, lostAfterMinutes } from "../src/heartbeatFlow.ts";
+import { INTERVAL_MINUTES, LOST_AFTER_MINUTES, agoText, clockText, heartbeatFact, heartbeatText, heldFact, intervalMinutes, lostAfterMinutes } from "../src/heartbeatFlow.ts";
 import type { Project, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 import zh from "../src/i18n/zh-CN.json" with { type: "json" };
@@ -100,4 +100,23 @@ test("the clock time alone on the same local day, else with the date", () => {
   const now = new Date(2026, 10, 9, 15, 0);
   assert.equal(clockText(new Date(2026, 10, 9, 14, 2).toISOString(), now), "14:02");
   assert.equal(clockText(new Date(2026, 10, 8, 14, 2).toISOString(), now), "2026-11-08 14:02");
+});
+
+// Take over… on any held task (Task-A01-rocket260).
+test("a held task's fact in any state: only an in-progress task can be lost", () => {
+  const later = new Date("2026-11-09T12:00:00Z");
+  assert.equal(heldFact(held, 30, later)?.lost, true);
+  for (const state of ["waiting", "blocked"] as const) {
+    const fact = heldFact({ ...held, state }, 30, later);
+    assert.equal(fact?.lost, false, state);
+    assert.equal(fact?.minutes, 120, state);
+    assert.equal(heartbeatFact({ ...held, state }, 30, later), null, state);
+  }
+  assert.equal(heldFact({ ...held, holder: null }, 30, later), null);
+});
+
+test("the heartbeat interval: the project's, or the default", () => {
+  assert.equal(intervalMinutes(null), INTERVAL_MINUTES);
+  assert.equal(intervalMinutes({ heartbeat: { interval_minutes: 5 } } as Project), 5);
+  assert.equal(intervalMinutes({ heartbeat: { interval_minutes: 0 } } as Project), INTERVAL_MINUTES);
 });

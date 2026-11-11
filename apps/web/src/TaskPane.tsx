@@ -111,7 +111,7 @@ export function TaskPane({
    * session is; the companions show the Session row's text only. Rejects with a Problem. */
   onOpenSession?: () => Promise<void>;
   /** Take over… (Task-A03-flock345): opens the takeover dialog (pick an agent, a new session claims the
-   * task). The button shows only while the task is lost; desktop only. */
+   * task). The button shows for every held task that is not finished (Task-A01-rocket260); desktop only. */
   onTakeOver?: () => void;
   /** Approves the task's plan, as `alm approve` (channel app): `shown` is the description the
    * person read; `ready` also makes a backlog task ready (Task-A01-baker800). Desktop only.
@@ -661,7 +661,7 @@ export function TaskPane({
         ) : (
           <h2>
             <span className="id">{task.id}</span> {task.title} {changeButton("title")} {topButton}
-            {onTakeOver && <> <TakeOverButton task={task} lostAfter={lostAfter} lastChange={lastChange} onTakeOver={onTakeOver} /></>}
+            {onTakeOver && <> <TakeOverButton task={task} lostAfter={lostAfter} lastChange={lastChange} anyHolder onTakeOver={onTakeOver} /></>}
           </h2>
         )}
         <button type="button" className="close" onClick={onClose} title={t("pane.close")} aria-label={t("pane.close")}>

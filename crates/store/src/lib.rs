@@ -308,7 +308,9 @@ the project notes (below).
   (`--busy 0m` ends it early). A held task silent past the project's limit (30 minutes by
   default) with no busy window is lost: `alm next` lists it under \"Lost, can be taken over\" with
   the command. Take one over only to continue its work: claiming it is the takeover; go on on its
-  working branch, and look at the former holder's worktree but change nothing there. When `alm`
+  working branch, and look at the former holder's worktree but change nothing there. Use `--take`
+  only when the holder has stopped or a person asks for the takeover; on your own, take over only
+  lost tasks. When `alm`
   says one of your tasks was taken over (`notice [taken_over]`), stop work on it at once (no more
   commits or pushes to its branch, do not claim it back), leave your worktree as it is, tell the
   person, and go on with another ready task or end. Details: `alm guide workflow`, step 2.

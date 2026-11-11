@@ -1249,5 +1249,12 @@
   "takeover.does": "新的 AI 智能体会话会认领这个任务（即从前一个持有者手里接过它），在它自己的工作树里继续做。",
   "takeover.asked": "已打开 {agent}。请在那里阅读请求并发送。智能体认领 {id} 后，这一行会显示新的持有者。",
   "takeover.asked_sent": "已在终端中打开 {agent}，请求已立即交给它。智能体认领 {id} 后，这一行会显示新的持有者。",
-  "takeover.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体认领 {id} 后，这一行会显示新的持有者。"
+  "takeover.asked_paste": "已在终端中打开 {agent}。请按 {keys} 粘贴请求，看过后按回车键发送。智能体认领 {id} 后，这一行会显示新的持有者。",
+  "takeover.button_title_held": "开一个新的 AI 智能体会话，从持有者手里接手这个任务，在它原来的工作分支上继续",
+  "takeover.title_held": "从持有者手里接手任务",
+  "takeover.found_held": "{id} {title}（{state}）由 {holder} 持有，{ago}。它没有失联，原会话可能还在工作。",
+  "takeover.ago_busy": "{ago}（{busy}）",
+  "takeover.held_warning": "最好先让原会话停下，或让它写好交接，再接手。原会话要到下一次运行 alm（最长约 {minutes} 分钟，一个心跳间隔）才知道任务被接手；在这之前，两个会话可能在同一个工作分支上提交、推送，发生冲突。",
+  "takeover.does_held": "新的 AI 智能体会话会用 --take 认领这个任务（即从持有者手里接过它），在它自己的工作树里继续做。原会话收到 alm 的提示后会放弃这个任务。",
+  "takeover.confirm_held": "仍然接手"
 }

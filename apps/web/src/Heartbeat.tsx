@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useI18n } from "./i18n";
 import { heartbeatFact, heartbeatText } from "./heartbeatFlow";
+import { canTakeOver } from "./proceedFlow";
 import type { Task } from "./types";
 
 /** The time now, renewed every minute. */
@@ -41,28 +42,32 @@ export function LostTag({ task, lostAfter, lastChange }: { task: Task; lostAfter
 }
 
 /** Take over… (Task-A01-voyage603), after the Lost tag: opens the dialog that explains the takeover
- * and opens a new session; nothing while the task is not lost. */
+ * and opens a new session; nothing while the task is not lost. With `anyHolder` (the task pane,
+ * Task-A01-rocket260) it shows for every held task that is not finished. */
 export function TakeOverButton({
   task,
   lostAfter,
   lastChange,
+  anyHolder,
   onKeyDown,
   onTakeOver,
 }: {
   task: Task;
   lostAfter: number;
   lastChange?: string;
+  anyHolder?: boolean;
   onKeyDown?: (e: KeyboardEvent) => void;
   onTakeOver: () => void;
 }) {
   const { t } = useI18n();
   const now = useMinute();
-  if (!heartbeatFact(task, lostAfter, now, lastChange)?.lost) return null;
+  const lost = !!heartbeatFact(task, lostAfter, now, lastChange)?.lost;
+  if (!lost && !(anyHolder && canTakeOver(task))) return null;
   return (
     <button
       type="button"
       className="link with-icon proceed takeover"
-      title={t("takeover.button_title")}
+      title={t(lost ? "takeover.button_title" : "takeover.button_title_held")}
       onKeyDown={onKeyDown}
       onClick={(e) => {
         e.stopPropagation();

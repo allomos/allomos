@@ -66,7 +66,7 @@ import { MonitorDialog } from "./MonitorDialog";
 import { readyTasks, type OpenedFrom } from "./monitorFlow";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
 import { isProblem } from "./types";
-import { lostAfterMinutes } from "./heartbeatFlow";
+import { intervalMinutes, lostAfterMinutes } from "./heartbeatFlow";
 import { TabActive } from "./tabActive";
 import type { TabStart } from "./tabsFlow";
 import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
@@ -1917,6 +1917,7 @@ function TaskbagView({
           messenger={messenger}
           root={opened.root}
           task={proceeding}
+          interval={intervalMinutes(box?.project)}
           lostAfter={lostAfter}
           lastChange={opened.last_changed?.[proceeding.id]}
           working={opened.branches?.[proceeding.id]?.working ?? null}

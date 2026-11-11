@@ -13,6 +13,12 @@ export function canProceed(task: Task): boolean {
   return !task.holder && task.state !== "done" && task.state !== "dropped";
 }
 
+/** Whether Take over… can be offered (Task-A01-rocket260, decision 0022 § 6): a session holds the
+ * task and it is not finished, lost or not. */
+export function canTakeOver(task: Task): boolean {
+  return !!task.holder && task.state !== "done" && task.state !== "dropped";
+}
+
 /** Blocked or waiting: the agent cannot start, so it asks the person what to do instead. */
 export function stopped(task: Task): boolean {
   return task.state === "blocked" || task.state === "waiting";
@@ -124,10 +130,11 @@ export function edited(text: string, original: string): string | null {
   return text === original ? null : text;
 }
 
-/** Take over… (Task-A01-voyage603): what the request for a lost task needs besides the task. */
+/** Take over… (Task-A01-voyage603): what the request needs besides the task. */
 export interface TakeOver {
-  /** The lost limit that applied, in minutes. */
-  lostAfter: number;
+  /** The lost limit that applied, in minutes; null when the holder is not lost and the person asks
+   * for the takeover anyway (Task-A01-rocket260). */
+  lostAfter: number | null;
   /** The task's working branch, as the history records it; null when none is recorded. */
   working: string | null;
 }
@@ -135,41 +142,45 @@ export interface TakeOver {
 /** The request Allomos types in to take a lost task over (Task-A01-voyage603): claiming a lost task
  * is the takeover (Task-A01-sign613); the work goes on on the task's working branch; the former
  * holder's worktree may hold changes it never committed, which the new session looks at but leaves
- * alone. `taskbag` as in `proceedRequest`. */
+ * alone. A holder that is not lost (Task-A01-rocket260) needs `--take`, which the request says the
+ * person asked for, and may still be at work, so the new session is told to expect its pushes.
+ * `taskbag` as in `proceedRequest`. */
 export function takeOverRequest(task: Task, taskbag: string, language: Language, take: TakeOver): string {
   const id = task.id;
   const holder = task.holder ?? "";
   const tb = `--taskbag "${taskbag}"`;
   const w = take.working;
+  const held = take.lostAfter === null;
+  const flag = held ? " --take" : "";
   if (language === "zh-CN") {
-    return `请接手这个项目任务袋里失联的任务 ${id}（“${task.title}”）。每条 alm 命令都加上 ${tb}。
+    return `请接手这个项目任务袋里${held ? "的" : "失联的"}任务 ${id}（“${task.title}”）。每条 alm 命令都加上 ${tb}。
 
-它由 ${holder} 持有，但超过 ${take.lostAfter} 分钟没有心跳，也没有未到期的忙碌窗口：它失联了。
+${held ? `它由 ${holder} 持有，没有失联：原会话可能还在工作。这次接手是我在「换肩」里要求的，所以可以用 --take。` : `它由 ${holder} 持有，但超过 ${take.lostAfter} 分钟没有心跳，也没有未到期的忙碌窗口：它失联了。`}
 
 1. 阅读：alm show ${id}（它的说明和最新的交接）。
-2. 按 AGENTS.md 的说法认领它，这就是接手（alm claim ${id} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
+2. 按 AGENTS.md 的说法认领它${held ? "，带上 --take" : ""}，这就是接手（alm claim ${id}${flag} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
 3. 在原工作分支${w ? ` ${w}` : "（认领时列出）"}上继续：为它开一个你自己的工作树（git worktree add <文件夹> ${w ?? "<工作分支>"}，不带 -b）。
 4. 前一个会话的工作树（认领时列出）里可能有它没提交的改动：可以去看，但不要改动、提交或删除那里的东西；拿不准就问我。
-5. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
+${held ? "5. 原会话要到下一次运行 alm 才知道任务被接手，在这之前它可能还会往这个分支推送：提交前先取最新的改动；如果它的提交和你的冲突，告诉我。\n6" : "5"}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
   if (language === "ja") {
-    return `このプロジェクトのタスクバッグにある応答なしのタスク ${id}（「${task.title}」）を引き継いでください。alm コマンドはすべて ${tb} を付けて実行してください。
+    return `このプロジェクトのタスクバッグにある${held ? "" : "応答なしの"}タスク ${id}（「${task.title}」）を引き継いでください。alm コマンドはすべて ${tb} を付けて実行してください。
 
-${holder} が引き受けていますが、${take.lostAfter} 分を超えてハートビートがなく、作業中の期間もありません：応答なしです。
+${held ? `${holder} が引き受けていて、応答なしではありません：元のセッションはまだ作業中かもしれません。この引き継ぎは私が「肩代」で頼んだものなので、--take を使ってかまいません。` : `${holder} が引き受けていますが、${take.lostAfter} 分を超えてハートビートがなく、作業中の期間もありません：応答なしです。`}
 
 1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
-2. AGENTS.md のとおりに引き受けてください。それが引き継ぎになります（alm claim ${id} --as <あなたのセッション名> --branch <あなたのブランチ> ...）。その引き受けを共有してください。
+2. AGENTS.md のとおりに${held ? "、--take を付けて" : ""}引き受けてください。それが引き継ぎになります（alm claim ${id}${flag} --as <あなたのセッション名> --branch <あなたのブランチ> ...）。その引き受けを共有してください。
 3. 元の作業ブランチ${w ? ` ${w}` : "（引き受けたときに表示されます）"}で続けてください：自分専用のワークツリーを作ります（git worktree add <フォルダー> ${w ?? "<作業ブランチ>"}、-b なし）。
 4. 前のセッションのワークツリー（引き受けたときに表示されます）には、コミットされていない変更があるかもしれません：見てもかまいませんが、そこにあるものを変更・コミット・削除しないでください。迷ったら私に聞いてください。
-5. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
+${held ? "5. 元のセッションは次に alm を実行するまで引き継がれたことを知らないので、それまでこのブランチにプッシュするかもしれません：コミットの前に最新の変更を取り込み、そのコミットとぶつかったら私に教えてください。\n6" : "5"}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
-  return `Take over the lost task ${id} ("${task.title}") in this project's taskbag. Run every alm command with ${tb}.
+  return `Take over ${held ? "" : "the lost "}task ${id} ("${task.title}") in this project's taskbag. Run every alm command with ${tb}.
 
-${holder} holds it, but has sent no heartbeat for over ${take.lostAfter} minutes and has no busy window running: it is lost.
+${held ? `${holder} holds it and is not lost: its session may still be at work. I asked for this takeover in Allomos, so you may use --take.` : `${holder} holds it, but has sent no heartbeat for over ${take.lostAfter} minutes and has no busy window running: it is lost.`}
 
 1. Read it: alm show ${id} (its description and latest handoff note).
-2. Claim it as AGENTS.md says; that is the takeover (alm claim ${id} --as <your session name> --branch <your branch> ...), and share the claim.
+2. Claim it as AGENTS.md says${held ? ", with --take" : ""}; that is the takeover (alm claim ${id}${flag} --as <your session name> --branch <your branch> ...), and share the claim.
 3. Go on on its working branch${w ? `, ${w}` : " (the claim prints it)"}: open a worktree of your own for it (git worktree add <folder> ${w ?? "<working branch>"}, without -b).
 4. The former session's worktree (the claim prints where) may hold changes it never committed: look at them if you need to, but do not change, commit or delete anything there; if unsure, ask me.
-5. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
+${held ? "5. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.\n6" : "5"}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
 }

@@ -77,7 +77,8 @@ Before a long quiet step (a long build, a test run), the agent declares how long
 - The new session continues on the task's **original working branch**: the claim prints it and the commands to start a new worktree from it.
 - `alm` reminds that the old worktree may still hold uncommitted changes, and where it is when known; it does not look inside it (`alm` tells, the agent checks).
 - Two sessions taking over at once: whichever push lands first wins; the other gets a Git conflict on pull, as with any two claims today.
-- Claiming a task that is held and **not** lost is still refused, as today.
+- Claiming a task that is held and **not** lost is still refused, as today, unless `--take` is passed.
+- **Amended 2026-11-11** (approver, task `A01-rocket260`): a person may take over any held task that is not finished from the app (**Take over…** in the task pane), lost or not, for example to go on with another agent or account. The new session claims it with `--take`, and its request says the person asked. `--take` is used only when the holder has stopped or a person asks for the takeover; an agent on its own still takes over only lost tasks. A holder that is not lost learns of the takeover at its next `alm` command (§ 8), up to about one heartbeat interval later, and until then both sessions may commit and push on the working branch, so the app warns before it opens anything.
 
 *Not chosen:* a new branch for the new session (loses the old work or needs a merge of two branches of one task); asking the approver before each takeover (a lost task would then wait for a person, against quiet mode); `alm` itself resolving a race (it never runs Git).
 
@@ -117,3 +118,5 @@ No reminder or escalation when a task is lost several times in a row (discussed 
 ## Decided
 
 2026-11-09, will.w.hui: **Accepted**, with one addition made that day: a session whose task was taken over gives the task up (§ 8). The agent's three routine choices (English and number 0022; field names left to the implementation card; the two implied points in § 6 and § 8) were reviewed and kept.
+
+2026-11-11, will.w.hui: amended § 6: a person may take over any held task from the app (task `A01-rocket260`).

@@ -11,6 +11,9 @@ import type { Project, Task } from "./types";
 /** The default limit, in minutes (decision 0022 § 3). */
 export const LOST_AFTER_MINUTES = 30;
 
+/** The default heartbeat interval, in minutes (decision 0022 § 3). */
+export const INTERVAL_MINUTES = 10;
+
 /** The project's limit in minutes; a missing or non-positive value takes the default. */
 export function lostAfterMinutes(project?: Project | null): number {
   const m = project?.heartbeat?.lost_after_minutes;
@@ -35,17 +38,30 @@ const parse = (stamp: string | null | undefined): number | null => {
   return Number.isNaN(ms) ? null : ms;
 };
 
+/** The project's heartbeat interval in minutes; a missing or non-positive value takes the default. */
+export function intervalMinutes(project?: Project | null): number {
+  const m = project?.heartbeat?.interval_minutes;
+  return typeof m === "number" && m > 0 ? Math.floor(m) : INTERVAL_MINUTES;
+}
+
 /** The heartbeat fact of a task; null when it is not in progress or nobody holds it (no heartbeat
  * to show). `lastChange`: when the task last changed (UTC), for a holder that never beat. */
 export function heartbeatFact(task: Task, lostAfter: number, now: Date, lastChange?: string): HeartbeatFact | null {
-  if (task.state !== "in_progress" || !task.holder) return null;
+  return task.state === "in_progress" ? heldFact(task, lostAfter, now, lastChange) : null;
+}
+
+/** The same fact for a holder in any state, for Take over… (Task-A01-rocket260): a waiting or blocked
+ * task keeps its holder, whose last heartbeat is still worth saying; only an in-progress task can be
+ * lost. Null when nobody holds it. */
+export function heldFact(task: Task, lostAfter: number, now: Date, lastChange?: string): HeartbeatFact | null {
+  if (!task.holder) return null;
   const mine = task.heartbeat && task.heartbeat.by === task.holder ? task.heartbeat : null;
   const at = parse(mine?.at);
   const until = parse(mine?.busy_until);
   const nowMs = now.getTime();
   const running = until !== null && until > nowMs;
   const since = at !== null || until !== null ? Math.max(at ?? -Infinity, until ?? -Infinity) : parse(lastChange);
-  const lost = !running && since !== null && nowMs - since > lostAfter * 60_000;
+  const lost = task.state === "in_progress" && !running && since !== null && nowMs - since > lostAfter * 60_000;
   return {
     at: at !== null ? mine!.at : null,
     minutes: at !== null ? Math.max(0, Math.floor((nowMs - at) / 60_000)) : null,

@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canProceed, edited, proceedRequest, stopped, takeOverRequest } from "../src/proceedFlow.ts";
+import { canProceed, canTakeOver, edited, proceedRequest, stopped, takeOverRequest } from "../src/proceedFlow.ts";
 import type { Task } from "../src/types.ts";
 
 const TB = "../allomos-taskbag/.allomos/taskbag";
@@ -140,5 +140,43 @@ test("the take-over request without a recorded working branch, and in each langu
     assert.match(r, /claude\/s1/, language);
     assert.match(r, /--taskbag "\.\.\/allomos-taskbag\/\.allomos\/taskbag"/, language);
     assert.doesNotMatch(r, /-b claude/, language);
+  }
+});
+
+// Take over… on a holder that is not lost (Task-A01-rocket260): the person asks, so the request uses --take.
+test("Take over… can be offered for a held task that is not finished, in any state", () => {
+  for (const state of ["in_progress", "waiting", "blocked"] as const) assert.equal(canTakeOver(task({ state, holder: "claude/s1" })), true, state);
+  for (const state of ["done", "dropped"] as const) assert.equal(canTakeOver(task({ state, holder: "claude/s1" })), false, state);
+  assert.equal(canTakeOver(task({ state: "in_progress", holder: null })), false);
+});
+
+test("taking over a holder that is not lost, word for word", () => {
+  assert.equal(
+    takeOverRequest(lostTask(), TB, "en", { lostAfter: null, working: "claude/one" }),
+    `Take over task A01-50 ("One") in this project's taskbag. Run every alm command with --taskbag "../allomos-taskbag/.allomos/taskbag".
+
+claude/s1 holds it and is not lost: its session may still be at work. I asked for this takeover in Allomos, so you may use --take.
+
+1. Read it: alm show A01-50 (its description and latest handoff note).
+2. Claim it as AGENTS.md says, with --take; that is the takeover (alm claim A01-50 --take --as <your session name> --branch <your branch> ...), and share the claim.
+3. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
+4. The former session's worktree (the claim prints where) may hold changes it never committed: look at them if you need to, but do not change, commit or delete anything there; if unsure, ask me.
+5. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.
+6. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
+  );
+});
+
+test("taking over a holder that is not lost, in Chinese and Japanese, and a lost holder gets no --take", () => {
+  for (const language of ["zh-CN", "ja"] as const) {
+    const r = takeOverRequest(lostTask(), TB, language, { lostAfter: null, working: "claude/one" });
+    assert.match(r, /alm claim A01-50 --take --as/, language);
+    assert.match(r, language === "zh-CN" ? /「换肩」/ : /「肩代」/, language);
+    assert.match(r, /\n6\. /, language);
+    assert.doesNotMatch(r, /null/, language);
+  }
+  for (const language of ["en", "zh-CN", "ja"] as const) {
+    const r = takeOverRequest(lostTask(), TB, language, { lostAfter: 30, working: "claude/one" });
+    assert.doesNotMatch(r, /--take/, language);
+    assert.doesNotMatch(r, /\n6\. /, language);
   }
 });

@@ -8,6 +8,9 @@
 // Take over… (Task-A01-voyage603) opens the same dialog from a lost task's row: it says who holds
 // the task, how long it has been silent and the working branch to go on on, and its request asks
 // the new session to claim it (the takeover) and leave the former session's worktree alone.
+// From the task pane it opens for any held task (Task-A01-rocket260, decision 0022 § 6): when the
+// holder is not lost, the dialog warns that its session may still be at work, its confirm button
+// says so, and the request claims with --take.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -15,8 +18,8 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL, requestWay } from "./agentPickerFlow";
-import { edited, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
-import { agoText, heartbeatFact } from "./heartbeatFlow";
+import { canTakeOver, edited, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
+import { agoText, clockText, heldFact } from "./heartbeatFlow";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -28,6 +31,7 @@ export function ProceedDialog({
   root,
   task,
   lostAfter,
+  interval,
   lastChange,
   working,
   onClose,
@@ -38,6 +42,8 @@ export function ProceedDialog({
   task: Task;
   /** The project's lost limit, in minutes (Task-A01-kernel761). */
   lostAfter: number;
+  /** The project's heartbeat interval, in minutes: how long a holder may take to learn of a takeover. */
+  interval: number;
   /** When the task last changed (UTC), for a holder that never beat. */
   lastChange?: string;
   /** The task's working branch, from the history; null when none is recorded. */
@@ -46,9 +52,12 @@ export function ProceedDialog({
   onClose: (message: string | null) => void;
 }) {
   const { t, rich, problem, language } = useI18n();
-  // Take over… (Task-A01-voyage603): a held task that is lost, worked out when the dialog opens.
-  const [lost] = useState(() => (task.holder ? heartbeatFact(task, lostAfter, new Date(), lastChange) : null));
-  const takeOver = !!lost?.lost;
+  // Take over… (Task-A01-voyage603): a held task, lost or not, worked out when the dialog opens.
+  const [now] = useState(() => new Date());
+  const [fact] = useState(() => (canTakeOver(task) ? heldFact(task, lostAfter, now, lastChange) : null));
+  const takeOver = fact !== null;
+  /** Taking over a holder that is not lost (Task-A01-rocket260): its session may still be at work. */
+  const held = takeOver && !fact.lost;
   const ask = !takeOver && stopped(task);
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   /** The taskbag as the agent passes it to `--taskbag`; null while it is read. */
@@ -67,7 +76,7 @@ export function ProceedDialog({
     taskbag === null
       ? null
       : takeOver
-        ? takeOverRequest(task, taskbag, language, { lostAfter: lost!.lostAfter, working })
+        ? takeOverRequest(task, taskbag, language, { lostAfter: held ? null : fact.lostAfter, working })
         : proceedRequest(task, taskbag, language);
   /** The person's own request, for this dialog only (null: Allomos's). */
   const [mine, setMine] = useState<string | null>(null);
@@ -122,12 +131,21 @@ export function ProceedDialog({
 
   const stateWord = <span className={`state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>;
   const named = <strong>{task.id}</strong>;
-  const found = takeOver
+  const silence = fact && (fact.minutes !== null ? t("takeover.silent_for", { ago: agoText(fact.minutes, t) }) : t("takeover.never_beat"));
+  const found = held
+    ? rich("takeover.found_held", {
+        id: named,
+        title: task.title,
+        state: stateWord,
+        holder: <strong>{task.holder}</strong>,
+        ago: fact.busyUntil ? t("takeover.ago_busy", { ago: silence!, busy: t("heartbeat.busy", { time: clockText(fact.busyUntil, now) }) }) : silence!,
+      })
+    : takeOver
     ? rich("takeover.found", {
         id: named,
         title: task.title,
         holder: <strong>{task.holder}</strong>,
-        ago: lost!.minutes !== null ? t("takeover.silent_for", { ago: agoText(lost!.minutes, t) }) : t("takeover.never_beat"),
+        ago: silence!,
       })
     : task.state === "blocked"
       ? rich("proceed.found_blocked", { id: named, title: task.title, state: stateWord, by: (task.blocked_by ?? []).join(", ") })
@@ -138,7 +156,7 @@ export function ProceedDialog({
   return (
     <div className="overlay" role="presentation">
       <section className="dialog wizard move-cards proceed" role="dialog" aria-modal="true" aria-labelledby="proceed-title">
-        <h2 id="proceed-title">{t(takeOver ? "takeover.title" : ask ? "proceed.title_ask" : "proceed.title")}</h2>
+        <h2 id="proceed-title">{t(held ? "takeover.title_held" : takeOver ? "takeover.title" : ask ? "proceed.title_ask" : "proceed.title")}</h2>
         <div className="dialog-body wizard-body">
           {manual === null ? (
             <>
@@ -154,10 +172,11 @@ export function ProceedDialog({
                   {working ? rich("takeover.branch", { branch: <code>{working}</code> }) : t("takeover.branch_unknown")}
                 </p>
               )}
+              {held && <p className="banner update small">{t("takeover.held_warning", { minutes: interval })}</p>}
               {takeOver && <p className="banner update small">{t("takeover.worktree")}</p>}
               {!takeOver && task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
               <p>
-                {t(takeOver ? "takeover.does" : task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
+                {t(held ? "takeover.does_held" : takeOver ? "takeover.does" : task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
               </p>
               <p className="muted small">{t("proceed.how")}</p>
               <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />
@@ -186,7 +205,7 @@ export function ProceedDialog({
                 {t("wizard.cancel")}
               </button>
               <button type="button" className="primary" onClick={() => void open()} disabled={busy || !agent || request === null}>
-                {t("cards.open")}
+                {t(held ? "takeover.confirm_held" : "cards.open")}
               </button>
             </>
           ) : (

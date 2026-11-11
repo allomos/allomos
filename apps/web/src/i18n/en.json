@@ -1249,5 +1249,12 @@
   "takeover.does": "A new AI agent session claims the task, which takes it over from the former holder, and goes on with the work in a worktree of its own.",
   "takeover.asked": "Opened {agent}. Read the request there and send it. The row shows the new holder of {id} once the agent claims it.",
   "takeover.asked_sent": "Opened {agent} in a terminal, and the request was sent to it at once. The row shows the new holder of {id} once the agent claims it.",
-  "takeover.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The row shows the new holder of {id} once the agent claims it."
+  "takeover.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The row shows the new holder of {id} once the agent claims it.",
+  "takeover.button_title_held": "Open a new AI agent session to take this task over from its holder and go on on its working branch",
+  "takeover.title_held": "Take over a task from its holder",
+  "takeover.found_held": "{id} {title} ({state}) is held by {holder}, which {ago}. It is not lost, so that session may still be at work.",
+  "takeover.ago_busy": "{ago} ({busy})",
+  "takeover.held_warning": "Best to stop that session, or have it write a handoff, first. It learns of the takeover only the next time it runs alm (at most about {minutes} minutes, one heartbeat). Until then both sessions may commit and push on the same working branch and collide.",
+  "takeover.does_held": "A new AI agent session claims the task with --take, which takes it over from its holder, and goes on with the work in a worktree of its own. The former session gives the task up when alm tells it.",
+  "takeover.confirm_held": "Take over anyway"
 }

@@ -237,7 +237,8 @@ Work a task:
   you are not on the base. A task someone else holds is refused (`task_held`) unless it is lost
   (`alm next` lists those): claiming a lost task takes it over, keeps its working branch (unless
   `--working`), and the claim's event records the former holder (`--json`: `took_over`).
-  `--take` takes over a task that is not lost, only when its holder has stopped. While card files are kept
+  `--take` takes over a task that is not lost, only when its holder has stopped or a person asks
+  for the takeover (from the Allomos app, say); on your own, take over only lost tasks. While card files are kept
   outside the taskbag it refuses (`claim_cards_outside`): move them in first (`alm guide
   move-cards`). The `--session-…` options record your session, so the Allomos app can reopen it
   from the task (stored as given, never checked).
@@ -628,7 +629,9 @@ const WORKFLOW: &str = "# How to work the tasks
    (the claim prints the commands to start a worktree from it). The former holder's worktree may
    still hold changes it did not save or share; the claim says where it ran when known: look,
    but do not change, commit or remove anything there. A held task that is not lost is still
-   refused. Two sessions taking over at once: as with two claims at once (above), the claim
+   refused unless you pass `--take`, and `--take` is only for a holder that has stopped or when
+   a person asks for the takeover (the Allomos app's Take over… writes that in its request); on
+   your own, take over only lost tasks. Two sessions taking over at once: as with two claims at once (above), the claim
    you push second is refused by your version control tool; get the latest changes
    (`git pull --rebase`), and `alm` says the task is the other session's (`notice
    [claim_lost]`): drop your claim, leave its branch alone and take another task. Once you hold it, beat like any holder (`alm beat`): when you
@@ -2196,6 +2199,8 @@ mod tests {
                 "`notice [taken_over]`",
                 "stop work on it at once",
                 "do not claim it back",
+                "a person asks",
+                "on your own, take over only",
             ] {
                 assert!(text.contains(words), "{words}: {text}");
             }
