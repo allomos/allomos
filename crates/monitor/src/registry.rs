@@ -407,8 +407,12 @@ pub fn same_place(a: &Path, b: &Path) -> bool {
 /// The runs of the taskbag at `root`, with the record-missing processes whose command line names
 /// it (or names no taskbag).
 pub fn of_project(dir: &Path, root: &Path) -> Vec<Entry> {
-    let procs = monitor_processes();
-    list(dir, Some(&procs))
+    of_project_with(dir, root, &monitor_processes())
+}
+
+/// [`of_project`] with a process list already read, for example by [`recent_processes`].
+pub fn of_project_with(dir: &Path, root: &Path, procs: &[Process]) -> Vec<Entry> {
+    list(dir, Some(procs))
         .into_iter()
         .filter(|e| match e {
             Entry::Running(r) => same_place(&r.taskbag, root),
@@ -469,6 +473,26 @@ pub fn monitor_processes() -> Vec<Process> {
             })
         })
         .collect()
+}
+
+/// The `alm monitor run` processes, read again only when the last reading is older than
+/// `max_age` (Task-A03-reef286). Reading the system's process list starts a program (`ps`), and
+/// the app asks for it from several places at once (the menu, each window's runs, the Monitors
+/// bar), so these share one reading. Use [`monitor_processes`] where a fresh answer matters (after
+/// ending a process).
+pub fn recent_processes(max_age: std::time::Duration) -> Vec<Process> {
+    use std::sync::Mutex;
+    use std::time::Instant;
+    static LAST: Mutex<Option<(Instant, Vec<Process>)>> = Mutex::new(None);
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((at, procs)) = last.as_ref() {
+        if at.elapsed() <= max_age {
+            return procs.clone();
+        }
+    }
+    let procs = monitor_processes();
+    *last = Some((Instant::now(), procs.clone()));
+    procs
 }
 
 /// Each process as `<number> <command line>`.
@@ -776,6 +800,16 @@ mod tests {
         assert!(list(&d, Some(&[])).is_empty());
         assert_eq!(take_requests(&d, "m-1"), [Request::Check]);
         fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn a_recent_reading_of_the_processes_is_shared() {
+        use std::time::Duration;
+        // Fresh: read now. Within the age: the same reading again, even though the system's
+        // list may have changed since.
+        let first = recent_processes(Duration::ZERO);
+        let again = recent_processes(Duration::from_secs(3600));
+        assert_eq!(first, again);
     }
 
     #[test]

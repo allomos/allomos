@@ -18,6 +18,11 @@ fn no_dir() -> Problem {
     }
 }
 
+/// How old a reading of the system's process list may be when the window, the Monitors bar and
+/// the menu ask for it (Task-A03-reef286): they ask at about the same time, and one `ps` serves
+/// them all. Ending a process still reads it fresh.
+pub const PROCESSES_AGE: std::time::Duration = std::time::Duration::from_millis(1500);
+
 /// The runs of the taskbag at `root` (several may run at once), oldest first, with the
 /// record-missing `alm monitor run` processes that name it.
 #[tauri::command]
@@ -25,7 +30,7 @@ pub fn monitor_runs(root: PathBuf) -> Vec<serde_json::Value> {
     let Some(dir) = registry::dir() else {
         return Vec::new();
     };
-    registry::of_project(&dir, &root)
+    registry::of_project_with(&dir, &root, &registry::recent_processes(PROCESSES_AGE))
         .iter()
         .map(Entry::json)
         .collect()
@@ -38,7 +43,7 @@ pub fn monitor_all() -> Vec<serde_json::Value> {
     let Some(dir) = registry::dir() else {
         return Vec::new();
     };
-    let procs = registry::monitor_processes();
+    let procs = registry::recent_processes(PROCESSES_AGE);
     registry::list(&dir, Some(&procs))
         .iter()
         .map(Entry::json)
