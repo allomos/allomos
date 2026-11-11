@@ -229,7 +229,10 @@ mod tests {
     fn a_waiting_or_blocked_holder_can_be_asked() {
         for state in ["waiting", "blocked"] {
             let b = bag(task(state, Some("s1")));
-            assert!(request(&b, "A01-01", None, "codex_cli", AT).is_ok(), "{state}");
+            assert!(
+                request(&b, "A01-01", None, "codex_cli", AT).is_ok(),
+                "{state}"
+            );
         }
     }
 

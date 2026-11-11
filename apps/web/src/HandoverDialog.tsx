@@ -85,7 +85,9 @@ export function HandoverDialog({
   const already = pendingHandover(task);
   /** The holder asked to hand over; opened again while a request is in force, that one. */
   const [asked, setAsked] = useState<string | null>(already?.holder ?? null);
-  const step = handoverStep(task, asked);
+  // The holder when the dialog opened: if it lets go before the person asks, the dialog moves on too.
+  const [first] = useState(task.holder ?? null);
+  const step = handoverStep(task, asked ?? (task.holder !== first ? first : null));
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   // Opened again: the agent the request names, once the agents are found.
   const [wanted] = useState(already?.to ?? null);
@@ -144,7 +146,7 @@ export function HandoverDialog({
     copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS);
   };
 
-  const holder = asked ?? task.holder ?? "";
+  const holder = asked ?? first ?? "";
   const strong = <strong>{holder}</strong>;
   const named = <strong>{task.id}</strong>;
   const stateWord = <span className={`state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>;

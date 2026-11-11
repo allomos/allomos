@@ -9001,7 +9001,9 @@ fn a_handover_request_tells_only_the_holder_it_names_until_it_ends() {
     ask_handover(&repo, "A01-01", "s2");
     ok(
         &repo,
-        &["--as", "s3", "claim", "A01-01", "--take", "--branch", "main"],
+        &[
+            "--as", "s3", "claim", "A01-01", "--take", "--branch", "main",
+        ],
     );
     let (_, v) = fj(&repo, &["--as", "s3", "show", "A01-01"]);
     assert!(v["task"].get("handover_request").is_none(), "{v}");
