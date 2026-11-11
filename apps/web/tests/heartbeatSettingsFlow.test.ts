@@ -5,8 +5,10 @@ import { atDefaults, changeOf, checkMinutes, limitTooShort, type HeartbeatSettin
 const defaults: HeartbeatSettings = {
   interval_minutes: null,
   lost_after_minutes: null,
+  push_work: null,
   applied_interval_minutes: 10,
   applied_lost_after_minutes: 30,
+  applied_push_work: true,
   default_interval_minutes: 10,
   default_lost_after_minutes: 30,
 };
@@ -35,6 +37,16 @@ test("only a changed number is sent; the first bad one is named", () => {
 test("Restore Defaults has nothing to do only when nothing is written", () => {
   assert.equal(atDefaults(defaults), true);
   assert.equal(atDefaults({ ...defaults, interval_minutes: 10 }), false);
+  assert.equal(atDefaults({ ...defaults, push_work: false, applied_push_work: false }), false);
+});
+
+test("the push switch is sent only when it changes", () => {
+  const f = (text: string) => ({ field: "A", text });
+  assert.deepEqual(changeOf(defaults, f("10"), f("30"), true), { ok: true, change: {} });
+  assert.deepEqual(changeOf(defaults, f("10"), f("30"), false), { ok: true, change: { pushWork: false } });
+  const off = { ...defaults, push_work: false, applied_push_work: false };
+  assert.deepEqual(changeOf(off, f("10"), f("30"), false), { ok: true, change: {} });
+  assert.deepEqual(changeOf(off, f("10"), f("30"), true), { ok: true, change: { pushWork: true } });
 });
 
 test("a limit not longer than the interval is said", () => {

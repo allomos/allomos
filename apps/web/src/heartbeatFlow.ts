@@ -27,6 +27,10 @@ export interface HeartbeatFact {
   minutes: number | null;
   /** The end of a busy window that is still running (UTC); null otherwise. */
   busyUntil: string | null;
+  /** What the holder last said it is doing (`alm beat --doing`); null when it said nothing. */
+  doing: string | null;
+  /** When it said so (UTC); null when not known. */
+  doingAt: string | null;
   lost: boolean;
   /** The limit that applied, in minutes. */
   lostAfter: number;
@@ -66,6 +70,8 @@ export function heldFact(task: Task, lostAfter: number, now: Date, lastChange?: 
     at: at !== null ? mine!.at : null,
     minutes: at !== null ? Math.max(0, Math.floor((nowMs - at) / 60_000)) : null,
     busyUntil: running ? mine!.busy_until! : null,
+    doing: mine?.doing ?? null,
+    doingAt: mine?.doing ? (mine.doing_at ?? null) : null,
     lost,
     lostAfter,
   };
@@ -93,12 +99,20 @@ export function clockText(stamp: string, now: Date): string {
   return sameDay ? clock : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${clock}`;
 }
 
+/** What the holder last said it is doing, with the time it said so; null when it said nothing. */
+export function doingText(fact: HeartbeatFact, now: Date, t: T): string | null {
+  if (!fact.doing) return null;
+  return fact.doingAt ? t("heartbeat.doing_at", { doing: fact.doing, time: clockText(fact.doingAt, now) }) : t("heartbeat.doing", { doing: fact.doing });
+}
+
 /** The heartbeat line: "12 min ago (14:02)", or "No record"; then "· busy until 16:00" while a
- * busy window runs. The Lost tag is shown beside it, not in this text. */
+ * busy window runs, and "· doing: … (14:00)" when the holder said what it is doing. The Lost tag is
+ * shown beside it, not in this text. */
 export function heartbeatText(fact: HeartbeatFact, now: Date, t: T): string {
   const when =
     fact.at !== null && fact.minutes !== null
       ? t("heartbeat.ago", { ago: agoText(fact.minutes, t), time: clockText(fact.at, now) })
       : t("heartbeat.none");
-  return fact.busyUntil ? `${when} · ${t("heartbeat.busy", { time: clockText(fact.busyUntil, now) })}` : when;
+  const busy = fact.busyUntil ? t("heartbeat.busy", { time: clockText(fact.busyUntil, now) }) : null;
+  return [when, busy, doingText(fact, now, t)].filter(Boolean).join(" · ");
 }

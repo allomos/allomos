@@ -12,7 +12,8 @@ pub use allomos_monitor::terminal::{
     applescript_string, command, new_console, powershell_quote, shell_quote,
 };
 use allomos_monitor::terminal::{
-    ask_failed, find_tool, home, name, powershell_script, session_command, terminal_script, tool_dirs,
+    ask_failed, find_tool, home, name, powershell_script, session_command, terminal_script,
+    tool_dirs,
 };
 
 /// One agent the person can ask.

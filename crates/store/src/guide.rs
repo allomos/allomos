@@ -246,20 +246,26 @@ Work a task:
   [--app-session-id <id>]`: fill in or correct the session a task records, afterwards: each option
   given replaces that part, the others stay. Any state, by the holder or after done
   (`session_missing` when nothing is given).
-- `alm beat [<id>] [--busy <length>]` (with `--as`): a heartbeat, the sign that the session
+- `alm beat [<id>] [--busy <length>] [--doing \"<text>\"]` (with `--as`): a heartbeat, the sign that the session
   holding an in-progress task is still at work (decision 0022). It writes the time into the task's
   file and no event; it counts once shared, so save and share it as `alm` prints. Without an ID,
   every task the session holds, in one change. Under half the interval (5 of 10 minutes by default) after the
   last one it writes nothing and says when the next is due. `--busy 2h` declares a quiet stretch
-  (a long build or test run), shown until it ends; `--busy 0m` ends it. Every change the holder
-  makes to its task (`label`, `note`, `handoff`, …) beats along with it; reading never does.
+  (a long build or test run), shown until it ends; `--busy 0m` ends it. `--doing \"write the
+  dialog's tests\"` says what you are doing now, in a few words, for whoever may take over: `alm
+  next`, `alm show` and the app show it with its time, later beats keep it until you say something
+  else, and `--doing \"\"` takes it off. While the project's setting is on, `alm beat` also reminds
+  you to commit and push your work in progress to the working branch and prints the commands.
+  Every change the holder makes to its task (`label`, `note`, `handoff`, …) beats along with it;
+  reading never does.
 - `alm next` also lists the **lost** tasks (decision 0022): held, in progress, with no heartbeat
   for longer than the project's limit (30 minutes by default) and no busy window running, each with
   its holder, how long it has been silent, the limit and the command to take it over; and the held
   tasks in a busy window. `alm` takes nothing over: you check the task (its holder, its handoff
   note) and decide. Waiting, blocked and released tasks are never lost.
-  `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--clear]` shows or changes
-  the two numbers (project settings).
+  `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--wip on|off]
+  [--clear]` shows or changes the two numbers and whether work in progress is pushed at each
+  heartbeat (project settings; on by default).
 - After `claim`, `session`, `label`, `wait`, `block`, `release`, `handoff` and `done`, `alm` lists
   as Fact lines what the task is missing (`--json`: `missing`, each with `code`, `fact` and `fix`):
   session details the app needs to reopen the session, the working branch of a task that was
@@ -621,6 +627,19 @@ const WORKFLOW: &str = "# How to work the tasks
    (no upper limit; `alm next` shows it to everyone), and `alm beat <id> --busy 0m` when it ends
    early. Without heartbeats or a busy window, after the project's limit (30 minutes by default)
    your task is lost and another session may take it over.
+   **While you hold a task: keep it ready for a takeover** (Task-A01-butter895). Whoever takes it
+   over may be on another computer, and only what is pushed reaches it: commits not pushed,
+   changes not committed and your conversation stay behind. So after each small step, update the
+   handoff note (`alm handoff <id>`), not only at the end, and say what you are doing with your
+   heartbeats: `alm beat --as <your session name> --doing \"<what, in a few words>\"`. While the
+   project's setting to push work in progress at each heartbeat is on (`alm heartbeat-settings`;
+   on by default), also commit and push to your working branch after each small step and at every
+   heartbeat, half-finished work too, with WIP in the commit message, so at most one heartbeat
+   interval of work is lost; `alm beat` reminds you and prints the commands. alm runs no version
+   control tool: the commits and pushes, of the working branch and the taskbag, are yours. With
+   the setting off, `alm beat` does not remind you and those pushes are not asked for; the handoff
+   note and `--doing` stay. A branch with many WIP commits may be merged with a squash (in Git:
+   `git merge --squash`, then `git branch -D` once it is in); never force-push.
    **Taking over a lost task** (decision 0022 § 6). A held task whose holder has sent no
    heartbeat for longer than the project's limit, with no busy window running, is lost: `alm next`
    lists it under \"Lost, can be taken over\" with the command. Take one over only when you mean to
@@ -628,7 +647,10 @@ const WORKFLOW: &str = "# How to work the tasks
    records whom you took it from and when, and the work goes on on the task's working branch
    (the claim prints the commands to start a worktree from it). The former holder's worktree may
    still hold changes it did not save or share; the claim says where it ran when known: look,
-   but do not change, commit or remove anything there. A held task that is not lost is still
+   but do not change, commit or remove anything there: only what was pushed counts, and that folder
+   is of use only on the computer it ran on; on another computer, go by the working branch and the
+   handoff note, and by what the holder last said it was doing (`alm show`, `alm next`; the claim
+   repeats it). A held task that is not lost is still
    refused unless you pass `--take`, and `--take` is only for a holder that has stopped or when
    a person asks for the takeover (the Allomos app's Take over… writes that in its request); on
    your own, take over only lost tasks. Two sessions taking over at once: as with two claims at once (above), the claim
@@ -1037,7 +1059,8 @@ contradictions.
    - never stops the agent: on any failure it exits quietly, and the agent beats by hand as
      before.
    The hook only beats: claiming, releasing and busy windows (`alm beat <id> --busy <length>`)
-   stay the agent's, and a step longer than the interval still needs a busy window. Saving and
+   stay the agent's, and a step longer than the interval still needs a busy window. So do
+   `--doing` and pushing work in progress: the agent still runs `alm beat` for its reminder. Saving and
    sharing on its own is an outside effect: set it up only when the person has approved it, and
    record the hook beside the agent under `## Agents set up` (for example
    `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`).
@@ -1110,7 +1133,7 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
      推送被拒时拉取一次（`git -C <taskbag> pull --rebase --autostash`）再推送，绝不强推；
    - 从不让 agent 停下：出任何错都安静退出，agent 照旧手动写心跳。
    hook 只写心跳：认领、释放和忙碌时段（`alm beat <id> --busy <length>`）仍由 agent 来做，比间隔
-   还长的一步仍要先声明忙碌时段。自己保存并分享是一种外部影响：只在用户批准后才设置，并在
+   还长的一步仍要先声明忙碌时段。`--doing` 和推送半成品也一样：agent 仍要自己运行 `alm beat`，看它的提醒。自己保存并分享是一种外部影响：只在用户批准后才设置，并在
    `## Agents set up` 里这个智能体的一行写上这个 hook（例如
    `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`）。
 6. **Codex：「换肩」给 Codex 的规则，每台电脑一次。** 你是 Codex，或在为 Codex 设置时：Codex
@@ -1194,6 +1217,7 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
      ハートビートを書きます。
    hook はハートビートを書くだけです。取ること、手放すこと、忙しい時間（`alm beat <id> --busy
    <length>`）はエージェントの仕事のままで、間隔より長い一歩には今までどおり忙しい時間を宣言します。
+   `--doing` と作りかけの作業のプッシュも同じです。エージェントが自分で `alm beat` を実行し、その知らせに従います。
    自分で保存して共有するのは外への影響です。ユーザーが承認したときだけ設定し、`## Agents set up`
    のそのエージェントの行に hook を書きます（たとえば
    `- Claude Code: CLAUDE.md (imports AGENTS.md), automatic heartbeat in .claude/settings.json, 2026-11-09`）。
@@ -2201,6 +2225,14 @@ mod tests {
                 "do not claim it back",
                 "a person asks",
                 "on your own, take over only",
+                "each small step, update the handoff note",
+                "--doing \"<what, in a few words>\"",
+                "setting to push work in progress at each heartbeat is on",
+                "WIP in the commit message",
+                "at most one heartbeat interval of work is lost",
+                "With the setting off",
+                "only what was pushed counts",
+                "never force-push",
             ] {
                 assert!(text.contains(words), "{words}: {text}");
             }

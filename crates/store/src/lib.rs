@@ -308,12 +308,23 @@ the project notes (below).
   (`--busy 0m` ends it early). A held task silent past the project's limit (30 minutes by
   default) with no busy window is lost: `alm next` lists it under \"Lost, can be taken over\" with
   the command. Take one over only to continue its work: claiming it is the takeover; go on on its
-  working branch, and look at the former holder's worktree but change nothing there. Use `--take`
+  working branch, and look at the former holder's worktree but change nothing there (that folder
+  is of use only on its own computer; on another one, go by the working branch and the handoff
+  note: only what was pushed counts). Use `--take`
   only when the holder has stopped or a person asks for the takeover; on your own, take over only
   lost tasks. When `alm`
   says one of your tasks was taken over (`notice [taken_over]`), stop work on it at once (no more
   commits or pushes to its branch, do not claim it back), leave your worktree as it is, tell the
   person, and go on with another ready task or end. Details: `alm guide workflow`, step 2.
+- While you hold a task, keep it ready for a takeover, also on another computer: only what is
+  pushed reaches it. After each small step, update the handoff note (`alm handoff <id>`), not only
+  at the end, and say what you are doing with your heartbeats: `alm beat --as <your session name>
+  --doing \"<what, in a few words>\"`. While the project's setting to push work in progress at each
+  heartbeat is on (`alm heartbeat-settings`; on by default), also commit and push to your working
+  branch after each small step and at every heartbeat, half-finished work too, with WIP in the
+  commit message, so at most one heartbeat interval of work is lost; `alm beat` reminds you and
+  prints the commands. With the setting off it does not remind you, and those pushes are not asked
+  for; the rest stays. A branch with many WIP commits may be merged with a squash; never force-push.
 - Report progress: `alm label <id> \"<label>\"`.
 - Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
   another task: `alm block <id> --by <task-id>`. When its last blocker finishes (done or
@@ -2377,6 +2388,9 @@ pub struct Beaten {
     pub beats: Vec<heartbeat::Beat>,
     /// The project's heartbeat interval that applied, in seconds (Task-A01-zero387).
     pub interval_secs: i64,
+    /// Whether the project asks for work in progress to be pushed at each heartbeat
+    /// (Task-A01-butter895).
+    pub push_work: bool,
     pub issues: Vec<Issue>,
 }
 
@@ -2391,11 +2405,13 @@ pub fn beat(
     wait: Duration,
     id: Option<&str>,
     busy: Option<i64>,
+    doing: Option<&str>,
 ) -> Result<Beaten, Problem> {
     let me = actor.by.ok_or(Problem::HolderMissing)?;
     let (lock, bag, issues) = lock_for_change(root, wait)?;
     let now = now_secs();
-    let interval = heartbeat::applied(&bag.project).interval_secs;
+    let applied = heartbeat::applied(&bag.project);
+    let interval = applied.interval_secs;
     let tasks: Vec<&Task> = match id {
         Some(id) => vec![
             bag.tasks
@@ -2417,7 +2433,7 @@ pub fn beat(
     };
     let beats = tasks
         .into_iter()
-        .map(|t| heartbeat::beat(t, me, now, busy, interval))
+        .map(|t| heartbeat::beat(t, me, now, busy, doing, interval))
         .collect::<Result<Vec<_>, _>>()?;
     for b in &beats {
         if let heartbeat::Beat::Written(task) = b {
@@ -2427,6 +2443,7 @@ pub fn beat(
     Ok(Beaten {
         beats,
         interval_secs: interval,
+        push_work: applied.push_work,
         issues,
     })
 }
@@ -2569,6 +2586,9 @@ pub struct TookOver {
     pub folder: Option<String>,
     /// The working branch the task had before the claim.
     pub working: Option<String>,
+    /// What the former holder last said it was doing (`alm beat --doing`), and when, in UTC.
+    pub doing: Option<String>,
+    pub doing_at: Option<String>,
 }
 
 /// Claim task `id` (`alm claim`, Task-A03-22): the claim rule, plus its branches. `current` is the
@@ -2629,6 +2649,12 @@ pub fn claim_task(
             .and_then(|t| t.session.as_ref())
             .and_then(|s| s.folder.clone()),
         working: before.working.clone(),
+        doing: found
+            .and_then(heartbeat::doing)
+            .map(|(words, _)| words.to_string()),
+        doing_at: found
+            .and_then(heartbeat::doing)
+            .and_then(|(_, at)| at.map(str::to_string)),
     });
     // Work goes on on the task's working branch (decision 0022 § 6): a takeover keeps it unless
     // `--working` names another.

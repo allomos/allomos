@@ -217,7 +217,7 @@ export interface Messenger {
   /** Project settings → Heartbeat (Task-A01-osprey500): the heartbeat interval and the lost limit, as `alm heartbeat-settings`. */
   heartbeatSettings(root: string): Promise<HeartbeatSettings>;
   /** Changes them (whole minutes), or puts both back to their defaults (`clear`); resolves to the settings as saved. Rejects with a Problem. */
-  setHeartbeatSettings(root: string, change: { interval?: string; lostAfter?: string; clear?: boolean }): Promise<HeartbeatSettings>;
+  setHeartbeatSettings(root: string, change: { interval?: string; lostAfter?: string; pushWork?: boolean; clear?: boolean }): Promise<HeartbeatSettings>;
   /** Project settings → Audit (Task-A01-frolic587): the identity level. */
   auditSettings(root: string): Promise<AuditSettings>;
   /** Changes the identity level, as `alm audit-settings`; resolves to the settings as saved. Rejects with a Problem. */
@@ -570,6 +570,7 @@ export const desktopMessenger: Messenger = {
       root,
       interval: c.interval ?? null,
       lostAfter: c.lostAfter ?? null,
+      pushWork: c.pushWork ?? null,
       clear: c.clear ?? false,
     }),
   auditSettings: (root) => invoke<AuditSettings>("audit_settings", { root }),

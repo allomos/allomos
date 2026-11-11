@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { INTERVAL_MINUTES, LOST_AFTER_MINUTES, agoText, clockText, heartbeatFact, heartbeatText, heldFact, intervalMinutes, lostAfterMinutes } from "../src/heartbeatFlow.ts";
+import { INTERVAL_MINUTES, LOST_AFTER_MINUTES, agoText, clockText, doingText, heartbeatFact, heartbeatText, heldFact, intervalMinutes, lostAfterMinutes } from "../src/heartbeatFlow.ts";
 import type { Project, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 import zh from "../src/i18n/zh-CN.json" with { type: "json" };
@@ -94,6 +94,24 @@ test("the line: age and clock time, busy window, no record", () => {
   const busy = { ...held, heartbeat: { at: "2026-11-09T10:00:00Z", by: "s1", busy_until: "2026-11-09T12:00:00Z" } };
   assert.equal(heartbeatText(heartbeatFact(busy, 30, now)!, now, tz), `12 分钟前（${local}） · 忙碌到 ${clockText("2026-11-09T12:00:00Z", now)}`);
   assert.equal(heartbeatText(heartbeatFact({ ...held, heartbeat: null }, 30, now)!, now, tz), "没有记录");
+});
+
+test("the line says what the holder is doing, with its time", () => {
+  const now = at("2026-11-09T10:12:00Z");
+  const local = clockText("2026-11-09T10:00:00Z", now);
+  const said = clockText("2026-11-09T10:05:00Z", now);
+  const doing = { ...held, heartbeat: { at: "2026-11-09T10:00:00Z", by: "s1", doing: "write the dialog's tests", doing_at: "2026-11-09T10:05:00Z" } };
+  const fact = heartbeatFact(doing, 30, now)!;
+  assert.equal(fact.doing, "write the dialog's tests");
+  assert.equal(heartbeatText(fact, now, t), `12 min ago (${local}) · doing: write the dialog's tests (${said})`);
+  assert.equal(doingText(fact, now, tz), `正在做：write the dialog's tests（${said}）`);
+  // A former holder's words are not this holder's.
+  const former = { ...doing, holder: "s2" };
+  assert.equal(heartbeatFact(former, 30, now)!.doing, null);
+  // Without a time, the words alone.
+  const noTime = { ...held, heartbeat: { at: "2026-11-09T10:00:00Z", by: "s1", doing: "x" } };
+  assert.equal(doingText(heartbeatFact(noTime, 30, now)!, now, t), "doing: x");
+  assert.equal(doingText(heartbeatFact(held, 30, now)!, now, t), null);
 });
 
 test("the clock time alone on the same local day, else with the date", () => {
