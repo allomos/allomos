@@ -80,7 +80,11 @@ impl MonitorLoop {
 
     /// Whether some window is in use.
     pub fn in_use(&self) -> bool {
-        !self.focused.lock().unwrap_or_else(|e| e.into_inner()).is_empty()
+        !self
+            .focused
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty()
     }
 
     /// Starts a round now (after the window asked a run for something, say).
@@ -124,7 +128,12 @@ fn read_runs() -> Value {
         return Value::Array(Vec::new());
     };
     let procs = registry::recent_processes(Duration::ZERO);
-    Value::Array(registry::list(&dir, Some(&procs)).iter().map(Entry::json).collect())
+    Value::Array(
+        registry::list(&dir, Some(&procs))
+            .iter()
+            .map(Entry::json)
+            .collect(),
+    )
 }
 
 /// Starts the loop; it runs until the app closes.
@@ -209,12 +218,45 @@ mod tests {
     fn only_a_change_is_told() {
         let mut seen = Seen::default();
         let none = json!([]);
-        assert_eq!(seen.round(none.clone()), Tell { runs: Some(none.clone()), count: Some(0) }, "the first round tells");
-        assert_eq!(seen.round(none.clone()), Tell { runs: None, count: None }, "nothing new");
+        assert_eq!(
+            seen.round(none.clone()),
+            Tell {
+                runs: Some(none.clone()),
+                count: Some(0)
+            },
+            "the first round tells"
+        );
+        assert_eq!(
+            seen.round(none.clone()),
+            Tell {
+                runs: None,
+                count: None
+            },
+            "nothing new"
+        );
         let one = json!([{ "id": "r1", "checked": "10:00" }]);
-        assert_eq!(seen.round(one.clone()), Tell { runs: Some(one.clone()), count: Some(1) });
+        assert_eq!(
+            seen.round(one.clone()),
+            Tell {
+                runs: Some(one.clone()),
+                count: Some(1)
+            }
+        );
         let checked = json!([{ "id": "r1", "checked": "10:05" }]);
-        assert_eq!(seen.round(checked.clone()), Tell { runs: Some(checked), count: None }, "a new check: the runs, not the count");
-        assert_eq!(seen.round(none.clone()), Tell { runs: Some(none), count: Some(0) });
+        assert_eq!(
+            seen.round(checked.clone()),
+            Tell {
+                runs: Some(checked),
+                count: None
+            },
+            "a new check: the runs, not the count"
+        );
+        assert_eq!(
+            seen.round(none.clone()),
+            Tell {
+                runs: Some(none),
+                count: Some(0)
+            }
+        );
     }
 }

@@ -33,14 +33,15 @@ pub struct Watch {
 impl Watch {
     pub fn start(folder: &Path, changed: impl Fn() + Send + 'static) -> Option<Watch> {
         let (tx, rx) = channel::<()>();
-        let mut watcher = ::notify::recommended_watcher(move |res: ::notify::Result<::notify::Event>| {
-            if let Ok(event) = res {
-                if counts(&event.kind) {
-                    let _ = tx.send(());
+        let mut watcher =
+            ::notify::recommended_watcher(move |res: ::notify::Result<::notify::Event>| {
+                if let Ok(event) = res {
+                    if counts(&event.kind) {
+                        let _ = tx.send(());
+                    }
                 }
-            }
-        })
-        .ok()?;
+            })
+            .ok()?;
         watcher.watch(folder, RecursiveMode::Recursive).ok()?;
         std::thread::spawn(move || {
             while gather(&rx, GATHER) {
@@ -109,7 +110,12 @@ impl State {
 
     /// The watches no window needs any more.
     fn unneeded(&mut self) {
-        let shown: Vec<String> = self.watches.keys().filter(|r| !self.shown(r)).cloned().collect();
+        let shown: Vec<String> = self
+            .watches
+            .keys()
+            .filter(|r| !self.shown(r))
+            .cloned()
+            .collect();
         for root in shown {
             self.watches.remove(&root);
         }
@@ -162,7 +168,10 @@ impl Following {
 
     /// The windows that show `root` now.
     fn windows_of(&self, root: &str) -> BTreeSet<String> {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner()).windows_of(root)
+        self.inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .windows_of(root)
     }
 }
 
@@ -212,7 +221,10 @@ mod tests {
         assert!(rx.try_recv().is_err());
         assert!(start.elapsed() < Duration::from_millis(500));
         drop(tx);
-        assert!(!gather(&rx, Duration::from_millis(50)), "an ended watch ends the thread");
+        assert!(
+            !gather(&rx, Duration::from_millis(50)),
+            "an ended watch ends the thread"
+        );
     }
 
     #[test]
@@ -228,16 +240,23 @@ mod tests {
         });
         let start = Instant::now();
         assert!(gather(&rx, Duration::from_millis(50)));
-        assert!(start.elapsed() < Duration::from_millis(350), "at most four quiet pauses");
+        assert!(
+            start.elapsed() < Duration::from_millis(350),
+            "at most four quiet pauses"
+        );
         drop(rx);
         busy.join().unwrap();
     }
 
     #[test]
     fn reading_a_file_is_not_a_change() {
-        assert!(!counts(&EventKind::Access(::notify::event::AccessKind::Any)));
+        assert!(!counts(&EventKind::Access(
+            ::notify::event::AccessKind::Any
+        )));
         assert!(counts(&EventKind::Modify(::notify::event::ModifyKind::Any)));
-        assert!(counts(&EventKind::Create(::notify::event::CreateKind::File)));
+        assert!(counts(&EventKind::Create(
+            ::notify::event::CreateKind::File
+        )));
     }
 
     #[test]
@@ -275,11 +294,21 @@ mod tests {
         let f = Following::default();
         assert!(f.follow("main", "/a"), "the first tab starts the watch");
         f.set_watch("/a", None);
-        assert!(!f.follow("w2", "/a"), "another window showing it shares the watch");
+        assert!(
+            !f.follow("w2", "/a"),
+            "another window showing it shares the watch"
+        );
         assert!(!f.follow("main", "/a"), "so does another tab");
-        assert_eq!(f.windows_of("/a").into_iter().collect::<Vec<_>>(), ["main", "w2"]);
+        assert_eq!(
+            f.windows_of("/a").into_iter().collect::<Vec<_>>(),
+            ["main", "w2"]
+        );
         f.unfollow("main", "/a");
-        assert_eq!(f.windows_of("/a").len(), 2, "main still has a tab showing it");
+        assert_eq!(
+            f.windows_of("/a").len(),
+            2,
+            "main still has a tab showing it"
+        );
         f.forget("w2");
         f.unfollow("main", "/a");
         assert!(f.windows_of("/a").is_empty());

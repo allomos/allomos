@@ -2633,12 +2633,18 @@ pub fn run() {
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Destroyed => {
                 window.state::<Windows>().forget(window.label());
-                window.state::<taskbag_watch::Following>().forget(window.label());
-                window.state::<monitor_loop::MonitorLoop>().forget(window.label());
+                window
+                    .state::<taskbag_watch::Following>()
+                    .forget(window.label());
+                window
+                    .state::<monitor_loop::MonitorLoop>()
+                    .forget(window.label());
                 window_list::refresh(window.app_handle(), Some(window.label()));
             }
             tauri::WindowEvent::Focused(focused) => {
-                window.state::<monitor_loop::MonitorLoop>().focus(window.label(), *focused);
+                window
+                    .state::<monitor_loop::MonitorLoop>()
+                    .focus(window.label(), *focused);
                 window_list::refresh(window.app_handle(), None)
             }
             _ => {}
