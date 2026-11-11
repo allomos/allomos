@@ -18,10 +18,11 @@ fn no_dir() -> Problem {
     }
 }
 
-/// How old a reading of the system's process list may be when the window, the Monitors bar and
-/// the menu ask for it (Task-A03-reef286): they ask at about the same time, and one `ps` serves
-/// them all. Ending a process still reads it fresh.
-pub const PROCESSES_AGE: std::time::Duration = std::time::Duration::from_millis(1500);
+/// How old a reading of the system's process list may be when a window asks for runs
+/// (Task-A03-reef286): the app's monitor loop reads it every few seconds while a window is in use
+/// and tells the windows when the runs changed (Task-A03-spider528), so the windows' reads then
+/// use the loop's reading. Ending a process still reads it fresh.
+pub const PROCESSES_AGE: std::time::Duration = crate::monitor_loop::IN_USE;
 
 /// The runs of the taskbag at `root` (several may run at once), oldest first, with the
 /// record-missing `alm monitor run` processes that name it.

@@ -11,13 +11,14 @@ mod codex_rules;
 mod handover;
 mod heartbeat_settings;
 mod lan;
+mod monitor_loop;
 mod monitor_menu;
 mod monitor_pause;
 mod monitor_runs;
-mod notify;
 mod pairing;
 mod sessions;
 mod tab_drag;
+mod taskbag_watch;
 mod update;
 mod window_list;
 mod windows;
@@ -170,8 +171,9 @@ fn open_taskbag(root: PathBuf) -> Opened {
     }
 }
 
-/// A fingerprint of the taskbag's files. The window asks for it about once a second and
-/// reloads when it changes, so changes made by `alm` show without reopening the folder.
+/// A fingerprint of the taskbag's files. The window asks for it when the system says a file
+/// changed (`taskbag_watch`), and once a minute in case a notice was missed, and reloads when it
+/// changed, so changes made by `alm` show without reopening the folder.
 /// Sent as text: a 64-bit number does not fit a JavaScript number.
 #[tauri::command]
 fn taskbag_stamp(root: PathBuf) -> String {
@@ -2543,15 +2545,17 @@ pub fn run() {
         .menu(build_menu)
         .manage(Windows::default())
         .manage(tab_drag::Drag::default())
+        .manage(taskbag_watch::Following::default())
+        .manage(monitor_loop::MonitorLoop::default())
         .manage(Lan::new())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
             // Reopen windows and tabs (Task-A01-marble320): the other windows open again.
             windows::restore(app.handle());
-            // The monitor's notifications, shown under the app's name (Task-A03-stork103).
-            notify::start(app.handle().clone());
-            // The View menu's Running Monitors item follows the runs (Task-A03-motor529).
-            monitor_menu::start(app.handle().clone());
+            // One loop for the runs: the windows' status bars and Monitors bar, the View menu's
+            // Running Monitors item (Task-A03-motor529) and the monitor's notifications
+            // (Task-A03-stork103), Task-A03-spider528.
+            monitor_loop::start(app.handle().clone());
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_screen(&window);
             }
@@ -2629,9 +2633,14 @@ pub fn run() {
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Destroyed => {
                 window.state::<Windows>().forget(window.label());
+                window.state::<taskbag_watch::Following>().forget(window.label());
+                window.state::<monitor_loop::MonitorLoop>().forget(window.label());
                 window_list::refresh(window.app_handle(), Some(window.label()));
             }
-            tauri::WindowEvent::Focused(_) => window_list::refresh(window.app_handle(), None),
+            tauri::WindowEvent::Focused(focused) => {
+                window.state::<monitor_loop::MonitorLoop>().focus(window.label(), *focused);
+                window_list::refresh(window.app_handle(), None)
+            }
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
@@ -2653,6 +2662,8 @@ pub fn run() {
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
+            taskbag_watch::follow_taskbag,
+            taskbag_watch::unfollow_taskbag,
             version_check,
             move_taskbag_aside,
             taskbag_format,
