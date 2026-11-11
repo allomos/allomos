@@ -803,6 +803,16 @@ mod tests {
     }
 
     #[test]
+    fn a_recent_reading_of_the_processes_is_shared() {
+        use std::time::Duration;
+        // Fresh: read now. Within the age: the same reading again, even though the system's
+        // list may have changed since.
+        let first = recent_processes(Duration::ZERO);
+        let again = recent_processes(Duration::from_secs(3600));
+        assert_eq!(first, again);
+    }
+
+    #[test]
     fn monitor_processes_are_read_from_their_command_lines() {
         assert_eq!(
             run_words(&[
