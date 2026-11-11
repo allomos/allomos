@@ -26,6 +26,8 @@
   "agentline.tell": "Connect with the agents…",
   "agentline.unshared": "{count} changes made here are not shared yet",
   "agentline.unshared_hint": "Allomos saves your changes but never runs your version control tool. The next AI agent that changes a task is shown them, with the files to save and share as yours (for Git, the commands).",
+  "agentline.refresh": "Check again",
+  "agentline.refresh_hint": "Check again: whether the instruction files tell the agents about Allomos, the quota and the changes not shared yet. It checks on its own when the project opens and every 30 minutes.",
   "agentline.label": "AI agents:",
   "agentline.quota": "{name}: Quota {left}%",
   "agentline.age": "{minutes} min ago",

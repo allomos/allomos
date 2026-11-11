@@ -879,10 +879,7 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
             link: link.to_string(),
         });
     };
-    let recorded = fs::read_to_string(root.join(PROJECT_FILE))
-        .ok()
-        .and_then(|text| parse_project(PROJECT_FILE, &text).ok())
-        .and_then(|project| project_folder_of(root, &project));
+    let recorded = recorded_project_folder(root);
     let inside = [
         Some(picked_folder(root).unwrap_or(root).to_path_buf()),
         recorded,
@@ -899,6 +896,15 @@ pub fn resolve_task_link(root: &Path, task: &str, link: &str) -> Result<LinkTarg
         return Err(refused());
     }
     Ok(LinkTarget::File(plain_path(&target)))
+}
+
+/// The project folder recorded in the taskbag's `project.json`, read from that one file, without
+/// loading the tasks ([`project_folder_of`]). `None` when none is recorded or the file is unreadable.
+pub fn recorded_project_folder(root: &Path) -> Option<PathBuf> {
+    fs::read_to_string(root.join(PROJECT_FILE))
+        .ok()
+        .and_then(|text| parse_project(PROJECT_FILE, &text).ok())
+        .and_then(|project| project_folder_of(root, &project))
 }
 
 /// The folder the user picked, for a taskbag at `<folder>/.allomos/taskbag`; `None` for a

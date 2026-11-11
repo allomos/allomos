@@ -392,12 +392,8 @@ export interface AgentStatus {
   project: string;
   /** Which agents' instruction files tell them about Allomos. */
   setup: { codex: boolean; claude: boolean };
-  /** The newest change an agent made through `alm` under a name, from the change history. `at` is UTC. */
-  last: { who: string; at: string } | null;
   /** Changes made in the app that no agent has been told to share yet (decision 0017). */
   unshared: number;
-  /** Who holds tasks in progress now. */
-  holders: string[];
 }
 
 export interface Gates {

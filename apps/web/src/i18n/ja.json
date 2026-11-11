@@ -26,6 +26,8 @@
   "agentline.tell": "AI エージェントとつなぐ…",
   "agentline.unshared": "ここでの変更 {count} 件はまだ共有されていません",
   "agentline.unshared_hint": "「肩代」は変更を保存しますが、バージョン管理ツールは一切実行しません。次にタスクを変える AI エージェントに、これらの変更と、あなたの変更として保存・共有するファイル（Git ならそのコマンド）が表示されます。",
+  "agentline.refresh": "もう一度確かめる",
+  "agentline.refresh_hint": "説明ファイルがエージェントに「肩代」を伝えているか、残りの枠、まだ共有されていない変更をもう一度確かめます。プロジェクトを開いたときと 30 分ごとに自動で確かめます。",
   "agentline.label": "AI エージェント：",
   "agentline.quota": "{name}：残り {left}%",
   "agentline.age": "{minutes} 分前",

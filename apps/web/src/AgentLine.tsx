@@ -7,16 +7,17 @@
 // Since Task-A03-02 the line is one chip per agent: the agent that reported its quota last
 // (`alm quota`) comes first with its quota, coloured by the share left; the others are dimmed.
 // Hovering a chip lists every reported account (quotaFlow.ts).
+//
+// Since Task-A03-spade155 it checks when the project opens, every 30 minutes and when the person
+// presses its refresh button (agentLineFlow.ts), no longer every 4 seconds.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { startChecks, type Checks } from "./agentLineFlow";
 import { useI18n } from "./i18n";
 import { localTime } from "./timeFlow";
 import type { Messenger } from "./messenger";
 import { ageText, agentName, chips, freshness, popupRows, rowKey, tone } from "./quotaFlow";
 import type { AgentStatus, QuotaReport } from "./types";
-
-/** How often the line checks again: the instruction files are outside the taskbag. */
-const CHECK_MS = 4000;
 
 export function AgentLine({
   messenger,
@@ -32,6 +33,7 @@ export function AgentLine({
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [reports, setReports] = useState<QuotaReport[]>([]);
   const [now, setNow] = useState(() => new Date());
+  const checks = useRef<Checks | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -46,11 +48,12 @@ export function AgentLine({
         .then((r) => live && setReports(r))
         .catch(() => undefined);
     };
-    check();
-    const timer = window.setInterval(check, CHECK_MS);
+    const line = startChecks(check, window);
+    checks.current = line;
     return () => {
       live = false;
-      window.clearInterval(timer);
+      line.stop();
+      checks.current = null;
     };
   }, [messenger, root]);
 
@@ -126,6 +129,15 @@ export function AgentLine({
       {status.unshared > 0 && (
         <span title={t("agentline.unshared_hint")}>{t("agentline.unshared", { count: status.unshared })}</span>
       )}
+      <button
+        type="button"
+        className="link agent-refresh"
+        title={t("agentline.refresh_hint")}
+        aria-label={t("agentline.refresh")}
+        onClick={() => checks.current?.refresh()}
+      >
+        ↻
+      </button>
     </div>
   );
 }
