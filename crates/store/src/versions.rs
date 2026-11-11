@@ -101,7 +101,11 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// agent's proposal and never holds back finished work (Task-A00-eclair542).
 /// 35: `--take` only when the holder has stopped or a person asks for the takeover; on its own an
 /// agent takes over only lost tasks (decision 0022 § 6, Task-A01-rocket260).
-pub const SECTION_VERSION: u32 = 35;
+/// 36: a holder updates the handoff note after each small step, says what it is doing with
+/// `alm beat --doing`, and, while the project's setting is on, pushes work in progress after each
+/// small step and at every heartbeat; on another computer a takeover goes by the working branch
+/// and the handoff note (Task-A01-butter895).
+pub const SECTION_VERSION: u32 = 36;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

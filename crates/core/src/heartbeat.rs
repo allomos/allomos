@@ -21,7 +21,8 @@ pub const INTERVAL_SECS: i64 = 10 * 60;
 pub const LOST_AFTER_SECS: i64 = 30 * 60;
 
 /// `project.json`'s `heartbeat` (decision 0022 § 3, Task-A01-zero387): the project's two numbers,
-/// in whole minutes. A missing one takes its default; `alm heartbeat-settings` changes them.
+/// in whole minutes, and whether work in progress is pushed at each heartbeat (Task-A01-butter895).
+/// A missing one takes its default; `alm heartbeat-settings` changes them.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Settings {
     /// How often a holding session beats. Missing: 10.
@@ -31,16 +32,23 @@ pub struct Settings {
     /// Missing: 30.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lost_after_minutes: Option<u32>,
+    /// Whether `alm beat` reminds the holding session to commit and push its work in progress to
+    /// the working branch, to prepare for a takeover (Task-A01-butter895). Missing: on, so only
+    /// `false` is written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub push_work: Option<bool>,
     /// Fields this Allomos does not know, kept as they are.
     #[serde(flatten)]
     pub extra: Extra,
 }
 
-/// The two numbers as they apply, defaults filled in, in seconds.
+/// The settings as they apply, defaults filled in, the two numbers in seconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Applied {
     pub interval_secs: i64,
     pub lost_after_secs: i64,
+    /// Whether work in progress is pushed at each heartbeat (on by default).
+    pub push_work: bool,
 }
 
 impl Default for Applied {
@@ -48,6 +56,7 @@ impl Default for Applied {
         Applied {
             interval_secs: INTERVAL_SECS,
             lost_after_secs: LOST_AFTER_SECS,
+            push_work: true,
         }
     }
 }
@@ -64,15 +73,18 @@ pub fn applied(project: &Project) -> Applied {
     Applied {
         interval_secs: pick(s.interval_minutes, INTERVAL_SECS),
         lost_after_secs: pick(s.lost_after_minutes, LOST_AFTER_SECS),
+        push_work: s.push_work.unwrap_or(true),
     }
 }
 
 /// A change to the heartbeat settings (`alm heartbeat-settings`): each given length (`10m`, `1h`,
-/// or a bare number of minutes) replaces that number; `clear` first goes back to the defaults.
+/// or a bare number of minutes) replaces that number, `push_work` turns pushing work in progress
+/// on or off; `clear` first goes back to the defaults.
 #[derive(Debug, Default)]
 pub struct SettingsChange<'a> {
     pub interval: Option<&'a str>,
     pub lost_after: Option<&'a str>,
+    pub push_work: Option<bool>,
     pub clear: bool,
 }
 
@@ -93,7 +105,7 @@ pub fn parse_minutes(field: &str, text: &str) -> Result<u32, Problem> {
         })
 }
 
-/// The project with its heartbeat settings changed; `heartbeat` goes away when both are back to
+/// The project with its heartbeat settings changed; `heartbeat` goes away when all are back to
 /// their defaults and nothing unknown is kept.
 pub fn set_settings(project: &Project, change: &SettingsChange) -> Result<Project, Problem> {
     let interval = change
@@ -108,12 +120,16 @@ pub fn set_settings(project: &Project, change: &SettingsChange) -> Result<Projec
     if change.clear {
         s.interval_minutes = None;
         s.lost_after_minutes = None;
+        s.push_work = None;
     }
     if interval.is_some() {
         s.interval_minutes = interval;
     }
     if lost.is_some() {
         s.lost_after_minutes = lost;
+    }
+    if let Some(on) = change.push_work {
+        s.push_work = (!on).then_some(false);
     }
     let mut project = project.clone();
     project.heartbeat = (s != Settings::default()).then_some(s);
@@ -139,6 +155,9 @@ pub struct Lost {
     pub silent_seconds: i64,
     /// The limit that applied, in seconds.
     pub lost_after_seconds: i64,
+    /// What the holder last said it was doing (`alm beat --doing`), and when, in UTC.
+    pub doing: Option<String>,
+    pub doing_at: Option<String>,
 }
 
 /// Whether `task` is lost at `now` (seconds since 1970, UTC). `last_change`: the time of the
@@ -172,6 +191,8 @@ pub fn lost(task: &Task, now: i64, lost_after: i64, last_change: Option<&str>) -
         since: format_utc(since),
         silent_seconds: silent,
         lost_after_seconds: lost_after,
+        doing: mine.and_then(|h| h.doing.clone()),
+        doing_at: mine.and_then(|h| h.doing_at.clone()),
     })
 }
 
@@ -188,6 +209,14 @@ pub fn busy_until(task: &Task, now: i64) -> Option<String> {
         .then(|| until.clone())
 }
 
+/// What the holder of `task` last said it is doing (`alm beat --doing`, Task-A01-butter895): its
+/// words and when it said them, in UTC; `None` while it said nothing.
+pub fn doing(task: &Task) -> Option<(&str, Option<&str>)> {
+    let holder = task.holder.as_deref()?;
+    let h = task.heartbeat.as_ref().filter(|h| h.by == holder)?;
+    Some((h.doing.as_deref()?, h.doing_at.as_deref()))
+}
+
 /// The last heartbeat of a held task, in `task.json` as `heartbeat`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Heartbeat {
@@ -199,6 +228,13 @@ pub struct Heartbeat {
     /// the task is not lost, however old `at` is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub busy_until: Option<String>,
+    /// What the session said it is doing (`alm beat --doing`, Task-A01-butter895), one line. A
+    /// later beat or change keeps it until the session says something else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doing: Option<String>,
+    /// When the session last said it, in UTC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doing_at: Option<String>,
     /// Fields this Allomos does not know, kept as they are.
     #[serde(flatten)]
     pub extra: Extra,
@@ -221,14 +257,17 @@ pub enum Beat {
 
 /// `alm beat` for one task, by the session `me`, at `now` (seconds since 1970, UTC). Only the
 /// holder of an `in_progress` task beats (`not_held`, `task_held`). `busy`: a busy window of that
-/// many seconds from now (`0` ends the one running); a declared window is always written. Without
-/// it, a heartbeat younger than half of `interval` (seconds) is not written again: [`Beat::TooSoon`].
-/// A plain beat keeps a busy window that is still running.
+/// many seconds from now (`0` ends the one running); a declared window is always written. `doing`:
+/// what the session is doing now, put on one line (empty takes it off); new words are always
+/// written. Without either, a heartbeat younger than half of `interval` (seconds) is not written
+/// again: [`Beat::TooSoon`]. A plain beat keeps a busy window that is still running and what the
+/// session said it is doing.
 pub fn beat(
     task: &Task,
     me: &str,
     now: i64,
     busy: Option<i64>,
+    doing: Option<&str>,
     interval: i64,
 ) -> Result<Beat, Problem> {
     if task.state != State::InProgress || task.holder.is_none() {
@@ -248,7 +287,10 @@ pub fn beat(
         .as_ref()
         .filter(|h| h.by == me)
         .and_then(|h| parse_utc(&h.at).map(|at| (h, at)));
-    if busy.is_none() {
+    let said = doing.map(|d| d.split_whitespace().collect::<Vec<_>>().join(" "));
+    let said_before = last.and_then(|(h, _)| h.doing.as_deref()).unwrap_or("");
+    let new_words = said.as_deref().is_some_and(|d| d != said_before);
+    if busy.is_none() && !new_words {
         if let Some((_, at)) = last {
             let ago = now - at;
             if (0..interval / 2).contains(&ago) {
@@ -264,6 +306,13 @@ pub fn beat(
     let kept = last
         .and_then(|(h, _)| h.busy_until.clone())
         .filter(|until| busy.is_none() && parse_utc(until).is_some_and(|u| u > now));
+    let (doing, doing_at) = match said {
+        Some(d) if d.is_empty() => (None, None),
+        Some(d) => (Some(d), Some(format_utc(now))),
+        None => last
+            .map(|(h, _)| (h.doing.clone(), h.doing_at.clone()))
+            .unwrap_or_default(),
+    };
     let extra = task
         .heartbeat
         .as_ref()
@@ -277,6 +326,8 @@ pub fn beat(
             Some(_) => None,
             None => kept,
         },
+        doing,
+        doing_at,
         extra,
     });
     Ok(Beat::Written(task))
@@ -284,7 +335,7 @@ pub fn beat(
 
 /// The heartbeat a change to `task` by the session `me` writes along with it (decision 0022 § 5),
 /// at `now`: when `me` holds the task and it is `in_progress`, the heartbeat becomes now (a busy
-/// window still running is kept). A task nobody holds, or no longer `in_progress` (released,
+/// window still running and what the session said it is doing are kept). A task nobody holds, or no longer `in_progress` (released,
 /// waiting, blocked, done, dropped), loses its heartbeat. A change by someone else to a task the
 /// session holds (the app, a person) leaves it as it is.
 pub fn along(task: &mut Task, me: Option<&str>, now: i64) {
@@ -296,12 +347,12 @@ pub fn along(task: &mut Task, me: Option<&str>, now: i64) {
     if task.holder.as_deref() != Some(me) {
         return;
     }
-    let kept = task
-        .heartbeat
-        .as_ref()
-        .filter(|h| h.by == me)
+    let mine = task.heartbeat.as_ref().filter(|h| h.by == me);
+    let kept = mine
         .and_then(|h| h.busy_until.clone())
         .filter(|until| parse_utc(until).is_some_and(|u| u > now));
+    let doing = mine.and_then(|h| h.doing.clone());
+    let doing_at = mine.and_then(|h| h.doing_at.clone());
     let extra = task
         .heartbeat
         .as_ref()
@@ -311,6 +362,8 @@ pub fn along(task: &mut Task, me: Option<&str>, now: i64) {
         at: format_utc(now),
         by: me.to_string(),
         busy_until: kept,
+        doing,
+        doing_at,
         extra,
     });
 }
@@ -474,17 +527,17 @@ mod tests {
     fn only_the_holder_of_a_task_in_progress_beats() {
         let t = held("s1");
         assert!(matches!(
-            beat(&t, "s2", t0(), None, INTERVAL_SECS),
+            beat(&t, "s2", t0(), None, None, INTERVAL_SECS),
             Err(Problem::TaskHeld { .. })
         ));
         let mut ready = t.clone();
         ready.state = State::Ready;
         ready.holder = None;
         assert!(matches!(
-            beat(&ready, "s1", t0(), None, INTERVAL_SECS),
+            beat(&ready, "s1", t0(), None, None, INTERVAL_SECS),
             Err(Problem::NotHeld { .. })
         ));
-        let Ok(Beat::Written(b)) = beat(&t, "s1", t0(), None, INTERVAL_SECS) else {
+        let Ok(Beat::Written(b)) = beat(&t, "s1", t0(), None, None, INTERVAL_SECS) else {
             panic!()
         };
         let h = b.heartbeat.unwrap();
@@ -496,10 +549,10 @@ mod tests {
 
     #[test]
     fn a_beat_under_half_the_interval_writes_nothing() {
-        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, INTERVAL_SECS) else {
+        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, None, INTERVAL_SECS) else {
             panic!()
         };
-        match beat(&t, "s1", t0() + 299, None, INTERVAL_SECS).unwrap() {
+        match beat(&t, "s1", t0() + 299, None, None, INTERVAL_SECS).unwrap() {
             Beat::TooSoon { ago, due, .. } => {
                 assert_eq!(ago, 299);
                 assert_eq!(due, "2026-11-09T14:10:00Z");
@@ -507,25 +560,122 @@ mod tests {
             other => panic!("{other:?}"),
         }
         assert!(matches!(
-            beat(&t, "s1", t0() + 300, None, INTERVAL_SECS).unwrap(),
+            beat(&t, "s1", t0() + 300, None, None, INTERVAL_SECS).unwrap(),
             Beat::Written(_)
         ));
         // A heartbeat of another session (the one before a takeover) does not count.
         let mut other = t.clone();
         other.holder = Some("s2".into());
         assert!(matches!(
-            beat(&other, "s2", t0() + 10, None, INTERVAL_SECS).unwrap(),
+            beat(&other, "s2", t0() + 10, None, None, INTERVAL_SECS).unwrap(),
             Beat::Written(_)
         ));
     }
 
+    /// What the session said it is doing (Task-A01-butter895): new words are always written, a
+    /// plain beat and a change keep them with their time, the same words are no reason to write,
+    /// empty takes them off, and a new holder does not inherit them.
+    #[test]
+    fn what_the_session_is_doing_is_written_kept_and_taken_off() {
+        let beat_at = |t: &Task, at: i64, doing: Option<&str>| {
+            beat(t, "s1", t0() + at, None, doing, INTERVAL_SECS).unwrap()
+        };
+        let Beat::Written(t) = beat_at(&held("s1"), 0, None) else {
+            panic!("the first beat is written");
+        };
+        // New words are written even under half the interval, on one line.
+        let Beat::Written(t) = beat_at(&t, 10, Some("  write the\n dialog   tests ")) else {
+            panic!("new words are written");
+        };
+        let h = t.heartbeat.clone().unwrap();
+        assert_eq!(h.doing.as_deref(), Some("write the dialog tests"));
+        assert_eq!(h.doing_at, Some(format_utc(t0() + 10)));
+        assert_eq!(
+            doing(&t),
+            Some((
+                "write the dialog tests",
+                Some(format_utc(t0() + 10)).as_deref()
+            ))
+        );
+        // The same words add nothing while it is too soon.
+        assert!(matches!(
+            beat_at(&t, 20, Some("write the dialog tests")),
+            Beat::TooSoon { .. }
+        ));
+        // A plain beat keeps the words and their time.
+        let Beat::Written(t) = beat_at(&t, 400, None) else {
+            panic!("a beat past half the interval is written");
+        };
+        let h = t.heartbeat.clone().unwrap();
+        assert_eq!(h.doing.as_deref(), Some("write the dialog tests"));
+        assert_eq!(h.doing_at, Some(format_utc(t0() + 10)));
+        // So does a change the holder makes.
+        let mut changed = t.clone();
+        along(&mut changed, Some("s1"), t0() + 500);
+        assert_eq!(changed.heartbeat.unwrap().doing_at, h.doing_at);
+        // A new holder starts without them.
+        let mut taken = t.clone();
+        taken.holder = Some("s2".to_string());
+        assert_eq!(doing(&taken), None);
+        along(&mut taken, Some("s2"), t0() + 500);
+        assert_eq!(taken.heartbeat.as_ref().unwrap().doing, None);
+        // A lost task says them.
+        let l = lost(&t, t0() + 400 + LOST_AFTER_SECS + 1, LOST_AFTER_SECS, None).unwrap();
+        assert_eq!(l.doing.as_deref(), Some("write the dialog tests"));
+        assert_eq!(l.doing_at, h.doing_at);
+        // Empty takes them off.
+        let Beat::Written(t) = beat_at(&t, 410, Some(" ")) else {
+            panic!("taking the words off is written");
+        };
+        let h = t.heartbeat.unwrap();
+        assert_eq!((h.doing, h.doing_at), (None, None));
+    }
+
+    /// Pushing work in progress at each heartbeat (Task-A01-butter895): on by default, only `false`
+    /// is written, and `clear` puts it back.
+    #[test]
+    fn pushing_work_is_on_by_default_and_only_off_is_written() {
+        let p = project(serde_json::Value::Null);
+        assert!(applied(&p).push_work);
+        let off = set_settings(
+            &p,
+            &SettingsChange {
+                push_work: Some(false),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(!applied(&off).push_work);
+        assert_eq!(off.heartbeat.as_ref().unwrap().push_work, Some(false));
+        let on = set_settings(
+            &off,
+            &SettingsChange {
+                push_work: Some(true),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(applied(&on).push_work);
+        assert_eq!(on.heartbeat, None);
+        let cleared = set_settings(
+            &off,
+            &SettingsChange {
+                clear: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(cleared.heartbeat, None);
+    }
+
     #[test]
     fn busy_windows_are_written_kept_and_ended() {
-        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, INTERVAL_SECS) else {
+        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, None, INTERVAL_SECS) else {
             panic!()
         };
         // Declared even right after a beat.
-        let Ok(Beat::Written(t)) = beat(&t, "s1", t0() + 60, Some(7_200), INTERVAL_SECS) else {
+        let Ok(Beat::Written(t)) = beat(&t, "s1", t0() + 60, Some(7_200), None, INTERVAL_SECS)
+        else {
             panic!()
         };
         let until = "2026-11-09T16:01:00Z";
@@ -534,7 +684,7 @@ mod tests {
             Some(until)
         );
         // A plain beat keeps it while it runs.
-        let Ok(Beat::Written(t)) = beat(&t, "s1", t0() + 1_000, None, INTERVAL_SECS) else {
+        let Ok(Beat::Written(t)) = beat(&t, "s1", t0() + 1_000, None, None, INTERVAL_SECS) else {
             panic!()
         };
         assert_eq!(
@@ -551,7 +701,8 @@ mod tests {
         along(&mut c, Some("s1"), t0() + 9_000);
         assert_eq!(c.heartbeat.as_ref().unwrap().busy_until, None);
         // `0m` ends it.
-        let Ok(Beat::Written(t)) = beat(&t, "s1", t0() + 1_100, Some(0), INTERVAL_SECS) else {
+        let Ok(Beat::Written(t)) = beat(&t, "s1", t0() + 1_100, Some(0), None, INTERVAL_SECS)
+        else {
             panic!()
         };
         assert_eq!(t.heartbeat.unwrap().busy_until, None);
@@ -574,6 +725,7 @@ mod tests {
         let change = SettingsChange {
             interval: Some("15m"),
             lost_after: Some("1h"),
+            push_work: None,
             clear: false,
         };
         let p2 = set_settings(&p, &change).unwrap();
@@ -581,7 +733,8 @@ mod tests {
             applied(&p2),
             Applied {
                 interval_secs: 900,
-                lost_after_secs: 3_600
+                lost_after_secs: 3_600,
+                push_work: true,
             }
         );
         let s = p2.heartbeat.clone().unwrap();
@@ -640,7 +793,7 @@ mod tests {
 
     #[test]
     fn a_task_is_lost_after_the_limit_without_a_heartbeat_or_busy_window() {
-        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, INTERVAL_SECS) else {
+        let Ok(Beat::Written(t)) = beat(&held("s1"), "s1", t0(), None, None, INTERVAL_SECS) else {
             panic!()
         };
         assert_eq!(
@@ -655,7 +808,7 @@ mod tests {
         // The project's own limit.
         assert!(lost(&t, t0() + 700, 600, None).is_some());
         // A busy window still running: not lost, however old the heartbeat.
-        let Ok(Beat::Written(b)) = beat(&t, "s1", t0(), Some(7_200), INTERVAL_SECS) else {
+        let Ok(Beat::Written(b)) = beat(&t, "s1", t0(), Some(7_200), None, INTERVAL_SECS) else {
             panic!()
         };
         assert_eq!(lost(&b, t0() + 7_000, LOST_AFTER_SECS, None), None);
@@ -679,7 +832,8 @@ mod tests {
         let l = lost(&t, t0() + 1_801, LOST_AFTER_SECS, Some(T0)).unwrap();
         assert_eq!((l.heartbeat_at, l.since.as_str()), (None, T0));
         // A former holder's heartbeat does not count for the new one.
-        let Ok(Beat::Written(mut other)) = beat(&t, "s1", t0() + 1_700, None, INTERVAL_SECS) else {
+        let Ok(Beat::Written(mut other)) = beat(&t, "s1", t0() + 1_700, None, None, INTERVAL_SECS)
+        else {
             panic!()
         };
         other.holder = Some("s2".into());

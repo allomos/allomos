@@ -160,7 +160,7 @@ ${held ? `它由 ${holder} 持有，没有失联：原会话可能还在工作�
 1. 阅读：alm show ${id}（它的说明和最新的交接）。
 2. 按 AGENTS.md 的说法认领它${held ? "，带上 --take" : ""}，这就是接手（alm claim ${id}${flag} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
 3. 在原工作分支${w ? ` ${w}` : "（认领时列出）"}上继续：为它开一个你自己的工作树（git worktree add <文件夹> ${w ?? "<工作分支>"}，不带 -b）。
-4. 前一个会话的工作树（认领时列出）里可能有它没提交的改动：可以去看，但不要改动、提交或删除那里的东西；拿不准就问我。
+4. 只有推送过的东西才算数：从工作分支上的提交和交接说明接着做。前一个会话的工作树（认领时列出）里可能有它没提交的改动，但那个文件夹只在它所在的电脑上有用：在同一台电脑上可以去看，但不要改动、提交或删除那里的东西；在另一台电脑上就看工作分支和交接说明。拿不准就问我。
 ${held ? "5. 原会话要到下一次运行 alm 才知道任务被接手，在这之前它可能还会往这个分支推送：提交前先取最新的改动；如果它的提交和你的冲突，告诉我。\n6" : "5"}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
   if (language === "ja") {
@@ -171,7 +171,7 @@ ${held ? `${holder} が引き受けていて、応答なしではありません
 1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
 2. AGENTS.md のとおりに${held ? "、--take を付けて" : ""}引き受けてください。それが引き継ぎになります（alm claim ${id}${flag} --as <あなたのセッション名> --branch <あなたのブランチ> ...）。その引き受けを共有してください。
 3. 元の作業ブランチ${w ? ` ${w}` : "（引き受けたときに表示されます）"}で続けてください：自分専用のワークツリーを作ります（git worktree add <フォルダー> ${w ?? "<作業ブランチ>"}、-b なし）。
-4. 前のセッションのワークツリー（引き受けたときに表示されます）には、コミットされていない変更があるかもしれません：見てもかまいませんが、そこにあるものを変更・コミット・削除しないでください。迷ったら私に聞いてください。
+4. プッシュされたものだけが引き継げます：作業ブランチのコミットと引き継ぎメモから続けてください。前のセッションのワークツリー（引き受けたときに表示されます）にはコミットされていない変更があるかもしれませんが、そのフォルダーが役に立つのは同じコンピューターの上だけです。同じコンピューターでは見てもかまいませんが、そこにあるものを変更・コミット・削除しないでください。別のコンピューターでは作業ブランチと引き継ぎメモを見てください。迷ったら私に聞いてください。
 ${held ? "5. 元のセッションは次に alm を実行するまで引き継がれたことを知らないので、それまでこのブランチにプッシュするかもしれません：コミットの前に最新の変更を取り込み、そのコミットとぶつかったら私に教えてください。\n6" : "5"}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
   return `Take over ${held ? "" : "the lost "}task ${id} ("${task.title}") in this project's taskbag. Run every alm command with ${tb}.
@@ -181,6 +181,6 @@ ${held ? `${holder} holds it and is not lost: its session may still be at work. 
 1. Read it: alm show ${id} (its description and latest handoff note).
 2. Claim it as AGENTS.md says${held ? ", with --take" : ""}; that is the takeover (alm claim ${id}${flag} --as <your session name> --branch <your branch> ...), and share the claim.
 3. Go on on its working branch${w ? `, ${w}` : " (the claim prints it)"}: open a worktree of your own for it (git worktree add <folder> ${w ?? "<working branch>"}, without -b).
-4. The former session's worktree (the claim prints where) may hold changes it never committed: look at them if you need to, but do not change, commit or delete anything there; if unsure, ask me.
+4. Only what was pushed counts: go on from the commits on the working branch and the handoff note. The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note. If unsure, ask me.
 ${held ? "5. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.\n6" : "5"}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
 }

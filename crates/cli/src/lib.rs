@@ -664,6 +664,10 @@ enum Command {
         /// Declare a busy window: how long you will be quiet (45m, 2h, 1h30m; 0m ends it).
         #[arg(long, value_name = "LENGTH")]
         busy: Option<String>,
+        /// Say what you are doing now, in a few words, for whoever may take over; later beats
+        /// keep it until you say something else ("" takes it off).
+        #[arg(long, value_name = "TEXT")]
+        doing: Option<String>,
     },
     /// Set the project folders a task belongs to, by their short names (decision 0019); --none:
     /// no particular folder.
@@ -827,7 +831,12 @@ enum Command {
         /// After how long without a heartbeat (and no busy window) a held task is lost.
         #[arg(long, value_name = "LENGTH")]
         lost_after: Option<String>,
-        /// Back to the defaults (10 and 30 minutes); --interval or --lost-after then still apply.
+        /// Whether a session pushes its work in progress at each heartbeat, to prepare for a
+        /// takeover: `alm beat` reminds it while on (the default).
+        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        push_work: Option<String>,
+        /// Back to the defaults (10 and 30 minutes, pushing on); the other options then still
+        /// apply.
         #[arg(long)]
         clear: bool,
     },
@@ -1195,10 +1204,11 @@ impl Command {
         if let Command::HeartbeatSettings {
             interval,
             lost_after,
+            push_work,
             clear,
         } = self
         {
-            return interval.is_some() || lost_after.is_some() || *clear;
+            return interval.is_some() || lost_after.is_some() || push_work.is_some() || *clear;
         }
         if let Command::AuditSettings {
             identity,
@@ -2903,6 +2913,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::HeartbeatSettings {
             interval,
             lost_after,
+            push_work,
             clear,
         } => heartbeat::settings(
             cli,
@@ -2910,6 +2921,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             &allomos_core::heartbeat::SettingsChange {
                 interval: interval.as_deref(),
                 lost_after: lost_after.as_deref(),
+                push_work: push_work.as_deref().map(|v| v == "on"),
                 clear: *clear,
             },
         ),
@@ -3804,6 +3816,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .heartbeat
                 .as_ref()
                 .map(|h| heartbeat::heartbeat_line(h, allomos_store::now_secs()));
+            let doing_text = allomos_core::heartbeat::doing(&task)
+                .map(|(w, at)| heartbeat::doing_line(w, at, allomos_store::now_secs()));
             let fields = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
@@ -3815,6 +3829,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("labels", labels_text.as_deref()),
                 ("holder", task.holder.as_deref()),
                 ("heartbeat", heartbeat_text.as_deref()),
+                ("doing", doing_text.as_deref()),
                 ("waiting on", task.waiting_on.as_deref()),
                 ("waiting for", task.who.as_deref()),
                 ("blocked by", blocked.as_deref()),
@@ -4127,6 +4142,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "tasks": listed,
                     "lost": held.lost,
                     "busy": held.busy,
+                    "doing": held.doing,
                     "heartbeat_settings": allomos_core::heartbeat::applied(&bag.project),
                     "instruction": instruction,
                     "taking_over": taking_over,
@@ -4735,7 +4751,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = m.issues;
             Ok(done)
         }
-        Command::Beat { id, busy } => heartbeat::beat(cli, cwd, id.as_deref(), busy.as_deref()),
+        Command::Beat { id, busy, doing } => {
+            heartbeat::beat(cli, cwd, id.as_deref(), busy.as_deref(), doing.as_deref())
+        }
         Command::Note { id, text } => change(cli, cwd, |bag| {
             ops::set_handoff_note(bag, id, me, text.as_deref())
         }),
@@ -5057,8 +5075,17 @@ fn took_over_text(root: &Path, t: &allomos_store::TookOver) -> String {
         Some(f) => format!("its claim ran in {f}"),
         None => "alm does not know where".to_string(),
     };
+    if let Some(words) = &t.doing {
+        text.push_str(&format!(
+            "  it was doing: {}\n",
+            heartbeat::doing_line(words, t.doing_at.as_deref(), allomos_store::now_secs())
+        ));
+    }
+    text.push_str(
+        "Fact: only what was pushed counts: go on from the commits on the working branch and the handoff note.\n",
+    );
     text.push_str(&format!(
-        "Fact: {}'s worktree may still hold changes it did not save or share ({place}; on another computer, if it ran there). Look before you redo anything, but do not change, commit or remove what is there: it is not yours. Continue from what was shared on the working branch.\n",
+        "Fact: {}'s worktree may still hold changes it did not save or share ({place}), but that folder is of use only on the computer it ran on; on another computer, go by the working branch and the handoff note. On the same computer, look before you redo anything, but do not change, commit or remove what is there: it is not yours.\n",
         t.from
     ));
     text
@@ -5071,6 +5098,8 @@ fn took_over_json(root: &Path, t: &allomos_store::TookOver) -> Value {
         "folder": t.folder,
         "folder_path": former_folder(root, t),
         "working_branch": t.working,
+        "doing": t.doing,
+        "doing_at": t.doing_at,
     })
 }
 

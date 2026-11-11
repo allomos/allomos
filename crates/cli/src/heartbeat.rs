@@ -27,13 +27,26 @@ pub(crate) fn heartbeat_line(h: &allomos_core::heartbeat::Heartbeat, now: i64) -
     line
 }
 
+/// What a session said it is doing, in plain words (Task-A01-butter895): its words, and how long
+/// ago it said them.
+pub(crate) fn doing_line(words: &str, at: Option<&str>, now: i64) -> String {
+    use allomos_core::heartbeat::{parse_utc, plain_duration};
+    match at.and_then(|a| parse_utc(a).map(|t| (a, t))) {
+        Some((a, t)) => format!("{words} (said {} ago, {a})", plain_duration(now - t)),
+        None => words.to_string(),
+    }
+}
+
 /// `alm beat` (decision 0022, Task-A01-nurse164): write the heartbeat of one task, or of every
-/// task the session holds, and say what was written and when the next one is due.
+/// task the session holds, and say what was written and when the next one is due. While the
+/// project asks for it (Task-A01-butter895), remind the session to push its work in progress too,
+/// with the Git commands as the example: alm runs no Git (decision 0017).
 pub(crate) fn beat(
     cli: &Cli,
     cwd: &Path,
     id: Option<&str>,
     busy: Option<&str>,
+    doing: Option<&str>,
 ) -> Result<Done, Problem> {
     use allomos_core::heartbeat::{self, Beat};
     let busy = busy
@@ -45,7 +58,7 @@ pub(crate) fn beat(
         .transpose()?;
     let root = locate(cli, cwd)?;
     let me = cli.holder.as_deref();
-    let beaten = allomos_store::beat(&root, Actor::alm(me), lock_wait(), id, busy)?;
+    let beaten = allomos_store::beat(&root, Actor::alm(me), lock_wait(), id, busy, doing)?;
     let mut text = String::new();
     let mut list = Vec::new();
     let mut written = false;
@@ -63,6 +76,9 @@ pub(crate) fn beat(
                 text.push_str(&format!("{}: heartbeat written at {}", task.id, h.at));
                 if let Some(until) = &h.busy_until {
                     text.push_str(&format!(", busy until {until}"));
+                }
+                if let Some(words) = &h.doing {
+                    text.push_str(&format!(", doing: {words}"));
                 }
                 text.push_str(&format!("; the next one is due by {due}.\n"));
                 list.push(json!({
@@ -94,9 +110,55 @@ pub(crate) fn beat(
             "A heartbeat counts only once it is shared: save and share it now (other sessions judge from what they pulled).\n",
         );
     }
-    let mut done = Done::new(json!({ "taskbag": root, "beats": list }), text);
+    let push_work = if beaten.push_work {
+        push_work_reminder(&root, &beaten.beats, me.unwrap_or("?"), &mut text)
+    } else {
+        Vec::new()
+    };
+    let mut done = Done::new(
+        json!({ "taskbag": root, "beats": list, "push_work": push_work }),
+        text,
+    );
     done.issues = beaten.issues;
     Ok(done)
+}
+
+/// The reminder to push work in progress with each heartbeat (Task-A01-butter895): what to do and,
+/// for each task beaten for, the Git commands on its working branch. Said on every beat, also one
+/// too soon to write: an automatic heartbeat may have written the last one.
+fn push_work_reminder(
+    root: &Path,
+    beats: &[heartbeat::Beat],
+    me: &str,
+    text: &mut String,
+) -> Vec<Value> {
+    if beats.is_empty() {
+        return Vec::new();
+    }
+    let branches = allomos_store::branches(root);
+    text.push_str(
+        "Also save and share your work in progress on the working branch, half-finished too, with WIP in the commit message: only what is pushed reaches a session on another computer (project setting, `alm heartbeat-settings`). Nothing new since the last time: nothing to do. For Git, in that branch's worktree:\n",
+    );
+    let mut list = Vec::new();
+    for b in beats {
+        let (heartbeat::Beat::Written(task) | heartbeat::Beat::TooSoon { task, .. }) = b;
+        let working = branches.get(&task.id).and_then(|b| b.working.clone());
+        let branch = working.as_deref().unwrap_or("<its working branch>");
+        let commands = [
+            "git add -A".to_string(),
+            format!(
+                "git commit -m \"WIP {}: <what you did>\" -m \"Agent: {me}\"",
+                task.id
+            ),
+            format!("git push origin {branch}"),
+        ];
+        text.push_str(&format!("  {}:\n", task.id));
+        for c in &commands {
+            text.push_str(&format!("    {c}\n"));
+        }
+        list.push(json!({ "id": task.id, "working_branch": working, "git_commands": commands }));
+    }
+    list
 }
 
 /// `alm heartbeat-settings` (decision 0022 § 3, Task-A01-zero387): show the project's two
@@ -107,7 +169,10 @@ pub(crate) fn settings(
     change: &heartbeat::SettingsChange,
 ) -> Result<Done, Problem> {
     let root = locate(cli, cwd)?;
-    let changing = change.interval.is_some() || change.lost_after.is_some() || change.clear;
+    let changing = change.interval.is_some()
+        || change.lost_after.is_some()
+        || change.push_work.is_some()
+        || change.clear;
     let (project, issues, changed) = if changing {
         let lock = Lock::acquire(&root, lock_wait())?;
         let (bag, issues) = taskbag_of(&root, lock.load())?;
@@ -144,6 +209,14 @@ pub(crate) fn settings(
         heartbeat::plain_duration(applied.lost_after_secs),
         mark(written.lost_after_minutes),
     ));
+    text.push_str(&if applied.push_work {
+        format!(
+            "Push work in progress at each heartbeat: on{}: `alm beat` reminds the holding session to commit and push its half-finished work to the working branch, so a session on another computer can go on from it.\n",
+            if written.push_work.is_none() { " (default)" } else { "" },
+        )
+    } else {
+        "Push work in progress at each heartbeat: off: `alm beat` does not remind the holding session. Handoff notes and `alm beat --doing` go on as usual.\n".to_string()
+    });
     // alm tells; the agent checks: a limit no longer than the interval is allowed but said.
     if applied.lost_after_secs <= applied.interval_secs {
         text.push_str(
@@ -166,6 +239,8 @@ pub(crate) struct Held {
     pub text: String,
     pub lost: Vec<Value>,
     pub busy: Vec<Value>,
+    /// Every held task in progress whose holder said what it is doing.
+    pub doing: Vec<Value>,
     /// Whether any task is listed as lost.
     pub any_lost: bool,
 }
@@ -231,6 +306,12 @@ pub(crate) fn held(root: &Path, bag: &Taskbag, tasks: &[&Task], now: i64) -> Hel
             l.holder,
             heartbeat::plain_duration(l.lost_after_seconds)
         ));
+        if let Some(words) = &l.doing {
+            text.push_str(&format!(
+                "  was doing: {}\n",
+                doing_line(words, l.doing_at.as_deref(), now)
+            ));
+        }
         let take = format!(
             "alm claim {} --as <your session name> --branch {}",
             t.id,
@@ -247,14 +328,45 @@ pub(crate) fn held(root: &Path, bag: &Taskbag, tasks: &[&Task], now: i64) -> Hel
     }
     let mut busy_json = Vec::new();
     for (t, until) in &busy {
+        let said = heartbeat::doing(t);
         text.push_str(&format!(
-            "Busy: {} is held by {}, busy until {until} (not lost while it runs).\n",
+            "Busy: {} is held by {}, busy until {until} (not lost while it runs){}.\n",
             t.id,
-            t.holder.as_deref().unwrap_or("?")
+            t.holder.as_deref().unwrap_or("?"),
+            said.map(|(w, at)| format!("; doing: {}", doing_line(w, at, now)))
+                .unwrap_or_default(),
         ));
-        busy_json.push(json!({ "id": t.id, "holder": t.holder, "busy_until": until }));
+        busy_json.push(json!({
+            "id": t.id, "holder": t.holder, "busy_until": until,
+            "doing": said.map(|(w, _)| w), "doing_at": said.and_then(|(_, at)| at),
+        }));
     }
     if !busy.is_empty() {
+        text.push('\n');
+    }
+    // What every other session at work says it is doing (Task-A01-butter895); the lost and the
+    // busy ones were said above.
+    let mut doing_json = Vec::new();
+    let mut at_work = false;
+    for t in tasks.iter().filter(|t| t.state == State::InProgress) {
+        let Some((words, at)) = heartbeat::doing(t) else {
+            continue;
+        };
+        doing_json.push(json!({
+            "id": t.id, "holder": t.holder, "doing": words, "doing_at": at,
+        }));
+        if lost.iter().any(|(l, _)| l.id == t.id) || busy.iter().any(|(b, _)| b.id == t.id) {
+            continue;
+        }
+        at_work = true;
+        text.push_str(&format!(
+            "Doing: {} is held by {}: {}.\n",
+            t.id,
+            t.holder.as_deref().unwrap_or("?"),
+            doing_line(words, at, now)
+        ));
+    }
+    if at_work {
         text.push('\n');
     }
     Held {
@@ -262,5 +374,6 @@ pub(crate) fn held(root: &Path, bag: &Taskbag, tasks: &[&Task], now: i64) -> Hel
         text,
         lost: lost_json,
         busy: busy_json,
+        doing: doing_json,
     }
 }

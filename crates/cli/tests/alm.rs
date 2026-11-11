@@ -2623,7 +2623,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v35)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v36)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2633,7 +2633,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v35)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v36)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -7773,6 +7773,130 @@ fn ok_at(dir: &Path, now: &str, args: &[&str]) -> Value {
     v
 }
 
+/// What a session is doing, and pushing work in progress (Task-A01-butter895): `--doing` goes in the
+/// heartbeat and no event; `alm next`, `alm show` and a takeover say it with its time; `alm beat`
+/// prints the commands to push work in progress while the project's setting is on, and not after
+/// it is turned off; the claim says only what was pushed counts.
+#[test]
+fn beats_say_what_a_session_is_doing_and_remind_to_push_work() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-01"]);
+    let t0 = "2026-11-09T14:00:00Z";
+    ok_at(
+        &repo,
+        t0,
+        &[
+            "--as",
+            "s1",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--working",
+            "claude/x",
+        ],
+    );
+    let events = event_count(&repo);
+
+    // New words are written at once, even under half the interval, and no event records them.
+    let t1 = "2026-11-09T14:01:00Z";
+    let v = ok_at(
+        &repo,
+        t1,
+        &["--as", "s1", "beat", "--doing", "write the dialog tests"],
+    );
+    assert_eq!(v["beats"][0]["written"], true, "{v}");
+    assert_eq!(event_count(&repo), events);
+    assert_eq!(
+        task_file(&repo, "A01-01")["heartbeat"],
+        json!({ "at": t1, "by": "s1", "doing": "write the dialog tests", "doing_at": t1 })
+    );
+
+    // The reminder: the commands on the working branch.
+    assert_eq!(v["push_work"][0]["id"], "A01-01", "{v}");
+    assert_eq!(v["push_work"][0]["working_branch"], "claude/x");
+    assert_eq!(
+        v["push_work"][0]["git_commands"],
+        json!([
+            "git add -A",
+            "git commit -m \"WIP A01-01: <what you did>\" -m \"Agent: s1\"",
+            "git push origin claude/x",
+        ])
+    );
+    // Also on a beat too soon to write: an automatic heartbeat may have written the last one.
+    let v = ok_at(&repo, t1, &["--as", "s1", "beat"]);
+    assert_eq!(v["beats"][0]["written"], false, "{v}");
+    assert_eq!(v["push_work"][0]["id"], "A01-01", "{v}");
+
+    // alm next and alm show say it, with its time.
+    let v = ok_at(&repo, "2026-11-09T14:05:00Z", &["next"]);
+    assert_eq!(
+        v["doing"],
+        json!([{ "id": "A01-01", "holder": "s1", "doing": "write the dialog tests", "doing_at": t1 }]),
+        "{v}"
+    );
+    assert_eq!(v["heartbeat_settings"]["push_work"], true);
+    let out = alm_at(&repo, "2026-11-09T14:05:00Z", &["next"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("Doing: A01-01 is held by s1: write the dialog tests (said 4 min ago"),
+        "{text}"
+    );
+    let text = String::from_utf8_lossy(&alm(&repo, &["show", "A01-01"]).stdout).into_owned();
+    assert!(
+        text.contains("doing: write the dialog tests (said"),
+        "{text}"
+    );
+    assert_eq!(
+        ok(&repo, &["show", "A01-01"])["task"]["heartbeat"]["doing_at"],
+        t1
+    );
+
+    // Lost: alm next says what it was doing; the takeover repeats it and says only pushes count.
+    let later = "2026-11-09T16:00:00Z";
+    let v = ok_at(&repo, later, &["next"]);
+    assert_eq!(v["lost"][0]["doing"], "write the dialog tests", "{v}");
+    assert_eq!(v["lost"][0]["doing_at"], t1);
+    let v = ok_at(
+        &repo,
+        later,
+        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+    );
+    assert_eq!(v["took_over"]["doing"], "write the dialog tests", "{v}");
+    assert_eq!(v["took_over"]["doing_at"], t1);
+    // The words were the former holder's: the new holder starts without them.
+    assert_eq!(
+        task_file(&repo, "A01-01")["heartbeat"],
+        json!({ "at": later, "by": "s2" })
+    );
+
+    // Turned off: written in project.json, and alm beat no longer reminds.
+    let v = ok(&repo, &["heartbeat-settings", "--push-work", "off"]);
+    assert_eq!(v["heartbeat"], json!({ "push_work": false }), "{v}");
+    assert_eq!(v["applied"]["push_work"], false);
+    let v = ok_at(
+        &repo,
+        "2026-11-09T16:10:00Z",
+        &["--as", "s2", "beat", "--doing", "go on"],
+    );
+    assert_eq!(v["beats"][0]["written"], true, "{v}");
+    assert_eq!(v["push_work"], json!([]), "{v}");
+    let text = String::from_utf8_lossy(&alm(&repo, &["heartbeat-settings"]).stdout).into_owned();
+    assert!(
+        text.contains("Push work in progress at each heartbeat: off"),
+        "{text}"
+    );
+
+    // On again: the default, so nothing is written.
+    let v = ok(&repo, &["heartbeat-settings", "--push-work", "on"]);
+    assert_eq!(v["heartbeat"], Value::Null, "{v}");
+    let text = String::from_utf8_lossy(&alm(&repo, &["heartbeat-settings"]).stdout).into_owned();
+    assert!(
+        text.contains("Push work in progress at each heartbeat: on (default)"),
+        "{text}"
+    );
+}
+
 /// Heartbeats (decision 0022, Task-A01-nurse164): `alm beat` writes the holder's last heartbeat
 /// into the task's file and no event; under half the interval it writes nothing; `--busy` records a
 /// busy window; with no ID it beats for every task the session holds; the holder's changes beat
@@ -8032,7 +8156,7 @@ fn next_lists_lost_tasks_and_busy_windows() {
     let v = ok(&repo, &["heartbeat-settings"]);
     assert_eq!(
         v["applied"],
-        json!({ "interval_secs": 600, "lost_after_secs": 1800 })
+        json!({ "interval_secs": 600, "lost_after_secs": 1800, "push_work": true })
     );
     let v = ok(
         &repo,
@@ -8176,11 +8300,14 @@ fn claim_takes_over_a_lost_task() {
     assert_eq!(task["heartbeat"]["at"], t1);
     // The claim's event records whom it was taken from, and when.
     let h = ok(&repo, &["history", "A01-01"]);
-    let e = &h["events"][0];
-    assert_eq!(
-        (e["command"].as_str(), e["at"].as_str(), e["by"].as_str()),
-        (Some("claim"), Some(t1), Some("s2"))
-    );
+    // Found by its holder, not its place: `ready` ran on the real clock, after this fixed date.
+    let e = h["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["command"] == "claim" && e["by"] == "s2")
+        .unwrap();
+    assert_eq!(e["at"].as_str(), Some(t1));
     assert_eq!(
         e["changes"][0],
         json!({ "field": "holder", "from": "s1", "to": "s2" })

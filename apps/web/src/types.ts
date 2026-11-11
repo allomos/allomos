@@ -15,7 +15,7 @@ export interface Project {
   project_folders?: { name: string; path: string }[];
   /** How often holding sessions beat and when a held task is lost, in whole minutes (decision
    * 0022 § 3, Task-A01-zero387); a missing number takes its default (10 and 30). */
-  heartbeat?: { interval_minutes?: number; lost_after_minutes?: number };
+  heartbeat?: { interval_minutes?: number; lost_after_minutes?: number; push_work?: boolean };
 }
 
 /** One label of the project's label table (decision 0020): its name, an optional meaning, and
@@ -69,6 +69,10 @@ export interface Heartbeat {
   by: string;
   /** The end of a busy window it declared (`alm beat --busy`), in UTC. */
   busy_until?: string;
+  /** What it said it is doing (`alm beat --doing`, Task-A01-butter895). */
+  doing?: string;
+  /** When it said so, in UTC. */
+  doing_at?: string;
 }
 
 export interface Task {

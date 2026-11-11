@@ -123,7 +123,7 @@ claude/s1 holds it, but has sent no heartbeat for over 30 minutes and has no bus
 1. Read it: alm show A01-50 (its description and latest handoff note).
 2. Claim it as AGENTS.md says; that is the takeover (alm claim A01-50 --as <your session name> --branch <your branch> ...), and share the claim.
 3. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
-4. The former session's worktree (the claim prints where) may hold changes it never committed: look at them if you need to, but do not change, commit or delete anything there; if unsure, ask me.
+4. Only what was pushed counts: go on from the commits on the working branch and the handoff note. The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note. If unsure, ask me.
 5. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
   );
 });
@@ -160,7 +160,7 @@ claude/s1 holds it and is not lost: its session may still be at work. I asked fo
 1. Read it: alm show A01-50 (its description and latest handoff note).
 2. Claim it as AGENTS.md says, with --take; that is the takeover (alm claim A01-50 --take --as <your session name> --branch <your branch> ...), and share the claim.
 3. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
-4. The former session's worktree (the claim prints where) may hold changes it never committed: look at them if you need to, but do not change, commit or delete anything there; if unsure, ask me.
+4. Only what was pushed counts: go on from the commits on the working branch and the handoff note. The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note. If unsure, ask me.
 5. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.
 6. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
   );

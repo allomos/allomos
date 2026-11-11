@@ -1,7 +1,8 @@
 // Heartbeat settings (Task-A01-osprey500, decision 0022 § 3): the Heartbeat section of the
 // taskbag's settings shows and changes the two numbers `alm heartbeat-settings` shows and changes
-// (project.json's `heartbeat`): how often a session holding a task beats, and after how long
-// without one a held task is lost. After a save the taskbag is read again, so the task list's Lost
+// (project.json's `heartbeat`): how often a session holding a task beats, after how long without
+// one a held task is lost, and whether work in progress is pushed at each heartbeat
+// (Task-A01-butter895). After a save the taskbag is read again, so the task list's Lost
 // tags follow the new limit.
 
 import { useEffect, useState } from "react";
@@ -15,6 +16,7 @@ export function HeartbeatSection({ messenger, root, onChanged }: { messenger: Me
   const [settings, setSettings] = useState<HeartbeatSettings | null>(null);
   const [interval, setInterval] = useState("");
   const [lostAfter, setLostAfter] = useState("");
+  const [pushWork, setPushWork] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -23,6 +25,7 @@ export function HeartbeatSection({ messenger, root, onChanged }: { messenger: Me
     setSettings(s);
     setInterval(String(s.applied_interval_minutes));
     setLostAfter(String(s.applied_lost_after_minutes));
+    setPushWork(s.applied_push_work);
   };
   useEffect(() => {
     messenger.heartbeatSettings(root).then(fill, (e) => setError(isProblem(e) ? problem(e) : String(e)));
@@ -46,7 +49,7 @@ export function HeartbeatSection({ messenger, root, onChanged }: { messenger: Me
 
   const save = () => {
     if (!settings) return;
-    const checked = changeOf(settings, { field: t("heartbeat_settings.interval_name"), text: interval }, { field: t("heartbeat_settings.lost_after_name"), text: lostAfter });
+    const checked = changeOf(settings, { field: t("heartbeat_settings.interval_name"), text: interval }, { field: t("heartbeat_settings.lost_after_name"), text: lostAfter }, pushWork);
     if (!checked.ok) {
       setSaved(false);
       setError(problem(checked.problem));
@@ -79,6 +82,11 @@ export function HeartbeatSection({ messenger, root, onChanged }: { messenger: Me
             <span className="muted small">{mark(settings?.lost_after_minutes)}</span>
           </span>
         </label>
+        <label className="choice">
+          <input type="checkbox" checked={pushWork} onChange={(e) => setPushWork(e.target.checked)} disabled={busy || !settings} />
+          {t("heartbeat_settings.push_work")}
+        </label>
+        <p className="muted small">{t("heartbeat_settings.push_work_note")}</p>
       </div>
       {settings && i >= 1 && l >= 1 && limitTooShort(i, l) && <p className="muted small">{t("heartbeat_settings.too_short")}</p>}
       {error && <p className="banner error">{error}</p>}

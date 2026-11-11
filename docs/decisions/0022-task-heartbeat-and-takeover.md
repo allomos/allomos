@@ -80,6 +80,8 @@ Before a long quiet step (a long build, a test run), the agent declares how long
 - Claiming a task that is held and **not** lost is still refused, as today, unless `--take` is passed.
 - **Amended 2026-11-11** (approver, task `A01-rocket260`): a person may take over any held task that is not finished from the app (**Take over…** in the task pane), lost or not, for example to go on with another agent or account. The new session claims it with `--take`, and its request says the person asked. `--take` is used only when the holder has stopped or a person asks for the takeover; an agent on its own still takes over only lost tasks. A holder that is not lost learns of the takeover at its next `alm` command (§ 8), up to about one heartbeat interval later, and until then both sessions may commit and push on the working branch, so the app warns before it opens anything.
 
+- **Amended 2026-11-11** (approver, task `A01-butter895`): a takeover may happen on another computer, and only what is pushed reaches it. A holder updates its handoff note after each small step and says what it is doing with `alm beat --doing` (a part of the heartbeat field, so no event, § 2). A project setting, on by default, asks it to commit and push its work in progress after each small step and at every heartbeat, so at most one interval of work is lost; `alm` only reminds and prints the commands ([0017](./0017-agents-run-git-not-alm.md)). The former holder's worktree is of use only on the computer it ran on; elsewhere the new session goes by the working branch and the handoff note.
+
 *Not chosen:* a new branch for the new session (loses the old work or needs a merge of two branches of one task); asking the approver before each takeover (a lost task would then wait for a person, against quiet mode); `alm` itself resolving a race (it never runs Git).
 
 ### 7. Takeover chains
@@ -120,3 +122,5 @@ No reminder or escalation when a task is lost several times in a row (discussed 
 2026-11-09, will.w.hui: **Accepted**, with one addition made that day: a session whose task was taken over gives the task up (§ 8). The agent's three routine choices (English and number 0022; field names left to the implementation card; the two implied points in § 6 and § 8) were reviewed and kept.
 
 2026-11-11, will.w.hui: amended § 6: a person may take over any held task from the app (task `A01-rocket260`).
+
+2026-11-11, will.w.hui: amended § 6: work in progress is pushed at each heartbeat, by a project setting that is on by default, and a heartbeat can say what the session is doing (task `A01-butter895`).
