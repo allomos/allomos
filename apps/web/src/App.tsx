@@ -10,6 +10,7 @@ import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
 import { MoveCardsDialog } from "./MoveCardsDialog";
 import { ProceedDialog } from "./ProceedDialog";
+import { HandoverDialog } from "./HandoverDialog";
 import { cardRows, cardsNotice, oldHandoffs, tasksInStart } from "./moveCardsFlow";
 import type { MoveIn } from "./moveCardsFlow";
 import { directStep, neverConnected, newFiles, stillMissing } from "./setupFlow";
@@ -1715,6 +1716,9 @@ function TaskbagView({
   };
   /** The task Work on it… is open for (Task-A03-galley051). */
   const [proceeding, setProceeding] = useState<Task | null>(null);
+  /** The task Hand over to another agent… is open for; its dialog follows the task as it changes. */
+  const [handingOver, setHandingOver] = useState<string | null>(null);
+  const handOverTask = handingOver ? box?.tasks.find((t) => t.id === handingOver) : undefined;
   // Monitor ready tasks (Task-A03-moth285): the desktop app only, where agent sessions run. The
   // dialog opens from the top bar or the active iteration's card.
   const monitor = useMonitor({ messenger, root: opened.root, active: activeIteration, onError: onFailure });
@@ -1879,6 +1883,7 @@ function TaskbagView({
                 folders={folders}
                 onOpenSession={canOpenSessions ? () => messenger.openAgentSession(opened.root, selected.id) : undefined}
                 onTakeOver={canOpenSessions ? () => setProceeding(selected) : undefined}
+                onHandOver={canOpenSessions ? () => setHandingOver(selected.id) : undefined}
                 lostAfter={lostAfter}
                 lastChange={opened.last_changed?.[selected.id]}
               />
@@ -1910,6 +1915,26 @@ function TaskbagView({
             monitor.start(scope, agents, quiet, every, sessions, difficulties);
           }}
           onClose={() => setMonitorFrom(null)}
+        />
+      )}
+      {handOverTask && (
+        <HandoverDialog
+          messenger={messenger}
+          root={opened.root}
+          task={handOverTask}
+          interval={intervalMinutes(box?.project)}
+          lostAfter={lostAfter}
+          lastChange={opened.last_changed?.[handOverTask.id]}
+          working={opened.branches?.[handOverTask.id]?.working ?? null}
+          canOpenSession={canOpenSessions}
+          onTakeOver={() => {
+            setHandingOver(null);
+            setProceeding(handOverTask);
+          }}
+          onClose={(message) => {
+            setHandingOver(null);
+            if (message) onNotice(message);
+          }}
         />
       )}
       {proceeding && (
