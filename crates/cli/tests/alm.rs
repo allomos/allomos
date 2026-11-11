@@ -7871,7 +7871,7 @@ fn beats_say_what_a_session_is_doing_and_remind_to_push_work() {
     );
 
     // Turned off: written in project.json, and alm beat no longer reminds.
-    let v = ok(&repo, &["heartbeat-settings", "--push-work", "off"]);
+    let v = ok(&repo, &["heartbeat-settings", "--wip", "off"]);
     assert_eq!(v["heartbeat"], json!({ "push_work": false }), "{v}");
     assert_eq!(v["applied"]["push_work"], false);
     let v = ok_at(
@@ -7888,7 +7888,7 @@ fn beats_say_what_a_session_is_doing_and_remind_to_push_work() {
     );
 
     // On again: the default, so nothing is written.
-    let v = ok(&repo, &["heartbeat-settings", "--push-work", "on"]);
+    let v = ok(&repo, &["heartbeat-settings", "--wip", "on"]);
     assert_eq!(v["heartbeat"], Value::Null, "{v}");
     let text = String::from_utf8_lossy(&alm(&repo, &["heartbeat-settings"]).stdout).into_owned();
     assert!(

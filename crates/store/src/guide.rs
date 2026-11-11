@@ -263,7 +263,7 @@ Work a task:
   its holder, how long it has been silent, the limit and the command to take it over; and the held
   tasks in a busy window. `alm` takes nothing over: you check the task (its holder, its handoff
   note) and decide. Waiting, blocked and released tasks are never lost.
-  `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--push-work on|off]
+  `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--wip on|off]
   [--clear]` shows or changes the two numbers and whether work in progress is pushed at each
   heartbeat (project settings; on by default).
 - After `claim`, `session`, `label`, `wait`, `block`, `release`, `handoff` and `done`, `alm` lists

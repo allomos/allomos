@@ -833,7 +833,7 @@ enum Command {
         lost_after: Option<String>,
         /// Whether a session pushes its work in progress at each heartbeat, to prepare for a
         /// takeover: `alm beat` reminds it while on (the default).
-        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        #[arg(long = "wip", value_name = "on|off", value_parser = ["on", "off"])]
         push_work: Option<String>,
         /// Back to the defaults (10 and 30 minutes, pushing on); the other options then still
         /// apply.
