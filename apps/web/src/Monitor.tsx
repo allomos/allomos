@@ -33,8 +33,6 @@ import {
 import type { Frequency, LastRun, LostRun, Levels, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
 import { LevelsPicker } from "./MonitorDialog";
 import { useAgentAccounts } from "./useAgentAccounts";
-import { usePaced } from "./usePaced";
-import { MONITOR_IDLE_MS, MONITOR_MS } from "./paceFlow";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -113,9 +111,24 @@ export function useMonitor({
     setLost([]);
     setLast(readLast(root));
   }, [root]);
-  // The runs' files are read again often while the window is in use, slowly in the background
-  // (Task-A03-reef286).
-  usePaced(() => void read(), MONITOR_MS, MONITOR_IDLE_MS, [read]);
+  // Read when the project opens, then again whenever the app's monitor loop says the runs changed
+  // (Task-A03-spider528): the window no longer asks on its own.
+  useEffect(() => {
+    void read();
+    let live = true;
+    let stop: (() => void) | undefined;
+    void messenger
+      .onMonitorsChanged(() => void read())
+      .then((un) => {
+        if (live) stop = un;
+        else un();
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [messenger, read]);
 
   // The read a resume effect uses: it runs once per opening of the project, not per change of
   // `active`.

@@ -4,17 +4,15 @@ import type { Messenger } from "./messenger";
 import type { VersionCheck } from "./types";
 import { updateNotice, updateTaskbagLines, upgradeFrom } from "./versionFlow";
 
-/** How often the notice checks again: an agent's update shows without reopening. */
-const VERSION_CHECK_MS = 4000;
-
 /** The one **Update the taskbag…** banner (Task-A03-train969): every reason the taskbag needs
  * updating, each on a line of its own, under a single button that opens the dialog covering them
  * all (Task-A03-27). The reasons: Allomos's instructions are out of date (Task-A01-25); the taskbag
  * was written by an older Allomos (Task-A01-45: the old folder is renamed aside, a new taskbag
  * created, and an agent moves the tasks across); card files still in the project folder
  * (Task-A00-30, A01-51); old handoff files (Task-A03-polar770). The version is asked when the
- * folder opens (every way of opening one) and every few seconds while it is open. Allomos never
- * changes the tasks or the instructions itself. */
+ * folder opens (every way of opening one) and again whenever the window finds the taskbag's
+ * files changed (`changes`), not on a timer (Task-A03-spider528): an agent's update shows without
+ * reopening. Allomos never changes the tasks or the instructions itself. */
 export function UpdateTaskbagNotice({
   messenger,
   root,
@@ -22,9 +20,12 @@ export function UpdateTaskbagNotice({
   handoffs,
   onUpdate,
   onOlder,
+  changes,
 }: {
   messenger: Messenger;
   root: string;
+  /** Goes up each time the window finds the taskbag's files changed. */
+  changes: number;
   /** How many tasks keep their card files in the project folder. */
   cards: number;
   /** How many old handoff files the taskbag still keeps. */
@@ -40,19 +41,16 @@ export function UpdateTaskbagNotice({
   const [check, setCheck] = useState<VersionCheck | null>(null);
   useEffect(() => {
     let live = true;
-    setCheck(null);
-    const look = () =>
-      messenger
-        .versionCheck(root)
-        .then((c) => live && setCheck(c))
-        .catch(() => undefined);
-    void look();
-    const timer = window.setInterval(() => void look(), VERSION_CHECK_MS);
+    void messenger
+      .versionCheck(root)
+      .then((c) => live && setCheck(c))
+      .catch(() => undefined);
     return () => {
       live = false;
-      window.clearInterval(timer);
     };
-  }, [messenger, root]);
+  }, [messenger, root, changes]);
+  // Another project: nothing shown until its own answer comes.
+  useEffect(() => setCheck(null), [root]);
   const [busy, setBusy] = useState(false);
   const notice = updateNotice(check);
   const older = notice?.kind === "move_in";
