@@ -631,6 +631,7 @@ pub fn new_task(
         folders: Default::default(),
         session: None,
         heartbeat: None,
+        handover_request: None,
         extra: Default::default(),
         id: id.to_string(),
         title,
@@ -675,6 +676,7 @@ pub fn claim(
     task.holder = Some(me);
     task.state = State::InProgress;
     clear_stop(&mut task);
+    task.handover_request = None;
     Ok(Outcome::warned(task, warnings))
 }
 
@@ -939,6 +941,7 @@ pub fn finish(
     }
     task.state = State::Done;
     clear_stop(&mut task);
+    task.handover_request = None;
     Ok(Outcome::warned(task, warnings))
 }
 
@@ -1017,6 +1020,7 @@ pub fn release(
     }
     check_holder(&task, me)?;
     task.holder = None;
+    task.handover_request = None;
     if task.state == State::InProgress {
         task.state = State::Ready;
     }
@@ -1163,10 +1167,12 @@ fn with_evidence(description: &str, entry: &str) -> String {
 pub fn task_version(task: &crate::model::Task) -> String {
     // FNV-1a, 64 bits: the same on every computer and Rust version.
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    // A heartbeat is not a change of the task (decision 0022): it leaves the version as it is.
-    let json = if task.heartbeat.is_some() {
+    // A heartbeat is not a change of the task (decision 0022): it leaves the version as it is. A
+    // request to hand over only tells the holder (Task-A01-minnow200): the holder's copy stays good.
+    let json = if task.heartbeat.is_some() || task.handover_request.is_some() {
         let mut t = task.clone();
         t.heartbeat = None;
+        t.handover_request = None;
         serde_json::to_string(&t).unwrap_or_default()
     } else {
         serde_json::to_string(task).unwrap_or_default()
@@ -1452,6 +1458,7 @@ pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcom
     check_open(&task, &[State::Done, State::Dropped])?;
     task.state = State::Dropped;
     task.holder = None;
+    task.handover_request = None;
     clear_stop(&mut task);
     Ok(Outcome::plain(task))
 }

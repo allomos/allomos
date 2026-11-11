@@ -1205,6 +1205,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             folders: Default::default(),
             session: None,
             heartbeat: None,
+            handover_request: None,
             extra: Default::default(),
             id: id.into(),
             title: title.into(),
@@ -2692,6 +2693,34 @@ pub fn claim_task(
     })
 }
 
+/// Ask the session holding task `id` to hand it over to `to` (Task-A01-minnow200): the app's
+/// **Hand over to another agent…**. One `request-handover` event, under the lock.
+pub fn request_handover(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    to: &str,
+) -> Result<Changed, Problem> {
+    let at = allomos_core::heartbeat::format_utc(now_secs());
+    change_task(root, actor, wait, |bag| {
+        allomos_core::handover::request(bag, id, actor.by, to, &at).map(|o| (o, "request-handover"))
+    })
+}
+
+/// Take back a request to hand task `id` over (Task-A01-minnow200). One `cancel-handover` event,
+/// under the lock.
+pub fn cancel_handover(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Changed, Problem> {
+    change_task(root, actor, wait, |bag| {
+        allomos_core::handover::cancel(bag, id).map(|o| (o, "cancel-handover"))
+    })
+}
+
 /// Change task `id`'s base to `name` (`alm base`, Task-A03-22): one `base` event, under the lock;
 /// the task's files do not change. Returns the task and its branches after it.
 pub fn set_base(
@@ -3629,6 +3658,50 @@ mod tests {
                 fs::write(&path, text.replace('\n', "\r\n")).unwrap();
             }
         }
+    }
+
+    /// Task-A01-minnow200: the app's request and Cancel go through the lock and leave an event each.
+    #[test]
+    fn a_handover_request_is_written_and_cancelled_with_events() {
+        let dir = tmp("handover");
+        let root = default_root(&dir);
+        init(&root, "p", "P").unwrap();
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        let mut task = ops::new_task(&bag, "A01-01", "A01", "Do it", None).unwrap();
+        task.holder = Some("s1".into());
+        task.state = State::InProgress;
+        lock.create_task(&task).unwrap();
+        drop(lock);
+
+        let app = Actor {
+            by: Some("will"),
+            via: "app",
+        };
+        let asked = request_handover(&root, app, Duration::ZERO, "A01-01", "codex_cli").unwrap();
+        let request = asked.task.handover_request.expect("written");
+        assert_eq!(
+            (
+                request.holder.as_str(),
+                request.by.as_deref(),
+                request.to.as_str()
+            ),
+            ("s1", Some("will"), "codex_cli")
+        );
+        let loaded = load(&root).taskbag.unwrap();
+        assert!(loaded.tasks[0].handover_request.is_some());
+        assert_eq!(loaded.tasks[0].holder.as_deref(), Some("s1"));
+
+        cancel_handover(&root, app, Duration::ZERO, "A01-01").unwrap();
+        let loaded = load(&root).taskbag.unwrap();
+        assert!(loaded.tasks[0].handover_request.is_none());
+        let (all, _) = events::list(&root);
+        let commands: Vec<&str> = all.iter().map(|e| e.command.as_str()).collect();
+        assert!(commands.contains(&"request-handover"), "{commands:?}");
+        assert!(commands.contains(&"cancel-handover"), "{commands:?}");
     }
 
     #[test]

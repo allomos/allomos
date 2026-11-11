@@ -246,6 +246,11 @@ problems! {
     /// A notice given first to a session coming back (decision 0022 § 8, Task-A01-castle658): a
     /// task it held was taken over by another session. Its changes to the task are refused.
     TakenOver { id, by, at } => "taken_over", "Task {id} was taken over by {by} at {at}: you no longer hold it. Stop work on it: no more commits or pushes to its working branch, and do not claim it back. Leave your worktree as it is, tell the person the task was taken over and by whom, and go on with another ready task (`alm next`) or end.";
+    /// A notice given first to the session holding a task (Task-A01-minnow200): a person asked it
+    /// to hand the task over. It only tells; `to` is the agent the task is to go to.
+    HandoverRequested { id, by, at, to } => "handover_requested", "{by} asked at {at} that you hand task {id} over to another agent ({to}). Finish the small step you are on and start nothing new on it. Write your handoff (`alm handoff {id}`), commit and push your work to the working branch, then release the task (`alm release {id} --note \"<what the next one needs, and the working branch>\"`) and share that change. Then stop work on it: a new session takes it from there.";
+    /// A request to hand a task over named no agent to give it to (Task-A01-minnow200).
+    HandoverAgentMissing => "handover_agent_missing", "Say which agent the task is to go to.";
     /// A taskbag file with a version control tool's conflict markers in it: two changes to it met
     /// (Task-A01-lawn320).
     MergeConflict => "merge_conflict", "This file has conflict markers from your version control tool: two changes to it met when you got the latest changes. alm cannot read it until the conflict is resolved.";

@@ -43,6 +43,7 @@ import {
 import { canReopen, reopenEdit } from "./reopenFlow";
 import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
 import { HeartbeatLine, TakeOverButton } from "./Heartbeat";
+import { HandoverButton } from "./HandoverDialog";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
 import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
@@ -72,6 +73,7 @@ export function TaskPane({
   folders,
   onOpenSession,
   onTakeOver,
+  onHandOver,
   onApprove,
   onWithdraw,
   lostAfter,
@@ -113,6 +115,8 @@ export function TaskPane({
   /** Take over… (Task-A03-flock345): opens the takeover dialog (pick an agent, a new session claims the
    * task). The button shows for every held task that is not finished (Task-A01-rocket260); desktop only. */
   onTakeOver?: () => void;
+  /** Hand over to another agent… (Task-A01-minnow200); left out where agents cannot be opened. */
+  onHandOver?: () => void;
   /** Approves the task's plan, as `alm approve` (channel app): `shown` is the description the
    * person read; `ready` also makes a backlog task ready (Task-A01-baker800). Desktop only.
    * Rejects with a Problem. */
@@ -662,6 +666,7 @@ export function TaskPane({
           <h2>
             <span className="id">{task.id}</span> {task.title} {changeButton("title")} {topButton}
             {onTakeOver && <> <TakeOverButton task={task} lostAfter={lostAfter} lastChange={lastChange} anyHolder onTakeOver={onTakeOver} /></>}
+            {onHandOver && <> <HandoverButton task={task} onHandOver={onHandOver} /></>}
           </h2>
         )}
         <button type="button" className="close" onClick={onClose} title={t("pane.close")} aria-label={t("pane.close")}>

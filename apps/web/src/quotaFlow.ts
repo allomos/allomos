@@ -28,6 +28,13 @@ export function agentId(reported: string): string {
   return word;
 }
 
+/** The newest 5-hour report of the agent behind a picker choice (`claude_cli`, `codex_app`, …). */
+export function quotaOfChoice(reports: QuotaReport[], choice: string): QuotaReport | null {
+  const agent = agentId(choice);
+  const mine = reports.filter((r) => agentId(r.agent) === agent && r.window === "5h");
+  return mine.sort((a, b) => b.at.localeCompare(a.at))[0] ?? null;
+}
+
 /** Every report under its folded agent id, newest first. */
 function folded(reports: QuotaReport[]): QuotaReport[] {
   return reports.map((r) => ({ ...r, agent: agentId(r.agent) })).sort((a, b) => b.at.localeCompare(a.at));

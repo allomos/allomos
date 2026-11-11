@@ -518,6 +518,11 @@ pub struct Task {
     /// task is no longer held and in progress.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeat: Option<crate::heartbeat::Heartbeat>,
+    /// A person's request that the holding session hand the task over (Task-A01-minnow200): only
+    /// tells that session. Gone once the task is released, claimed or finished, or the request
+    /// is cancelled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handover_request: Option<crate::handover::HandoverRequest>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,

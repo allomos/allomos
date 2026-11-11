@@ -170,6 +170,13 @@
     "folders"
   ],
   "handoff_empty": [],
+  "handover_agent_missing": [],
+  "handover_requested": [
+    "id",
+    "by",
+    "at",
+    "to"
+  ],
   "heartbeat_minutes_invalid": [
     "field",
     "value"

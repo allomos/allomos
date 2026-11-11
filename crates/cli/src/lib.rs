@@ -1512,6 +1512,8 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     // A session coming back (decision 0022 § 8, Task-A01-castle658): the tasks taken over from
     // it are named first, and its changes to them refused.
     let taken = takeover::look(&cli, cwd);
+    // A person asked this session to hand a task over (Task-A01-minnow200): said first as well.
+    let handovers = handover::look(&cli, cwd);
     // Two claims of one task that met (Task-A01-lawn320): said first, with the next ready task.
     let races = race::look(&cli, cwd);
     // A one-time number (Task-A01-58): a repeat returns the first result; a new number marks
@@ -1610,6 +1612,7 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                     .iter()
                     .map(|r| r.notice())
                     .chain(taken.iter().map(|t| t.notice()))
+                    .chain(handovers.iter().map(|h| h.notice()))
                     .chain(done.warnings.iter().cloned())
                     .map(|w| problem_json(&w))
                     .collect();
@@ -1617,11 +1620,15 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 if !taken.is_empty() {
                     out["taken_over"] = takeover::json(&taken);
                 }
+                if !handovers.is_empty() {
+                    out["handover_requested"] = handover::json(&handovers);
+                }
                 race::json(&races, &mut out);
                 stdout.push_str(&format!("{out}\n"));
             } else {
                 stdout.push_str(&race::text(&races));
                 stdout.push_str(&takeover::text(&taken));
+                stdout.push_str(&handover::text(&handovers));
                 stdout.push_str(&done.text);
                 for w in &done.warnings {
                     stderr.push_str(&format!("warning [{}]: {}\n", w.code(), w.english()));
@@ -1669,10 +1676,14 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
                 if !taken.is_empty() {
                     line["taken_over"] = takeover::json(&taken);
                 }
+                if !handovers.is_empty() {
+                    line["handover_requested"] = handover::json(&handovers);
+                }
                 stdout.push_str(&format!("{line}\n"));
             } else {
                 stderr.push_str(&race::text(&races));
                 stderr.push_str(&takeover::text(&taken));
+                stderr.push_str(&handover::text(&handovers));
                 stderr.push_str(&format!(
                     "error [{}]: {}\n",
                     problem.code(),
@@ -2635,6 +2646,7 @@ mod classify;
 mod effects;
 mod exceptions;
 mod folders;
+mod handover;
 mod heartbeat;
 mod links;
 mod monitor;
@@ -3818,6 +3830,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .map(|h| heartbeat::heartbeat_line(h, allomos_store::now_secs()));
             let doing_text = allomos_core::heartbeat::doing(&task)
                 .map(|(w, at)| heartbeat::doing_line(w, at, allomos_store::now_secs()));
+            let handover_text = allomos_core::handover::pending(&task).map(|r| {
+                let by = r.by.as_deref().unwrap_or("a person");
+                format!("to {}, of {}, asked by {by} at {}", r.to, r.holder, r.at)
+            });
             let fields = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
@@ -3835,6 +3851,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("blocked by", blocked.as_deref()),
                 ("next dependency", task.next_dependency.as_deref()),
                 ("handoff note", task.handoff_note.as_deref()),
+                ("handover requested", handover_text.as_deref()),
                 ("not human-checked", task.without_human_check.as_deref()),
             ];
             // For `alm title` / `alm describe --expected-version` (Task-A01-57).

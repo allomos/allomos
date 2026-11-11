@@ -665,6 +665,15 @@ const WORKFLOW: &str = "# How to work the tasks
    commits or pushes to its working branch, and do not claim it back), leave your worktree as it
    is, tell the person in your conversation that it was taken over and by whom, and go on with
    another ready task (`alm next`) or end.
+   **Asked to hand over** (Task-A01-minnow200). A person can ask, in the app, that the session
+   holding a task hand it to another agent. Any `alm` command run with `--as <your session name>`
+   then first says so (`notice [handover_requested]`), so you learn of it within one heartbeat
+   interval at most. Do it yourself: finish the small step you are on and start nothing new on the
+   task, write your handoff (`alm handoff <id>`), commit and push your work to the working branch,
+   and release the task (`alm release <id> --note \"<what the next one needs, and the working
+   branch>\"`), then share that change. Stop work on it there: a new session claims it and goes on
+   on the working branch. The request names only you, and ends with the release, any claim, done
+   or dropped, or when the person cancels it; if the notice is gone, carry on as before.
    **When Git cannot write the checkout** (Task-A03-pier032): `Operation not permitted` on
    `.git/…` (as in Codex's sandbox) means your agent may not change the repository from where
    it runs. Stop and say so: the agent needs Allomos's rules for Codex (`alm guide

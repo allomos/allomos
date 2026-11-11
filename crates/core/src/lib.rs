@@ -18,6 +18,7 @@ pub mod effect;
 pub mod event;
 pub mod exception;
 pub mod folders;
+pub mod handover;
 pub mod heartbeat;
 pub mod ids;
 pub mod labels;

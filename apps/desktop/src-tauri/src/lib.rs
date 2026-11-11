@@ -8,6 +8,7 @@ mod agents;
 mod alm_command;
 mod audit;
 mod codex_rules;
+mod handover;
 mod heartbeat_settings;
 mod lan;
 mod monitor_menu;
@@ -2694,6 +2695,8 @@ pub fn run() {
             show_in_file_manager,
             open_task_link,
             open_agent_session,
+            handover::request_handover,
+            handover::cancel_handover,
             system_languages,
             save_ui_language,
             owner_name,
