@@ -346,6 +346,8 @@
   "problem.took_over": "已从 {previous} 接手任务 {id}。",
   "problem.took_over_lost": "已从 {previous} 接手任务 {id}：它已失联，{previous} 自 {since} 起再没有动静。",
   "problem.taken_over": "任务 {id} 已于 {at} 被 {by} 接手：你不再担当它。请停止做这个任务：不再向它的工作分支提交或推送，也不要把它领回来。你的 worktree 原样留下，告诉你为之工作的人：任务已被谁接手，然后去做别的就绪任务（`alm next`）或结束。",
+  "problem.handover_requested": "{by} 于 {at} 请你把任务 {id} 交给另一个智能体（{to}）。做完手头这一小步，不要再开始新的工作。写好交接（`alm handoff {id}`），把工作提交并推送到工作分支，然后释放任务（`alm release {id} --note \"<下一位需要知道的，以及工作分支>\"`），并把这个改动分享出去。之后停止做这个任务：会有新会话接着做。",
+  "problem.handover_agent_missing": "请说明要把任务交给哪个智能体。",
   "problem.merge_conflict": "这个文件里有版本控制工具留下的冲突标记：拉取最新改动时，对它的两处改动撞在了一起。冲突解决之前，alm 读不了它。",
   "problem.claim_lost": "任务 {id} 被两个会话同时领取，{holder} 的领取（最后心跳 {at}）先分享出去：任务归 {holder}，不归你。不要做它。丢掉你自己的领取，也就是版本控制工具没能分享出去的那个改动（Git 里，在 `git pull --rebase` 当中：`git rebase --skip`；用的是普通 `git pull` 时：先 `git merge --abort`，再 `git pull --rebase` 和 `git rebase --skip`），然后去领别的就绪任务（`alm next`）。",
   "problem.claim_race": "任务 {id} 被两个会话同时领取：{first}（最后心跳 {first_at}）和 {second}（最后心跳 {second_at}）。先分享出去的领取，也就是随最新改动拉下来的那个，领到了任务；推送被拒的会话丢掉自己的领取（在 `git pull --rebase` 当中 `git rebase --skip`），去领别的就绪任务。",

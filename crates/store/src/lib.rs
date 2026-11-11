@@ -1205,6 +1205,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
             folders: Default::default(),
             session: None,
             heartbeat: None,
+            handover_request: None,
             extra: Default::default(),
             id: id.into(),
             title: title.into(),
@@ -2689,6 +2690,35 @@ pub fn claim_task(
         },
         branches: at,
         took_over,
+    })
+}
+
+/// Ask the session holding task `id` to hand it over to `to` (Task-A01-minnow200): the app's
+/// **Hand over to another agent…**. One `request-handover` event, under the lock.
+pub fn request_handover(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+    to: &str,
+) -> Result<Changed, Problem> {
+    let at = allomos_core::heartbeat::format_utc(now_secs());
+    change_task(root, actor, wait, |bag| {
+        allomos_core::handover::request(bag, id, actor.by, to, &at)
+            .map(|o| (o, "request-handover"))
+    })
+}
+
+/// Take back a request to hand task `id` over (Task-A01-minnow200). One `cancel-handover` event,
+/// under the lock.
+pub fn cancel_handover(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    id: &str,
+) -> Result<Changed, Problem> {
+    change_task(root, actor, wait, |bag| {
+        allomos_core::handover::cancel(bag, id).map(|o| (o, "cancel-handover"))
     })
 }
 

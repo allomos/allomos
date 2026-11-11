@@ -225,6 +225,7 @@ mod tests {
             folders: Default::default(),
             session: None,
             heartbeat: None,
+            handover_request: None,
             extra: Default::default(),
             id: "A01-1".into(),
             title: "Build".into(),

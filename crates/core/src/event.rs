@@ -214,6 +214,7 @@ pub const TASK_FIELDS: &[&str] = &[
     "blocked_by",
     "next_dependency",
     "handoff_note",
+    "handover_request",
     "without_human_check",
     "human_check_steps",
     // The note's name before allomos/4: events recorded then still name it.
@@ -373,6 +374,7 @@ mod tests {
             folders: Default::default(),
             session: None,
             heartbeat: None,
+            handover_request: None,
             extra: Default::default(),
             id: "A01-01".into(),
             title: "First".into(),

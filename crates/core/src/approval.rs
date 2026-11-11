@@ -333,6 +333,7 @@ mod tests {
             folders: Default::default(),
             session: None,
             heartbeat: None,
+            handover_request: None,
             extra: Default::default(),
             id: id.into(),
             title: "T".into(),
