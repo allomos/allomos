@@ -340,21 +340,29 @@ button.link:hover { text-decoration: underline; }
   font-weight: 900; line-height: 1.18; letter-spacing: .01em; font-size: clamp(28px, min(4.4vw, 6.2vh), 58px);
 }
 .welcome .lede { font-size: clamp(15px, min(1.6vw, 2.4vh), 19px); color: var(--muted); max-width: 60ch; }
-.welcome-start { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 8px; }
-.welcome .start { font-size: 15px; padding: 11px 28px; border-radius: 999px; }
-.welcome-start .muted { font-size: 13px; }
-/* Task-A05-road243: Create a new project… and Set up an existing project side by side; they stack
-   on a narrow window. */
-.welcome-actions { display: flex; flex-wrap: wrap; gap: 10px 12px; }
-@media (max-width: 520px) { .welcome-actions { flex-direction: column; align-items: stretch; width: 100%; } }
-/* Open recent… under the start page's card, at its left edge, and its dialog (Task-A01-43). The card
-   itself is unchanged; the wrapper takes its width and centring. */
-/* The card and the buttons under it fill the page's height, the card's content centred inside it,
-   so the margins around them stay even (Task-A05-gusto837); in a very tall window the block stops
-   growing and the auto margins centre it. */
+/* The three choices, one row each inside the card: icon, title with its hint under it, arrow
+   (design A, approver, 2026-11-11; Task-A01-hose447). The three icons share one style. Rows get
+   shorter with the window's height, so the card still fits without scrolling (Task-A05-11). */
+.welcome-choices { display: grid; gap: clamp(6px, 1vh, 8px); margin-top: clamp(2px, 0.6vh, 8px); max-width: 520px; }
+.welcome-choice {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  text-align: left; padding: clamp(6px, 1.2vh, 12px) 16px; border-radius: 12px; font-size: 15px;
+}
+.welcome-choice:hover { background: var(--bg); }
+.welcome-choice-icon {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px;
+  background: var(--bg); color: var(--ink);
+}
+.welcome-choice:hover .welcome-choice-icon { background: var(--surface); color: var(--accent-ink); }
+.welcome-choice-text { display: grid; gap: 2px; }
+.welcome-choice-text strong { font-weight: 600; }
+.welcome-choice-text .muted { font-size: 13px; font-weight: 400; line-height: 1.4; }
+.welcome-choice-arrow { color: var(--muted); font-size: 22px; line-height: 1; }
+/* The card fills the page's height, its content centred inside it, so the margins around it stay
+   even (Task-A05-gusto837); in a very tall window it stops growing and the auto margins centre it. */
 .welcome-wrap {
   width: min(1120px, 100%); flex: 1 0 auto; max-height: 840px; margin: auto; display: grid;
-  grid-template-rows: 1fr auto; gap: 12px; justify-items: start;
+  grid-template-rows: 1fr; justify-items: start;
 }
 .welcome-wrap > .welcome { width: 100%; margin: 0; display: grid; align-content: center; }
 .recent-dialog { grid-template-rows: auto minmax(0, 1fr); width: min(560px, 100%); }
@@ -799,9 +807,7 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .refresh-line { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .refresh-line button.link { align-self: baseline; font-size: inherit; }
 .refresh-line button.link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
-/* Under the start page's card, Open recent… (Task-A01-43); the Create a new project… dialog
-   (Task-A03-25-02). */
-.welcome-under { display: flex; flex-wrap: wrap; gap: 8px; }
+/* The Create a new project… dialog (Task-A03-25-02). */
 .build-app .build-description { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; min-height: 7.5em; }
 .build-app .banner code { overflow-wrap: anywhere; }
 .build-app .agent-list .hint { margin: 2px 0 0 24px; }

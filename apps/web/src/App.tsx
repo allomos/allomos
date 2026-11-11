@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
 import type { Language, Message } from "./i18n";
@@ -1091,10 +1091,11 @@ function LanguagePicker() {
 }
 
 /** The first screen with nothing open: the road show's opening slide (slogan, a task shifting
- * between agents and a teammate around the taskbag), with two buttons side by side
- * (Task-A05-road243): Create a new project…, which opens the Build a new app dialog
- * (Task-A03-25-02), then Set up an existing project, which opens the setup wizard (Task-A05-03).
- * Under the card, Open recent… (Task-A01-43). */
+ * between agents and a teammate around the taskbag), with three choices inside the card, one row
+ * each with its own hint under its title (design A, approver, 2026-11-11; Task-A01-hose447):
+ * Create a new project…, which opens the Create a new project dialog (Task-A03-25-02); Set up an
+ * existing project…, which opens the setup wizard (Task-A05-03); Open recent…, which opens the
+ * recent projects dialog (Task-A01-43). */
 function Welcome({
   onOpen,
   onBuild,
@@ -1120,28 +1121,65 @@ function Welcome({
               <em className="phrase">{t("welcome.keep")}</em>
             </h1>
             <p className="lede">{t("welcome.lede")}</p>
-            <div className="welcome-start">
-              <div className="welcome-actions">
-                <button type="button" className="start welcome-build" onClick={onBuild}>
-                  {t("build.button")}
-                </button>
-                <button type="button" className="primary start" onClick={onOpen}>
-                  {t("welcome.open")}
-                </button>
-              </div>
-              <span className="muted">{t("welcome.hint")}</span>
+            <div className="welcome-choices">
+              <WelcomeChoice icon="plus" title={t("build.button")} hint={t("welcome.build_hint")} onClick={onBuild} />
+              <WelcomeChoice icon="folder" title={t("welcome.open")} hint={t("welcome.open_hint")} onClick={onOpen} />
+              <WelcomeChoice
+                icon="clock"
+                title={t("welcome.open_recent")}
+                hint={t("welcome.recent_hint")}
+                onClick={onRecent}
+                buttonRef={recentRef}
+              />
             </div>
           </div>
           <HopFigure />
         </div>
       </section>
-      {/* Under the card, at its left edge (owner, 2026-10-15; Task-A01-43). */}
-      <div className="welcome-under">
-        <button type="button" ref={recentRef} className="welcome-recent" onClick={onRecent}>
-          {t("welcome.open_recent")}
-        </button>
-      </div>
     </div>
+  );
+}
+
+/** One of the start page's choices: an icon, the title, its hint under it, and an arrow; the whole
+ * row is the button. Its name is the title; the hint describes it. */
+function WelcomeChoice({
+  icon,
+  title,
+  hint,
+  onClick,
+  buttonRef,
+}: {
+  icon: "plus" | "folder" | "clock";
+  title: string;
+  hint: string;
+  onClick: () => void;
+  buttonRef?: RefObject<HTMLButtonElement | null>;
+}) {
+  const hintId = useId();
+  return (
+    <button type="button" ref={buttonRef} className="welcome-choice" onClick={onClick} aria-label={title} aria-describedby={hintId}>
+      <span className="welcome-choice-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {icon === "plus" && <path d="M12 5v14M5 12h14" />}
+          {icon === "folder" && <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />}
+          {icon === "clock" && (
+            <>
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 7.5V12l3 2" />
+            </>
+          )}
+        </svg>
+      </span>
+      <span className="welcome-choice-text">
+        <strong>{title}</strong>
+        <span id={hintId} className="muted">
+          {hint}
+        </span>
+      </span>
+      <span className="welcome-choice-arrow" aria-hidden="true">
+        ›
+      </span>
+    </button>
   );
 }
 
