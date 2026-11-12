@@ -184,6 +184,16 @@ impl Run {
         }
     }
 
+    /// Which tasks the run takes from the next check on (A03-yolk481). The sessions at work
+    /// finish their tasks; a task the run already took is not given again. An iteration with no
+    /// ID is ignored.
+    pub fn set_scope(&mut self, scope: Scope) {
+        if matches!(&scope, Scope::Iteration { id } if id.trim().is_empty()) {
+            return;
+        }
+        self.scope = scope;
+    }
+
     /// The free session slots: each agent once for every session it may still start (its count
     /// less the sessions at work), in the run's order.
     pub fn free_agents(&self) -> Vec<String> {
@@ -665,6 +675,35 @@ mod tests {
             1,
         );
         assert_eq!(r.unfilled(&[]), ["claude_cli"]);
+    }
+
+    #[test]
+    fn a_new_scope_counts_from_the_next_share_and_keeps_the_sessions_at_work() {
+        let mut r = run(&["claude_cli"]);
+        r.set_sessions("claude_cli", 2);
+        let mut a: Task = leveled("A01-1", 3);
+        a.iteration = Some("I-1".into());
+        let mut b: Task = leveled("A01-2", 3);
+        b.iteration = Some("I-2".into());
+        r.take("claude_cli", &a, None, None, 1);
+        r.set_scope(Scope::Iteration { id: "I-2".into() });
+        let mut bag = bag_of(vec![a.clone(), b.clone()]);
+        for (id, order) in [("I-1", 1), ("I-2", 2)] {
+            bag.iterations.push(
+                serde_json::from_value(serde_json::json!({ "id": id, "name": id, "order": order }))
+                    .unwrap(),
+            );
+        }
+        let shares = r.share(&bag, 0);
+        assert_eq!(shares.len(), 1);
+        assert_eq!(shares[0].1.id, "A01-2");
+        // The session at work is kept.
+        assert_eq!(r.working.len(), 1);
+        // An iteration with no ID is ignored.
+        r.set_scope(Scope::Iteration { id: " ".into() });
+        assert_eq!(r.scope, Scope::Iteration { id: "I-2".into() });
+        r.set_scope(Scope::All);
+        assert_eq!(r.scope, Scope::All);
     }
 
     #[test]

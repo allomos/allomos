@@ -61,6 +61,10 @@ pub(crate) enum MonitorWhat {
         #[arg(long = "run", value_name = "ID|PID")]
         run: Option<String>,
     },
+    /// Change a running monitor's settings from its next check on (A03-yolk481): which tasks, the
+    /// run mode, the frequency, the agents, their sessions and difficulty ranges. The sessions at
+    /// work finish their tasks with the settings they were started with.
+    Set(SetArgs),
     /// This project's monitors: each run's ID, its tasks, agents, the tasks being worked, and the
     /// next check.
     Status,
@@ -108,6 +112,37 @@ pub(crate) struct StartArgs {
     difficulty: Vec<String>,
 }
 
+/// What `alm monitor set` changes; whatever is not given stays as it is.
+#[derive(Args, Clone)]
+pub(crate) struct SetArgs {
+    /// The run, by its ID (from `alm monitor status`); needed when the project has several.
+    #[arg(long = "run", value_name = "ID")]
+    run: Option<String>,
+    /// From now on only tasks planned in this iteration.
+    #[arg(long, conflicts_with = "all_tasks")]
+    iteration: Option<String>,
+    /// From now on every ready task, whatever its iteration.
+    #[arg(long = "all-tasks")]
+    all_tasks: bool,
+    /// The run mode new sessions are given: quiet or normal.
+    #[arg(long, value_name = "quiet|normal")]
+    mode: Option<String>,
+    /// How often to check when no task is ready, in minutes: 1, 5, 10, 30, 60, 90 or 120.
+    #[arg(long, value_name = "MINUTES")]
+    every: Option<u32>,
+    /// The agents to give tasks to from now on (repeat for several): one of those the run
+    /// offered when it started. One left out finishes the task its session works.
+    #[arg(long = "agent", value_name = "AGENT")]
+    agents: Vec<String>,
+    /// How many sessions an agent may have at work at once, as AGENT=N.
+    #[arg(long = "sessions", value_name = "AGENT=N")]
+    sessions: Vec<String>,
+    /// The difficulties an agent takes tasks from, as [AGENT=]RANGE (without an agent, every
+    /// agent of the run).
+    #[arg(long = "difficulty", value_name = "[AGENT=]RANGE")]
+    difficulty: Vec<String>,
+}
+
 impl MonitorWhat {
     pub(crate) fn name(&self) -> &'static str {
         match self {
@@ -116,6 +151,7 @@ impl MonitorWhat {
             MonitorWhat::Resume => "monitor resume",
             MonitorWhat::Check { .. } => "monitor check",
             MonitorWhat::Stop { .. } => "monitor stop",
+            MonitorWhat::Set(_) => "monitor set",
             MonitorWhat::Status => "monitor status",
             MonitorWhat::List => "monitor list",
             MonitorWhat::CloseTab { .. } => "monitor close-tab",
@@ -786,6 +822,38 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 }
             }
         }
+        MonitorWhat::Set(args) => {
+            let root = crate::locate(cli, cwd)?;
+            let entries = registry::of_project(&dir, &root);
+            let chosen = choose(&entries, args.run.as_deref(), "set")?;
+            let Entry::Running(r) = chosen else {
+                return Err(Problem::BadUsage {
+                    detail: format!(
+                        "process {}: its run file is missing, so its settings cannot be changed; `alm monitor stop --run {}` ends it",
+                        chosen.pid(),
+                        chosen.pid()
+                    ),
+                });
+            };
+            let (bag, _) = allomos_store::taskbag_of(&root, allomos_store::load(&root))?;
+            let (requests, said) = set_requests(args, &r.run, &bag.iterations)?;
+            if requests.is_empty() {
+                return Err(Problem::BadUsage {
+                    detail: "nothing to change: give --iteration, --all-tasks, --mode, --every, --agent, --sessions or --difficulty".to_string(),
+                });
+            }
+            for req in &requests {
+                ask(&dir, &r.id, req)?;
+            }
+            Ok(Done::new(
+                json!({ "taskbag": root, "run": r.id, "asked": requests }),
+                format!(
+                    "Asked monitor {} to change: {}. It counts from the next check on; the sessions at work finish their tasks with the settings they were started with. `alm monitor status` shows the new settings.\n",
+                    r.id,
+                    said.join("; ")
+                ),
+            ))
+        }
         MonitorWhat::Status => {
             let root = crate::locate(cli, cwd)?;
             let entries = registry::of_project(&dir, &root);
@@ -820,6 +888,107 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
             ))
         }
     }
+}
+
+/// The requests `alm monitor set` leaves for `run`, in the order the run takes them (scope, mode,
+/// frequency, agents, then each agent's sessions and range), with what each one says; checked
+/// like `start` checks its flags. An agent must be one the run offered.
+fn set_requests(
+    args: &SetArgs,
+    run: &Run,
+    iterations: &[allomos_core::Iteration],
+) -> Result<(Vec<Request>, Vec<String>), Problem> {
+    let mut out = Vec::new();
+    let mut said = Vec::new();
+    if let Some(id) = &args.iteration {
+        if !iterations.iter().any(|i| &i.id == id) {
+            return Err(Problem::UnknownIteration {
+                iteration: id.clone(),
+            });
+        }
+        out.push(Request::Scope {
+            scope: Scope::Iteration { id: id.clone() },
+        });
+        said.push(format!("tasks of iteration {id}"));
+    } else if args.all_tasks {
+        out.push(Request::Scope { scope: Scope::All });
+        said.push("every ready task".to_string());
+    }
+    if let Some(mode) = &args.mode {
+        let quiet = match mode.trim() {
+            "quiet" => true,
+            "normal" => false,
+            other => {
+                return Err(Problem::BadUsage {
+                    detail: format!("--mode {other}: use quiet or normal"),
+                });
+            }
+        };
+        out.push(Request::Mode { quiet });
+        said.push(format!("{} mode", if quiet { "quiet" } else { "normal" }));
+    }
+    if let Some(every) = args.every {
+        if !FREQUENCIES.contains(&every) {
+            return Err(Problem::BadUsage {
+                detail: format!(
+                    "--every {every}: use one of 1, 5, 10, 30, 60, 90 or 120 (minutes)"
+                ),
+            });
+        }
+        out.push(Request::Every { minutes: every });
+        said.push(format!("every {every} min"));
+    }
+    let mut agents = run.agents.clone();
+    if !args.agents.is_empty() {
+        agents.clear();
+        for given in &args.agents {
+            let id = agent_key(given)?;
+            if !run.offered.contains(&id) {
+                return Err(Problem::BadUsage {
+                    detail: format!(
+                        "--agent {given}: not one of the agents this run can give tasks to ({}); start another monitor for it",
+                        run.offered
+                            .iter()
+                            .map(|a| agent_word(a))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                });
+            }
+            if !agents.contains(&id) {
+                agents.push(id);
+            }
+        }
+        out.push(Request::Agents {
+            agents: agents.clone(),
+        });
+        said.push(format!(
+            "agents {}",
+            agents
+                .iter()
+                .map(|a| agent_word(a))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    for (agent, count) in sessions_of(&args.sessions, &agents)? {
+        said.push(format!("{} sessions {count}", agent_word(&agent)));
+        out.push(Request::Sessions { agent, count });
+    }
+    for (agent, range) in difficulties_of(&args.difficulty, &agents)? {
+        let targets = match agent {
+            Some(a) => vec![a],
+            None => agents.clone(),
+        };
+        for a in targets {
+            said.push(format!("{} difficulty {range}", agent_word(&a)));
+            out.push(Request::Difficulty {
+                agent: a,
+                range: range.clone(),
+            });
+        }
+    }
+    Ok((out, said))
 }
 
 fn ask(dir: &Path, id: &str, request: &Request) -> Result<(), Problem> {
@@ -864,6 +1033,95 @@ mod tests {
         assert!(
             difficulties_of(&["claude-code=1-2".to_string()], &["codex_cli".to_string()]).is_err()
         );
+    }
+
+    fn set_args() -> SetArgs {
+        SetArgs {
+            run: None,
+            iteration: None,
+            all_tasks: false,
+            mode: None,
+            every: None,
+            agents: vec![],
+            sessions: vec![],
+            difficulty: vec![],
+        }
+    }
+
+    /// A03-yolk481: `alm monitor set` asks for each change given, in order, and checks them.
+    #[test]
+    fn set_asks_for_each_change_given() {
+        let agents = vec!["claude_cli".to_string(), "codex_cli".to_string()];
+        let run = Run::start(
+            Scope::All,
+            vec!["claude_cli".to_string()],
+            agents,
+            true,
+            30,
+            0,
+        );
+        let its: Vec<allomos_core::Iteration> = vec![
+            serde_json::from_value(json!({ "id": "I-2", "name": "Two", "order": 2 })).unwrap(),
+        ];
+        let mut a = set_args();
+        a.iteration = Some("I-2".into());
+        a.mode = Some("normal".into());
+        a.every = Some(5);
+        a.agents = vec!["claude-code".into(), "codex".into()];
+        a.sessions = vec!["codex=2".into()];
+        a.difficulty = vec!["1-3".into()];
+        let (reqs, said) = set_requests(&a, &run, &its).unwrap();
+        assert_eq!(
+            reqs,
+            vec![
+                Request::Scope {
+                    scope: Scope::Iteration { id: "I-2".into() }
+                },
+                Request::Mode { quiet: false },
+                Request::Every { minutes: 5 },
+                Request::Agents {
+                    agents: vec!["claude_cli".into(), "codex_cli".into()]
+                },
+                Request::Sessions {
+                    agent: "codex_cli".into(),
+                    count: 2
+                },
+                Request::Difficulty {
+                    agent: "claude_cli".into(),
+                    range: "1-3".into()
+                },
+                Request::Difficulty {
+                    agent: "codex_cli".into(),
+                    range: "1-3".into()
+                },
+            ]
+        );
+        assert_eq!(said.len(), reqs.len());
+        // Every ready task again; nothing else changes.
+        let mut b = set_args();
+        b.all_tasks = true;
+        assert_eq!(
+            set_requests(&b, &run, &its).unwrap().0,
+            vec![Request::Scope { scope: Scope::All }]
+        );
+        // An unknown iteration, a bad mode or frequency, and an agent the run did not offer are refused.
+        let mut c = set_args();
+        c.iteration = Some("I-9".into());
+        assert!(set_requests(&c, &run, &its).is_err());
+        let mut c = set_args();
+        c.mode = Some("loud".into());
+        assert!(set_requests(&c, &run, &its).is_err());
+        let mut c = set_args();
+        c.every = Some(7);
+        assert!(set_requests(&c, &run, &its).is_err());
+        let mut c = set_args();
+        c.agents = vec!["antigravity".into()];
+        assert!(set_requests(&c, &run, &its).is_err());
+        // Sessions of an agent not in the run (without --agent) are refused.
+        let mut c = set_args();
+        c.sessions = vec!["codex=2".into()];
+        assert!(set_requests(&c, &run, &its).is_err());
+        assert!(set_requests(&set_args(), &run, &its).unwrap().0.is_empty());
     }
 
     #[test]

@@ -249,6 +249,8 @@ impl Loop {
                     run.set_difficulty(&agent, &range);
                 }
             }
+            Request::Scope { scope } => run.set_scope(scope),
+            Request::Mode { quiet } => run.quiet = quiet,
         }
         true
     }

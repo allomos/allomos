@@ -21,7 +21,11 @@ export type MonitorRequest =
   | { action: "agents"; agents: string[] }
   | { action: "sessions"; agent: string; count: number }
   /** The difficulty levels an agent takes tasks from, from the next check on, as `1-3` or `4` (Task-A03-wave335). */
-  | { action: "difficulty"; agent: string; range: string };
+  | { action: "difficulty"; agent: string; range: string }
+  /** Which tasks the run takes from the next check on (A03-yolk481). */
+  | { action: "scope"; scope: { kind: "all" } | { kind: "iteration"; id: string } }
+  /** The run mode new sessions are given (A03-yolk481). */
+  | { action: "mode"; quiet: boolean };
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { AgentAccount, AgentAccounts } from "./monitorFlow";

@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 use fs4::{FileExt, TryLockError};
 use serde::{Deserialize, Serialize};
 
-use crate::flow::Run;
+use crate::flow::{Run, Scope};
 
 /// The run file's format.
 pub const FORMAT: u32 = 1;
@@ -195,6 +195,12 @@ pub enum Request {
     /// The difficulty range one agent takes tasks from, from the next check on, as `1-3` or `4`
     /// (Task-A03-wave335).
     Difficulty { agent: String, range: String },
+    /// Which tasks the run takes, from the next check on (A03-yolk481): every ready task or one
+    /// iteration's. The sessions at work finish their tasks.
+    Scope { scope: Scope },
+    /// The run mode the sessions started from now on are given (A03-yolk481): quiet or normal.
+    /// The sessions at work keep the mode they were started with.
+    Mode { quiet: bool },
 }
 
 /// Leave `request` for run `id` in `dir`; its process takes it within about a second.
@@ -781,6 +787,25 @@ mod tests {
         assert!(take_requests(&d, "m-1").is_empty());
         assert_eq!(take_requests(&d, "m-2"), [Request::Stop]);
         fs::remove_dir_all(&d).unwrap();
+    }
+
+    /// A03-yolk481: what the app sends to change the scope and the run mode.
+    #[test]
+    fn scope_and_mode_requests_read_as_the_app_writes_them() {
+        let scope: Request =
+            serde_json::from_str(r#"{"action":"scope","scope":{"kind":"iteration","id":"I-2"}}"#)
+                .unwrap();
+        assert_eq!(
+            scope,
+            Request::Scope {
+                scope: Scope::Iteration { id: "I-2".into() }
+            }
+        );
+        let all: Request =
+            serde_json::from_str(r#"{"action":"scope","scope":{"kind":"all"}}"#).unwrap();
+        assert_eq!(all, Request::Scope { scope: Scope::All });
+        let mode: Request = serde_json::from_str(r#"{"action":"mode","quiet":false}"#).unwrap();
+        assert_eq!(mode, Request::Mode { quiet: false });
     }
 
     #[test]
