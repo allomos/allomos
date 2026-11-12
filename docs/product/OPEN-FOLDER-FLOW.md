@@ -24,7 +24,7 @@ A folder **with** `.allomos` opens directly, and the app walks the same checks i
 
 ### The first screen
 
-- With nothing open (the first start, or the last folder is gone), the window shows the headline "The work *always carries on*" (the website's, since A07-inlet317; A07-quilt943), its short explanation and the drawing of a task shifting between agents and a teammate around the taskbag, and one button, **Start**, with the hint "Select a folder where you want to keep your tasks". **Start** opens the wizard at step 1. The top bar has no folder button on this page.
+- With nothing open (the first start, or the last folder is gone), the window shows the headline "Development in the AI era: *hand it to anyone. Nothing drops.*" (the website's, since A07-inlet317; A07-quilt943; A01-aunt631), its short explanation and the drawing of a task shifting between agents and a teammate around the taskbag, and one button, **Start**, with the hint "Select a folder where you want to keep your tasks". **Start** opens the wizard at step 1. The top bar has no folder button on this page.
 
 ### The setup wizard
 

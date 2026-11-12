@@ -4,7 +4,7 @@
 
 # Allomos
 
-**The work always carries on**
+**Development in the AI era: hand it to anyone. Nothing drops.**
 
 Your AI agent or account hits its usage limit, and you have to switch. A teammate gets stuck on a hard problem and hands the task to you. Whoever takes over picks up exactly where it stopped. The whole project stays on the record — every task, its status and its handoff notes, in one place, the project's **taskbag** (plain files in your own repository), instead of scattered across chats.
 

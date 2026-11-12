@@ -3,7 +3,7 @@ title: 肩代 Allomos ガイド
 description: 「肩代」（Allomos）の使い方。プロジェクトが AI エージェントやチームメイトの間で移っても、タスクは失われません。
 template: splash
 hero:
-  tagline: 仕事は、いつでも続けられる
+  tagline: AI 時代の開発、誰が引き継いでも取りこぼさない。
   actions:
     - text: はじめる
       link: /allomos/ja/start/getting-started/
