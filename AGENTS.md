@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v36)
+## Tasks: Allomos (v37)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -78,7 +78,9 @@ the project notes (below).
   the command. Take one over only to continue its work: claiming it is the takeover; go on on its
   working branch, and look at the former holder's worktree but change nothing there (that folder
   is of use only on its own computer; on another one, go by the working branch and the handoff
-  note: only what was pushed counts). Use `--take`
+  note: only what was pushed counts). Exception: when the person chose "Commit and push these
+  changes for it first" in the Allomos app's Take over… dialog, commit what is not committed there
+  as WIP and push it to the working branch, and change nothing else there. Use `--take`
   only when the holder has stopped or a person asks for the takeover; on your own, take over only
   lost tasks. When `alm`
   says one of your tasks was taken over (`notice [taken_over]`), stop work on it at once (no more

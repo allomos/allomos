@@ -105,7 +105,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// `alm beat --doing`, and, while the project's setting is on, pushes work in progress after each
 /// small step and at every heartbeat; on another computer a takeover goes by the working branch
 /// and the handoff note (Task-A01-butter895).
-pub const SECTION_VERSION: u32 = 36;
+/// 37: one exception to leaving the former holder's worktree alone: when the person chose to have
+/// its changes committed and pushed first in the app's Take over… dialog, the new session commits
+/// them as WIP and pushes the working branch, and changes nothing else there (Task-A01-flag101).
+pub const SECTION_VERSION: u32 = 37;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
