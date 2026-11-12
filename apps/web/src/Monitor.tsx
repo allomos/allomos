@@ -276,7 +276,8 @@ export function MonitorControl({
 
   const button = (
     <button type="button" className="monitor-button" onClick={onOpen} title={ready === 0 ? t("monitor.button_none_tip") : undefined}>
-      {t("monitor.button")}
+      {/* A run is going (Task-A03-mug608): the button opens another one beside it. */}
+      {t(runs.length ? "monitor.button_another" : "monitor.button")}
     </button>
   );
   if (!runs.length && !lost.length) {

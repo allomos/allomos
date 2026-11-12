@@ -1044,6 +1044,7 @@
   "proceed.use_original": "Use Allomos's request",
   "proceed.save": "Save",
   "monitor.button": "▶ Monitor ready tasks",
+  "monitor.button_another": "Start another monitor…",
   "monitor.button_none_tip": "No task is ready now; once started, it checks at the frequency you set.",
   "monitor.title": "Monitor ready tasks",
   "monitor.intro": "Allomos works each ready task in a new agent session, one at a time: the next starts only when the last one is finished. With none ready, it waits and checks again.",

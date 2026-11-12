@@ -1044,6 +1044,7 @@
   "proceed.use_original": "使用「换肩」的请求",
   "proceed.save": "保存",
   "monitor.button": "▶ 自动监测就绪任务",
+  "monitor.button_another": "再开一个监测…",
   "monitor.button_none_tip": "现在没有就绪任务；开始后会按设定的频率检查。",
   "monitor.title": "自动监测就绪任务",
   "monitor.intro": "「换肩」为每个就绪任务新开一个智能体会话，一次一个：上一个做完才开下一个。没有就绪任务时，等一会儿再检查。",
