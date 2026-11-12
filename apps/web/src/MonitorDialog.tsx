@@ -134,7 +134,9 @@ export function MonitorDialog({
   );
   const codexChosen = picked.some((a) => baseAgent(a) === "codex_cli");
   const [scope, setScope] = useState<Scope>(() => editing?.scope ?? firstScope(options, from));
-  const selectable = options.other.items.filter((i) => i.ready > 0);
+  // Editing a running monitor (A03-yolk481), an iteration with no ready task yet can be chosen:
+  // the monitor waits for its tasks.
+  const selectable = editing ? options.other.items : options.other.items.filter((i) => i.ready > 0);
   const [otherId, setOtherId] = useState<string | null>(() => (scope.kind === "iteration" && !scope.current ? scope.id : (selectable[0]?.id ?? null)));
   const [every, setEvery] = useState<Frequency>(editing?.every ?? FIRST_FREQUENCY);
   const [quiet, setQuiet] = useState(editing?.quiet ?? true);
@@ -278,7 +280,7 @@ export function MonitorDialog({
                 >
                   {otherId === null && <option value="" />}
                   {options.other.items.map((i) => (
-                    <option key={i.id} value={i.id} disabled={i.ready === 0}>
+                    <option key={i.id} value={i.id} disabled={!editing && i.ready === 0}>
                       {t("monitor.iteration_item", { place: i.place, id: i.id, n: i.ready })}
                     </option>
                   ))}
