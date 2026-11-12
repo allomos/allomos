@@ -497,11 +497,7 @@ button.link:hover { text-decoration: underline; }
    right beside Copy and Done; the edit popup's Use Allomos's request on the left. */
 .proceed .request-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .proceed .row .copied-hint { align-self: center; font-size: 13px; color: var(--ok); }
-.handover .handover-waiting { font-weight: 600; }
-.handover .handover-quota .quota-green { color: var(--ok); }
-.handover .handover-quota .quota-amber { color: var(--warn); }
-.handover .handover-quota .quota-red { color: var(--err); }
-.handover .handover-note { margin: 0; padding: 6px 10px; border-left: 3px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: auto; }
+.handover .handover-steps { margin: 0; padding-left: 1.4em; }
 .edit-request .row .reset { align-self: center; margin-right: auto; font-size: 13px; }
 .edit-request .row .reset:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 .edit-request textarea { resize: vertical; min-height: 220px; width: 100%; box-sizing: border-box; }

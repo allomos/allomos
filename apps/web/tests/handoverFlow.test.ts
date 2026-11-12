@@ -1,15 +1,11 @@
-// Tests for Hand over to another agent… (Task-A01-minnow200): which step the dialog is on, which
-// request is in force, and the requests Allomos writes.
+// Tests for Prepare a handoff… (Task-A01-kind858): whether the holder's session can be opened, and
+// the prompt the person pastes into it.
 // Run: npm --prefix apps/web test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handoverAskRequest, handoverClaimRequest, handoverLate, handoverStep, pendingHandover } from "../src/handoverFlow.ts";
-import { quotaOfChoice } from "../src/quotaFlow.ts";
-import type { HandoverRequest, QuotaReport, Task } from "../src/types.ts";
-
-const TB = "../allomos-taskbag/.allomos/taskbag";
-const REQUEST: HandoverRequest = { holder: "s1", by: "will", at: "2026-11-11T06:00:00Z", to: "codex_cli" };
+import { handoverAskRequest, handoverOpen } from "../src/handoverFlow.ts";
+import type { Task } from "../src/types.ts";
 
 const task = (over: Partial<Task>): Task =>
   ({
@@ -26,70 +22,35 @@ const task = (over: Partial<Task>): Task =>
     ...over,
   }) as Task;
 
-test("a request is in force only for the holder it names, on an open task", () => {
-  assert.equal(pendingHandover(task({})), null);
-  assert.deepEqual(pendingHandover(task({ handover_request: REQUEST })), REQUEST);
-  assert.equal(pendingHandover(task({ holder: "s2", handover_request: REQUEST })), null);
-  assert.equal(pendingHandover(task({ state: "done", handover_request: REQUEST })), null);
-  assert.equal(pendingHandover(task({ state: "dropped", holder: null, handover_request: REQUEST })), null);
+test("the holder's session opens only from the desktop app, when the claim recorded it", () => {
+  assert.deepEqual(handoverOpen(task({ session: { by: "s1", id: "u1" } }), true), { can: true });
+  assert.deepEqual(handoverOpen(task({ session: { by: "s1", app_session_id: "local_1" } }), true), { can: true });
+  assert.deepEqual(handoverOpen(task({ session: { id: "u1" } }), true), { can: true });
+  assert.deepEqual(handoverOpen(task({ session: { by: "s1", id: "u1" } }), false), { can: false, why: "no_app" });
+  assert.deepEqual(handoverOpen(task({}), true), { can: false, why: "not_recorded" });
+  assert.deepEqual(handoverOpen(task({ session: { by: "s1", id: "  " } }), true), { can: false, why: "not_recorded" });
+  assert.deepEqual(handoverOpen(task({ session: { by: "s0", id: "u0" } }), true), { can: false, why: "other_session" });
 });
 
-test("the dialog goes from choosing to waiting to opening", () => {
-  assert.equal(handoverStep(task({}), null), "choose");
-  assert.equal(handoverStep(task({}), "s1"), "wait");
-  assert.equal(handoverStep(task({ state: "ready", holder: null }), "s1"), "open");
-});
-
-test("a new holder or a finished task ends the dialog's work", () => {
-  assert.equal(handoverStep(task({ holder: "s2" }), "s1"), "gone");
-  assert.equal(handoverStep(task({ state: "done" }), "s1"), "gone");
-  assert.equal(handoverStep(task({ state: "dropped", holder: null }), "s1"), "gone");
-});
-
-test("Take over… is suggested only after a full heartbeat interval", () => {
-  assert.equal(handoverLate(REQUEST, 10, new Date("2026-11-11T06:09:59Z")), false);
-  assert.equal(handoverLate(REQUEST, 10, new Date("2026-11-11T06:10:01Z")), true);
-  assert.equal(handoverLate(null, 10, new Date("2026-11-11T07:00:00Z")), false);
-});
-
-test("the quota shown is the agent's newest 5-hour report", () => {
-  const r = (agent: string, window: string, left: number, at: string): QuotaReport => ({ agent, window, left, at });
-  const reports = [
-    r("claude-code", "5h", 80, "2026-11-11T05:00:00Z"),
-    r("claude-code", "5h", 60, "2026-11-11T06:00:00Z"),
-    r("claude-code", "week", 10, "2026-11-11T07:00:00Z"),
-    r("codex", "5h", 5, "2026-11-11T06:00:00Z"),
-  ];
-  assert.equal(quotaOfChoice(reports, "claude_cli")?.left, 60);
-  assert.equal(quotaOfChoice(reports, "claude_app")?.left, 60);
-  assert.equal(quotaOfChoice(reports, "codex_app")?.left, 5);
-  assert.equal(quotaOfChoice(reports, "antigravity_cli"), null);
-});
-
-test("the request to the holder, word for word", () => {
+test("the prompt for the holder, word for word", () => {
   assert.equal(
     handoverAskRequest(task({}), "en"),
-    `Please hand task A01-41 ("Search finds words") over to another agent: I asked for this in Allomos.
+    `Please get task A01-41 ("Search finds words") ready for a handoff: I asked for this in Allomos.
 
 1. Finish the small step you are on and start nothing new on it.
 2. Write your handoff: alm handoff A01-41 --as <your session name> --text "<where it stopped, the one next step, who it waits on>".
 3. Commit and push your work to the working branch.
 4. Release the task: alm release A01-41 --as <your session name> --note "<what the next one needs, and the working branch>", and share that change.
-5. Then stop work on it: a new session takes it from there.`,
+5. Then stop work on it: I will start whoever goes on with it separately.`,
   );
 });
 
-test("the new session claims without --take, on the working branch", () => {
+test("the prompt asks for handoff, push and release in every language, and names no next agent", () => {
   for (const language of ["en", "zh-CN", "ja"] as const) {
-    const text = handoverClaimRequest(task({ state: "ready", holder: null }), TB, language, "s1", "claude/x");
-    assert.ok(text.includes("alm show A01-41"), language);
-    assert.ok(text.includes("--working claude/x"), language);
-    assert.ok(text.includes("git worktree add") && text.includes("claude/x"), language);
-    assert.ok(text.includes("s1"), language);
-    assert.ok(text.includes(TB), language);
-    assert.ok(!text.includes("--take"), language);
+    const text = handoverAskRequest(task({}), language);
+    assert.ok(text.includes("alm handoff A01-41"), language);
+    assert.ok(text.includes("alm release A01-41"), language);
+    assert.ok(!text.includes("--taskbag"), language);
+    assert.ok(!/another agent|另一个智能体|別のエージェント/.test(text), language);
   }
-  const none = handoverClaimRequest(task({ state: "ready", holder: null }), TB, "en", "s1", null);
-  assert.ok(!none.includes("--working"));
-  assert.ok(none.includes("<working branch>"));
 });

@@ -1757,7 +1757,7 @@ function TaskbagView({
   };
   /** The task Work on it… is open for (Task-A03-galley051). */
   const [proceeding, setProceeding] = useState<Task | null>(null);
-  /** The task Hand over to another agent… is open for; its dialog follows the task as it changes. */
+  /** The task Prepare a handoff… is open for; its dialog follows the task as it changes. */
   const [handingOver, setHandingOver] = useState<string | null>(null);
   const handOverTask = handingOver ? box?.tasks.find((t) => t.id === handingOver) : undefined;
   // Monitor ready tasks (Task-A03-moth285): the desktop app only, where agent sessions run. The
@@ -1963,19 +1963,14 @@ function TaskbagView({
           messenger={messenger}
           root={opened.root}
           task={handOverTask}
-          interval={intervalMinutes(box?.project)}
           lostAfter={lostAfter}
           lastChange={opened.last_changed?.[handOverTask.id]}
-          working={opened.branches?.[handOverTask.id]?.working ?? null}
           canOpenSession={canOpenSessions}
           onTakeOver={() => {
             setHandingOver(null);
             setProceeding(handOverTask);
           }}
-          onClose={(message) => {
-            setHandingOver(null);
-            if (message) onNotice(message);
-          }}
+          onClose={() => setHandingOver(null)}
         />
       )}
       {proceeding && (

@@ -62,10 +62,6 @@ export interface Messenger {
    * `claude --resume` in a new terminal. Rejects with a Problem when there is none or it cannot start.
    */
   openAgentSession(root: string, task: string): Promise<void>;
-  /** Hand over to another agent… (Task-A01-minnow200): ask the session holding `id` to hand it over to `to`. Rejects with a Problem. */
-  requestHandover(root: string, id: string, to: string): Promise<Task>;
-  /** Hand over to another agent…: take the request back. Rejects with a Problem. */
-  cancelHandover(root: string, id: string): Promise<Task>;
   /** Show the taskbag's folder in Finder or Explorer. Rejects with a Problem on failure. */
   showInFileManager(root: string): Promise<void>;
   /**
@@ -486,8 +482,6 @@ export const desktopMessenger: Messenger = {
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
   openAgentSession: (root, task) => invoke<void>("open_agent_session", { root, task }),
-  requestHandover: (root, id, to) => invoke<Task>("request_handover", { root, id, to }),
-  cancelHandover: (root, id) => invoke<Task>("cancel_handover", { root, id }),
   createTaskbag: (root, name, language) => invoke<Opened>("create_taskbag", { root, name, language }),
   // Each tab's messenger reports it to its window, which tells the app (`WindowTabs`).
   setWindowProject: () => Promise.resolve(),

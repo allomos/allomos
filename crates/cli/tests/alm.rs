@@ -8935,7 +8935,7 @@ fn plain(dir: &Path, args: &[&str]) -> String {
     String::from_utf8(alm(dir, args).stdout).unwrap()
 }
 
-/// Task-A01-minnow200: writes a request to hand `id` over into its `task.json`, as the app does.
+/// Task-A01-minnow200: writes a request to hand `id` over into its `task.json`, as an older app did.
 fn ask_handover(dir: &Path, id: &str, holder: &str) {
     let path = dir.join(format!(".allomos/taskbag/tasks/{id}/task.json"));
     let mut task: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
@@ -8945,8 +8945,9 @@ fn ask_handover(dir: &Path, id: &str, holder: &str) {
     fs::write(&path, serde_json::to_string_pretty(&task).unwrap()).unwrap();
 }
 
+/// Task-A01-kind858: an old request still reads, tells nobody, and a release or claim clears it.
 #[test]
-fn a_handover_request_tells_only_the_holder_it_names_until_it_ends() {
+fn an_old_handover_request_tells_nobody_and_ends_with_release_or_claim() {
     let repo = filled();
     ok(&repo, &["ready", "A01-01"]);
     ok(
@@ -8955,49 +8956,27 @@ fn a_handover_request_tells_only_the_holder_it_names_until_it_ends() {
     );
     ask_handover(&repo, "A01-01", "s1");
 
-    // The holder is told first, by reading commands too.
     let (code, v) = fj(&repo, &["--as", "s1", "show", "A01-01"]);
     assert_eq!(code, 0, "{v}");
-    assert_eq!(v["warnings"][0]["code"], "handover_requested", "{v}");
-    assert_eq!(v["handover_requested"][0]["to"], "codex_cli", "{v}");
+    assert!(v.get("handover_requested").is_none(), "{v}");
+    assert!(!v["warnings"].to_string().contains("handover"), "{v}");
+    assert_eq!(v["task"]["handover_request"]["to"], "codex_cli", "{v}");
     let out = plain(&repo, &["--as", "s1", "beat"]);
-    assert!(
-        out.starts_with("notice [handover_requested]: will asked at 2026-11-11T06:10:02Z that you hand task A01-01 over to another agent (codex_cli)."),
-        "{out}"
-    );
-    // `alm show` says so to anyone; other sessions get no notice.
-    let out = plain(&repo, &["--as", "s2", "show", "A01-01"]);
-    assert!(!out.contains("notice [handover_requested]"), "{out}");
-    assert!(
-        out.contains("handover requested: to codex_cli, of s1, asked by will at"),
-        "{out}"
-    );
+    assert!(!out.contains("handover"), "{out}");
+    let out = plain(&repo, &["--as", "s1", "show", "A01-01"]);
+    assert!(!out.contains("handover"), "{out}");
 
-    // A release ends it, and the new session is never asked.
     ok(
         &repo,
         &["--as", "s1", "release", "A01-01", "--note", "go on on w"],
     );
     let (_, v) = fj(&repo, &["--as", "s1", "show", "A01-01"]);
-    assert!(v.get("handover_requested").is_none(), "{v}");
     assert!(v["task"].get("handover_request").is_none(), "{v}");
+
     ok(
         &repo,
         &["--as", "s2", "claim", "A01-01", "--branch", "main"],
     );
-    let out = plain(&repo, &["--as", "s2", "show", "A01-01"]);
-    assert!(!out.contains("handover_requested"), "{out}");
-
-    // A request naming a former holder is ignored, by the old holder and by the new one.
-    ask_handover(&repo, "A01-01", "s1");
-    for me in ["s1", "s2"] {
-        let (_, v) = fj(&repo, &["--as", me, "show", "A01-01"]);
-        assert!(v.get("handover_requested").is_none(), "{me}: {v}");
-    }
-    let out = plain(&repo, &["--as", "s2", "show", "A01-01"]);
-    assert!(!out.contains("handover requested"), "{out}");
-
-    // Any claim clears it (here a takeover), so it does not linger for the next holder.
     ask_handover(&repo, "A01-01", "s2");
     ok(
         &repo,

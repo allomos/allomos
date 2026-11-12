@@ -61,18 +61,6 @@ export interface AgentSession {
   folder?: string;
 }
 
-/** A request to hand a task over, as task.json keeps it (crates/core/src/handover.rs). */
-export interface HandoverRequest {
-  /** The holder when the person asked: the only session it speaks to. */
-  holder: string;
-  /** Who asked, when known. */
-  by?: string | null;
-  /** When, in UTC. */
-  at: string;
-  /** The agent picker's choice the task is to go to. */
-  to: string;
-}
-
 /** A held task's last heartbeat as task.json keeps it (crates/core/src/heartbeat.rs). */
 export interface Heartbeat {
   /** When, in UTC. */
@@ -120,8 +108,6 @@ export interface Task {
   /** The holding session's last heartbeat (decision 0022, Task-A01-nurse164): `alm beat` and every
    * change the holder makes write it; gone once the task is no longer held and in progress. */
   heartbeat?: Heartbeat | null;
-  /** A person's request that the holding session hand the task over (Task-A01-minnow200). */
-  handover_request?: HandoverRequest | null;
   description: string;
   /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
    * a field of task.json: worked out from the history and added when the taskbag is opened. */
