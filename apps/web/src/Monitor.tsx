@@ -2,9 +2,9 @@
 // while runs go on. Since Task-A03-cow112 (approver 2026-11-09) a run is a background `alm monitor
 // run` process of this computer, started here with the app's own `alm monitor start` or from a
 // terminal, and it goes on after the app is closed: the app runs no loop of its own. It reads the
-// project's run files every few seconds and shows a status bar for each run (a project may have
-// several); Stop, Check now and the menus leave a request for the run. The last run's summary is
-// remembered per project for the line beside the button.
+// project's run files every few seconds and shows them in the Auto-monitor section, one foldable
+// panel per run (A03-yolk481); Stop monitor, Check now and Edit monitor… leave requests for the
+// run. The last run's summary is remembered per project for the line beside the button.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
@@ -14,10 +14,14 @@ import { localTime } from "./timeFlow";
 import { sessionPlace } from "./sessionFlow";
 import { toCheck } from "./stopFlow";
 import {
-  FREQUENCIES,
+  NO_FOLDS,
+  STALL_MS,
+  editRequests,
   freeAgents,
   frequencyText,
+  grouped,
   isRun,
+  keptFolds,
   lastRunCounts,
   lastRunFromFile,
   levelsOf,
@@ -25,13 +29,16 @@ import {
   newerLast,
   nextCheck,
   readEntry,
-  setAgents,
+  readFolds,
+  runState,
+  sessionGroups,
   sessionsOf,
   stalled,
+  stateCounts,
   unblockNotice,
+  workedFor,
 } from "./monitorFlow";
-import type { Frequency, LastRun, LostRun, Levels, Run, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
-import { LevelsPicker } from "./MonitorDialog";
+import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -221,13 +228,13 @@ export function useMonitor({
     stop: (run: Run) => ask(run, { action: "stop" }),
     undoStop: (run: Run) => ask(run, { action: "undo_stop" }),
     checkNow: (run: Run) => ask(run, { action: "check" }),
-    setEvery: (run: Run, every: Frequency) => ask(run, { action: "every", minutes: every }),
-    /** Adds or takes off agents while the run goes on (Task-A03-fruit467). */
-    setAgents: (run: Run, agents: TerminalAgent[]) => ask(run, { action: "agents", agents: setAgents(run, agents) }),
-    /** How many sessions an agent may have at work at once, from the next check on (Task-A03-weasel276). */
-    setSessions: (run: Run, agent: TerminalAgent, count: number) => ask(run, { action: "sessions", agent, count }),
-    /** The difficulty levels an agent takes tasks from, from the next check on (Task-A03-wave335). */
-    setLevels: (run: Run, agent: TerminalAgent, levels: Levels) => ask(run, { action: "difficulty", agent, range: levelsText(levels) }),
+    /** Edit monitor…'s Save (A03-yolk481): one request for each setting that changed, in order. */
+    edit: (run: Run, next: MonitorSettings) => {
+      editRequests(run, next)
+        .reduce((p, r) => p.then(() => messenger.monitorAsk(run.id, r)), Promise.resolve())
+        .then(() => window.setTimeout(() => void read(), 1_200))
+        .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
+    },
     /** Ends a run whose record is missing. */
     endLost: (l: LostRun) => {
       messenger
@@ -245,13 +252,91 @@ function scopeName(scope: Scope, t: ReturnType<typeof useI18n>["t"]): string {
   return scope.kind === "all" ? t("monitor.scope_all") : t("monitor.scope_label", { id: scope.id });
 }
 
-/** The button (with the last run's line beside it), or the status bar while monitoring. */
+type T = ReturnType<typeof useI18n>["t"];
+
+const timeOf = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/** A difficulty range as the panel shows it: `1–5`, or one level. */
+const rangeText = (l: Levels) => (l.low === l.high ? String(l.low) : `${l.low}–${l.high}`);
+
+/** How long a session has worked, in words. */
+function forText(at: number, now: number, t: T): string {
+  const w = workedFor(at, now);
+  return t(w.unit === "hours" ? "monitor.for_hours" : "monitor.for_minutes", { n: w.n });
+}
+
+const FOLDS_KEY = "allomos.monitor.folds";
+
+function loadFolds(root: string): MonitorFolds {
+  try {
+    return readFolds(localStorage.getItem(`${FOLDS_KEY}:${root}`));
+  } catch {
+    return NO_FOLDS;
+  }
+}
+
+/** The section's and the panels' folds, kept on this computer per project (A03-yolk481): never
+ * in the taskbag. A panel opens by itself once when one of its sessions goes quiet for long. */
+function useFolds(root: string, runs: Run[], now: number) {
+  const [folds, setFolds] = useState<MonitorFolds>(() => loadFolds(root));
+  useEffect(() => setFolds(loadFolds(root)), [root]);
+  const save = (next: MonitorFolds) => {
+    const kept = runs.length ? keptFolds(next, runs.map((r) => r.id)) : next;
+    setFolds(kept);
+    try {
+      localStorage.setItem(`${FOLDS_KEY}:${root}`, JSON.stringify(kept));
+    } catch {
+      /* storage unavailable: the folds last until the window closes */
+    }
+  };
+  // Each stalled session opens its panel once (keyed by run and task).
+  const opened = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const add: string[] = [];
+    for (const r of runs) {
+      for (const w of stalled(r, now)) {
+        const key = `${r.id}:${w.id}`;
+        if (opened.current.has(key)) continue;
+        opened.current.add(key);
+        if (!folds.open.includes(r.id) && !add.includes(r.id)) add.push(r.id);
+      }
+    }
+    if (add.length) save({ ...folds, open: [...folds.open, ...add] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runs, now]);
+  return {
+    sectionOpen: !folds.sectionFolded,
+    toggleSection: () => save({ ...folds, sectionFolded: !folds.sectionFolded }),
+    isOpen: (id: string) => folds.open.includes(id),
+    toggle: (id: string) => save({ ...folds, open: folds.open.includes(id) ? folds.open.filter((x) => x !== id) : [...folds.open, id] }),
+  };
+}
+
+/** A panel's one-line summary (folded, and in the section title when there is one monitor). */
+function runSummary(run: Run, now: number, t: T, withSettings: boolean): string {
+  const ids = run.working.map((w) => w.id);
+  if (run.stopping && ids.length) return t("monitor.stopping", { id: ids.join(", ") });
+  let head: string;
+  if (ids.length === 1) head = t("monitor.sum_working", { id: ids[0] });
+  else if (ids.length > 1) {
+    const shown = ids.length > 2 ? t("monitor.sum_and_more", { ids: ids.slice(0, 2).join(", ") }) : ids.join(", ");
+    head = t("monitor.sum_many", { n: ids.length, ids: shown });
+  } else head = nextCheck(run) <= now ? t("monitor.sum_checking") : t("monitor.sum_idle", { time: timeOf(nextCheck(run)) });
+  if (!withSettings || ids.length !== 1) return head;
+  const { unit, n } = frequencyText(run.every);
+  return `${head} · ${t(`monitor.every_${unit}`, { n })} · ${t(run.quiet ? "monitor.sum_quiet" : "monitor.sum_normal")}`;
+}
+
+/** The button (with the last run's line beside it), or the Auto-monitor section while monitors
+ * run (A03-yolk481, approver 2026-11-12): its title with one badge per state, then one foldable
+ * panel per monitor, then Start another monitor…. */
 export function MonitorControl({
   monitor,
   tasks,
   ready,
-  showScope,
+  root,
   onOpen,
+  onEdit,
   onOpenSession,
   onOpenTask,
   onError,
@@ -261,9 +346,11 @@ export function MonitorControl({
   tasks: Task[];
   /** Ready tasks nobody holds in the whole project, for the button's hint when there are none. */
   ready: number;
-  /** Name the scope in the status bar (on the Iterations tab). */
-  showScope?: boolean;
+  /** The project, whose folds this computer remembers. */
+  root: string;
   onOpen: () => void;
+  /** Opens Edit monitor… for a run (A03-yolk481). */
+  onEdit: (run: Run) => void;
   onOpenSession: (id: string) => Promise<void>;
   /** Opens a task the monitor's line names (Task-A01-steam936). */
   onOpenTask?: (id: string) => void;
@@ -273,6 +360,7 @@ export function MonitorControl({
 }) {
   const { t } = useI18n();
   const { runs, lost, last, now } = monitor;
+  const folds = useFolds(root, runs, now);
 
   const button = (
     <button type="button" className="monitor-button" onClick={onOpen} title={ready === 0 ? t("monitor.button_none_tip") : undefined}>
@@ -286,6 +374,7 @@ export function MonitorControl({
     const split = counts && counts.byAgent.length > 1 ? counts.byAgent.map((b) => `${monitorAgentName(b.agent, t)} ${b.done}`).join(" · ") : null;
     return (
       <span className="monitor">
+        {button}
         {last && counts && (
           <span className="monitor-last muted small">
             {split
@@ -305,268 +394,240 @@ export function MonitorControl({
             )}
           </span>
         )}
-        {button}
       </span>
     );
   }
 
+  const states = runs.map((r) => runState(r, tasks, now));
+  const counts = stateCounts(states);
+  const atWork = runs.reduce((n, r) => n + r.working.length, 0);
+  // Folded with one monitor, the summary says what it does; otherwise how many sessions work.
+  const summary =
+    runs.length === 1 && !folds.sectionOpen
+      ? runSummary(runs[0], now, t, false)
+      : atWork
+        ? t("monitor.sum_sessions", { n: atWork })
+        : t("monitor.sum_none_at_work");
   return (
-    <span className="monitor-stack">
-      {runs.map((run) => (
-        <RunBar
-          key={run.id}
-          run={run}
-          monitor={monitor}
-          tasks={tasks}
-          now={now}
-          showScope={showScope || runs.length > 1}
-          onOpenSession={onOpenSession}
-          onOpenTask={onOpenTask}
-          onError={onError}
-        />
-      ))}
-      {lost.map((l) => (
-        <span key={l.pid} className="monitor-bar stopping" role="status">
-          <span className="dot" aria-hidden="true" />
-          <span>{t("monitor.lost", { pid: l.pid, id: l.id ?? "" })}</span>
-          <button type="button" className="small stop" onClick={() => monitor.endLost(l)}>
-            {t("monitor.stop")}
-          </button>
-        </span>
-      ))}
-      <span className="monitor">{button}</span>
-    </span>
+    <section className={`monitor-section${folds.sectionOpen ? "" : " folded"}`} aria-label={t("monitor.section")}>
+      <div className="monitor-section-head">
+        <button type="button" className="monitor-fold" aria-expanded={folds.sectionOpen} title={t("monitor.section_aria")} onClick={folds.toggleSection}>
+          <strong>{t("monitor.section")}</strong>
+          {counts.map((c) => (
+            <span key={c.state} className={`monitor-badge ${c.state}`}>
+              {t(`monitor.count_${c.state}`, { n: c.n })}
+            </span>
+          ))}
+          {lost.length > 0 && <span className="monitor-badge stopping">{t("monitor.count_stopping", { n: lost.length })}</span>}
+          <span className="muted small monitor-summary">{summary}</span>
+        </button>
+      </div>
+      {folds.sectionOpen && (
+        <div className="monitor-section-body">
+          {runs.map((run, i) => (
+            <RunPanel
+              key={run.id}
+              run={run}
+              state={states[i]}
+              monitor={monitor}
+              tasks={tasks}
+              now={now}
+              open={folds.isOpen(run.id)}
+              onToggle={() => folds.toggle(run.id)}
+              onEdit={() => onEdit(run)}
+              onOpenSession={onOpenSession}
+              onOpenTask={onOpenTask}
+              onError={onError}
+            />
+          ))}
+          {lost.map((l) => (
+            <div key={l.pid} className="monitor-panel lost" role="status">
+              <div className="monitor-panel-head">
+                <span className="monitor-panel-text">{t("monitor.lost", { pid: l.pid, id: l.id ?? "" })}</span>
+                <span className="monitor-actions">
+                  <button type="button" className="small stop" onClick={() => monitor.endLost(l)}>
+                    {t("monitor.stop_monitor")}
+                  </button>
+                </span>
+              </div>
+            </div>
+          ))}
+          <div className="monitor-another">{button}</div>
+        </div>
+      )}
+    </section>
   );
 }
 
-/** One run's status bar: what it is doing, Check now, its frequency and agents, the sessions at
- * work (each a link to its session), and Stop. */
-function RunBar({
+/** One monitor's panel (A03-yolk481): folded, one line (its badge when it is not plainly
+ * running, a summary, Check now and Stop monitor, which never fold or unfold it); open, also its
+ * settings, Edit monitor… and the sessions it opened, grouped by agent when it has several. */
+function RunPanel({
   run,
+  state,
   monitor,
   tasks,
   now,
-  showScope,
+  open,
+  onToggle,
+  onEdit,
   onOpenSession,
   onOpenTask,
   onError,
 }: {
   run: Run;
+  state: RunState;
   monitor: Monitor;
   tasks: Task[];
   now: number;
-  showScope?: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
   onOpenSession: (id: string) => Promise<void>;
   onOpenTask?: (id: string) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
-  const [menu, setMenu] = useState(false);
-  const working = run.working;
-  const ids = working.map((w) => w.id).join(", ");
-  const free = freeAgents(run);
-  const { unit, n } = frequencyText(run.every);
-  const nextAt = new Date(nextCheck(run)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const due = nextCheck(run) <= now;
-  const status = run.stopping && working.length
-    ? t("monitor.stopping", { id: ids })
-    : working.length
-      ? free.length
-        ? t(due ? "monitor.on_working_starting" : "monitor.on_working_waiting", { id: ids, n: run.taken.length, time: nextAt })
-        : t("monitor.on_working", { id: ids, n: run.taken.length })
-      : due
-        ? t("monitor.on_starting")
-        : t("monitor.on_waiting", { time: nextAt });
-  const late = stalled(run, now);
   const notice = monitor.notice(run);
+  const free = freeAgents(run);
+  const late = stalled(run, now);
+  // With several sessions, the badge counts the quiet ones.
+  const badge =
+    state === "running"
+      ? null
+      : state === "stalled" && run.working.length > 1
+        ? t("monitor.count_stalled", { n: late.length })
+        : t(`monitor.badge_${state}`);
+  const { unit, n } = frequencyText(run.every);
+  const settings = [
+    t("monitor.set_every", { every: t(`monitor.every_${unit}`, { n }) }),
+    ...run.agents.map((a) => t("monitor.set_agent", { agent: monitorAgentName(a, t), n: sessionsOf(run, a), levels: rangeText(levelsOf(run, a)) })),
+    t(run.quiet ? "build.mode_quiet" : "build.mode_normal"),
+    t("monitor.set_opened", { n: run.taken.length }),
+  ].join(" · ");
   return (
-    <>
-    <span className={run.stopping ? "monitor-bar stopping" : "monitor-bar"} role="status" title={t("monitor.run_tip", { id: run.id })}>
-      <span className="dot" aria-hidden="true" />
-      {showScope && <span className="monitor-scope">{scopeName(run.scope, t)} ·</span>}
-      <span>{status}</span>
-      {free.length > 0 && !run.stopping && (
-        <button type="button" className="link small" onClick={() => monitor.checkNow(run)}>
-          {t("monitor.check_now")}
+    <div className={`monitor-panel ${state}${open ? " open" : ""}`} title={t("monitor.run_tip", { id: run.id })}>
+      <div className="monitor-panel-head">
+        <button type="button" className="monitor-fold" aria-expanded={open} title={t("monitor.panel_aria")} onClick={onToggle}>
+          <span className="monitor-panel-title">{t("monitor.panel_title", { scope: scopeName(run.scope, t) })}</span>
+          {badge && <span className={`monitor-badge ${state}`}>{badge}</span>}
+          {!open && <span className="muted small monitor-summary">{runSummary(run, now, t, true)}</span>}
         </button>
-      )}
-      <span className="monitor-every-wrap">
-        <button type="button" className="every" aria-haspopup="menu" aria-expanded={menu} aria-label={t("monitor.freq_aria")} onClick={() => setMenu((m) => !m)}>
-          {t(`monitor.every_${unit}`, { n })} ✎
-        </button>
-        {menu && (
-          <div className="monitor-menu" role="menu">
-            <p className="small">
-              <strong>{t("monitor.freq_menu_title")}</strong>
+        <span className="monitor-actions">
+          {open && !run.stopping && (
+            <button type="button" className="small" onClick={onEdit}>
+              {t("monitor.edit_button")}
+            </button>
+          )}
+          {!run.stopping && (
+            <button type="button" className="small" disabled={free.length === 0} onClick={() => monitor.checkNow(run)}>
+              {t("monitor.check_now")}
+            </button>
+          )}
+          {run.stopping ? (
+            <button type="button" className="small" onClick={() => monitor.undoStop(run)}>
+              {t("monitor.undo_stop")}
+            </button>
+          ) : (
+            <button type="button" className="small stop" onClick={() => monitor.stop(run)}>
+              {t("monitor.stop_monitor")}
+            </button>
+          )}
+        </span>
+      </div>
+      {open && (
+        <div className="monitor-panel-body">
+          <p className="muted small monitor-settings">{settings}</p>
+          <h4 className="monitor-sessions-title small">{t("monitor.sessions_title")}</h4>
+          {grouped(run) ? (
+            sessionGroups(run).map((g) => (
+              <div key={g.agent} className="monitor-group">
+                <p className="small monitor-group-head">
+                  <strong>{monitorAgentName(g.agent, t)}</strong>
+                  {" · "}
+                  {g.removed
+                    ? t("monitor.group_removed")
+                    : `${t("monitor.group_count", { n: g.working.length, max: g.sessions })} · ${t("monitor.group_levels", { levels: rangeText(g.levels) })}`}
+                </p>
+                {g.working.length ? (
+                  <ul className="monitor-rows">
+                    {g.working.map((w) => (
+                      <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={g.removed} inGroup onOpenSession={onOpenSession} onError={onError} />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted small monitor-group-note">{t(g.noTask ? "monitor.group_no_task" : "monitor.group_idle")}</p>
+                )}
+              </div>
+            ))
+          ) : run.working.length ? (
+            <ul className="monitor-rows">
+              {run.working.map((w) => (
+                <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={false} onOpenSession={onOpenSession} onError={onError} />
+              ))}
+            </ul>
+          ) : (
+            <p className="muted small monitor-group-note">{t(run.noTask.length ? "monitor.group_no_task" : "monitor.sessions_none")}</p>
+          )}
+          {free.length > 0 && !run.stopping && (
+            <p className="muted small monitor-next">
+              {nextCheck(run) <= now ? t("monitor.sum_checking") : t("monitor.next_check", { time: timeOf(nextCheck(run)) })}
             </p>
-            {FREQUENCIES.map((f) => {
-              const w = frequencyText(f);
-              return (
-                <button
-                  key={f}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={f === run.every}
-                  className={f === run.every ? "on" : undefined}
-                  onClick={() => {
-                    monitor.setEvery(run, f);
-                    setMenu(false);
-                  }}
-                >
-                  {f === run.every ? "✓ " : ""}
-                  {t(`monitor.freq_${w.unit}`, { n: w.n })}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </span>
-      <AgentsMenu
-        run={run}
-        onChange={(agents) => monitor.setAgents(run, agents)}
-        onSessions={(a, n) => monitor.setSessions(run, a, n)}
-        onLevels={(a, l) => monitor.setLevels(run, a, l)}
-      />
-      {run.noTask.length > 0 && (
-        <span className="muted small">
-          {t("monitor.no_task_in_levels", { agents: run.noTask.map((a) => monitorAgentName(a, t)).join(", ") })}
-        </span>
+          )}
+        </div>
       )}
-      {working.map((cur) => {
-        const task = tasks.find((x) => x.id === cur.id);
-        const place = task ? sessionPlace(task) : null;
-        const label = `${monitorAgentName(cur.agent, t)} · ${cur.id}`;
-        return place ? (
-          <button
-            key={cur.id}
-            type="button"
-            className="link with-icon holder-open"
-            title={t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
-            onClick={() => onOpenSession(cur.id).catch(onError)}
-          >
-            {label}
-            <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11" />
-              <path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5" />
-            </svg>
-          </button>
-        ) : (
-          <span key={cur.id} className="muted">
-            {label}
-          </span>
-        );
-      })}
-      {late.map((cur) => (
-        <span key={cur.id} className="monitor-stalled">
-          {t("monitor.stalled", { id: cur.id })}
-        </span>
-      ))}
-      {run.stopping ? (
-        <button type="button" className="small" onClick={() => monitor.undoStop(run)}>
-          {t("monitor.undo_stop")}
-        </button>
-      ) : (
-        <button type="button" className="small stop" onClick={() => monitor.stop(run)}>
-          {t("monitor.stop")}
-        </button>
-      )}
-    </span>
-    {notice && <UnblockLine notice={notice} onOpenTask={onOpenTask} onClose={() => monitor.dismissNotice(run)} />}
-    </>
+      {notice && <UnblockLine notice={notice} onOpenTask={onOpenTask} onClose={() => monitor.dismissNotice(run)} />}
+    </div>
   );
 }
 
-/** The status bar's agents (Task-A03-fruit467, approver 2026-11-08): the agents the run gives
- * tasks to, with a menu to add one offered at the start or take one off, and for each chosen one
- * how many sessions it may have at work at once (Task-A03-weasel276). One taken off finishes the
- * task its session works; the last one cannot be taken off (Stop ends the run). */
-function AgentsMenu({
-  run,
-  onChange,
-  onSessions,
-  onLevels,
+/** One session the monitor opened: its task, its agent (when not grouped), how long it has
+ * worked, and Open session ↗ when it can be reopened. A quiet one is marked. */
+function SessionRow({
+  cur,
+  tasks,
+  now,
+  finishing,
+  inGroup,
+  onOpenSession,
+  onError,
 }: {
-  run: Run;
-  onChange: (agents: TerminalAgent[]) => void;
-  onSessions: (agent: TerminalAgent, count: number) => void;
-  onLevels: (agent: TerminalAgent, levels: Levels) => void;
+  cur: Current;
+  tasks: Task[];
+  now: number;
+  finishing: boolean;
+  inGroup?: boolean;
+  onOpenSession: (id: string) => Promise<void>;
+  onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  /** What the person is typing into a count, until it is left (the run's count shows otherwise). */
-  const [draft, setDraft] = useState<Partial<Record<TerminalAgent, string>>>({});
-  const names = run.agents
-    .map((a) => {
-      const count = sessionsOf(run, a) > 1 ? ` ×${sessionsOf(run, a)}` : "";
-      const levels = levelsOf(run, a);
-      const range = levels.low === 1 && levels.high === 5 ? "" : ` (${levelsText(levels)})`;
-      return `${monitorAgentName(a, t)}${count}${range}`;
-    })
-    .join(", ");
+  const task = tasks.find((x) => x.id === cur.id);
+  const place = task ? sessionPlace(task) : null;
+  const quiet = now - cur.changed >= STALL_MS;
+  const time = forText(cur.at, now, t);
   return (
-    <span className="monitor-every-wrap">
-      <button
-        type="button"
-        className="every"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t("monitor.agents_aria")}
-        onClick={() => setOpen((o) => !o)}
-      >
-        {names} ✎
-      </button>
-      {open && (
-        <div className="monitor-menu" role="menu">
-          <p className="small">
-            <strong>{t("monitor.agents_menu_title")}</strong>
-          </p>
-          {run.offered.map((a) => {
-            const on = run.agents.includes(a);
-            const last = on && run.agents.length === 1;
-            const busy = run.working.find((w) => w.agent === a);
-            return (
-              <div key={a} className="monitor-menu-agent">
-                <button
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked={on}
-                  className={on ? "on" : undefined}
-                  disabled={last}
-                  title={last ? t("monitor.agents_last") : undefined}
-                  onClick={() => onChange(on ? run.agents.filter((x) => x !== a) : [...run.agents, a])}
-                >
-                  {on ? "✓ " : ""}
-                  {monitorAgentName(a, t)}
-                  {!on && busy && <span className="muted small"> · {t("monitor.agents_finishing", { id: busy.id })}</span>}
-                </button>
-                {on && (
-                  <label className="small monitor-sessions" title={t("monitor.sessions_label")}>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      inputMode="numeric"
-                      aria-label={t("monitor.sessions_aria", { agent: monitorAgentName(a, t) })}
-                      value={draft[a] ?? String(sessionsOf(run, a))}
-                      onChange={(e) => {
-                        setDraft((d) => ({ ...d, [a]: e.target.value }));
-                        const n = Math.floor(Number(e.target.value));
-                        if (n >= 1 && n !== sessionsOf(run, a)) onSessions(a, n);
-                      }}
-                      onBlur={() => setDraft((d) => ({ ...d, [a]: undefined }))}
-                    />
-                  </label>
-                )}
-                {on && <LevelsPicker agent={a} name={monitorAgentName(a, t)} levels={levelsOf(run, a)} onChange={(l) => onLevels(a, l)} />}
-              </div>
-            );
-          })}
-          <p className="muted small">{t("monitor.agents_menu_note")}</p>
-          <p className="muted small">{t("monitor.sessions_menu_note")}</p>
-          <p className="muted small">{t("monitor.levels_menu_note")}</p>
-        </div>
+    <li className={`monitor-row${quiet ? " stalled" : ""}`}>
+      <span className="monitor-row-text">
+        <strong>{cur.id}</strong>
+        {!inGroup && <span className="muted"> · {monitorAgentName(cur.agent, t)}</span>}
+        <span className="muted small"> · {t(finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
+        {quiet && <span className="monitor-stalled small"> · {t("monitor.session_stalled")}</span>}
+      </span>
+      {place && (
+        <button
+          type="button"
+          className="link with-icon holder-open small"
+          title={t(place === "app" ? "session.open_in_claude" : "session.resume_in_terminal")}
+          onClick={() => onOpenSession(cur.id).catch(onError)}
+        >
+          {t("monitor.open_session")}
+          <svg className="button-icon" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M9 4.5H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9.5a1 1 0 0 0 1-1V11" />
+            <path d="M12 3.5h4.5V8M16.5 3.5 9.5 10.5" />
+          </svg>
+        </button>
       )}
-    </span>
+    </li>
   );
 }
 

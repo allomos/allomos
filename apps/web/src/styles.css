@@ -1043,26 +1043,8 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
    the status bar that takes its place while monitoring, and the dialog's Which tasks field. */
 .monitor { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .monitor-button { font-size: 13px; padding: 4px 12px; }
-.monitor-stack { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .monitor-notice { padding: 0 12px; }
-.monitor-bar { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--ok-bg); color: var(--ok); border-radius: 14px; padding: 3px 6px 3px 12px; font-size: 13px; }
-.monitor-bar.stopping { background: var(--warn-bg); color: var(--warn); }
-.monitor-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: monitor-pulse 1.6s infinite; }
-@keyframes monitor-pulse { 50% { opacity: 0.3; } }
-@media (prefers-reduced-motion: reduce) { .monitor-bar .dot { animation: none; } }
-.monitor-bar .every { border: none; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; }
 /* The global `button.link` sits at the top (align-self: start); in the status bar every item is centred on one line (Task-A03-quiz554). */
-.monitor-bar button.link { align-self: center; }
-.monitor-bar button.small { padding: 2px 9px; font-size: 12px; }
-.monitor-bar button.stop { border-color: color-mix(in srgb, var(--err) 35%, var(--line)); color: var(--err); }
-.monitor-every-wrap { position: relative; }
-.monitor-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: flex; flex-direction: column; gap: 2px; width: 240px; padding: 10px 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgb(0 0 0 / 15%); }
-.monitor-menu p { margin: 0 0 6px; }
-.monitor-menu button { border: none; background: none; text-align: left; padding: 4px 8px 4px 22px; border-radius: 6px; font-size: 13px; color: inherit; }
-.monitor-menu button.on { padding-left: 8px; font-weight: 600; background: var(--bg); }
-.monitor-menu button:hover { background: var(--info-bg); }
-.monitor-menu-agent { display: flex; align-items: center; gap: 6px; }
-.monitor-menu-agent > button { flex: 1; min-width: 0; }
 .monitor-sessions { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .monitor-sessions input { width: 4.5em; font-size: 13px; }
 .monitor-stalled { color: var(--warn); font-weight: 600; }
@@ -1087,7 +1069,6 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .monitors-pop button.stop { border-color: color-mix(in srgb, var(--err) 35%, var(--line)); color: var(--err); }
 .monitors-none, .monitors-error { margin: 8px 0 0; }
 .monitors-error { color: var(--err); }
-.group-monitor { margin-left: auto; font-weight: normal; }
 .monitor-scopes { list-style: none; margin: 0 0 4px; padding: 0; }
 .monitor-scopes li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
 .monitor-scopes li.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
@@ -1098,8 +1079,44 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .monitor-dialog .mode-effect { margin: 4px 0 0 22px; }
 .monitor-dialog select { width: auto; max-width: 100%; justify-self: start; }
 .agent-list .hint.own-line { display: block; margin-top: 2px; }
-.area:has(.monitor-menu) { overflow: visible; }
-.group-monitor .monitor-bar { border-radius: 12px; }
+/* A03-yolk481 (approver 2026-11-12): an iteration card's count and Edit iteration sit at the right
+   of its title line; the Auto-monitor section (or its button) goes under the progress bar. */
+.area-head .head-end { display: inline-flex; align-items: baseline; gap: 10px; white-space: nowrap; justify-self: end; }
+.area-head .group-monitor { grid-column: 1 / -1; margin-top: 6px; font-weight: normal; min-width: 0; }
+.list-tools .monitor-section { flex-basis: 100%; }
+/* The Auto-monitor section: its title, one foldable panel per monitor, Start another monitor…. */
+.monitor-section { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--surface); font-size: 13px; }
+.monitor-section-head, .monitor-panel-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.monitor-fold { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; flex: 1 1 14em; min-width: 0; text-align: left; border: none; background: none; padding: 2px 0; font: inherit; color: inherit; cursor: pointer; }
+.monitor-fold::before { content: ""; flex: none; width: 0; height: 0; border-style: solid; border-width: 4px 0 4px 6px; border-color: transparent transparent transparent var(--muted); transition: transform 0.12s; }
+.monitor-fold[aria-expanded="true"]::before { transform: rotate(90deg); }
+.monitor-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.monitor-summary { min-width: 0; overflow-wrap: anywhere; }
+.monitor-section-body { display: flex; flex-direction: column; gap: 6px; padding-left: 12px; }
+.monitor-badge { font-size: 12px; font-weight: 600; line-height: 1.5; padding: 0 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); }
+.monitor-badge.stalled { background: var(--err-bg); color: var(--err); }
+.monitor-badge.need_you, .monitor-badge.stopping { background: var(--warn-bg); color: var(--warn); }
+.monitor-panel { border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 8px; padding: 4px 8px; background: var(--bg); }
+.monitor-panel.stalled { border-left-color: var(--err); }
+.monitor-panel.need_you, .monitor-panel.stopping, .monitor-panel.lost { border-left-color: var(--warn); }
+.monitor-panel-title { font-weight: 600; }
+.monitor-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.monitor-actions button.small { padding: 2px 9px; font-size: 12px; }
+.monitor-actions button.stop { border-color: color-mix(in srgb, var(--err) 35%, var(--line)); color: var(--err); }
+.monitor-panel-body { padding: 2px 0 4px 14px; }
+.monitor-panel-body p { margin: 2px 0; }
+.monitor-sessions-title { margin: 8px 0 2px; font-weight: 600; color: var(--muted); }
+.monitor-group { margin-top: 4px; }
+.monitor-rows { list-style: none; margin: 0; padding: 0; }
+.monitor-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 2px 0; }
+.monitor-row-text { flex: 1 1 auto; min-width: 0; }
+.monitor-row.stalled { color: var(--err); }
+.monitor-row.stalled .muted { color: var(--err); }
+.monitor-group .monitor-rows { padding-left: 12px; }
+.monitor-group-note { padding-left: 12px; }
+.monitor-another { padding-top: 2px; }
+.monitor-section .monitor-notice { padding: 2px 0 0 14px; display: block; }
+.monitor-busy { color: var(--warn); }
 
 /* Task-A01-kernel761: a held task that is lost (no heartbeat past the project's limit, no busy
    window running): a small amber tag beside the holder and in the Last heartbeat row. */

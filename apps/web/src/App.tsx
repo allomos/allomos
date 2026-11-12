@@ -1764,14 +1764,18 @@ function TaskbagView({
   // dialog opens from the top bar or the active iteration's card.
   const monitor = useMonitor({ messenger, root: opened.root, active: activeIteration, onError: onFailure });
   const [monitorFrom, setMonitorFrom] = useState<OpenedFrom | null>(null);
+  /** The run Edit monitor… is open for (A03-yolk481); the dialog closes when the run ends. */
+  const [editingRun, setEditingRun] = useState<string | null>(null);
+  const editRun = editingRun ? monitor.runs.find((r) => r.id === editingRun) : undefined;
   const monitorControl = (from: OpenedFrom) =>
     box && (
       <MonitorControl
         monitor={monitor}
         tasks={box.tasks}
         ready={readyTasks(box.tasks, box.areas, iterations, activeIteration).length}
-        showScope={from === "iteration"}
+        root={opened.root}
         onOpen={() => setMonitorFrom(from)}
+        onEdit={(run) => setEditingRun(run.id)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
         onOpenTask={(id) => setSelectedId(id)}
         onError={onError}
@@ -1958,6 +1962,25 @@ function TaskbagView({
           onClose={() => setMonitorFrom(null)}
         />
       )}
+      {editRun && box && (
+        <MonitorDialog
+          key={editRun.id}
+          messenger={messenger}
+          root={opened.root}
+          tasks={box.tasks}
+          areas={box.areas}
+          iterations={iterations}
+          activeIteration={activeIteration}
+          from="iteration"
+          editing={editRun}
+          onStart={() => undefined}
+          onSave={(settings) => {
+            setEditingRun(null);
+            monitor.edit(editRun, settings);
+          }}
+          onClose={() => setEditingRun(null)}
+        />
+      )}
       {handOverTask && (
         <HandoverDialog
           messenger={messenger}
@@ -2124,6 +2147,11 @@ function TaskGroup({
   const { t } = useI18n();
   const all = counted ?? tasks;
   const { done, total, pct } = groupCount(all.map((t) => t.state));
+  const editButton = onEdit && (
+    <button type="button" className="link small group-edit" onClick={onEdit} aria-label={t("group_edit.edit_aria", { group: name })}>
+      {t(iterationState ? "group_edit.edit_iteration_button" : "group_edit.edit_button")}
+    </button>
+  );
   return (
     <section id={anchor} className={["area", collapsed ? "collapsed" : "", iterationState ? `${iterationState}-iteration` : ""].filter(Boolean).join(" ")}>
       <header className="area-head">
@@ -2137,18 +2165,20 @@ function TaskGroup({
             </button>
             {iterationState && <span className={`badge iteration-${iterationState}`}>{t(`iteration.state_${iterationState}`)}</span>}
           </h2>
-          {onEdit && !editForm && (
-            <button type="button" className="link small group-edit" onClick={onEdit} aria-label={t("group_edit.edit_aria", { group: name })}>
-              {t("group_edit.edit_button")}
-            </button>
-          )}
-          {monitor && <span className="group-monitor">{monitor}</span>}
+          {onEdit && !editForm && !iterationState && editButton}
         </div>
-        <span className="count">{t("area.count", { done, total })}</span>
+        {/* An iteration's card (A03-yolk481): the count and Edit iteration at the right of the
+            title line, so Edit is not taken for Edit monitor… below. */}
+        <span className="head-end">
+          <span className="count">{t("area.count", { done, total })}</span>
+          {onEdit && !editForm && iterationState && editButton}
+        </span>
         {sub && <span className="sub">{sub}</span>}
         <div className="meter" role="img" aria-label={t("area.meter", { pct })}>
           <div style={{ width: `${pct}%` }} />
         </div>
+        {/* The Auto-monitor section, or its button, under the progress bar (A03-yolk481). */}
+        {monitor && <div className="group-monitor">{monitor}</div>}
         {onNewTask && !form && (
           <span className="group-actions">
             <button type="button" className="link small new-task" onClick={onNewTask} aria-label={t("create.new_task_aria", { group: name })}>
