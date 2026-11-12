@@ -960,6 +960,7 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .about-window p { margin: 0; }
 .about-window .about-version { color: var(--muted); font-size: 13px; }
 .about-window .about-tagline { margin: 10px 0 4px; max-width: 280px; line-height: 1.4; }
+:root:lang(zh-CN) .about-window .about-tagline .phrase, :root:lang(ja) .about-window .about-tagline .phrase { display: inline-block; max-width: 100%; }
 .about-window .about-website { font-size: 14px; align-self: center; }
 .about-window .about-licence { margin-top: 12px; color: var(--muted); }
 /* Taskbags as tabs (Task-A01-marble320): the tab bar above the taskbag view, like a browser's. */

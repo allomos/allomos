@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { BrandMark } from "./BrandMark";
 import { useI18n } from "./i18n";
+import { taglinePhrases } from "./tagline";
 import type { AboutInfo, Messenger } from "./messenger";
 
 export function AboutWindow({ messenger }: { messenger: Pick<Messenger, "aboutInfo" | "openWebsite" | "closeWindow"> }) {
@@ -28,7 +29,16 @@ export function AboutWindow({ messenger }: { messenger: Pick<Messenger, "aboutIn
       <BrandMark className="about-icon brand-mark" />
       <h1>{t("brand.name")}</h1>
       {info && <p className="about-version">{t("about.version", { version: info.version })}</p>}
-      <p className="about-tagline">{t("about.tagline")}</p>
+      {/* The slogan in phrases, split after its first comma or colon, so Chinese and Japanese
+          break only between them, as on the welcome page (Task-A01-aunt631). */}
+      <p className="about-tagline">
+        {taglinePhrases(t("about.tagline")).map((phrase, i) => (
+          <span key={i} className="phrase">
+            {i > 0 && /^[\x00-\x7f]/.test(phrase) ? " " : ""}
+            {phrase}
+          </span>
+        ))}
+      </p>
       <button
         type="button"
         className="link about-website"
