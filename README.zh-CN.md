@@ -111,7 +111,7 @@ alm claim A01-03
 ## 开发者
 
 - 从源代码运行应用：[docs/workflow/CODING_RULES.md § Running the app](docs/workflow/CODING_RULES.md#running-the-app)（英文）。
-- 产品计划：[docs/product/PLAN.md](docs/product/PLAN.md) · 需求：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 三组功能：[决定 0014](docs/decisions/0014-main-purpose-and-three-sets.md)（均为英文）。
+- 产品计划：[docs/product/PLAN.md](docs/product/PLAN.md) · 需求：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 产品定位：[决定 0024](docs/decisions/0024-positioning-switching-not-tied-to-any-agent.md)（均为英文）。
 - 当前在做什么、审批人待答的问题：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。完整的任务清单在「换肩」自己的任务包里，放在另一个仓库中，目前尚未公开。有权限的维护者把它克隆到这个仓库旁边（`../allomos-taskbag`），然后运行 `alm list --taskbag "../allomos-taskbag/.allomos/taskbag"`，或在「换肩」应用里打开这个仓库。
 - 全部文档：[docs/README.md](docs/README.md)。AI 智能体从 [AGENTS.md](AGENTS.md) 开始。
 

@@ -111,7 +111,7 @@ Allomos tracks its own development with Allomos.
 ## For developers
 
 - Run the app from source: [docs/workflow/CODING_RULES.md § Running the app](docs/workflow/CODING_RULES.md#running-the-app).
-- Product plan: [docs/product/PLAN.md](docs/product/PLAN.md) · requirements: [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · the three sets: [decision 0014](docs/decisions/0014-main-purpose-and-three-sets.md).
+- Product plan: [docs/product/PLAN.md](docs/product/PLAN.md) · requirements: [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · what Allomos is: [decision 0024](docs/decisions/0024-positioning-switching-not-tied-to-any-agent.md).
 - What is being worked on now, and the approver's open questions: [docs/TASK_BOARD.md](docs/TASK_BOARD.md). The full task list lives in Allomos's own taskbag, kept in a separate repository that is private for now. Maintainers with access clone it beside this one (`../allomos-taskbag`) and run `alm list --taskbag "../allomos-taskbag/.allomos/taskbag"`, or open this repository in the Allomos app.
 - All documentation: [docs/README.md](docs/README.md). AI agents start at [AGENTS.md](AGENTS.md).
 

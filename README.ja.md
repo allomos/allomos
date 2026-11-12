@@ -111,7 +111,7 @@ Claude Code と Codex それぞれの得意なことと、プロジェクトに�
 ## 開発者向け
 
 - ソースからアプリを動かす：[docs/workflow/CODING_RULES.md § Running the app](docs/workflow/CODING_RULES.md#running-the-app)（英語）。
-- プロダクト計画：[docs/product/PLAN.md](docs/product/PLAN.md) · 要件：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 三つのセット：[決定 0014](docs/decisions/0014-main-purpose-and-three-sets.md)（いずれも英語）。
+- プロダクト計画：[docs/product/PLAN.md](docs/product/PLAN.md) · 要件：[docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md) · 製品の位置づけ：[決定 0024](docs/decisions/0024-positioning-switching-not-tied-to-any-agent.md)（いずれも英語）。
 - いま取り組んでいることと、承認者への質問：[docs/TASK_BOARD.md](docs/TASK_BOARD.md)。タスクの一覧は「肩代」自身のタスクバッグにあり、別のリポジトリで管理しています（いまは非公開）。アクセスできるメンテナーは、それをこのリポジトリの隣（`../allomos-taskbag`）にクローンして `alm list --taskbag "../allomos-taskbag/.allomos/taskbag"` を実行するか、このリポジトリを「肩代」のアプリで開きます。
 - すべてのドキュメント：[docs/README.md](docs/README.md)。AI エージェントは [AGENTS.md](AGENTS.md) から始めます。
 

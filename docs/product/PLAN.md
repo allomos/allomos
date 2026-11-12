@@ -4,7 +4,7 @@
 
 ## 1. Problem
 
-**Main purpose (owner, 2026-10-06, [0014](../decisions/0014-main-purpose-and-three-sets.md)):** Allomos lets a project switch between AI agents (and their accounts) and between teammates without losing anything. AI skills and progress management are the two other sets of features. The problems below are the costs of switching today.
+**What Allomos is (approver, 2026-11-12, [0024](../decisions/0024-positioning-switching-not-tied-to-any-agent.md), replacing [0014](../decisions/0014-main-purpose-and-three-sets.md)):** switching that is **not tied to any one agent**, plus **approvals people can read and give on the go**. Whichever agent or account you use, the tasks, progress and handoffs are kept in your own git; when one stops, another carries on and nothing is lost; you can always understand what happened and approve it with a tap. Fully automatic assigning and handing on ([0023](../decisions/0023-full-automatic-agent-orchestration.md)) is the engine underneath, not the selling point; progress management is kept as views. It is for small teams of 2 to 5 people and solo developers, each running several agents and accounts. The problems below are the costs of working this way today.
 
 Work is carried out by several AI coding sessions (Claude Code, Codex) in parallel worktrees, plus the owner and teammates. Today the state of that work lives in hand-maintained markdown (reference: the Joyns SSR migration `TASK_BOARD.md` + `workstreams/` card files). That approach has these costs:
 
@@ -18,6 +18,8 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 ## 2. Goals
 
+The goals serve the three layers of [D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md): **not tied to any one agent** (switching, one record and shared quota across vendors, local first), **approvals people can read and give on the go** (readable handoffs, evidence and AI decisions, review, approving away from the computer), and the **engine** (fully automatic assigning and handing on). Progress views (lists, charts, burndown) are kept, behind them.
+
 - See every task's **state and progress**, **grouped by area**, as **lists and charts**.
 - A **burndown chart** with an **estimated finish date** (a range, not a single guess).
 - **A free local app** ([D12](../decisions/0012-free-local-app-paid-cloud.md)): developers and team leaders can use the desktop app on their own computer free of charge, with no account; paying is optional and only for cloud features.
@@ -26,7 +28,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Agents are first-class users**: Claude and Codex sessions claim, update and release tasks through the `alm` CLI, cheaply, with one holder per task (R12).
 - **A desktop app as the hub**, with the full feature set. Web and mobile companion apps connect to the running desktop app to view projects, including progress and status ([D9](../decisions/0009-desktop-hub-with-web-and-mobile-companions.md), R69–R71).
 - **Interfaces for people and agents**, with desktop/mobile human use and browser/human CLI considered in the design. Shared structure and platform patterns are documented in [INTERFACES.md](./INTERFACES.md) (R60–R68; detailed design proposed).
-- A **"waiting on me"** inbox for checks and approvals owed by a person.
+- A **"waiting on me"** inbox for checks and approvals owed by a person, readable enough to approve on the go: from the web or phone companion, away from the computer ([D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md)).
 - **Import** the existing SSR migration board as the first real dataset.
 - **Build a new app…:** a person describes the app they want; an agent plans it into areas, iterations and tasks with `alm` and builds it (Task A03-25). A separate generated-file import (R50–R55) was dropped 2026-10-20.
 - **Start a task in a chosen AI agent** (Claude Code, Codex) from the app, and **jump into** an already-started task's agent session ([D5](../decisions/0005-start-and-open-agent-sessions.md)).
@@ -55,7 +57,9 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D10](../decisions/0010-project-data-folder.md) | **User-chosen taskbag.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
 | [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: **Tauri 2**. | **accepted 2026-10-04** |
 | [D12](../decisions/0012-free-local-app-paid-cloud.md) | **Free local app; payment only for the cloud.** | **accepted 2026-10-04**; paid features and source licence open |
+| [D14](../decisions/0014-main-purpose-and-three-sets.md) | ~~Main purpose: switching between AI agents and teammates; three sets (main, AI skills, progress management).~~ | **superseded by D24, 2026-11-12** |
 | [D23](../decisions/0023-full-automatic-agent-orchestration.md) | **Allomos may orchestrate agents fully automatically**: scheduling, assigning to agents and accounts, chaining, switching on quota. Outside effects and releases still need the approver's approval. Replaces the non-goal "no automatic orchestration". | **accepted 2026-11-12**; limits (budget, parallel sessions, retries, when to stop) left to later tasks |
+| [D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md) | **What Allomos is:** switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on (D23) is the engine, not the selling point; progress management kept as views. For small teams of 2–5 and solo developers. | **accepted 2026-11-12**; replaces D14 |
 
 ## 5. Data model (first cut)
 

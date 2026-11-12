@@ -2,6 +2,8 @@
 
 A **contract**: what Allomos must do. Each requirement has an ID that cards and tests cite. The *why* and design are in [PLAN.md](./PLAN.md) and the [decisions](../decisions/README.md). Status: **accepted** = the owner asked for it or accepted it; **proposed** = recommended, awaiting the owner.
 
+What the requirements serve ([0024](../decisions/0024-positioning-switching-not-tied-to-any-agent.md), 2026-11-12): Allomos is switching **not tied to any one agent**, plus **approvals people can read and give on the go**, with fully automatic assigning and handing on (R96) as the engine. The progress requirements below (R1–R8) are kept as views, not as the lead.
+
 ## Visibility and progress
 
 | ID | Requirement | Source | Status |
