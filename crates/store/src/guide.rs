@@ -648,7 +648,11 @@ const WORKFLOW: &str = "# How to work the tasks
    (the claim prints the commands to start a worktree from it). The former holder's worktree may
    still hold changes it did not save or share; the claim says where it ran when known: look,
    but do not change, commit or remove anything there: only what was pushed counts, and that folder
-   is of use only on the computer it ran on; on another computer, go by the working branch and the
+   is of use only on the computer it ran on (one exception: when the person chose \"Commit and push
+   these changes for it first\" in the Allomos app's Take over… dialog, its request names the
+   worktree and the files: commit them there as one WIP commit, push the working branch and make
+   sure it is not \"ahead\", change nothing else there, and ask the person first when what you
+   find differs from what the request lists); on another computer, go by the working branch and the
    handoff note, and by what the holder last said it was doing (`alm show`, `alm next`; the claim
    repeats it). A held task that is not lost is still
    refused unless you pass `--take`, and `--take` is only for a holder that has stopped or when

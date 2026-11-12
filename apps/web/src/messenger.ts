@@ -11,6 +11,7 @@ import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
+import type { FormerWorktree } from "./proceedFlow";
 /** What a running monitor can be asked (Task-A03-cow112), as `alm monitor` leaves it. */
 export type MonitorRequest =
   | { action: "check" }
@@ -125,6 +126,10 @@ export interface Messenger {
   proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
   /** Work on it… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
+  /** Take over… (Task-A01-flag101): the former holder's worktree on the working branch `working`,
+   * when it is on this computer, with what it has not committed or pushed; null when it is not.
+   * `folder`: where its claim ran (the task's session). Only reads. */
+  formerWorktree(taskbag: string, folder: string | null, working: string): Promise<FormerWorktree | null>;
   /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
    * once), as `alm monitor status --json` lists them; read again when `onMonitorsChanged` says. */
   monitorRuns(root: string): Promise<unknown[]>;
@@ -528,6 +533,7 @@ export const desktopMessenger: Messenger = {
   proceedTaskbag: (taskbag) => invoke<string>("proceed_taskbag", { taskbag }),
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
+  formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
   monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties }),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),

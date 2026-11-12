@@ -1982,6 +1982,10 @@ function TaskbagView({
           lostAfter={lostAfter}
           lastChange={opened.last_changed?.[proceeding.id]}
           working={opened.branches?.[proceeding.id]?.working ?? null}
+          onHandOver={() => {
+            setProceeding(null);
+            setHandingOver(proceeding.id);
+          }}
           onClose={(message) => {
             setProceeding(null);
             if (message) onNotice(message);

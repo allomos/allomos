@@ -180,3 +180,61 @@ test("taking over a holder that is not lost, in Chinese and Japanese, and a lost
     assert.doesNotMatch(r, /\n6\. /, language);
   }
 });
+
+// Saving what the former worktree has not pushed (Task-A01-flag101).
+const former = {
+  path: "/work/project/.claude/worktrees/one",
+  files: [
+    { kind: "modified" as const, path: "src/a.ts" },
+    { kind: "untracked" as const, path: "notes.md" },
+  ],
+  commits: [{ hash: "abc1234", subject: "WIP A01-50: half" }],
+};
+
+test("a lost task's request with the former worktree's changes saved first, word for word", () => {
+  assert.equal(
+    takeOverRequest(lostTask(), TB, "en", { lostAfter: 30, working: "claude/one", save: former }),
+    `Take over the lost task A01-50 ("One") in this project's taskbag. Run every alm command with --taskbag "../allomos-taskbag/.allomos/taskbag".
+
+claude/s1 holds it, but has sent no heartbeat for over 30 minutes and has no busy window running: it is lost.
+
+1. Read it: alm show A01-50 (its description and latest handoff note).
+2. Claim it as AGENTS.md says; that is the takeover (alm claim A01-50 --as <your session name> --branch <your branch> ...), and share the claim.
+3. I chose "Commit and push these changes for it first" in Allomos, so this once you may change the former holder's worktree: /work/project/.claude/worktrees/one. There, commit the files it has not committed (src/a.ts, notes.md) as one WIP commit (git -C "/work/project/.claude/worktrees/one" add -A, then git -C "/work/project/.claude/worktrees/one" commit -m "WIP: changes saved for claude/s1 before the takeover (A01-50)", with your attribution line), then push the working branch claude/one with the 1 commit it committed but did not push to origin (git -C "/work/project/.claude/worktrees/one" push origin claude/one), and make sure it is not "ahead" (git -C "/work/project/.claude/worktrees/one" status -sb). Apart from that, change or delete nothing there. If the changes you find differ from what I saw in Allomos, ask me first.
+4. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
+5. Only what was pushed counts: go on from the commits on the working branch and the handoff note. Step 3 pushed what the former session's worktree had not; apart from step 3, do not change, commit or delete anything there. If unsure, ask me.
+6. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
+  );
+});
+
+test("saving first: only commits to push, a forced takeover, each language, and nothing to save", () => {
+  const pushOnly = takeOverRequest(lostTask(), TB, "en", { lostAfter: 30, working: "claude/one", save: { ...former, files: [] } });
+  assert.doesNotMatch(pushOnly, /add -A/);
+  assert.match(pushOnly, /There, push the working branch claude\/one with the 1 commit/);
+  const filesOnly = takeOverRequest(lostTask(), TB, "en", { lostAfter: 30, working: "claude/one", save: { ...former, commits: [] } });
+  assert.match(filesOnly, /then push the working branch claude\/one to origin/);
+  for (const language of ["en", "zh-CN", "ja"] as const) {
+    const forced = takeOverRequest(lostTask(), TB, language, { lostAfter: null, working: "claude/one", save: former });
+    assert.match(forced, /alm claim A01-50 --take --as/, language);
+    assert.match(forced, /\n3\. [^\n]*\/work\/project\/\.claude\/worktrees\/one[^\n]*push origin claude\/one/, language);
+    assert.match(forced, /\n7\. /, language);
+    assert.match(forced, /src\/a\.ts/, language);
+    // Nothing to save, no working branch, or not chosen: the request is as before.
+    const plain = takeOverRequest(lostTask(), TB, language, { lostAfter: 30, working: "claude/one" });
+    assert.equal(takeOverRequest(lostTask(), TB, language, { lostAfter: 30, working: "claude/one", save: { ...former, files: [], commits: [] } }), plain, language);
+    assert.equal(takeOverRequest(lostTask(), TB, language, { lostAfter: 30, working: "claude/one", save: null }), plain, language);
+    assert.doesNotMatch(takeOverRequest(lostTask(), TB, language, { lostAfter: 30, working: null, save: former }), /worktrees\/one/, language);
+  }
+  const zh = takeOverRequest(lostTask(), TB, "zh-CN", { lostAfter: 30, working: "claude/one", save: former });
+  assert.match(zh, /「先替它提交并推送这些改动」/);
+  assert.match(zh, /WIP: 接手前替 claude\/s1 保存的改动（A01-50）/);
+  const ja = takeOverRequest(lostTask(), TB, "ja", { lostAfter: 30, working: "claude/one", save: former });
+  assert.match(ja, /「先にこれらの変更を代わりにコミットしてプッシュする」/);
+});
+
+test("a long file list names thirty files and says how many more", () => {
+  const many = { ...former, files: Array.from({ length: 33 }, (_, i) => ({ kind: "modified" as const, path: `f${i}.ts` })) };
+  const r = takeOverRequest(lostTask(), TB, "en", { lostAfter: 30, working: "claude/one", save: many });
+  assert.match(r, /f29\.ts and 3 more\)/);
+  assert.doesNotMatch(r, /f30\.ts/);
+});

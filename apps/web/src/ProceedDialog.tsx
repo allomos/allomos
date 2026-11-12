@@ -11,6 +11,12 @@
 // From the task pane it opens for any held task (Task-A01-rocket260, decision 0022 § 6): when the
 // holder is not lost, the dialog warns that its session may still be at work, its confirm button
 // says so, and the request claims with --take.
+// Saving what the former worktree has not pushed (Task-A01-flag101, approver 2026-11-12): when that
+// worktree is on this computer the dialog lists its files not committed and commits not pushed, and
+// a box (checked by default) adds a step to the request: commit them as WIP and push the working
+// branch first. For a holder that is not lost the dialog first asks how to take over: preparing a
+// handoff with the holding session (recommended, the default; it opens Prepare a handoff…) or
+// forcing the takeover, with a red warning and a red confirm button.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -18,7 +24,8 @@ import { useI18n } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL, requestWay } from "./agentPickerFlow";
-import { canTakeOver, edited, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
+import { canTakeOver, edited, hasUnpushed, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
+import type { FormerWorktree } from "./proceedFlow";
 import { agoText, clockText, doingText, heldFact } from "./heartbeatFlow";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -34,6 +41,7 @@ export function ProceedDialog({
   interval,
   lastChange,
   working,
+  onHandOver,
   onClose,
 }: {
   messenger: Messenger;
@@ -48,6 +56,8 @@ export function ProceedDialog({
   lastChange?: string;
   /** The task's working branch, from the history; null when none is recorded. */
   working: string | null;
+  /** Prepare a handoff… instead of taking over (Task-A01-flag101): this dialog closes and that one opens. */
+  onHandOver?: () => void;
   /** The dialog closes; `message` says what happened (null: Cancel or Done). */
   onClose: (message: string | null) => void;
 }) {
@@ -59,6 +69,27 @@ export function ProceedDialog({
   /** Taking over a holder that is not lost (Task-A01-rocket260): its session may still be at work. */
   const held = takeOver && !fact.lost;
   const ask = !takeOver && stopped(task);
+  /** How to take over a holder that is not lost (Task-A01-flag101): ask it for a handoff first (the default) or force it. */
+  const [way, setWay] = useState<"handover" | "force">("handover");
+  const force = held && way === "force";
+  /** The simple form: a held task whose session is asked for a handoff first. */
+  const simple = held && !force && !!onHandOver;
+  /** The former worktree on this computer (undefined while it is read, null when it is not here). */
+  const [former, setFormer] = useState<FormerWorktree | null | undefined>(takeOver && working ? undefined : null);
+  useEffect(() => {
+    if (!takeOver || !working) return;
+    let live = true;
+    messenger.formerWorktree(root, task.session?.folder ?? null, working).then(
+      (w) => live && setFormer(w),
+      () => live && setFormer(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [messenger, root, takeOver, working, task.session?.folder]);
+  /** Commit and push the former worktree's changes first (checked by default, approver 2026-11-12). */
+  const [save, setSave] = useState(true);
+  const saving = save && !!former && hasUnpushed(former) ? former : null;
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
   /** The taskbag as the agent passes it to `--taskbag`; null while it is read. */
   const [taskbag, setTaskbag] = useState<string | null>(null);
@@ -76,7 +107,7 @@ export function ProceedDialog({
     taskbag === null
       ? null
       : takeOver
-        ? takeOverRequest(task, taskbag, language, { lostAfter: held ? null : fact.lostAfter, working })
+        ? takeOverRequest(task, taskbag, language, { lostAfter: held ? null : fact.lostAfter, working, save: saving })
         : proceedRequest(task, taskbag, language);
   /** The person's own request, for this dialog only (null: Allomos's). */
   const [mine, setMine] = useState<string | null>(null);
@@ -161,26 +192,64 @@ export function ProceedDialog({
           {manual === null ? (
             <>
               <p>{found}</p>
-              <p className="request-line">
-                <button type="button" onClick={() => setEditing(true)} disabled={request === null || busy}>
-                  {t("proceed.edit_request")}
-                </button>
-                {mine !== null && <span className="muted small">{t("proceed.edited")}</span>}
-              </p>
-              {takeOver && (
-                <p className="takeover-branch">
-                  {working ? rich("takeover.branch", { branch: <code>{working}</code> }) : t("takeover.branch_unknown")}
-                </p>
+              {held && fact.doing && <p className="takeover-doing">{doingText(fact, now, t)}</p>}
+              {held && onHandOver && (
+                <fieldset className="takeover-way">
+                  <legend>{t("takeover.how")}</legend>
+                  <label>
+                    <input type="radio" name="takeover-way" checked={way === "handover"} onChange={() => setWay("handover")} disabled={busy} />
+                    <span>
+                      {t("takeover.way_handover")}
+                      <span className="muted small block">{t("takeover.way_handover_note")}</span>
+                    </span>
+                  </label>
+                  <label>
+                    <input type="radio" name="takeover-way" checked={way === "force"} onChange={() => setWay("force")} disabled={busy} />
+                    <span>{t("takeover.way_force")}</span>
+                  </label>
+                </fieldset>
               )}
-              {takeOver && fact.doing && <p className="takeover-doing">{doingText(fact, now, t)}</p>}
-              {held && <p className="banner update small">{t("takeover.held_warning", { minutes: interval })}</p>}
-              {takeOver && <p className="banner update small">{t("takeover.worktree")}</p>}
-              {!takeOver && task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
-              <p>
-                {t(held ? "takeover.does_held" : takeOver ? "takeover.does" : task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
-              </p>
-              <p className="muted small">{t("proceed.how")}</p>
-              <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />
+              {held && (force || !onHandOver) && <p className="banner error small">{t("takeover.force_warning", { minutes: interval })}</p>}
+              {!simple && (
+                <>
+                  <p className="request-line">
+                    <button type="button" onClick={() => setEditing(true)} disabled={request === null || busy}>
+                      {t("proceed.edit_request")}
+                    </button>
+                    {mine !== null && <span className="muted small">{t("proceed.edited")}</span>}
+                  </p>
+                  {takeOver && (
+                    <p className="takeover-branch">
+                      {working ? rich("takeover.branch", { branch: <code>{working}</code> }) : t("takeover.branch_unknown")}
+                    </p>
+                  )}
+                  {takeOver && !held && fact.doing && <p className="takeover-doing">{doingText(fact, now, t)}</p>}
+                  {takeOver && former === undefined && <p className="muted small">{t("takeover.changes_looking")}</p>}
+                  {takeOver && former && <FormerChanges former={former} />}
+                  {takeOver && former && hasUnpushed(former) && (
+                    <div className="takeover-save">
+                      <label>
+                        <input type="checkbox" checked={save} onChange={(e) => setSave(e.currentTarget.checked)} disabled={busy} />
+                        <span>{t("takeover.save")}</span>
+                      </label>
+                      <p className="muted small">{t("takeover.save_note")}</p>
+                      {held && <p className="error-text small">{t("takeover.save_held_warning")}</p>}
+                      {save && <p className="small">{t("takeover.save_added")}</p>}
+                    </div>
+                  )}
+                  {takeOver && former === null && (
+                    <p className="banner update small">
+                      {t("takeover.worktree")} {working ? t("takeover.elsewhere") : ""}
+                    </p>
+                  )}
+                  {!takeOver && task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
+                  <p>
+                    {t(held ? "takeover.does_held" : takeOver ? "takeover.does" : task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
+                  </p>
+                  <p className="muted small">{t("proceed.how")}</p>
+                  <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />
+                </>
+              )}
             </>
           ) : (
             <div className="manual">
@@ -205,9 +274,20 @@ export function ProceedDialog({
               <button type="button" onClick={() => onClose(null)} disabled={busy}>
                 {t("wizard.cancel")}
               </button>
-              <button type="button" className="primary" onClick={() => void open()} disabled={busy || !agent || request === null}>
-                {t(held ? "takeover.confirm_held" : "cards.open")}
-              </button>
+              {simple ? (
+                <button type="button" className="primary" onClick={() => onHandOver?.()}>
+                  {t("handover.button")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={held ? "primary danger" : "primary"}
+                  onClick={() => void open()}
+                  disabled={busy || !agent || request === null}
+                >
+                  {t(held ? "takeover.confirm_force" : "cards.open")}
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -241,6 +321,48 @@ export function ProceedDialog({
           )}
       </section>
     </div>
+  );
+}
+
+/** The former worktree's changes not pushed (Task-A01-flag101): in a box of its own, titled, with
+ * where the worktree is; it scrolls inside when long, so the dialog keeps its height. */
+function FormerChanges({ former }: { former: FormerWorktree }) {
+  const { t } = useI18n();
+  return (
+    <section className="former-changes" aria-labelledby="former-changes-title">
+      <h3 id="former-changes-title">{t("takeover.changes_title")}</h3>
+      <p className="muted small">{t("takeover.changes_where", { path: former.path })}</p>
+      {!hasUnpushed(former) ? (
+        <p className="small">{t("takeover.changes_none")}</p>
+      ) : (
+        <div className="former-list">
+          {former.files.length > 0 && (
+            <>
+              <p className="small">{t("takeover.changes_files", { count: former.files.length })}</p>
+              <ul>
+                {former.files.map((f) => (
+                  <li key={f.path}>
+                    <span className={`file-kind k-${f.kind}`}>{t(`takeover.kind_${f.kind}`)}</span> <code>{f.path}</code>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {former.commits.length > 0 && (
+            <>
+              <p className="small">{t("takeover.changes_commits", { count: former.commits.length })}</p>
+              <ul>
+                {former.commits.map((c) => (
+                  <li key={c.hash}>
+                    <code>{c.hash}</code> {c.subject}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
