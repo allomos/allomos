@@ -11,6 +11,8 @@
 
 This reverses the earlier non-goal "Allomos tracks work; it does not start it".
 
+**Extended 2026-11-12 by [0023](./0023-full-automatic-agent-orchestration.md):** besides starting a session when a person asks, Allomos may also start and chain sessions on its own (fully automatic orchestration), inside the same boundaries.
+
 ## The core problem
 
 Allomos is an online web app; the agents usually run **on a person's own machine** (Claude Code / Codex CLI or desktop app, inside a git worktree) or **in a vendor's cloud** (web sessions). A browser page cannot launch programs on a computer by itself. So Allomos needs a way to reach where the agent runs.

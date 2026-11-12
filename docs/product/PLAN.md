@@ -1,6 +1,6 @@
 # Allomos — plan
 
-> Status: **draft, first written 2026-09-27, last revised 2026-10-04.** Decisions marked *proposed* are recommendations awaiting the owner's confirmation. Full records: [decisions/](../decisions/README.md); requirements: [REQUIREMENTS.md](./REQUIREMENTS.md); discussions: [all records](../README.md#discussions). Allomos is developed by AI agents following [AGENTS.md](../../AGENTS.md).
+> Status: **draft, first written 2026-09-27, last revised 2026-11-12.** Decisions marked *proposed* are recommendations awaiting the owner's confirmation. Full records: [decisions/](../decisions/README.md); requirements: [REQUIREMENTS.md](./REQUIREMENTS.md); discussions: [all records](../README.md#discussions). Allomos is developed by AI agents following [AGENTS.md](../../AGENTS.md).
 
 ## 1. Problem
 
@@ -30,10 +30,10 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 - **Import** the existing SSR migration board as the first real dataset.
 - **Build a new app…:** a person describes the app they want; an agent plans it into areas, iterations and tasks with `alm` and builds it (Task A03-25). A separate generated-file import (R50–R55) was dropped 2026-10-20.
 - **Start a task in a chosen AI agent** (Claude Code, Codex) from the app, and **jump into** an already-started task's agent session ([D5](../decisions/0005-start-and-open-agent-sessions.md)).
+- **Orchestrate agents fully automatically** (approver, 2026-11-12, [D23](../decisions/0023-full-automatic-agent-orchestration.md)): Allomos may schedule ready tasks, assign them to agents and accounts, chain sessions one after another and switch agent or account when quota runs out; people mainly review the results. Outside effects and releases still need the approver's approval. *Watch ready tasks* (A03-moth285, A03-fruit467) is the first step.
 
 ## 3. Non-goals (for now)
 
-- Orchestrating agents automatically (scheduling, auto-assigning, chaining agents). Allomos starts an agent only when a person asks it to.
 - Replacing git, PRs or CI. Allomos links to them.
 - Storing secrets, credentials or evidence logs. Cards link to evidence; they do not hold it.
 - Full project-management features (budgets, time sheets, resource leveling).
@@ -55,6 +55,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 | [D10](../decisions/0010-project-data-folder.md) | **User-chosen taskbag.** Each local project's data lives in a folder the user picks: standalone, or a subfolder of an existing project folder such as a code repository. | **requirement accepted 2026-10-04**; details proposed |
 | [D11](../decisions/0011-desktop-framework-and-shared-code.md) | **Desktop for macOS and Windows; one shared interface code base.** Desktop window, browser and phone use the same web UI; only the desktop adds native parts. Framework: **Tauri 2**. | **accepted 2026-10-04** |
 | [D12](../decisions/0012-free-local-app-paid-cloud.md) | **Free local app; payment only for the cloud.** | **accepted 2026-10-04**; paid features and source licence open |
+| [D23](../decisions/0023-full-automatic-agent-orchestration.md) | **Allomos may orchestrate agents fully automatically**: scheduling, assigning to agents and accounts, chaining, switching on quota. Outside effects and releases still need the approver's approval. Replaces the non-goal "no automatic orchestration". | **accepted 2026-11-12**; limits (budget, parallel sessions, retries, when to stop) left to later tasks |
 
 ## 5. Data model (first cut)
 

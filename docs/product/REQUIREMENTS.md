@@ -70,6 +70,7 @@ Local tracking works offline. AI-provider calls and other external integrations 
 | R31 | **Jump into** an already-started task's session in that agent. | owner, 2026-09-27; [0005](../decisions/0005-start-and-open-agent-sessions.md) | accepted |
 | R32 | Show whether a task's agent session is **running, waiting for input or exited**. | [0005](../decisions/0005-start-and-open-agent-sessions.md) | proposed |
 | R33 | Only permitted members may start agents; runners accept only allowed projects, repositories and people; every start and open is recorded. | [0005](../decisions/0005-start-and-open-agent-sessions.md) | proposed |
+| R96 | Allomos may **orchestrate agents fully automatically**: choose the next ready task, assign it to an agent and account, start and chain sessions, and switch agent or account when quota runs out. Outside effects and releases still need the approver's exact approval; making a task ready stays a person's choice. | approver, 2026-11-12; [0023](../decisions/0023-full-automatic-agent-orchestration.md) | accepted |
 
 ## AI-generated project setup
 
