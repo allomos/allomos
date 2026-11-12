@@ -8,6 +8,7 @@ mod agents;
 mod alm_command;
 mod audit;
 mod codex_rules;
+mod former_worktree;
 mod heartbeat_settings;
 mod lan;
 mod monitor_loop;
@@ -2746,6 +2747,7 @@ pub fn run() {
             proceed_taskbag,
             proceed_with_agent,
             proceed_manual_request,
+            former_worktree::former_worktree,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
             monitor_runs::monitor_resume,
