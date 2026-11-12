@@ -137,6 +137,64 @@ export interface TakeOver {
   lostAfter: number | null;
   /** The task's working branch, as the history records it; null when none is recorded. */
   working: string | null;
+  /** Set when the person chose to have the former worktree's changes committed and pushed first
+   * (Task-A01-flag101): that worktree as the dialog listed it. */
+  save?: FormerWorktree | null;
+}
+
+/** The former holder's worktree on this computer and what it has not pushed (Task-A01-flag101),
+ * as the desktop app reads it (`former_worktree`). */
+export interface FormerWorktree {
+  path: string;
+  files: { kind: "modified" | "added" | "untracked" | "deleted"; path: string }[];
+  commits: { hash: string; subject: string }[];
+}
+
+/** Whether the former worktree holds anything not pushed. */
+export function hasUnpushed(w: FormerWorktree): boolean {
+  return w.files.length > 0 || w.commits.length > 0;
+}
+
+/** How many files the request names before it says how many more there are. */
+const NAMED_FILES = 30;
+
+/** The files the request names, joined: at most `NAMED_FILES`, then how many more. */
+function fileList(w: FormerWorktree, language: Language): string {
+  const names = w.files.slice(0, NAMED_FILES).map((f) => f.path);
+  const more = w.files.length - names.length;
+  const sep = language === "en" ? ", " : "、";
+  const tail = more > 0 ? { en: ` and ${more} more`, "zh-CN": `，另外还有 ${more} 个`, ja: `、ほか ${more} 件` }[language] : "";
+  return names.join(sep) + tail;
+}
+
+/** The step that commits and pushes what the former worktree holds (Task-A01-flag101), numbered `n`;
+ * empty when nothing is to be saved. */
+function saveStep(n: number, id: string, holder: string, working: string, w: FormerWorktree, language: Language): string {
+  const at = `git -C "${w.path}"`;
+  const files = w.files.length > 0;
+  const commits = w.commits.length;
+  if (language === "zh-CN") {
+    const commit = files
+      ? `把没提交的文件（${fileList(w, language)}）作为一个 WIP 提交（${at} add -A，然后 ${at} commit -m "WIP: 接手前替 ${holder} 保存的改动（${id}）"，带上你的署名行），`
+      : "";
+    const with_ = commits > 0 ? `连同已提交但没推送的 ${commits} 个提交，` : "";
+    return `${n}. 我在「换肩」里选了「先替它提交并推送这些改动」，所以这一次你可以改动前一个持有者的工作树：${w.path}。在那里${commit}${with_}把工作分支 ${working} 推送到 origin（${at} push origin ${working}），并确认没有「ahead」（${at} status -sb）。此外不要改动、删除那里的任何东西。你看到的改动和我在「换肩」里看到的不一样时，先问我。
+`;
+  }
+  if (language === "ja") {
+    const commit = files
+      ? `コミットされていないファイル（${fileList(w, language)}）を一つの WIP コミットにし（${at} add -A、続けて ${at} commit -m "WIP: 引き継ぎ前に ${holder} の代わりに保存した変更（${id}）"、あなたの署名行を付けて）、`
+      : "";
+    const with_ = commits > 0 ? `コミット済みでまだプッシュされていない ${commits} 件のコミットとともに、` : "";
+    return `${n}. 私が「肩代」で「先にこれらの変更を代わりにコミットしてプッシュする」を選んだので、今回は前の持ち主のワークツリーを変更してかまいません：${w.path}。そこで${commit}${with_}作業ブランチ ${working} を origin にプッシュし（${at} push origin ${working}）、「ahead」がないことを確かめてください（${at} status -sb）。それ以外は、そこにあるものを変更・削除しないでください。見つかった変更が私が「肩代」で見たものと違うときは、先に私に聞いてください。
+`;
+  }
+  const commit = files
+    ? `commit the files it has not committed (${fileList(w, language)}) as one WIP commit (${at} add -A, then ${at} commit -m "WIP: changes saved for ${holder} before the takeover (${id})", with your attribution line), then `
+    : "";
+  const with_ = commits > 0 ? ` with the ${commits} commit${commits > 1 ? "s" : ""} it committed but did not push` : "";
+  return `${n}. I chose "Commit and push these changes for it first" in Allomos, so this once you may change the former holder's worktree: ${w.path}. There, ${commit}push the working branch ${working}${with_} to origin (${at} push origin ${working}), and make sure it is not "ahead" (${at} status -sb). Apart from that, change or delete nothing there. If the changes you find differ from what I saw in Allomos, ask me first.
+`;
 }
 
 /** The request Allomos types in to take a lost task over (Task-A01-voyage603): claiming a lost task
@@ -152,6 +210,9 @@ export function takeOverRequest(task: Task, taskbag: string, language: Language,
   const w = take.working;
   const held = take.lostAfter === null;
   const flag = held ? " --take" : "";
+  // Saving needs the working branch and something to save (Task-A01-flag101).
+  const save = w && take.save && hasUnpushed(take.save) ? take.save : null;
+  const n = save ? 4 : 3;
   if (language === "zh-CN") {
     return `请接手这个项目任务袋里${held ? "的" : "失联的"}任务 ${id}（“${task.title}”）。每条 alm 命令都加上 ${tb}。
 
@@ -159,9 +220,9 @@ ${held ? `它由 ${holder} 持有，没有失联：原会话可能还在工作�
 
 1. 阅读：alm show ${id}（它的说明和最新的交接）。
 2. 按 AGENTS.md 的说法认领它${held ? "，带上 --take" : ""}，这就是接手（alm claim ${id}${flag} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
-3. 在原工作分支${w ? ` ${w}` : "（认领时列出）"}上继续：为它开一个你自己的工作树（git worktree add <文件夹> ${w ?? "<工作分支>"}，不带 -b）。
-4. 只有推送过的东西才算数：从工作分支上的提交和交接说明接着做。前一个会话的工作树（认领时列出）里可能有它没提交的改动，但那个文件夹只在它所在的电脑上有用：在同一台电脑上可以去看，但不要改动、提交或删除那里的东西；在另一台电脑上就看工作分支和交接说明。拿不准就问我。
-${held ? "5. 原会话要到下一次运行 alm 才知道任务被接手，在这之前它可能还会往这个分支推送：提交前先取最新的改动；如果它的提交和你的冲突，告诉我。\n6" : "5"}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
+${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. 在原工作分支${w ? ` ${w}` : "（认领时列出）"}上继续：为它开一个你自己的工作树（git worktree add <文件夹> ${w ?? "<工作分支>"}，不带 -b）。
+${n + 1}. 只有推送过的东西才算数：从工作分支上的提交和交接说明接着做。${save ? `前一个会话的工作树里没推送的改动，第 3 步已经推送；除了第 3 步，不要改动、提交或删除那里的东西。` : `前一个会话的工作树（认领时列出）里可能有它没提交的改动，但那个文件夹只在它所在的电脑上有用：在同一台电脑上可以去看，但不要改动、提交或删除那里的东西；在另一台电脑上就看工作分支和交接说明。`}拿不准就问我。
+${held ? `${n + 2}. 原会话要到下一次运行 alm 才知道任务被接手，在这之前它可能还会往这个分支推送：提交前先取最新的改动；如果它的提交和你的冲突，告诉我。\n${n + 3}` : `${n + 2}`}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
   if (language === "ja") {
     return `このプロジェクトのタスクバッグにある${held ? "" : "応答なしの"}タスク ${id}（「${task.title}」）を引き継いでください。alm コマンドはすべて ${tb} を付けて実行してください。
@@ -170,9 +231,9 @@ ${held ? `${holder} が引き受けていて、応答なしではありません
 
 1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
 2. AGENTS.md のとおりに${held ? "、--take を付けて" : ""}引き受けてください。それが引き継ぎになります（alm claim ${id}${flag} --as <あなたのセッション名> --branch <あなたのブランチ> ...）。その引き受けを共有してください。
-3. 元の作業ブランチ${w ? ` ${w}` : "（引き受けたときに表示されます）"}で続けてください：自分専用のワークツリーを作ります（git worktree add <フォルダー> ${w ?? "<作業ブランチ>"}、-b なし）。
-4. プッシュされたものだけが引き継げます：作業ブランチのコミットと引き継ぎメモから続けてください。前のセッションのワークツリー（引き受けたときに表示されます）にはコミットされていない変更があるかもしれませんが、そのフォルダーが役に立つのは同じコンピューターの上だけです。同じコンピューターでは見てもかまいませんが、そこにあるものを変更・コミット・削除しないでください。別のコンピューターでは作業ブランチと引き継ぎメモを見てください。迷ったら私に聞いてください。
-${held ? "5. 元のセッションは次に alm を実行するまで引き継がれたことを知らないので、それまでこのブランチにプッシュするかもしれません：コミットの前に最新の変更を取り込み、そのコミットとぶつかったら私に教えてください。\n6" : "5"}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
+${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. 元の作業ブランチ${w ? ` ${w}` : "（引き受けたときに表示されます）"}で続けてください：自分専用のワークツリーを作ります（git worktree add <フォルダー> ${w ?? "<作業ブランチ>"}、-b なし）。
+${n + 1}. プッシュされたものだけが引き継げます：作業ブランチのコミットと引き継ぎメモから続けてください。${save ? `前のセッションのワークツリーにあったまだプッシュされていない変更は、手順 3 でプッシュ済みです。手順 3 のほかは、そこにあるものを変更・コミット・削除しないでください。` : `前のセッションのワークツリー（引き受けたときに表示されます）にはコミットされていない変更があるかもしれませんが、そのフォルダーが役に立つのは同じコンピューターの上だけです。同じコンピューターでは見てもかまいませんが、そこにあるものを変更・コミット・削除しないでください。別のコンピューターでは作業ブランチと引き継ぎメモを見てください。`}迷ったら私に聞いてください。
+${held ? `${n + 2}. 元のセッションは次に alm を実行するまで引き継がれたことを知らないので、それまでこのブランチにプッシュするかもしれません：コミットの前に最新の変更を取り込み、そのコミットとぶつかったら私に教えてください。\n${n + 3}` : `${n + 2}`}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
   return `Take over ${held ? "" : "the lost "}task ${id} ("${task.title}") in this project's taskbag. Run every alm command with ${tb}.
 
@@ -180,7 +241,7 @@ ${held ? `${holder} holds it and is not lost: its session may still be at work. 
 
 1. Read it: alm show ${id} (its description and latest handoff note).
 2. Claim it as AGENTS.md says${held ? ", with --take" : ""}; that is the takeover (alm claim ${id}${flag} --as <your session name> --branch <your branch> ...), and share the claim.
-3. Go on on its working branch${w ? `, ${w}` : " (the claim prints it)"}: open a worktree of your own for it (git worktree add <folder> ${w ?? "<working branch>"}, without -b).
-4. Only what was pushed counts: go on from the commits on the working branch and the handoff note. The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note. If unsure, ask me.
-${held ? "5. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.\n6" : "5"}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
+${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. Go on on its working branch${w ? `, ${w}` : " (the claim prints it)"}: open a worktree of your own for it (git worktree add <folder> ${w ?? "<working branch>"}, without -b).
+${n + 1}. Only what was pushed counts: go on from the commits on the working branch and the handoff note. ${save ? `Step 3 pushed what the former session's worktree had not; apart from step 3, do not change, commit or delete anything there.` : `The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note.`} If unsure, ask me.
+${held ? `${n + 2}. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.\n${n + 3}` : `${n + 2}`}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
 }
