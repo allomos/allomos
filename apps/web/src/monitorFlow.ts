@@ -502,3 +502,139 @@ export function listedRuns(entries: unknown[]): ListedRun[] {
   return rows;
 }
 
+
+// A03-yolk481 (approver 2026-11-12): a running monitor is edited with one Edit monitor… dialog
+// (the start dialog, filled in), and the iteration card shows an Auto-monitor section: one
+// foldable panel per monitor, each with its sessions grouped by agent.
+
+/** What a monitor panel's badge says: only one per monitor, the first that holds in this order
+ * (approver 2026-11-12): a session quiet for long, a task waiting on the person, stopping, running. */
+export type RunState = "stalled" | "need_you" | "stopping" | "running";
+export const RUN_STATES: readonly RunState[] = ["stalled", "need_you", "stopping", "running"];
+
+/** The tasks of `run` waiting on the person (not on someone named): they need you. */
+export function needYou(run: Run, tasks: Task[]): string[] {
+  return run.taken.filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
+}
+
+export function runState(run: Run, tasks: Task[], now: number): RunState {
+  if (stalled(run, now).length > 0) return "stalled";
+  if (needYou(run, tasks).length > 0) return "need_you";
+  if (run.stopping) return "stopping";
+  return "running";
+}
+
+/** The section title's counts: one per state, in [`RUN_STATES`]' order, those of zero left out. */
+export function stateCounts(states: RunState[]): { state: RunState; n: number }[] {
+  return RUN_STATES.map((state) => ({ state, n: states.filter((s) => s === state).length })).filter((c) => c.n > 0);
+}
+
+/** One agent's group under "Sessions this monitor opened": its sessions at work, how many it may
+ * have, its levels; `removed` when it was taken off the monitor and finishes its task;
+ * `noTask` when it had a free slot and no ready task in its levels at the last check. */
+export interface SessionGroup {
+  agent: TerminalAgent;
+  removed: boolean;
+  working: Current[];
+  sessions: number;
+  levels: Levels;
+  noTask: boolean;
+}
+
+/** The groups, one per agent of the run (in its order), then the agents taken off that still
+ * finish a task. */
+export function sessionGroups(run: Run): SessionGroup[] {
+  const removed = run.working.map((w) => w.agent).filter((a, i, all) => !run.agents.includes(a) && all.indexOf(a) === i);
+  return [...run.agents, ...removed].map((agent) => ({
+    agent,
+    removed: !run.agents.includes(agent),
+    working: run.working.filter((w) => w.agent === agent),
+    sessions: sessionsOf(run, agent),
+    levels: levelsOf(run, agent),
+    noTask: run.noTask.includes(agent),
+  }));
+}
+
+/** Whether the sessions list is grouped by agent: more than one agent, or one that may have
+ * several sessions. One agent with one session lists its row alone. */
+export function grouped(run: Run): boolean {
+  const groups = sessionGroups(run);
+  return groups.length > 1 || groups.some((g) => g.sessions > 1);
+}
+
+/** What the Edit monitor… dialog saves: the settings as the person left them. */
+export interface MonitorSettings {
+  scope: Scope;
+  agents: TerminalAgent[];
+  quiet: boolean;
+  every: Frequency;
+  sessions: Partial<Record<TerminalAgent, number>>;
+  difficulties: Partial<Record<TerminalAgent, Levels>>;
+}
+
+const sameScope = (a: Scope, b: Scope) => a.kind === b.kind && (a.kind === "all" || (b.kind === "iteration" && a.id === b.id));
+
+/** The requests that turn `run` into `next`, only for what changed, in the order the run takes
+ * them: which tasks, the mode, the frequency, the agents, then each agent's sessions and levels.
+ * No agent left leaves the agents as they are (Stop ends a run). */
+export function editRequests(run: Run, next: MonitorSettings): MonitorRequestOf[] {
+  const out: MonitorRequestOf[] = [];
+  if (!sameScope(run.scope, next.scope)) {
+    out.push({ action: "scope", scope: next.scope.kind === "all" ? { kind: "all" } : { kind: "iteration", id: next.scope.id } });
+  }
+  if (run.quiet !== next.quiet) out.push({ action: "mode", quiet: next.quiet });
+  if (run.every !== next.every) out.push({ action: "every", minutes: next.every });
+  const agents = next.agents.length ? setAgents(run, next.agents) : run.agents;
+  if (agents.join("\n") !== run.agents.join("\n")) out.push({ action: "agents", agents });
+  for (const a of agents) {
+    const count = Math.max(1, Math.floor(next.sessions[a] ?? 1));
+    if (count !== sessionsOf(run, a)) out.push({ action: "sessions", agent: a, count });
+    const l = next.difficulties[a] ?? ALL_LEVELS;
+    const was = levelsOf(run, a);
+    if (l.low !== was.low || l.high !== was.high) out.push({ action: "difficulty", agent: a, range: levelsText(l) });
+  }
+  return out;
+}
+
+/** A request for a run, as `monitor_ask` takes it (messenger.ts's `MonitorRequest`; repeated here
+ * so this file needs no import that Node cannot strip). */
+export type MonitorRequestOf =
+  | { action: "scope"; scope: { kind: "all" } | { kind: "iteration"; id: string } }
+  | { action: "mode"; quiet: boolean }
+  | { action: "every"; minutes: number }
+  | { action: "agents"; agents: string[] }
+  | { action: "sessions"; agent: string; count: number }
+  | { action: "difficulty"; agent: string; range: string };
+
+/** How long a session has been at work, in whole minutes, hours past 60: `{ unit, n }`. */
+export function workedFor(at: number, now: number): { unit: "minutes" | "hours"; n: number } {
+  const minutes = Math.max(0, Math.floor((now - at) / 60_000));
+  return minutes >= 60 ? { unit: "hours", n: Math.floor(minutes / 60) } : { unit: "minutes", n: minutes };
+}
+
+/** What this computer remembers of the section's folding, per project: whether the section is
+ * folded, and which monitor panels are open (panels start folded, the section open). */
+export interface MonitorFolds {
+  sectionFolded: boolean;
+  open: string[];
+}
+export const NO_FOLDS: MonitorFolds = { sectionFolded: false, open: [] };
+
+/** Reads what was stored; anything that does not fit is the default. */
+export function readFolds(text: string | null): MonitorFolds {
+  try {
+    const v = text ? JSON.parse(text) : null;
+    if (!v || typeof v !== "object") return NO_FOLDS;
+    return {
+      sectionFolded: v.sectionFolded === true,
+      open: Array.isArray(v.open) ? v.open.filter((x: unknown): x is string => typeof x === "string") : [],
+    };
+  } catch {
+    return NO_FOLDS;
+  }
+}
+
+/** The folds kept: only the panels of runs still going (a run's ID is never used again). */
+export function keptFolds(folds: MonitorFolds, runIds: string[]): MonitorFolds {
+  return { sectionFolded: folds.sectionFolded, open: folds.open.filter((id) => runIds.includes(id)) };
+}

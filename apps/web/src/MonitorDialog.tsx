@@ -16,7 +16,7 @@ import { codexActionAtStart, codexFirstChecked, codexOffer, ruleText, rulesList 
 import type { CodexRules } from "./codexRulesFlow";
 import { isProblem } from "./types";
 import { ALL_LEVELS, FIRST_FREQUENCY, FREQUENCIES, TERMINAL_AGENTS, accountKey, accountRows, agentLabel, baseAgent, firstScope, frequencyText, scopeOptions, suggestedAccountName } from "./monitorFlow";
-import type { AccountRow, AgentAccount, Frequency, Levels, OpenedFrom, Scope, TerminalAgent } from "./monitorFlow";
+import type { AccountRow, AgentAccount, Frequency, Levels, MonitorSettings, OpenedFrom, Run, Scope, TerminalAgent } from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { labelOf } from "./agentAccounts";
 import { levelsHold } from "./difficultyFlow";
@@ -45,7 +45,9 @@ export function MonitorDialog({
   iterations,
   activeIteration,
   from,
+  editing,
   onStart,
+  onSave,
   onClose,
 }: {
   messenger: Messenger;
@@ -58,6 +60,11 @@ export function MonitorDialog({
   iterations: Iteration[];
   activeIteration: string | null | undefined;
   from: OpenedFrom;
+  /** The running monitor this dialog edits (A03-yolk481): it opens with the monitor's settings,
+   * and Save sends what changed (`onSave`) instead of starting a run. */
+  editing?: Run;
+  /** Edit monitor…'s Save: the settings as the person left them. */
+  onSave?: (settings: MonitorSettings) => void;
   /** `agents` chosen, in the order they are shown; `offered`: every one that could be chosen,
    * offered again in the status bar while the run goes on; `sessions`: how many sessions each
    * chosen agent may have at work at once (Task-A03-weasel276); `difficulties`: the levels each
@@ -100,7 +107,7 @@ export function MonitorDialog({
     [agents, extra, firstName],
   );
   // The first agent the picker would choose starts checked; the person adds or takes off others.
-  const [chosen, setChosen] = useState<TerminalAgent[] | null>(null);
+  const [chosen, setChosen] = useState<TerminalAgent[] | null>(editing ? editing.agents : null);
   useEffect(() => {
     if (chosen === null && agents !== null) setChosen(first && TERMINAL_AGENTS.includes(first) ? [first as TerminalAgent] : []);
   }, [agents, first, chosen]);
@@ -110,13 +117,15 @@ export function MonitorDialog({
   const [adding, setAdding] = useState<string | null>(null);
   // How many sessions each agent may have at work at once (Task-A03-weasel276): kept as typed,
   // read as a whole number of one or more (one when not).
-  const [sessionText, setSessionText] = useState<Partial<Record<TerminalAgent, string>>>({});
+  const [sessionText, setSessionText] = useState<Partial<Record<TerminalAgent, string>>>(() =>
+    editing ? Object.fromEntries(Object.entries(editing.sessions).map(([a, n]) => [a, String(n)])) : {},
+  );
   const countOf = (a: TerminalAgent): number => {
     const n = Math.floor(Number(sessionText[a] ?? 1));
     return n >= 1 ? n : 1;
   };
   // The difficulty levels each agent takes tasks from (Task-A03-wave335): every level unless set.
-  const [levels, setLevels] = useState<Partial<Record<TerminalAgent, Levels>>>({});
+  const [levels, setLevels] = useState<Partial<Record<TerminalAgent, Levels>>>(() => (editing ? { ...editing.difficulties } : {}));
   const levelsOfAgent = (a: TerminalAgent): Levels => levels[a] ?? ALL_LEVELS;
   // The counts of the Which tasks choices: the ready tasks any chosen agent may take (all when
   // none is chosen yet).
@@ -124,11 +133,11 @@ export function MonitorDialog({
     picked.length === 0 || picked.some((a) => levelsHold(levelsOfAgent(a), task)),
   );
   const codexChosen = picked.some((a) => baseAgent(a) === "codex_cli");
-  const [scope, setScope] = useState<Scope>(() => firstScope(options, from));
+  const [scope, setScope] = useState<Scope>(() => editing?.scope ?? firstScope(options, from));
   const selectable = options.other.items.filter((i) => i.ready > 0);
   const [otherId, setOtherId] = useState<string | null>(() => (scope.kind === "iteration" && !scope.current ? scope.id : (selectable[0]?.id ?? null)));
-  const [every, setEvery] = useState<Frequency>(FIRST_FREQUENCY);
-  const [quiet, setQuiet] = useState(true);
+  const [every, setEvery] = useState<Frequency>(editing?.every ?? FIRST_FREQUENCY);
+  const [quiet, setQuiet] = useState(editing?.quiet ?? true);
   const [modes, setModes] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -177,14 +186,20 @@ export function MonitorDialog({
         return;
       }
     }
+    const sessions = Object.fromEntries(picked.map((a) => [a, countOf(a)])) as Partial<Record<TerminalAgent, number>>;
+    const difficulties = Object.fromEntries(picked.map((a) => [a, levelsOfAgent(a)])) as Partial<Record<TerminalAgent, Levels>>;
+    if (editing) {
+      onSave?.({ scope, agents: picked, quiet, every, sessions, difficulties });
+      return;
+    }
     onStart(
       scope,
       picked,
       quiet,
       every,
       offered,
-      Object.fromEntries(picked.map((a) => [a, countOf(a)])) as Partial<Record<TerminalAgent, number>>,
-      Object.fromEntries(picked.map((a) => [a, levelsOfAgent(a)])) as Partial<Record<TerminalAgent, Levels>>,
+      sessions,
+      difficulties,
     );
   };
 
@@ -201,9 +216,9 @@ export function MonitorDialog({
   return (
     <div className="overlay" role="presentation">
       <section className="dialog wizard move-cards monitor-dialog" role="dialog" aria-modal="true" aria-labelledby="monitor-title">
-        <h2 id="monitor-title">{t("monitor.title")}</h2>
+        <h2 id="monitor-title">{editing ? t("monitor.edit_title", { scope: editing.scope.kind === "all" ? t("monitor.scope_all") : t("monitor.scope_label", { id: editing.scope.id }) }) : t("monitor.title")}</h2>
         <div className="dialog-body wizard-body">
-          <p className="muted small">{t("monitor.intro")}</p>
+          <p className="muted small">{t(editing ? "monitor.edit_intro" : "monitor.intro")}</p>
 
           <h3>{t("monitor.which")}</h3>
           <ul className="monitor-scopes">
@@ -298,6 +313,7 @@ export function MonitorDialog({
             onLevels={(a, l) => setLevels((s) => ({ ...s, [a]: l }))}
             rowsOf={rowsOf}
             onAdd={(a) => setAdding(a)}
+            busy={(a) => editing?.working.filter((w) => w.agent === a).map((w) => w.id) ?? []}
           />
           {adding && (
             <AddAccount
@@ -402,7 +418,7 @@ export function MonitorDialog({
             disabled={!canStart || starting}
             onClick={() => void start()}
           >
-            {t("monitor.start")}
+            {t(editing ? "monitor.save" : "monitor.start")}
           </button>
         </div>
       </section>
@@ -428,6 +444,7 @@ function AgentChecklist({
   onLevels,
   rowsOf,
   onAdd,
+  busy,
 }: {
   agents: Agent[] | null;
   slow: boolean;
@@ -441,6 +458,8 @@ function AgentChecklist({
   onLevels: (agent: TerminalAgent, levels: Levels) => void;
   rowsOf: (agent: string) => AccountRow[];
   onAdd: (agent: string) => void;
+  /** The tasks an agent's sessions are working for the monitor being edited (A03-yolk481). */
+  busy?: (agent: TerminalAgent) => string[];
 }) {
   const { t } = useI18n();
   if (agents === null) {
@@ -480,6 +499,9 @@ function AgentChecklist({
                     <li key={row.key}>
                       <label>
                         <input type="checkbox" checked={on} onChange={(e) => onToggle(row.key, e.target.checked)} /> {label}{" "}
+                        {(busy?.(row.key).length ?? 0) > 0 && (
+                          <span className="monitor-busy small">{t("monitor.edit_working", { ids: busy!(row.key).join(", ") })} </span>
+                        )}
                         {on && (
                           <span className="muted">
                             — {t("monitor.how_terminal")} ({a.found})
