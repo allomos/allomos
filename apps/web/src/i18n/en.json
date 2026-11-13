@@ -243,6 +243,7 @@
   "pane.description": "Description",
   "pane.no_description": "No description.",
   "pane.history": "History",
+  "pane.details": "All fields",
   "pane.history_none": "Not recorded yet. Allomos records every change made from now on.",
   "pane.history_since": "Changes are recorded since {date}; earlier ones are not known.",
   "pane.history_empty": "No changes to this task since recording started on {date}.",
