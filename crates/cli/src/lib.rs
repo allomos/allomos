@@ -2589,7 +2589,12 @@ fn human(
     }
     // Task-A01-palm011: emergency changes not approved afterwards.
     let emergencies = allomos_store::classify::unapproved(root);
-    text.push_str(&classify::human_section(bag, &tasks, &emergencies, language));
+    text.push_str(&classify::human_section(
+        bag,
+        &tasks,
+        &emergencies,
+        language,
+    ));
     let emergencies: Vec<&allomos_core::classify::Unapproved> = emergencies
         .iter()
         .filter(|u| tasks.iter().any(|t| t.id == u.task))

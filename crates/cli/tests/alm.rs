@@ -8998,7 +8998,10 @@ fn human_shows_states_and_labels_in_task_language() {
         &repo,
         &["--as", "a", "label", "A01-01", "locally verified by agent"],
     );
-    ok(&repo, &["--as", "a", "ai-decided", "A01-01", "Kept it simple"]);
+    ok(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "Kept it simple"],
+    );
     ok(
         &repo,
         &[
@@ -9012,11 +9015,22 @@ fn human_shows_states_and_labels_in_task_language() {
     );
     ok(
         &repo,
-        &["add", "task", "A01-03", "--area", "A01", "--title", "Second task"],
+        &[
+            "add",
+            "task",
+            "A01-03",
+            "--area",
+            "A01",
+            "--title",
+            "Second task",
+        ],
     );
     ok(&repo, &["ready", "A01-03"]);
     ok(&repo, &["--as", "b", "claim", "A01-03"]);
-    ok(&repo, &["--as", "b", "wait", "A01-03", "--on", "your choice"]);
+    ok(
+        &repo,
+        &["--as", "b", "wait", "A01-03", "--on", "your choice"],
+    );
 
     let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
     assert!(out.contains("已完成"), "{out}");
