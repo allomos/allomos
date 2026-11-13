@@ -593,6 +593,10 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .fields dd { margin: 0; overflow-wrap: anywhere; }
 .task-pane h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .task-pane section { border-top: 1px solid var(--line); padding-top: 12px; }
+/* Task-A01-berry927: what the task's state calls for opens first; the rest is folded. */
+.task-pane .pane-more { border-top: 1px solid var(--line); padding-top: 10px; }
+.task-pane .pane-more > summary { cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 600; }
+.task-pane .pane-more[open] > summary { margin-bottom: 8px; }
 .task-pane .history { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 8px; }
 .task-pane .history li { overflow-wrap: anywhere; }
 .markdown { overflow-wrap: anywhere; }

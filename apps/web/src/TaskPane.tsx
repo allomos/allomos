@@ -43,6 +43,8 @@ import {
 import { canReopen, reopenEdit } from "./reopenFlow";
 import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
 import { HeartbeatLine, TakeOverButton } from "./Heartbeat";
+import { heldFact } from "./heartbeatFlow";
+import { paneFocus, type FocusPart } from "./paneFocusFlow";
 import { HandoverButton } from "./HandoverDialog";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
@@ -652,6 +654,66 @@ export function TaskPane({
     [t("pane.without_human_check"), humanCheckNote(task) || null, null],
   ];
 
+  // Task-A01-berry927 (decision 0025): the parts the task's state calls for open at the top; the
+  // field table, the rest of the records and the history stay folded below.
+  const focus = paneFocus(task, toCheck(task), heldFact(task, lostAfter, new Date(), lastChange)?.lost ?? false);
+  const descriptionBody =
+    editing === "description" ? (
+      editor("description")
+    ) : task.description.trim() ? (
+      <Markdown source={task.description} onLink={onLink} />
+    ) : (
+      <p className="muted small">{t("pane.no_description")}</p>
+    );
+  const part = (p: FocusPart): ReactNode => {
+    switch (p) {
+      case "check_steps":
+        return (
+          <section key={p} className="pane-focus">
+            <h3>{t("pane.human_check_steps")}</h3>
+            {task.human_check_steps?.trim() ? (
+              <Markdown source={task.human_check_steps} onLink={onLink} />
+            ) : (
+              <p className="muted small">{t("pane.no_steps")}</p>
+            )}
+          </section>
+        );
+      case "question":
+        return (
+          <section key={p} className="pane-focus">
+            <h3>{t("pane.waiting_on")}</h3>
+            {task.waiting_on?.trim() ? <Markdown source={task.waiting_on} onLink={onLink} /> : <p className="muted small">—</p>}
+            <p className="muted small">
+              {t("pane.who")}: {task.who ?? t("task.you")}
+            </p>
+          </section>
+        );
+      case "blockers":
+        return (
+          <section key={p} className="pane-focus">
+            <h3>{t("pane.blocked_by")}</h3>
+            <p>{(task.blocked_by ?? []).length ? blockers(task, tasks).map((b) => blockerText(b, t)).join(", ") : "—"}</p>
+          </section>
+        );
+      case "handoff":
+        return (
+          <section key={p} className="pane-focus">
+            <h3>{t("pane.handoff")}</h3>
+            <Markdown source={task.handoff_note ?? ""} onLink={onLink} />
+          </section>
+        );
+      case "description":
+        return (
+          <section key={p} className="pane-focus">
+            <h3>
+              {t("pane.description")} {changeButton("description")}
+            </h3>
+            {descriptionBody}
+          </section>
+        );
+    }
+  };
+
   return (
     <aside className="task-pane" ref={ref} aria-label={t("pane.label_aria", { id: task.id })}>
       <header className="pane-head">
@@ -714,6 +776,7 @@ export function TaskPane({
           )}
         </div>
       )}
+      {focus.map(part)}
       {((task.approvals ?? []).length > 0 || onApprove) && (
         <div className="pane-check pane-approvals">
           <h3>{t("pane.approvals")}</h3>
@@ -944,6 +1007,8 @@ export function TaskPane({
           <p className="muted small">{t("pane.reopen_hint")}</p>
         </div>
       )}
+      <details className="pane-more">
+        <summary>{t("pane.details")}</summary>
       <dl className="fields">
         {rows.map(([label, value, field, title, button]) => (
           <div key={label}>
@@ -959,30 +1024,16 @@ export function TaskPane({
           </div>
         ))}
       </dl>
-      {toCheck(task) && (
-        <section>
-          <h3>{t("pane.human_check_steps")}</h3>
-          {task.human_check_steps?.trim() ? (
-            <Markdown source={task.human_check_steps} onLink={onLink} />
-          ) : (
-            <p className="muted small">{t("pane.no_steps")}</p>
-          )}
-        </section>
+      </details>
+      {!focus.includes("description") && (
+        <details className="pane-more">
+          <summary>{t("pane.description")}</summary>
+          <p className="small">{changeButton("description")}</p>
+          {descriptionBody}
+        </details>
       )}
-      <section>
-        <h3>
-          {t("pane.description")} {changeButton("description")}
-        </h3>
-        {editing === "description" ? (
-          editor("description")
-        ) : task.description.trim() ? (
-          <Markdown source={task.description} onLink={onLink} />
-        ) : (
-          <p className="muted small">{t("pane.no_description")}</p>
-        )}
-      </section>
-      <section>
-        <h3>{t("pane.history")}</h3>
+      <details className="pane-more">
+        <summary>{t("pane.history")}</summary>
         {!history?.since ? (
           <p className="muted small">{t("pane.history_none")}</p>
         ) : history.events.length === 0 ? (
@@ -1006,7 +1057,7 @@ export function TaskPane({
             <p className="muted small">{t("pane.history_since", { date: localTime(history.since) })}</p>
           </>
         )}
-      </section>
+      </details>
     </aside>
   );
 }

@@ -243,6 +243,7 @@
   "pane.description": "説明",
   "pane.no_description": "説明はありません。",
   "pane.history": "履歴",
+  "pane.details": "すべての項目",
   "pane.history_none": "まだ記録されていません。これから「肩代」はすべての変更を記録します。",
   "pane.history_since": "{date} から変更を記録しています。それ以前の変更はわかりません。",
   "pane.history_empty": "{date} に記録を始めてから、このタスクに変更はありません。",
