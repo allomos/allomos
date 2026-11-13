@@ -2,6 +2,8 @@
 
 One file per decision: context, options, the decision and its consequences. Status is one of **Open**, **Proposed**, **Accepted**, **Superseded**.
 
+**语言：** 从 0025 起，新的决定记录和它在下表里的那一行都用中文（zh-CN）写；0001–0024 保持原样，不翻译（批准者 2026-11-13）。
+
 | # | Decision | Status |
 |---|---|---|
 | [0001](./0001-database-source-of-truth.md) | The database is the source of truth | Superseded by 0007 on 2026-10-04 |
@@ -28,4 +30,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0022](./0022-task-heartbeat-and-takeover.md) | Task heartbeat and takeover: a pushed heartbeat every 10 minutes in the task's own file (no event), lost after 30 minutes without one or a busy window (both project settings), `alm beat [--busy]`, claiming a lost task takes it over on its working branch, `--as` on every command tells a session it was taken over, and that session gives the task up | Accepted 2026-11-09 |
 | [0023](./0023-full-automatic-agent-orchestration.md) | Allomos may orchestrate agents fully automatically (scheduling, assigning to agents and accounts, chaining, switching on quota); outside effects and releases still need approval; replaces PLAN's non-goal | Accepted 2026-11-12 (direction; limits left to later tasks) |
 | [0024](./0024-positioning-switching-not-tied-to-any-agent.md) | What Allomos is: switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on (0023) is the engine; progress management kept as views; AI skills kept as in 0014; replaces 0014 | Accepted 2026-11-12; corrected 2026-11-13 |
-| [0025](./0025-records-shown-by-task-state.md) | Records people read: agents write for people first, the app shows first what the task's state calls for, AI decisions in three kinds: visible to users and approach are reviewed, other detail is only recorded, fixed words shown in the task language | Accepted 2026-11-13 |
+| [0025](./0025-records-shown-by-task-state.md) | 给人看的记录：代理先写给人看的话；应用按任务的状态先显示要看的部分；AI 决定分三种，用户看得到的和实现方法的原理要审，其他细节只记下；固定的词用任务语言显示 | 已接受 2026-11-13 |
