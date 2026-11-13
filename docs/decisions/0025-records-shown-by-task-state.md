@@ -1,31 +1,37 @@
-# 0025 — Records people read: shown by the task's state, written for people first
+# 0025 — 给人看的记录：按任务的状态显示，先写给人看的话
 
-| Status | Raised | Decided | Owner |
+| 状态 | 提出 | 决定 | 决定人 |
 |---|---|---|---|
-| **Accepted** (direction; each piece is its own task); point 3 corrected the same day | 2026-11-12 | 2026-11-13 | will.w.hui |
+| **已接受**（方向；每一条各是一个任务）；第 3 条同日改正 | 2026-11-12 | 2026-11-13 | will.w.hui |
 
-Card: task `A01-cup419`. Discussion: [2026-11-13-readable-records.md](../discussions/2026-11-13-readable-records.md).
+任务：`A01-cup419`。讨论记录：[2026-11-13-readable-records.md](../discussions/2026-11-13-readable-records.md)。
 
-## In plain words
+## 说明
 
-What Allomos records for a task (handoff note, description, evidence, AI decisions, human check steps) is tiring to read. The main trouble is not one bad field: there is simply **too much, and nothing tells a person which part matters for the task's state right now**. A task waiting for a check needs the check steps first; a task with AI decisions to review needs only the decisions a user would see; a lost task needs the handoff for the next agent.
+Allomos 为每个任务记下的东西（交接说明、描述、证据、AI 决定、人工检查步骤）读起来很累。问题不在某一样记录写得不好，而在于**东西太多，又没有什么告诉人：任务现在这个状态，该看哪一部分**。等人检查的任务，要先看检查步骤；有 AI 决定待审的任务，只需要看用户看得到的决定；失联的任务，要先看留给下一个代理的交接说明。
 
-**Decided:**
+**决定：**
 
-1. **Agents write for people first** (shared rules in AGENTS.md and `alm guide`). Each handoff note, AI decision and set of check steps starts with one plain sentence a person can act on, then what the person must do, and only then technical detail (commits, commands, IDs). No data format change.
-2. **The app then shows records by the task's state.** The task panel and the review lists put first the part that the task's current state calls for, and fold the rest. No data format change.
-3. **AI decisions come in three kinds**, and two of them are reviewed:
-   - *visible to users* — wording, look, behaviour a person meets. **Reviewed.**
-   - *approach* — the principle of how something is built and why it works that way (for example: finding the former worktree by the task's working branch rather than by the folder the claim ran in). An approach can be wrong even when everything users see is right, so it is **reviewed** too.
-   - *other detail* — sizes, limits, flags, names inside the code (for example: a list box 160px high, at most 200 commits). Recorded and shown in the task, but **not** put in *To review: AI decisions*.
+1. **代理先写给人看的话**（改 AGENTS.md 的共享规则和 `alm guide`）。每条交接说明、AI 决定和每份检查步骤，第一句都写人能照着做的话，然后写要人做的事，最后才是技术细节（提交号、命令、ID）。不改数据格式。
+2. **应用按任务的状态来显示记录。** 任务面板和各个审查列表，先显示任务当前状态要人看的那部分，其余收起来。不改数据格式。
+3. **AI 决定分成三种，其中两种要审：**
+   - **用户看得到的**：文字、样子、人会碰到的行为。**要审。**
+   - **实现方法的原理**：怎么做的、为什么这样做（例如按任务的工作分支找原工作树，而不是按认领时所在的文件夹找）。用户看得到的都对，实现方法也可能是错的，所以这种**也要审**。
+   - **其他细节**：尺寸、上限、参数、代码里的名字（例如列表框高 160px、最多 200 个提交）。记在任务里，可以查看，但**不进**「待审：AI 决定」。
 
-   **This changes the data format** (a kind on each AI decision), approved here.
-4. **Fixed words are shown in the task language**: labels, states and similar fixed terms appear translated wherever people read them; the stored values stay as they are.
+   **这一条改数据格式**（每条 AI 决定加上种类），在此批准。
+4. **固定的词用任务语言显示**：标签、状态这类固定的词，在人读的地方都显示成任务语言；存的值不变。
 
-## The approver's words
+## 批准者的原话
 
-On 2026-11-13, in the conversation, the approver chose "先改写法再改显示" (rules first, then the app's display), agreed that AI decisions are split by kind ("可以，分两种"), and then corrected the split the same day: "根据我的经验，有时候实现方法也是有问题的。所以实现细节可以分成两个方面，一方面是实现方法的原理性说明。另一方面是其他细节。前者应该是要用户审核的。" (In my experience the implementation approach is sometimes wrong too, so implementation detail has two sides: the principle of the approach, which users should review, and the other details.) Point 3 is written to that correction; and chose to show labels in the task language. Asked which record is most tiring, they answered: "很难说。感觉是内容太多了。也许首要的问题是，没有办法按照当前任务所处的状态，快速找到/决定需要看的部分。" — that answer is why point 2 is the centre of this decision.
+2026-11-13，批准者在对话中选了「先改写法再改显示」，同意 AI 决定按种类分开（「可以，分两种」），并选择标签用任务语言显示。
 
-## Safe to build now
+问到哪一样记录读起来最累，批准者回答：「很难说。感觉是内容太多了。也许首要的问题是，没有办法按照当前任务所处的状态，快速找到/决定需要看的部分。」所以第 2 条是这个决定的重点。
 
-All four points. Older AI decisions have no kind: they stay in review as they are, so nothing drops out of review unseen. When an agent is unsure whether a decision is an *approach* or an *other detail*, it records it as an *approach*.
+同一天批准者又改正了分法：「根据我的经验，有时候实现方法也是有问题的。所以实现细节可以分成两个方面，一方面是实现方法的原理性说明。另一方面是其他细节。前者应该是要用户审核的。」第 3 条按这个改正来写。
+
+批准者要求这份决定记录用中文写（2026-11-13）。
+
+## 现在可以做的
+
+四条都可以做。旧的 AI 决定没有种类，照旧留在待审里，不会悄悄漏审。代理拿不准一条决定是「实现方法的原理」还是「其他细节」时，记成「实现方法的原理」。
