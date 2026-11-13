@@ -4,7 +4,7 @@
 
 ## 1. Problem
 
-**What Allomos is (approver, 2026-11-12, [0024](../decisions/0024-positioning-switching-not-tied-to-any-agent.md), replacing [0014](../decisions/0014-main-purpose-and-three-sets.md)):** switching that is **not tied to any one agent**, plus **approvals people can read and give on the go**. Whichever agent or account you use, the tasks, progress and handoffs are kept in your own git; when one stops, another carries on and nothing is lost; you can always understand what happened and approve it with a tap. Fully automatic assigning and handing on ([0023](../decisions/0023-full-automatic-agent-orchestration.md)) is the engine underneath, not the selling point; progress management is kept as views. It is for small teams of 2 to 5 people and solo developers, each running several agents and accounts. The problems below are the costs of working this way today.
+**What Allomos is (approver, 2026-11-12, [0024](../decisions/0024-positioning-switching-not-tied-to-any-agent.md), replacing [0014](../decisions/0014-main-purpose-and-three-sets.md)):** switching that is **not tied to any one agent**, plus **approvals people can read and give on the go**. Whichever agent or account you use, the tasks, progress and handoffs are kept in your own git; when one stops, another carries on and nothing is lost; you can always understand what happened and approve it with a tap. Fully automatic assigning and handing on ([0023](../decisions/0023-full-automatic-agent-orchestration.md)) is the engine underneath, not the selling point; progress management is kept as views, and AI skills stays as in 0014. It is for small teams of 2 to 5 people and solo developers, each running several agents and accounts. The problems below are the costs of working this way today.
 
 Work is carried out by several AI coding sessions (Claude Code, Codex) in parallel worktrees, plus the owner and teammates. Today the state of that work lives in hand-maintained markdown (reference: the Joyns SSR migration `TASK_BOARD.md` + `workstreams/` card files). That approach has these costs:
 
@@ -18,7 +18,7 @@ Work is carried out by several AI coding sessions (Claude Code, Codex) in parall
 
 ## 2. Goals
 
-The goals serve the three layers of [D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md): **not tied to any one agent** (switching, one record and shared quota across vendors, local first), **approvals people can read and give on the go** (readable handoffs, evidence and AI decisions, review, approving away from the computer), and the **engine** (fully automatic assigning and handing on). Progress views (lists, charts, burndown) are kept, behind them.
+The goals serve the three layers of [D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md): **not tied to any one agent** (switching, one record and shared quota across vendors, local first), **approvals people can read and give on the go** (readable handoffs, evidence and AI decisions, review, approving away from the computer), and the **engine** (fully automatic assigning and handing on). Progress views (lists, charts, burndown) are kept, behind them. AI skills stays as in D14.
 
 - See every task's **state and progress**, **grouped by area**, as **lists and charts**.
 - A **burndown chart** with an **estimated finish date** (a range, not a single guess).
@@ -59,7 +59,7 @@ The goals serve the three layers of [D24](../decisions/0024-positioning-switchin
 | [D12](../decisions/0012-free-local-app-paid-cloud.md) | **Free local app; payment only for the cloud.** | **accepted 2026-10-04**; paid features and source licence open |
 | [D14](../decisions/0014-main-purpose-and-three-sets.md) | ~~Main purpose: switching between AI agents and teammates; three sets (main, AI skills, progress management).~~ | **superseded by D24, 2026-11-12** |
 | [D23](../decisions/0023-full-automatic-agent-orchestration.md) | **Allomos may orchestrate agents fully automatically**: scheduling, assigning to agents and accounts, chaining, switching on quota. Outside effects and releases still need the approver's approval. Replaces the non-goal "no automatic orchestration". | **accepted 2026-11-12**; limits (budget, parallel sessions, retries, when to stop) left to later tasks |
-| [D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md) | **What Allomos is:** switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on (D23) is the engine, not the selling point; progress management kept as views. For small teams of 2–5 and solo developers. | **accepted 2026-11-12**; replaces D14 |
+| [D24](../decisions/0024-positioning-switching-not-tied-to-any-agent.md) | **What Allomos is:** switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on (D23) is the engine, not the selling point; progress management kept as views; AI skills kept as in D14. For small teams of 2–5 and solo developers. | **accepted 2026-11-12**; replaces D14 |
 
 ## 5. Data model (first cut)
 

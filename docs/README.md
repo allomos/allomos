@@ -1,6 +1,6 @@
 # Allomos documentation
 
-**What Allomos is:** switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on is the engine ([decision 0024](./decisions/0024-positioning-switching-not-tied-to-any-agent.md)).
+**What Allomos is:** switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on is the engine; AI skills stays as before ([decision 0024](./decisions/0024-positioning-switching-not-tied-to-any-agent.md)).
 
 **Agents:** start at [../AGENTS.md](../AGENTS.md). **People:** start with [product/PLAN.md](./product/PLAN.md) and [TASK_BOARD.md](./TASK_BOARD.md).
 

@@ -4,7 +4,7 @@
 |---|---|---|---|
 | **Superseded** by [0024](./0024-positioning-switching-not-tied-to-any-agent.md) (2026-11-12): switching not tied to any one agent, plus approvals people can read and give on the go; was Accepted (purpose and sets) | 2026-10-06 | 2026-10-06 | will.w.hui |
 
-> **Superseded.** Allomos's positioning is now [0024](./0024-positioning-switching-not-tied-to-any-agent.md): three layers (not tied to any one agent; approvals people can read and give on the go; fully automatic assigning and handing on as the engine). This record is kept as history.
+> **Superseded.** Allomos's positioning is now [0024](./0024-positioning-switching-not-tied-to-any-agent.md): three layers (not tied to any one agent; approvals people can read and give on the go; fully automatic assigning and handing on as the engine). Its set 2, AI skills, carries over unchanged. This record is kept as history.
 
 ## In plain words
 
