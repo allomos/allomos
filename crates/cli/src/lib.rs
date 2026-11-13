@@ -2538,13 +2538,15 @@ fn human(
         .filter(|t| t.has_label(allomos_core::labels::AI_DECISIONS))
         .map(|t| (*t, decisions.get(&t.id).unwrap_or(&none)))
         .collect();
+    let system: Vec<String> = sys_locale::get_locales().collect();
+    let language = pick_ui_language(&[task_language(&bag.project, &system).language]);
     let mut text = String::new();
     text.push_str(&format!("To check ({})\n", to_check.len()));
     if to_check.is_empty() {
         text.push_str("  Nothing to check.\n");
     }
     for t in &to_check {
-        text.push_str(&format!("  {}\n", task_line(t)));
+        text.push_str(&format!("  {}\n", human_task_line(t, language)));
         let why = t
             .without_human_check
             .as_deref()
@@ -2567,7 +2569,7 @@ fn human(
         text.push_str("  Nothing to answer.\n");
     }
     for t in &to_answer {
-        text.push_str(&format!("  {}\n", task_line(t)));
+        text.push_str(&format!("  {}\n", human_task_line(t, language)));
         if let Some(line) = stop_line(bag, t) {
             text.push_str(&format!("      {line}\n"));
         }
@@ -2580,14 +2582,14 @@ fn human(
         text.push_str("  Nothing to review.\n");
     }
     for (t, d) in &to_review {
-        text.push_str(&format!("  {}\n", task_line(t)));
+        text.push_str(&format!("  {}\n", human_task_line(t, language)));
         for line in decision_lines(d).lines() {
             text.push_str(&format!("    {line}\n"));
         }
     }
     // Task-A01-palm011: emergency changes not approved afterwards.
     let emergencies = allomos_store::classify::unapproved(root);
-    text.push_str(&classify::human_section(bag, &tasks, &emergencies));
+    text.push_str(&classify::human_section(bag, &tasks, &emergencies, language));
     let emergencies: Vec<&allomos_core::classify::Unapproved> = emergencies
         .iter()
         .filter(|u| tasks.iter().any(|t| t.id == u.task))
@@ -2660,6 +2662,71 @@ fn difficulty_level(given: &str) -> Result<u8, String> {
 /// `--difficulty <range>` for `alm next` and `alm list`.
 fn difficulty_range(given: &str) -> Result<allomos_core::difficulty::Range, String> {
     allomos_core::difficulty::Range::parse(given).map_err(|p| p.english())
+}
+
+fn state_text(state: State, language: &str) -> &'static str {
+    match (state, language) {
+        (State::Backlog, "zh-CN") => "储备",
+        (State::Backlog, "ja") => "バックログ",
+        (State::Backlog, _) => "Backlog",
+        (State::Ready, "zh-CN") => "就绪",
+        (State::Ready, "ja") => "準備完了",
+        (State::Ready, _) => "Ready",
+        (State::InProgress, "zh-CN") => "进行中",
+        (State::InProgress, "ja") => "進行中",
+        (State::InProgress, _) => "In progress",
+        (State::Waiting, "zh-CN") => "等待中",
+        (State::Waiting, "ja") => "待機中",
+        (State::Waiting, _) => "Waiting",
+        (State::Blocked, "zh-CN") => "被阻塞",
+        (State::Blocked, "ja") => "ブロック中",
+        (State::Blocked, _) => "Blocked",
+        (State::Done, "zh-CN") => "已完成",
+        (State::Done, "ja") => "完了",
+        (State::Done, _) => "Done",
+        (State::Dropped, "zh-CN") => "已放弃",
+        (State::Dropped, "ja") => "中止",
+        (State::Dropped, _) => "Dropped",
+        (State::Unknown, _) => state.as_str(),
+    }
+}
+
+fn label_text<'a>(label: &'a str, language: &str) -> &'a str {
+    use allomos_core::labels::{
+        AI_DECISIONS, DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN,
+    };
+    match (label, language) {
+        (LOCALLY_BY_AGENT, "zh-CN") => "智能体已在本地验证",
+        (LOCALLY_BY_AGENT, "ja") => "エージェントがローカルで検証済み",
+        (DEPLOYED_BY_AGENT, "zh-CN") => "智能体已部署并验证",
+        (DEPLOYED_BY_AGENT, "ja") => "エージェントがデプロイして検証済み",
+        (LOCALLY_BY_HUMAN, "zh-CN") => "人已在本地验证",
+        (LOCALLY_BY_HUMAN, "ja") => "人がローカルで検証済み",
+        (DEPLOYED_BY_HUMAN, "zh-CN") => "人已在部署后验证",
+        (DEPLOYED_BY_HUMAN, "ja") => "人がデプロイ後に検証済み",
+        (AI_DECISIONS, "zh-CN") => "待审阅 AI 决定",
+        (AI_DECISIONS, "ja") => "レビュー待ちの AI の決定",
+        _ => label,
+    }
+}
+
+pub(crate) fn human_task_line(t: &Task, language: &str) -> String {
+    format!(
+        "{}  {}  {}  {}  {}",
+        t.id,
+        state_text(t.state, language),
+        if t.labels.is_empty() {
+            "-".to_string()
+        } else {
+            t.labels
+                .iter()
+                .map(|l| label_text(l, language))
+                .collect::<Vec<_>>()
+                .join(", ")
+        },
+        t.holder.as_deref().unwrap_or("-"),
+        t.title
+    )
 }
 
 fn task_line(t: &Task) -> String {

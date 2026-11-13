@@ -8987,3 +8987,58 @@ fn an_old_handover_request_tells_nobody_and_ends_with_release_or_claim() {
     let (_, v) = fj(&repo, &["--as", "s3", "show", "A01-01"]);
     assert!(v["task"].get("handover_request").is_none(), "{v}");
 }
+
+#[test]
+fn human_shows_states_and_labels_in_task_language() {
+    let repo = filled();
+    ok(&repo, &["task-language", "zh-CN"]);
+    ok(&repo, &["ready", "A01-01"]);
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-01", "locally verified by agent"],
+    );
+    ok(&repo, &["--as", "a", "ai-decided", "A01-01", "Kept it simple"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
+    ok(
+        &repo,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Second task"],
+    );
+    ok(&repo, &["ready", "A01-03"]);
+    ok(&repo, &["--as", "b", "claim", "A01-03"]);
+    ok(&repo, &["--as", "b", "wait", "A01-03", "--on", "your choice"]);
+
+    let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(out.contains("已完成"), "{out}");
+    assert!(out.contains("智能体已在本地验证"), "{out}");
+    assert!(out.contains("待审阅 AI 决定"), "{out}");
+    assert!(out.contains("等待中"), "{out}");
+    assert!(!out.contains("locally verified by agent"), "{out}");
+
+    // Stored values in --json remain unchanged.
+    let v = ok(&repo, &["human"]);
+    assert_eq!(v["to_check"][0]["state"], "done");
+    assert_eq!(
+        v["to_check"][0]["labels"],
+        json!(["locally verified by agent", "AI decisions to review"])
+    );
+    assert_eq!(v["to_answer"][0]["state"], "waiting");
+
+    // Switching task-language to Japanese updates alm human output.
+    ok(&repo, &["task-language", "ja"]);
+    let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(out.contains("完了"), "{out}");
+    assert!(out.contains("エージェントがローカルで検証済み"), "{out}");
+    assert!(out.contains("レビュー待ちの AI の決定"), "{out}");
+    assert!(out.contains("待機中"), "{out}");
+}

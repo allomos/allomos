@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { useI18n } from "./i18n";
+import { useI18n, useTaskT } from "./i18n";
 import type { Messenger } from "./messenger";
 import { PASTE_KEYS } from "./AgentPicker";
 import { canTakeOver } from "./proceedFlow";
@@ -67,6 +67,7 @@ export function HandoverDialog({
   onClose: () => void;
 }) {
   const { t, rich, problem, language } = useI18n();
+  const taskT = useTaskT();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 15_000);
@@ -111,7 +112,7 @@ export function HandoverDialog({
 
   const strong = <strong>{holder}</strong>;
   const named = <strong>{task.id}</strong>;
-  const stateWord = <span className={`state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>;
+  const stateWord = <span className={`state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>;
   const finished = task.state === "done" || task.state === "dropped";
   const still = !finished && task.holder === holder && !!holder;
   const fact = still ? heldFact(task, lostAfter, now, lastChange) : null;

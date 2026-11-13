@@ -22,7 +22,7 @@ import { HandoffSection } from "./HandoffSettings";
 import { HeartbeatSection } from "./HeartbeatSettings";
 import { AuditSection } from "./AuditSettings";
 import { ProjectFolders } from "./ProjectFolders";
-import { LANGUAGE_NAMES, useI18n, type Key } from "./i18n";
+import { LANGUAGE_NAMES, useI18n, useTaskT, type Key } from "./i18n";
 import { LanguageMenu } from "./LanguageMenu";
 import { TranslateDialog } from "./TranslateDialog";
 import { addStep, ladderChanged, ladderProblem, removeStep, renameStep, startLadder, type LadderStep } from "./ladderFlow";
@@ -209,6 +209,7 @@ function Translate({ messenger, root }: { messenger: Messenger; root: string }) 
  * them (the built-in labels cannot be changed). */
 function LabelTable({ labels, onSave }: { labels: LabelEntry[]; onSave: (steps: LadderStep[]) => Promise<void> }) {
   const { t, problem } = useI18n();
+  const taskT = useTaskT();
   const [steps, setSteps] = useState<LadderStep[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -217,7 +218,7 @@ function LabelTable({ labels, onSave }: { labels: LabelEntry[]; onSave: (steps: 
   const own = table.filter((e) => !e.built_in).map((e) => e.name);
   const row = (e: LabelEntry) => (
     <li key={e.name}>
-      <span className={e.built_in ? "label-chip" : "label-chip own"}>{labelText(e.name, t)}</span>
+      <span className={e.built_in ? "label-chip" : "label-chip own"}>{labelText(e.name, taskT)}</span>
       {e.built_in && <span className="muted small"> {t("settings.built_in")}</span>}
       {labelMeaning(e, t) && <div className="muted small">{labelMeaning(e, t)}</div>}
     </li>

@@ -11,7 +11,7 @@
 // decided in stopFlow.ts.
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useI18n } from "./i18n";
+import { useI18n, useTaskT } from "./i18n";
 import {
   FILTER_STATES,
   HUMAN_COLUMN,
@@ -51,6 +51,7 @@ export function FilterMenu({
   onChange: (f: StateFilter) => void;
 }) {
   const { t } = useI18n();
+  const taskT = useTaskT();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("presets");
   const box = useRef<HTMLSpanElement>(null);
@@ -90,7 +91,7 @@ export function FilterMenu({
         ref={button}
         onClick={toggle}
       >
-        <span>{filterName(filter, t)}</span>
+        <span>{filterName(filter, t, taskT)}</span>
         <svg viewBox="0 0 20 20" aria-hidden="true">
           <path d="M5 8l5 5 5-5" />
         </svg>
@@ -155,7 +156,7 @@ export function FilterMenu({
                     </span>
                     <span className="filter-preset-words">
                       <span className="filter-preset-name">{presetName(p, t)}</span>
-                      <span className="filter-preset-ticks">{presetTicks(p, t)}</span>
+                      <span className="filter-preset-ticks">{presetTicks(p, t, taskT)}</span>
                     </span>
                     <span className="filter-preset-count">{t(n === 1 ? "filter.who_one" : "filter.who_other", { count: n })}</span>
                   </button>
@@ -184,7 +185,7 @@ export function FilterMenu({
                     </th>
                     {columns.map((c) => (
                       <th key={c} colSpan={2} className="lab" title={c === HUMAN_COLUMN ? t("filter.human_hint") : undefined}>
-                        {columnText(c, t)}
+                        {columnText(c, t, taskT)}
                       </th>
                     ))}
                   </tr>
@@ -200,7 +201,7 @@ export function FilterMenu({
                 <tbody>
                   {FILTER_STATES.map((s) => {
                     const ticks = rowTicks(filter, s);
-                    const state = t(`state.${s}`);
+                    const state = taskT(`state.${s}`);
                     return (
                       <tr key={s} className={`r-${s}`}>
                         <td className="st">
@@ -221,7 +222,7 @@ export function FilterMenu({
                             <td key={`${c}\u0000${side}`} className={side}>
                               <input
                                 type="checkbox"
-                                aria-label={t("filter.cell", { state, cell: t(`filter.side_${side}`, { label: columnText(c, t) }) })}
+                                aria-label={t("filter.cell", { state, cell: t(`filter.side_${side}`, { label: columnText(c, t, taskT) }) })}
                                 checked={isTicked(filter, s, c, side)}
                                 onChange={(e) => onChange(tickCell(filter, s, c, side, e.target.checked))}
                               />

@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
-import { LANGUAGES, LANGUAGE_NAMES, useI18n } from "./i18n";
+import { LANGUAGES, LANGUAGE_NAMES, TaskLanguageProvider, useI18n, useTaskT } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { AgentLine } from "./AgentLine";
 import { usePaced } from "./usePaced";
@@ -615,6 +615,7 @@ export function App({
   }, [opened]);
 
   return (
+    <TaskLanguageProvider taskLanguage={opened?.loaded.taskbag?.project.task_language}>
     <div className="app">
       <header className="top">
         <div className="brand" aria-label={t("brand.name")}>
@@ -869,6 +870,7 @@ export function App({
         )}
       </main>
     </div>
+    </TaskLanguageProvider>
   );
 }
 
@@ -1340,6 +1342,7 @@ function TaskbagView({
   onRefresh: () => Promise<void>;
 }) {
   const { t, rich } = useI18n();
+  const taskT = useTaskT();
   const { taskbag: box, issues, active_iteration: activeIteration } = opened.loaded;
   const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_to_move_in") : issues;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
@@ -1468,7 +1471,7 @@ function TaskbagView({
     }
   };
   const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
-  const stop = (task: Task) => stopFact(task, box?.tasks ?? [], t);
+  const stop = (task: Task) => stopFact(task, box?.tasks ?? [], t, taskT);
   // The search box (Task-A01-36): the task list's search, emptied when another project opens. Cmd/Ctrl+F focuses it.
   const [query, setQuery] = useState("");
   const terms = searchTerms(query);
@@ -2145,6 +2148,7 @@ function TaskGroup({
   monitor?: ReactNode;
 }) {
   const { t } = useI18n();
+  const taskT = useTaskT();
   const all = counted ?? tasks;
   const { done, total, pct } = groupCount(all.map((t) => t.state));
   const editButton = onEdit && (
@@ -2212,7 +2216,7 @@ function TaskGroup({
       )}
       {!collapsed && hidden && hidden.count > 0 && (
         <p className="filter-hidden small">
-          <span>{hiddenText(hidden, t)}</span>{" "}
+          <span>{hiddenText(hidden, t, taskT)}</span>{" "}
           <button type="button" className="link small" onClick={onShowAll}>
             {t("filter.show_all")}
           </button>
