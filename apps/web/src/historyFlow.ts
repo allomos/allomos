@@ -3,6 +3,15 @@
 import type { Key } from "./i18n";
 import type { EffectRecord, FieldChange, LinkRecord } from "./types";
 
+const LABEL_KEYS: Record<string, Key> = {
+  "locally verified by agent": "label.locally_by_agent",
+  "deployed and verified by agent": "label.deployed_by_agent",
+  "locally verified by human": "label.locally_by_human",
+  "deployed and verified by human": "label.deployed_by_human",
+  "AI decisions to review": "label.ai_decisions",
+};
+const labelWord = (label: string, t: T): string => (LABEL_KEYS[label] ? t(LABEL_KEYS[label]) : label);
+
 /** The task pane's name for each task field, so History uses the same words as the fields above it. */
 const FIELD_KEYS: Record<string, Key> = {
   title: "pane.title",
@@ -52,14 +61,15 @@ const SHORT = 60;
 /** The change types, risk levels and what a change touches that Allomos names (Task-A01-palm011). */
 const CLASSIFY_VALUES = new Set(["standard", "normal", "emergency", "low", "medium", "high", "production", "others_data"]);
 
-/** One side of a change: a state in words, a description only as "changed", long text shortened. */
-export function valueText(field: string, value: unknown, t: T): string {
+/** One side of a change: a state or label in the task language, a description only as "changed", long text shortened. */
+export function valueText(field: string, value: unknown, t: T, taskT: T = t): string {
   if (value === undefined || value === null || value === "") return "—";
   // A value removed by a redaction (Task-A01-stem986): only the marker is left.
   if (isRedacted(value)) return t("pane.redacted");
   // A redaction: which fields were removed, from how many events, and who approved it.
   if (field === "redaction" && typeof value === "object") return redactionText(value as RedactionRecord, t);
-  if (field === "state" && typeof value === "string") return t(`state.${value}` as Key);
+  if (field === "state" && typeof value === "string") return taskT(`state.${value}` as Key);
+  if (field === "label" && typeof value === "string") return labelWord(value, taskT);
   // An approval record (Task-A01-coach782) by its ID; older approvals were a text.
   if (field === "approval" && typeof value === "object" && "id" in value) return String((value as { id: unknown }).id);
   // An outside effect (Task-A01-job650): where, what, and what happened once it has a result.
@@ -74,16 +84,17 @@ export function valueText(field: string, value: unknown, t: T): string {
   if ((field === "change_type" || field === "risk") && typeof value === "string" && CLASSIFY_VALUES.has(value)) return t(`classify.${value}` as Key);
   if (field === "touches" && Array.isArray(value))
     return value.length ? value.map((v) => (CLASSIFY_VALUES.has(String(v)) ? t(`classify.${v}` as Key) : String(v))).join(", ") : t("classify.touches_none");
-  if ((field === "blocked_by" || field === "labels" || field === "traces") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
+  if (field === "labels" && Array.isArray(value)) return value.length ? value.map((v) => labelWord(String(v), taskT)).join(", ") : "—";
+  if ((field === "blocked_by" || field === "traces") && Array.isArray(value)) return value.length ? value.join(", ") : "—";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const first = text.split("\n")[0];
   return first.length > SHORT || first.length < text.trimEnd().length ? `${first.slice(0, SHORT)}…` : first;
 }
 
 /** "State: Ready → In progress"; a description says only that it changed. */
-export function changeLine(c: FieldChange, t: T): string {
+export function changeLine(c: FieldChange, t: T, taskT: T = t): string {
   if (c.field === "description") return t("pane.history_description", { field: fieldName(c.field, t) });
-  return `${fieldName(c.field, t)}: ${valueText(c.field, c.from, t)} → ${valueText(c.field, c.to, t)}`;
+  return `${fieldName(c.field, t)}: ${valueText(c.field, c.from, t, taskT)} → ${valueText(c.field, c.to, t, taskT)}`;
 }
 
 /** A `human_check` record (decision 0021 § 1.1), as stored in a `checked` event. */

@@ -15,7 +15,7 @@
 // asks why (Task-A01-baker800); neither changes the state.
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useI18n, type Key } from "./i18n";
+import { useI18n, useTaskT, type Key } from "./i18n";
 import { WhoForm } from "./WhoForm";
 import { Markdown } from "./Markdown";
 import { localTime } from "./timeFlow";
@@ -131,6 +131,7 @@ export function TaskPane({
   lastChange?: string;
 }) {
   const { t, problem } = useI18n();
+  const taskT = useTaskT();
   const ref = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<EditField | null>(null);
   const [draft, setDraft] = useState<Draft>({ value: "", waitingOn: "", who: "", blockedBy: [], folders: [], labels: [] });
@@ -337,7 +338,7 @@ export function TaskPane({
       {blockerChoices(task, tasks).map((x) => (
         <label key={x.id} className="small">
           <input type="checkbox" checked={draft.blockedBy.includes(x.id)} onChange={() => setDraft((d) => toggleBlocker(d, x.id))} />{" "}
-          <span className="id">{x.id}</span> {x.title} <span className="muted">({t(`state.${x.state}`)})</span>
+          <span className="id">{x.id}</span> {x.title} <span className="muted">({taskT(`state.${x.state}`)})</span>
         </label>
       ))}
     </fieldset>
@@ -354,7 +355,7 @@ export function TaskPane({
             <select value={draft.value} onChange={(e) => set(e.target.value)} disabled={busy} aria-label={label} autoFocus>
               {stateChoices(task).map((s) => (
                 <option key={s} value={s} disabled={stateDisabled(task, s)}>
-                  {t(`state.${s}`)}
+                  {taskT(`state.${s}`)}
                 </option>
               ))}
             </select>
@@ -416,7 +417,7 @@ export function TaskPane({
             <legend className="small">{t("edit.labels_legend")}</legend>
             {labels.map((l) => (
               <label key={l} className="small">
-                <input type="checkbox" checked={draft.labels.includes(l)} onChange={() => setDraft((d) => toggleLabel(d, l))} /> {labelText(l, t)}
+                <input type="checkbox" checked={draft.labels.includes(l)} onChange={() => setDraft((d) => toggleLabel(d, l))} /> {labelText(l, taskT)}
               </label>
             ))}
           </fieldset>
@@ -612,7 +613,7 @@ export function TaskPane({
     </>
   ) : null;
   // Task-A01-yard163: the state word on its tint; a waiting or blocked task's text takes the colour only.
-  const stop = stopText(task, tasks, t);
+  const stop = stopText(task, tasks, t, taskT);
   const stateClass = stop ? `s-${task.state}-text` : `state-word tint s-${task.state}-text`;
   // The area, agent, check and session are not changed here: holders are agent sessions (owner,
   // 2026-10-14), and the others have no change of their own in `alm` (the Checked button below
@@ -621,7 +622,7 @@ export function TaskPane({
   const rows: [string, ReactNode, EditField | null, string?, ReactNode?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
-    [t("pane.state"), stop ?? t(`state.${task.state}`), "state"],
+    [t("pane.state"), stop ?? taskT(`state.${task.state}`), "state"],
     // Always shown (approver, 2026-10-25), whatever the number of bound folders.
     [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
     // Always shown: a task with none counts as 3, marked as the default (Task-A01-actor813).
@@ -745,7 +746,7 @@ export function TaskPane({
               <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
                 {t("pane.checked_button")}
               </button>
-              <p className="muted small">{t("pane.checked_hint", { label: labelText(checkedLabel(task), t) })}</p>
+              <p className="muted small">{t("pane.checked_hint", { label: labelText(checkedLabel(task), taskT) })}</p>
               {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
             </>
           )}
@@ -1049,7 +1050,7 @@ export function TaskPane({
                     {e.agent && ` · ${agentName(agentId(e.agent))}`}
                   </span>
                   {e.changes.map((c, j) => (
-                    <div key={`${c.field}-${j}`}>{changeLine(c, t)}</div>
+                    <div key={`${c.field}-${j}`}>{changeLine(c, t, taskT)}</div>
                   ))}
                 </li>
               ))}

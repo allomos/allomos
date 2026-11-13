@@ -25,21 +25,21 @@ export function allBlockersDone(task: Task, tasks: readonly Task[]): boolean {
 }
 
 /** "A01-17 (in progress)", "A01-20 (dropped)"; an unknown one said so. */
-export function blockerText(b: Blocker, t: T): string {
+export function blockerText(b: Blocker, t: T, taskT: T = t): string {
   if (b.state === null) return t("task.blocker_missing", { id: b.id });
   if (b.state === "dropped") return t("task.blocker_dropped", { id: b.id });
-  return t("task.blocker", { id: b.id, state: t(`state.${b.state}` as Key) });
+  return t("task.blocker", { id: b.id, state: taskT(`state.${b.state}` as Key) });
 }
 
 /** The line a stopped task shows in the list and the task pane; `null` when it is not stopped. */
-export function stopText(task: Task, tasks: readonly Task[], t: T): string | null {
+export function stopText(task: Task, tasks: readonly Task[], t: T, taskT: T = t): string | null {
   if (task.state === "waiting") {
     const what = task.waiting_on ?? "";
     return task.who ? t("task.waiting_for", { who: task.who, what }) : t("task.waiting_for_you", { what });
   }
   if (task.state === "blocked") {
     const list = blockers(task, tasks)
-      .map((b) => blockerText(b, t))
+      .map((b) => blockerText(b, t, taskT))
       .join(", ");
     const line = t("task.blocked_by", { list });
     return allBlockersDone(task, tasks) ? `${line} — ${t("task.blockers_done")}` : line;
@@ -52,14 +52,14 @@ export function stopText(task: Task, tasks: readonly Task[], t: T): string | nul
  * `null` when the task is not stopped. */
 export type StopFact = { name: Key; text: string };
 
-export function stopFact(task: Task, tasks: readonly Task[], t: T): StopFact | null {
+export function stopFact(task: Task, tasks: readonly Task[], t: T, taskT: T = t): StopFact | null {
   if (task.state === "waiting") {
     const what = task.waiting_on ?? "";
     return { name: "pane.waiting_on", text: task.who ? t("task.waiting_for", { who: task.who, what }) : what };
   }
   if (task.state === "blocked") {
     const list = blockers(task, tasks)
-      .map((b) => blockerText(b, t))
+      .map((b) => blockerText(b, t, taskT))
       .join(", ");
     return { name: "pane.blocked_by", text: allBlockersDone(task, tasks) ? `${list} — ${t("task.blockers_done")}` : list };
   }
@@ -234,9 +234,9 @@ export function filterColumns(filter: Pick<StateFilter, "labels">): string[] {
   return [HUMAN_COLUMN, ...filter.labels.filter((l) => !BY_HUMAN.includes(l))];
 }
 
-/** A column's heading in the interface language. */
-export function columnText(column: string, t: T): string {
-  return column === HUMAN_COLUMN ? t("filter.human") : labelText(column, t);
+/** A column's heading: "Checked by a human" in the interface language, built-in labels in the task language. */
+export function columnText(column: string, t: T, taskT: T = t): string {
+  return column === HUMAN_COLUMN ? t("filter.human") : labelText(column, taskT);
 }
 
 /** Which side of a column a task is on: Yes when it has that column's label ("by human": either one). */
@@ -386,22 +386,22 @@ export function hiddenByFilter(filter: StateFilter, tasks: readonly Task[]): Hid
 }
 
 /** "38 more hidden by the filter: 1 Waiting, 4 Ready, 33 Done". */
-export function hiddenText(hidden: Hidden, t: T): string {
-  const states = hidden.states.map((s) => t("filter.state_count", { count: s.count, state: t(`state.${s.state}` as Key) })).join(t("filter.list_sep"));
+export function hiddenText(hidden: Hidden, t: T, taskT: T = t): string {
+  const states = hidden.states.map((s) => t("filter.state_count", { count: s.count, state: taskT(`state.${s.state}` as Key) })).join(t("filter.list_sep"));
   return t("filter.hidden", { count: hidden.count, states });
 }
 
 /** The unticked boxes by name, in the grid's order: a row with nothing ticked by its state's name,
  * otherwise each unticked cell ("Done · Checked by a human: no"). */
-export function untickedNames(filter: StateFilter, t: T): string[] {
+export function untickedNames(filter: StateFilter, t: T, taskT: T = t): string[] {
   return FILTER_STATES.flatMap((state) => {
     const ticks = rowTicks(filter, state);
-    const name = t(`state.${state}` as Key);
+    const name = taskT(`state.${state}` as Key);
     if (ticks === "all") return [];
     if (ticks === "none") return [name];
     return filter.off
       .filter((c) => c.state === state)
-      .map((c) => t("filter.cell", { state: name, cell: t(`filter.side_${c.side}`, { label: columnText(c.column, t) }) }));
+      .map((c) => t("filter.cell", { state: name, cell: t(`filter.side_${c.side}`, { label: columnText(c.column, t, taskT) }) }));
   });
 }
 
@@ -453,9 +453,9 @@ export function presetName(preset: Preset, t: T): string {
 }
 
 /** What a preset ticks, in words: its rows by name, or a sentence for "All tasks" and "Needs you". */
-export function presetTicks(preset: Preset, t: T): string {
+export function presetTicks(preset: Preset, t: T, taskT: T = t): string {
   if (preset === "all" || preset === "needs_you") return t(`filter.preset_ticks.${preset}` as Key);
-  return PRESET_ROWS[preset].map((s) => t(`state.${s}` as Key)).join(t("filter.list_sep"));
+  return PRESET_ROWS[preset].map((s) => taskT(`state.${s}` as Key)).join(t("filter.list_sep"));
 }
 
 /** How many of these tasks a preset lists now. */
@@ -466,10 +466,10 @@ export function presetCount(preset: Preset, labels: readonly string[], tasks: re
 
 /** The filter's name as the Show button words it: a preset's name when the ticks are exactly a
  * preset's ("All tasks", "Needs you"), else "Hide Backlog, Dropped", "Filtered (3 hidden)". */
-export function filterName(filter: StateFilter, t: T): string {
+export function filterName(filter: StateFilter, t: T, taskT: T = t): string {
   const preset = matchPreset(filter);
   if (preset) return presetName(preset, t);
-  const off = untickedNames(filter, t);
+  const off = untickedNames(filter, t, taskT);
   if (off.length === 0) return t("filter.all_tasks");
   if (off.length <= 2) return t("filter.hide", { names: off.join(t("filter.list_sep")) });
   return t("filter.filtered", { count: off.length });

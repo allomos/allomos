@@ -12,6 +12,7 @@ import zhCN from "./zh-CN.json";
 
 export type Key = keyof typeof en;
 type Params = Record<string, string | number>;
+export type Translator = (key: Key, params?: Params) => string;
 
 /** A text to show later, kept as a key so it changes when the language does. */
 export type Message = { key: Key; params?: Params };
@@ -65,6 +66,36 @@ interface I18n {
 
 const I18nContext = createContext<I18n | null>(null);
 
+export function translator(language: Language): Translator {
+  const words = MESSAGES[language];
+  // A key no language has comes from a value this Allomos does not know, such as a task state a
+  // newer Allomos wrote (`state.parked`): show the value itself (Task-A01-piano403).
+  return (key: Key, params?: Params) => fill(words[key] ?? en[key] ?? key.slice(key.indexOf(".") + 1), params);
+}
+
+/** Resolve a taskbag's `task_language` setting (`"ui"`, missing, or a language tag) to one of Allomos's languages. */
+export function resolveTaskLanguage(taskLanguage: string | undefined, uiLanguage: Language): Language {
+  const trimmed = taskLanguage?.trim();
+  if (!trimmed || trimmed === "ui") return uiLanguage;
+  return pickLanguage([trimmed]);
+}
+
+const TaskLanguageContext = createContext<Translator | null>(null);
+
+export function TaskLanguageProvider({ taskLanguage, children }: { taskLanguage?: string; children: ReactNode }) {
+  const { language } = useI18n();
+  const resolved = resolveTaskLanguage(taskLanguage, language);
+  const t = useMemo(() => translator(resolved), [resolved]);
+  return <TaskLanguageContext.Provider value={t}>{children}</TaskLanguageContext.Provider>;
+}
+
+/** Translator for the active taskbag's task language; falls back to the UI language outside a taskbag. */
+export function useTaskT(): Translator {
+  const taskT = useContext(TaskLanguageContext);
+  const { t } = useI18n();
+  return taskT ?? t;
+}
+
 export function I18nProvider({ systemLanguages, children }: { systemLanguages: () => Promise<string[]>; children: ReactNode }) {
   const [system, setSystem] = useState<Language>(() => pickLanguage(navigator.languages ?? []));
   const [choice, setChoiceState] = useState<Language | null>(readChoice);
@@ -95,9 +126,7 @@ export function I18nProvider({ systemLanguages, children }: { systemLanguages: (
 
   const value = useMemo<I18n>(() => {
     const words = MESSAGES[language];
-    // A key no language has comes from a value this Allomos does not know, such as a task state a
-    // newer Allomos wrote (`state.parked`): show the value itself (Task-A01-piano403).
-    const t = (key: Key, params?: Params) => fill(words[key] ?? en[key] ?? key.slice(key.indexOf(".") + 1), params);
+    const t = translator(language);
     return {
       language,
       choice,

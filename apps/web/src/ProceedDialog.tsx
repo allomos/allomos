@@ -20,7 +20,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useI18n } from "./i18n";
+import { useI18n, useTaskT } from "./i18n";
 import type { Messenger } from "./messenger";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL, requestWay } from "./agentPickerFlow";
@@ -160,7 +160,8 @@ export function ProceedDialog({
     }
   };
 
-  const stateWord = <span className={`state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>;
+  const taskT = useTaskT();
+  const stateWord = <span className={`state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>;
   const named = <strong>{task.id}</strong>;
   const silence = fact && (fact.minutes !== null ? t("takeover.silent_for", { ago: agoText(fact.minutes, t) }) : t("takeover.never_beat"));
   const found = held

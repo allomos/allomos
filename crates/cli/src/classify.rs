@@ -127,7 +127,12 @@ pub(crate) fn lines(id: &str, c: &Classification, approvals: &[Approval]) -> Str
 }
 
 /// `alm human`'s section: emergencies not approved afterwards, overdue ones marked.
-pub(crate) fn human_section(bag: &Taskbag, tasks: &[&Task], list: &[Unapproved]) -> String {
+pub(crate) fn human_section(
+    bag: &Taskbag,
+    tasks: &[&Task],
+    list: &[Unapproved],
+    language: &str,
+) -> String {
     let shown: Vec<&Unapproved> = list
         .iter()
         .filter(|u| tasks.iter().any(|t| t.id == u.task))
@@ -141,7 +146,7 @@ pub(crate) fn human_section(bag: &Taskbag, tasks: &[&Task], list: &[Unapproved])
     }
     for u in &shown {
         match bag.tasks.iter().find(|t| t.id == u.task) {
-            Some(t) => text.push_str(&format!("  {}\n", task_line(t))),
+            Some(t) => text.push_str(&format!("  {}\n", crate::human_task_line(t, language))),
             None => text.push_str(&format!("  {}\n", u.task)),
         }
         let due = u.due.as_deref().unwrap_or("no deadline recorded");

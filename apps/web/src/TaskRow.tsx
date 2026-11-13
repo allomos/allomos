@@ -9,7 +9,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { useI18n } from "./i18n";
+import { useI18n, useTaskT } from "./i18n";
 import { HeartbeatLine, LostTag, TakeOverButton } from "./Heartbeat";
 import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
@@ -53,11 +53,12 @@ export function TaskRow({
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
+  const taskT = useTaskT();
   const decisions = task.ai_decisions?.length ?? 0;
   const facts: [string, ReactNode, string?][] = [
     [
       t("pane.state"),
-      <span className={`fact-state state-word tint s-${task.state}-text`}>{t(`state.${task.state}`)}</span>,
+      <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>,
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
   ];
