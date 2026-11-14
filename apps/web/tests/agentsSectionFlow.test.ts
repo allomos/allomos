@@ -27,7 +27,7 @@ test("a folder not found counts as missing and says so", () => {
   assert.deepEqual(claude.missing, [{ name: "gone", full: "/p/gone", exists: false }]);
 });
 
-test("one folder says set up or not set up, as the agent line does", () => {
+test("one folder says set up or not set up", () => {
   const [claude, codex] = agentRows([folder("app", true, false)]);
   assert.equal(rowText(claude).key, "agents_section.set_up");
   assert.equal(rowText(codex).key, "agents_section.not_set_up");

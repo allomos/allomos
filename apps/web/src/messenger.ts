@@ -29,7 +29,7 @@ export type MonitorRequest =
 import { withDecisions } from "./stopFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { AgentAccount, AgentAccounts } from "./monitorFlow";
-import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, QuotaReport, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
+import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
 export interface TranslateTo {
@@ -340,12 +340,10 @@ export interface Messenger {
   /** "Don't ask again" for **Install the alm command**. */
   /** "Don't ask again", for this mismatch only (`AlmStatus.mismatch`). */
   dismissAlmOffer(mismatch: string): Promise<void>;
-  /** Whether the AI agents know about the project of the taskbag at `root`, and their last use of it. */
+  /** The project folder of the taskbag at `root` and whether its AI agents know about it. */
   agentStatus(root: string): Promise<AgentStatus>;
   /** Which agents a folder's instruction files tell about Allomos (Task-A05-bag963). */
   agentSetupOf(project: string): Promise<AgentStatus["setup"]>;
-  /** Each agent account's quota as the agents reported it (`alm quota`), newest first (Task-A03-02). */
-  quotaReports(): Promise<QuotaReport[]>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
   /** What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08). */
@@ -569,7 +567,6 @@ export const desktopMessenger: Messenger = {
   writeAgentFiles: (project) => invoke<string[]>("write_agent_files", { project }),
   agentStatus: (root) => invoke<AgentStatus>("agent_status", { root }),
   agentSetupOf: (project) => invoke<AgentStatus["setup"]>("agent_setup_of", { project }),
-  quotaReports: () => invoke<QuotaReport[]>("quota_reports"),
   versionCheck: (root) => invoke<VersionCheck | null>("version_check", { root }),
   moveTaskbagAside: (root) => invoke<Opened>("move_taskbag_aside", { root }),
   openDownloadPage: () => invoke<void>("open_download_page"),

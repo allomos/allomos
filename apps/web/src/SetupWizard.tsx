@@ -441,7 +441,7 @@ export function SetupWizard({
               <p>{rich("project.line", { path: <code>{step.project}</code> })}</p>
               <p className="muted">{t("agents.taskbag", { path: step.opened.root })}</p>
               <p>
-                {t("agentline.line", {
+                {t("wizard.agents_line", {
                   state: `Codex ${four.setup?.agents.codex ? "✓" : "✗"}  Claude Code ${four.setup?.agents.claude ? "✓" : "✗"}`,
                 })}
               </p>

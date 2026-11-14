@@ -2,7 +2,6 @@ import { useCallback, useContext, useEffect, useId, useRef, useState } from "rea
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, TaskLanguageProvider, useI18n, useTaskT } from "./i18n";
 import type { Language, Message } from "./i18n";
-import { AgentLine } from "./AgentLine";
 import { usePaced } from "./usePaced";
 import { followPace } from "./paceFlow";
 import type { ConnectResult } from "./AgentsPanel";
@@ -647,19 +646,13 @@ export function App({
               </button>
               )}
             </div>
-            {/* Whether the AI agents are told about this project (owner, 2026-10-10), on its own row;
-                in a browser, which computer the data comes from instead (R68). */}
-            <div className="where-row">
-              {companion ? (
+            {/* In a browser, which computer the data comes from (R68). The agent line that stood
+                here in the app is gone (Task-A03-root435). */}
+            {companion && (
+              <div className="where-row">
                 <span className="muted small">{t("companion.from", { computer: companion.computer || "—" })}</span>
-              ) : (
-                <AgentLine
-                  messenger={messenger}
-                  root={opened.root}
-                  onTell={() => openWizard({ resume: { root: opened.root, at: 4 } })}
-                />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
         <LanguagePicker />

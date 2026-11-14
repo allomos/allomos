@@ -657,31 +657,6 @@ pub fn list_with_files(root: &Path) -> (Vec<(String, Event)>, Vec<Issue>) {
     (events, issues)
 }
 
-/// What the change history's files look like on disk, without reading them: each file in
-/// `events/` with its size and when it last changed, by name. Two equal stamps mean the history
-/// is the same, so a reader may keep what it worked out from it (Task-A03-spade155: the app's
-/// agent line checks the changes not shared yet without reading thousands of files again).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct HistoryStamp(Vec<(std::ffi::OsString, u64, Option<std::time::SystemTime>)>);
-
-pub fn history_stamp(root: &Path) -> HistoryStamp {
-    let mut files: Vec<_> = std::fs::read_dir(root.join(EVENTS_DIR))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|entry| {
-            let meta = entry.metadata().ok();
-            (
-                entry.file_name(),
-                meta.as_ref().map_or(0, |m| m.len()),
-                meta.and_then(|m| m.modified().ok()),
-            )
-        })
-        .collect();
-    files.sort();
-    HistoryStamp(files)
-}
-
 /// The agent `alm` last ran under for a task (Task-A03-27): the newest event that changed a task
 /// and records an agent ([`Event::agent`]), with its tool when known. **Update the taskbag…**
 /// offers only that agent while it is not registered under `## Agents set up`.

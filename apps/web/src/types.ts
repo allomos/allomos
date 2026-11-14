@@ -378,8 +378,6 @@ export interface AgentStatus {
   project: string;
   /** Which agents' instruction files tell them about Allomos. */
   setup: { codex: boolean; claude: boolean };
-  /** Changes made in the app that no agent has been told to share yet (decision 0017). */
-  unshared: number;
 }
 
 export interface Gates {
@@ -591,20 +589,4 @@ export interface UpdateStatus {
   ready: string | null;
   /** `available`'s installer is downloading now: the menu's Download waits (A07-glove300). */
   preparing: string | null;
-}
-
-/** How much of an agent account's quota is left, as the agent reported it (`alm quota`, Task-A03-02). */
-export interface QuotaReport {
-  /** `claude-code`, `codex`, or another agent's id. */
-  agent: string;
-  /** A name for the account, only when the agent could tell one. */
-  account?: string | null;
-  /** `5h` or `week`. */
-  window: string;
-  /** Share left, 0–100. */
-  left: number;
-  /** When the window resets, local time (`2026-10-20T17:00`). */
-  resets?: string | null;
-  /** When it was reported, UTC. */
-  at: string;
 }

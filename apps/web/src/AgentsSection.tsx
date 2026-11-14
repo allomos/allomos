@@ -2,7 +2,7 @@
 // AI agent saying in how many of the taskbag's project folders it is set up, naming the folders
 // where it is not, each with Set up…, which opens the same flow as Connect with the Agents…
 // (`AgentsPanel`) for that folder. With no folder bound, the taskbag's one project folder is the
-// folder, as the agent line under the taskbag's name shows it (`AgentLine`).
+// folder, as the agent line under the taskbag's name showed it until Task-A03-root435.
 
 import { useEffect, useState } from "react";
 import { agentRows, rowText, type SectionFolder } from "./agentsSectionFlow";

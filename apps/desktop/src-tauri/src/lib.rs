@@ -2022,13 +2022,6 @@ fn dismiss_progress(project: PathBuf, id: String) {
     allomos_store::progress::dismiss(&project, &id)
 }
 
-/// How much quota each agent account has left, as the agents reported it with `alm quota`,
-/// newest first (Task-A03-02). Kept on this computer, not in a taskbag.
-#[tauri::command]
-fn quota_reports() -> Vec<allomos_store::QuotaReport> {
-    allomos_store::quota_reports()
-}
-
 /// Questions an agent is asking about `project` with `alm confirm`, oldest first. Listing them
 /// marks them seen, so `alm` knows this window shows them.
 #[tauri::command]
@@ -2047,43 +2040,18 @@ fn answer_confirm_request(
     answer_confirm(&project, &id, yes, fingerprint.as_deref())
 }
 
-/// Do the AI agents know about this project? What the window's agent line shows (Task-A03-04).
-/// Since 2026-10-10 (approver) the line no longer says who last used `alm` or holds tasks, so
-/// neither is worked out here any more (Task-A03-spade155).
+/// Do the AI agents know about this project? The project folder and which agents' instruction
+/// files tell them about Allomos, for the taskbag settings' Agents section (Task-A05-bag963). The
+/// window's agent line that showed it is gone (Task-A03-root435).
 #[derive(Serialize)]
 struct AgentStatus {
-    /// The project folder the line is about.
+    /// The project folder the status is about.
     project: PathBuf,
     /// Which agents' instruction files tell them about Allomos.
     setup: AgentSetup,
-    /// Changes made in the app that no agent has been told to share yet (decision 0017, row 9).
-    unshared: usize,
 }
 
-/// The count of changes not shared yet for each taskbag, with the history it was worked out
-/// from: while `events/` is unchanged, [`agent_status`] does not read the history again.
-static UNSHARED: Mutex<Vec<(PathBuf, allomos_store::events::HistoryStamp, usize)>> =
-    Mutex::new(Vec::new());
-
-/// [`allomos_store::events::unshared_app_changes`]'s count for `root`, reading the change
-/// history at most once, and not at all when its files have not changed since the last time.
-fn unshared_count(root: &Path) -> usize {
-    let stamp = allomos_store::events::history_stamp(root);
-    if let Ok(cache) = UNSHARED.lock() {
-        if let Some((_, _, count)) = cache.iter().find(|(r, s, _)| r == root && *s == stamp) {
-            return *count;
-        }
-    }
-    let count = allomos_store::events::unshared_app_changes(root).count;
-    if let Ok(mut cache) = UNSHARED.lock() {
-        cache.retain(|(r, _, _)| r != root);
-        cache.push((root.to_path_buf(), stamp, count));
-    }
-    count
-}
-
-/// Reads `project.json` and the instruction files, and the change history at most once (not at
-/// all while `events/` is unchanged); it does not load the tasks.
+/// Reads `project.json` and the instruction files; it does not load the tasks.
 #[tauri::command]
 async fn agent_status(root: PathBuf) -> AgentStatus {
     // The recorded project folder; before one is recorded, the folder holding `.allomos/`.
@@ -2091,7 +2059,6 @@ async fn agent_status(root: PathBuf) -> AgentStatus {
         .unwrap_or_else(|| picked_folder(&root).unwrap_or(&root).to_path_buf());
     AgentStatus {
         setup: agent_setup(&project),
-        unshared: unshared_count(&root),
         project,
     }
 }
@@ -2769,7 +2736,6 @@ pub fn run() {
             write_agent_files,
             agent_status,
             agent_setup_of,
-            quota_reports,
             confirm_requests,
             answer_confirm_request,
             progress_reports,
@@ -3375,13 +3341,12 @@ mod tests {
         std::fs::remove_dir_all(&base).unwrap();
     }
 
-    /// Task-A03-spade155: the agent line's count of changes not shared yet is worked out from the
-    /// change history once; while `events/` is unchanged it is kept, and a new change in
-    /// `events/` is counted at the next check.
+    /// Task-A03-root435: `agent_status` names the recorded project folder (the Agents section
+    /// asks it); it no longer counts the changes not shared yet.
     #[test]
-    fn the_agent_line_reads_the_history_again_only_when_it_changed() {
+    fn agent_status_names_the_project_folder() {
         let base = std::env::temp_dir().join(format!(
-            "allomos-agent-line-{}-{}",
+            "allomos-agent-status-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -3393,25 +3358,7 @@ mod tests {
         let root = plain.join(allomos_store::DEFAULT_DIR);
         create_taskbag(root.clone(), "Plain".into(), "en".into()).unwrap();
         set_project_folder(root.clone(), plain.clone()).unwrap();
-        let events = root.join("events");
-        let stamp = allomos_store::events::history_stamp(&root);
-        assert_eq!(stamp, allomos_store::events::history_stamp(&root));
-        assert_eq!(unshared_count(&root), 2);
-        // An unreadable file in `events/` would change the count if the history were read again;
-        // while the stamp is the same, the kept count is used. Copying a change the app made
-        // changes the stamp, so it is counted.
-        let first = std::fs::read_dir(&events)
-            .unwrap()
-            .flatten()
-            .map(|e| e.path())
-            .find(|p| p.extension().is_some_and(|x| x == "json"))
-            .unwrap();
-        std::fs::copy(&first, events.join("2099-01-01-000000-000-zzzzzz.json")).unwrap();
-        assert_ne!(stamp, allomos_store::events::history_stamp(&root));
-        assert_eq!(unshared_count(&root), 3);
-        assert_eq!(unshared_count(&root), 3);
         let status = tauri::async_runtime::block_on(agent_status(root.clone()));
-        assert_eq!(status.unshared, 3);
         assert_eq!(
             status.project.canonicalize().unwrap(),
             plain.canonicalize().unwrap()

@@ -117,7 +117,6 @@ export function lanMessenger(
     projectFolders: (root) => get<ProjectFolderInfo[]>("folders", { root }),
     // Nothing the browser can act on: no notice, no quota chips.
     versionCheck: () => Promise.resolve(null),
-    quotaReports: () => Promise.resolve([]),
   };
 
   return new Proxy(reading as Messenger, {

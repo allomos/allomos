@@ -26,7 +26,7 @@ export interface AgentRow {
   missing: { name: string; full: string; exists: boolean }[];
 }
 
-/** Product names, as the agent line shows them (`quotaFlow.ts`'s AGENT_NAMES); not translated. */
+/** Product names, as `quotaFlow.ts`'s AGENT_NAMES has them; not translated. */
 const NAMES: Record<SectionAgent, string> = { claude: "Claude Code", codex: "Codex" };
 
 export function agentName(agent: SectionAgent): string {
@@ -40,7 +40,7 @@ export function agentRows(folders: readonly SectionFolder[]): AgentRow[] {
   });
 }
 
-/** With one folder the row says "set up" or "not set up", as the agent line does; with more, "N of M". */
+/** With one folder the row says "set up" or "not set up"; with more, "N of M". */
 export function rowText(row: AgentRow): { key: "agents_section.set_up" | "agents_section.not_set_up" | "agents_section.count"; done: number; total: number } {
   if (row.total <= 1) return { key: row.done === row.total && row.total === 1 ? "agents_section.set_up" : "agents_section.not_set_up", done: row.done, total: row.total };
   return { key: "agents_section.count", done: row.done, total: row.total };

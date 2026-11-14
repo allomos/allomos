@@ -184,8 +184,7 @@ fn replaced(mut reports: Vec<QuotaReport>, report: QuotaReport) -> Vec<QuotaRepo
 }
 
 /// How old an agent's newest 5-hour report may be before a command that moves a task on asks for
-/// a new one (Task-A03-flour054, approver 2026-10-22), in minutes: the app's chip turns stale at
-/// the same age (`apps/web/src/quotaFlow.ts`).
+/// a new one (Task-A03-flour054, approver 2026-10-22), in minutes.
 pub const ASK_AFTER_MINUTES: i64 = 30;
 
 /// The ask a command that moves a task on prints when the agent's quota report is missing or old.
