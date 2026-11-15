@@ -48,7 +48,7 @@ import { paneFocus, type FocusPart } from "./paneFocusFlow";
 import { HandoverButton } from "./HandoverDialog";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
-import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
+import { blockerText, blockers, check, checkedLabel, chipLabels, decisionDetails, decisionsToReview, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
 import { LabelChips } from "./LabelChips";
 import { checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
@@ -758,8 +758,9 @@ export function TaskPane({
           <AiDecidedBadge task={task} />
           <h3>{t("pane.ai_decisions")}</h3>
           <ul className="ai-decisions">
-            {(task.ai_decisions ?? []).map((d, i) => (
+            {decisionsToReview(task).map((d, i) => (
               <li key={`${d.at}-${i}`}>
+                {d.kind && <span className="muted small">{t(`pane.ai_decision_kind.${d.kind}` as Key)} · </span>}
                 {d.text}{" "}
                 <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
               </li>
@@ -777,6 +778,20 @@ export function TaskPane({
             </>
           )}
         </div>
+      )}
+      {decisionDetails(task).length > 0 && (
+        <details className="pane-check pane-details">
+          <summary>{t("pane.ai_details", { count: decisionDetails(task).length })}</summary>
+          <ul className="ai-decisions">
+            {decisionDetails(task).map((d, i) => (
+              <li key={`${d.at}-${i}`}>
+                {d.text}{" "}
+                <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">{t("pane.ai_details_hint")}</p>
+        </details>
       )}
       {focus.map(part)}
       {((task.approvals ?? []).length > 0 || onApprove) && (
@@ -1079,7 +1094,7 @@ export function HumanCheckBadge({ task }: { task: Task }) {
  * lists and the task pane; hovering says how many the history holds. */
 export function AiDecidedBadge({ task }: { task: Task }) {
   const { t } = useI18n();
-  const count = task.ai_decisions?.length ?? 0;
+  const count = decisionsToReview(task).length;
   return (
     <span className="badge ai-decided" title={count > 0 ? t("task.ai_decided_title", { count }) : t("label.meaning.ai_decisions")}>
       {t("task.ai_decided")}

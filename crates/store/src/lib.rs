@@ -1804,7 +1804,9 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
         let labels = allomos_core::labels::upgraded_labels(
             old.as_deref(),
             deployed.contains(&task.id),
-            unreviewed.get(&task.id).is_some_and(|d| !d.is_empty()),
+            unreviewed
+                .get(&task.id)
+                .is_some_and(|d| d.iter().any(|x| x.to_review())),
         );
         let mut next = task.clone();
         next.labels = labels;
@@ -2759,13 +2761,15 @@ pub struct Decided {
     pub task: Task,
     /// The decisions the change recorded or marked reviewed.
     pub decisions: Vec<decision::Decision>,
-    /// The task's decisions still to review after the change.
+    /// The task's decisions since its last review after the change, details included (see
+    /// [`decision::Decision::to_review`] for the ones that wait for review).
     pub pending: Vec<decision::Decision>,
     /// Problems found in the taskbag's files while loading it.
     pub issues: Vec<Issue>,
 }
 
-/// Every task's AI decisions not reviewed yet, by task ID (Task-A03-19), from the history.
+/// Every task's AI decisions since its last review, by task ID (Task-A03-19), from the history:
+/// details too, which are kept but do not wait for review (decision 0025 § 3).
 pub fn ai_decisions(root: &Path) -> std::collections::BTreeMap<String, Vec<decision::Decision>> {
     decision::pending(&events::list(root).0)
 }
@@ -2778,13 +2782,17 @@ pub fn record_ai_decision(
     wait: Duration,
     id: &str,
     text: &str,
+    kind: Option<decision::DecisionKind>,
 ) -> Result<Decided, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let mut changes = decision::decide(&bag, id, text)?;
+    let mut changes = decision::decide(&bag, id, text, kind)?;
     let before = ops::find_task(&bag, id)?;
-    // The task carries `AI decisions to review` until `alm reviewed` (decision 0020).
+    // The task carries `AI decisions to review` until `alm reviewed` (decision 0020); a detail
+    // is kept but does not wait for review (decision 0025 § 3).
     let mut task = before.clone();
-    task.add_label(allomos_core::labels::AI_DECISIONS);
+    if kind != Some(decision::DecisionKind::Detail) {
+        task.add_label(allomos_core::labels::AI_DECISIONS);
+    }
     heartbeat::along(&mut task, actor.by, now_secs());
     changes.extend(event::changes(Some(&before), &task, event::TASK_FIELDS));
     let event = actor.event(decision::DECIDED, Kind::Task, Some(&task.id), changes);
@@ -2850,7 +2858,11 @@ pub fn review_ai_decisions(
     let had_label = task.remove_label(allomos_core::labels::AI_DECISIONS);
     heartbeat::along(&mut task, actor.by, now_secs());
     // A task carrying the label with nothing left in its history is cleared too (decision 0020).
-    let mut changes = if decisions.is_empty() && had_label {
+    // Details alone are nothing to review (decision 0025 § 3); a review lists them with the rest.
+    if !had_label && !decisions.iter().any(|d| d.to_review()) {
+        return Err(Problem::NothingToReview { id: before.id });
+    }
+    let mut changes = if decisions.is_empty() {
         Vec::new()
     } else {
         decision::review(&bag, id, &decisions)?
