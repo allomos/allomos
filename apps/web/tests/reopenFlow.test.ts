@@ -11,7 +11,7 @@ const t = (key: string, params?: Record<string, string | number>) =>
 test("only a done or dropped task offers Reopen…", () => {
   assert.equal(canReopen({ state: "done" }), true);
   assert.equal(canReopen({ state: "dropped" }), true);
-  for (const state of ["backlog", "ready", "in_progress", "waiting", "blocked"] as const) {
+  for (const state of ["backlog", "ready", "in_progress", "waiting"] as const) {
     assert.equal(canReopen({ state }), false, state);
   }
 });

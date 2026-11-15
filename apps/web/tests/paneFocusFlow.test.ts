@@ -20,8 +20,11 @@ test("a waiting task shows the question, then the handoff note", () => {
   assert.deepEqual(paneFocus(task({ state: "waiting", waiting_on: "q", handoff_note: "stopped here" }), false, false), ["question", "handoff"]);
 });
 
-test("a blocked task shows its blockers first", () => {
-  assert.deepEqual(paneFocus(task({ state: "blocked" }), false, false), ["blockers"]);
+test("a blocked task shows its blockers first, whatever its state (decision 0026)", () => {
+  assert.deepEqual(paneFocus(task({ state: "backlog", blocked_by: ["A01-17"], open_blockers: ["A01-17"] }), false, false), ["blockers"]);
+  assert.deepEqual(paneFocus(task({ state: "waiting", waiting_on: "q", open_blockers: ["A01-17"] }), false, false), ["question", "blockers"]);
+  // Its blockers finished: no longer blocked, so its own state decides.
+  assert.deepEqual(paneFocus(task({ state: "ready", blocked_by: ["A01-17"], open_blockers: [] }), false, false), ["description"]);
 });
 
 test("an in-progress task shows its handoff note; a lost one also its description", () => {

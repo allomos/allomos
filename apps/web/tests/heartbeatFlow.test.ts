@@ -124,7 +124,7 @@ test("the clock time alone on the same local day, else with the date", () => {
 test("a held task's fact in any state: only an in-progress task can be lost", () => {
   const later = new Date("2026-11-09T12:00:00Z");
   assert.equal(heldFact(held, 30, later)?.lost, true);
-  for (const state of ["waiting", "blocked"] as const) {
+  for (const state of ["waiting"] as const) {
     const fact = heldFact({ ...held, state }, 30, later);
     assert.equal(fact?.lost, false, state);
     assert.equal(fact?.minutes, 120, state);

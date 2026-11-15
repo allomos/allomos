@@ -23,10 +23,11 @@ const task = (over: Partial<Task>): Task => ({
 } as Task);
 
 test("Work on it… shows for unheld tasks that are not finished", () => {
-  for (const state of ["backlog", "ready", "blocked", "waiting"] as const) assert.equal(canProceed(task({ state })), true, state);
+  for (const state of ["backlog", "ready", "waiting"] as const) assert.equal(canProceed(task({ state })), true, state);
   for (const state of ["done", "dropped"] as const) assert.equal(canProceed(task({ state })), false, state);
   assert.equal(canProceed(task({ holder: "claude/x" })), false);
-  assert.equal(stopped(task({ state: "blocked" })), true);
+  assert.equal(stopped(task({ state: "ready", blocked_by: ["A01-17"], open_blockers: ["A01-17"] })), true);
+  assert.equal(stopped(task({ state: "ready", blocked_by: ["A01-17"], open_blockers: [] })), false, "its blockers finished");
   assert.equal(stopped(task({ state: "waiting" })), true);
   assert.equal(stopped(task({ state: "backlog" })), false);
 });
@@ -58,19 +59,19 @@ test("a backlog task's request makes it ready first", () => {
 
 test("a blocked task's request asks the person", () => {
   assert.equal(
-    proceedRequest(task({ id: "A01-45", title: "Sort by modified keeps the open task in view", state: "blocked", blocked_by: ["A01-41"] }), TB, "en"),
+    proceedRequest(task({ id: "A01-45", title: "Sort by modified keeps the open task in view", state: "ready", blocked_by: ["A01-41"], open_blockers: ["A01-41"] }), TB, "en"),
     `Look at task A01-45 ("Sort by modified keeps the open task in view") in this project's taskbag. Run every alm command with --taskbag "../allomos-taskbag/.allomos/taskbag".
 
 It cannot start now: it is blocked by A01-41. Do not claim it and do not change it yet.
 
 1. Read it: alm show A01-45 and alm show A01-41.
-2. Tell me in plain words why it is stopped and what could be done about it (for example: work A01-41 first, or unblock A01-45 if A01-41 is already done).
+2. Tell me in plain words why it is stopped and what could be done about it (for example: work A01-41 first, or, if A01-45 should not wait for it after all, take it off its blockers with alm unblock).
 3. Ask me what I want you to do with A01-45, and wait for my answer before you change anything.`,
   );
-  const two = proceedRequest(task({ id: "A01-45", state: "blocked", blocked_by: ["A01-41", "A01-42"] }), TB, "en");
+  const two = proceedRequest(task({ id: "A01-45", state: "ready", blocked_by: ["A01-41", "A01-42"], open_blockers: ["A01-41", "A01-42"] }), TB, "en");
   assert.match(two, /blocked by A01-41 and A01-42\./);
   assert.match(two, /Read it: alm show A01-45, alm show A01-41 and alm show A01-42\./);
-  assert.match(two, /if A01-41 and A01-42 are already done/);
+  assert.match(two, /should not wait for them after all, take them off its blockers/);
 });
 
 test("a waiting task's request asks the person", () => {
@@ -100,7 +101,7 @@ test("Chinese and Japanese requests keep the commands, steps and product name", 
     assert.match(backlog, /alm ready A01-41/);
     assert.match(backlog, language === "zh-CN" ? /「换肩」/ : /「肩代」/);
     assert.match(backlog, /\n5\. /);
-    assert.match(proceedRequest(task({ state: "blocked", blocked_by: ["A01-40"] }), TB, language), /alm show A01-40/);
+    assert.match(proceedRequest(task({ state: "ready", blocked_by: ["A01-40"], open_blockers: ["A01-40"] }), TB, language), /alm show A01-40/);
     assert.match(proceedRequest(task({ state: "waiting", waiting_on: "Pick a week" }), TB, language), /Pick a week/);
   }
 });
@@ -145,7 +146,7 @@ test("the take-over request without a recorded working branch, and in each langu
 
 // Take over… on a holder that is not lost (Task-A01-rocket260): the person asks, so the request uses --take.
 test("Take over… can be offered for a held task that is not finished, in any state", () => {
-  for (const state of ["in_progress", "waiting", "blocked"] as const) assert.equal(canTakeOver(task({ state, holder: "claude/s1" })), true, state);
+  for (const state of ["in_progress", "waiting"] as const) assert.equal(canTakeOver(task({ state, holder: "claude/s1" })), true, state);
   for (const state of ["done", "dropped"] as const) assert.equal(canTakeOver(task({ state, holder: "claude/s1" })), false, state);
   assert.equal(canTakeOver(task({ state: "in_progress", holder: null })), false);
 });
