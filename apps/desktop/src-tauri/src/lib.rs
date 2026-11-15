@@ -15,6 +15,7 @@ mod monitor_loop;
 mod monitor_menu;
 mod monitor_pause;
 mod monitor_runs;
+mod monitor_update;
 mod pairing;
 mod sessions;
 mod tab_drag;
@@ -2511,6 +2512,8 @@ pub fn run() {
             // Running Monitors item (Task-A03-motor529) and the monitor's notifications
             // (Task-A03-stork103), Task-A03-spider528.
             monitor_loop::start(app.handle().clone());
+            // After an update, runs still on the old alm move to this one (Task-A03-cookie729).
+            std::thread::spawn(monitor_update::take_over_outdated);
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_screen(&window);
             }

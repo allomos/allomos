@@ -57,35 +57,43 @@ pub struct Words {
 pub fn words(language: &str, action: Action, sessions: usize) -> Words {
     let lang = language.to_lowercase().replace('_', "-");
     if lang == "zh" || lang.starts_with("zh-") {
-        let (verb, confirm) = match action {
-            Action::Restart => ("重新启动", "重新启动"),
-            Action::Quit => ("退出", "退出"),
+        let (verb, confirm, moved) = match action {
+            Action::Restart => ("重新启动", "重新启动", "，并换成新版，设置不变"),
+            Action::Quit => ("退出", "退出", ""),
         };
         Words {
             title: "自动监测就绪任务会继续运行".into(),
             body: format!(
-                "应用将{verb}。「自动监测就绪任务」会继续在后台运行；已开的 {sessions} 个会话照常做完各自的任务。要先停掉它，可以在状态栏里操作。"
+                "应用将{verb}。「自动监测就绪任务」会继续在后台运行{moved}；已开的 {sessions} 个会话照常做完各自的任务。要先停掉它，可以在状态栏里操作。"
             ),
             confirm,
             cancel: "取消",
         }
     } else if lang == "ja" || lang.starts_with("ja-") {
-        let (verb, confirm) = match action {
-            Action::Restart => ("再起動します", "再起動"),
-            Action::Quit => ("終了します", "終了"),
+        let (verb, confirm, moved) = match action {
+            Action::Restart => (
+                "再起動します",
+                "再起動",
+                "（新しいバージョンに切り替わり、設定は同じです）",
+            ),
+            Action::Quit => ("終了します", "終了", ""),
         };
         Words {
             title: "準備完了のタスクの自動監視は続きます".into(),
             body: format!(
-                "「肩代」を{verb}。「準備完了のタスクを自動で監視」はバックグラウンドで動き続け、開いている {sessions} 件のセッションは、それぞれのタスクをいつも通り最後まで進めます。止めてから行う場合は、ステータスバーから停止できます。"
+                "「肩代」を{verb}。「準備完了のタスクを自動で監視」はバックグラウンドで動き続け{moved}、開いている {sessions} 件のセッションは、それぞれのタスクをいつも通り最後まで進めます。止めてから行う場合は、ステータスバーから停止できます。"
             ),
             confirm,
             cancel: "キャンセル",
         }
     } else {
-        let (verb, confirm) = match action {
-            Action::Restart => ("restart", "Restart"),
-            Action::Quit => ("quit", "Quit"),
+        let (verb, confirm, moved) = match action {
+            Action::Restart => (
+                "restart",
+                "Restart",
+                ", moved to the new version with the same settings",
+            ),
+            Action::Quit => ("quit", "Quit", ""),
         };
         let open = if sessions == 1 {
             "1 open session".to_string()
@@ -95,7 +103,7 @@ pub fn words(language: &str, action: Action, sessions: usize) -> Words {
         Words {
             title: "Automatic monitoring of ready tasks keeps running".into(),
             body: format!(
-                "Allomos will {verb}. Monitor ready tasks keeps running in the background; the {open} will finish their tasks as usual. To stop it first, use the status bar."
+                "Allomos will {verb}. Monitor ready tasks keeps running in the background{moved}; the {open} will finish their tasks as usual. To stop it first, use the status bar."
             ),
             confirm,
             cancel: "Cancel",
@@ -172,6 +180,24 @@ mod tests {
         assert!(!w.body.contains("will pause"));
         assert!(w.body.contains("2 open sessions"));
         assert_eq!((w.confirm, w.cancel), ("Restart", "Cancel"));
+    }
+
+    #[test]
+    fn before_an_update_the_reminder_says_the_monitor_moves_to_the_new_version() {
+        // Task-A03-cookie729: Restart is Restart to Update.
+        let en = words("en", Action::Restart, 1).body;
+        assert!(en.contains("moved to the new version with the same settings"));
+        assert!(!words("en", Action::Quit, 1).body.contains("new version"));
+        assert!(
+            words("zh-CN", Action::Restart, 1)
+                .body
+                .contains("并换成新版，设置不变")
+        );
+        assert!(
+            words("ja", Action::Restart, 1)
+                .body
+                .contains("新しいバージョンに切り替わり")
+        );
     }
 
     #[test]

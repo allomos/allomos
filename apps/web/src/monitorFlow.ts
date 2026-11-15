@@ -222,6 +222,8 @@ export interface Run {
   checked: number;
   /** When the next check is due (ms). */
   next: number;
+  /** The `alm` version the app moved this run to after an update (Task-A03-cookie729), when it did. */
+  updatedTo?: string;
 }
 
 /** An `alm monitor run` process this computer runs with no run file: running, record missing.
@@ -328,6 +330,7 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     stopping: Boolean(r.stopping),
     checked: num(r.checked),
     next: num(e.next_check, num(r.checked) + every * 60_000),
+    ...(typeof e.program?.updated_from === "string" && typeof e.program?.version === "string" ? { updatedTo: e.program.version } : {}),
   };
 }
 

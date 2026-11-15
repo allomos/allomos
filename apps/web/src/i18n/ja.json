@@ -1136,6 +1136,7 @@
   "monitor.last_run": "前回の実行 {time} に終了 · {scope} · 完了 {done} 件",
   "monitor.last_run_need": "あなたの対応が必要 {n} 件",
   "monitor.last_run_need_tip": "対応が必要なタスクを表示（プリセット「あなたの対応が必要」）",
+  "monitor.updated": "「肩代」を更新しました：この監視は新しいバージョン（{version}）で、同じ設定のまま続いています。",
   "monitor.last_stopped_taskbag_format": "停止しました：この「肩代」ではタスクバッグの形式を読めません。「肩代」を更新してから、監視をもう一度始めてください。",
   "monitor.last_stopped_taskbag_unreadable": "停止しました：タスクバッグを 2 分間読めませんでした。確認してから、監視をもう一度始めてください。",
   "monitor.start_failed": "監視を止めました：{id} のために {agent} を起動できませんでした。{detail}",

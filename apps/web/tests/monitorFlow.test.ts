@@ -295,3 +295,12 @@ test("a run that stopped on its own keeps why, and the window takes it from the 
   assert.equal(lastOfGoneRun(own, kept, Date.UTC(2026, 10, 16, 2, 0)), own);
   assert.equal(lastOfGoneRun(own, null, 0), own);
 });
+
+test("a run the app moved to its new alm after an update says which version (A03-cookie729)", () => {
+  const base = { id: "m-1", pid: 1, record: "present", run: { scope: { kind: "all" }, agents: ["claude_cli"], every: 30, started: 0 } };
+  const moved = readEntry({ ...base, program: { version: "0.1.64", updated_from: "" } }, null) as { updatedTo?: string } | null;
+  assert.equal(moved?.updatedTo, "0.1.64");
+  // Started by this version, or from before runs named their alm: nothing to say.
+  assert.equal("updatedTo" in (readEntry({ ...base, program: { version: "0.1.64" } }, null) ?? {}), false);
+  assert.equal("updatedTo" in (readEntry(base, null) ?? {}), false);
+});

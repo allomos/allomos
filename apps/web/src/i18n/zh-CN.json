@@ -1136,6 +1136,7 @@
   "monitor.last_run": "上次运行 {time} 结束 · {scope} · 完成 {done} 个",
   "monitor.last_run_need": "{n} 个需要你",
   "monitor.last_run_need_tip": "显示需要你的任务（预设“需要你”）",
+  "monitor.updated": "「换肩」已更新：这个监测换成新版（{version}）继续运行，设置不变。",
   "monitor.last_stopped_taskbag_format": "已停止：这个「换肩」读不了任务包的格式。请更新「换肩」，再重新开始监测。",
   "monitor.last_stopped_taskbag_unreadable": "已停止：任务包有 2 分钟读不了。请检查任务包，再重新开始监测。",
   "monitor.start_failed": "监测已停止：没能为 {id} 启动 {agent}。{detail}",

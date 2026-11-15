@@ -542,6 +542,7 @@ function RunPanel({
       {open && (
         <div className="monitor-panel-body">
           <p className="muted small monitor-settings">{settings}</p>
+          {run.updatedTo && <p className="muted small monitor-updated">{t("monitor.updated", { version: run.updatedTo })}</p>}
           <h4 className="monitor-sessions-title small">{t("monitor.sessions_title")}</h4>
           {grouped(run) ? (
             sessionGroups(run).map((g) => (
