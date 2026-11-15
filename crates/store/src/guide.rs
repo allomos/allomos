@@ -55,9 +55,12 @@ about the project's tasks.
   without one is unplanned.
 - **State**: where a task is in its life: backlog, ready (approved to start), in progress (held
   by someone), waiting (a person or an outside event must act: its waiting-on says what, its
-  optional who says who; no who means the approver), blocked (another task in this taskbag must
-  finish first: its blocked-by lists them), done, or dropped (will not be done). A task blocked by
-  a task and also waiting on a person is blocked; the person part goes in its next dependency.
+  optional who says who; no who means the approver), done, or dropped (will not be done).
+- **Blocked**: not a state. A task names the tasks of this taskbag that must finish first (its
+  blockers, blocked-by), and it is blocked while one of them has not finished (done or dropped).
+  It keeps its own state the whole time, shown together (backlog · blocked by A01-17), and may
+  wait on a person as well. When its blockers finish, nothing changes in it: a backlog task is
+  still backlog, and a ready one is then listed by `alm next`.
 - **Label**: a plain tag on a task, from the project's **label table**; a task can have several,
   with no order between them. Five are built in: locally verified by agent, deployed and verified
   by agent, locally verified by human, deployed and verified by human, AI decisions to review.
@@ -95,7 +98,8 @@ const CUSTOMIZE: &str = "# What a project may change, and what is fixed
 
 Fixed for every project:
 
-- **The seven states**: backlog, ready, in progress, waiting, blocked, done, dropped.
+- **The six states**: backlog, ready, in progress, waiting, done, dropped. Blocked is not one:
+  it is worked out from a task's blockers.
 - **The words \"area\" and \"iteration\"**: a project cannot rename them yet (planned: requirement
   R90). Use these words with `alm`, even if the team says \"workstream\" or \"sprint\".
 - **The file format**: never edit the taskbag's files by hand (except `project-notes.md`); `alm`
@@ -212,10 +216,11 @@ prints none: save the new taskbag yourself.
 See:
 - `alm next [--iteration <id>] [--difficulty <range>]`: every ready task no one holds (in that
   iteration; of those difficulties, `1-3` or `4`, a task with none counting as 3), each with its
-  handoff note, and the rule for choosing one; then the blocked tasks whose blockers are all
-  done. `alm` chooses and moves nothing; you do.
+  handoff note, and the rule for choosing one. A ready task that is blocked is not among them: it
+  is named below the list with its open blockers, and is listed once they have finished. `alm`
+  chooses and moves nothing; you do.
 - `alm list [--area <id>] [--iteration <id>] [--state <state>] [--difficulty <range>] [--mine] [--by area|iteration]`
-  (`--state blocked`, `--state waiting`, …);
+  (`--state waiting`, …; `--blocked`: only blocked tasks, which goes with `--state`);
   `--without-human-check`: only tasks finished without the human check, not checked since.
   `--by iteration` lists every iteration, empty ones too, each starting with its place in the
   plan (1, 2, 3…, as the app shows it; `place` in `--json`), counted from the plan's order, so it
@@ -262,7 +267,7 @@ Work a task:
   for longer than the project's limit (30 minutes by default) and no busy window running, each with
   its holder, how long it has been silent, the limit and the command to take it over; and the held
   tasks in a busy window. `alm` takes nothing over: you check the task (its holder, its handoff
-  note) and decide. Waiting, blocked and released tasks are never lost.
+  note) and decide. Waiting and released tasks are never lost.
   `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--wip on|off]
   [--clear]` shows or changes the two numbers and whether work in progress is pushed at each
   heartbeat (project settings; on by default).
@@ -276,13 +281,16 @@ Work a task:
 - `alm note <id> \"<what the next one needs>\"`: its handoff note (no text clears it).
 - `alm wait <id> --on \"<what>\" [--who \"<who>\"]`: state waiting: a person (or an outside
   event) must act; without `--who`, the approver.
-- `alm block <id> --by <task-id> [<task-id>…]`: state blocked: those tasks must finish first.
-  `alm list`, `show` and `next` show each blocker's state. A blocker has finished when it is
-  done or dropped. When the last one finishes (`alm done`, `alm drop`, or finishing it in the
-  app), the blocked task goes on by itself in the same change: ready, or in progress when someone
-  holds it; its handoff note says so, and whoever takes it reads its blockers' AI decisions first.
-- `alm unblock <id>`: let a blocked task go on before its blockers finish (ready, or in progress
-  when someone holds it); `alm` does not check its blockers: you do.
+- `alm block <id> --by <task-id> [<task-id>…]`: those tasks must finish first; they are added to
+  its blockers. Its state stays as it is (backlog stays backlog, a held task stays in progress
+  with its holder), and it may be waiting on a person too. It is blocked while a blocker has not
+  finished (done or dropped): `alm list`, `show` and `next` show the state and the block together,
+  with each open blocker's state, and `alm next` does not list it. When the last one finishes,
+  nothing changes in the task; `alm done` and `alm drop` say which tasks are no longer blocked,
+  and whoever takes one reads its blockers' AI decisions and handoffs first. Claiming a blocked
+  task is not refused: `alm claim` says it is blocked, and you decide.
+- `alm unblock <id> [--by <task-id>…]`: take blockers off (all of them, or the ones named), for
+  when it should not wait for them after all. Its state stays as it is.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
 - `alm done <id> [--without-human-check \"<why>\" --steps <file.md> --accepted-by <who>]`: finished (see
   `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
@@ -362,8 +370,8 @@ Work a task:
   gone. Facts only, never a verdict: you check what they mean and tell the person.
   `alm checkpoint [--git-commit <the taskbag repository's commit>]` fixes a fingerprint of the
   whole taskbag in `checkpoints/`; save and share it like any change.
-  `alm drop <id>`; `alm ready <id>` (an unheld backlog, waiting or blocked task);
-  `alm backlog <id>` (back to backlog, to think it over again: an unheld ready, waiting or blocked
+  `alm drop <id>`; `alm ready <id>` (an unheld backlog or waiting task; its blockers stay);
+  `alm backlog <id>` (back to backlog, to think it over again: an unheld ready or waiting
   task; write the open questions in its description's Notes).
 - `alm reopen <id> --note \"<why>\"`: more work on a done or dropped task's outcome (it failed its
   check, or the person wants more): it becomes ready, held by nobody, and the history records who
@@ -719,11 +727,12 @@ const WORKFLOW: &str = "# How to work the tasks
 3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
    with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
-   [--who \"<who>\"]`; when another task must finish first, `alm block <id> --by <task-id>` (if
-   a person must act too, say so with `alm needs`). Blocked and waiting tasks are never in
-   `alm next`'s list: they are skipped by their state. A blocked task goes on by itself when its
-   last blocker finishes (done or dropped); read its blockers' AI decisions before you start it.
-   To let one go on earlier, check it, then `alm unblock <id>`.
+   [--who \"<who>\"]`; when another task must finish first, `alm block <id> --by <task-id>`: its
+   state stays as it is, and it is blocked while a blocker has not finished (a task can be both
+   waiting and blocked). Waiting and blocked tasks are never in `alm next`'s list. When a task's
+   last blocker finishes (done or dropped), nothing changes in it: a ready one is then listed, a
+   backlog one stays backlog; read its blockers' AI decisions and handoffs before you start it.
+   To stop waiting for a blocker, `alm unblock <id>`.
 5. Write your handoff when `alm handoff-rules` says (near the quota or context gate while you
    hold a task, then release it with `alm release <id> --note` naming the working branch, so the
    next session continues it; and after every meaningful step), into each task you worked: `alm handoff <id> --as <your session name>
@@ -1346,8 +1355,8 @@ run page scripts on a local network address such as `192.168.x.x`: the browser a
 approve every script there, and the run would stall. When an acceptance check still needs the
 browser, write that in the task's steps for the person, finish the task as above, and go on.
 
-A blocked task goes on by itself when its last blocker finishes; read its blockers' AI decisions
-before you start it (to let one go on earlier: `alm unblock <id>`). A task
+A ready task that is blocked is listed by `alm next` once its last blocker finishes; read its
+blockers' AI decisions before you start it (to stop waiting for one: `alm unblock <id>`). A task
 with an outside effect: `alm wait <id> --on \"<what the approver must do>\"`, then go on with the
 next ready task. A task that needs another one first: add that task if it is missing, then
 `alm block`. A task given up: `alm drop <id>`, with the reason in its note (`alm note`). Write your
@@ -1355,8 +1364,8 @@ handoff (`alm handoff`) after every task, and follow `alm handoff-rules`.
 
 ## 4. Finish
 
-When the last iteration's acceptance check is done (the goal task goes on by itself when its last
-blocker finishes; if it is still blocked, `alm unblock` it), check the whole
+When the last iteration's acceptance check is done (the goal task is no longer blocked once its
+last blocker finishes; if it is still blocked, `alm unblock` it), check the whole
 app against the spec's acceptance criteria, and finish the goal task the same way, done and to
 check by the person:
 `alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`, the steps
@@ -1438,14 +1447,14 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 `192.168.x.x` 这样的局域网地址上运行页面脚本：浏览器在那里每运行一段脚本都要那个人批准，运行会卡住。
 如果某个验收检查仍然需要浏览器，就把这一点写进这个任务给那个人的步骤里，照上面的方式完成任务，接着往下做。
 
-被阻塞的任务在最后一个阻塞任务结束（完成或放弃）时自动解除阻塞；开工前读它的阻塞任务的 AI 决定（要提前放行：`alm unblock <id>`）。对外有影响的任务：
+被阻塞的就绪任务，在最后一个前置任务结束（完成或放弃）后才出现在 `alm next` 里；开工前读它的前置任务的 AI 决定（不再等某个前置任务：`alm unblock <id>`）。对外有影响的任务：
 `alm wait <id> --on \"<what the approver must do>\"`，然后接着做下一个就绪的任务。需要先做另一个任务
 的任务：如果那个任务还没有，就添加它，然后 `alm block`。放弃的任务：`alm drop <id>`，把原因写进它的
 备注（`alm note`）。每完成一个任务就写交接（`alm handoff`），并遵守 `alm handoff-rules`。
 
 ## 4. 收尾
 
-最后一个迭代的验收检查完成后（目标任务在最后一个阻塞任务结束时自动解除阻塞；仍被阻塞就对它运行 `alm unblock`），对照规格的验收标准检查整个应用，然后用同一种
+最后一个迭代的验收检查完成后（最后一个前置任务结束后，目标任务就不再被阻塞；仍被阻塞就对它运行 `alm unblock`），对照规格的验收标准检查整个应用，然后用同一种
 方式完成目标任务，标为已完成、待那个人检查：
 `alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`，步骤告诉那个人怎么试用整个应用。如果发现目标做不到，目标
 任务改为等待那个人，并写明原因。然后打印 `alm list --json`，停下。
@@ -1535,7 +1544,7 @@ name> --branch <the branch you are on>`（担当を保存して共有します�
 承認を求め、実行が止まってしまうからです。それでもブラウザが要る受け入れ確認は、そのタスクのその人向けの
 手順にそう書き、上のとおりタスクを終えて先へ進みます。
 
-ブロックされたタスクは、最後のブロック元が終わる（完了か取りやめ）とひとりでに解除されます。始める前にブロック元の AI の判断を読みます（早めに進めるなら `alm unblock <id>`）。
+ブロックされた準備完了のタスクは、最後のブロック元が終わる（完了か取りやめ）と `alm next` に出てきます。始める前にブロック元の AI の判断を読みます（ブロック元を待つのをやめるなら `alm unblock <id>`）。
 外部への影響があるタスク：`alm wait <id> --on \"<what the approver must do>\"`、そして次の準備完了の
 タスクへ。先に別のタスクが要るタスク：そのタスクがなければ加え、`alm block`。やめたタスク：
 `alm drop <id>`、理由はメモに（`alm note`）。タスクを一つ終えるたびにハンドオフを書き
@@ -1543,7 +1552,7 @@ name> --branch <the branch you are on>`（担当を保存して共有します�
 
 ## 4. 仕上げる
 
-最後のイテレーションの受け入れ確認が終わったら（ゴールのタスクは最後のブロック元が終わるとひとりでに解除されます。まだブロック中なら `alm unblock`）、仕様の受け入れ
+最後のイテレーションの受け入れ確認が終わったら（ゴールのタスクは最後のブロック元が終わるとブロックされなくなります。まだブロック中なら `alm unblock`）、仕様の受け入れ
 基準に照らしてアプリ全体を確かめ、ゴールのタスクも同じように、完了・その人の確認待ちにして終えます：
 `alm done <id> --without-human-check \"Goal run: try the app\" --steps <file.md>`。手順には
 アプリ全体を試すしかたを書きます。ゴールが無理だと分かったら、代わりにゴールのタスクを
@@ -2076,7 +2085,7 @@ mod tests {
         assert!(
             guide(Some("customize"))
                 .unwrap()
-                .contains("The seven states")
+                .contains("The six states")
         );
         for text in [guide(Some("commands")).unwrap(), crate::agent_section()] {
             assert!(text.contains("alm block <id> --by"), "{text}");

@@ -1920,7 +1920,7 @@ fn brief_and_guide_tell_agents_about_allomos() {
     );
 
     let v = ok(&repo, &["guide", "customize"]);
-    assert!(v["guide"].as_str().unwrap().contains("The seven states"));
+    assert!(v["guide"].as_str().unwrap().contains("The six states"));
     let all = ok(&repo, &["guide"]);
     assert!(all["guide"].as_str().unwrap().contains("# Allomos terms"));
     let (code, v) = fj(&repo, &["guide", "nope"]);
@@ -2623,7 +2623,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v37)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v38)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2633,7 +2633,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v37)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v38)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
