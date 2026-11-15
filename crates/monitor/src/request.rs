@@ -221,6 +221,21 @@ pub fn stopped_unreadable(language: &str, why: crate::unreadable::Why, detail: &
     }
 }
 
+/// The app moved a run to its new `alm` after an update (Task-A03-cookie729).
+pub fn updated(language: &str, version: &str) -> String {
+    match lang(language) {
+        "zh-CN" => format!(
+            "「换肩」已更新：自动监测换成新版（{version}）继续运行，设置不变；已开的会话照常做完各自的任务。"
+        ),
+        "ja" => format!(
+            "「肩代」を更新しました：自動監視は新しいバージョン（{version}）で、同じ設定のまま続きます。開いているセッションは、それぞれのタスクをいつも通り最後まで進めます。"
+        ),
+        _ => format!(
+            "Allomos was updated: monitoring carries on with the new version ({version}) and the same settings; the open sessions finish their tasks as usual."
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,6 +249,13 @@ mod tests {
         assert!(stopped_unreadable("en", Why::Unreadable, "x").contains("2 minutes"));
         assert!(stopped_unreadable("zh-CN", Why::Unreadable, "x").ends_with('x'));
         assert!(!stopped_unreadable("zh-CN", Why::Format, "x").contains('x'));
+    }
+
+    #[test]
+    fn a_monitor_moved_to_the_new_version_says_so_in_each_language() {
+        assert!(updated("zh-CN", "0.1.64").contains("新版（0.1.64）"));
+        assert!(updated("ja", "0.1.64").contains("（0.1.64）"));
+        assert!(updated("en", "0.1.64").contains("(0.1.64)"));
     }
 
     /// The same request the interface wrote (monitorFlow.test.ts), word for word.

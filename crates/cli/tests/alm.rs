@@ -4599,7 +4599,10 @@ fn block_keeps_the_state_and_next_skips_blocked_ready_tasks() {
     assert!(!next.contains("Changed files"), "{next}");
     let show = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
     assert!(show.contains("state: ready\n"), "{show}");
-    assert!(show.contains("blockers finished: A01-01 (done), A02-01 (dropped)"), "{show}");
+    assert!(
+        show.contains("blockers finished: A01-01 (done), A02-01 (dropped)"),
+        "{show}"
+    );
 
     // Blocking on a dropped task is allowed, with a warning: it holds nothing back.
     let v = ok(&repo, &["block", "A01-02", "--by", "A02-01"]);
@@ -4621,7 +4624,10 @@ fn block_keeps_the_state_and_next_skips_blocked_ready_tasks() {
     );
     let list = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
     assert!(list.contains("A01-02  waiting · blocked  "), "{list}");
-    assert!(list.contains("waiting for the approver: approve the card"), "{list}");
+    assert!(
+        list.contains("waiting for the approver: approve the card"),
+        "{list}"
+    );
     assert!(list.contains("blocked by A01-09 (backlog)"), "{list}");
 
     // Unblock takes blockers off, by name or all; the state stays.
@@ -4688,7 +4694,10 @@ fn a_held_task_stays_in_progress_when_blocked_and_claiming_a_blocked_task_tells(
         text.contains("A01-02 (in progress) is no longer blocked: all its blockers have finished."),
         "{text}"
     );
-    assert!(text.contains("A02-01 (in progress) is no longer blocked"), "{text}");
+    assert!(
+        text.contains("A02-01 (in progress) is no longer blocked"),
+        "{text}"
+    );
     assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
     assert_eq!(task_file(&repo, "A01-02")["holder"], "b");
     assert_eq!(task_file(&repo, "A01-02")["blocked_by"], json!(["A01-01"]));
@@ -4739,7 +4748,10 @@ fn upgrade_gives_an_old_blocked_task_its_earlier_state() {
         "blockers_need_upgrade",
     );
     let said = String::from_utf8(alm(&repo, &["upgrade"]).stdout).unwrap();
-    assert!(said.contains("1 task(s) in the old blocked state"), "{said}");
+    assert!(
+        said.contains("1 task(s) in the old blocked state"),
+        "{said}"
+    );
     let v = ok(&repo, &["upgrade", "--confirm"]);
     assert_eq!(v["upgraded"], true, "{v}");
     assert_eq!(v["upgrade"]["unblocked"], json!([["A01-02", "backlog"]]));

@@ -1868,8 +1868,7 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
     let packed = done.fields["packed"]
         .as_array()
         .is_some_and(|p| !p.is_empty());
-    let changes = (cli.command.changes() || packed)
-        && !matches!(cli.command, Command::Init { .. });
+    let changes = (cli.command.changes() || packed) && !matches!(cli.command, Command::Init { .. });
     let mut text = String::new();
     let mut files: Vec<String> = written
         .iter()
@@ -4485,7 +4484,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         done.text.push_str(&format!("  {line}\n"));
                     }
                     if task.blocked_by.is_empty() {
-                        done.text.push_str("  It has no blockers now; its state stays as it is.\n");
+                        done.text
+                            .push_str("  It has no blockers now; its state stays as it is.\n");
                     }
                     done.fields["task"] = task_json_in(&bag, task);
                 }

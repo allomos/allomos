@@ -58,7 +58,11 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
             " Blocked is no longer a state (decision 0026): a task keeps its own state and is blocked while one of its blockers has not finished. {} task(s) in the old blocked state get back the state they had before they were blocked, from their history (ready, or in progress when held, when the history does not say); their blockers stay.",
             old_blocked
         );
-        let signing = if signed { "" } else { " From then on every change is signed with the key of the computer that makes it (kept in the system's key store, never in the taskbag; on macOS the Keychain), its public key goes in keys/, and a checkpoint (checkpoints/) fixes a fingerprint of everything recorded before: `alm audit` lists what it finds (decision 0021)." };
+        let signing = if signed {
+            ""
+        } else {
+            " From then on every change is signed with the key of the computer that makes it (kept in the system's key store, never in the taskbag; on macOS the Keychain), its public key goes in keys/, and a checkpoint (checkpoints/) fixes a fingerprint of everything recorded before: `alm audit` lists what it finds (decision 0021)."
+        };
         let signing = format!("{blocked}{signing}");
         let text = if labels_done {
             format!(

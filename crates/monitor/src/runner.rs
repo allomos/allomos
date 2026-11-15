@@ -42,6 +42,10 @@ pub struct Options {
     pub run: Run,
     /// The `alm` the sessions run: its folder goes first in their `PATH`.
     pub alm: Option<PathBuf>,
+    /// The version of `alm` that ran this run before, when it is resumed by another one (the app
+    /// moved it to its new `alm` after an update, Task-A03-cookie729); `Some("")` for a run whose
+    /// record did not say.
+    pub updated_from: Option<String>,
 }
 
 /// A line in the run's log (its standard error, which `start` points at the log file).
@@ -422,6 +426,11 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
             log: registry::log_path(dir, id),
             alive: now_ms(),
             run: options.run,
+            program: registry::Program {
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                path: options.alm.clone(),
+                updated_from: options.updated_from.clone(),
+            },
         },
         held,
         found,
@@ -444,6 +453,25 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         }
     ));
     drop(bag);
+    // Moved to this alm after an update (Task-A03-cookie729): the person is told once.
+    if let Some(from) = &options.updated_from {
+        let body = request::updated(&lp.record.language, env!("CARGO_PKG_VERSION"));
+        log(&format!(
+            "carries on with alm {} (was {}): {body}",
+            env!("CARGO_PKG_VERSION"),
+            if from.is_empty() {
+                "an older one"
+            } else {
+                from
+            }
+        ));
+        notify::show(
+            &lp.dir,
+            &lp.id,
+            request::notify_title(&lp.record.language),
+            &body,
+        );
+    }
     lp.write();
     let mut last_read: Option<Instant> = None;
     // Reads that failed in a row, and why the run stopped on its own (Task-A03-raven398).

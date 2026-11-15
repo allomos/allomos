@@ -59,6 +59,30 @@ pub struct Record {
     /// When the process last said it is alive (ms since 1970).
     pub alive: i64,
     pub run: Run,
+    /// Which `alm` runs it (Task-A03-cookie729): empty in a run started before.
+    #[serde(default, skip_serializing_if = "Program::is_empty")]
+    pub program: Program,
+}
+
+/// Which `alm` runs a run, so the app can tell a run still on an older `alm` after an update
+/// (Task-A03-cookie729, [`crate::update`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Program {
+    /// Its version, for example `0.1.64`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Where it is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
+    /// The version that ran it before the app moved it to this one, when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_from: Option<String>,
+}
+
+impl Program {
+    pub fn is_empty(&self) -> bool {
+        *self == Program::default()
+    }
 }
 
 /// The paths of one run's files in `dir`.
@@ -481,6 +505,16 @@ pub fn monitor_processes() -> Vec<Process> {
         .collect()
 }
 
+/// The command line of process `pid` as the system lists it, when it is an `alm monitor run`
+/// (Task-A03-cookie729: a run started before its record named its program is known by it).
+pub fn command_of(pid: u32) -> Option<String> {
+    process_lines().into_iter().find_map(|line| {
+        let line = line.trim();
+        let (n, rest) = line.split_once(char::is_whitespace)?;
+        (n.trim().parse::<u32>().ok()? == pid).then(|| rest.trim().to_string())
+    })
+}
+
 /// The `alm monitor run` processes, read again only when the last reading is older than
 /// `max_age` (Task-A03-reef286). Reading the system's process list starts a program (`ps`), and
 /// the app asks for it from several places at once (the menu, each window's runs, the Monitors
@@ -697,6 +731,7 @@ mod tests {
                 30,
                 1_000,
             ),
+            program: Program::default(),
         }
     }
 
@@ -912,6 +947,7 @@ mod tests {
                 30,
                 0,
             ),
+            program: Program::default(),
         };
         for id in ["m-alive", "m-gone"] {
             write_whole(

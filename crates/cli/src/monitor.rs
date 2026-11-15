@@ -653,6 +653,10 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                         taskbag: saved.taskbag.clone(),
                         language: saved.language.clone(),
                         run: saved.run,
+                        // Another alm than the one that ran it (Task-A03-cookie729).
+                        updated_from: (saved.program.version.as_deref()
+                            != Some(env!("CARGO_PKG_VERSION")))
+                        .then(|| saved.program.version.clone().unwrap_or_default()),
                         alm,
                     },
                 )?;
@@ -680,6 +684,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                     language,
                     run,
                     alm,
+                    updated_from: None,
                 },
             )?;
             Ok(Done::new(
