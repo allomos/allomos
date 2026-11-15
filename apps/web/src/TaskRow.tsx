@@ -182,37 +182,48 @@ export function TaskRow({
   );
 }
 
-/** The row's indent in the dependency tree: a guide line for each level above, an elbow to its
- * parent, then the fold button when tasks hang under it (a blank of the same width otherwise, so
- * IDs line up). */
+/** How many colours the tree's levels cycle through (styles.css, `.tree-cell.lv-N`). */
+const TREE_COLOURS = 6;
+const lv = (depth: number) => `lv-${depth % TREE_COLOURS}`;
+
+/** The row's indent in the dependency tree, drawn like a group tree: one column per level, each
+ * level in its own colour. A rail runs down a column while that level has more tasks below; the
+ * line to this row's parent turns into the row with a rounded corner; then this row's node, a
+ * dot, which is the fold button (− open, + folded) when tasks hang under it, with its own rail
+ * running down to them while open. */
 function TreeLead({ tree }: { tree: TreeMark }) {
   const { t } = useI18n();
   const { row } = tree;
+  const node = `tree-cell node ${lv(row.depth)}${row.kids > 0 && !row.folded ? " open" : ""}`;
   return (
     <span className="tree-lead">
       {row.lines.map((on, i) => (
-        <span key={i} className={on ? "tree-cell line" : "tree-cell"} />
+        <span key={i} className={`tree-cell ${lv(i)}${on ? " line" : ""}`} />
       ))}
-      {row.depth > 0 && <span className={row.last ? "tree-cell elbow last" : "tree-cell elbow"} />}
+      {row.depth > 0 && <span className={`tree-cell elbow ${lv(row.depth - 1)}${row.last ? " last" : ""}`} />}
       {row.kids > 0 ? (
-        <button
-          type="button"
-          className="tree-cell tree-fold"
-          aria-expanded={!row.folded}
-          aria-label={t(row.folded ? "tree.expand" : "tree.collapse", { id: row.task.id })}
-          title={t(row.folded ? "tree.expand" : "tree.collapse", { id: row.task.id })}
-          onKeyDown={ownKeys}
-          onClick={(e) => {
-            e.stopPropagation();
-            tree.onFold();
-          }}
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M7 4.5 13 10l-6 5.5" />
-          </svg>
-        </button>
+        <span className={node}>
+          <button
+            type="button"
+            className="tree-dot tree-fold"
+            aria-expanded={!row.folded}
+            aria-label={t(row.folded ? "tree.expand" : "tree.collapse", { id: row.task.id })}
+            title={t(row.folded ? "tree.expand" : "tree.collapse", { id: row.task.id })}
+            onKeyDown={ownKeys}
+            onClick={(e) => {
+              e.stopPropagation();
+              tree.onFold();
+            }}
+          >
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d={row.folded ? "M2 5h6M5 2v6" : "M2 5h6"} />
+            </svg>
+          </button>
+        </span>
       ) : (
-        <span className="tree-cell" />
+        <span className={node}>
+          <span className="tree-dot" />
+        </span>
       )}
     </span>
   );
