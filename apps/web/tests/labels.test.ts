@@ -120,7 +120,7 @@ test("states and built-in labels follow taskT while surrounding UI words stay in
   assert.equal(hiddenText({ count: 1, states: [{ state: "ready", count: 1 }] }, t, zhT), "1 more hidden by the filter: 1 就绪");
   const filtered = tickCell(allTicked(BUILT_IN_NAMES), "done", LOCALLY_BY_AGENT, "no", false);
   assert.deepEqual(untickedNames(filtered, t, zhT), ["已完成 · 智能体已在本地验证: no"]);
-  const blocked = task({ id: "A01-02", state: "blocked", blocked_by: ["A01-01"] });
+  const blocked = task({ id: "A01-02", state: "ready", blocked_by: ["A01-01"] });
   const blocker = task({ id: "A01-01", state: "in_progress" });
   assert.equal(stopText(blocked, [blocked, blocker], t, zhT), "Blocked by A01-01 (进行中)");
   assert.equal(valueText("state", "ready", t, zhT), "就绪");

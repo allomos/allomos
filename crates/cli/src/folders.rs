@@ -52,7 +52,14 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
         };
         let labels_done = allomos_core::format_version(&bag.project.format)
             .is_some_and(|n| n >= allomos_core::LABELS_FROM);
-        let signing = " From then on every change is signed with the key of the computer that makes it (kept in the system's key store, never in the taskbag; on macOS the Keychain), its public key goes in keys/, and a checkpoint (checkpoints/) fixes a fingerprint of everything recorded before: `alm audit` lists what it finds (decision 0021).";
+        let signed = allomos_core::format_version(&bag.project.format).is_some_and(|n| n >= 8);
+        let old_blocked = bag.tasks.iter().filter(|t| t.old_blocked()).count();
+        let blocked = format!(
+            " Blocked is no longer a state (decision 0026): a task keeps its own state and is blocked while one of its blockers has not finished. {} task(s) in the old blocked state get back the state they had before they were blocked, from their history (ready, or in progress when held, when the history does not say); their blockers stay.",
+            old_blocked
+        );
+        let signing = if signed { "" } else { " From then on every change is signed with the key of the computer that makes it (kept in the system's key store, never in the taskbag; on macOS the Keychain), its public key goes in keys/, and a checkpoint (checkpoints/) fixes a fingerprint of everything recorded before: `alm audit` lists what it finds (decision 0021)." };
+        let signing = format!("{blocked}{signing}");
         let text = if labels_done {
             format!(
                 "This taskbag is in {}. Upgrading writes {FORMAT}: labels stay as they are.{signing}\nAfter the upgrade, Allomos versions older than this one (the app, alm, and every agent session using them) refuse the taskbag until the newest Allomos is installed. Install it first, then run `alm upgrade --confirm`.\n",
@@ -89,8 +96,22 @@ pub(crate) fn upgrade(root: &Path, me: Option<&str>, confirm: bool) -> Result<Do
             for (label, n) in &u.labels {
                 text.push_str(&format!("  {label}: {n}\n"));
             }
+            if u.unblocked.is_empty() {
+                text.push_str("No task was in the old blocked state.\n");
+            } else {
+                text.push_str(&format!(
+                    "{} task(s) were in the old blocked state; each has the state it had before, and keeps its blockers:\n",
+                    u.unblocked.len()
+                ));
+                for (id, state) in &u.unblocked {
+                    text.push_str(&format!("  {id}: {}\n", state.replace('_', " ")));
+                }
+            }
+            let signed_before = allomos_core::format_version(&u.from).is_some_and(|n| n >= 8);
             text.push_str(&match &u.checkpoint {
+                Some(c) if signed_before => format!("The checkpoint {c} fixes the history recorded before (`alm audit` lists it).\n"),
                 Some(c) => format!("Changes are signed from now on; the checkpoint {c} fixes the history recorded before (`alm audit` lists it).\n"),
+                None if signed_before => String::new(),
                 None => "This computer has no signing key store Allomos can use yet, so its changes are written unsigned (`alm audit` lists them) and no checkpoint was made.\n".to_string(),
             });
             text

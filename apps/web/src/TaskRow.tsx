@@ -17,7 +17,7 @@ import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
-import { chipLabels, humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
+import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import { difficultyOf, difficultyText } from "./difficultyFlow";
 import type { TreeRow } from "./depTreeFlow";
@@ -69,11 +69,15 @@ export function TaskRow({
 }) {
   const { t } = useI18n();
   const taskT = useTaskT();
-  const decisions = task.ai_decisions?.length ?? 0;
+  const decisions = decisionsToReview(task).length;
   const facts: [string, ReactNode, string?][] = [
     [
       t("pane.state"),
-      <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>,
+      <>
+        <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>
+        {/* Decision 0026: blocked is worked out, shown beside the task's own state. */}
+        {isBlocked(task) && <span className="fact-blocked s-blocked-text"> · {t("task.blocked_mark")}</span>}
+      </>,
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
   ];
@@ -299,7 +303,7 @@ function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
   return (
     <div className="row-stop">
       <div className="row-stop-name">{t(fact.name)}</div>
-      <div ref={ref} className={`row-stop-text s-${state}-text${open ? "" : " clamped"}`}>
+      <div ref={ref} className={`row-stop-text s-${fact.kind === "blocked" ? "blocked" : state}-text${open ? "" : " clamped"}`}>
         {fact.text}
       </div>
       {cut && (

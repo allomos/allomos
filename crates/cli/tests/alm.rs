@@ -1920,7 +1920,7 @@ fn brief_and_guide_tell_agents_about_allomos() {
     );
 
     let v = ok(&repo, &["guide", "customize"]);
-    assert!(v["guide"].as_str().unwrap().contains("The seven states"));
+    assert!(v["guide"].as_str().unwrap().contains("The six states"));
     let all = ok(&repo, &["guide"]);
     assert!(all["guide"].as_str().unwrap().contains("# Allomos terms"));
     let (code, v) = fj(&repo, &["guide", "nope"]);
@@ -2554,7 +2554,7 @@ fn set_format(repo: &Path, format: &str) {
 #[test]
 fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
     let repo = filled();
-    set_format(&repo, "allomos/9");
+    set_format(&repo, "allomos/99");
     // A field this Allomos does not know, as a newer one might add.
     let path = repo.join(".allomos/taskbag/project.json");
     let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
@@ -2572,7 +2572,7 @@ fn a_newer_taskbag_stops_alm_with_the_persons_choice() {
         let message = v["error"]["message"].as_str().unwrap();
         assert!(message.contains("update Allomos now"), "{message}");
         assert!(message.contains("your own understanding"), "{message}");
-        assert_eq!(v["error"]["params"]["found"], "allomos/9");
+        assert_eq!(v["error"]["params"]["found"], "allomos/99");
     }
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
@@ -2623,7 +2623,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v37)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v38)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2633,7 +2633,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v37)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v38)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -3190,7 +3190,7 @@ fn every_older_taskbag_is_to_be_moved_in() {
         ] {
             let v = refused(&repo, args, 1, "taskbag_to_move_in");
             assert_eq!(v["error"]["params"]["found"], format!("allomos/{n}"));
-            assert_eq!(v["error"]["params"]["current"], "allomos/8");
+            assert_eq!(v["error"]["params"]["current"], "allomos/9");
             let message = v["error"]["message"].as_str().unwrap();
             assert!(message.contains("Update the taskbag…"), "{message}");
             assert!(message.contains("`alm move-in`"), "{message}");
@@ -3727,6 +3727,96 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
     assert_eq!(decisions[1]["from"], "Layout: one file per command");
     assert!(changes.iter().any(|c| c["field"] == "labels"));
     refused(&repo, &["reviewed", "A01-01"], 1, "nothing_to_review");
+    assert_eq!(ok(&repo, &["show", "A01-01"])["ai_decisions"], json!([]));
+}
+
+#[test]
+fn ai_decisions_have_three_kinds_and_details_are_not_reviewed() {
+    // Task-A01-piglet562, decision 0025 § 3: `--kind visible|principle|detail`. A detail is kept
+    // with the task (`alm show`) but neither adds the label nor shows under To review.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "List 160px high",
+            "--kind",
+            "detail",
+        ],
+    );
+    assert_eq!(v["decision"]["kind"], "detail");
+    assert_eq!(v["ai_decisions"], json!([]));
+    assert_eq!(v["ai_details"].as_array().unwrap().len(), 1);
+    assert!(
+        task_file(&repo, "A01-01").get("labels").is_none(),
+        "no label for a detail"
+    );
+    assert_eq!(ok(&repo, &["human"])["to_review"], json!([]));
+    refused(&repo, &["reviewed", "A01-01"], 1, "nothing_to_review");
+    let out = alm(&repo, &["show", "A01-01"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("AI decided (details, not reviewed):"),
+        "{text}"
+    );
+    assert!(text.contains("- [detail] List 160px high (a, "), "{text}");
+    let out = alm(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "x", "--kind", "other"],
+    );
+    assert!(!out.status.success(), "an unknown kind is refused");
+
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "Find the worktree by working branch",
+            "--kind",
+            "principle",
+        ],
+    );
+    let out = alm(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "Button says Reviewed"],
+    );
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("has no kind, so it waits for review"),
+        "{text}"
+    );
+    assert_eq!(
+        task_file(&repo, "A01-01")["labels"],
+        json!(["AI decisions to review"])
+    );
+    let v = ok(&repo, &["human"]);
+    let texts: Vec<&str> = v["to_review"][0]["ai_decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            "Find the worktree by working branch",
+            "Button says Reviewed"
+        ]
+    );
+    assert_eq!(v["to_review"][0]["ai_decisions"][0]["kind"], "principle");
+    let out = alm(&repo, &["human"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("To review: AI decisions (1)"), "{text}");
+    assert!(!text.contains("160px"), "{text}");
+    // A review takes all three off, the detail with them; the history keeps them.
+    let v = ok(&repo, &["--as", "will", "reviewed", "A01-01"]);
+    assert_eq!(v["reviewed"].as_array().unwrap().len(), 3);
     assert_eq!(ok(&repo, &["show", "A01-01"])["ai_decisions"], json!([]));
 }
 
@@ -4370,10 +4460,11 @@ fn wait_says_what_and_optionally_who() {
     assert!(text.contains("waiting on: approve the card"), "{text}");
 }
 
-/// Decision 0016: `alm block` and its refusals; each blocker's state in list, show and next; a
-/// dropped blocker flagged; all done told but not acted on; one event per change.
+/// Decision 0026: `alm block` and its refusals; the task keeps its state and is blocked while a
+/// blocker has not finished; list, show and next say so; finishing the last blocker changes
+/// nothing in the task; `alm unblock` takes blockers off; one event per change.
 #[test]
-fn block_shows_blockers_and_next_unblocks_left_overs() {
+fn block_keeps_the_state_and_next_skips_blocked_ready_tasks() {
     let repo = filled();
     refused(
         &repo,
@@ -4395,43 +4486,68 @@ fn block_shows_blockers_and_next_unblocks_left_overs() {
     );
     let (code, _) = fj(&repo, &["block", "A01-02"]);
     assert_eq!(code, 2, "--by is required");
-    assert_eq!(
-        task_file(&repo, "A01-02")["state"],
-        "backlog",
+    assert!(
+        task_file(&repo, "A01-02").get("blocked_by").is_none(),
         "nothing written"
     );
 
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     let v = ok(&repo, &["block", "A01-02", "--by", "A01-01", "A02-01"]);
-    assert_eq!(v["task"]["state"], "blocked");
+    assert_eq!(v["task"]["state"], "backlog", "the state stays");
+    assert_eq!(v["task"]["blocked"], true);
     assert_eq!(v["task"]["blocked_by"], json!(["A01-01", "A02-01"]));
     assert_eq!(
         v["task"]["blockers"],
         json!([{ "id": "A01-01", "state": "in_progress" }, { "id": "A02-01", "state": "backlog" }])
     );
-    assert_eq!(
-        task_file(&repo, "A01-02")["blocked_by"],
-        json!(["A01-01", "A02-01"])
-    );
-    // People read each blocker's current state.
+    let file = task_file(&repo, "A01-02");
+    assert_eq!(file["state"], "backlog");
+    assert_eq!(file["blocked_by"], json!(["A01-01", "A02-01"]));
+    // People read the state and the block together, with each open blocker's state.
     let list = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(list.contains("A01-02  backlog · blocked  "), "{list}");
     assert!(
         list.contains("blocked by A01-01 (in progress), A02-01 (backlog)"),
         "{list}"
     );
-    let v = ok(&repo, &["list", "--state", "blocked"]);
+    let v = ok(&repo, &["list", "--blocked"]);
+    assert_eq!(v["areas"][0]["tasks"].as_array().unwrap().len(), 1);
     assert_eq!(v["areas"][0]["tasks"][0]["id"], "A01-02");
-    assert_eq!(v["areas"][0]["tasks"][0]["all_blockers_done"], false);
+    assert_eq!(v["areas"][0]["tasks"][0]["blocked"], true);
+    let (code, _) = fj(&repo, &["list", "--state", "blocked"]);
+    assert_eq!(code, 2, "blocked is not a state any more");
     let show = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
     assert!(
-        show.contains("blocked by: A01-01 (in progress), A02-01 (backlog)"),
+        show.contains("state: backlog · blocked by A01-01 (in progress), A02-01 (backlog)"),
         "{show}"
     );
-    // Not ready, so never in next; nothing to tell yet.
-    let v = ok(&repo, &["next"]);
-    assert_eq!(v["blocked"], json!([]));
+    assert!(
+        show.contains("blockers: A01-01 (in progress), A02-01 (backlog)"),
+        "{show}"
+    );
 
-    // The first blocker done: still blocked, and the output names nothing unblocked.
+    // Made ready, it keeps its blockers: `alm next` leaves it out and says where it is.
+    let v = ok(&repo, &["ready", "A01-02"]);
+    assert_eq!(v["task"]["state"], "ready");
+    assert_eq!(v["task"]["blocked_by"], json!(["A01-01", "A02-01"]));
+    let v = ok(&repo, &["next"]);
+    assert!(
+        v["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| t["id"] != "A01-02"),
+        "{v}"
+    );
+    assert_eq!(v["blocked"][0]["id"], "A01-02");
+    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(next.contains("Ready but blocked"), "{next}");
+    assert!(
+        next.contains("A01-02  blocked by A01-01 (in progress), A02-01 (backlog)"),
+        "{next}"
+    );
+
+    // The first blocker done: still blocked, and the output names nothing freed.
     let out = alm(
         &repo,
         &[
@@ -4444,16 +4560,15 @@ fn block_shows_blockers_and_next_unblocks_left_overs() {
         ],
     );
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(!text.contains("Unblocked"), "{text}");
-    assert_eq!(task_file(&repo, "A01-02")["state"], "blocked");
+    assert!(!text.contains("no longer blocked"), "{text}");
 
-    // The last blocker dropped: a dropped blocker counts as finished, so the same change moves
-    // it on by itself (Task-A01-tuna668): ready, blockers cleared, a note, an `unblock` event.
+    // The last blocker dropped: a dropped blocker counts as finished. alm says the task is no
+    // longer blocked and changes nothing in it: same state, same blockers, no event.
     let v = ok(&repo, &["drop", "A02-01"]);
     assert_eq!(v["unblocked"][0]["id"], "A01-02");
     assert_eq!(v["unblocked"][0]["state"], "ready");
     assert!(
-        v["changed_files"]
+        !v["changed_files"]
             .as_array()
             .unwrap()
             .contains(&json!("tasks/A01-02/task.json")),
@@ -4461,101 +4576,71 @@ fn block_shows_blockers_and_next_unblocks_left_overs() {
     );
     let file = task_file(&repo, "A01-02");
     assert_eq!(file["state"], "ready");
-    assert!(file.get("blocked_by").is_none());
-    assert!(
-        file["handoff_note"]
-            .as_str()
-            .unwrap()
-            .starts_with("Unblocked automatically after A01-01, A02-01 finished;"),
-        "{file}"
-    );
+    assert_eq!(file["blocked_by"], json!(["A01-01", "A02-01"]));
     let v = ok(&repo, &["history", "A01-02"]);
-    let last = &v["events"][0];
-    assert_eq!(last["command"], "unblock");
-    assert!(
-        last["changes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|c| c["field"] == "reason" && c["to"].as_str().unwrap().starts_with("automatic:")),
-        "{last}"
-    );
+    assert_eq!(v["events"][0]["command"], "ready");
+    // Now it is listed, with its finished blockers to read first; next writes nothing.
     let v = ok(&repo, &["next"]);
-    assert_eq!(v["blocked"], json!([]), "nothing left over to tell");
+    assert_eq!(v["blocked"], json!([]));
+    let listed = v["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["id"] == "A01-02")
+        .expect("listed once its blockers finished");
+    assert_eq!(listed["blocked"], false);
+    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
+    assert!(
+        next.contains(
+            "blockers finished: A01-01 (done), A02-01 (dropped): before starting, read their AI decisions and handoffs"
+        ),
+        "{next}"
+    );
+    assert!(!next.contains("Changed files"), "{next}");
+    let show = String::from_utf8(alm(&repo, &["show", "A01-02"]).stdout).unwrap();
+    assert!(show.contains("state: ready\n"), "{show}");
+    assert!(show.contains("blockers finished: A01-01 (done), A02-01 (dropped)"), "{show}");
 
     // Blocking on a dropped task is allowed, with a warning: it holds nothing back.
     let v = ok(&repo, &["block", "A01-02", "--by", "A02-01"]);
     assert_eq!(v["warnings"][0]["code"], "blocker_dropped");
 
-    // A task left blocked with every blocker finished (as from before the rule): `alm next` lets
-    // it go on first, lists it, says so and names the files to share (Task-A01-steam936).
-    ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
-    let v = ok(&repo, &["--as", "s", "next"]);
-    assert_eq!(v["unblocked"][0]["id"], "A01-02");
-    assert_eq!(v["unblocked"][0]["state"], "ready");
-    assert_eq!(v["unblocked"][0]["finished_blockers"], json!(["A01-01"]));
-    assert_eq!(v["blocked"], json!([]));
-    assert!(
-        v["tasks"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|t| t["id"] == "A01-02"),
-        "{v}"
+    // Waiting on a person and blocked at once: a new blocker is added to the ones it has.
+    ok(
+        &repo,
+        &["add", "task", "A01-09", "--area", "A01", "--title", "Later"],
     );
-    assert!(
-        v["changed_files"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("tasks/A01-02/task.json")),
-        "{v}"
-    );
-    assert!(
-        v["git_commands"][1]
-            .as_str()
-            .unwrap()
-            .contains("alm: unblock A01-02"),
-        "{v}"
-    );
-    let file = task_file(&repo, "A01-02");
-    assert_eq!(file["state"], "ready");
-    assert!(file.get("blocked_by").is_none());
-    assert!(
-        file["handoff_note"]
-            .as_str()
-            .unwrap()
-            .starts_with("Unblocked automatically after A01-01 finished;"),
-        "{file}"
-    );
-    let h = ok(&repo, &["history", "A01-02"]);
-    assert_eq!(h["events"][0]["command"], "unblock");
-    // Nothing more to let go on: `alm next` writes nothing and names no files.
-    let before = fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap();
-    let events_before = fs::read_dir(repo.join(".allomos/taskbag/events"))
-        .unwrap()
-        .count();
-    let next = String::from_utf8(alm(&repo, &["next"]).stdout).unwrap();
-    assert!(!next.contains("Unblocked A01-02 ("), "{next}");
-    assert!(!next.contains("Changed files"), "{next}");
+    ok(&repo, &["wait", "A01-02", "--on", "approve the card"]);
+    let v = ok(&repo, &["block", "A01-02", "--by", "A01-09"]);
+    assert_eq!(v["task"]["state"], "waiting");
+    assert_eq!(v["task"]["waiting_on"], "approve the card");
+    assert_eq!(v["task"]["blocked"], true);
     assert_eq!(
-        fs::read_to_string(repo.join(".allomos/taskbag/tasks/A01-02/task.json")).unwrap(),
-        before,
-        "next changes nothing"
+        v["task"]["blocked_by"],
+        json!(["A01-01", "A02-01", "A01-09"])
     );
-    assert_eq!(
-        fs::read_dir(repo.join(".allomos/taskbag/events"))
-            .unwrap()
-            .count(),
-        events_before
-    );
+    let list = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(list.contains("A01-02  waiting · blocked  "), "{list}");
+    assert!(list.contains("waiting for the approver: approve the card"), "{list}");
+    assert!(list.contains("blocked by A01-09 (backlog)"), "{list}");
 
-    // Unblock moves it on by hand; only a blocked task.
-    ok(&repo, &["block", "A01-02", "--by", "A01-01"]);
+    // Unblock takes blockers off, by name or all; the state stays.
+    refused(
+        &repo,
+        &["unblock", "A01-02", "--by", "A09-09"],
+        1,
+        "not_blocked_by",
+    );
+    let v = ok(&repo, &["unblock", "A01-02", "--by", "A01-09"]);
+    assert_eq!(v["task"]["state"], "waiting");
+    assert_eq!(v["task"]["blocked"], false);
+    assert_eq!(v["task"]["blocked_by"], json!(["A01-01", "A02-01"]));
     let v = ok(&repo, &["unblock", "A01-02"]);
-    assert_eq!(v["task"]["state"], "ready");
+    assert_eq!(v["task"]["state"], "waiting");
     assert!(task_file(&repo, "A01-02").get("blocked_by").is_none());
     refused(&repo, &["unblock", "A01-02"], 1, "not_blocked");
-    // One event per change, named after the command.
+    // One event per change, named after the command (blocking on a blocker it already has
+    // changes nothing, so it writes none).
     let v = ok(&repo, &["history", "A01-02"]);
     let commands: Vec<&str> = v["events"]
         .as_array()
@@ -4566,40 +4651,105 @@ fn block_shows_blockers_and_next_unblocks_left_overs() {
     assert_eq!(
         commands,
         [
-            "unblock", "block", "unblock", "block", "block", "unblock", "block", "add task"
+            "unblock", "unblock", "block", "wait", "ready", "block", "add task"
         ]
     );
 }
 
-/// Task-A01-tuna668: a held blocked task goes on in progress when its last blocker is done; a
-/// task left blocked from before goes on at the next finishing change.
+/// Decision 0026, details f and g: a held task that gets a blocker stays in progress with its
+/// holder; claiming a blocked task is allowed and alm says the fact; finishing the blocker tells
+/// which tasks it freed.
 #[test]
-fn the_last_blocker_finishing_unblocks_a_held_task_and_left_overs() {
+fn a_held_task_stays_in_progress_when_blocked_and_claiming_a_blocked_task_tells() {
     let repo = filled();
     ok(&repo, &["--as", "b", "claim", "A01-02"]);
-    ok(&repo, &["--as", "b", "block", "A01-02", "--by", "A01-01"]);
-    let v = ok(
+    let v = ok(&repo, &["--as", "b", "block", "A01-02", "--by", "A01-01"]);
+    assert_eq!(v["task"]["state"], "in_progress");
+    assert_eq!(v["task"]["holder"], "b");
+    assert_eq!(v["task"]["blocked"], true);
+    let list = String::from_utf8(alm(&repo, &["list"]).stdout).unwrap();
+    assert!(list.contains("A01-02  in_progress · blocked  "), "{list}");
+    // Claiming a blocked task: not refused, the fact is said.
+    ok(&repo, &["block", "A02-01", "--by", "A01-01"]);
+    let out = alm(&repo, &["--as", "c", "claim", "A02-01"]);
+    assert!(out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Fact: this task is blocked by A01-01 (backlog)"),
+        "{text}"
+    );
+    // The blocker done: both are told as freed, and neither is changed.
+    let out = alm(
         &repo,
         &["done", "A01-01", "--without-human-check", "test run"],
     );
-    assert_eq!(v["unblocked"][0]["id"], "A01-02");
-    assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
-    assert_eq!(task_file(&repo, "A01-02")["holder"], "b");
-    let text =
-        String::from_utf8(alm(&repo, &["--as", "b", "block", "A01-02", "--by", "A01-01"]).stdout)
-            .unwrap();
-    assert!(
-        !text.contains("Unblocked"),
-        "blocking moves nothing: {text}"
-    );
-    // Left over (its blocker finished before): the next done or drop lets it go on too.
-    let out = alm(&repo, &["drop", "A02-01"]);
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(
-        text.contains("Unblocked A01-02 (in progress): all its blockers have finished."),
+        text.contains("A01-02 (in progress) is no longer blocked: all its blockers have finished."),
         "{text}"
     );
+    assert!(text.contains("A02-01 (in progress) is no longer blocked"), "{text}");
     assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
+    assert_eq!(task_file(&repo, "A01-02")["holder"], "b");
+    assert_eq!(task_file(&repo, "A01-02")["blocked_by"], json!(["A01-01"]));
+}
+
+/// Decision 0026, detail l: `alm upgrade` on an `allomos/8` taskbag gives a task in the old
+/// `blocked` state the state it had before, from its history, and keeps its blockers. Before the
+/// upgrade the task is listed with its old state and blockers are not changed.
+#[test]
+fn upgrade_gives_an_old_blocked_task_its_earlier_state() {
+    let repo = filled();
+    ok(&repo, &["ready", "A01-02"]);
+    // As an allomos/8 build left it: state blocked, with the `block` event that says what it was.
+    set_format(&repo, "allomos/8");
+    let bag = repo.join(".allomos/taskbag");
+    let path = bag.join("tasks/A01-02/task.json");
+    let mut v: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    v["state"] = json!("blocked");
+    v["blocked_by"] = json!(["A01-01"]);
+    fs::write(&path, v.to_string()).unwrap();
+    fs::write(
+        bag.join("events/2026-01-01-000000-000-oldblk.json"),
+        json!({
+            "at": "2026-01-01T00:00:00.000Z", "via": "alm", "command": "block", "kind": "task",
+            "id": "A01-02",
+            "changes": [
+                { "field": "state", "from": "backlog", "to": "blocked" },
+                { "field": "blocked_by", "to": ["A01-01"] }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let v = ok(&repo, &["list"]);
+    assert!(
+        v["issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["problem"]["code"] == "blocked_state_old"),
+        "{v}"
+    );
+    refused(&repo, &["ready", "A01-02"], 1, "blocked_state_old");
+    refused(
+        &repo,
+        &["block", "A02-01", "--by", "A01-01"],
+        1,
+        "blockers_need_upgrade",
+    );
+    let said = String::from_utf8(alm(&repo, &["upgrade"]).stdout).unwrap();
+    assert!(said.contains("1 task(s) in the old blocked state"), "{said}");
+    let v = ok(&repo, &["upgrade", "--confirm"]);
+    assert_eq!(v["upgraded"], true, "{v}");
+    assert_eq!(v["upgrade"]["unblocked"], json!([["A01-02", "backlog"]]));
+    let file = task_file(&repo, "A01-02");
+    assert_eq!(file["state"], "backlog");
+    assert_eq!(file["blocked_by"], json!(["A01-01"]));
+    let v = ok(&repo, &["list", "--blocked"]);
+    assert_eq!(v["areas"][0]["tasks"][0]["id"], "A01-02");
+    assert_eq!(v["issues"], json!([]));
+    ok(&repo, &["block", "A02-01", "--by", "A01-01"]);
 }
 
 /// A taskbag in format 4 is newer than an allomos/3 build: the older build says so
@@ -4607,7 +4757,7 @@ fn the_last_blocker_finishing_unblocks_a_held_task_and_left_overs() {
 #[test]
 fn a_newer_taskbag_is_refused_by_an_older_build() {
     let repo = filled();
-    set_format(&repo, "allomos/9");
+    set_format(&repo, "allomos/99");
     refused(&repo, &["list"], 4, "taskbag_newer");
 }
 
@@ -5839,7 +5989,7 @@ fn tasks_name_their_project_folders_after_an_upgrade() {
     let v = ok(&repo, &["upgrade", "--confirm"]);
     assert_eq!(v["upgraded"], true, "{v}");
     let project: Value = serde_json::from_str(&fs::read_to_string(&project_file).unwrap()).unwrap();
-    assert_eq!(project["format"], "allomos/8");
+    assert_eq!(project["format"], "allomos/9");
     assert_eq!(project.get("project_folder"), None);
     assert_eq!(project["project_folders"][0]["path"], ".");
     let main = project["project_folders"][0]["name"]

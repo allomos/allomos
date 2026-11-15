@@ -20,27 +20,27 @@ export type EditField =
 
 /**
  * What the person typed or chose. `waitingOn` and `who` go with the state `waiting`; `blockedBy`
- * (task IDs) with the state `blocked` and the field "Blocked by" (decision 0016); `labels` with
+ * (task IDs) with the field "Blocked by", which leaves the state as it is (decision 0026); `labels` with
  * the field Labels (decision 0020, Task-A01-petal376): every label the task is to carry.
  */
 export type Draft = { value: string; waitingOn: string; who: string; blockedBy: string[]; folders: string[]; labels: string[] };
 
 /**
- * The states the app can set, each by its `alm` command (backlog, ready, wait, block, done, drop).
+ * The states the app can set, each by its `alm` command (backlog, ready, wait, done, drop).
  * In progress comes only from an agent claiming the task (owner, 2026-10-14: no claiming or
  * releasing from the app). Back to backlog since Task-A01-lotus143 (approver, 2026-10-25).
  */
-export const SETTABLE_STATES: State[] = ["backlog", "ready", "waiting", "blocked", "done", "dropped"];
+export const SETTABLE_STATES: State[] = ["backlog", "ready", "waiting", "done", "dropped"];
 
 /** The states offered for `task`: its own first, so the list shows where it is, then the settable ones. */
 export function stateChoices(task: Task): State[] {
   return SETTABLE_STATES.includes(task.state) ? SETTABLE_STATES : [task.state, ...SETTABLE_STATES];
 }
 
-/** Back to backlog is allowed for a ready, waiting or blocked task nobody holds, as
+/** Back to backlog is allowed for a ready or waiting task nobody holds, as
  * `alm backlog` allows it (Rust decides; this only greys the choice out). */
 export function backlogAllowed(task: Task): boolean {
-  return !task.holder && (task.state === "ready" || task.state === "waiting" || task.state === "blocked");
+  return !task.holder && (task.state === "ready" || task.state === "waiting");
 }
 
 /** Why backlog is greyed out for `task`, so a greyed-out choice is never unexplained: it is held
@@ -81,17 +81,15 @@ export function startDraft(task: Task, field: EditField): Draft {
 
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-/** Whether Save would change anything. Waiting with a new "waiting on" or "who", or blocked by other tasks, counts. */
+/** Whether Save would change anything. Waiting with a new "waiting on" or "who" counts; so do other
+ * blockers, or none (which takes them all off, as `alm unblock` does). */
 export function draftChanged(task: Task, field: EditField, draft: Draft): boolean {
   const start = startDraft(task, field);
-  if (field === "blocked_by") return draft.blockedBy.length > 0 && !sameIds(draft.blockedBy, start.blockedBy);
+  if (field === "blocked_by") return !sameIds(draft.blockedBy, start.blockedBy);
   if (field === "folders") return !sameIds(draft.folders, start.folders);
   if (field === "label") return !sameIds([...draft.labels].sort(), [...start.labels].sort());
   if (field === "state" && draft.value === "waiting") {
     return task.state !== "waiting" || draft.waitingOn.trim() !== start.waitingOn.trim() || draft.who.trim() !== start.who.trim();
-  }
-  if (field === "state" && draft.value === "blocked") {
-    return task.state !== "blocked" || !sameIds(draft.blockedBy, start.blockedBy);
   }
   if (field === "description") return draft.value.trimEnd() !== start.value.trimEnd();
   return draft.value.trim() !== start.value.trim();
@@ -106,9 +104,7 @@ export function toEdit(field: EditField, draft: Draft, version: string | null = 
     case "state":
       return draft.value === "waiting"
         ? { field, state: "waiting", waiting_on: draft.waitingOn.trim(), who: draft.who.trim() || null }
-        : draft.value === "blocked"
-          ? { field, state: "blocked", blocked_by: draft.blockedBy }
-          : { field, state: draft.value as State };
+        : { field, state: draft.value as State };
     case "label":
       return { field: "labels", labels: draft.labels };
     case "waiting_on":

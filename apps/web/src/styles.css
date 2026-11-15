@@ -612,6 +612,8 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .badge.ai-decided { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); border: 1px dashed var(--ok); }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
 .pane-review .ai-decisions { padding-left: 20px; }
+.pane-details summary { cursor: pointer; }
+.pane-details .ai-decisions { padding-left: 20px; margin: 6px 0; }
 /* Task-A01-baker800: Approve… shows the plan being approved, as it is; Withdraw… asks why. */
 .pane-approvals h3, .pane-approvals .approvals, .pane-approvals .banner, .pane-approvals .editor { flex-basis: 100%; margin: 0; }
 .pane-approvals .approvals { padding-left: 20px; }
@@ -901,6 +903,7 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 .filter-grid tbody tr td:first-child { border-radius: 6px 0 0 6px; }
 .filter-grid tbody tr td:last-child { border-radius: 0 6px 6px 0; }
 .filter-empty { color: var(--warn); margin: 6px 8px 2px; }
+.filter-blocked { display: flex; align-items: center; gap: 4px; margin: 8px 8px 2px; padding-top: 6px; border-top: 1px solid var(--line); }
 /* Task-A01-wigwam308: the panel's two tabs (Presets, Custom) and the preset list. */
 .filter-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: -6px -4px 6px; padding: 0 6px; }
 .filter-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 13px; padding: 7px 12px 6px; margin-bottom: -1px; }

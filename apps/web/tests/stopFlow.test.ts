@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FILTER_STATES, HUMAN_COLUMN, allTicked, allBlockersDone, blockers, bothBanner, columnText, emptyBy, filterBanner, filterColumns, filterGroups, filterName, gridTicks, hiddenByFilter, isAll, isTicked, labelText, onTable, rowTicks, searchBanner, sideOf, storeFilter, tableFilter, taskCount, taskListBanners, tickAll, tickCell, tickRow, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions, PRESETS, SIDES, matchPreset, presetCount, presetFilter, presetName, presetTicks, type Preset } from "../src/stopFlow.ts";
+import { FILTER_STATES, HUMAN_COLUMN, allTicked, blockers, isBlocked, markBlocked, onlyBlocked, stateWord, bothBanner, columnText, emptyBy, filterBanner, filterColumns, filterGroups, filterName, gridTicks, hiddenByFilter, isAll, isTicked, labelText, onTable, rowTicks, searchBanner, sideOf, storeFilter, tableFilter, taskCount, taskListBanners, tickAll, tickCell, tickRow, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions, PRESETS, SIDES, matchPreset, presetCount, presetFilter, presetName, presetTicks, type Preset } from "../src/stopFlow.ts";
 import { AI_DECISIONS, BY_HUMAN, DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN } from "../src/stopFlow.ts";
 import type { Opened, State, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
@@ -40,32 +40,57 @@ test("waiting says who must act: you when no one is named", () => {
 });
 
 test("the list's stop fact: its name, then its text; a named person leads the text (Task-A01-cactus586)", () => {
-  assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "approve the card" }), [], t), { name: "pane.waiting_on", text: "approve the card" });
+  assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "approve the card" }), [], t), { name: "pane.waiting_on", text: "approve the card", kind: "waiting" });
   assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "reply on licence", who: "Ann" }), [], t), {
     name: "pane.waiting_on",
     text: "Waiting for Ann: reply on licence",
+    kind: "waiting",
   });
-  const blocker = task({ id: "A01-17", state: "done" });
-  const me = task({ state: "blocked", blocked_by: ["A01-17"] });
-  assert.deepEqual(stopFact(me, [blocker, me], t), { name: "pane.blocked_by", text: "A01-17 (Done) — all finished; unblock it?" });
+  const blocker = task({ id: "A01-17", state: "in_progress" });
+  const me = task({ state: "backlog", blocked_by: ["A01-17"] });
+  assert.deepEqual(stopFact(me, [blocker, me], t), { name: "pane.blocked_by", text: "A01-17 (In progress)", kind: "blocked" });
+  assert.equal(stopFact(me, [{ ...blocker, state: "done" }, me], t), null, "a finished blocker holds nothing back");
   assert.equal(stopFact(task({ state: "in_progress" }), [], t), null);
 });
 
-test("blocked names each blocker with its state now; a dropped one is flagged, never done", () => {
+test("blocked is worked out from unfinished blockers; the task keeps its own state (decision 0026)", () => {
   const blocker = task({ id: "A01-17", state: "in_progress" });
-  const me = task({ state: "blocked", blocked_by: ["A01-17"] });
+  const me = task({ state: "backlog", blocked_by: ["A01-17"] });
   assert.equal(stopText(me, [blocker, me], t), "Blocked by A01-17 (In progress)");
-  assert.equal(allBlockersDone(me, [blocker, me]), false);
+  assert.equal(isBlocked(me, [blocker, me]), true);
+  assert.equal(stateWord(markBlocked([blocker, me])[1], t), "Backlog · blocked");
 
-  const done = { ...blocker, state: "done" as const };
-  assert.equal(stopText(me, [done, me], t), "Blocked by A01-17 (Done) — all finished; unblock it?");
-  assert.equal(allBlockersDone(me, [done, me]), true);
-  assert.equal(me.state, "blocked", "a left-over task only tells; the change that finishes a blocker moves it");
+  // Finished or dropped: no longer blocked, and the state stays backlog (nothing makes it ready).
+  for (const state of ["done", "dropped"] as const) {
+    const all = markBlocked([{ ...blocker, state }, me]);
+    assert.equal(isBlocked(all[1]), false, state);
+    assert.equal(stopText(all[1], all, t), null, state);
+    assert.equal(all[1].state, "backlog", state);
+    assert.equal(stateWord(all[1], t), "Backlog", state);
+  }
+  // A finished task is never blocked; a blocker not in the taskbag still blocks.
+  assert.equal(isBlocked(task({ state: "done", blocked_by: ["A01-17"] }), [blocker]), false);
+  assert.deepEqual(blockers(task({ blocked_by: ["A09-09"] }), []), [{ id: "A09-09", state: null }]);
+  assert.equal(isBlocked(task({ blocked_by: ["A09-09"] }), []), true);
+});
 
-  const dropped = { ...blocker, state: "dropped" as const };
-  assert.equal(stopText(me, [dropped, me], t), "Blocked by A01-17 (dropped) — all finished; unblock it?");
-  assert.equal(allBlockersDone(me, [dropped, me]), true, "a dropped blocker counts as finished");
-  assert.deepEqual(blockers(task({ state: "blocked", blocked_by: ["A09-09"] }), []), [{ id: "A09-09", state: null }]);
+test("waiting and blocked at once say both (decision 0026)", () => {
+  const blocker = task({ id: "A01-17", state: "ready" });
+  const me = task({ state: "waiting", waiting_on: "approve the card", blocked_by: ["A01-17"] });
+  assert.equal(stopText(me, [blocker, me], t), "Waiting for you: approve the card · Blocked by A01-17 (Ready)");
+  assert.equal(stopFact(me, [blocker, me], t)?.kind, "waiting", "waiting first");
+});
+
+test("markBlocked keeps each task's open blockers; the list reads them, not the taskbag again", () => {
+  const a = task({ id: "A-1", state: "done" });
+  const b = task({ id: "A-2", state: "ready" });
+  const c = task({ id: "A-3", state: "ready", blocked_by: ["A-1", "A-2"] });
+  const [, , marked] = markBlocked([a, b, c]);
+  assert.deepEqual(marked.open_blockers, ["A-2"]);
+  assert.equal(isBlocked(marked), true);
+  const [, , freed] = markBlocked([a, { ...b, state: "dropped" }, marked]);
+  assert.deepEqual(freed.open_blockers, []);
+  assert.equal(isBlocked(freed), false);
 });
 
 // Decision 0020 (Task-A01-petal376): the table's labels, built-in first, then this project's own.
@@ -84,17 +109,25 @@ test("the grid's columns: Checked by a human first, then every other label of th
 
 test("everything ticked lists every task; a row with nothing ticked lists none of its state", () => {
   const waiting = task({ state: "waiting", waiting_on: "x" });
-  const blocked = task({ state: "blocked", blocked_by: ["A01-17"], labels: [AI_DECISIONS] });
+  const blocked = task({ state: "backlog", blocked_by: ["A01-17"], open_blockers: ["A01-17"], labels: [AI_DECISIONS] });
   const kinds = [waiting, blocked, task({ state: "done", labels: [LOCALLY_BY_HUMAN] }), task({ labels: ["shipped", "not in the table"] })];
   for (const x of kinds) assert.equal(keepState(all, x), true, x.state);
   assert.equal(isAll(all), true);
   assert.equal(keepState(only("waiting"), waiting), true);
   assert.equal(keepState(only("waiting"), blocked), false);
-  assert.equal(keepState(only("waiting", "blocked"), blocked), true, "several rows: either one");
-  const noBlocked = tickRow(all, "blocked", false);
-  assert.equal(keepState(noBlocked, blocked), false);
-  assert.equal(keepState(noBlocked, task({ state: "blocked" })), false, "every blocked task, whatever its labels");
-  assert.equal(keepState(noBlocked, waiting), true, "other rows untouched");
+  assert.equal(keepState(only("waiting", "backlog"), blocked), true, "several rows: either one");
+  const noBacklog = tickRow(all, "backlog", false);
+  assert.equal(keepState(noBacklog, blocked), false, "a blocked task is in its own state's row");
+  assert.equal(keepState(noBacklog, task({ state: "backlog" })), false, "every backlog task, whatever its labels");
+  assert.equal(keepState(noBacklog, waiting), true, "other rows untouched");
+  // Only blocked tasks goes with the grid's ticks (decision 0026).
+  const onlyB = onlyBlocked(all, true);
+  assert.equal(isAll(onlyB), false);
+  assert.equal(keepState(onlyB, blocked), true);
+  assert.equal(keepState(onlyB, waiting), false);
+  assert.equal(keepState(onlyBlocked(only("ready"), true), blocked), false, "blocked, but not ready");
+  assert.deepEqual(readFilter(storeFilter(onlyB)), { off: [], labels: [], blocked: true });
+  assert.equal(filterName(onlyB, t), "Only blocked tasks");
   assert.equal(isAll(only("done")), false);
 });
 
@@ -191,7 +224,7 @@ test("the filter is named as the Show button words it: what it hides", () => {
   assert.equal(filterName(tickRow(all, "backlog", false), t), "Hide Backlog");
   assert.equal(filterName(tickCell(tickRow(all, "dropped", false), "done", HUMAN_COLUMN, "yes", false), t), "Hide Done · Checked by a human: yes, Dropped", "in the grid's order of rows");
   assert.equal(filterName(tickCell(all, "ready", LOCALLY_BY_AGENT, "no", false), t), "Hide Ready · locally verified by agent: no");
-  assert.equal(filterName(only("done"), t), "Filtered (6 hidden)");
+  assert.equal(filterName(only("done"), t), "Filtered (5 hidden)");
   assert.equal(labelText(DEPLOYED_BY_AGENT, t), "deployed and verified by agent");
   assert.equal(labelText("our own label", t), "our own label");
 });
@@ -350,26 +383,26 @@ const plain = (w: Words) => w.map((x) => (x.strong ? `**${x.text}**` : x.text)).
 
 test("the filter leaves out groups with no match and keeps the whole list for the count", () => {
   const groups = [
-    { key: "a", tasks: [task({ id: "A-1", state: "blocked" }), task({ id: "A-2", state: "done" })] },
+    { key: "a", tasks: [task({ id: "A-1", state: "waiting" }), task({ id: "A-2", state: "done" })] },
     { key: "b", tasks: [task({ id: "B-1", state: "done" })] },
     { key: "c", tasks: [] },
   ];
   assert.equal(filterGroups(groups, all), groups);
-  const kept = filterGroups(groups, only("blocked"));
+  const kept = filterGroups(groups, only("waiting"));
   assert.deepEqual(kept.map((g) => g.key), ["a"]);
   assert.deepEqual(kept[0].tasks.map((x) => x.id), ["A-1"]);
   assert.equal(kept[0].counted?.length, 2);
-  assert.deepEqual(filterGroups(groups, only("waiting")), []);
+  assert.deepEqual(filterGroups(groups, only("ready")), []);
 });
 
 test("the filter banner counts tasks and the groups left out", () => {
   assert.deepEqual(filterBanner(all, { kind: "area", tasks: 3, groups: 2, total: 7 }, t), []);
   assert.equal(
-    plain(filterBanner(only("blocked"), { kind: "area", tasks: 3, groups: 2, total: 7 }, t)),
+    plain(filterBanner(only("backlog"), { kind: "area", tasks: 3, groups: 2, total: 7 }, t)),
     "**3 tasks** match the filter, in 2 of 7 areas. The 5 areas with none are left out.",
   );
   assert.equal(
-    plain(filterBanner(only("blocked"), { kind: "iteration", tasks: 1, groups: 1, total: 2 }, t)),
+    plain(filterBanner(only("backlog"), { kind: "iteration", tasks: 1, groups: 1, total: 2 }, t)),
     "**1 task** matches the filter, in 1 of 2 iterations. The 1 iteration with none is left out.",
   );
   assert.equal(plain(filterBanner(only("ready"), { kind: "area", tasks: 4, groups: 3, total: 3 }, t)), "**4 tasks** match the filter, in 3 areas.");
@@ -377,10 +410,10 @@ test("the filter banner counts tasks and the groups left out", () => {
 
 test("nothing matches: only the banner, saying every group is left out", () => {
   assert.equal(
-    plain(filterBanner(only("blocked"), { kind: "iteration", tasks: 0, groups: 0, total: 12 }, t)),
+    plain(filterBanner(only("backlog"), { kind: "iteration", tasks: 0, groups: 0, total: 12 }, t)),
     "No task matches the filter. All 12 iterations are left out.",
   );
-  assert.equal(plain(filterBanner(only("blocked"), { kind: "area", tasks: 0, groups: 0, total: 1 }, t)), "No task matches the filter. The only area is left out.");
+  assert.equal(plain(filterBanner(only("backlog"), { kind: "area", tasks: 0, groups: 0, total: 1 }, t)), "No task matches the filter. The only area is left out.");
   assert.equal(plain(filterBanner(only("done"), { kind: "area", tasks: 0, groups: 0, total: 0 }, t)), "No task matches the filter.");
 });
 
@@ -394,12 +427,12 @@ test("while searching, the filter banner says the list is the filter and the sea
     "Filter and search together: only tasks that match the filter and hold “x” are listed, in 2 iterations. 1 more match is hidden by the filter.",
   );
   assert.equal(
-    plain(bothBanner(only("blocked"), { kind: "area", query: "alm", tasks: 0, groups: 0, matches: 3 }, t)),
+    plain(bothBanner(only("backlog"), { kind: "area", query: "alm", tasks: 0, groups: 0, matches: 3 }, t)),
     "None of the tasks found for “alm” matches the filter. All 3 matches are hidden by the filter.",
   );
-  assert.equal(plain(bothBanner(only("blocked"), { kind: "area", query: "alm", tasks: 0, groups: 0, matches: 1 }, t)), "None of the tasks found for “alm” matches the filter. The 1 match is hidden by the filter.");
+  assert.equal(plain(bothBanner(only("backlog"), { kind: "area", query: "alm", tasks: 0, groups: 0, matches: 1 }, t)), "None of the tasks found for “alm” matches the filter. The 1 match is hidden by the filter.");
   // Nothing found at all: "Nothing found" says so, not the banner; no filter: no filter banner.
-  assert.deepEqual(bothBanner(only("blocked"), { kind: "area", query: "zzz", tasks: 0, groups: 0, matches: 0 }, t), []);
+  assert.deepEqual(bothBanner(only("backlog"), { kind: "area", query: "zzz", tasks: 0, groups: 0, matches: 0 }, t), []);
   assert.deepEqual(bothBanner(all, { kind: "area", query: "alm", tasks: 2, groups: 1, matches: 2 }, t), []);
 });
 
@@ -420,7 +453,7 @@ test("filter and search narrow the task list together; clearing either falls bac
   const found = search(filtered);
   assert.deepEqual(found.map((g) => g.tasks.map((x) => x.id)), [["A-1"]]);
   const both = taskListBanners({ kind: "area", filter: only("waiting"), query: " alm ", groups, filtered, found, matches }, t);
-  assert.equal(plain(both.search), "**1 task** found for “alm” with the “Filtered (6 hidden)” filter on.");
+  assert.equal(plain(both.search), "**1 task** found for “alm” with the “Filtered (5 hidden)” filter on.");
   assert.equal(
     plain(both.filter),
     "Filter and search together: only tasks that match the filter and hold “alm” are listed, in 1 area. 2 more matches are hidden by the filter.",
@@ -434,7 +467,7 @@ test("filter and search narrow the task list together; clearing either falls bac
   assert.equal(plain(searchOnly.search), "**3 tasks** found for “alm”.");
   assert.deepEqual(searchOnly.filter, []);
   // Every match hidden by the filter: no search banner, the filter banner says why.
-  const none = taskListBanners({ kind: "area", filter: only("blocked"), query: "alm", groups, filtered: [], found: [], matches }, t);
+  const none = taskListBanners({ kind: "area", filter: only("backlog"), query: "alm", groups, filtered: [], found: [], matches }, t);
   assert.deepEqual(none.search, []);
   assert.equal(plain(none.filter), "None of the tasks found for “alm” matches the filter. All 3 matches are hidden by the filter.");
 });
@@ -458,9 +491,9 @@ const inStates = (...states: State[]) => everyTask.filter((x) => states.includes
 test("each row preset ticks its rows whole, nothing else", () => {
   const rows: Record<string, State[]> = {
     all: FILTER_STATES,
-    not_finished: ["backlog", "ready", "in_progress", "waiting", "blocked"],
+    not_finished: ["backlog", "ready", "in_progress", "waiting"],
     ready: ["ready"],
-    in_hand: ["in_progress", "waiting", "blocked"],
+    in_hand: ["in_progress", "waiting"],
     finished: ["done", "dropped"],
   };
   for (const [p, states] of Object.entries(rows)) {
@@ -477,7 +510,7 @@ test("Needs you ticks the grid as the approver set it (2026-11-08)", () => {
     filterColumns(f).flatMap((c) => SIDES.filter((side) => isTicked(f, s, c, side)).map((side) => `${c || "human"}:${side}`));
   assert.deepEqual(ticked("done"), ["human:no", `${AI_DECISIONS}:yes`]);
   assert.equal(rowTicks(f, "waiting"), "all");
-  for (const s of ["backlog", "ready", "in_progress", "blocked", "dropped"] as State[]) assert.deepEqual(ticked(s), [`${AI_DECISIONS}:yes`], s);
+  for (const s of ["backlog", "ready", "in_progress", "dropped"] as State[]) assert.deepEqual(ticked(s), [`${AI_DECISIONS}:yes`], s);
 });
 
 test("Needs you lists exactly alm human's three lists: to check, to answer, to review", () => {
@@ -515,8 +548,8 @@ test("the ticks of a preset show it: ✓ and the Show button's name; any change 
 });
 
 test("each preset says what it ticks and how many tasks it lists now", () => {
-  assert.equal(presetTicks("not_finished", t), "Backlog, Ready, In progress, Waiting, Blocked");
-  assert.equal(presetTicks("in_hand", t), "In progress, Waiting, Blocked");
+  assert.equal(presetTicks("not_finished", t), "Backlog, Ready, In progress, Waiting");
+  assert.equal(presetTicks("in_hand", t), "In progress, Waiting");
   assert.equal(presetTicks("finished", t), "Done, Dropped");
   assert.equal(presetTicks("ready", t), "Ready");
   assert.match(presetTicks("needs_you", t), /AI decisions to review/);

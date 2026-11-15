@@ -21,7 +21,7 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0013](./0013-product-name-fliphopper.md) | The product is called FlipHopper; a project's data is its seabag, always in `.fliphopper/seabag/` | Superseded by 0015 (2026-10-10) |
 | [0014](./0014-main-purpose-and-three-sets.md) | Main purpose: switch between AI agents and teammates; three sets (main, AI skills, progress management) | Superseded by 0024 on 2026-11-12 |
 | [0015](./0015-product-name-allomos.md) | The product is called Allomos (换肩); a project's data is its taskbag, always in `.allomos/taskbag/` | Accepted 2026-10-10 |
-| [0016](./0016-waiting-and-blocked-states.md) | Waiting on a person and blocked by another task are two different states (`waiting` narrowed, new `blocked`) | **Accepted** 2026-10-14 |
+| [0016](./0016-waiting-and-blocked-states.md) | Waiting on a person and blocked by another task are two different states (`waiting` narrowed, new `blocked`) | **Accepted** 2026-10-14; the `blocked` state replaced by 0026 on 2026-11-15 |
 | [0017](./0017-agents-run-git-not-alm.md) | `alm` and the app never run Git; each change tells the agent the exact Git commands to share it | **Accepted** 2026-10-14 |
 | [0018](./0018-mcp-deferred-agents-use-alm.md) | MCP is deferred: agents use the `alm` command; Iteration 3 is closed | **Accepted** 2026-10-24 |
 | [0019](./0019-several-project-folders.md) | One taskbag tracks several project folders, each with a short name; each task names its folders (`allomos/6`) | **Accepted** 2026-10-25 |
@@ -31,3 +31,5 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0023](./0023-full-automatic-agent-orchestration.md) | Allomos may orchestrate agents fully automatically (scheduling, assigning to agents and accounts, chaining, switching on quota); outside effects and releases still need approval; replaces PLAN's non-goal | Accepted 2026-11-12 (direction; limits left to later tasks) |
 | [0024](./0024-positioning-switching-not-tied-to-any-agent.md) | What Allomos is: switching not tied to any one agent, plus approvals people can read and give on the go; fully automatic assigning and handing on (0023) is the engine; progress management kept as views; AI skills kept as in 0014; replaces 0014 | Accepted 2026-11-12; corrected 2026-11-13 |
 | [0025](./0025-records-shown-by-task-state.md) | 给人看的记录：代理先写给人看的话；应用按任务的状态先显示要看的部分；AI 决定分三种，用户看得到的和实现方法的原理要审，其他细节只记下；固定的词用任务语言显示 | 已接受 2026-11-13 |
+| [0026](./0026-blocked-is-computed-not-a-state.md) | 「被阻塞」不再是状态：由 `blocked_by` 里没结束的前置任务算出；设前置任务不改状态，前置完成后任务保持原状态；被阻塞和等人可以同时成立；替代 0016 的 `blocked` 状态和自动转就绪（`allomos/9`） | 已接受 2026-11-15 |
+| [0027](./0027-what-counts-as-high-risk.md) | 什么算高风险：H1–H7 高、M1–M4 中、其余低；由代理用 `alm classify` 判断，Allomos 只显示和排序；项目可以加规则、不能去掉 H1–H7；两条限制做成项目设置「风险管理」里的开关，默认关；旧任务只补最近一个月 | 已接受 2026-11-15 |

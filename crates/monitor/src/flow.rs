@@ -84,10 +84,6 @@ pub struct Run {
     pub stopping: bool,
     /// When it last checked for a ready task (ms).
     pub checked: i64,
-    /// What the last sweep (at the start and on Check now) let go on because their blockers had
-    /// finished, until the next check: the app's line under the status bar.
-    #[serde(default)]
-    pub unblocked: Vec<Unblocked>,
     /// Tabs of finished tasks whose 30-second countdown to close them has not ended yet. Kept in
     /// the run's file so a run that resumes after it was ended early starts the countdown again
     /// (A03-pocket537).
@@ -101,14 +97,6 @@ pub struct Closing {
     /// The agent whose session the tab shows.
     pub agent: String,
     pub tab: SessionTab,
-}
-
-/// A task a sweep let go on, and the state it went back to (`ready`, or `in_progress` when
-/// someone holds it).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Unblocked {
-    pub id: String,
-    pub state: String,
 }
 
 /// What the monitor tells the person when it is stuck: a task waiting on them. (A quiet monitor
@@ -144,7 +132,6 @@ impl Run {
             working: Vec::new(),
             stopping: false,
             checked: now - i64::from(every) * 60_000,
-            unblocked: Vec::new(),
             closing: Vec::new(),
         }
     }
@@ -351,8 +338,7 @@ fn seen_of(task: Option<&Task>) -> String {
     .unwrap_or_default()
 }
 
-/// One session's task as it is now: none when it is finished (done, dropped, waiting or
-/// blocked; held by no one after being claimed; left `ready` without ever being held; gone).
+/// One session's task as it is now: none when it is finished (done, dropped or waiting; held by no one after being claimed; left `ready` without ever being held; gone).
 fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Option<Working> {
     let task = tasks.iter().find(|t| t.id == cur.id);
     let seen = seen_of(task);
@@ -362,7 +348,7 @@ fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Option<Working> {
         Some(t) => {
             matches!(
                 t.state,
-                State::Done | State::Dropped | State::Waiting | State::Blocked
+                State::Done | State::Dropped | State::Waiting
             ) || (t.holder.is_none() && (seen_held || t.state != State::Ready))
         }
     };

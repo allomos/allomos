@@ -30,12 +30,18 @@
   "blocked_by_self": [
     "id"
   ],
+  "blocked_state_old": [
+    "id"
+  ],
   "blocker_dropped": [
     "id",
     "blocker"
   ],
   "blocker_unknown": [
     "id"
+  ],
+  "blockers_need_upgrade": [
+    "format"
   ],
   "branch_invalid": [
     "name"
@@ -276,8 +282,11 @@
     "path"
   ],
   "not_blocked": [
+    "id"
+  ],
+  "not_blocked_by": [
     "id",
-    "state"
+    "blocker"
   ],
   "not_done": [
     "id",

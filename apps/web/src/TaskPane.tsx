@@ -48,7 +48,7 @@ import { paneFocus, type FocusPart } from "./paneFocusFlow";
 import { HandoverButton } from "./HandoverDialog";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
-import { blockerText, blockers, check, checkedLabel, chipLabels, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
+import { blockerText, blockers, check, checkedLabel, chipLabels, decisionDetails, decisionsToReview, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
 import { LabelChips } from "./LabelChips";
 import { checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
@@ -390,7 +390,6 @@ export function TaskPane({
                 disabled={busy}
               />
             )}
-            {draft.value === "blocked" && picker()}
           </>
         );
       case "blocked_by":
@@ -513,7 +512,7 @@ export function TaskPane({
       <div className="editor">
         {control(field)}
         {field === "waiting_on" && task.state !== "waiting" && <p className="muted small">{t("edit.waiting_on_hint")}</p>}
-        {field === "blocked_by" && task.state !== "blocked" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
+        {field === "blocked_by" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
         <div className="editor-buttons">
           <button type="button" className="primary" onClick={() => void save()} disabled={busy || !savable(field)}>
             {busy ? t("edit.saving") : t("edit.save")}
@@ -623,7 +622,8 @@ export function TaskPane({
   const rows: [string, ReactNode, EditField | null, string?, ReactNode?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
-    [t("pane.state"), stop ?? taskT(`state.${task.state}`), "state"],
+    // Decision 0026: a blocked task keeps its own state, said first ("Backlog · Blocked by A01-17 (in progress)").
+    [t("pane.state"), stop ? (task.state === "waiting" ? stop : `${taskT(`state.${task.state}`)} · ${stop}`) : taskT(`state.${task.state}`), "state"],
     // Always shown (approver, 2026-10-25), whatever the number of bound folders.
     [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
     // Always shown: a task with none counts as 3, marked as the default (Task-A01-actor813).
@@ -758,8 +758,9 @@ export function TaskPane({
           <AiDecidedBadge task={task} />
           <h3>{t("pane.ai_decisions")}</h3>
           <ul className="ai-decisions">
-            {(task.ai_decisions ?? []).map((d, i) => (
+            {decisionsToReview(task).map((d, i) => (
               <li key={`${d.at}-${i}`}>
+                {d.kind && <span className="muted small">{t(`pane.ai_decision_kind.${d.kind}` as Key)} · </span>}
                 {d.text}{" "}
                 <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
               </li>
@@ -777,6 +778,20 @@ export function TaskPane({
             </>
           )}
         </div>
+      )}
+      {decisionDetails(task).length > 0 && (
+        <details className="pane-check pane-details">
+          <summary>{t("pane.ai_details", { count: decisionDetails(task).length })}</summary>
+          <ul className="ai-decisions">
+            {decisionDetails(task).map((d, i) => (
+              <li key={`${d.at}-${i}`}>
+                {d.text}{" "}
+                <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">{t("pane.ai_details_hint")}</p>
+        </details>
       )}
       {focus.map(part)}
       {((task.approvals ?? []).length > 0 || onApprove) && (
@@ -1079,7 +1094,7 @@ export function HumanCheckBadge({ task }: { task: Task }) {
  * lists and the task pane; hovering says how many the history holds. */
 export function AiDecidedBadge({ task }: { task: Task }) {
   const { t } = useI18n();
-  const count = task.ai_decisions?.length ?? 0;
+  const count = decisionsToReview(task).length;
   return (
     <span className="badge ai-decided" title={count > 0 ? t("task.ai_decided_title", { count }) : t("label.meaning.ai_decisions")}>
       {t("task.ai_decided")}
