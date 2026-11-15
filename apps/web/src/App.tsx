@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import type { ComponentProps, CSSProperties, ReactNode, RefObject } from "react";
 import { LANGUAGES, LANGUAGE_NAMES, TaskLanguageProvider, useI18n, useTaskT } from "./i18n";
 import type { Language, Message } from "./i18n";
 import { usePaced } from "./usePaced";
@@ -1916,6 +1916,7 @@ function TaskbagView({
                   onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
                   onProceed={canOpenSessions ? setProceeding : undefined}
                   onError={onError}
+                  stateMenu={{ ownerName, onSaveName: saveOwnerName, onEdit: editTask }}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
                   terms={terms}
@@ -2146,6 +2147,7 @@ function TaskGroup({
   onOpenSession,
   onProceed,
   onError,
+  stateMenu,
   monitor,
 }: {
   /** The section's element ID, so a link can bring it into view (Task-A03-meteor649). */
@@ -2195,6 +2197,8 @@ function TaskGroup({
    * (Task-A01-voyage603); the desktop app only. */
   onProceed?: (task: Task) => void;
   onError: (e: unknown) => void;
+  /** The rows' state menu (Task-A01-frost005). */
+  stateMenu?: ComponentProps<typeof TaskRow>["stateMenu"];
   /** The active iteration's Monitor ready tasks button, or its status bar (Task-A03-moth285). */
   monitor?: ReactNode;
 }) {
@@ -2262,6 +2266,7 @@ function TaskGroup({
               onOpenSession={onOpenSession}
               onProceed={onProceed}
               onError={onError}
+              stateMenu={stateMenu}
             />
           ))}
         </ul>

@@ -195,3 +195,36 @@ export function changedVersion(e: unknown): string | null {
   const p = e as { code?: unknown; params?: Record<string, unknown> };
   return p.code === "task_changed" && typeof p.params?.version === "string" ? p.params.version : null;
 }
+
+/** Why a state is greyed out in a state menu (Task-A01-frost005), so no greyed-out choice is
+ * unexplained: in progress comes only from an agent claiming the task; backlog as
+ * `backlogBlocked` says. Null when the state can be chosen. */
+export type StateWhy = { why: "claim" } | { why: "held"; holder: string } | { why: "finished" };
+
+/** One choice in the task list's state menu (Task-A01-frost005): the same states, in the same
+ * order and greyed out by the same rule as the task pane's state menu. */
+export interface StateItem {
+  state: State;
+  /** The task's state now: shown ticked; choosing it changes nothing. */
+  current: boolean;
+  disabled: boolean;
+  why: StateWhy | null;
+}
+
+export function stateItems(task: Task): StateItem[] {
+  return stateChoices(task).map((s) => {
+    const disabled = s !== task.state && stateDisabled(task, s);
+    const why: StateWhy | null = !disabled ? null : s === "in_progress" ? { why: "claim" } : backlogBlocked(task);
+    return { state: s, current: s === task.state, disabled, why };
+  });
+}
+
+/** The change the task list's state menu sends for `state` (Task-A01-frost005), built as the task
+ * pane builds it; null when there is nothing to send yet: the state the task is in, a greyed-out
+ * one, or Waiting with no "waiting on" written (the pane asks for it the same way). */
+export function stateMenuEdit(task: Task, state: State, waitingOn = "", who = ""): Edit | null {
+  const item = stateItems(task).find((i) => i.state === state);
+  if (!item || item.disabled || item.current) return null;
+  if (state === "waiting" && !waitingOn.trim()) return null;
+  return toEdit("state", { ...startDraft(task, "state"), value: state, waitingOn, who });
+}

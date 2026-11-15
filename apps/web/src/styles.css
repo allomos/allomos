@@ -843,6 +843,20 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }
 .sort-popover button[role="menuitemcheckbox"]::before { content: ""; position: absolute; left: 11px; top: 50%; width: 11px; height: 11px; margin-top: -6.5px; border: 1px solid var(--muted); border-radius: 3px; }
 .sort-popover button[role="menuitemcheckbox"][aria-checked="true"]::before { content: "✓"; border-color: var(--accent); font-size: 10px; line-height: 11px; text-align: center; }
+/* Task-A01-frost005: the task list's state menu. The state word is a button that looks like the
+   word; the list opens under it, styled as the sort menu, a greyed-out state's reason under it. */
+.state-menu { position: relative; display: inline-block; }
+button.state-menu-button { font: inherit; color: inherit; border: none; cursor: pointer; }
+button.state-menu-button:hover { text-decoration: underline; text-underline-offset: 2px; }
+.state-popover { min-width: 220px; max-width: 320px; cursor: default; }
+.state-popover .state-item { display: flex; flex-direction: column; }
+.state-popover button:disabled { color: var(--muted); cursor: not-allowed; background: none; }
+.state-popover .state-why { margin: 0 12px 4px 30px; }
+.state-popover .state-waiting { display: grid; gap: 6px; padding: 6px 12px; border-top: 1px solid var(--line); margin-top: 4px; }
+.state-popover .state-waiting .editor-buttons button { padding: 5px 12px; border: 1px solid var(--line); border-radius: 8px; text-align: center; }
+.state-popover .state-waiting .editor-buttons button.primary { border-color: var(--ink); }
+.state-popover .who-form { padding: 8px 12px; }
+.state-popover .who-form button { padding: 5px 12px; border: 1px solid var(--line); border-radius: 8px; text-align: center; }
 /* Task-A01-alpine458: the dependency tree. The tag beside the sort button while it is on; rows
    indented under the task that blocks them, with guide lines as in a folder tree. */
 .sort-menu { align-items: center; gap: 6px; }

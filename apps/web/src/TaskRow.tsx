@@ -21,7 +21,8 @@ import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toRe
 import { localTime } from "./timeFlow";
 import { difficultyOf, difficultyText } from "./difficultyFlow";
 import type { TreeRow } from "./depTreeFlow";
-import type { Task } from "./types";
+import type { Edit, Task } from "./types";
+import { StateMenu } from "./StateMenu";
 
 /** A row's place in the dependency tree (Task-A01-alpine458). */
 export interface TreeMark {
@@ -47,7 +48,11 @@ export function TaskRow({
   onOpenSession,
   onProceed,
   onError,
+  stateMenu,
 }: {
+  /** The state menu in the row (Task-A01-frost005): the person's name and the change to make;
+   * left out, the state is plain text. */
+  stateMenu?: { ownerName: string | null; onSaveName: (name: string) => Promise<void>; onEdit: (id: string, edit: Edit) => Promise<void> };
   /** Its place in the dependency tree, when the tree is on. */
   tree?: TreeMark;
   task: Task;
@@ -74,7 +79,12 @@ export function TaskRow({
     [
       t("pane.state"),
       <>
-        <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>
+        {/* Task-A01-frost005: the state word opens the state list; "Blocked" is only a note beside it. */}
+        {stateMenu ? (
+          <StateMenu task={task} ownerName={stateMenu.ownerName} onSaveName={stateMenu.onSaveName} onEdit={(edit) => stateMenu.onEdit(task.id, edit)} />
+        ) : (
+          <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>
+        )}
         {/* Decision 0026: blocked is worked out, shown beside the task's own state. */}
         {isBlocked(task) && <span className="fact-blocked s-blocked-text"> · {t("task.blocked_mark")}</span>}
       </>,
