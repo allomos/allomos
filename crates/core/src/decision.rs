@@ -321,7 +321,7 @@ mod tests {
             })
             .collect();
         assert_eq!(events[2].changes[0].extra[KIND], "detail");
-        assert!(events[3].changes[0].extra.get(KIND).is_none());
+        assert!(!events[3].changes[0].extra.contains_key(KIND));
         let all = &pending(&events)["A01-01"];
         let got: Vec<_> = all.iter().map(|d| (d.text.as_str(), d.kind)).collect();
         assert_eq!(got, kinds);
