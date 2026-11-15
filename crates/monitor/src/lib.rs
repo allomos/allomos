@@ -12,3 +12,4 @@ pub mod request;
 pub mod runner;
 pub mod session_tab;
 pub mod terminal;
+pub mod unreadable;

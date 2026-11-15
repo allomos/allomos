@@ -346,10 +346,8 @@ fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Option<Working> {
     let finished = match task {
         None => true,
         Some(t) => {
-            matches!(
-                t.state,
-                State::Done | State::Dropped | State::Waiting
-            ) || (t.holder.is_none() && (seen_held || t.state != State::Ready))
+            matches!(t.state, State::Done | State::Dropped | State::Waiting)
+                || (t.holder.is_none() && (seen_held || t.state != State::Ready))
         }
     };
     if finished {
