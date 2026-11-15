@@ -3731,6 +3731,96 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
 }
 
 #[test]
+fn ai_decisions_have_three_kinds_and_details_are_not_reviewed() {
+    // Task-A01-piglet562, decision 0025 § 3: `--kind visible|principle|detail`. A detail is kept
+    // with the task (`alm show`) but neither adds the label nor shows under To review.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "List 160px high",
+            "--kind",
+            "detail",
+        ],
+    );
+    assert_eq!(v["decision"]["kind"], "detail");
+    assert_eq!(v["ai_decisions"], json!([]));
+    assert_eq!(v["ai_details"].as_array().unwrap().len(), 1);
+    assert!(
+        task_file(&repo, "A01-01").get("labels").is_none(),
+        "no label for a detail"
+    );
+    assert_eq!(ok(&repo, &["human"])["to_review"], json!([]));
+    refused(&repo, &["reviewed", "A01-01"], 1, "nothing_to_review");
+    let out = alm(&repo, &["show", "A01-01"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("AI decided (details, not reviewed):"),
+        "{text}"
+    );
+    assert!(text.contains("- [detail] List 160px high (a, "), "{text}");
+    let out = alm(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "x", "--kind", "other"],
+    );
+    assert!(!out.status.success(), "an unknown kind is refused");
+
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "Find the worktree by working branch",
+            "--kind",
+            "principle",
+        ],
+    );
+    let out = alm(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "Button says Reviewed"],
+    );
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("has no kind, so it waits for review"),
+        "{text}"
+    );
+    assert_eq!(
+        task_file(&repo, "A01-01")["labels"],
+        json!(["AI decisions to review"])
+    );
+    let v = ok(&repo, &["human"]);
+    let texts: Vec<&str> = v["to_review"][0]["ai_decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            "Find the worktree by working branch",
+            "Button says Reviewed"
+        ]
+    );
+    assert_eq!(v["to_review"][0]["ai_decisions"][0]["kind"], "principle");
+    let out = alm(&repo, &["human"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("To review: AI decisions (1)"), "{text}");
+    assert!(!text.contains("160px"), "{text}");
+    // A review takes all three off, the detail with them; the history keeps them.
+    let v = ok(&repo, &["--as", "will", "reviewed", "A01-01"]);
+    assert_eq!(v["reviewed"].as_array().unwrap().len(), 3);
+    assert_eq!(ok(&repo, &["show", "A01-01"])["ai_decisions"], json!([]));
+}
+
+#[test]
 fn handoff_rules_have_defaults_overrides_and_refusals() {
     let repo = filled();
     let v = ok(&repo, &["handoff-rules"]);

@@ -612,6 +612,8 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .badge.ai-decided { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--ok-bg); color: var(--ok); border: 1px dashed var(--ok); }
 .pane-review h3, .pane-review .ai-decisions { flex-basis: 100%; margin: 0; }
 .pane-review .ai-decisions { padding-left: 20px; }
+.pane-details summary { cursor: pointer; }
+.pane-details .ai-decisions { padding-left: 20px; margin: 6px 0; }
 /* Task-A01-baker800: Approve… shows the plan being approved, as it is; Withdraw… asks why. */
 .pane-approvals h3, .pane-approvals .approvals, .pane-approvals .banner, .pane-approvals .editor { flex-basis: 100%; margin: 0; }
 .pane-approvals .approvals { padding-left: 20px; }
