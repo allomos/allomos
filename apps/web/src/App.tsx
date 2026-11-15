@@ -1578,7 +1578,8 @@ function TaskbagView({
   const drawn: (Group & { rows?: TreeRow[] })[] = depTree
     ? found.map((g) => {
         const rows = depTreeRows(g.tasks, searching ? [] : treeFolded, idRank);
-        return { ...g, rows, tasks: rows.map((r) => r.task) };
+        // The group's count and progress still cover the tasks a fold hides.
+        return { ...g, rows, tasks: rows.map((r) => r.task), counted: g.counted ?? g.tasks };
       })
     : found;
   // A blocker that is not shown in the task's group: "ID · where it is", with the whole story on hover.
