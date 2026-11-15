@@ -37,7 +37,7 @@ import {
   stateCounts,
   workedFor,
 } from "./monitorFlow";
-import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent} from "./monitorFlow";
+import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -86,8 +86,6 @@ export function useMonitor({
   const [now, setNow] = useState(() => Date.now());
   /** The runs seen at the last read: one gone since then has ended. */
   const seen = useRef<Map<string, Run>>(new Map());
-  /** The sweep notices the person closed, by run and check. */
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const read = useCallback(async () => {
     let list: unknown[];
@@ -333,7 +331,6 @@ export function MonitorControl({
   onOpen,
   onEdit,
   onOpenSession,
-  onOpenTask,
   onError,
   onNeedYou,
 }: {
@@ -347,8 +344,6 @@ export function MonitorControl({
   /** Opens Edit monitor… for a run (A03-yolk481). */
   onEdit: (run: Run) => void;
   onOpenSession: (id: string) => Promise<void>;
-  /** Opens a task the monitor's line names (Task-A01-steam936). */
-  onOpenTask?: (id: string) => void;
   onError: (e: unknown) => void;
   /** Picks the Show filter's "Needs you" preset (Task-A01-wigwam308): "K need you" is then a link. */
   onNeedYou?: () => void;
@@ -431,7 +426,6 @@ export function MonitorControl({
               onToggle={() => folds.toggle(run.id)}
               onEdit={() => onEdit(run)}
               onOpenSession={onOpenSession}
-              onOpenTask={onOpenTask}
               onError={onError}
             />
           ))}
@@ -467,7 +461,6 @@ function RunPanel({
   onToggle,
   onEdit,
   onOpenSession,
-  onOpenTask,
   onError,
 }: {
   run: Run;
@@ -479,11 +472,9 @@ function RunPanel({
   onToggle: () => void;
   onEdit: () => void;
   onOpenSession: (id: string) => Promise<void>;
-  onOpenTask?: (id: string) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
-  const notice = monitor.notice(run);
   const free = freeAgents(run);
   const late = stalled(run, now);
   // With several sessions, the badge counts the quiet ones.
@@ -623,7 +614,4 @@ function SessionRow({
       )}
     </li>
   );
-}
-
-
 }

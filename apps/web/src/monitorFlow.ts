@@ -220,6 +220,8 @@ export interface Run {
   stopping: boolean;
   /** When it last checked for a ready task (ms). */
   checked: number;
+  /** When the next check is due (ms). */
+  next: number;
 }
 
 /** An `alm monitor run` process this computer runs with no run file: running, record missing.

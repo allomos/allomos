@@ -27,6 +27,7 @@ import { MANUAL, requestWay } from "./agentPickerFlow";
 import { canTakeOver, edited, hasUnpushed, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
 import type { FormerWorktree } from "./proceedFlow";
 import { agoText, clockText, doingText, heldFact } from "./heartbeatFlow";
+import { isBlocked } from "./stopFlow";
 import { isProblem } from "./types";
 import type { Task } from "./types";
 
@@ -179,8 +180,8 @@ export function ProceedDialog({
         holder: <strong>{task.holder}</strong>,
         ago: silence!,
       })
-    : task.state === "blocked"
-      ? rich("proceed.found_blocked", { id: named, title: task.title, state: stateWord, by: (task.blocked_by ?? []).join(", ") })
+    : isBlocked(task)
+      ? rich("proceed.found_blocked", { id: named, title: task.title, state: stateWord, by: (task.open_blockers ?? []).join(", ") })
       : task.state === "waiting"
         ? rich("proceed.found_waiting", { id: named, title: task.title, state: stateWord, on: task.waiting_on ?? "" })
         : rich("proceed.found", { id: named, title: task.title, state: stateWord });
@@ -245,7 +246,7 @@ export function ProceedDialog({
                   )}
                   {!takeOver && task.state === "backlog" && <p className="banner update small">{t("proceed.backlog")}</p>}
                   <p>
-                    {t(held ? "takeover.does_held" : takeOver ? "takeover.does" : task.state === "blocked" ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
+                    {t(held ? "takeover.does_held" : takeOver ? "takeover.does" : isBlocked(task) ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
                   </p>
                   <p className="muted small">{t("proceed.how")}</p>
                   <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />

@@ -44,6 +44,13 @@ export function markBlocked(tasks: readonly Task[]): Task[] {
   });
 }
 
+/** The opened project with every task's open blockers worked out (`markBlocked`). */
+export function withBlocked(opened: Opened): Opened {
+  const bag = opened.loaded.taskbag;
+  if (!bag) return opened;
+  return { ...opened, loaded: { ...opened.loaded, taskbag: { ...bag, tasks: markBlocked(bag.tasks) } } };
+}
+
 /** The state as people read it (decision 0026): the state's word, with "· blocked" while the task
  * is blocked ("Backlog · blocked"). */
 export function stateWord(task: Task, t: T, taskT: T = t): string {
