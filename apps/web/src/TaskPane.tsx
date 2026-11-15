@@ -390,7 +390,6 @@ export function TaskPane({
                 disabled={busy}
               />
             )}
-            {draft.value === "blocked" && picker()}
           </>
         );
       case "blocked_by":
@@ -513,7 +512,7 @@ export function TaskPane({
       <div className="editor">
         {control(field)}
         {field === "waiting_on" && task.state !== "waiting" && <p className="muted small">{t("edit.waiting_on_hint")}</p>}
-        {field === "blocked_by" && task.state !== "blocked" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
+        {field === "blocked_by" && <p className="muted small">{t("edit.blocked_by_hint")}</p>}
         <div className="editor-buttons">
           <button type="button" className="primary" onClick={() => void save()} disabled={busy || !savable(field)}>
             {busy ? t("edit.saving") : t("edit.save")}
@@ -623,7 +622,8 @@ export function TaskPane({
   const rows: [string, ReactNode, EditField | null, string?, ReactNode?][] = [
     [t("pane.area"), area ? `${area.id} ${area.name}` : task.area, null],
     [t("pane.iteration"), iterationText, "iteration"],
-    [t("pane.state"), stop ?? taskT(`state.${task.state}`), "state"],
+    // Decision 0026: a blocked task keeps its own state, said first ("Backlog · Blocked by A01-17 (in progress)").
+    [t("pane.state"), stop ? (task.state === "waiting" ? stop : `${taskT(`state.${task.state}`)} · ${stop}`) : taskT(`state.${task.state}`), "state"],
     // Always shown (approver, 2026-10-25), whatever the number of bound folders.
     [t("pane.folders"), (task.folders ?? []).join(", ") || null, "folders"],
     // Always shown: a task with none counts as 3, marked as the default (Task-A01-actor813).

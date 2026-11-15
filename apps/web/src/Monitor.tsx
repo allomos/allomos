@@ -35,10 +35,9 @@ import {
   sessionsOf,
   stalled,
   stateCounts,
-  unblockNotice,
   workedFor,
 } from "./monitorFlow";
-import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -87,8 +86,6 @@ export function useMonitor({
   const [now, setNow] = useState(() => Date.now());
   /** The runs seen at the last read: one gone since then has ended. */
   const seen = useRef<Map<string, Run>>(new Map());
-  /** The sweep notices the person closed, by run and check. */
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const read = useCallback(async () => {
     let list: unknown[];
@@ -200,10 +197,6 @@ export function useMonitor({
     lost,
     last,
     now,
-    /** The line under a run's status bar after its sweep let blocked tasks go on, until the next
-     * check or until closed. */
-    notice: (run: Run): UnblockNotice | null => (dismissed.has(`${run.id}:${run.checked}`) ? null : unblockNotice(run.unblocked)),
-    dismissNotice: (run: Run) => setDismissed((d) => new Set(d).add(`${run.id}:${run.checked}`)),
     start: (
       scope: Scope,
       agents: TerminalAgent[],
@@ -338,7 +331,6 @@ export function MonitorControl({
   onOpen,
   onEdit,
   onOpenSession,
-  onOpenTask,
   onError,
   onNeedYou,
 }: {
@@ -352,8 +344,6 @@ export function MonitorControl({
   /** Opens Edit monitor… for a run (A03-yolk481). */
   onEdit: (run: Run) => void;
   onOpenSession: (id: string) => Promise<void>;
-  /** Opens a task the monitor's line names (Task-A01-steam936). */
-  onOpenTask?: (id: string) => void;
   onError: (e: unknown) => void;
   /** Picks the Show filter's "Needs you" preset (Task-A01-wigwam308): "K need you" is then a link. */
   onNeedYou?: () => void;
@@ -436,7 +426,6 @@ export function MonitorControl({
               onToggle={() => folds.toggle(run.id)}
               onEdit={() => onEdit(run)}
               onOpenSession={onOpenSession}
-              onOpenTask={onOpenTask}
               onError={onError}
             />
           ))}
@@ -472,7 +461,6 @@ function RunPanel({
   onToggle,
   onEdit,
   onOpenSession,
-  onOpenTask,
   onError,
 }: {
   run: Run;
@@ -484,11 +472,9 @@ function RunPanel({
   onToggle: () => void;
   onEdit: () => void;
   onOpenSession: (id: string) => Promise<void>;
-  onOpenTask?: (id: string) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
-  const notice = monitor.notice(run);
   const free = freeAgents(run);
   const late = stalled(run, now);
   // With several sessions, the badge counts the quiet ones.
@@ -576,7 +562,6 @@ function RunPanel({
           )}
         </div>
       )}
-      {notice && <UnblockLine notice={notice} onOpenTask={onOpenTask} onClose={() => monitor.dismissNotice(run)} />}
     </div>
   );
 }
@@ -628,48 +613,5 @@ function SessionRow({
         </button>
       )}
     </li>
-  );
-}
-
-/** The line under the status bar after a sweep let blocked tasks go on (Task-A01-steam936,
- * approver 2026-11-08): which tasks, each one a link to it; kept until the next check or ×. */
-function UnblockLine({
-  notice,
-  onOpenTask,
-  onClose,
-}: {
-  notice: UnblockNotice;
-  onOpenTask?: (id: string) => void;
-  onClose: () => void;
-}) {
-  const { t } = useI18n();
-  const MARK = "\u0000";
-  return (
-    <span className="monitor-notice muted small" role="status">
-      {notice.groups.map((g) => {
-        const [before, after = ""] = t(g.state === "ready" ? "monitor.unblocked_ready" : "monitor.unblocked_in_progress", { ids: MARK }).split(MARK);
-        return (
-          <span key={g.state}>
-            {before}
-            {g.ids.map((id, i) => (
-              <span key={id}>
-                {i > 0 && ", "}
-                {onOpenTask ? (
-                  <button type="button" className="link" onClick={() => onOpenTask(id)}>
-                    {id}
-                  </button>
-                ) : (
-                  id
-                )}
-              </span>
-            ))}
-            {after}{" "}
-          </span>
-        );
-      })}
-      <button type="button" className="link" aria-label={t("monitor.unblocked_close")} title={t("monitor.unblocked_close")} onClick={onClose}>
-        ×
-      </button>
-    </span>
   );
 }

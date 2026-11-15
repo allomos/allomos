@@ -95,6 +95,8 @@ problems! {
     TaskbagToUpgrade { found, current } => "taskbag_to_upgrade", "This taskbag is in {found}; this Allomos reads it but writes only {current}, whose labels have a new shape. Nothing was changed. Run `alm upgrade` (or Update the taskbag… in the Allomos app) first; older Allomos versions refuse an upgraded taskbag.";
     /// Task-A01-piano403: the state was written by a newer Allomos, or mistyped.
     StateUnknown { id, state } => "state_unknown", "{id} has the state {state}, which this version of Allomos does not know, so it does not change it. Update Allomos, or correct the state in its file.";
+    /// Decision 0026: a task still in the `blocked` state of a taskbag before `allomos/9`.
+    BlockedStateOld { id } => "blocked_state_old", "{id} has the state blocked, which is no longer a state: blocked is now worked out from its blockers. Upgrade the taskbag (`alm upgrade` says what that does): the task gets back the state it had before it was blocked.";
     InvalidChoice { value } => "invalid_choice", "{value} is not a valid value here: it must be a word in quotes.";
     InvalidId { id } => "invalid_id", "\"{id}\" is not a valid ID. Use 1–64 letters, digits, '-' or '_'.";
     WrongFormat { expected, found } => "wrong_format", "Expected \"{expected}\" but found \"{found}\". This version of Allomos reads only \"{expected}\".";
@@ -128,14 +130,18 @@ problems! {
     UnknownArea { area } => "unknown_area", "The area \"{area}\" does not exist. Add areas/{area}.json or use an existing area ID.";
     LabelNotInTable { label, labels } => "label_not_in_table", "\"{label}\" is not in this project's label table ({labels}).";
     WaitingOnMissing => "waiting_on_missing", "A waiting task must say what it is waiting on.";
-    /// A `blocked` task names no blocking task (decision 0016, Task-A01-31).
-    BlockedByMissing => "blocked_by_missing", "A blocked task must name the task(s) that must finish first: `alm block <id> --by <task-id>`.";
+    /// `alm block` names no blocking task.
+    BlockedByMissing => "blocked_by_missing", "Name the task(s) that must finish first: `alm block <id> --by <task-id>`.";
     /// `blocked_by` names a task that is not in this taskbag.
     BlockerUnknown { id } => "blocker_unknown", "There is no task \"{id}\" in this taskbag, so it cannot block another task.";
     /// `blocked_by` names the task itself.
     BlockedBySelf { id } => "blocked_by_self", "Task {id} cannot be blocked by itself.";
-    /// `alm unblock` on a task that is not blocked.
-    NotBlocked { id, state } => "not_blocked", "Task {id} is {state}, not blocked, so there is nothing to unblock.";
+    /// `alm unblock` on a task that names no blockers.
+    NotBlocked { id } => "not_blocked", "Task {id} has no blockers, so there is nothing to take off.";
+    /// `alm unblock --by` names a task that is not among its blockers.
+    NotBlockedBy { id, blocker } => "not_blocked_by", "Task {id} is not blocked by {blocker}: `alm show {id}` lists its blockers.";
+    /// Blockers are changed only in a taskbag that works out `blocked` from them (`allomos/9`).
+    BlockersNeedUpgrade { format } => "blockers_need_upgrade", "This taskbag is in {format}, where blocked is still a state. Blockers can be changed after it is upgraded: `alm upgrade` says what that does.";
     /// A warning: a blocking task is dropped, so it will never be done (owner, 2026-10-14).
     BlockerDropped { id, blocker } => "blocker_dropped", "{blocker}, which blocks {id}, is dropped: a dropped blocker counts as finished, so it holds {id} back no longer.";
     /// `alm done --without-human-check` with no text, or the field empty in `task.json`
@@ -286,12 +292,12 @@ problems! {
     LinkNotFound { link } => "link_not_found", "The file \"{link}\" does not exist.";
     /// Allomos was started with a folder that does not exist or is not a folder.
     StartupNotAFolder { path } => "startup_not_a_folder", "Allomos was started with {path}, which is not a folder, so nothing was opened.";
-    /// Only an unheld backlog, waiting or blocked task can be made ready.
-    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog, waiting or blocked task that no one holds can be made ready.";
+    /// Only an unheld backlog or waiting task can be made ready.
+    CannotMakeReady { id, state } => "cannot_make_ready", "Task {id} is {state}; only a backlog or waiting task that no one holds can be made ready.";
     /// The app was asked to set a state that only another step sets (Task-A01-18).
     CannotSetState { id, state } => "cannot_set_state", "Task {id} cannot be set to {state} here: a task becomes in progress only when an agent claims it (`alm claim`).";
-    /// Back to backlog (Task-A01-lotus143): only an unheld ready, waiting or blocked task.
-    CannotBackToBacklog { id, state } => "cannot_back_to_backlog", "Task {id} is {state}; only a ready, waiting or blocked task that no one holds can go back to backlog. A held task is released first (`alm release`); a finished one is reopened (`alm reopen`).";
+    /// Back to backlog (Task-A01-lotus143): only an unheld ready or waiting task.
+    CannotBackToBacklog { id, state } => "cannot_back_to_backlog", "Task {id} is {state}; only a ready or waiting task that no one holds can go back to backlog. A held task is released first (`alm release`); a finished one is reopened (`alm reopen`).";
     /// `alm claim` while card files are kept outside the taskbag (Task-A03-27, approver
     /// 2026-10-18): the taskbag is updated first, then tasks are worked.
     ClaimCardsOutside { count, tasks } => "claim_cards_outside", "{count} task(s) keep their card files outside the taskbag ({tasks}), so no task can be claimed until they are moved in. First follow `alm guide move-cards`: it shows the person the plan before anything changes (in a quiet run, park that question with `alm wait` and stop). Then claim again.";

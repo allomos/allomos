@@ -12,6 +12,11 @@ export type FocusPart = "check_steps" | "question" | "blockers" | "handoff" | "d
  * toCheck); `lost`: the holder of an in-progress task is lost. */
 export function paneFocus(task: Task, toCheck: boolean, lost: boolean): FocusPart[] {
   const handoff = task.handoff_note?.trim() ? (["handoff"] as const) : [];
+  // Blocked is worked out, not a state (decision 0026): an open task that is blocked shows its
+  // blockers first, after the question when it also waits on a person.
+  if ((task.open_blockers?.length ?? 0) > 0 && task.state !== "done" && task.state !== "dropped") {
+    return task.state === "waiting" ? ["question", "blockers", ...handoff] : ["blockers", ...handoff];
+  }
   switch (task.state) {
     case "done":
       // To check: the steps a person follows. Otherwise the outcome, as the description says it.
@@ -19,8 +24,6 @@ export function paneFocus(task: Task, toCheck: boolean, lost: boolean): FocusPar
     case "waiting":
       // The question the task waits on, then where the work stopped.
       return ["question", ...handoff];
-    case "blocked":
-      return ["blockers", ...handoff];
     case "in_progress":
       // Lost or not, the handoff note says where the work is; a lost one has nothing else to go by.
       return lost ? [...handoff, "description"] : [...handoff];

@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v37)
+## Tasks: Allomos (v38)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -96,10 +96,12 @@ the project notes (below).
   prints the commands. With the setting off it does not remind you, and those pushes are not asked
   for; the rest stays. A branch with many WIP commits may be merged with a squash; never force-push.
 - Report progress: `alm label <id> "<label>"`.
-- Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`; blocked by
-  another task: `alm block <id> --by <task-id>`. When its last blocker finishes (done or
-  dropped), it goes on by itself; read its blockers' AI decisions before you start it. To let it
-  go on earlier: `alm unblock <id>`.
+- Stopped: waiting on a person: `alm wait <id> --on "<what>" [--who "<who>"]`. Another task
+  must finish first: `alm block <id> --by <task-id>`. Blocked is not a state: the task keeps its
+  state (backlog stays backlog) and is blocked while a blocker has not finished (done or
+  dropped); `alm next` does not list it until then. When its blockers finish, nothing changes in
+  it; read their AI decisions before you start it. To stop waiting for a blocker:
+  `alm unblock <id>`.
 - Stopping before it is done: `alm release <id> --note "<what the next one needs>"`.
 - Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
   another), ask the person to choose quiet or normal mode: show them what
@@ -220,7 +222,7 @@ and leave other changes as they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
-has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
+has proven) and **state** (backlog, ready, in progress, waiting, done, dropped). When
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),

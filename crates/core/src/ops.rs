@@ -76,6 +76,11 @@ pub fn find_task(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
 /// from a newer one) is refused, so it is never overwritten (Task-A01-piano403).
 pub fn find_task_to_move(taskbag: &Taskbag, id: &str) -> Result<Task, Problem> {
     let task = find_task(taskbag, id)?;
+    if task.old_blocked() {
+        return Err(Problem::BlockedStateOld {
+            id: task.id.clone(),
+        });
+    }
     if task.state.is_unknown() {
         return Err(Problem::StateUnknown {
             id: task.id.clone(),
@@ -719,15 +724,16 @@ pub fn set_session(
     Ok(Outcome::plain(task))
 }
 
-/// Clear what a stopped task waited on or was blocked by: it is moving on.
+/// Clear what a stopped task waited on: it is moving on. Its blockers stay: `blocked_by` is the
+/// recorded dependency, changed only by `alm block` and `alm unblock` (decision 0026).
 fn clear_stop(task: &mut Task) {
     task.waiting_on = None;
     task.who = None;
-    task.blocked_by.clear();
 }
 
 /// Park the task as `waiting`: a person (or an outside event) must act. `on` says what (required),
-/// `who` optionally who; without it the owner is meant (decision 0016). Blocking tasks are cleared.
+/// `who` optionally who; without it the owner is meant (decision 0016). Its blockers stay: a task
+/// may wait on a person and be blocked at once (decision 0026).
 pub fn wait(
     taskbag: &Taskbag,
     id: &str,
@@ -782,79 +788,47 @@ pub fn finished(state: Option<State>) -> bool {
     matches!(state, Some(State::Done | State::Dropped))
 }
 
-/// Whether a `blocked` task's blockers have all finished ([`finished`]: done or dropped).
-pub fn all_blockers_done(taskbag: &Taskbag, task: &Task) -> bool {
-    task.state == State::Blocked
-        && !task.blocked_by.is_empty()
-        && blockers(taskbag, task).iter().all(|b| finished(b.state))
+/// Whether the task is blocked (decision 0026): `blocked_by` still names a task that has not
+/// finished ([`finished`]: done or dropped). Not a state: worked out each time, so a task keeps
+/// its own state while it is blocked and after its blockers finish. A finished task is never
+/// blocked.
+pub fn is_blocked(taskbag: &Taskbag, task: &Task) -> bool {
+    !matches!(task.state, State::Done | State::Dropped)
+        && blockers(taskbag, task).iter().any(|b| !finished(b.state))
 }
 
-/// The first line of the handoff note of a task that was unblocked by itself
-/// ([`released`]), naming its blockers.
-pub fn released_note(blockers: &[String]) -> String {
-    format!(
-        "Unblocked automatically after {} finished; before starting, read their AI decisions and handoffs (`alm show <id>`), and change this task's plan if they changed what it needs.",
-        blockers.join(", ")
-    )
-}
-
-/// The blocked tasks that go on by themselves (Task-A01-tuna668, approver 2026-11-08): every
-/// `blocked` task in `taskbag` whose blockers have all finished ([`all_blockers_done`]). Each moves
-/// on as [`unblock`] moves it (`in_progress` when someone holds it, else `ready`; its blockers
-/// cleared), its handoff note starts with [`released_note`], and its history records why
-/// (a [`crate::event::REASON`] change). Unblocking is a logic step, not a judgement: the agent
-/// that takes the task checks whether its plan still holds. `taskbag` is the taskbag as it is
-/// after the change that finished a blocker; the caller writes each outcome as an `unblock`.
-pub fn released(taskbag: &Taskbag) -> Vec<Outcome> {
-    taskbag
-        .tasks
-        .iter()
-        .filter(|t| all_blockers_done(taskbag, t))
-        .map(|t| {
-            let mut task = t.clone();
-            let by = std::mem::take(&mut task.blocked_by);
-            clear_stop(&mut task);
-            task.state = if task.holder.is_some() {
-                State::InProgress
-            } else {
-                State::Ready
-            };
-            let note = released_note(&by);
-            task.handoff_note = Some(match task.handoff_note.take() {
-                Some(old) if !old.trim().is_empty() => format!("{note}\n\n{old}"),
-                _ => note,
-            });
-            let mut outcome = Outcome::plain(task);
-            outcome.recorded.push(crate::event::reason_change(&format!(
-                "automatic: its blockers {} have finished (done or dropped)",
-                by.join(", ")
-            )));
-            outcome
-        })
+/// The task's blockers that have not finished, each with its state now.
+pub fn open_blockers(taskbag: &Taskbag, task: &Task) -> Vec<Blocker> {
+    if matches!(task.state, State::Done | State::Dropped) {
+        return Vec::new();
+    }
+    blockers(taskbag, task)
+        .into_iter()
+        .filter(|b| !finished(b.state))
         .collect()
 }
 
-/// Mark the task `blocked` by other tasks in this taskbag that must finish first (`alm block`,
-/// decision 0016). `by` needs at least one ID; each must be a task here and not the task itself.
-/// A dropped blocker is allowed but warned about: it counts as finished, so it holds nothing back. What it waited on is
-/// cleared; a person part belongs in the task's next dependency.
-pub fn block(
+/// The task's blockers that have finished: whoever starts the task reads their AI decisions and
+/// handoffs first (decision 0026, detail h).
+pub fn finished_blockers(taskbag: &Taskbag, task: &Task) -> Vec<Blocker> {
+    blockers(taskbag, task)
+        .into_iter()
+        .filter(|b| finished(b.state))
+        .collect()
+}
+
+/// The IDs in `by` (commas split, blanks dropped, each once), each a task of this taskbag and not
+/// `task` itself; a dropped one is allowed but warned about.
+fn blocker_ids(
     taskbag: &Taskbag,
-    id: &str,
-    me: Option<&str>,
+    task: &Task,
     by: &[String],
-) -> Result<Outcome, Problem> {
-    let mut task = find_task_to_move(taskbag, id)?;
-    check_holder(&task, me)?;
-    check_open(&task, &[State::Done, State::Dropped])?;
+) -> Result<(Vec<String>, Vec<Problem>), Problem> {
     let mut ids: Vec<String> = Vec::new();
     for b in by.iter().flat_map(|b| b.split(',')).map(str::trim) {
         if !b.is_empty() && !ids.iter().any(|x| x == b) {
             ids.push(b.to_string());
         }
-    }
-    if ids.is_empty() {
-        return Err(Problem::BlockedByMissing);
     }
     let mut warnings = Vec::new();
     for b in &ids {
@@ -872,31 +846,101 @@ pub fn block(
             Some(_) => {}
         }
     }
-    clear_stop(&mut task);
-    task.blocked_by = ids;
-    task.state = State::Blocked;
+    Ok((ids, warnings))
+}
+
+/// A taskbag older than `allomos/9` keeps `blocked` as a state, which an older Allomos reads, so
+/// blockers are not changed there until it is upgraded (decision 0026).
+fn check_blockers_format(taskbag: &Taskbag) -> Result<(), Problem> {
+    if crate::format_version(&taskbag.project.format).is_some_and(|n| n < crate::BLOCKERS_FROM) {
+        return Err(Problem::BlockersNeedUpgrade {
+            format: taskbag.project.format.clone(),
+        });
+    }
+    Ok(())
+}
+
+/// Add tasks of this taskbag that must finish before this one (`alm block`, decision 0026). `by`
+/// needs at least one ID; each must be a task here and not the task itself; they are added to the
+/// blockers it already has. The task's state, holder and what it waits on stay as they are: being
+/// blocked is worked out from `blocked_by` ([`is_blocked`]). A dropped blocker is allowed but
+/// warned about: it counts as finished, so it holds nothing back.
+pub fn block(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    by: &[String],
+) -> Result<Outcome, Problem> {
+    let mut task = find_task_to_move(taskbag, id)?;
+    check_holder(&task, me)?;
+    check_open(&task, &[State::Done, State::Dropped])?;
+    check_blockers_format(taskbag)?;
+    let (ids, warnings) = blocker_ids(taskbag, &task, by)?;
+    if ids.is_empty() {
+        return Err(Problem::BlockedByMissing);
+    }
+    for b in ids {
+        if !task.blocked_by.contains(&b) {
+            task.blocked_by.push(b);
+        }
+    }
     Ok(Outcome::warned(task, warnings))
 }
 
-/// Move a `blocked` task on (`alm unblock`): back to `in_progress` when someone holds it, else
-/// `ready`. Its blocking tasks are cleared. `alm` does not check that they are done: this is for
-/// letting a task go on early, before its blockers finish (owner, 2026-10-14). When the last
-/// blocker finishes, the task goes on by itself ([`released`], Task-A01-tuna668).
-pub fn unblock(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
+/// Set the task's blockers to exactly `by` (the app's Blocked by field); none clears them. The
+/// same rules as [`block`]; the state stays.
+pub fn set_blockers(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    by: &[String],
+) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
-    if task.state != State::Blocked {
+    check_open(&task, &[State::Done, State::Dropped])?;
+    check_blockers_format(taskbag)?;
+    let (ids, warnings) = blocker_ids(taskbag, &task, by)?;
+    task.blocked_by = ids;
+    Ok(Outcome::warned(task, warnings))
+}
+
+/// Take blockers off the task (`alm unblock`, decision 0026): the ones in `by`, or all of them
+/// when `by` is empty. Its state stays. `alm` does not check whether they finished: this is for
+/// "do not wait for it after all". A task with no blockers, or a named one it does not have, is
+/// refused.
+pub fn unblock(
+    taskbag: &Taskbag,
+    id: &str,
+    me: Option<&str>,
+    by: &[String],
+) -> Result<Outcome, Problem> {
+    let mut task = find_task_to_move(taskbag, id)?;
+    check_holder(&task, me)?;
+    check_blockers_format(taskbag)?;
+    if task.blocked_by.is_empty() {
         return Err(Problem::NotBlocked {
             id: task.id.clone(),
-            state: task.state.as_str().to_string(),
         });
     }
-    clear_stop(&mut task);
-    task.state = if task.holder.is_some() {
-        State::InProgress
+    let named: Vec<&str> = by
+        .iter()
+        .flat_map(|b| b.split(','))
+        .map(str::trim)
+        .filter(|b| !b.is_empty())
+        .collect();
+    if named.is_empty() {
+        task.blocked_by.clear();
     } else {
-        State::Ready
-    };
+        for b in &named {
+            if !task.blocked_by.iter().any(|x| x == b) {
+                return Err(Problem::NotBlockedBy {
+                    id: task.id.clone(),
+                    blocker: b.to_string(),
+                });
+            }
+        }
+        task.blocked_by.retain(|x| !named.contains(&x.as_str()));
+    }
     Ok(Outcome::plain(task))
 }
 
@@ -1230,17 +1274,14 @@ pub fn set_description(
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "field", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Edit {
-    /// `ready`, `waiting` (with `waiting_on`, optionally `who`), `blocked` (with `blocked_by`),
-    /// `done` or `dropped`. `in_progress` comes only from claiming the task (or unblocking a held
-    /// one), and nothing moves a task back to `backlog`.
+    /// `backlog`, `ready`, `waiting` (with `waiting_on`, optionally `who`), `done` or `dropped`.
+    /// `in_progress` comes only from claiming the task.
     State {
         state: State,
         #[serde(default)]
         waiting_on: Option<String>,
         #[serde(default)]
         who: Option<String>,
-        #[serde(default)]
-        blocked_by: Vec<String>,
     },
     Label {
         label: String,
@@ -1255,7 +1296,7 @@ pub enum Edit {
     WaitingOn {
         text: String,
     },
-    /// The tasks that block it; like `alm block`, this also makes it `blocked`.
+    /// The tasks that block it, all of them (none: no blockers); the state stays (decision 0026).
     BlockedBy {
         ids: Vec<String>,
     },
@@ -1322,7 +1363,6 @@ pub fn edit(
             state,
             waiting_on,
             who,
-            blocked_by,
         } => match state {
             State::Ready => make_ready(taskbag, id, me).map(|o| (o, "ready")),
             State::Waiting => wait(
@@ -1333,7 +1373,6 @@ pub fn edit(
                 who.as_deref(),
             )
             .map(|o| (o, "wait")),
-            State::Blocked => block(taskbag, id, me, blocked_by).map(|o| (o, "block")),
             State::Done => finish(taskbag, id, me, None, None).map(|o| (o, "done")),
             State::Dropped => drop_task(taskbag, id, me).map(|o| (o, "drop")),
             State::Backlog => back_to_backlog(taskbag, id, me).map(|o| (o, "backlog")),
@@ -1350,7 +1389,14 @@ pub fn edit(
             let who = find_task(taskbag, id)?.who;
             wait(taskbag, id, me, text, who.as_deref()).map(|o| (o, "wait"))
         }
-        Edit::BlockedBy { ids } => block(taskbag, id, me, ids).map(|o| (o, "block")),
+        Edit::BlockedBy { ids } => {
+            let command = if ids.iter().all(|i| i.trim().is_empty()) {
+                "unblock"
+            } else {
+                "block"
+            };
+            set_blockers(taskbag, id, me, ids).map(|o| (o, command))
+        }
         Edit::NextDependency { text } => {
             set_next(taskbag, id, me, text.as_deref()).map(|o| (o, "needs"))
         }
@@ -1412,13 +1458,13 @@ pub fn rename_project(
     Ok(project)
 }
 
-/// Mark an unheld `backlog`, `waiting` or `blocked` task `ready` (for example, the owner approved
-/// it). What it waited on or was blocked by is cleared.
+/// Mark an unheld `backlog` or `waiting` task `ready` (for example, the owner approved it). What
+/// it waited on is cleared; its blockers stay (decision 0026).
 pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     if task.holder.is_some()
-        || !matches!(task.state, State::Backlog | State::Waiting | State::Blocked)
+        || !matches!(task.state, State::Backlog | State::Waiting)
     {
         return Err(Problem::CannotMakeReady {
             id: task.id.clone(),
@@ -1430,16 +1476,16 @@ pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outco
     Ok(Outcome::plain(task))
 }
 
-/// Send an unheld `ready`, `waiting` or `blocked` task back to `backlog`, to be thought over again
+/// Send an unheld `ready` or `waiting` task back to `backlog`, to be thought over again
 /// (`alm backlog`, the app's state menu; Task-A01-lotus143, approver 2026-10-25, replacing the
 /// 2026-10-14 rule that nothing moves a task back to backlog). The same rule as [`make_ready`]:
 /// a held, in-progress, done or dropped task is refused (a held one is released first, a finished
-/// one reopened). What it waited on or was blocked by is cleared.
+/// one reopened). What it waited on is cleared; its blockers stay (decision 0026).
 pub fn back_to_backlog(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
     if task.holder.is_some()
-        || !matches!(task.state, State::Ready | State::Waiting | State::Blocked)
+        || !matches!(task.state, State::Ready | State::Waiting)
     {
         return Err(Problem::CannotBackToBacklog {
             id: task.id.clone(),
@@ -1451,7 +1497,7 @@ pub fn back_to_backlog(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<
     Ok(Outcome::plain(task))
 }
 
-/// Drop the task: it will not be done. Its holder, *waiting on* and blockers are cleared.
+/// Drop the task: it will not be done. Its holder and *waiting on* are cleared.
 pub fn drop_task(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
@@ -1501,7 +1547,8 @@ pub fn reopen(taskbag: &Taskbag, id: &str, note: &str) -> Result<Outcome, Proble
 }
 
 /// Every task that is `ready` and held by no one, for the agent to choose from (Task-A03-14). A
-/// `blocked` or `waiting` task is never among them: skipped by its state, not by its words:
+/// `waiting` task is never among them, nor one that is blocked ([`is_blocked`], decision 0026:
+/// a ready task whose blockers have not all finished shows up here once they have):
 /// the active iteration first (Task-A01-root343), then the earliest iteration (unplanned tasks
 /// last), then area order, then ID. With an
 /// iteration, only the tasks planned in it; an iteration that does not exist is refused.
@@ -1535,6 +1582,7 @@ pub fn next<'a>(taskbag: &'a Taskbag, iteration: Option<&str>) -> Result<Vec<&'a
         .tasks
         .iter()
         .filter(|t| t.state == State::Ready && t.holder.is_none())
+        .filter(|t| !is_blocked(taskbag, t))
         .filter(|t| iteration.is_none_or(|i| t.iteration.as_deref() == Some(i)))
         .collect();
     tasks.sort_by(|a, b| {
@@ -1686,11 +1734,15 @@ mod tests {
         assert_eq!(with_evidence("", "e"), "## Evidence\n\n- e\n");
     }
 
-    /// Decision 0016: `alm block` refuses an empty list, the task itself and an unknown ID; a
-    /// dropped blocker is allowed but warned about; unblocking moves it on by its holder.
+    /// Decision 0026: `alm block` refuses an empty list, the task itself and an unknown ID, adds
+    /// blockers without changing the state, and a task is blocked while one has not finished;
+    /// when they finish it keeps its state; `alm unblock` takes blockers off.
     #[test]
     fn block_and_unblock_rules() {
         let mut s = bag();
+        let mut third = find_task(&s, "A01-02").unwrap();
+        third.id = "A01-03".into();
+        s.tasks.push(third);
         let by = |ids: &[&str]| ids.iter().map(|i| i.to_string()).collect::<Vec<_>>();
         assert_eq!(
             block(&s, "A01-01", None, &by(&[])),
@@ -1712,7 +1764,8 @@ mod tests {
                 id: "A09-01".into()
             })
         );
-        // Waiting, then blocked: what it waited on is cleared; IDs are de-duplicated, commas split.
+        // Waiting and blocked at once: the state and what it waits on stay; IDs are
+        // de-duplicated, commas split.
         put!(
             s,
             wait(&s, "A01-01", None, "approval", Some("Ann"))
@@ -1721,14 +1774,17 @@ mod tests {
         );
         let o = block(&s, "A01-01", None, &by(&["A01-02,A02-01", "A01-02"])).unwrap();
         assert!(o.warnings.is_empty());
-        assert_eq!(o.task.state, State::Blocked);
+        assert_eq!(o.task.state, State::Waiting);
         assert_eq!(o.task.blocked_by, by(&["A01-02", "A02-01"]));
         assert_eq!(
-            (o.task.waiting_on.clone(), o.task.who.clone()),
-            (None, None)
+            (o.task.waiting_on.as_deref(), o.task.who.as_deref()),
+            (Some("approval"), Some("Ann"))
         );
         put!(s, o.task);
-        // Blockers with their states; not all done.
+        // Blocking again adds; a blocker it already has is not repeated.
+        let o = block(&s, "A01-01", None, &by(&["A02-01", "A01-03"])).unwrap();
+        assert_eq!(o.task.blocked_by, by(&["A01-02", "A02-01", "A01-03"]));
+        // Blockers with their states; blocked while one has not finished.
         let t = find_task(&s, "A01-01").unwrap();
         assert_eq!(
             blockers(&s, &t)
@@ -1737,51 +1793,20 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["A01-02 (backlog)", "A02-01 (backlog)"]
         );
-        assert!(!all_blockers_done(&s, &t));
-        // One done: not all finished yet, nothing goes on.
+        assert!(is_blocked(&s, &t));
         put!(s, finish(&s, "A01-02", None, None, None).unwrap().task);
         let t = find_task(&s, "A01-01").unwrap();
-        assert!(!all_blockers_done(&s, &t));
-        assert!(released(&s).is_empty());
-        // The other dropped: a dropped blocker counts as finished (Task-A01-tuna668).
+        assert!(is_blocked(&s, &t));
+        assert_eq!(open_blockers(&s, &t).len(), 1);
+        assert_eq!(finished_blockers(&s, &t)[0].id, "A01-02");
+        // The other dropped: a dropped blocker counts as finished. The task keeps its state and
+        // its list of blockers; it is just no longer blocked.
         put!(s, drop_task(&s, "A02-01", None).unwrap().task);
         let t = find_task(&s, "A01-01").unwrap();
-        assert!(all_blockers_done(&s, &t));
+        assert!(!is_blocked(&s, &t));
         assert_eq!(blockers(&s, &t)[1].describe(), "A02-01 (dropped)");
-        // It goes on by itself: ready (no holder), blockers cleared, a note and a reason.
-        let r = released(&s);
-        assert_eq!(r.len(), 1);
-        assert_eq!(
-            (
-                r[0].task.id.as_str(),
-                r[0].task.state,
-                r[0].task.blocked_by.len()
-            ),
-            ("A01-01", State::Ready, 0)
-        );
-        assert!(
-            r[0].task
-                .handoff_note
-                .as_deref()
-                .unwrap()
-                .starts_with("Unblocked automatically after A01-02, A02-01 finished;")
-        );
-        assert_eq!(r[0].recorded[0].field, crate::event::REASON);
-        // An earlier handoff note is kept under the new line; a held task goes in progress.
-        let mut held = s.clone();
-        let mut t = find_task(&held, "A01-01").unwrap();
-        t.holder = Some("a".into());
-        t.handoff_note = Some("Old note".into());
-        put!(held, t);
-        let r = released(&held);
-        assert_eq!(r[0].task.state, State::InProgress);
-        assert!(
-            r[0].task
-                .handoff_note
-                .as_deref()
-                .unwrap()
-                .ends_with("\n\nOld note")
-        );
+        assert_eq!(t.state, State::Waiting);
+        assert_eq!(t.blocked_by, by(&["A01-02", "A02-01"]));
         // Blocking on a dropped task is allowed, with a warning.
         let o = block(&s, "A01-01", None, &by(&["A02-01"])).unwrap();
         assert_eq!(
@@ -1791,45 +1816,61 @@ mod tests {
                 blocker: "A02-01".into()
             }]
         );
-        // All done: alm only tells; the task stays blocked until someone unblocks it.
-        put!(s, block(&s, "A01-01", None, &by(&["A01-02"])).unwrap().task);
+        // `alm ready` changes the state only: the blockers stay.
+        let r = make_ready(&s, "A01-01", None).unwrap().task;
+        assert_eq!((r.state, r.blocked_by.len()), (State::Ready, 2));
+        put!(s, r);
+        assert!(next(&s, None).unwrap().iter().any(|t| t.id == "A01-01"));
+        // A ready task with an open blocker is never next; once the blocker finishes it is.
+        put!(s, block(&s, "A01-01", None, &by(&["A01-03"])).unwrap().task);
         let t = find_task(&s, "A01-01").unwrap();
-        assert!(all_blockers_done(&s, &t));
-        assert_eq!(t.state, State::Blocked);
-        // Unblock: ready when unheld, in progress when held; only a blocked task.
-        let u = unblock(&s, "A01-01", None).unwrap().task;
-        assert_eq!((u.state, u.blocked_by.len()), (State::Ready, 0));
+        assert_eq!(t.state, State::Ready);
+        assert!(is_blocked(&s, &t));
+        assert!(next(&s, None).unwrap().iter().all(|t| t.id != "A01-01"));
+        // Unblock by name: only that one; a task it is not blocked by is refused.
         assert_eq!(
-            unblock(&s, "A01-02", None),
-            Err(Problem::NotBlocked {
-                id: "A01-02".into(),
-                state: "done".into()
+            unblock(&s, "A01-01", None, &by(&["A09-09"])),
+            Err(Problem::NotBlockedBy {
+                id: "A01-01".into(),
+                blocker: "A09-09".into()
             })
         );
+        let u = unblock(&s, "A01-01", None, &by(&["A01-03"])).unwrap().task;
+        assert_eq!((u.state, u.blocked_by.clone()), (State::Ready, by(&["A01-02", "A02-01"])));
+        // Unblock with no name: all of them; the state stays. No blockers: refused.
+        let u = unblock(&s, "A01-01", None, &[]).unwrap().task;
+        assert_eq!((u.state, u.blocked_by.len()), (State::Ready, 0));
+        assert_eq!(
+            unblock(&s, "A01-02", None, &[]),
+            Err(Problem::NotBlocked {
+                id: "A01-02".into(),
+            })
+        );
+        // A held task stays in progress with its holder when it gets a blocker.
         let mut held = s.clone();
+        put!(held, unblock(&held, "A01-01", None, &[]).unwrap().task);
         put!(held, claim(&held, "A01-01", Some("a"), true).unwrap().task);
-        put!(
-            held,
-            block(&held, "A01-01", Some("a"), &by(&["A01-02"]))
-                .unwrap()
-                .task
-        );
-        assert_eq!(
-            unblock(&held, "A01-01", Some("a")).unwrap().task.state,
-            State::InProgress
-        );
-        // `alm ready` also moves an unheld blocked task on; a blocked task is never next.
-        assert_eq!(
-            make_ready(&s, "A01-01", None).unwrap().task.state,
-            State::Ready
-        );
-        assert!(next(&s, None).unwrap().iter().all(|t| t.id != "A01-01"));
+        let b = block(&held, "A01-01", Some("a"), &by(&["A01-03"]))
+            .unwrap()
+            .task;
+        assert_eq!((b.state, b.holder.as_deref()), (State::InProgress, Some("a")));
+        // The app's field sets the whole list; none clears it.
+        let e = set_blockers(&s, "A01-01", None, &by(&["A01-03"])).unwrap().task;
+        assert_eq!(e.blocked_by, by(&["A01-03"]));
+        assert!(set_blockers(&s, "A01-01", None, &[]).unwrap().task.blocked_by.is_empty());
         // Done or dropped tasks cannot be blocked.
         assert_eq!(
             block(&s, "A01-02", None, &by(&["A01-01"]))
                 .unwrap_err()
                 .code(),
             "task_closed"
+        );
+        // Before `allomos/9`, blocked is still a state: blockers wait for the upgrade.
+        let mut old = s.clone();
+        old.project.format = "allomos/8".into();
+        assert_eq!(
+            block(&old, "A01-01", None, &by(&["A01-03"])).unwrap_err().code(),
+            "blockers_need_upgrade"
         );
     }
 
@@ -2257,7 +2298,7 @@ mod tests {
         assert_eq!((r.state, r.waiting_on.clone()), (State::Ready, None));
         put!(s, r);
 
-        // Back to backlog (Task-A01-lotus143): from ready, waiting or blocked, unheld, clearing
+        // Back to backlog (Task-A01-lotus143): from ready or waiting, unheld, clearing
         // what it waited on; held, in progress, done or dropped: refused.
         put!(s, wait(&s, "A01-02", None, "owner", None).unwrap().task);
         let r = back_to_backlog(&s, "A01-02", None).unwrap().task;
@@ -2838,7 +2879,6 @@ mod tests {
             state: st,
             waiting_on: on.map(String::from),
             who: None,
-            blocked_by: vec![],
         };
         same(
             ed(&s, state(State::Ready, None)),
@@ -3006,7 +3046,6 @@ mod tests {
                 state: State::Waiting,
                 waiting_on: Some("x".into()),
                 who: None,
-                blocked_by: vec![]
             }
         );
         let e: Edit = serde_json::from_str(r#"{"field":"iteration","iteration":null}"#).unwrap();

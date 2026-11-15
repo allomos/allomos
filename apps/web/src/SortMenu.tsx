@@ -1,12 +1,24 @@
 // The task list's sort menu (Task-A01-52; in the By area tab too, Task-A01-plum588): a compact
 // button saying the sort in use, which opens a menu of what to sort by and which way. The order
-// itself is decided in sortFlow.ts.
+// itself is decided in sortFlow.ts. Under the sort, a Show section turns the dependency tree on and
+// off (Task-A01-alpine458): a way of showing the list, not a sort, so the sort stays as chosen.
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { DEFAULT_SORT, SORT_KEYS, type Sort, type SortDir } from "./sortFlow";
 
-export function SortMenu({ sort, onChange }: { sort: Sort; onChange: (s: Sort) => void }) {
+export function SortMenu({
+  sort,
+  onChange,
+  tree,
+  onTree,
+}: {
+  sort: Sort;
+  onChange: (s: Sort) => void;
+  /** Whether the dependency tree is on. */
+  tree: boolean;
+  onTree: (on: boolean) => void;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
@@ -43,6 +55,11 @@ export function SortMenu({ sort, onChange }: { sort: Sort; onChange: (s: Sort) =
         </svg>
         {t("sort.summary", { key: t(`sort.by_${sort.key}`), dir: dirText(sort.dir) })}
       </button>
+      {tree && (
+        <span className="sort-tag" title={t("sort.dep_tree_title")}>
+          {t("sort.dep_tree")}
+        </span>
+      )}
       {open && (
         <div className="sort-popover" role="menu" aria-label={t("sort.label")}>
           <div className="sort-heading">{t("sort.by")}</div>
@@ -69,6 +86,11 @@ export function SortMenu({ sort, onChange }: { sort: Sort; onChange: (s: Sort) =
               {dirText(dir)}
             </button>
           ))}
+          <hr />
+          <div className="sort-heading">{t("sort.show")}</div>
+          <button type="button" role="menuitemcheckbox" aria-checked={tree} title={t("sort.dep_tree_title")} onClick={() => onTree(!tree)}>
+            {t("sort.dep_tree")}
+          </button>
         </div>
       )}
     </span>

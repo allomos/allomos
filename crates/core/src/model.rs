@@ -13,7 +13,7 @@ pub type Extra = BTreeMap<String, Value>;
 
 /// The file-format identifier written in every `project.json` (see `docs/product/FILE-FORMAT.md`):
 /// `allomos/<FORMAT_VERSION>`.
-pub const FORMAT: &str = "allomos/8";
+pub const FORMAT: &str = "allomos/9";
 
 /// The number in [`FORMAT`]. It goes up whenever the taskbag changes shape. An older Allomos
 /// refuses a newer taskbag (Task-A01-25); this one reads only its own format. A taskbag in any
@@ -50,7 +50,17 @@ pub const FORMAT: &str = "allomos/8";
 /// the signature), the public keys are in `keys/` and checkpoints in `checkpoints/`. An older
 /// Allomos refuses it, so it cannot go on writing unsigned events unnoticed. An `allomos/7`
 /// taskbag is still read and written as it is, unsigned, until a person upgrades it.
-pub const FORMAT_VERSION: u32 = 8;
+/// 9: no `blocked` state (decision 0026, Task-A01-house696): a task of any open state may name
+/// blockers in `blocked_by`, and it is blocked while one of them has not finished. An older
+/// Allomos would list a ready task with blockers as free, so it must refuse the taskbag. An
+/// `allomos/7` or `allomos/8` taskbag is still read and written as it is, except its blockers
+/// (`alm block`, `alm unblock`) and its tasks in the old `blocked` state, which wait for the
+/// upgrade: the upgrade gives each the state it had before it was blocked.
+pub const FORMAT_VERSION: u32 = 9;
+
+/// The first format where `blocked` is worked out from `blocked_by` instead of a state (decision
+/// 0026).
+pub const BLOCKERS_FROM: u32 = 9;
 
 /// The first format with the label table (decision 0020): an older taskbag is read but not
 /// written until it is upgraded.
@@ -130,7 +140,7 @@ impl Project {
         format_version(&self.format).is_some_and(|n| n >= 6)
     }
 
-    /// Written in the current format (`allomos/8`): nothing to upgrade.
+    /// Written in the current format (`allomos/9`): nothing to upgrade.
     pub fn current(&self) -> bool {
         format_version(&self.format).is_some_and(|n| n >= FORMAT_VERSION)
     }
@@ -414,8 +424,6 @@ pub enum State {
     InProgress,
     /// A person (or an outside event) must act; `waiting_on` says what, `who` optionally who.
     Waiting,
-    /// Another task in the taskbag must finish first; `blocked_by` lists them (decision 0016).
-    Blocked,
     Done,
     Dropped,
     /// A value this Allomos does not know, perhaps from a newer one (Task-A01-piano403): the task
@@ -425,12 +433,11 @@ pub enum State {
 }
 
 impl State {
-    pub const ALL: [State; 7] = [
+    pub const ALL: [State; 6] = [
         State::Backlog,
         State::Ready,
         State::InProgress,
         State::Waiting,
-        State::Blocked,
         State::Done,
         State::Dropped,
     ];
@@ -441,7 +448,6 @@ impl State {
             State::Ready => "ready",
             State::InProgress => "in_progress",
             State::Waiting => "waiting",
-            State::Blocked => "blocked",
             State::Done => "done",
             State::Dropped => "dropped",
             State::Unknown => "unknown",
@@ -476,8 +482,9 @@ pub struct Task {
     /// 0016). Without it the app says "Waiting for you".
     #[serde(default)]
     pub who: Option<String>,
-    /// For a `blocked` task: the tasks in this taskbag that must finish first (`alm block --by`,
-    /// decision 0016). Empty for every other state.
+    /// The tasks in this taskbag that must finish first (`alm block --by`). The task is blocked
+    /// while one of them has not finished (done or dropped); that is worked out, not a state
+    /// (decision 0026, replacing 0016's `blocked` state).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_by: Vec<String>,
     #[serde(default)]
@@ -537,6 +544,12 @@ impl Task {
             (State::Unknown, Some(text)) => text.to_string(),
             (state, _) => state.as_str().to_string(),
         }
+    }
+
+    /// It still has the `blocked` state of a taskbag before `allomos/9` (decision 0026): this
+    /// Allomos has no such state, so it does not change the task until the taskbag is upgraded.
+    pub fn old_blocked(&self) -> bool {
+        self.state == State::Unknown && self.state_text() == "blocked"
     }
 
     /// Done and carrying neither "by human" label: "To check" (decision 0020).

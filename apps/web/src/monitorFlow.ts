@@ -190,9 +190,6 @@ export interface Current {
   changed: number;
 }
 
-/** A task the run's last sweep let go on (Task-A01-steam936): its blockers had all finished. */
-export type Unblocked = { id: string; state: string };
-
 /** One monitoring run, as its process last wrote it in its run file. */
 export interface Run {
   /** The run's ID (`alm monitor status` shows it). */
@@ -225,7 +222,6 @@ export interface Run {
   checked: number;
   /** When the next check is due (ms). */
   next: number;
-  unblocked: Unblocked[];
 }
 
 /** An `alm monitor run` process this computer runs with no run file: running, record missing.
@@ -332,9 +328,6 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     stopping: Boolean(r.stopping),
     checked: num(r.checked),
     next: num(e.next_check, num(r.checked) + every * 60_000),
-    unblocked: (Array.isArray(r.unblocked) ? r.unblocked : []).filter(
-      (u: unknown): u is Unblocked => typeof (u as Unblocked)?.id === "string" && typeof (u as Unblocked)?.state === "string",
-    ),
   };
 }
 
@@ -441,18 +434,6 @@ export function lastRunCounts(
 export function frequencyText(every: Frequency): { unit: "minute" | "minutes" | "hour" | "hours"; n: number } {
   if (every >= 60) return { unit: every === 60 ? "hour" : "hours", n: every / 60 };
   return { unit: every === 1 ? "minute" : "minutes", n: every };
-}
-
-/** The line under the monitor's status bar after a sweep let tasks go on: one group per state they
- * went back to (ready, or in progress when someone holds them). */
-export type UnblockNotice = { groups: { state: "ready" | "in_progress"; ids: string[] }[] };
-
-/** What the run's last sweep let go on, as the notice says it; null when it let nothing go on. */
-export function unblockNotice(unblocked: Unblocked[]): UnblockNotice | null {
-  const groups = (["ready", "in_progress"] as const)
-    .map((state) => ({ state, ids: unblocked.filter((r) => r.state === state).map((r) => r.id) }))
-    .filter((g) => g.ids.length > 0);
-  return groups.length ? { groups } : null;
 }
 
 // The Monitors list (Task-A03-motor529, approver 2026-11-09): the rows of `monitor_all`, every run

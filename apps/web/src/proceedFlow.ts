@@ -19,9 +19,15 @@ export function canTakeOver(task: Task): boolean {
   return !!task.holder && task.state !== "done" && task.state !== "dropped";
 }
 
+/** Blocked (decision 0026: one of its blockers has not finished, as stopFlow's markBlocked worked
+ * out; not a state). */
+function blocked(task: Task): boolean {
+  return (task.open_blockers?.length ?? 0) > 0;
+}
+
 /** Blocked or waiting: the agent cannot start, so it asks the person what to do instead. */
 export function stopped(task: Task): boolean {
-  return task.state === "blocked" || task.state === "waiting";
+  return blocked(task) || task.state === "waiting";
 }
 
 /** `items` joined as a sentence lists them: "A", "A and B", "A, B and C" (in each language). */
@@ -36,17 +42,17 @@ function joined(items: string[], language: Language): string {
  * in the project folder, should pass it to `--taskbag`. */
 export function proceedRequest(task: Task, taskbag: string, language: Language): string {
   const id = task.id;
-  const blockers = task.blocked_by ?? [];
+  const blockers = task.open_blockers ?? [];
   const tb = `--taskbag "${taskbag}"`;
   if (language === "zh-CN") {
-    if (task.state === "blocked") {
+    if (blocked(task)) {
       const by = joined(blockers, language);
       return `请看看这个项目任务袋里的任务 ${id}（“${task.title}”）。每条 alm 命令都加上 ${tb}。
 
 它现在不能开始：它受阻于 ${by}。先不要认领它，也先不要改动它。
 
 1. 阅读：${["alm show " + id, ...blockers.map((b) => "alm show " + b)].join("、")}。
-2. 用平常的话告诉我它为什么停下，以及可以怎么处理（例如：先做 ${by}；如果 ${by} 已经完成，就解除 ${id} 的受阻）。
+2. 用平常的话告诉我它为什么停下，以及可以怎么处理（例如：先做 ${by}；如果不必再等 ${by}，就用 alm unblock 把它从 ${id} 的前置任务里去掉）。
 3. 问我想让你怎么处理 ${id}，在我回答之前不要改动任何东西。`;
     }
     if (task.state === "waiting") {
@@ -68,14 +74,14 @@ ${n + 1}. 在它自己的工作树里做，工作树从认领时列出的基础�
 ${n + 2}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
   if (language === "ja") {
-    if (task.state === "blocked") {
+    if (blocked(task)) {
       const by = joined(blockers, language);
       return `このプロジェクトのタスクバッグにあるタスク ${id}（「${task.title}」）を見てください。alm コマンドはすべて ${tb} を付けて実行してください。
 
 今は始められません：${by} に止められています。まだ引き受けず、変更もしないでください。
 
 1. 読む：${["alm show " + id, ...blockers.map((b) => "alm show " + b)].join("、")}。
-2. なぜ止まっているのか、どうすればよいか（例：先に ${by} を進める。${by} がもう終わっていれば ${id} の止まりを解く）を、わかりやすい言葉で教えてください。
+2. なぜ止まっているのか、どうすればよいか（例：先に ${by} を進める。${by} を待たなくてよければ、alm unblock で ${id} のブロック元から外す）を、わかりやすい言葉で教えてください。
 3. ${id} をどうしてほしいか私に聞き、私が答えるまで何も変更しないでください。`;
     }
     if (task.state === "waiting") {
@@ -96,14 +102,14 @@ ${backlog ? `2. このタスクはバックログにあります。私が「肩�
 ${n + 1}. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
 ${n + 2}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
-  if (task.state === "blocked") {
+  if (blocked(task)) {
     const by = joined(blockers, language);
     return `Look at task ${id} ("${task.title}") in this project's taskbag. Run every alm command with ${tb}.
 
 It cannot start now: it is blocked by ${by}. Do not claim it and do not change it yet.
 
 1. Read it: ${joined(["alm show " + id, ...blockers.map((b) => "alm show " + b)], language)}.
-2. Tell me in plain words why it is stopped and what could be done about it (for example: work ${by} first, or unblock ${id} if ${by} ${blockers.length > 1 ? "are" : "is"} already done).
+2. Tell me in plain words why it is stopped and what could be done about it (for example: work ${by} first, or, if ${id} should not wait for ${blockers.length > 1 ? "them" : "it"} after all, take ${blockers.length > 1 ? "them" : "it"} off its blockers with alm unblock).
 3. Ask me what I want you to do with ${id}, and wait for my answer before you change anything.`;
   }
   if (task.state === "waiting") {

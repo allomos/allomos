@@ -108,7 +108,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 37: one exception to leaving the former holder's worktree alone: when the person chose to have
 /// its changes committed and pushed first in the app's Take over… dialog, the new session commits
 /// them as WIP and pushes the working branch, and changes nothing else there (Task-A01-flag101).
-pub const SECTION_VERSION: u32 = 37;
+/// 38: blocked is not a state: `alm block` keeps the task's state, the task is blocked while a
+/// blocker has not finished, and nothing changes in it when they finish; `alm unblock` takes
+/// blockers off (decision 0026, Task-A01-house696).
+pub const SECTION_VERSION: u32 = 38;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

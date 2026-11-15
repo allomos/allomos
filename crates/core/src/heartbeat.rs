@@ -162,7 +162,7 @@ pub struct Lost {
 
 /// Whether `task` is lost at `now` (seconds since 1970, UTC). `last_change`: the time of the
 /// task's newest recorded event, used when the holder never beat. A task that is not
-/// `in_progress` or has no holder (waiting, blocked, released, ready, done, dropped) is never
+/// `in_progress` or has no holder (waiting, released, ready, done, dropped) is never
 /// lost, nor one whose silence cannot be dated.
 pub fn lost(task: &Task, now: i64, lost_after: i64, last_change: Option<&str>) -> Option<Lost> {
     if task.state != State::InProgress {
@@ -336,7 +336,7 @@ pub fn beat(
 /// The heartbeat a change to `task` by the session `me` writes along with it (decision 0022 § 5),
 /// at `now`: when `me` holds the task and it is `in_progress`, the heartbeat becomes now (a busy
 /// window still running and what the session said it is doing are kept). A task nobody holds, or no longer `in_progress` (released,
-/// waiting, blocked, done, dropped), loses its heartbeat. A change by someone else to a task the
+/// waiting, done, dropped), loses its heartbeat. A change by someone else to a task the
 /// session holds (the app, a person) leaves it as it is.
 pub fn along(task: &mut Task, me: Option<&str>, now: i64) {
     if task.state != State::InProgress || task.holder.is_none() {
@@ -843,7 +843,7 @@ mod tests {
                 .heartbeat_at,
             None
         );
-        for state in [State::Waiting, State::Blocked, State::Ready, State::Done] {
+        for state in [State::Waiting, State::Ready, State::Done] {
             let mut s = t.clone();
             s.state = state;
             assert_eq!(lost(&s, t0() + 9_999, LOST_AFTER_SECS, Some(T0)), None);

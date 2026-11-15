@@ -5,7 +5,9 @@
 // it again closes it. The holder's link and Show all do not select the task. Held by always shows
 // (Nobody when no session holds the task), and a task nobody holds that is not finished gets
 // Work on it… after it (Task-A03-galley051); a lost task gets Take over… after its Lost tag
-// (Task-A01-voyage603).
+// (Task-A01-voyage603). In the dependency tree (Task-A01-alpine458) the row is indented under the
+// task that blocks it, with guide lines, a fold button when tasks hang under it, and small marks
+// for its other blockers.
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
@@ -15,10 +17,20 @@ import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
-import { chipLabels, decisionsToReview, humanCheckNote, toCheck, toReview, type StopFact } from "./stopFlow";
+import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import { difficultyOf, difficultyText } from "./difficultyFlow";
+import type { TreeRow } from "./depTreeFlow";
 import type { Task } from "./types";
+
+/** A row's place in the dependency tree (Task-A01-alpine458). */
+export interface TreeMark {
+  row: TreeRow;
+  /** Folds or opens the tasks under it. */
+  onFold: () => void;
+  /** Its blockers that are not shown in this group: the mark's text and its hover text. */
+  outside: { id: string; text: string; title: string }[];
+}
 
 /** Keeps a key on a control inside the row from selecting the task (its click stops itself). */
 const ownKeys = (e: KeyboardEvent) => e.stopPropagation();
@@ -31,10 +43,13 @@ export function TaskRow({
   stop,
   modified,
   lostAfter,
+  tree,
   onOpenSession,
   onProceed,
   onError,
 }: {
+  /** Its place in the dependency tree, when the tree is on. */
+  tree?: TreeMark;
   task: Task;
   selected: boolean;
   onSelect: (id: string) => void;
@@ -58,7 +73,11 @@ export function TaskRow({
   const facts: [string, ReactNode, string?][] = [
     [
       t("pane.state"),
-      <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>,
+      <>
+        <span className={`fact-state state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>
+        {/* Decision 0026: blocked is worked out, shown beside the task's own state. */}
+        {isBlocked(task) && <span className="fact-blocked s-blocked-text"> · {t("task.blocked_mark")}</span>}
+      </>,
     ],
     [t("row.modified"), modified ? <time dateTime={modified}>{localTime(modified)}</time> : <span className="muted">—</span>],
   ];
@@ -109,26 +128,15 @@ export function TaskRow({
   // Task-A01-kernel761: a held, in-progress task's last heartbeat and busy window.
   if (task.state === "in_progress" && task.holder)
     facts.push([t("pane.heartbeat"), <HeartbeatLine task={task} lostAfter={lostAfter} lastChange={modified} />]);
-  return (
-    <li
-      id={`task-${task.id}`}
-      className={selected ? "task selected" : "task"}
-      tabIndex={0}
-      aria-current={selected ? "true" : undefined}
-      onClick={() => onSelect(task.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect(task.id);
-        }
-      }}
-    >
+  const main = (
+    <>
       <span className="id">
         <Highlight text={task.id} terms={terms} />
       </span>
       <div className="task-body">
         <span className="title">
           <Highlight text={task.title} terms={terms} />
+          {tree && <TreeNotes tree={tree} />}
         </span>
         <dl className="row-facts">
           {facts.map(([name, value, title]) => (
@@ -142,7 +150,109 @@ export function TaskRow({
         <DescriptionHit text={task.description ?? ""} terms={terms} />
         <DescriptionHit text={task.handoff_note ?? ""} terms={terms} where="search.in_handoff" />
       </div>
+    </>
+  );
+  const finished = task.state === "done" || task.state === "dropped";
+  const classes = ["task", selected ? "selected" : "", tree ? "in-tree" : "", tree && tree.row.kids > 0 && finished ? "tree-parent-finished" : ""];
+  return (
+    <li
+      id={`task-${task.id}`}
+      className={classes.filter(Boolean).join(" ")}
+      tabIndex={0}
+      aria-current={selected ? "true" : undefined}
+      onClick={() => onSelect(task.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(task.id);
+        }
+      }}
+    >
+      {tree ? (
+        <>
+          <TreeLead tree={tree} />
+          <div className="tree-rest">
+            {main}
+          </div>
+        </>
+      ) : (
+        main
+      )}
     </li>
+  );
+}
+
+/** How many colours the tree's levels cycle through (styles.css, `.tree-cell.lv-N`). */
+const TREE_COLOURS = 6;
+const lv = (depth: number) => `lv-${depth % TREE_COLOURS}`;
+
+/** The row's indent in the dependency tree, drawn like a group tree: one column per level, each
+ * level in its own colour. A rail runs down a column while that level has more tasks below; the
+ * line to this row's parent turns into the row with a rounded corner; then this row's node, a
+ * dot, which is the fold button (− open, + folded) when tasks hang under it, with its own rail
+ * running down to them while open. */
+function TreeLead({ tree }: { tree: TreeMark }) {
+  const { t } = useI18n();
+  const { row } = tree;
+  const node = `tree-cell node ${lv(row.depth)}${row.kids > 0 && !row.folded ? " open" : ""}`;
+  return (
+    <span className="tree-lead">
+      {row.lines.map((on, i) => (
+        <span key={i} className={`tree-cell ${lv(i)}${on ? " line" : ""}`} />
+      ))}
+      {row.depth > 0 && <span className={`tree-cell elbow ${lv(row.depth - 1)}${row.last ? " last" : ""}`} />}
+      {row.kids > 0 ? (
+        <span className={node}>
+          <button
+            type="button"
+            className="tree-dot tree-fold"
+            aria-expanded={!row.folded}
+            aria-label={t(row.folded ? "tree.expand" : "tree.collapse", { id: row.task.id })}
+            title={t(row.folded ? "tree.expand" : "tree.collapse", { id: row.task.id })}
+            onKeyDown={ownKeys}
+            onClick={(e) => {
+              e.stopPropagation();
+              tree.onFold();
+            }}
+          >
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d={row.folded ? "M2 5h6M5 2v6" : "M2 5h6"} />
+            </svg>
+          </button>
+        </span>
+      ) : (
+        <span className={node}>
+          <span className="tree-dot" />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** After the title in the dependency tree: how many tasks its fold hides, its other blockers in
+ * this group ("also depends on"), and its blockers shown elsewhere ("ID · where"). */
+function TreeNotes({ tree }: { tree: TreeMark }) {
+  const { t } = useI18n();
+  const { row } = tree;
+  const also = row.also.join(t("tree.list_sep"));
+  return (
+    <>
+      {row.hidden > 0 && (
+        <span className="tree-note tree-more" title={t("tree.more_title", { count: row.hidden })}>
+          +{row.hidden}
+        </span>
+      )}
+      {row.also.length > 0 && (
+        <span className="tree-note" title={t("tree.also_title", { ids: also })}>
+          {t("tree.also", { ids: also })}
+        </span>
+      )}
+      {tree.outside.map((o) => (
+        <span key={o.id} className="tree-note tree-outside" title={o.title}>
+          {o.text}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -204,7 +314,7 @@ function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
   return (
     <div className="row-stop">
       <div className="row-stop-name">{t(fact.name)}</div>
-      <div ref={ref} className={`row-stop-text s-${state}-text${open ? "" : " clamped"}`}>
+      <div ref={ref} className={`row-stop-text s-${fact.kind === "blocked" ? "blocked" : state}-text${open ? "" : " clamped"}`}>
         {fact.text}
       </div>
       {cut && (

@@ -841,6 +841,44 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 }
 .sort-popover button:hover { background: var(--bg); }
 .sort-popover button[aria-checked="true"]::before { content: "✓"; position: absolute; left: 12px; color: var(--accent); }
+.sort-popover button[role="menuitemcheckbox"]::before { content: ""; position: absolute; left: 11px; top: 50%; width: 11px; height: 11px; margin-top: -6.5px; border: 1px solid var(--muted); border-radius: 3px; }
+.sort-popover button[role="menuitemcheckbox"][aria-checked="true"]::before { content: "✓"; border-color: var(--accent); font-size: 10px; line-height: 11px; text-align: center; }
+/* Task-A01-alpine458: the dependency tree. The tag beside the sort button while it is on; rows
+   indented under the task that blocks them, with guide lines as in a folder tree. */
+.sort-menu { align-items: center; gap: 6px; }
+.sort-tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent-ink); white-space: nowrap; }
+.task.in-tree { grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; }
+.tree-rest { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 4px 12px; align-items: baseline; min-width: 0; }
+.tree-lead { display: flex; align-self: stretch; margin: -9px 0 -10px; --tw: 20px; --tx: 10px; --ty: 20px; }
+.tree-cell { position: relative; flex: none; width: var(--tw); --c: #4f46e5; --rail: color-mix(in srgb, var(--c) 50%, transparent); }
+.tree-cell.lv-1 { --c: #0891b2; }
+.tree-cell.lv-2 { --c: #16a34a; }
+.tree-cell.lv-3 { --c: #d97706; }
+.tree-cell.lv-4 { --c: #db2777; }
+.tree-cell.lv-5 { --c: #9333ea; }
+/* A rail: the level goes on below this row. In the elbow column it runs on only when this row's
+   parent has more tasks after it; under an open node it starts at the dot. */
+.tree-cell.line::before, .tree-cell.elbow:not(.last)::before, .tree-cell.node.open::before {
+  content: ""; position: absolute; left: calc(var(--tx) - 1px); width: 2px; top: 0; bottom: 0; background: var(--rail); border-radius: 1px;
+}
+.tree-cell.node.open::before { top: var(--ty); }
+/* The line from the parent's rail into this row's dot, with a rounded corner. */
+.tree-cell.elbow::after {
+  content: ""; position: absolute; left: calc(var(--tx) - 1px); top: 0; height: calc(var(--ty) + 1px); width: calc(var(--tw) - 4px);
+  box-sizing: border-box; border-left: 2px solid var(--rail); border-bottom: 2px solid var(--rail); border-bottom-left-radius: 8px;
+}
+.tree-dot {
+  position: absolute; z-index: 1; left: var(--tx); top: var(--ty); transform: translate(-50%, -50%); box-sizing: border-box;
+  width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--c); background: var(--row-bg, var(--surface));
+}
+.task.selected { --row-bg: var(--ok-bg); }
+button.tree-fold { width: 16px; height: 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--c); background: color-mix(in srgb, var(--c) 10%, var(--row-bg, var(--surface))); }
+button.tree-fold:hover { background: color-mix(in srgb, var(--c) 22%, var(--row-bg, var(--surface))); }
+button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tree-fold svg { width: 8px; height: 8px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.tree-note { display: inline-block; margin-left: 8px; font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; vertical-align: 1px; }
+.tree-note.tree-more { font-variant-numeric: tabular-nums; border-color: var(--accent); color: var(--accent-ink); }
+.task.tree-parent-finished .title { color: var(--muted); }
 /* Task-A01-lens781: the Show filter, ticks in two groups (states, labels with Yes and No). */
 .filter-menu { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .filter-button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border-radius: 6px; max-width: 280px; }
@@ -882,6 +920,7 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .filter-grid tbody tr td:first-child { border-radius: 6px 0 0 6px; }
 .filter-grid tbody tr td:last-child { border-radius: 0 6px 6px 0; }
 .filter-empty { color: var(--warn); margin: 6px 8px 2px; }
+.filter-blocked { display: flex; align-items: center; gap: 4px; margin: 8px 8px 2px; padding-top: 6px; border-top: 1px solid var(--line); }
 /* Task-A01-wigwam308: the panel's two tabs (Presets, Custom) and the preset list. */
 .filter-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: -6px -4px 6px; padding: 0 6px; }
 .filter-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 13px; padding: 7px 12px 6px; margin-bottom: -1px; }
@@ -902,6 +941,9 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 /* A phone (Task-A04-02-03): one column, the ID before the title on the first line. */
 @media (max-width: 720px) {
   .task { display: block; }
+  .task.in-tree { display: grid; }
+  .tree-rest { display: block; }
+  .tree-lead { --tw: 16px; --tx: 8px; }
   .task .id { margin-right: 8px; }
   .task-body { display: contents; }
   .task .row-facts, .task .row-stop, .task .search-snippet { margin-top: 4px; }

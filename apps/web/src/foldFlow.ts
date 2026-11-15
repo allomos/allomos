@@ -2,8 +2,9 @@
 // (`npm --prefix apps/web test`). Only type imports here: Node strips them.
 
 /** Which list a set of keys belongs to. Groups start expanded, so their set holds the collapsed
- * ones. (The Handoffs tab's list is gone, Task-A03-polar770.) */
-export type FoldList = "groups";
+ * ones. (The Handoffs tab's list is gone, Task-A03-polar770.) `tree` holds the tasks whose
+ * children are folded away in the dependency tree (Task-A01-alpine458), by task ID. */
+export type FoldList = "groups" | "tree";
 
 /** The window-storage key for one project's list: remembered per project, per viewer. */
 export function foldStorageKey(root: string, list: FoldList): string {

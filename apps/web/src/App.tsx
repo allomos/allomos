@@ -38,6 +38,7 @@ import {
   stopFact,
   type StopFact,
   tableFilter,
+  withBlocked,
   presetFilter,
   taskListBanners,
   type Hidden,
@@ -45,6 +46,7 @@ import {
 } from "./stopFlow";
 import { useFold } from "./useFold";
 import { parseSort, sortTasks, type Sort } from "./sortFlow";
+import { depTreeRows, parseDepTree, type TreeRow } from "./depTreeFlow";
 import { SortMenu } from "./SortMenu";
 import { FilterMenu } from "./FilterMenu";
 import { BrandMark } from "./BrandMark";
@@ -56,7 +58,7 @@ import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
 import { keepListed, noteOpened, readRecent, readRecentInfo, RECENT_INFO_KEY, RECENT_KEY, RECENT_MAX, type RecentInfoMap } from "./recentFlow";
 import { TaskPane } from "./TaskPane";
-import { TaskRow } from "./TaskRow";
+import { TaskRow, type TreeMark } from "./TaskRow";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import { baseChoice, type Creating } from "./createFlow";
 import { GroupEditForm } from "./GroupEditForm";
@@ -141,7 +143,9 @@ export function App({
 }) {
   const { t, problem, language } = useI18n();
   const active = useContext(TabActive);
-  const [opened, setOpened] = useState<Opened | null>(null);
+  const [opened, keepOpened] = useState<Opened | null>(null);
+  // Decision 0026: blocked is worked out from blockers when the taskbag is read, never stored.
+  const setOpened = (o: Opened | null) => keepOpened(o && withBlocked(o));
   /** A kept or moved tab's taskbag is still opening: until then the tab keeps the label it came
    * with, instead of showing the start page's for a moment (Task-A01-banjo884). */
   const [opening, setOpening] = useState(start.how === "restore" || start.how === "moved");
@@ -1274,6 +1278,8 @@ const LIST_FILTER_KEY = "allomos.listFilter";
 /** The Folder filter, per taskbag (Task-A01-sketch327). */
 const FOLDER_FILTER_KEY = "allomos.folderFilter";
 const SORT_KEY = "allomos.iterationSort";
+/** Whether the dependency tree is on (Task-A01-alpine458): "on" or "off". */
+const DEP_TREE_KEY = "allomos.depTree";
 
 function readGroupBy(): GroupBy {
   try {
@@ -1464,6 +1470,24 @@ function TaskbagView({
     }
   };
   const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
+  // The dependency tree (Task-A01-alpine458), remembered like the sort; one choice for both tabs.
+  // The tasks whose children are folded away are remembered per project.
+  const [depTree, setDepTree] = useState(() => {
+    try {
+      return parseDepTree(localStorage.getItem(DEP_TREE_KEY));
+    } catch {
+      return false;
+    }
+  });
+  const chooseDepTree = (on: boolean) => {
+    setDepTree(on);
+    try {
+      localStorage.setItem(DEP_TREE_KEY, on ? "on" : "off");
+    } catch {
+      /* storage unavailable: the choice lasts until the window closes */
+    }
+  };
+  const [treeFolded, setTreeFolded] = useFold(opened.root, "tree");
   const stop = (task: Task) => stopFact(task, box?.tasks ?? [], t, taskT);
   // The search box (Task-A01-36): the task list's search, emptied when another project opens. Cmd/Ctrl+F focuses it.
   const [query, setQuery] = useState("");
@@ -1549,8 +1573,33 @@ function TaskbagView({
     : { search: [], filter: [] };
   // Nothing matches the filter: only the banner shows (Task-A01-44).
   const nothingShown = !searching && !isAll(stateFilter) && filtered.length === 0;
+  // The dependency tree (Task-A01-alpine458): each group's tasks as tree lines, built from the
+  // tasks the group shows now, so a blocker the filter hides is not a parent. The tasks are then
+  // listed in the tree's order, without those a fold hides. A search opens every fold, so no
+  // match is hidden.
+  const idRank = new Map(depTree && box ? sortTasks(box.tasks, { key: "id", dir: "asc" }).map((task, i) => [task.id, i]) : []);
+  const drawn: (Group & { rows?: TreeRow[] })[] = depTree
+    ? found.map((g) => {
+        const rows = depTreeRows(g.tasks, searching ? [] : treeFolded, idRank);
+        // The group's count and progress still cover the tasks a fold hides.
+        return { ...g, rows, tasks: rows.map((r) => r.task), counted: g.counted ?? g.tasks };
+      })
+    : found;
+  // A blocker that is not shown in the task's group: "ID · where it is", with the whole story on hover.
+  const outsideMark = (id: string, groupKey: string) => {
+    const blocker = box?.tasks.find((task) => task.id === id);
+    if (!blocker) return { id, text: id, title: t("tree.unknown_title", { id }) };
+    const home = groups.find((g) => g.tasks.includes(blocker));
+    if (!home || home.key === groupKey)
+      return { id, text: t("tree.outside", { id, where: t("tree.not_shown") }), title: t("tree.not_shown_title", { id, title: blocker.title }) };
+    return {
+      id,
+      text: t("tree.outside", { id, where: home.id || home.name }),
+      title: t("tree.outside_title", { id, title: blocker.title, where: [home.id, home.name].filter(Boolean).join(" ") }),
+    };
+  };
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
-  const shown = visibleItems(found, folded);
+  const shown = visibleItems(drawn, folded);
   const foldAll = (on: boolean) => setCollapsed((keys) => setKeys(keys, found.map((g) => g.key), on));
 
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
@@ -1773,7 +1822,6 @@ function TaskbagView({
         onOpen={() => setMonitorFrom(from)}
         onEdit={(run) => setEditingRun(run.id)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
-        onOpenTask={(id) => setSelectedId(id)}
         onError={onError}
         onNeedYou={() => chooseFilter(presetFilter("needs_you", ladder))}
       />
@@ -1809,7 +1857,7 @@ function TaskbagView({
                   </select>
                 </label>
               )}
-              <SortMenu sort={sort} onChange={chooseSort} />
+              <SortMenu sort={sort} onChange={chooseSort} tree={depTree} onTree={chooseDepTree} />
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
@@ -1843,7 +1891,7 @@ function TaskbagView({
           >
             <div className="areas">
               <ListBanners search={banners.search} filter={banners.filter} onShowAll={() => chooseFilter(allTicked(ladder))} />
-              {found.map((g) => (
+              {drawn.map((g) => (
                 <TaskGroup
                   key={g.key}
                   anchor={`group-${g.key}`}
@@ -1854,6 +1902,13 @@ function TaskbagView({
                   place={g.place}
                   empty={g.empty}
                   tasks={g.tasks}
+                  tree={
+                    g.rows &&
+                    ((id) => {
+                      const row = g.rows!.find((r) => r.task.id === id);
+                      return row && { row, onFold: () => setTreeFolded((keys) => toggleKey(keys, id)), outside: row.outside.map((o) => outsideMark(o, g.key)) };
+                    })
+                  }
                   counted={g.counted}
                   hidden={!searching && !isAll(stateFilter) ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
                   onShowAll={() => chooseFilter(allTicked(ladder))}
@@ -2072,6 +2127,7 @@ function TaskGroup({
   place,
   empty,
   tasks,
+  tree,
   counted,
   hidden,
   onShowAll,
@@ -2103,6 +2159,8 @@ function TaskGroup({
   place?: number;
   empty: string;
   tasks: Task[];
+  /** Each task's place in the dependency tree, when the tree is on (Task-A01-alpine458). */
+  tree?: (id: string) => TreeMark | undefined;
   /** Every task of the group, for its count and progress, when `tasks` is filtered by state. */
   counted?: Task[];
   /** What the state filter hides in this group (Task-A01-42); not given without a filter or while searching. */
@@ -2194,6 +2252,7 @@ function TaskGroup({
             <TaskRow
               key={task.id}
               task={task}
+              tree={tree?.(task.id)}
               selected={task.id === selectedId}
               onSelect={onSelect}
               terms={terms}

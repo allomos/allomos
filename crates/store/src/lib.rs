@@ -328,10 +328,12 @@ the project notes (below).
   prints the commands. With the setting off it does not remind you, and those pushes are not asked
   for; the rest stays. A branch with many WIP commits may be merged with a squash; never force-push.
 - Report progress: `alm label <id> \"<label>\"`.
-- Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`; blocked by
-  another task: `alm block <id> --by <task-id>`. When its last blocker finishes (done or
-  dropped), it goes on by itself; read its blockers' AI decisions before you start it. To let it
-  go on earlier: `alm unblock <id>`.
+- Stopped: waiting on a person: `alm wait <id> --on \"<what>\" [--who \"<who>\"]`. Another task
+  must finish first: `alm block <id> --by <task-id>`. Blocked is not a state: the task keeps its
+  state (backlog stays backlog) and is blocked while a blocker has not finished (done or
+  dropped); `alm next` does not list it until then. When its blockers finish, nothing changes in
+  it; read their AI decisions before you start it. To stop waiting for a blocker:
+  `alm unblock <id>`.
 - Stopping before it is done: `alm release <id> --note \"<what the next one needs>\"`.
 - Before an automatic or loop run begins (a card run, `/loop`, several tasks one after
   another), ask the person to choose quiet or normal mode: show them what
@@ -452,7 +454,7 @@ and leave other changes as they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),
 **iteration** (when it is planned), **label** (the step of this project's progress ladder a task
-has proven) and **state** (backlog, ready, in progress, waiting, blocked, done, dropped). When
+has proven) and **state** (backlog, ready, in progress, waiting, done, dropped). When
 you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean),
 `alm guide customize` (what this project may change and what is fixed), `alm guide commands`,
 `alm guide workflow`, `alm guide run-modes` (quiet or normal mode, for the person),
@@ -1702,8 +1704,8 @@ pub struct Changed {
     pub warnings: Vec<Problem>,
     /// Problems found in the taskbag's files while loading it.
     pub issues: Vec<Issue>,
-    /// The blocked tasks this change let go on by themselves: their last blocker finished
-    /// (Task-A01-tuna668).
+    /// The tasks this change freed: it finished their last open blocker, so they are no longer
+    /// blocked. They are not changed: each keeps its state (decision 0026).
     pub unblocked: Vec<Task>,
 }
 
@@ -1739,20 +1741,25 @@ pub struct Upgraded {
     pub labels: std::collections::BTreeMap<String, usize>,
     /// Tasks that lost a dropped label (`drafted`, `implemented`).
     pub dropped: usize,
+    /// Tasks that were in the old `blocked` state, each with the state it has now (decision
+    /// 0026): the one it had before it was blocked, from its history.
+    pub unblocked: Vec<(String, String)>,
     /// The checkpoint made right after the upgrade (`checkpoints/<name>.json`), which fixes the
     /// history recorded before signing; `None` without a signing key.
     pub checkpoint: Option<String>,
 }
 
-/// Upgrade an older taskbag to `allomos/8`, which only a person asks for (approver,
+/// Upgrade an older taskbag to `allomos/9`, which only a person asks for (approver,
 /// 2026-10-25). From `allomos/5`: `project_folder` becomes the first of `project_folders`, named
 /// after the folder (decision 0019). From `allomos/5` or `allomos/6`: the ladder becomes the label
 /// table and each task's `label` its `labels` (decision 0020, In detail 8): `drafted` and
 /// `implemented` are dropped, `locally verified` and `deployed and verified` become "… by agent",
 /// `human verified` (or `owner verified`) becomes `deployed and verified by human` when the task's
 /// history shows `deployed and verified` before it, else `locally verified by human`, and a task
-/// whose history has unreviewed AI decisions gets `AI decisions to review`. `None` when it is
-/// already up to date.
+/// whose history has unreviewed AI decisions gets `AI decisions to review`. From anything before
+/// `allomos/9` (decision 0026): a task in the old `blocked` state gets back the state it had
+/// before it was blocked ([`state_before_blocked`]); its blockers stay. `None` when it is already
+/// up to date.
 pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgraded>, Problem> {
     versions::write_allowed(root)?;
     let lock = Lock::acquire(root, wait)?;
@@ -1813,6 +1820,50 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
         allomos_core::labels::add_found(&mut project, &next.labels);
         changed.push(next);
     }
+    // Decision 0026: `blocked` is no longer a state. Each task still in it gets back the state it
+    // had before it was blocked, with what it waited on then.
+    let mut unblocked = Vec::new();
+    let mut restored: std::collections::BTreeMap<String, Vec<allomos_core::event::Change>> =
+        Default::default();
+    for task in bag.tasks.iter().filter(|t| t.old_blocked()) {
+        let mut next = match changed.iter().position(|c| c.id == task.id) {
+            Some(i) => changed.remove(i),
+            None => task.clone(),
+        };
+        let was = state_before_blocked(&history, &next);
+        let text = |v: &Option<String>| v.clone().map(serde_json::Value::String);
+        let mut changes = vec![allomos_core::event::Change {
+            extra: Default::default(),
+            field: "state".into(),
+            from: Some(serde_json::json!("blocked")),
+            to: Some(serde_json::json!(was.state.as_str())),
+        }];
+        for (field, from, to) in [
+            ("waiting_on", &next.waiting_on, &was.waiting_on),
+            ("who", &next.who, &was.who),
+        ] {
+            if from != to {
+                changes.push(allomos_core::event::Change {
+                    extra: Default::default(),
+                    field: field.into(),
+                    from: text(from),
+                    to: text(to),
+                });
+            }
+        }
+        changes.push(event::reason_change(if was.found {
+            "upgrade: blocked is no longer a state (decision 0026); this is the state it had before it was blocked, from its history"
+        } else {
+            "upgrade: blocked is no longer a state (decision 0026); its history does not say what it was before, so it is ready (in progress when held)"
+        }));
+        next.extra.remove("state");
+        next.state = was.state;
+        next.waiting_on = was.waiting_on;
+        next.who = was.who;
+        unblocked.push((next.id.clone(), next.state.as_str().to_string()));
+        restored.insert(next.id.clone(), changes);
+        changed.push(next);
+    }
     let before = Project {
         format: bag.project.format.clone(),
         ..bag.project.clone()
@@ -1838,7 +1889,7 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
             .filter(|v| !v.is_null());
         let to = (!next.labels.is_empty()).then(|| serde_json::json!(next.labels));
         let mut changes = Vec::new();
-        if raw_label.is_some() || to.is_some() {
+        if !labels_done && (raw_label.is_some() || to.is_some()) {
             changes.push(allomos_core::event::Change {
                 extra: Default::default(),
                 field: "labels".into(),
@@ -1849,10 +1900,12 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
         if !changes.is_empty() {
             tasks += 1;
         }
+        changes.extend(restored.remove(&next.id).unwrap_or_default());
         let event = actor.event("upgrade", Kind::Task, Some(&next.id), changes);
         lock.record(&event, |l| l.save_task(next))?;
     }
     if labels_done {
+        counts.clear();
         for task in &bag.tasks {
             for l in &task.labels {
                 *counts.entry(l.clone()).or_insert(0) += 1;
@@ -1869,8 +1922,87 @@ pub fn upgrade(root: &Path, actor: Actor, wait: Duration) -> Result<Option<Upgra
         tasks,
         labels: counts,
         dropped,
+        unblocked,
         checkpoint,
     }))
+}
+
+/// What a task in the old `blocked` state goes back to on the upgrade to `allomos/9`.
+struct BeforeBlocked {
+    state: allomos_core::State,
+    waiting_on: Option<String>,
+    who: Option<String>,
+    /// Its history said which state it had; otherwise the fallback.
+    found: bool,
+}
+
+/// The state `task` had before it was blocked (decision 0026, detail l): from the last change in
+/// its history that made it `blocked`, the state before that change, with what it waited on then.
+/// A state that no longer fits is corrected: in progress needs a holder and a holder means in
+/// progress, waiting needs what it waits on. With nothing in the history: in progress when
+/// someone holds it, else ready.
+fn state_before_blocked(history: &[allomos_core::event::Event], task: &Task) -> BeforeBlocked {
+    use allomos_core::State;
+    let held = task.holder.is_some();
+    let fallback = if held { State::InProgress } else { State::Ready };
+    let text = |v: &Option<serde_json::Value>| {
+        v.as_ref()
+            .and_then(|v| v.as_str())
+            .filter(|t| !t.trim().is_empty())
+            .map(String::from)
+    };
+    let found = history
+        .iter()
+        .filter(|e| e.kind == Kind::Task && e.id.as_deref() == Some(task.id.as_str()))
+        .filter(|e| {
+            e.changes
+                .iter()
+                .any(|c| c.field == "state" && c.to.as_ref().and_then(|v| v.as_str()) == Some("blocked"))
+        })
+        .max_by(|a, b| a.at.cmp(&b.at));
+    let Some(event) = found else {
+        return BeforeBlocked {
+            state: fallback,
+            waiting_on: None,
+            who: None,
+            found: false,
+        };
+    };
+    let from = |field: &str| {
+        event
+            .changes
+            .iter()
+            .find(|c| c.field == field)
+            .and_then(|c| text(&c.from))
+    };
+    let waiting_on = from("waiting_on");
+    let state = match from("state").as_deref() {
+        Some("backlog") if !held => Some(State::Backlog),
+        Some("ready") if !held => Some(State::Ready),
+        Some("waiting") if waiting_on.is_some() => Some(State::Waiting),
+        Some("in_progress") if held => Some(State::InProgress),
+        _ => None,
+    };
+    match state {
+        Some(State::Waiting) => BeforeBlocked {
+            state: State::Waiting,
+            waiting_on,
+            who: from("who"),
+            found: true,
+        },
+        Some(state) => BeforeBlocked {
+            state,
+            waiting_on: None,
+            who: None,
+            found: true,
+        },
+        None => BeforeBlocked {
+            state: fallback,
+            waiting_on: None,
+            who: None,
+            found: false,
+        },
+    }
 }
 
 pub(crate) fn lock_for_change(
@@ -2373,7 +2505,7 @@ pub fn change_task(
         }
         Ok(())
     })?;
-    let unblocked = release_blocked(&lock, &actor, &bag, &outcome.task)?;
+    let unblocked = freed_by(&bag, &outcome.task);
     Ok(Changed {
         task: outcome.task,
         warnings: outcome.warnings,
@@ -2459,81 +2591,28 @@ pub fn beat(
     })
 }
 
-/// After a change that leaves `task` finished (done or dropped): every blocked task whose
-/// blockers have now all finished goes on by itself, each as its own `unblock` event in the same
-/// locked change (Task-A01-tuna668, approver 2026-11-08). A task left blocked from before, whose
-/// blockers all finished earlier, goes on at the same time. Any other change moves nothing.
-fn release_blocked(
-    lock: &Lock,
-    actor: &Actor,
-    bag: &Taskbag,
-    task: &Task,
-) -> Result<Vec<Task>, Problem> {
+/// After a change that leaves `task` finished (done or dropped): the tasks it was the last open
+/// blocker of, which are no longer blocked. Nothing is written: being blocked is worked out from
+/// `blocked_by`, and each task keeps its state (decision 0026, replacing Task-A01-tuna668's
+/// automatic move to ready). The caller only tells.
+fn freed_by(bag: &Taskbag, task: &Task) -> Vec<Task> {
     if !matches!(
         task.state,
         allomos_core::State::Done | allomos_core::State::Dropped
     ) {
-        return Ok(Vec::new());
+        return Vec::new();
     }
     let mut after = bag.clone();
     match after.tasks.iter_mut().find(|t| t.id == task.id) {
         Some(t) => *t = task.clone(),
         None => after.tasks.push(task.clone()),
     }
-    write_released(lock, actor, &after)
-}
-
-/// Every blocked task in `bag` whose blockers have all finished goes on ([`ops::released`]), each
-/// written as its own `unblock` event under the held `lock`.
-fn write_released(lock: &Lock, actor: &Actor, bag: &Taskbag) -> Result<Vec<Task>, Problem> {
-    let mut unblocked = Vec::new();
-    for o in ops::released(bag) {
-        let before = bag.tasks.iter().find(|t| t.id == o.task.id);
-        let mut changes = event::changes(before, &o.task, event::TASK_FIELDS);
-        changes.extend(o.recorded.iter().cloned());
-        let event = actor.event("unblock", Kind::Task, Some(&o.task.id), changes);
-        lock.record(&event, |l| l.save_task(&o.task))?;
-        unblocked.push(o.task);
-    }
-    Ok(unblocked)
-}
-
-/// A task [`release_finished`] let go on, with the blockers that had finished.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct Released {
-    pub task: Task,
-    /// Its blockers, as `blocked_by` listed them before it was cleared.
-    pub blockers: Vec<String>,
-}
-
-/// Sweep the whole taskbag (Task-A01-steam936): every blocked task whose blockers have all
-/// finished goes on now, as the last blocker's `alm done` or `alm drop` would have let it
-/// ([`ops::released`]), each as its own `unblock` event in one locked change. The monitor calls it
-/// when it starts and on Check now, and `alm next` before it lists. With no such task nothing is
-/// written: not even the lock is taken, so a taskbag that cannot be written is only read.
-pub fn release_finished(
-    root: &Path,
-    actor: Actor,
-    wait: Duration,
-) -> Result<Vec<Released>, Problem> {
-    let (bag, _) = taskbag_of(root, load(root))?;
-    if ops::released(&bag).is_empty() {
-        return Ok(Vec::new());
-    }
-    let (lock, bag, _) = lock_for_change(root, wait)?;
-    let unblocked = write_released(&lock, &actor, &bag)?;
-    Ok(unblocked
-        .into_iter()
-        .map(|task| Released {
-            blockers: bag
-                .tasks
-                .iter()
-                .find(|t| t.id == task.id)
-                .map(|t| t.blocked_by.clone())
-                .unwrap_or_default(),
-            task,
-        })
-        .collect())
+    bag.tasks
+        .iter()
+        .filter(|t| t.id != task.id && t.blocked_by.contains(&task.id))
+        .filter(|t| ops::is_blocked(bag, t) && !ops::is_blocked(&after, t))
+        .cloned()
+        .collect()
 }
 
 /// Every task's branches (base and working), by task ID (Task-A03-22), from the history.
@@ -2971,76 +3050,160 @@ mod tests {
         fs::remove_dir_all(base).unwrap();
     }
 
-    /// Task-A01-steam936: the sweep lets every left-over blocked task go on (in progress when
-    /// held, else ready), each with an `unblock` event; with none, it writes nothing.
+    /// Decision 0026: finishing a task's last open blocker changes nothing in that task; the
+    /// change only reports it as freed.
     #[test]
-    fn the_sweep_unblocks_left_overs_and_otherwise_writes_nothing() {
-        let dir = tmp("sweep");
+    fn finishing_the_last_blocker_frees_a_task_without_changing_it() {
+        let dir = tmp("freed");
         let root = dir.join(DEFAULT_DIR);
         init(&root, "p", "P").unwrap();
         let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
         let bag = lock.load().taskbag.unwrap();
         lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
             .unwrap();
-        for id in ["A01-01", "A01-02", "A01-03", "A01-04"] {
+        for id in ["A01-01", "A01-02", "A01-03"] {
             let bag = lock.load().taskbag.unwrap();
             lock.create_task(&ops::new_task(&bag, id, "A01", id, None).unwrap())
                 .unwrap();
         }
-        // A01-02 (held by b) and A01-03 blocked by the done A01-01; A01-04 by the open A01-03.
-        let mut bag = lock.load().taskbag.unwrap();
-        for t in bag.tasks.iter_mut() {
-            match t.id.as_str() {
-                "A01-01" => t.state = allomos_core::State::Done,
-                "A01-02" | "A01-03" => {
-                    t.state = allomos_core::State::Blocked;
-                    t.blocked_by = vec!["A01-01".into()];
-                    if t.id == "A01-02" {
-                        t.holder = Some("b".into());
-                    }
-                }
-                "A01-04" => {
-                    t.state = allomos_core::State::Blocked;
-                    t.blocked_by = vec!["A01-03".into()];
-                }
-                _ => {}
+        drop(lock);
+        let me = || Actor::alm(Some("s"));
+        let by = |ids: &[&str]| ids.iter().map(|i| i.to_string()).collect::<Vec<_>>();
+        // A01-03 (backlog) is blocked by A01-01 and A01-02.
+        let c = change_task(&root, me(), Duration::ZERO, |bag| {
+            ops::block(bag, "A01-03", Some("s"), &by(&["A01-01", "A01-02"])).map(|o| (o, "block"))
+        })
+        .unwrap();
+        assert_eq!(c.task.state, allomos_core::State::Backlog);
+        let done = |id: &'static str| {
+            change_task(&root, me(), Duration::ZERO, move |bag| {
+                ops::finish(bag, id, Some("s"), None, None).map(|o| (o, "done"))
+            })
+            .unwrap()
+        };
+        assert!(done("A01-01").unblocked.is_empty());
+        let events = events::list(&root).0.len();
+        let freed = done("A01-02").unblocked;
+        assert_eq!(freed.len(), 1);
+        assert_eq!(freed[0].id, "A01-03");
+        // Only the `done` event: the freed task is as it was, blockers and all.
+        assert_eq!(events::list(&root).0.len(), events + 1);
+        let bag = load(&root).taskbag.unwrap();
+        let t = bag.tasks.iter().find(|t| t.id == "A01-03").unwrap();
+        assert_eq!(t.state, allomos_core::State::Backlog);
+        assert_eq!(t.blocked_by, by(&["A01-01", "A01-02"]));
+        assert!(!ops::is_blocked(&bag, t));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Decision 0026, detail l: the upgrade to `allomos/9` gives every task in the old `blocked`
+    /// state the state it had before it was blocked, from its history; with nothing there, ready
+    /// (in progress when held). Blockers stay.
+    #[test]
+    fn the_upgrade_gives_blocked_tasks_their_earlier_state() {
+        let dir = tmp("upgrade-blocked");
+        let root = dir.join(DEFAULT_DIR);
+        init(&root, "p", "P").unwrap();
+        let lock = Lock::acquire(&root, Duration::ZERO).unwrap();
+        let bag = lock.load().taskbag.unwrap();
+        lock.create_area(&ops::new_area(&bag, "A01", "First").unwrap())
+            .unwrap();
+        let ids = ["A01-01", "A01-02", "A01-03", "A01-04", "A01-05", "A01-06"];
+        for id in ids {
+            let bag = lock.load().taskbag.unwrap();
+            lock.create_task(&ops::new_task(&bag, id, "A01", id, None).unwrap())
+                .unwrap();
+        }
+        // As an `allomos/8` taskbag had them: `blocked` as a state, with what the history said.
+        // 02: backlog before. 03: waiting on Ann before. 04: no history. 05: held, no history.
+        // 06: ready before, blocked twice (the later change counts).
+        let actor = Actor::alm(Some("s"));
+        let change_of = |field: &str, from: Option<&str>, to: Option<&str>| {
+            allomos_core::event::Change {
+                extra: Default::default(),
+                field: field.into(),
+                from: from.map(|v| serde_json::json!(v)),
+                to: to.map(|v| serde_json::json!(v)),
             }
-            lock.save_task(t).unwrap();
+        };
+        let mut bag = lock.load().taskbag.unwrap();
+        for t in bag.tasks.iter_mut().filter(|t| t.id != "A01-01") {
+            let changes = match t.id.as_str() {
+                "A01-02" => vec![change_of("state", Some("backlog"), Some("blocked"))],
+                "A01-03" => vec![
+                    change_of("state", Some("waiting"), Some("blocked")),
+                    change_of("waiting_on", Some("the licence"), None),
+                    change_of("who", Some("Ann"), None),
+                ],
+                "A01-06" => vec![change_of("state", Some("ready"), Some("blocked"))],
+                _ => vec![],
+            };
+            if t.id == "A01-05" {
+                t.holder = Some("b".into());
+            }
+            t.state = allomos_core::State::Unknown;
+            t.extra.insert("state".into(), serde_json::json!("blocked"));
+            t.blocked_by = vec!["A01-01".into()];
+            if changes.is_empty() {
+                lock.save_task(t).unwrap();
+            } else {
+                let event = actor.event("block", Kind::Task, Some(&t.id), changes);
+                lock.record(&event, |l| l.save_task(t)).unwrap();
+            }
         }
         drop(lock);
-        let events = |root: &Path| events::list(root).0.len();
-        let before = events(&root);
-        let released = release_finished(&root, Actor::alm(Some("s")), Duration::ZERO).unwrap();
-        let ids: Vec<&str> = released.iter().map(|r| r.task.id.as_str()).collect();
-        assert_eq!(ids, ["A01-02", "A01-03"]);
-        assert_eq!(released[0].blockers, ["A01-01"]);
-        assert_eq!(events(&root), before + 2);
+        let project = root.join(PROJECT_FILE);
+        let text = fs::read_to_string(&project).unwrap();
+        fs::write(&project, text.replace(FORMAT, "allomos/8")).unwrap();
         let bag = load(&root).taskbag.unwrap();
-        let state = |id: &str| bag.tasks.iter().find(|t| t.id == id).unwrap().clone();
-        assert_eq!(state("A01-02").state, allomos_core::State::InProgress);
-        assert_eq!(state("A01-03").state, allomos_core::State::Ready);
-        assert!(state("A01-03").blocked_by.is_empty());
-        assert!(
-            state("A01-03")
-                .handoff_note
-                .unwrap()
-                .starts_with(&ops::released_note(&["A01-01".into()]))
-        );
-        assert_eq!(state("A01-04").state, allomos_core::State::Blocked);
-        let e = &events::history(&root, "A01-03").events[0];
-        assert_eq!(e.command, "unblock");
-        assert!(
-            allomos_core::event::reason(e)
-                .unwrap()
-                .starts_with("automatic:")
-        );
-        // Nothing left to let go on: no change, no event.
-        let before = events(&root);
+        assert!(bag.tasks.iter().filter(|t| t.old_blocked()).count() == 5);
+        // Not upgraded yet: such a task is not changed, and blockers are not either.
+        let refused = change_task(&root, Actor::alm(None), Duration::ZERO, |bag| {
+            ops::make_ready(bag, "A01-02", None).map(|o| (o, "ready"))
+        });
+        assert_eq!(refused.unwrap_err().code(), "blocked_state_old");
+
+        let up = upgrade(&root, Actor::alm(Some("s")), Duration::ZERO)
+            .unwrap()
+            .unwrap();
+        assert_eq!((up.from.as_str(), up.to.as_str()), ("allomos/8", FORMAT));
+        let got: Vec<(&str, &str)> = up
+            .unblocked
+            .iter()
+            .map(|(id, state)| (id.as_str(), state.as_str()))
+            .collect();
         assert_eq!(
-            release_finished(&root, Actor::alm(Some("s")), Duration::ZERO).unwrap(),
-            Vec::new()
+            got,
+            [
+                ("A01-02", "backlog"),
+                ("A01-03", "waiting"),
+                ("A01-04", "ready"),
+                ("A01-05", "in_progress"),
+                ("A01-06", "ready"),
+            ]
         );
-        assert_eq!(events(&root), before);
+        let loaded = load(&root);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let bag = loaded.taskbag.unwrap();
+        let t = |id: &str| bag.tasks.iter().find(|t| t.id == id).unwrap().clone();
+        assert_eq!(
+            (t("A01-03").waiting_on.as_deref(), t("A01-03").who.as_deref()),
+            (Some("the licence"), Some("Ann"))
+        );
+        for id in &ids[1..] {
+            assert_eq!(t(id).blocked_by, ["A01-01"], "{id}");
+            assert!(ops::is_blocked(&bag, &t(id)), "{id}");
+            assert!(!t(id).extra.contains_key("state"), "{id}");
+        }
+        let e = &events::history(&root, "A01-02").events[0];
+        assert_eq!(e.command, "upgrade");
+        assert!(allomos_core::event::reason(e).unwrap().starts_with("upgrade:"));
+        // Up to date now: nothing more to upgrade.
+        assert!(
+            upgrade(&root, Actor::alm(Some("s")), Duration::ZERO)
+                .unwrap()
+                .is_none()
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 

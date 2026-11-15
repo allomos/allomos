@@ -28,7 +28,6 @@ import {
   sessionsOf,
   setAgents,
   stalled,
-  unblockNotice,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
 import { levelsHold } from "../src/difficultyFlow.ts";
@@ -222,7 +221,6 @@ const entry = (over: Record<string, unknown> = {}) => ({
     working: [{ agent: "claude_cli", id: "A01-02", session_id: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, seen_held: true, seen: "", changed: 20 }],
     stopping: false,
     checked: 100,
-    unblocked: [{ id: "A01-03", state: "ready" }],
     ...over,
   },
 });
@@ -261,23 +259,6 @@ test("agents added or taken off: in the order offered, and never none", () => {
   assert.ok(r && isRun(r));
   assert.deepEqual(setAgents(r, ["antigravity_cli", "claude_cli"]), ["claude_cli", "antigravity_cli"]);
   assert.deepEqual(setAgents(r, []), ["claude_cli", "codex_cli"]);
-});
-
-test("the sweep's line groups the tasks by the state they went back to", () => {
-  assert.equal(unblockNotice([]), null, "nothing let go on: no line");
-  assert.deepEqual(
-    unblockNotice([
-      { id: "A01-02", state: "ready" },
-      { id: "A01-03", state: "in_progress" },
-      { id: "A01-04", state: "ready" },
-    ]),
-    {
-      groups: [
-        { state: "ready", ids: ["A01-02", "A01-04"] },
-        { state: "in_progress", ids: ["A01-03"] },
-      ],
-    },
-  );
 });
 
 test("a last run kept on this computer reads in the app's shape, and the later one is shown (A03-pocket537)", () => {
