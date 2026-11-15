@@ -24,7 +24,9 @@ import {
   gridTicks,
   isAll,
   isTicked,
+  isBlocked,
   matchPreset,
+  onlyBlocked,
   PRESETS,
   presetCount,
   presetFilter,
@@ -74,6 +76,7 @@ export function FilterMenu({
   }, [open]);
   const columns = filterColumns(filter);
   const grid = open ? gridTicks(filter) : null;
+  const blockedCount = open ? tasks.filter((task) => isBlocked(task)).length : 0;
   const preset = matchPreset(filter);
   // The panel opens on Presets while the ticks are a preset's, else on Custom.
   const toggle = () => {
@@ -238,6 +241,12 @@ export function FilterMenu({
             {emptyBy(filter) && <p className="filter-empty small">{t("filter.empty_all")}</p>}
             </div>
           )}
+          {/* Decision 0026: blocked is worked out, not a row of the grid, so it goes with either tab. */}
+          <label className="filter-blocked" title={t("filter.blocked_hint")}>
+            <input type="checkbox" checked={!!filter.blocked} onChange={(e) => onChange(onlyBlocked(filter, e.target.checked))} />{" "}
+            <span className="s-blocked-text">{t("filter.blocked_only")}</span>{" "}
+            <span className="muted small">{t(blockedCount === 1 ? "filter.who_one" : "filter.who_other", { count: blockedCount })}</span>
+          </label>
         </div>
       )}
     </span>

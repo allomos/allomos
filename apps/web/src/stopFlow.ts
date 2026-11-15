@@ -1,9 +1,9 @@
-// Why a stopped task is stopped, in words (decision 0016, Task-A01-31): `waiting` means a person
-// (or an outside event) must act — "Waiting for you: approve the card", "Waiting for Ann: …";
-// `blocked` means another task must finish first — "Blocked by A01-17 (in progress)", each
-// blocker with its state now. Also the list's state filter. Nothing here moves a task: when every
-// blocker has finished (done or dropped) the task goes on by itself when the last one
-// finishes (Task-A01-tuna668); a task left over from before only says so, as `alm` does.
+// Why a stopped task is stopped, in words (decisions 0016 and 0026): `waiting` means a person (or
+// an outside event) must act — "Waiting for you: approve the card", "Waiting for Ann: …". Blocked
+// is not a state: a task is blocked while one of the tasks in its `blocked_by` has not finished
+// (done or dropped) — "Blocked by A01-17 (in progress)" — and it keeps its own state meanwhile, so
+// it can be waiting and blocked at once. Also the list's state filter. Nothing here moves a task,
+// and nothing moves when blockers finish: the same rule as crates/core's `ops::is_blocked`.
 
 import type { Key } from "./i18n";
 import type { AiDecision, LabelEntry, Opened, Project, State, Task } from "./types";
@@ -18,10 +18,44 @@ export function blockers(task: Task, tasks: readonly Task[]): Blocker[] {
   return (task.blocked_by ?? []).map((id) => ({ id, state: tasks.find((x) => x.id === id)?.state ?? null }));
 }
 
-/** Whether a blocked task's blockers have all finished: done or dropped (Task-A01-tuna668). */
-export function allBlockersDone(task: Task, tasks: readonly Task[]): boolean {
-  const list = blockers(task, tasks);
-  return task.state === "blocked" && list.length > 0 && list.every((b) => b.state === "done" || b.state === "dropped");
+const finished = (state: State | null) => state === "done" || state === "dropped";
+
+/** The task's blockers that have not finished; none for a finished task. */
+export function openBlockers(task: Task, tasks: readonly Task[]): Blocker[] {
+  if (finished(task.state)) return [];
+  return blockers(task, tasks).filter((b) => !finished(b.state));
+}
+
+/** Whether the task is blocked: one of its blockers has not finished (decision 0026). Uses what
+ * `markBlocked` worked out when the task carries it. */
+export function isBlocked(task: Task, tasks?: readonly Task[]): boolean {
+  if (task.open_blockers || !tasks) return (task.open_blockers?.length ?? 0) > 0;
+  return openBlockers(task, tasks).length > 0;
+}
+
+/** The tasks as the app keeps them: each blocked one carries its open blockers (`open_blockers`),
+ * so the list, the filter and the dialogs need not look the blockers up again. */
+export function markBlocked(tasks: readonly Task[]): Task[] {
+  const states = new Map(tasks.map((x) => [x.id, x.state]));
+  return tasks.map((task) => {
+    if (!task.blocked_by?.length || finished(task.state)) return task.open_blockers ? { ...task, open_blockers: undefined } : task;
+    const open = task.blocked_by.filter((id) => !finished(states.get(id) ?? null));
+    return { ...task, open_blockers: open };
+  });
+}
+
+/** The opened project with every task's open blockers worked out (`markBlocked`). */
+export function withBlocked(opened: Opened): Opened {
+  const bag = opened.loaded.taskbag;
+  if (!bag) return opened;
+  return { ...opened, loaded: { ...opened.loaded, taskbag: { ...bag, tasks: markBlocked(bag.tasks) } } };
+}
+
+/** The state as people read it (decision 0026): the state's word, with "· blocked" while the task
+ * is blocked ("Backlog · blocked"). */
+export function stateWord(task: Task, t: T, taskT: T = t): string {
+  const word = taskT(`state.${task.state}` as Key);
+  return isBlocked(task) ? t("task.state_blocked", { state: word }) : word;
 }
 
 /** "A01-17 (in progress)", "A01-20 (dropped)"; an unknown one said so. */
@@ -31,39 +65,47 @@ export function blockerText(b: Blocker, t: T, taskT: T = t): string {
   return t("task.blocker", { id: b.id, state: taskT(`state.${b.state}` as Key) });
 }
 
-/** The line a stopped task shows in the list and the task pane; `null` when it is not stopped. */
+/** "Blocked by A01-17 (in progress)": the open blockers; `null` when the task is not blocked. */
+export function blockedText(task: Task, tasks: readonly Task[], t: T, taskT: T = t): string | null {
+  const open = openBlockers(task, tasks);
+  if (open.length === 0) return null;
+  return t("task.blocked_by", { list: open.map((b) => blockerText(b, t, taskT)).join(", ") });
+}
+
+/** The line a stopped task shows in the task pane; `null` when it is not stopped. A task both
+ * waiting and blocked says both. */
 export function stopText(task: Task, tasks: readonly Task[], t: T, taskT: T = t): string | null {
+  const lines: string[] = [];
   if (task.state === "waiting") {
     const what = task.waiting_on ?? "";
-    return task.who ? t("task.waiting_for", { who: task.who, what }) : t("task.waiting_for_you", { what });
+    lines.push(task.who ? t("task.waiting_for", { who: task.who, what }) : t("task.waiting_for_you", { what }));
   }
-  if (task.state === "blocked") {
-    const list = blockers(task, tasks)
-      .map((b) => blockerText(b, t, taskT))
-      .join(", ");
-    const line = t("task.blocked_by", { list });
-    return allBlockersDone(task, tasks) ? `${line} — ${t("task.blockers_done")}` : line;
-  }
-  return null;
+  const blocked = blockedText(task, tasks, t, taskT);
+  if (blocked) lines.push(blocked);
+  return lines.length ? lines.join(" · ") : null;
 }
 
 /** A stopped task's fact in the task list (Task-A01-cactus586): its name ("Waiting on", "Blocked by")
  * on a line of its own, its text under it. A person named to act leads the text ("Waiting for Ann: …");
  * `null` when the task is not stopped. */
-export type StopFact = { name: Key; text: string };
+export type StopFact = { name: Key; text: string; kind: "waiting" | "blocked" };
 
-export function stopFact(task: Task, tasks: readonly Task[], t: T, taskT: T = t): StopFact | null {
+/** Every fact that holds the task back, waiting first: a task can wait on a person and be blocked
+ * at once (decision 0026). */
+export function stopFacts(task: Task, tasks: readonly Task[], t: T, taskT: T = t): StopFact[] {
+  const facts: StopFact[] = [];
   if (task.state === "waiting") {
     const what = task.waiting_on ?? "";
-    return { name: "pane.waiting_on", text: task.who ? t("task.waiting_for", { who: task.who, what }) : what };
+    facts.push({ name: "pane.waiting_on", text: task.who ? t("task.waiting_for", { who: task.who, what }) : what, kind: "waiting" });
   }
-  if (task.state === "blocked") {
-    const list = blockers(task, tasks)
-      .map((b) => blockerText(b, t, taskT))
-      .join(", ");
-    return { name: "pane.blocked_by", text: allBlockersDone(task, tasks) ? `${list} — ${t("task.blockers_done")}` : list };
-  }
-  return null;
+  const open = openBlockers(task, tasks);
+  if (open.length > 0) facts.push({ name: "pane.blocked_by", text: open.map((b) => blockerText(b, t, taskT)).join(", "), kind: "blocked" });
+  return facts;
+}
+
+/** The first of them, for places with room for one. */
+export function stopFact(task: Task, tasks: readonly Task[], t: T, taskT: T = t): StopFact | null {
+  return stopFacts(task, tasks, t, taskT)[0] ?? null;
 }
 
 // Labels (decision 0020, Task-A01-petal376): Allomos's five built-in labels, a task's labels, the
@@ -220,7 +262,13 @@ export function withDecisions(opened: Opened): Opened {
  * cells, so a label new to the table starts ticked in every row; `labels` are the table's names,
  * built-in first, filled in when the list draws.
  */
-export type StateFilter = { off: Cell[]; labels: string[] };
+export type StateFilter = {
+  off: Cell[];
+  labels: string[];
+  /** Only blocked tasks (decision 0026): worked out, not a row, so it goes with any ticks of the
+   * grid ("Ready" and blocked). Left out when off. */
+  blocked?: boolean;
+};
 
 /** One tick of the grid: a state's row, a column, its Yes or No. */
 export type Cell = { state: State; column: string; side: Side };
@@ -230,7 +278,7 @@ export type Side = "yes" | "no";
 
 export const SIDES: Side[] = ["yes", "no"];
 
-export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "blocked", "done", "dropped"];
+export const FILTER_STATES: State[] = ["backlog", "ready", "in_progress", "waiting", "done", "dropped"];
 
 /** The "Checked by a human" column's name in the grid; no label is named with the empty word. */
 export const HUMAN_COLUMN = "";
@@ -281,12 +329,12 @@ function withOff(filter: StateFilter, off: Set<string>): StateFilter {
   const cells: Cell[] = [];
   for (const state of FILTER_STATES)
     for (const column of columns) for (const side of SIDES) if (off.has(cellKey(state, column, side))) cells.push({ state, column, side });
-  return { off: cells, labels: filter.labels };
+  return filter.blocked ? { off: cells, labels: filter.labels, blocked: true } : { off: cells, labels: filter.labels };
 }
 
 /** The filter for this label table: unticked cells of columns no longer in it are let go. */
 export function onTable(filter: StateFilter, labels: readonly string[]): StateFilter {
-  const table = { off: [], labels: [...labels] };
+  const table: StateFilter = filter.blocked ? { off: [], labels: [...labels], blocked: true } : { off: [], labels: [...labels] };
   const columns = filterColumns(table);
   const keep = filter.off.filter((c) => FILTER_STATES.includes(c.state) && columns.includes(c.column) && SIDES.includes(c.side));
   return withOff(table, new Set(keep.map((c) => cellKey(c.state, c.column, c.side))));
@@ -302,11 +350,17 @@ export function tableFilter(stored: StateFilter, project: Pick<Project, "labels"
 
 /** Whether nothing is unticked. */
 export function isAll(filter: StateFilter): boolean {
-  return filter.off.length === 0;
+  return filter.off.length === 0 && !filter.blocked;
+}
+
+/** "Only blocked tasks" turned on or off; the grid's ticks stay. */
+export function onlyBlocked(filter: StateFilter, on: boolean): StateFilter {
+  return on ? { off: filter.off, labels: filter.labels, blocked: true } : { off: filter.off, labels: filter.labels };
 }
 
 /** The tasks the filter keeps: those matching any ticked cell of their own state's row. */
 export function keepState(filter: StateFilter, task: Task): boolean {
+  if (filter.blocked && !isBlocked(task)) return false;
   if (filter.off.length === 0) return true;
   const { off, columns } = lookup(filter);
   return columns.some((column) => !off.has(cellKey(task.state, column, sideOf(task, column))));
@@ -342,7 +396,7 @@ export function tickRow(filter: StateFilter, state: State, on: boolean): StateFi
 
 /** The whole grid ticked (Select all) or unticked (Clear all). */
 export function tickAll(filter: StateFilter, on: boolean): StateFilter {
-  if (on) return { off: [], labels: filter.labels };
+  if (on) return onlyBlocked({ off: [], labels: filter.labels }, !!filter.blocked);
   return withOff(filter, new Set(FILTER_STATES.flatMap((s) => filterColumns(filter).flatMap((c) => SIDES.map((side) => cellKey(s, c, side))))));
 }
 
@@ -358,7 +412,8 @@ export function emptyBy(filter: StateFilter): boolean {
 
 /** The filter as stored: the unticked cells, each as [state, column, side]. */
 export function storeFilter(filter: StateFilter): string {
-  return JSON.stringify({ grid: filter.off.map((c) => [c.state, c.column, c.side]) });
+  const grid = filter.off.map((c) => [c.state, c.column, c.side]);
+  return JSON.stringify(filter.blocked ? { grid, blocked: true } : { grid });
 }
 
 /**
@@ -378,7 +433,7 @@ export function readFilter(value: string | null): StateFilter {
       if (!(FILTER_STATES as unknown[]).includes(state) || typeof column !== "string" || !(SIDES as unknown[]).includes(side)) continue;
       off.push({ state: state as State, column, side: side as Side });
     }
-    return { off, labels: [] };
+    return v.blocked === true ? { off, labels: [], blocked: true } : { off, labels: [] };
   } catch {
     return allTicked();
   }
@@ -429,9 +484,9 @@ export const PRESETS: Preset[] = ["all", "not_finished", "ready", "in_hand", "ne
 /** The rows a row preset ticks whole. */
 const PRESET_ROWS: Record<Exclude<Preset, "needs_you">, State[]> = {
   all: FILTER_STATES,
-  not_finished: ["backlog", "ready", "in_progress", "waiting", "blocked"],
+  not_finished: ["backlog", "ready", "in_progress", "waiting"],
   ready: ["ready"],
-  in_hand: ["in_progress", "waiting", "blocked"],
+  in_hand: ["in_progress", "waiting"],
   finished: ["done", "dropped"],
 };
 
@@ -447,6 +502,7 @@ export function presetFilter(preset: Preset, labels: readonly string[]): StateFi
 /** The preset whose ticks the filter has exactly, worked out once per filter; `null`: none. */
 const matched = new WeakMap<StateFilter, Preset | null>();
 export function matchPreset(filter: StateFilter): Preset | null {
+  if (filter.blocked) return null;
   if (matched.has(filter)) return matched.get(filter) ?? null;
   const off = lookup(filter).off;
   const found =
@@ -478,6 +534,10 @@ export function presetCount(preset: Preset, labels: readonly string[], tasks: re
 /** The filter's name as the Show button words it: a preset's name when the ticks are exactly a
  * preset's ("All tasks", "Needs you"), else "Hide Backlog, Dropped", "Filtered (3 hidden)". */
 export function filterName(filter: StateFilter, t: T, taskT: T = t): string {
+  if (filter.blocked) {
+    const grid = onlyBlocked(filter, false);
+    return isAll(grid) ? t("filter.blocked_only") : t("filter.and_blocked", { name: filterName(grid, t, taskT) });
+  }
   const preset = matchPreset(filter);
   if (preset) return presetName(preset, t);
   const off = untickedNames(filter, t, taskT);

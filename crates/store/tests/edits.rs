@@ -107,25 +107,16 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
             state: State::Ready,
             waiting_on: None,
             who: None,
-            blocked_by: vec![],
         },
         Edit::State {
             state: State::Waiting,
             waiting_on: Some("a reply on the licence".into()),
             who: Some("Ann".into()),
-            blocked_by: vec![],
-        },
-        Edit::State {
-            state: State::Blocked,
-            waiting_on: None,
-            who: None,
-            blocked_by: vec!["A01-02".into()],
         },
         Edit::State {
             state: State::Ready,
             waiting_on: None,
             who: None,
-            blocked_by: vec![],
         },
         Edit::BlockedBy {
             ids: vec!["A01-02".into()],
@@ -134,7 +125,6 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
             state: State::Done,
             waiting_on: None,
             who: None,
-            blocked_by: vec![],
         },
     ];
     let count = edits.len();
@@ -155,7 +145,9 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
     assert_eq!(t.title, "Do it well");
     assert_eq!(t.description, "A new *why*.\n");
     assert_eq!(t.state, State::Done);
-    assert!(t.blocked_by.is_empty() && t.who.is_none() && t.waiting_on.is_none());
+    // Its blockers stay when it moves on (decision 0026).
+    assert_eq!(t.blocked_by, ["A01-02"]);
+    assert!(t.who.is_none() && t.waiting_on.is_none());
     assert_eq!(
         fs::read_to_string(root.join("tasks/A01-01/description.md")).unwrap(),
         "A new *why*.\n"
@@ -176,7 +168,7 @@ fn every_field_changes_and_is_recorded_under_the_persons_name() {
         commands,
         [
             "label", "needs", "note", "plan", "title", "describe", "wait", "ready", "wait",
-            "block", "ready", "block", "done"
+            "ready", "block", "done"
         ]
     );
     // At the default identity level the person's name is in no event file (Task-A01-frolic587).
@@ -238,7 +230,6 @@ fn a_refused_edit_changes_no_file() {
                 state: State::Waiting,
                 waiting_on: None,
                 who: None,
-                blocked_by: vec![],
             },
         ),
         (
@@ -247,19 +238,9 @@ fn a_refused_edit_changes_no_file() {
                 state: State::InProgress,
                 waiting_on: None,
                 who: None,
-                blocked_by: vec![],
             },
         ),
-        // Blocked needs another task of this taskbag (decision 0016).
-        (
-            "A01-01",
-            Edit::State {
-                state: State::Blocked,
-                waiting_on: None,
-                who: None,
-                blocked_by: vec![],
-            },
-        ),
+        // A blocker is another task of this taskbag (decision 0026).
         (
             "A01-01",
             Edit::BlockedBy {

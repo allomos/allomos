@@ -122,41 +122,6 @@ pub fn new_session_id() -> String {
     )
 }
 
-/// Let every blocked task whose blockers have all finished go on (as the app's sweep did, at
-/// the start and on Check now), made as the person's saved name. Returns what it let go on; a
-/// failure is logged.
-fn sweep(root: &Path) -> Vec<crate::flow::Unblocked> {
-    let name = allomos_store::saved_owner_name();
-    match allomos_store::release_finished(
-        root,
-        allomos_store::Actor::alm(name.as_deref()),
-        Duration::from_secs(10),
-    ) {
-        Ok(list) => {
-            if !list.is_empty() {
-                let ids: Vec<&str> = list.iter().map(|r| r.task.id.as_str()).collect();
-                log(&format!(
-                    "let go on (blockers finished): {}",
-                    ids.join(", ")
-                ));
-            }
-            list.into_iter()
-                .map(|r| crate::flow::Unblocked {
-                    id: r.task.id.clone(),
-                    state: r.task.state.as_str().to_string(),
-                })
-                .collect()
-        }
-        Err(p) => {
-            log(&format!(
-                "could not let finished blockers' tasks go on: {}",
-                p.english()
-            ));
-            Vec::new()
-        }
-    }
-}
-
 /// The taskbag as it is now.
 fn read(root: &Path) -> Result<Taskbag, Problem> {
     allomos_store::taskbag_of(root, allomos_store::load(root)).map(|(bag, _)| bag)
@@ -216,7 +181,6 @@ impl Loop {
         log(&format!("asked: {req:?}"));
         match req {
             Request::Check => {
-                run.unblocked = sweep(&self.record.taskbag);
                 run.checked = 0;
             }
             Request::Stop => run.stopping = true,
@@ -371,10 +335,6 @@ impl Loop {
         }
         let due = !finished.is_empty() || now >= run.next_check();
         if !run.free_agents().is_empty() && due {
-            // The sweep's line lasts until the check after the one it came with.
-            if run.checked != 0 && run.checked != run.started - i64::from(run.every) * 60_000 {
-                self.record.run.unblocked.clear();
-            }
             let run = &self.record.run;
             let shares = run.share(bag, now / 1000);
             // An agent with a free slot and no task in its range gets no session; the status bar
@@ -472,7 +432,6 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         }
     ));
     drop(bag);
-    lp.record.run.unblocked = sweep(&root);
     lp.write();
     let mut last_read: Option<Instant> = None;
     loop {

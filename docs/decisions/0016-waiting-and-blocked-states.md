@@ -2,7 +2,7 @@
 
 | Status | Raised | Decided | Owner |
 |---|---|---|---|
-| **Accepted** | 2026-10-14 | 2026-10-14 | will.w.hui |
+| **Accepted**; the `blocked` state (and "one state at a time") replaced by [0026](./0026-blocked-is-computed-not-a-state.md) on 2026-11-15: blocked is worked out from `blocked_by`. The `waiting` part stands. | 2026-10-14 | 2026-10-14 | will.w.hui |
 
 Card: task `A01-31`. Accepted by the owner on 2026-10-14 (said in the owner's other session, relayed here, and confirmed by the owner in this session's chat).
 

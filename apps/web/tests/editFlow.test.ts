@@ -44,12 +44,14 @@ test("only the states alm can set are offered, after the task's own", () => {
   assert.deepEqual(stateChoices({ ...task, state: "ready" }), SETTABLE_STATES);
 });
 
-test("back to backlog: offered for an unheld ready, waiting or blocked task, explained when greyed out (Task-A01-lotus143)", () => {
+test("back to backlog: offered for an unheld ready or waiting task, explained when greyed out (Task-A01-lotus143, decision 0026)", () => {
   const unheld: Task = { ...task, state: "ready", holder: null };
   assert.equal(backlogAllowed(unheld), true);
   assert.equal(stateDisabled(unheld, "backlog"), false);
   assert.equal(backlogBlocked(unheld), null);
-  for (const state of ["waiting", "blocked"] as const) assert.equal(backlogAllowed({ ...unheld, state }), true);
+  assert.equal(backlogAllowed({ ...unheld, state: "waiting" }), true);
+  // A ready task with blockers keeps its state, so backlog is still offered.
+  assert.equal(backlogAllowed({ ...unheld, blocked_by: ["A01-17"] }), true);
   // Held: greyed out, saying who holds it.
   const held: Task = { ...task, state: "waiting", holder: "claude/x" };
   assert.equal(stateDisabled(held, "backlog"), true);
@@ -107,8 +109,8 @@ test("each field becomes the change Rust reads", () => {
     who: null,
   });
   assert.deepEqual(toEdit("state", d("waiting", "reply", " Ann ")), { field: "state", state: "waiting", waiting_on: "reply", who: "Ann" });
-  assert.deepEqual(toEdit("state", d("blocked", "", "", ["A01-17"])), { field: "state", state: "blocked", blocked_by: ["A01-17"] });
   assert.deepEqual(toEdit("blocked_by", d("", "", "", ["A01-17", "A01-20"])), { field: "blocked_by", ids: ["A01-17", "A01-20"] });
+  assert.deepEqual(toEdit("blocked_by", d("", "", "", [])), { field: "blocked_by", ids: [] });
   assert.deepEqual(toEdit("state", d("done")), { field: "state", state: "done" });
   assert.deepEqual(toEdit("waiting_on", d(" x ")), { field: "waiting_on", text: "x" });
   assert.deepEqual(toEdit("next_dependency", d(" ")), { field: "next_dependency", text: null });
@@ -146,14 +148,15 @@ test("a title or description carries the version it started from; a refusal name
   assert.equal(changedVersion("boom"), null);
 });
 
-test("blocked is a state the app sets, with the tasks that must finish first (decision 0016)", () => {
-  assert.ok(SETTABLE_STATES.includes("blocked"));
-  const blocked: Task = { ...task, state: "blocked", blocked_by: ["A01-17"] };
-  assert.deepEqual(startDraft(blocked, "blocked_by").blockedBy, ["A01-17"]);
-  const d = startDraft(blocked, "state");
-  assert.equal(draftChanged(blocked, "state", d), false);
-  assert.equal(draftChanged(blocked, "state", toggleBlocker(d, "A01-20")), true);
-  assert.equal(draftChanged(blocked, "blocked_by", { ...d, blockedBy: [] }), false, "an empty list is not saved");
+test("blockers are their own field and leave the state as it is (decision 0026)", () => {
+  assert.ok(!(SETTABLE_STATES as string[]).includes("blocked"));
+  const blocked: Task = { ...task, state: "backlog", blocked_by: ["A01-17"] };
+  const d = startDraft(blocked, "blocked_by");
+  assert.deepEqual(d.blockedBy, ["A01-17"]);
+  assert.equal(draftChanged(blocked, "blocked_by", d), false);
+  assert.equal(draftChanged(blocked, "blocked_by", toggleBlocker(d, "A01-20")), true);
+  assert.equal(draftChanged(blocked, "blocked_by", { ...d, blockedBy: [] }), true, "none takes them all off");
+  assert.equal(draftChanged(task, "blocked_by", startDraft(task, "blocked_by")), false);
   assert.deepEqual(toggleBlocker(toggleBlocker(d, "A01-02"), "A01-17").blockedBy, ["A01-02"]);
   // Waiting with a new who counts as a change.
   const waiting: Task = { ...task, state: "waiting", waiting_on: "x" };

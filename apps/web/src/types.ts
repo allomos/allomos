@@ -1,6 +1,6 @@
 // Shapes returned by the desktop app. They mirror the Rust types in crates/core and crates/store.
 
-export type State = "backlog" | "ready" | "in_progress" | "waiting" | "blocked" | "done" | "dropped";
+export type State = "backlog" | "ready" | "in_progress" | "waiting" | "done" | "dropped";
 
 export interface Project {
   format: string;
@@ -92,8 +92,12 @@ export interface Task {
   waiting_on: string | null;
   /** For a waiting task: who must act; none means the approver ("Waiting for you"). Decision 0016. */
   who?: string | null;
-  /** For a blocked task: the tasks that must finish first (left out when none). Decision 0016. */
+  /** The tasks that must finish first (left out when none). The task is blocked while one of them
+   * has not finished; blocked is not a state (decision 0026). */
   blocked_by?: string[];
+  /** Worked out by the app when it reads the taskbag, never in the file (stopFlow's markBlocked):
+   * the blockers that have not finished. Not empty: the task is blocked. */
+  open_blockers?: string[];
   next_dependency: string | null;
   iteration: string | null;
   handoff_note: string | null;
@@ -188,7 +192,7 @@ export interface AiDecision {
  * Each goes through the same rule as its `alm` command; Rust decides whether it is allowed.
  */
 export type Edit =
-  | { field: "state"; state: State; waiting_on?: string | null; who?: string | null; blocked_by?: string[] }
+  | { field: "state"; state: State; waiting_on?: string | null; who?: string | null }
   | { field: "label"; label: string }
   | { field: "labels"; labels: string[] }
   | { field: "waiting_on"; text: string }

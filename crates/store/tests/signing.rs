@@ -326,7 +326,7 @@ fn upgrading_from_allomos_7_starts_signing_and_fixes_what_came_before() {
     fs::remove_dir_all(root.join("keys")).unwrap();
     let project = root.join("project.json");
     let text = fs::read_to_string(&project).unwrap();
-    fs::write(&project, text.replace("allomos/8", "allomos/7")).unwrap();
+    fs::write(&project, text.replace(allomos_core::FORMAT, "allomos/7")).unwrap();
     // SAFETY: as in `turn`. Without a key store, `allomos/7` events are unsigned anyway.
     unsafe { std::env::remove_var("ALLOMOS_SETTINGS_DIR") };
     note(&root, "before");
@@ -337,7 +337,7 @@ fn upgrading_from_allomos_7_starts_signing_and_fixes_what_came_before() {
         .unwrap();
     assert_eq!(
         (up.from.as_str(), up.to.as_str()),
-        ("allomos/7", "allomos/8")
+        ("allomos/7", allomos_core::FORMAT)
     );
     assert_eq!(up.tasks, 0, "labels stay as they are");
     let checkpoint = up.checkpoint.expect("a checkpoint after the upgrade");

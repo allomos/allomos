@@ -62,7 +62,7 @@ The same taskbag carries the work from you to a teammate and back. Each of you k
 
 Tasks live as readable files in `.allomos/taskbag/`, versioned by your own Git, not inside one agent's memory or one account. The taskbag keeps:
 
-- **every task and its state** (ready, in progress, waiting, blocked, done) in one place, with one holder at a time;
+- **every task and its state** (ready, in progress, waiting, done; and which tasks block it) in one place, with one holder at a time;
 - **proven steps**: each task climbs a ladder (implemented → locally verified → deployed and verified → human verified), so progress is shown, not claimed;
 - **handoff notes and the AI's own decisions**: what was done, what is next, and every routine choice an agent made, for you to review later;
 - **a queue for you**: what waits on your check, your answer or your review, in one list.

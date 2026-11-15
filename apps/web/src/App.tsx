@@ -38,6 +38,7 @@ import {
   stopFact,
   type StopFact,
   tableFilter,
+  withBlocked,
   presetFilter,
   taskListBanners,
   type Hidden,
@@ -141,7 +142,9 @@ export function App({
 }) {
   const { t, problem, language } = useI18n();
   const active = useContext(TabActive);
-  const [opened, setOpened] = useState<Opened | null>(null);
+  const [opened, keepOpened] = useState<Opened | null>(null);
+  // Decision 0026: blocked is worked out from blockers when the taskbag is read, never stored.
+  const setOpened = (o: Opened | null) => keepOpened(o && withBlocked(o));
   /** A kept or moved tab's taskbag is still opening: until then the tab keeps the label it came
    * with, instead of showing the start page's for a moment (Task-A01-banjo884). */
   const [opening, setOpening] = useState(start.how === "restore" || start.how === "moved");
@@ -1773,7 +1776,6 @@ function TaskbagView({
         onOpen={() => setMonitorFrom(from)}
         onEdit={(run) => setEditingRun(run.id)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
-        onOpenTask={(id) => setSelectedId(id)}
         onError={onError}
         onNeedYou={() => chooseFilter(presetFilter("needs_you", ladder))}
       />
