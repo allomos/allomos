@@ -263,6 +263,10 @@ enum Command {
         by: String,
         #[arg(long, value_parser = State::ALL.map(State::as_str))]
         state: Option<String>,
+        /// Only tasks that are blocked: one of their blockers has not finished. Goes with
+        /// --state (for example --state ready --blocked).
+        #[arg(long)]
+        blocked: bool,
         /// Only tasks you hold.
         #[arg(long)]
         mine: bool,
@@ -579,17 +583,24 @@ enum Command {
         #[arg(long, value_name = "NAME")]
         who: Option<String>,
     },
-    /// Mark a task blocked: other tasks in this taskbag must finish first.
+    /// Add blockers to a task: other tasks in this taskbag that must finish first. Its state
+    /// stays as it is; it is blocked while one of them has not finished (done or dropped), and
+    /// `alm next` does not list it until then.
     Block {
         id: String,
         /// The blocking tasks' IDs (several, or separated by commas).
         #[arg(long, value_name = "TASK-ID", num_args = 1.., required = true)]
         by: Vec<String>,
     },
-    /// Move a blocked task on (ready, or in progress when someone holds it) before its blockers
-    /// finish. `alm` does not check its blockers: you do. When the last blocker finishes (done or
-    /// dropped), the task goes on by itself; this command is for letting it go earlier.
-    Unblock { id: String },
+    /// Take blockers off a task: all of them, or only the ones named with --by. Its state stays
+    /// as it is. For when it should not wait for them after all; blockers that finish need no
+    /// command.
+    Unblock {
+        id: String,
+        /// Only these blockers (several, or separated by commas); without it, all of them.
+        #[arg(long, value_name = "TASK-ID", num_args = 1..)]
+        by: Vec<String>,
+    },
     /// Finish a task. Finish it at the top label (a person has checked it); when only a person's
     /// hands-on check is left, in any run mode, finish it below it with --without-human-check and
     /// --steps. On a task already done, only its human check is recorded again.
@@ -621,9 +632,10 @@ enum Command {
         id: String,
         iteration: Option<String>,
     },
-    /// Mark an unheld backlog, waiting or blocked task ready (for example, the approver approved it).
+    /// Mark an unheld backlog or waiting task ready (for example, the approver approved it). Its
+    /// blockers stay.
     Ready { id: String },
-    /// Send an unheld ready, waiting or blocked task back to backlog, to be thought over again
+    /// Send an unheld ready or waiting task back to backlog, to be thought over again
     /// (write the open questions in its description's Notes).
     Backlog { id: String },
     /// Give a task a new title.
@@ -692,7 +704,7 @@ enum Command {
         #[command(subcommand)]
         what: FolderWhat,
     },
-    /// Upgrade this taskbag to the newest format (allomos/8: signed changes, keys and checkpoints,
+    /// Upgrade this taskbag to the newest format (allomos/9: blocked worked out from blockers; allomos/8: signed changes, keys and checkpoints,
     /// decision 0021; from allomos/5 or allomos/6 also the label table and several labels per task,
     /// decision 0020; from allomos/5 also project folders, decision 0019). Without --confirm
     /// it only says what it will do. Older Allomos versions
@@ -1122,7 +1134,7 @@ impl Command {
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
             | Command::Block { id, .. }
-            | Command::Unblock { id }
+            | Command::Unblock { id, .. }
             | Command::Done { id, .. }
             | Command::Checked { id, .. }
             | Command::Recheck { id, .. }
@@ -1850,19 +1862,7 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
     let packed = done.fields["packed"]
         .as_array()
         .is_some_and(|p| !p.is_empty());
-    // `alm next` that let blocked tasks go on (Task-A01-steam936) shares that change.
-    let swept: Vec<String> = match cli.command {
-        Command::Next { .. } => done.fields["unblocked"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|t| t["id"].as_str().map(String::from))
-                    .collect()
-            })
-            .unwrap_or_default(),
-        _ => Vec::new(),
-    };
-    let changes = (cli.command.changes() || packed || !swept.is_empty())
+    let changes = (cli.command.changes() || packed)
         && !matches!(cli.command, Command::Init { .. });
     let mut text = String::new();
     let mut files: Vec<String> = written
@@ -1886,9 +1886,7 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             Some(id) => format!("alm: {command} {id}"),
             None => format!("alm: {command}"),
         };
-        let subject = if !swept.is_empty() {
-            format!("alm: unblock {}", swept.join(" "))
-        } else if packed && !cli.command.changes() {
+        let subject = if packed && !cli.command.changes() {
             "alm: pack history".to_string()
         } else {
             subject
@@ -2308,41 +2306,58 @@ fn task_json(t: &Task) -> Value {
     v
 }
 
-/// A task for `--json` reading commands: with each blocker's current state when it is blocked.
+/// A task for `--json` reading commands: whether it is blocked (worked out, decision 0026), and
+/// each blocker's current state when it has blockers.
 fn task_json_in(bag: &Taskbag, t: &Task) -> Value {
     let mut v = task_json(t);
+    v["blocked"] = json!(ops::is_blocked(bag, t));
     if !t.blocked_by.is_empty() {
         v["blockers"] = json!(ops::blockers(bag, t));
-        v["all_blockers_done"] = json!(ops::all_blockers_done(bag, t));
     }
     v
 }
 
-/// What a stopped task waits on, in one line: "waiting for you: approve the card", "waiting for
-/// Ann: …", or "blocked by A01-17 (in progress), A01-20 (done)" (decision 0016).
-fn stop_line(bag: &Taskbag, t: &Task) -> Option<String> {
-    match t.state {
-        State::Waiting => Some(format!(
+/// "blocked by A01-17 (in progress), A01-20 (backlog)": the blockers that have not finished;
+/// none when the task is not blocked (decision 0026).
+fn blocked_text(bag: &Taskbag, t: &Task) -> Option<String> {
+    let open: Vec<String> = ops::open_blockers(bag, t)
+        .iter()
+        .map(ops::Blocker::describe)
+        .collect();
+    (!open.is_empty()).then(|| format!("blocked by {}", open.join(", ")))
+}
+
+/// "blockers finished: A01-17 (done)": the task has blockers and none is open any more. None for
+/// a finished task.
+fn finished_blockers_text(bag: &Taskbag, t: &Task) -> Option<String> {
+    if matches!(t.state, State::Done | State::Dropped) || ops::is_blocked(bag, t) {
+        return None;
+    }
+    let done: Vec<String> = ops::finished_blockers(bag, t)
+        .iter()
+        .map(ops::Blocker::describe)
+        .collect();
+    (!done.is_empty()).then(|| format!("blockers finished: {}", done.join(", ")))
+}
+
+/// What whoever starts a task with finished blockers does first (decision 0026, detail h).
+const READ_BLOCKERS_FIRST: &str = "before starting, read their AI decisions and handoffs (`alm show <id>`), and change this task's plan if they changed what it needs";
+
+/// What holds a task back, one line each: "waiting for you: approve the card", "waiting for
+/// Ann: …", "blocked by A01-17 (in progress)" (a task can be both, decision 0026); or that its
+/// blockers have finished.
+fn stop_lines(bag: &Taskbag, t: &Task) -> Vec<String> {
+    let mut lines = Vec::new();
+    if t.state == State::Waiting {
+        lines.push(format!(
             "waiting for {}: {}",
             t.who.as_deref().unwrap_or("the approver"),
             t.waiting_on.as_deref().unwrap_or("-")
-        )),
-        State::Blocked => {
-            let list: Vec<String> = ops::blockers(bag, t)
-                .iter()
-                .map(ops::Blocker::describe)
-                .collect();
-            let mut line = format!("blocked by {}", list.join(", "));
-            if ops::all_blockers_done(bag, t) {
-                line.push_str(&format!(
-                    " — all finished: check, then `alm unblock {}`",
-                    t.id
-                ));
-            }
-            Some(line)
-        }
-        _ => None,
+        ));
     }
+    lines.extend(blocked_text(bag, t));
+    lines.extend(finished_blockers_text(bag, t));
+    lines
 }
 
 /// An iteration's heading: ID and name, then its release and dates when it has them.
@@ -2570,7 +2585,7 @@ fn human(
     }
     for t in &to_answer {
         text.push_str(&format!("  {}\n", human_task_line(t, language)));
-        if let Some(line) = stop_line(bag, t) {
+        for line in stop_lines(bag, t) {
             text.push_str(&format!("      {line}\n"));
         }
     }
@@ -2683,9 +2698,6 @@ fn state_text(state: State, language: &str) -> &'static str {
         (State::Waiting, "zh-CN") => "等待中",
         (State::Waiting, "ja") => "待機中",
         (State::Waiting, _) => "Waiting",
-        (State::Blocked, "zh-CN") => "被阻塞",
-        (State::Blocked, "ja") => "ブロック中",
-        (State::Blocked, _) => "Blocked",
         (State::Done, "zh-CN") => "已完成",
         (State::Done, "ja") => "完了",
         (State::Done, _) => "Done",
@@ -2746,6 +2758,19 @@ fn task_line(t: &Task) -> String {
         },
         t.holder.as_deref().unwrap_or("-"),
         t.title
+    )
+}
+
+/// A task's line where the taskbag is at hand: the state says "· blocked" when a blocker has not
+/// finished (decision 0026: the state and being blocked are shown together).
+fn task_line_in(bag: &Taskbag, t: &Task) -> String {
+    if !ops::is_blocked(bag, t) {
+        return task_line(t);
+    }
+    task_line(t).replacen(
+        &format!("{}  {}  ", t.id, t.state.as_str()),
+        &format!("{}  {} · blocked  ", t.id, t.state.as_str()),
+        1,
     )
 }
 
@@ -3742,6 +3767,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             iteration,
             by,
             state,
+            blocked,
             mine,
             without_human_check,
             folder,
@@ -3773,6 +3799,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         .as_ref()
                         .is_none_or(|i| t.iteration.as_ref() == Some(i))
                     && state.as_ref().is_none_or(|s| t.state.as_str() == s)
+                    && (!*blocked || ops::is_blocked(&bag, t))
                     && (!*mine || t.holder.as_deref() == me)
                     && (!*without_human_check || t.to_check())
                     && folder.as_ref().is_none_or(|f| t.folders.contains(f))
@@ -3793,8 +3820,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     text.push_str("  (none)\n");
                 }
                 for t in members {
-                    text.push_str(&format!("  {}\n", task_line(t)));
-                    if let Some(line) = stop_line(&bag, t) {
+                    text.push_str(&format!("  {}\n", task_line_in(&bag, t)));
+                    for line in stop_lines(&bag, t) {
                         text.push_str(&format!("      {line}\n"));
                     }
                 }
@@ -3874,6 +3901,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             let task = ops::find_task(&bag, id)?;
             let mut text = String::new();
+            let state_shown = match blocked_text(&bag, &task) {
+                Some(by) => format!("{} · {by}", task.state_text()),
+                None => task.state_text(),
+            };
             let blocked = (!task.blocked_by.is_empty()).then(|| {
                 ops::blockers(&bag, &task)
                     .iter()
@@ -3897,14 +3928,14 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("iteration", task.iteration.as_deref()),
                 ("folders", folders_text.as_deref()),
                 ("difficulty", Some(difficulty_text.as_str())),
-                ("state", Some(task.state.as_str())),
+                ("state", Some(state_shown.as_str())),
                 ("labels", labels_text.as_deref()),
                 ("holder", task.holder.as_deref()),
                 ("heartbeat", heartbeat_text.as_deref()),
                 ("doing", doing_text.as_deref()),
                 ("waiting on", task.waiting_on.as_deref()),
                 ("waiting for", task.who.as_deref()),
-                ("blocked by", blocked.as_deref()),
+                ("blockers", blocked.as_deref()),
                 ("next dependency", task.next_dependency.as_deref()),
                 ("handoff note", task.handoff_note.as_deref()),
                 ("not human-checked", task.without_human_check.as_deref()),
@@ -3978,11 +4009,8 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(rules) = taking_over {
                 text.push_str(rules);
             }
-            if ops::all_blockers_done(&bag, &task) {
-                text.push_str(&format!(
-                    "All blockers have finished (done or dropped), before blockers went on by themselves: check, then `alm unblock {}`. The next `alm done` or `alm drop` lets it go on too.\n",
-                    task.id
-                ));
+            if let Some(line) = finished_blockers_text(&bag, &task) {
+                text.push_str(&format!("{line}: {READ_BLOCKERS_FIRST}.\n"));
             }
             if !task.description.is_empty() {
                 text.push('\n');
@@ -4027,18 +4055,6 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             difficulty,
         } => {
             let root = locate(cli, cwd)?;
-            // First, every blocked task whose blockers have all finished goes on, as the last
-            // blocker's `alm done` would have let it (Task-A01-steam936); it is then listed like
-            // any other. Nothing to let go on writes nothing. When the taskbag cannot be written,
-            // `alm next` says why and lists as it is.
-            let (unblocked, unblock_failed) = match allomos_store::release_finished(
-                &root,
-                Actor::alm(cli.holder.as_deref()),
-                lock_wait(),
-            ) {
-                Ok(list) => (list, None),
-                Err(p) => (Vec::new(), Some(p)),
-            };
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             // `alm` lists; the agent chooses (Task-A03-14).
             let mut tasks = ops::next(&bag, iteration.as_deref())?;
@@ -4086,11 +4102,6 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 CHOOSING_RULE.to_string()
             };
             let mut text = String::new();
-            let unblocked_tasks: Vec<Task> = unblocked.iter().map(|r| r.task.clone()).collect();
-            text.push_str(&unblocked_text(&unblocked_tasks));
-            if !unblocked.is_empty() {
-                text.push('\n');
-            }
             if let Some(name) = &here {
                 text.push_str(&format!(
                     "Inside project folder {name}: only its tasks are listed (tasks with no folder are left out). `alm next --all-folders` lists every task.\n\n"
@@ -4133,7 +4144,10 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 if let Some(note) = &t.handoff_note {
                     text.push_str(&format!("  handoff note: {note}\n"));
                 }
-                listed.push(task_json(t));
+                if let Some(line) = finished_blockers_text(&bag, t) {
+                    text.push_str(&format!("  {line}: {READ_BLOCKERS_FIRST}.\n"));
+                }
+                listed.push(task_json_in(&bag, t));
             }
             if !tasks.is_empty() {
                 text.push('\n');
@@ -4165,29 +4179,24 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     withdrawn.push(json!({ "task": t.id, "approval": r.approval.id }));
                 }
             }
-            // Blocked tasks are skipped by their state. One whose blockers have all finished went
-            // on above (Task-A01-steam936); one is left over only when that could not be written,
-            // and then `alm next` tells about it.
+            // Ready tasks that are blocked are not listed above (decision 0026): said here, each
+            // with its open blockers, so nobody wonders where they went. alm changes nothing;
+            // each shows up above by itself once its blockers have finished.
             let mut blocked = Vec::new();
             for t in bag.tasks.iter().filter(|t| {
-                t.state == State::Blocked
+                t.state == State::Ready
+                    && t.holder.is_none()
                     && iteration
                         .as_ref()
                         .is_none_or(|i| t.iteration.as_ref() == Some(i))
             }) {
-                if !ops::all_blockers_done(&bag, t) {
+                let Some(by) = blocked_text(&bag, t) else {
                     continue;
+                };
+                if blocked.is_empty() {
+                    text.push_str("Ready but blocked (not listed above; each is listed once its blockers have finished):\n");
                 }
-                let list: Vec<String> = ops::blockers(&bag, t)
-                    .iter()
-                    .map(ops::Blocker::describe)
-                    .collect();
-                text.push_str(&format!(
-                    "{}: all blockers have finished ({}) — unblock it? Check, then `alm unblock {}` (the next `alm done` or `alm drop` also lets it go on).\n",
-                    t.id,
-                    list.join(", "),
-                    t.id
-                ));
+                text.push_str(&format!("  {}  {by}  {}\n", t.id, t.title));
                 blocked.push(task_json_in(&bag, t));
             }
             // Card files (Task-A00-30): what the tasks' `Card:` links point to outside the
@@ -4228,17 +4237,11 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "handoffs": if handoffs_line.is_empty() { Value::Null } else { json!(handoffs_line.trim_end()) },
                     "active_iteration": ops::active_iteration(&bag).map(|i| i.id.clone()),
                     "folder": here,
-                    "unblocked": unblocked.iter().map(|r| {
-                        let mut v = task_json(&r.task);
-                        v["finished_blockers"] = json!(r.blockers);
-                        v
-                    }).collect::<Vec<_>>(),
                     "finished_iteration": finished.as_ref().map(|(done_it, next_it, words)| json!({ "iteration": done_it, "next": next_it, "suggestion": words })),
                 }),
                 text,
             );
             done.issues = issues;
-            done.warnings.extend(unblock_failed);
             Ok(done)
         }
         Command::Claim {
@@ -4284,11 +4287,25 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             if let Some(t) = &claimed.took_over {
                 text.push_str(&took_over_text(&root, t));
             }
+            // A blocked task may be claimed: alm says so and the agent decides (decision 0026,
+            // detail f).
+            let blocked_fact = load(&root).taskbag.and_then(|bag| {
+                let by = blocked_text(&bag, &claimed.changed.task)?;
+                Some(format!(
+                    "Fact: this task is {by}: tasks that were to finish first have not. You decide whether to go on, work another part, or release it (`alm release {}`).",
+                    claimed.changed.task.id
+                ))
+            });
+            if let Some(fact) = &blocked_fact {
+                text.push_str(fact);
+                text.push('\n');
+            }
             let steps = branch_steps(at);
             text.push_str(&steps.text);
             let mut done = Done::new(
                 json!({
                     "taskbag": root,
+                    "blocked_fact": blocked_fact,
                     "task": task_json(&claimed.changed.task),
                     "branches": at.branches,
                     "base_why": at.why,
@@ -4427,15 +4444,31 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let root = locate(cli, cwd)?;
             if let Some(bag) = load(&root).taskbag {
                 if let Some(task) = bag.tasks.iter().find(|t| &t.id == id) {
-                    if let Some(line) = stop_line(&bag, task) {
+                    for line in stop_lines(&bag, task) {
                         done.text.push_str(&format!("  {line}\n"));
+                    }
+                    done.text.push_str("  Its state stays as it is; while it is blocked, `alm next` does not list it.\n");
+                    done.fields["task"] = task_json_in(&bag, task);
+                }
+            }
+            Ok(done)
+        }
+        Command::Unblock { id, by } => {
+            let mut done = change(cli, cwd, |bag| ops::unblock(bag, id, me, by))?;
+            let root = locate(cli, cwd)?;
+            if let Some(bag) = load(&root).taskbag {
+                if let Some(task) = bag.tasks.iter().find(|t| &t.id == id) {
+                    for line in stop_lines(&bag, task) {
+                        done.text.push_str(&format!("  {line}\n"));
+                    }
+                    if task.blocked_by.is_empty() {
+                        done.text.push_str("  It has no blockers now; its state stays as it is.\n");
                     }
                     done.fields["task"] = task_json_in(&bag, task);
                 }
             }
             Ok(done)
         }
-        Command::Unblock { id } => change(cli, cwd, |bag| ops::unblock(bag, id, me)),
         Command::Done {
             id,
             without_human_check,
@@ -5039,13 +5072,13 @@ fn change(
     Ok(done)
 }
 
-/// What a change that finished a task says about the blocked tasks it let go on
-/// (Task-A01-tuna668): nothing when there are none.
+/// What a change that finished a task says about the tasks it freed (decision 0026): it was
+/// their last open blocker. They are not changed; nothing when there are none.
 fn unblocked_text(unblocked: &[Task]) -> String {
     let mut text = String::new();
     for t in unblocked {
         text.push_str(&format!(
-            "Unblocked {} ({}): all its blockers have finished. Its handoff note says so; whoever takes it reads its blockers' AI decisions first.\n",
+            "{} ({}) is no longer blocked: all its blockers have finished. It keeps its state (a ready one is now listed by `alm next`); whoever takes it reads its blockers' AI decisions and handoffs first.\n",
             t.id,
             t.state.as_str().replace('_', " ")
         ));
