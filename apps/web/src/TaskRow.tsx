@@ -15,7 +15,7 @@ import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
-import { chipLabels, humanCheckNote, isBlocked, toCheck, toReview, type StopFact } from "./stopFlow";
+import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import { difficultyOf, difficultyText } from "./difficultyFlow";
 import type { Task } from "./types";
@@ -54,7 +54,7 @@ export function TaskRow({
 }) {
   const { t } = useI18n();
   const taskT = useTaskT();
-  const decisions = task.ai_decisions?.length ?? 0;
+  const decisions = decisionsToReview(task).length;
   const facts: [string, ReactNode, string?][] = [
     [
       t("pane.state"),

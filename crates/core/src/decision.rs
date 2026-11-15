@@ -6,11 +6,18 @@
 //! (`alm reviewed <id>` or the app's **Reviewed** button), one `reviewed` event lists each of them
 //! with only its `from`: the decision was "emptied". A task's decisions to review are therefore
 //! the `ai_decision` changes since its last review, worked out from the events alone, so
-//! `task.json` gains no field and the taskbag's format does not change.
+//! `task.json` gains no field.
+//!
+//! Each decision says which of three kinds it is (decision 0025 § 3, Task-A01-piglet562), as a
+//! `kind` beside the change's `to`: `visible` (what a user sees or runs into: wording, look,
+//! behaviour), `principle` (how it is built and why) or `detail` (sizes, limits, parameters,
+//! names in the code). The first two wait for review; a detail is kept with the task, to be
+//! read, but does not. A decision with no kind (recorded before kinds, or without `--kind`)
+//! waits for review, so none slips past unreviewed.
 
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::event::{Change, Event, Kind};
@@ -24,6 +31,42 @@ pub const DECIDED: &str = "ai-decided";
 /// The command that marks a task's decisions reviewed.
 pub const REVIEWED: &str = "reviewed";
 
+/// The key, beside an `ai_decision` change's `to`, that holds the decision's [`DecisionKind`].
+pub const KIND: &str = "kind";
+
+/// Which of the three kinds a decision is (decision 0025 § 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionKind {
+    /// What a user sees or runs into: wording, look, behaviour. Waits for review.
+    Visible,
+    /// How it is built and why. Waits for review: the way it is done can be wrong too.
+    Principle,
+    /// Sizes, limits, parameters, names in the code. Kept, not reviewed.
+    Detail,
+}
+
+impl DecisionKind {
+    /// The word stored and typed for it (`--kind`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DecisionKind::Visible => "visible",
+            DecisionKind::Principle => "principle",
+            DecisionKind::Detail => "detail",
+        }
+    }
+
+    /// The kind a stored or typed word names, if any.
+    pub fn parse(word: &str) -> Option<DecisionKind> {
+        match word.trim() {
+            "visible" => Some(DecisionKind::Visible),
+            "principle" => Some(DecisionKind::Principle),
+            "detail" => Some(DecisionKind::Detail),
+            _ => None,
+        }
+    }
+}
+
 /// One decision an agent made and recorded, not reviewed yet.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Decision {
@@ -34,19 +77,43 @@ pub struct Decision {
     pub by: Option<String>,
     /// What was decided and why.
     pub text: String,
+    /// Which kind it is; none for one recorded without a kind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<DecisionKind>,
 }
 
-/// The change that records `text` as a decision on task `id`. Refused for an unknown task
-/// (`task_not_found`) and for an empty text (`ai_decision_missing`). Any task, in any state,
+impl Decision {
+    /// Whether it waits for review: every kind but a detail, and one with no kind.
+    pub fn to_review(&self) -> bool {
+        self.kind != Some(DecisionKind::Detail)
+    }
+}
+
+/// The decisions in `all` that wait for review (see [`Decision::to_review`]).
+pub fn to_review(all: &[Decision]) -> Vec<Decision> {
+    all.iter().filter(|d| d.to_review()).cloned().collect()
+}
+
+/// The change that records `text` as a decision of `kind` on task `id`. Refused for an unknown
+/// task (`task_not_found`) and for an empty text (`ai_decision_missing`). Any task, in any state,
 /// held by anyone, may get one: recording a decision changes nothing in the task.
-pub fn decide(taskbag: &Taskbag, id: &str, text: &str) -> Result<Vec<Change>, Problem> {
+pub fn decide(
+    taskbag: &Taskbag,
+    id: &str,
+    text: &str,
+    kind: Option<DecisionKind>,
+) -> Result<Vec<Change>, Problem> {
     find_task(taskbag, id)?;
     let text = text.trim();
     if text.is_empty() {
         return Err(Problem::AiDecisionMissing);
     }
+    let mut extra = crate::model::Extra::default();
+    if let Some(kind) = kind {
+        extra.insert(KIND.to_string(), Value::String(kind.as_str().to_string()));
+    }
     Ok(vec![Change {
-        extra: Default::default(),
+        extra,
         field: FIELD.to_string(),
         from: None,
         to: Some(Value::String(text.to_string())),
@@ -90,6 +157,11 @@ pub fn pending(events: &[Event]) -> BTreeMap<String, Vec<Decision>> {
                         Value::String(s) => s.clone(),
                         other => other.to_string(),
                     },
+                    kind: c
+                        .extra
+                        .get(KIND)
+                        .and_then(Value::as_str)
+                        .and_then(DecisionKind::parse),
                 }),
                 None => {
                     out.remove(id);
@@ -168,6 +240,7 @@ mod tests {
             &bag(),
             "A01-01",
             "  Names: alm describe — match alm title  ",
+            None,
         )
         .unwrap();
         assert_eq!(c.len(), 1);
@@ -177,11 +250,11 @@ mod tests {
             Some("Names: alm describe — match alm title".into())
         );
         assert_eq!(
-            decide(&bag(), "A01-01", " "),
+            decide(&bag(), "A01-01", " ", None),
             Err(Problem::AiDecisionMissing)
         );
         assert!(matches!(
-            decide(&bag(), "A09-09", "x"),
+            decide(&bag(), "A09-09", "x", None),
             Err(Problem::TaskNotFound { .. })
         ));
     }
@@ -190,8 +263,16 @@ mod tests {
     fn decisions_wait_until_reviewed() {
         let bag = bag();
         let mut events = vec![
-            event(DECIDED, "A01-01", decide(&bag, "A01-01", "one").unwrap()),
-            event(DECIDED, "A01-01", decide(&bag, "A01-01", "two").unwrap()),
+            event(
+                DECIDED,
+                "A01-01",
+                decide(&bag, "A01-01", "one", None).unwrap(),
+            ),
+            event(
+                DECIDED,
+                "A01-01",
+                decide(&bag, "A01-01", "two", None).unwrap(),
+            ),
             event("claim", "A01-01", vec![]),
         ];
         let p = pending(&events);
@@ -215,8 +296,44 @@ mod tests {
         events.push(event(
             DECIDED,
             "A01-01",
-            decide(&bag, "A01-01", "three").unwrap(),
+            decide(&bag, "A01-01", "three", None).unwrap(),
         ));
         assert_eq!(pending(&events)["A01-01"].len(), 1);
+    }
+
+    #[test]
+    fn details_are_kept_but_only_the_other_kinds_wait_for_review() {
+        let bag = bag();
+        let kinds = [
+            ("wording", Some(DecisionKind::Visible)),
+            ("by working branch", Some(DecisionKind::Principle)),
+            ("160px high", Some(DecisionKind::Detail)),
+            ("older, no kind", None),
+        ];
+        let events: Vec<Event> = kinds
+            .iter()
+            .map(|(text, kind)| {
+                event(
+                    DECIDED,
+                    "A01-01",
+                    decide(&bag, "A01-01", text, *kind).unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(events[2].changes[0].extra[KIND], "detail");
+        assert!(!events[3].changes[0].extra.contains_key(KIND));
+        let all = &pending(&events)["A01-01"];
+        let got: Vec<_> = all.iter().map(|d| (d.text.as_str(), d.kind)).collect();
+        assert_eq!(got, kinds);
+        let texts: Vec<String> = to_review(all).into_iter().map(|d| d.text).collect();
+        assert_eq!(texts, ["wording", "by working branch", "older, no kind"]);
+        // A kind this Allomos does not know waits for review too.
+        let mut odd = events[0].clone();
+        odd.changes[0].extra.insert(KIND.into(), "mystery".into());
+        assert!(pending(&[odd])["A01-01"][0].to_review());
+        assert_eq!(
+            DecisionKind::parse(" principle "),
+            Some(DecisionKind::Principle)
+        );
     }
 }

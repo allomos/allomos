@@ -6,7 +6,7 @@
 // and nothing moves when blockers finish: the same rule as crates/core's `ops::is_blocked`.
 
 import type { Key } from "./i18n";
-import type { LabelEntry, Opened, Project, State, Task } from "./types";
+import type { AiDecision, LabelEntry, Opened, Project, State, Task } from "./types";
 
 type T = (key: Key, params?: Record<string, string | number>) => string;
 
@@ -218,6 +218,17 @@ export function chipLabels(task: Task): string[] {
 /** Why it was finished without the human check (the note). */
 export function humanCheckNote(task: Task): string {
   return task.without_human_check ?? "";
+}
+
+/** A task's AI decisions that wait for review: every kind but a detail (decision 0025 § 3,
+ * Task-A01-piglet562); one with no kind waits too. */
+export function decisionsToReview(task: Task): AiDecision[] {
+  return (task.ai_decisions ?? []).filter((d) => d.kind !== "detail");
+}
+
+/** A task's AI decisions that are details: kept with the task, to be read, not reviewed. */
+export function decisionDetails(task: Task): AiDecision[] {
+  return (task.ai_decisions ?? []).filter((d) => d.kind === "detail");
 }
 
 /** The opened taskbag with each task's AI decisions to review (Task-A03-19), its approvals

@@ -333,14 +333,20 @@ enum Command {
     },
     /// Record a decision you made on your own in a task (a routine choice: a name, wording and
     /// look, a file layout, a small detail with an obvious default): what you decided and why, in
-    /// one line. It is kept
-    /// in the task's history; `alm human` lists it under To review: AI decisions until a person
-    /// has reviewed it.
+    /// one line, and which kind it is (`--kind`, decision 0025 § 3). It is kept in the task's
+    /// history; `alm human` lists a `visible` or `principle` one (or one with no kind) under To
+    /// review: AI decisions until a person has reviewed it; a `detail` is kept with the task but
+    /// not listed there.
     #[command(name = "ai-decided")]
     AiDecided {
         id: String,
         #[arg(value_name = "WHAT AND WHY")]
         text: String,
+        /// visible: what a user sees or runs into (wording, look, behaviour); principle: how it
+        /// is built and why; detail: sizes, limits, parameters, names in the code. Unsure
+        /// between principle and detail: principle.
+        #[arg(long, value_parser = ["visible", "principle", "detail"])]
+        kind: Option<String>,
     },
     /// A person has reviewed the task's AI decisions: they leave To review; the history keeps
     /// them. Run it only when the person says so.
@@ -2548,10 +2554,13 @@ fn human(
     // with its decisions from the history.
     let decisions = allomos_store::ai_decisions(root);
     let none = Vec::new();
-    let to_review: Vec<(&Task, &Vec<Decision>)> = tasks
+    let to_review: Vec<(&Task, Vec<Decision>)> = tasks
         .iter()
         .filter(|t| t.has_label(allomos_core::labels::AI_DECISIONS))
-        .map(|t| (*t, decisions.get(&t.id).unwrap_or(&none)))
+        .map(|t| {
+            let all = decisions.get(&t.id).unwrap_or(&none);
+            (*t, allomos_core::decision::to_review(all))
+        })
         .collect();
     let system: Vec<String> = sys_locale::get_locales().collect();
     let language = pick_ui_language(&[task_language(&bag.project, &system).language]);
@@ -2645,10 +2654,18 @@ fn decision_lines(decisions: &[Decision]) -> String {
     decisions
         .iter()
         .map(|d| match &d.by {
-            Some(by) => format!("  - {} ({by}, {})\n", d.text, d.at),
-            None => format!("  - {} ({})\n", d.text, d.at),
+            Some(by) => format!("  - {} ({by}, {})\n", decision_text(d), d.at),
+            None => format!("  - {} ({})\n", decision_text(d), d.at),
         })
         .collect()
+}
+
+/// A decision's text, after its kind in brackets when it has one (decision 0025 § 3).
+fn decision_text(d: &Decision) -> String {
+    match d.kind {
+        Some(kind) => format!("[{}] {}", kind.as_str(), d.text),
+        None => d.text.clone(),
+    }
 }
 
 /// One line about a task: ID, state, label, holder, title.
@@ -3971,9 +3988,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let decisions = allomos_store::ai_decisions(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
-            if !decisions.is_empty() {
+            let (review, details): (Vec<Decision>, Vec<Decision>) =
+                decisions.iter().cloned().partition(|d| d.to_review());
+            if !review.is_empty() {
                 text.push_str("AI decided (to review):\n");
-                text.push_str(&decision_lines(&decisions));
+                text.push_str(&decision_lines(&review));
+            }
+            if !details.is_empty() {
+                text.push_str("AI decided (details, not reviewed):\n");
+                text.push_str(&decision_lines(&details));
             }
             let approvals = allomos_store::approvals::approvals(&root)
                 .remove(&task.id)
@@ -4574,25 +4597,39 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ops::recheck(bag, id, reason, steps.as_deref())
             })
         }
-        Command::AiDecided { id, text } => {
+        Command::AiDecided { id, text, kind } => {
             let root = locate(cli, cwd)?;
+            let kind = kind
+                .as_deref()
+                .and_then(allomos_core::decision::DecisionKind::parse);
             let d = allomos_store::record_ai_decision(
                 &root,
                 Actor::alm(cli.holder.as_deref()),
                 lock_wait(),
                 id,
                 text,
+                kind,
             )?;
             let mut out = format!("{}\n", task_line(&d.task));
             for x in &d.decisions {
-                out.push_str(&format!("  AI decided: {}\n", x.text));
+                out.push_str(&format!("  AI decided: {}\n", decision_text(x)));
             }
+            let to_review = allomos_core::decision::to_review(&d.pending);
             out.push_str(&format!(
                 "{} AI decision(s) to review; `alm human` lists them for the person.\n",
-                d.pending.len()
+                to_review.len()
             ));
+            match kind {
+                Some(allomos_core::decision::DecisionKind::Detail) => out.push_str(
+                    "A detail: kept with the task (`alm show`), not listed for review.\n",
+                ),
+                Some(_) => {}
+                None => out.push_str(
+                    "Fact: this decision has no kind, so it waits for review. Next time, say which: `--kind visible` (what a user sees or runs into), `--kind principle` (how it is built and why) or `--kind detail` (sizes, limits, parameters, names in the code; not reviewed).\n",
+                ),
+            }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json(&d.task), "decision": d.decisions.first(), "ai_decisions": d.pending }),
+                json!({ "taskbag": root, "task": task_json(&d.task), "decision": d.decisions.first(), "ai_decisions": to_review, "ai_details": d.pending.iter().filter(|x| !x.to_review()).collect::<Vec<_>>() }),
                 out,
             );
             done.issues = d.issues;

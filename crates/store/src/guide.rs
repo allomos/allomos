@@ -309,9 +309,13 @@ Work a task:
   changed afterwards, so the person's check no longer covers it: the task goes back to To check
   with your reason (and new steps, or the earlier ones), one label below the top. You decide
   when; `alm` does not look at the work.
-- `alm ai-decided <id> \"<what and why>\"`: record a routine choice you made on your own in the
-  task, in one line, for example `alm ai-decided A01-37 \"Names: alm describe, alm note — match
-  alm title\"`. Any task, any state; the task's files do not change, the history keeps it.
+- `alm ai-decided <id> \"<what and why>\" --kind <kind>`: record a routine choice you made on your
+  own in the task, in one line, for example `alm ai-decided A01-37 \"Names: alm describe, alm note
+  — match alm title\" --kind detail`. The kind (decision 0025 § 3): `visible` (what a user sees or
+  runs into: wording, look, behaviour) and `principle` (how it is built and why) wait for review
+  under To review: AI decisions; `detail` (sizes, limits, parameters, names in the code) is kept
+  with the task (`alm show`) but not listed for review. Unsure between principle and detail:
+  principle. One with no kind waits for review. Any task, any state; the history keeps it.
 - `alm reviewed <id>`: the person has reviewed the task's AI decisions: they leave To review; the
   history keeps them. Run it only when the person says so.
 - `alm approve <id>… --words \"<the person's exact words>\"`: record the person's approval in
@@ -813,8 +817,8 @@ Rules:
   ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
-  record each with `alm ai-decided <id> \"<what and why>\"`, so the approver can review it with
-  `alm human`. Wording and look (what users see) are reviewed before release, not before the
+  record each with `alm ai-decided <id> \"<what and why>\" --kind visible|principle|detail`, so
+  the approver can review it with `alm human` (a `detail` is kept, not listed for review). Wording and look (what users see) are reviewed before release, not before the
   work (step 8). Data formats, removing things, permissions and security, anything that changes
   the plan or another task, and anything with a cost or an outside effect go to the approver
   first (`alm wait`). In a goal run (step 9) the plan was approved in advance; outside effects

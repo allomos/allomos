@@ -183,6 +183,8 @@ export interface AiDecision {
   at: string;
   by?: string;
   text: string;
+  /** Which kind (decision 0025 § 3): a detail is kept but not reviewed; none waits for review. */
+  kind?: "visible" | "principle" | "detail";
 }
 
 /**
