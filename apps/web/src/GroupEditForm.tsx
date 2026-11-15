@@ -8,6 +8,7 @@ import { useI18n } from "./i18n";
 import { WhoForm } from "./WhoForm";
 import { canSaveGroup, startGroupEdit, type Editing, type GroupDraft } from "./groupEditFlow";
 import { isProblem, type Area, type Iteration, type IterationState } from "./types";
+import { isPlainEnter } from "./enterKey";
 
 export function GroupEditForm({
   editing,
@@ -59,7 +60,7 @@ export function GroupEditForm({
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
-    } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+    } else if (isPlainEnter(e.nativeEvent)) {
       e.preventDefault();
       enter();
     }

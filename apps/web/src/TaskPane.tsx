@@ -54,6 +54,7 @@ import { checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
 import { LEVELS, difficultyOf, difficultyText, levelText } from "./difficultyFlow";
 import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
+import { isPlainEnter } from "./enterKey";
 
 export function TaskPane({
   task,
@@ -294,7 +295,7 @@ export function TaskPane({
     if (e.key === "Escape") {
       e.preventDefault();
       cancel();
-    } else if (e.key === "Enter" && enterSaves && !e.nativeEvent.isComposing) {
+    } else if (enterSaves && isPlainEnter(e.nativeEvent)) {
       e.preventDefault();
       void save();
     }

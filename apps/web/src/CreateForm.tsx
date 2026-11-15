@@ -8,6 +8,7 @@ import { WhoForm } from "./WhoForm";
 import { iterationPlaces, placedName } from "./iterationPlace";
 import { canAdd, pickArea, refreshItem, refreshTask, startItem, startTask, toNewIteration, toNewTask, type BaseChoice, type Creating, type ItemDraft, type TaskDraft } from "./createFlow";
 import { isProblem, type Area, type Iteration, type NewIteration, type NewTask, type NextIds } from "./types";
+import { isPlainEnter } from "./enterKey";
 
 export type AddRequest =
   | { kind: "task"; task: NewTask }
@@ -92,7 +93,7 @@ export function CreateForm({
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
-    } else if (e.key === "Enter" && !e.nativeEvent.isComposing && !(e.target instanceof HTMLTextAreaElement)) {
+    } else if (isPlainEnter(e.nativeEvent) && !(e.target instanceof HTMLTextAreaElement)) {
       e.preventDefault();
       enter();
     }

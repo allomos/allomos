@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { useI18n } from "./i18n";
 import { isProblem } from "./types";
+import { isPlainEnter } from "./enterKey";
 
 export function WhoForm({
   name,
@@ -41,7 +42,7 @@ export function WhoForm({
           placeholder={t("edit.name_placeholder")}
           onChange={(e) => onName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            if (isPlainEnter(e.nativeEvent)) {
               e.preventDefault();
               e.stopPropagation();
               if (name.trim() && !busy) onSave();
@@ -117,7 +118,7 @@ export function WhoLine({ name, onSave }: { name: string | null; onSave: (name: 
           placeholder={t("edit.name_placeholder")}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            if (isPlainEnter(e.nativeEvent)) {
               e.preventDefault();
               void save();
             } else if (e.key === "Escape") {
