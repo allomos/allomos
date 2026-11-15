@@ -382,20 +382,36 @@ export interface LastRun {
   taken: string[];
   /** The agent each of those tasks was given to. */
   takenBy?: Record<string, TerminalAgent>;
+  /** Why the run stopped on its own (Task-A03-raven398): it could not read the taskbag. Absent
+   * when it ended as asked. */
+  stopped?: LastStopped;
 }
+
+/** Why a run stopped on its own, as `alm monitor run` keeps it (crates/monitor/src/unreadable.rs). */
+export type LastStopped = "taskbag_format" | "taskbag_unreadable";
 
 /** A last run as this computer keeps it in its file (A03-pocket537): `ended` in ms, the rest as
  * the app's line reads it. `null` when the file does not fit. */
 export function lastRunFromFile(v: unknown): LastRun | null {
   if (!v || typeof v !== "object") return null;
-  const o = v as { ended?: unknown; scope?: unknown; taken?: unknown; takenBy?: unknown };
+  const o = v as { ended?: unknown; scope?: unknown; taken?: unknown; takenBy?: unknown; stopped?: unknown };
   if (typeof o.ended !== "number" || !Number.isFinite(o.ended) || !Array.isArray(o.taken) || !o.scope) return null;
-  return {
+  const last: LastRun = {
     ended: new Date(o.ended).toISOString(),
     scope: o.scope as Scope,
     taken: o.taken.filter((x): x is string => typeof x === "string"),
     takenBy: (o.takenBy && typeof o.takenBy === "object" ? o.takenBy : undefined) as Record<string, TerminalAgent> | undefined,
   };
+  // An unknown reason (a newer alm's) still says the run stopped on its own.
+  if (typeof o.stopped === "string") last.stopped = o.stopped === "taskbag_format" ? "taskbag_format" : "taskbag_unreadable";
+  return last;
+}
+
+/** The last run as the window keeps it when a run is gone, `own`, or the one the run left on this
+ * computer, `kept`, when that one is this run's (it ended after the run `started`, ms): it alone
+ * knows why the run stopped (Task-A03-raven398). */
+export function lastOfGoneRun(own: LastRun, kept: LastRun | null, started: number): LastRun {
+  return kept && Date.parse(kept.ended) >= started ? kept : own;
 }
 
 /** The later of two last runs (the one remembered by the window and the one kept on this

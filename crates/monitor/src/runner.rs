@@ -123,9 +123,20 @@ pub fn new_session_id() -> String {
     )
 }
 
-/// The taskbag as it is now.
+/// The taskbag as it is now. When it cannot be read for a reason only a person can fix (its
+/// format, Task-A03-raven398), that problem itself, not the general "could not be read".
 fn read(root: &Path) -> Result<Taskbag, Problem> {
-    allomos_store::taskbag_of(root, allomos_store::load(root)).map(|(bag, _)| bag)
+    let loaded = allomos_store::load(root);
+    if loaded.taskbag.is_none() {
+        let format = loaded
+            .issues
+            .iter()
+            .find(|i| crate::unreadable::needs_person(&i.problem));
+        if let Some(issue) = format {
+            return Err(issue.problem.clone());
+        }
+    }
+    allomos_store::taskbag_of(root, loaded).map(|(bag, _)| bag)
 }
 
 /// Tell the person a task waits on them: a notification the app shows (see [`notify`]).

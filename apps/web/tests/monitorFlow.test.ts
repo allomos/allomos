@@ -15,6 +15,7 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
+  lastOfGoneRun,
   lastRunFromFile,
   newerLast,
   levelsOf,
@@ -277,4 +278,20 @@ test("a last run kept on this computer reads in the app's shape, and the later o
   assert.equal(newerLast(window, null), window);
   assert.equal(newerLast(window, kept), kept);
   assert.equal(newerLast(kept, window), kept);
+});
+
+test("a run that stopped on its own keeps why, and the window takes it from the run's file (A03-raven398)", () => {
+  const file = { ended: Date.UTC(2026, 10, 16, 1, 0), scope: { kind: "all" }, taken: [], stopped: "taskbag_format" };
+  const kept = lastRunFromFile(file);
+  assert.equal(kept?.stopped, "taskbag_format");
+  // A reason a newer alm wrote still reads as stopped on its own.
+  assert.equal(lastRunFromFile({ ...file, stopped: "something_new" })?.stopped, "taskbag_unreadable");
+  // A run that ended as asked has no reason.
+  assert.equal("stopped" in (lastRunFromFile({ ...file, stopped: undefined }) ?? {}), false);
+
+  const own = { ended: "2026-11-16T01:00:05.000Z", scope: { kind: "all" as const }, taken: [] };
+  // The file is this run's when it ended after the run started; an older run's file is not.
+  assert.equal(lastOfGoneRun(own, kept, Date.UTC(2026, 10, 16, 0, 0)), kept);
+  assert.equal(lastOfGoneRun(own, kept, Date.UTC(2026, 10, 16, 2, 0)), own);
+  assert.equal(lastOfGoneRun(own, null, 0), own);
 });

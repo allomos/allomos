@@ -1136,6 +1136,8 @@
   "monitor.last_run": "Last run ended {time} · {scope} · {done} done",
   "monitor.last_run_need": "{n} need you",
   "monitor.last_run_need_tip": "Show the tasks that need you (the Needs you preset)",
+  "monitor.last_stopped_taskbag_format": "Stopped: this Allomos cannot read the taskbag's format. Update Allomos, then start monitoring again.",
+  "monitor.last_stopped_taskbag_unreadable": "Stopped: the taskbag could not be read for 2 minutes. Check it, then start monitoring again.",
   "monitor.start_failed": "Monitoring stopped: {agent} could not be started for {id}. {detail}",
   "monitor.close_prompt": "Allomos: the task is done. This tab closes in 30 seconds; press any key to keep it.",
   "monitor.close_kept": "Allomos: this tab stays open.",

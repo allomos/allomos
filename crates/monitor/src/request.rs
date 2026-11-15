@@ -198,25 +198,23 @@ pub fn start_failed(language: &str, agent: &str, id: &str, detail: &str) -> Stri
 }
 
 /// The run stopped on its own because the taskbag could not be read (Task-A03-raven398).
-/// `detail` is the failure in English, as the log has it.
+/// `detail` is the failure in English, as the log has it: named only for an ordinary failure (a
+/// format problem is said in the person's words, and its English is written for agents).
 pub fn stopped_unreadable(language: &str, why: crate::unreadable::Why, detail: &str) -> String {
     use crate::unreadable::Why;
     match (lang(language), why) {
-        ("zh-CN", Why::Format) => format!(
-            "自动监测已停止：这个「换肩」读不了任务包，因为它的格式需要你先处理（多半是任务包比这个「换肩」新）。请更新「换肩」，再重新开始监测。已开的会话照常做完各自的任务。{detail}"
-        ),
+        ("zh-CN", Why::Format) => "自动监测已停止：这个「换肩」读不了任务包，因为它的格式需要你先处理（多半是任务包比这个「换肩」新）。请更新「换肩」，再重新开始监测。已开的会话照常做完各自的任务。"
+            .to_string(),
         ("zh-CN", Why::Unreadable) => format!(
             "自动监测已停止：任务包有 2 分钟读不了。请检查任务包，再重新开始监测。已开的会话照常做完各自的任务。{detail}"
         ),
-        ("ja", Why::Format) => format!(
-            "自動監視を停止しました：タスクバッグの形式のため、この「肩代」では読めません（多くの場合、タスクバッグがこの「肩代」より新しい形式です）。「肩代」を更新してから、監視をもう一度始めてください。開いているセッションは、それぞれのタスクをいつも通り最後まで進めます。{detail}"
-        ),
+        ("ja", Why::Format) => "自動監視を停止しました：タスクバッグの形式のため、この「肩代」では読めません（多くの場合、タスクバッグがこの「肩代」より新しい形式です）。「肩代」を更新してから、監視をもう一度始めてください。開いているセッションは、それぞれのタスクをいつも通り最後まで進めます。"
+            .to_string(),
         ("ja", Why::Unreadable) => format!(
             "自動監視を停止しました：タスクバッグを 2 分間読めませんでした。タスクバッグを確認してから、監視をもう一度始めてください。開いているセッションは、それぞれのタスクをいつも通り最後まで進めます。{detail}"
         ),
-        (_, Why::Format) => format!(
-            "Monitoring stopped: this Allomos cannot read the taskbag because of its format (most often, the taskbag is newer than this Allomos). Update Allomos, then start monitoring again. The open sessions finish their tasks as usual. {detail}"
-        ),
+        (_, Why::Format) => "Monitoring stopped: this Allomos cannot read the taskbag because of its format (most often, the taskbag is newer than this Allomos). Update Allomos, then start monitoring again. The open sessions finish their tasks as usual."
+            .to_string(),
         (_, Why::Unreadable) => format!(
             "Monitoring stopped: the taskbag could not be read for 2 minutes. Check it, then start monitoring again. The open sessions finish their tasks as usual. {detail}"
         ),
@@ -235,6 +233,7 @@ mod tests {
         assert!(stopped_unreadable("en", Why::Format, "x").contains("Update Allomos"));
         assert!(stopped_unreadable("en", Why::Unreadable, "x").contains("2 minutes"));
         assert!(stopped_unreadable("zh-CN", Why::Unreadable, "x").ends_with('x'));
+        assert!(!stopped_unreadable("zh-CN", Why::Format, "x").contains('x'));
     }
 
     /// The same request the interface wrote (monitorFlow.test.ts), word for word.
