@@ -398,6 +398,14 @@ pub fn validate_taskbag(
         } else {
             &[]
         };
+        if task.old_blocked() {
+            // The old `blocked` state has its own reminder below (decision 0026), not "a newer
+            // version may have added it".
+            let mut extra = task.extra.clone();
+            extra.remove("state");
+            unknown_notes(file, "", &extra, &[], &mut issues);
+            continue;
+        }
         unknown_notes(file, "", &task.extra, kept, &mut issues);
     }
     let mut area_ids = HashSet::new();
@@ -872,7 +880,6 @@ mod tests {
         assert_eq!(
             got,
             vec![
-                ("tasks/T1/task.json", "value_unknown"),
                 ("tasks/T1/task.json", "blocked_state_old"),
                 ("tasks/T2/task.json", "blocked_by_self"),
                 ("tasks/T2/task.json", "blocker_unknown"),
