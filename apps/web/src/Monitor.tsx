@@ -35,10 +35,9 @@ import {
   sessionsOf,
   stalled,
   stateCounts,
-  unblockNotice,
   workedFor,
 } from "./monitorFlow";
-import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent, UnblockNotice } from "./monitorFlow";
+import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent} from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -200,10 +199,6 @@ export function useMonitor({
     lost,
     last,
     now,
-    /** The line under a run's status bar after its sweep let blocked tasks go on, until the next
-     * check or until closed. */
-    notice: (run: Run): UnblockNotice | null => (dismissed.has(`${run.id}:${run.checked}`) ? null : unblockNotice(run.unblocked)),
-    dismissNotice: (run: Run) => setDismissed((d) => new Set(d).add(`${run.id}:${run.checked}`)),
     start: (
       scope: Scope,
       agents: TerminalAgent[],
@@ -576,7 +571,6 @@ function RunPanel({
           )}
         </div>
       )}
-      {notice && <UnblockLine notice={notice} onOpenTask={onOpenTask} onClose={() => monitor.dismissNotice(run)} />}
     </div>
   );
 }
@@ -631,45 +625,5 @@ function SessionRow({
   );
 }
 
-/** The line under the status bar after a sweep let blocked tasks go on (Task-A01-steam936,
- * approver 2026-11-08): which tasks, each one a link to it; kept until the next check or ×. */
-function UnblockLine({
-  notice,
-  onOpenTask,
-  onClose,
-}: {
-  notice: UnblockNotice;
-  onOpenTask?: (id: string) => void;
-  onClose: () => void;
-}) {
-  const { t } = useI18n();
-  const MARK = "\u0000";
-  return (
-    <span className="monitor-notice muted small" role="status">
-      {notice.groups.map((g) => {
-        const [before, after = ""] = t(g.state === "ready" ? "monitor.unblocked_ready" : "monitor.unblocked_in_progress", { ids: MARK }).split(MARK);
-        return (
-          <span key={g.state}>
-            {before}
-            {g.ids.map((id, i) => (
-              <span key={id}>
-                {i > 0 && ", "}
-                {onOpenTask ? (
-                  <button type="button" className="link" onClick={() => onOpenTask(id)}>
-                    {id}
-                  </button>
-                ) : (
-                  id
-                )}
-              </span>
-            ))}
-            {after}{" "}
-          </span>
-        );
-      })}
-      <button type="button" className="link" aria-label={t("monitor.unblocked_close")} title={t("monitor.unblocked_close")} onClick={onClose}>
-        ×
-      </button>
-    </span>
-  );
+
 }
