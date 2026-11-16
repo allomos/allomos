@@ -1116,7 +1116,7 @@
   "monitor.agent": "エージェント",
   "monitor.how_terminal": "「肩代」がタスクごとにターミナルのセッションを開きます。最後まで人の操作はいりません",
   "monitor.permissions_claude_cli": "タスクごとに新しい Claude Code のセッションを開くため、1 つのセッションで auto mode をオンにしても（Shift+Tab）次のセッションには引き継がれません。始める前に、Claude Code 自身の設定で auto mode を既定にしてください。そうしないと、セッションごとに許可を求めて止まります。「肩代」がエージェントの権限を変えることはありません。",
-  "monitor.permissions_codex_cli": "タスクごとに新しい Codex のセッションが開き、そのコマンドを承認する人はいません。「換肩」の Codex 用ルール（下の選択肢）があれば、各セッションは尋ねずにプル、コミット、プッシュ、マージし、alm を実行できます。ほかのコマンドはこれまでどおり Codex のサンドボックスの中です。ルールがないと、Codex はサンドボックスからリポジトリを変えられず、止まります。",
+  "monitor.permissions_codex_cli": "タスクごとに新しい Codex のセッションが開き、そのコマンドを承認する人はいません。「換肩」の Codex 用ルール（チェックした Codex の下の選択肢）があれば、各セッションは尋ねずにプル、コミット、プッシュ、マージし、alm を実行できます。ほかのコマンドはこれまでどおり Codex のサンドボックスの中です。ルールがないと、Codex はサンドボックスからリポジトリを変えられず、止まります。",
   "monitor.codex_rules_add": "Codex が Git と alm を尋ねずに実行できるようにする（{path} を加える）",
   "monitor.codex_rules_update": "Codex が Git と alm を尋ねずに実行できるようにする（{path} を更新する）",
   "monitor.codex_rules_keep": "Codex が Git と alm を尋ねずに実行できるようにする（{path}、第 {version} 版。チェックを外すと「開始」で削除）",

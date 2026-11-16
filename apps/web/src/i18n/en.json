@@ -1116,7 +1116,7 @@
   "monitor.agent": "Agents",
   "monitor.how_terminal": "Allomos opens a terminal session for each task; unattended throughout",
   "monitor.permissions_claude_cli": "Each task gets a new Claude Code session, so turning on auto mode in one session (Shift+Tab) does not carry over to the next. Before you start, make auto mode Claude Code's default in its own settings; otherwise every session stops to ask for permission. Allomos never changes an agent's permissions.",
-  "monitor.permissions_codex_cli": "Each task gets a new Codex session, with nobody there to approve its commands. With Allomos's rules for Codex (the option below), each session can pull, commit, push and merge, and run alm, without asking; every other command stays in Codex's sandbox. Without them, Codex cannot change its repository from its sandbox and stops.",
+  "monitor.permissions_codex_cli": "Each task gets a new Codex session, with nobody there to approve its commands. With Allomos's rules for Codex (the option under the checked Codex), each session can pull, commit, push and merge, and run alm, without asking; every other command stays in Codex's sandbox. Without them, Codex cannot change its repository from its sandbox and stops.",
   "monitor.codex_rules_add": "Let Codex run Git and alm without asking (adds {path})",
   "monitor.codex_rules_update": "Let Codex run Git and alm without asking (updates {path})",
   "monitor.codex_rules_keep": "Let Codex run Git and alm without asking ({path}, version {version}; uncheck to remove it at Start)",

@@ -1116,7 +1116,7 @@
   "monitor.agent": "智能体",
   "monitor.how_terminal": "由「换肩」为每个任务开终端会话，全程无人值守",
   "monitor.permissions_claude_cli": "每个任务都开一个新的 Claude Code 会话，所以在一个会话里打开 auto mode（Shift+Tab）不会带到下一个。开始前，请在 Claude Code 自己的设置里把 auto mode 设为默认；否则每个会话都会停下来请求许可。「换肩」从不更改智能体的权限。",
-  "monitor.permissions_codex_cli": "每个任务都开一个新的 Codex 会话，没有人在场批准它的命令。有了「换肩」给 Codex 的规则（下面的选项），每个会话都能不问就拉取、提交、推送、合并，并运行 alm；其余命令照旧在 Codex 的沙箱里。没有这些规则，Codex 在沙箱里改不了它的仓库，会停下来。",
+  "monitor.permissions_codex_cli": "每个任务都开一个新的 Codex 会话，没有人在场批准它的命令。有了「换肩」给 Codex 的规则（上面勾选的 Codex 下的选项），每个会话都能不问就拉取、提交、推送、合并，并运行 alm；其余命令照旧在 Codex 的沙箱里。没有这些规则，Codex 在沙箱里改不了它的仓库，会停下来。",
   "monitor.codex_rules_add": "让 Codex 不问就运行 Git 和 alm（加上 {path}）",
   "monitor.codex_rules_update": "让 Codex 不问就运行 Git 和 alm（更新 {path}）",
   "monitor.codex_rules_keep": "让 Codex 不问就运行 Git 和 alm（{path}，第 {version} 版；取消勾选，按「开始」时删掉它）",
