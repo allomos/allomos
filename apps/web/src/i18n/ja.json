@@ -1364,6 +1364,7 @@
   "monitor.group_removed": "監視から外しました。作業中のタスクが終われば止まります",
   "monitor.group_no_task": "難易度の範囲に準備完了のタスクがないため、セッションを開いていません。",
   "monitor.group_idle": "作業中のセッションはありません。",
+  "monitor.let_go": "{id} は別のセッション {holder} が引き受けたため、ここには数えません。",
   "monitor.next_check": "次の確認 {time}",
   "monitor.edit_button": "監視を編集…",
   "monitor.stop_monitor": "■ 監視を停止",

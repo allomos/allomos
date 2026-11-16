@@ -159,6 +159,27 @@ test("the last run counts the done tasks per agent that gave them out", () => {
   ]);
 });
 
+test("the tasks a run let go to another session are read, each with who holds it now", () => {
+  const r = readEntry(
+    entry({
+      working: [],
+      let_go: [
+        { id: "A01-02", agent: "claude_cli", holder: "codex-a01-02", at: 30 },
+        { id: "A01-03", agent: "gemini", holder: "x", at: 30 },
+        { id: "A01-04", agent: "codex_cli" },
+      ],
+    }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  assert.deepEqual(r.letGo, [{ id: "A01-02", agent: "claude_cli", holder: "codex-a01-02" }], "an unknown agent or a missing holder is left out");
+  // Its slot is free again.
+  assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
+  const none = readEntry(entry(), null);
+  assert.ok(none && isRun(none));
+  assert.deepEqual(none.letGo, [], "a run file from before has none");
+});
+
 test("a run's sessions per agent: one unless set, and a free slot for each session it may still start", () => {
   const r = readEntry(entry({ agents: ["claude_cli", "codex_cli"], sessions: { claude_cli: 2, codex_cli: 0, gemini: 3 } }), null);
   assert.ok(r && isRun(r));

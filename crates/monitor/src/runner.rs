@@ -349,7 +349,9 @@ impl Loop {
         if run.stopping {
             return (*run != before, run.working.is_empty());
         }
-        let due = !finished.is_empty() || now >= run.next_check();
+        // A slot freed by a finished or a let-go task (A03-cart761) is filled at once.
+        let freed = !finished.is_empty() || run.let_go != before.let_go;
+        let due = freed || now >= run.next_check();
         if !run.free_agents().is_empty() && due {
             let run = &self.record.run;
             let shares = run.share(bag, now / 1000);
