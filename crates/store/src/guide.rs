@@ -2052,7 +2052,6 @@ fn written_in(language: &str) -> Option<&'static str> {
     }
 }
 
-/// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
 /// Around the risk rules at the end of `alm guide workflow` (decision 0027, Task-A00-nectar077).
 const RISK_RULES_HEAD: &str = "
 Risk rules (step 7; decision 0027). The risk says what the approver reviews first, and how
@@ -2071,6 +2070,7 @@ const RISK_RULES_TAIL: &str = "\
   tasks too.
 ";
 
+/// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
 pub fn guide(topic: Option<&str>) -> Option<String> {
     let text = |t: &str| match t {
         "terms" => Some(TERMS),
@@ -2901,6 +2901,7 @@ mod tests {
             assert!(check < prompt.find("## 4.").unwrap(), "{language}");
         }
     }
+
     /// The risk rules are in `alm guide workflow` and in the AGENTS.md section, the same text in
     /// both (decision 0027, Task-A00-nectar077).
     #[test]
