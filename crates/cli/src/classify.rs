@@ -126,11 +126,36 @@ pub(crate) fn lines(id: &str, c: &Classification, approvals: &[Approval]) -> Str
     text
 }
 
+/// A task's risk for `alm human` (Task-A01-garden385, decision 0027), in the task language like
+/// the state and the labels of its line: "risk: high", or "risk: not classified" when no agent
+/// recorded one. `alm` shows what is recorded and judges nothing.
+pub(crate) fn human_risk_line(risk: Option<&str>, language: &str) -> String {
+    let (word, sep) = match language {
+        "zh-CN" => ("风险", "："),
+        "ja" => ("リスク", "："),
+        _ => ("risk", ": "),
+    };
+    let level = match (risk, language) {
+        (Some("high"), "zh-CN") => "高",
+        (Some("medium"), "zh-CN") => "中",
+        (Some("low"), "zh-CN") => "低",
+        (None, "zh-CN") => "未分级",
+        (Some("high"), "ja") => "高",
+        (Some("medium"), "ja") => "中",
+        (Some("low"), "ja") => "低",
+        (None, "ja") => "未分類",
+        (None, _) => "not classified",
+        (Some(other), _) => other,
+    };
+    format!("{word}{sep}{level}")
+}
+
 /// `alm human`'s section: emergencies not approved afterwards, overdue ones marked.
 pub(crate) fn human_section(
     bag: &Taskbag,
     tasks: &[&Task],
     list: &[Unapproved],
+    risks: &std::collections::BTreeMap<String, Classification>,
     language: &str,
 ) -> String {
     let shown: Vec<&Unapproved> = list
@@ -149,6 +174,8 @@ pub(crate) fn human_section(
             Some(t) => text.push_str(&format!("  {}\n", crate::human_task_line(t, language))),
             None => text.push_str(&format!("  {}\n", u.task)),
         }
+        let risk = risks.get(&u.task).and_then(|c| c.risk.as_deref());
+        text.push_str(&format!("      {}\n", human_risk_line(risk, language)));
         let due = u.due.as_deref().unwrap_or("no deadline recorded");
         text.push_str(&format!(
             "      emergency since {}; approval due by {due}{}\n",

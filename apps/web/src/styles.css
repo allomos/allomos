@@ -706,6 +706,16 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .dialog .form .override-row input[type="number"] { width: 96px; }
 .dialog .form .overrides { margin: 0; padding-left: 18px; font-size: 13px; }
 .settings-section .handoff-settings { width: 100%; display: grid; gap: 8px; }
+/* Project settings → Risk management (Task-A01-beetle749): the fixed rules with their short names,
+   the project's own rules each with its buttons at the end of the line. */
+.risk-settings .risk-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.risk-settings .risk-rules li { display: flex; align-items: baseline; gap: 8px; }
+.risk-settings .risk-rules li > span, .risk-settings .risk-rules li > input { flex: 1 1 auto; min-width: 0; }
+.risk-settings .risk-rules.fixed code { flex: 0 0 auto; color: var(--muted, inherit); }
+.risk-settings .risk-rules input[type="text"], .risk-settings .risk-add input[type="text"] {
+  font: 13px var(--font); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+}
+.risk-settings .risk-add input[type="text"] { flex: 1 1 auto; min-width: 0; }
 /* Project settings → Audit (Task-A01-frolic587): a radio choice sits on one line like a checkbox;
    turning a control off or down is shown in the warning colour (decision 0021 § 6). */
 .settings-section .audit-settings { width: 100%; display: grid; gap: 8px; }
@@ -1168,3 +1178,9 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 /* Task-A01-kernel761: a held task that is lost (no heartbeat past the project's limit, no busy
    window running): a small amber tag beside the holder and in the Last heartbeat row. */
 .lost-tag { display: inline-block; margin-left: 6px; font-size: 12px; font-weight: 600; line-height: 1.4; padding: 0 7px; border-radius: 999px; white-space: nowrap; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); cursor: help; }
+
+/* Task-A01-garden385: a task's risk word. High stands out, medium keeps the text colour's weight,
+   an unclassified one is greyed like other "none" values. */
+.risk-high { color: var(--warn); font-weight: 600; }
+.risk-medium { font-weight: 600; }
+.risk-none { color: var(--muted); }
