@@ -253,7 +253,7 @@ impl Loop {
                         config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
                     )
                 });
-            if let Some(Ok(read)) = asked.as_deref().map(quota::from_usage) {
+            if let Some(read) = asked.as_deref().and_then(quota::from_usage) {
                 return read;
             }
         }

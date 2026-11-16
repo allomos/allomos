@@ -21,9 +21,9 @@ pub struct UsedUp {
 }
 
 /// What `claude -p /usage` printed, read: used up when its "Current session" or "Current week
-/// (all models)" line is at [`USED_UP_AT`]% used or more; `Ok(None)` when it has quota left;
-/// `Err(())` when neither line is there (it could not be read).
-pub fn from_usage(text: &str) -> Result<Option<UsedUp>, ()> {
+/// (all models)" line is at [`USED_UP_AT`]% used or more; `Some(None)` when it has quota left;
+/// `None` when neither line is there (it could not be read).
+pub fn from_usage(text: &str) -> Option<Option<UsedUp>> {
     let mut read = false;
     for line in text.lines().map(str::trim) {
         let Some(rest) = line
@@ -44,10 +44,10 @@ pub fn from_usage(text: &str) -> Result<Option<UsedUp>, ()> {
                 .split_once("resets")
                 .map(|(_, r)| r.trim().to_string())
                 .filter(|r| !r.is_empty());
-            return Ok(Some(UsedUp { resets }));
+            return Some(Some(UsedUp { resets }));
         }
     }
-    if read { Ok(None) } else { Err(()) }
+    read.then_some(None)
 }
 
 /// The line an agent shows when its quota is used up, in what a session printed (its tab):
@@ -146,7 +146,7 @@ Current week (Fable): 100% used · resets Nov 19 at 4pm (Asia/Tokyo)
     #[test]
     fn usage_with_quota_left_is_not_used_up() {
         // One model's own weekly line does not count: the session may run on another model.
-        assert_eq!(from_usage(USAGE), Ok(None));
+        assert_eq!(from_usage(USAGE), Some(None));
     }
 
     #[test]
@@ -154,7 +154,7 @@ Current week (Fable): 100% used · resets Nov 19 at 4pm (Asia/Tokyo)
         let text = USAGE.replace("73% used", "100% used");
         assert_eq!(
             from_usage(&text),
-            Ok(Some(UsedUp {
+            Some(Some(UsedUp {
                 resets: Some("Nov 17 at 12:10am (Asia/Tokyo)".into())
             }))
         );
@@ -163,7 +163,7 @@ Current week (Fable): 100% used · resets Nov 19 at 4pm (Asia/Tokyo)
             from_usage(&week).unwrap().unwrap().resets.as_deref(),
             Some("Nov 19 at 4pm (Asia/Tokyo)")
         );
-        assert_eq!(from_usage("Not logged in"), Err(()));
+        assert_eq!(from_usage("Not logged in"), None);
     }
 
     #[test]
