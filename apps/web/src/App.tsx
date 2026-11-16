@@ -1631,6 +1631,7 @@ function TaskbagView({
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
+  const selectTask = (id: string) => setSelectedId((now) => afterClick(now, id));
   // The selected task's history (Task-A01-17), read again whenever the taskbag reloads. Kept with
   // its task's ID, so another task never shows it and a reload does not blank it while reading.
   const [history, setHistory] = useState<{ id: string; history: TaskHistory | null } | null>(null);
@@ -1945,7 +1946,7 @@ function TaskbagView({
                   onError={onError}
                   stateMenu={{ ownerName, onSaveName: saveOwnerName, onEdit: editTask }}
                   selectedId={selectedId}
-                  onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
+                  onSelect={selectTask}
                   terms={terms}
                   modified={opened.last_changed}
                   lostAfter={lostAfter}
@@ -1992,6 +1993,7 @@ function TaskbagView({
                 area={box.areas.find((a) => a.id === selected.area)}
                 iteration={iterations.find((i) => i.id === selected.iteration)}
                 onClose={() => setSelectedId(null)}
+                onOpenTask={selectTask}
                 onLink={openLink}
                 history={history?.id === selected.id ? history.history : null}
                 labels={ladder}
