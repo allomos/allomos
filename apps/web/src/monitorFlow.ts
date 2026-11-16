@@ -188,6 +188,32 @@ export interface Current {
   at: number;
   /** When its task last changed (ms): the sign of life [`stalled`] looks at. */
   changed: number;
+  /** Its session has claimed the task (A03-otter944): until then it is starting, not working. */
+  claimed: boolean;
+}
+
+/** Why an agent gets no session for now (A03-otter944): its quota is used up, or its last
+ * session did not start for no reason the monitor could read. */
+export type PauseWhy = "quota" | "no_claim";
+
+/** An agent given no session for now. */
+export interface Pause {
+  agent: TerminalAgent;
+  why: PauseWhy;
+  /** When its quota comes back, as the agent wrote it, when it said. */
+  resets: string | null;
+  /** When it is looked at again (ms): its quota read again, or tried again. */
+  until: number;
+}
+
+/** A session that did not start: it never claimed its task, which is given out again. */
+export interface NotStarted {
+  agent: TerminalAgent;
+  id: string;
+  /** When it was found not to have started (ms). */
+  found: number;
+  why: PauseWhy;
+  resets: string | null;
 }
 
 /** One monitoring run, as its process last wrote it in its run file. */
@@ -229,6 +255,10 @@ export interface Run {
   unreadable?: Unreadable;
   /** The `alm` version the app moved this run to after an update (Task-A03-cookie729), when it did. */
   updatedTo?: string;
+  /** The agents given no session for now (A03-otter944). */
+  paused: Pause[];
+  /** The sessions that did not start, newest last (A03-otter944). */
+  notStarted: NotStarted[];
 }
 
 /** Why a run cannot read its taskbag, as `alm monitor run` keeps it (crates/monitor/src/unreadable.rs). */
@@ -284,6 +314,26 @@ const difficultyRanges = (map: unknown): Partial<Record<TerminalAgent, Levels>> 
   }
   return out;
 };
+const pauseWhy = (w: unknown): PauseWhy => (w === "quota" ? "quota" : "no_claim");
+const text = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+const pauses = (map: unknown): Pause[] => {
+  const out: Pause[] = [];
+  if (map && typeof map === "object") {
+    for (const [a, p] of Object.entries(map as Record<string, any>)) {
+      const agent = asAgent(a);
+      if (agent && p && typeof p === "object") out.push({ agent, why: pauseWhy(p.why), resets: text(p.resets), until: num(p.until) });
+    }
+  }
+  return out;
+};
+const notStartedList = (list: unknown): NotStarted[] =>
+  (Array.isArray(list) ? list : [])
+    .map((n: any): NotStarted | null => {
+      const agent = asAgent(n?.agent);
+      if (!agent || typeof n.id !== "string") return null;
+      return { agent, id: n.id, found: num(n.found), why: pauseWhy(n.why), resets: text(n.resets) };
+    })
+    .filter((n): n is NotStarted => n !== null);
 const takenByAgent = (map: unknown): Record<string, TerminalAgent> => {
   const out: Record<string, TerminalAgent> = {};
   if (map && typeof map === "object") {
@@ -347,6 +397,8 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
           tab: w.tab && typeof w.tab.window === "number" ? { window: w.tab.window, tty: String(w.tab.tty) } : null,
           at: num(w.at),
           changed: num(w.changed, num(w.at)),
+          // A run file from before A03-otter944 does not say: taken as claimed, as it was shown.
+          claimed: w.seen_held !== false,
         };
       })
       .filter((w: Current | null): w is Current => w !== null),
@@ -356,6 +408,8 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     // An unknown reason (a newer alm's) still says the taskbag cannot be read.
     ...(typeof r.unreadable === "string" ? { unreadable: r.unreadable === "taskbag_format" ? ("taskbag_format" as const) : ("taskbag_unreadable" as const) } : {}),
     ...(typeof e.program?.updated_from === "string" && typeof e.program?.version === "string" ? { updatedTo: e.program.version } : {}),
+    paused: pauses(r.paused),
+    notStarted: notStartedList(r.not_started),
   };
 }
 
@@ -385,7 +439,7 @@ export function levelsOf(run: Run, agent: TerminalAgent): Levels {
 /** The free session slots: each agent once for every session it may still start (its count less
  * the sessions at work). Each can be given one task at the next check. */
 export function freeAgents(run: Run): TerminalAgent[] {
-  return run.agents.flatMap((a) => {
+  return run.agents.filter((a) => !run.paused.some((p) => p.agent === a)).flatMap((a) => {
     const atWork = run.working.filter((w) => w.agent === a).length;
     return Array.from({ length: Math.max(0, sessionsOf(run, a) - atWork) }, () => a);
   });
@@ -548,6 +602,8 @@ export interface SessionGroup {
   sessions: number;
   levels: Levels;
   noTask: boolean;
+  /** Given no session for now (A03-otter944), and why. */
+  paused: Pause | null;
 }
 
 /** The groups, one per agent of the run (in its order), then the agents taken off that still
@@ -561,7 +617,14 @@ export function sessionGroups(run: Run): SessionGroup[] {
     sessions: sessionsOf(run, agent),
     levels: levelsOf(run, agent),
     noTask: run.noTask.includes(agent),
+    paused: run.paused.find((p) => p.agent === agent) ?? null,
   }));
+}
+
+/** The sessions that did not start whose task no session works now, newest first: the panel
+ * lists them under the sessions (A03-otter944). */
+export function notStartedShown(run: Run): NotStarted[] {
+  return [...run.notStarted].reverse().filter((n, i, all) => !run.working.some((w) => w.id === n.id) && all.findIndex((m) => m.id === n.id) === i);
 }
 
 /** Whether the sessions list is grouped by agent: more than one agent, or one that may have

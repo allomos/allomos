@@ -355,6 +355,23 @@ fn busy(tab: &SessionTab) -> Option<bool> {
     }
 }
 
+/// What the tab shows now (Terminal's `contents`), to read why a session did not start
+/// (A03-otter944); none when the tab is gone or this is not macOS.
+pub fn text_of(tab: &SessionTab) -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        osascript(&format!(
+            "tell application \"Terminal\" to get contents of {}",
+            tab_ref(tab)
+        ))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = tab;
+        None
+    }
+}
+
 /// Text typed into the tab, followed by Return (Terminal's `do script … in`).
 #[cfg(target_os = "macos")]
 fn type_in(tab: &SessionTab, text: &str) -> Option<String> {

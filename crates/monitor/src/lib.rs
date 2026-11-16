@@ -7,6 +7,7 @@
 pub mod accounts;
 pub mod flow;
 pub mod notify;
+pub mod quota;
 pub mod registry;
 pub mod request;
 pub mod runner;

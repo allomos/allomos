@@ -251,7 +251,7 @@ test("a run is read from its file: scope, agents, sessions at work, next check",
   assert.ok(r && isRun(r));
   assert.deepEqual(r.scope, { kind: "iteration", id: "I-haul", current: true });
   assert.equal(nextCheck(r), 1_900_000);
-  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20 }]);
+  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20, claimed: true }]);
   assert.deepEqual(freeAgents(r), ["codex_cli"]);
   assert.deepEqual(readEntry(entry(), "I-knit") && (readEntry(entry(), "I-knit") as { scope: unknown }).scope, { kind: "iteration", id: "I-haul", current: false });
   // An agent alm does not know and a frequency the app does not offer are left out.
