@@ -1168,3 +1168,9 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 /* Task-A01-kernel761: a held task that is lost (no heartbeat past the project's limit, no busy
    window running): a small amber tag beside the holder and in the Last heartbeat row. */
 .lost-tag { display: inline-block; margin-left: 6px; font-size: 12px; font-weight: 600; line-height: 1.4; padding: 0 7px; border-radius: 999px; white-space: nowrap; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); cursor: help; }
+
+/* Task-A01-garden385: a task's risk word. High stands out, medium keeps the text colour's weight,
+   an unclassified one is greyed like other "none" values. */
+.risk-high { color: var(--warn); font-weight: 600; }
+.risk-medium { font-weight: 600; }
+.risk-none { color: var(--muted); }

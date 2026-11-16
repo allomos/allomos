@@ -53,6 +53,7 @@ import { LabelChips } from "./LabelChips";
 import { checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
 import { LEVELS, difficultyOf, difficultyText, levelText } from "./difficultyFlow";
+import { riskClass, riskText } from "./riskFlow";
 import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 import { isPlainEnter } from "./enterKey";
 
@@ -633,6 +634,9 @@ export function TaskPane({
       "difficulty",
       t("pane.difficulty_title"),
     ],
+    // Always shown (Task-A01-garden385, decision 0027): the risk an agent recorded with
+    // `alm classify`, or "Not classified". Shown only: it is not changed here.
+    [t("pane.risk"), <span className={riskClass(task)}>{riskText(task, t)}</span>, null, t("pane.risk_title")],
     [t("pane.label"), chipLabels(task).length > 0 ? <LabelChips task={task} /> : null, "label"],
     [t("pane.responsible"), ownerName ?? t("task.you"), null, t("pane.responsible_title")],
     [t("pane.agent"), agentText, null],

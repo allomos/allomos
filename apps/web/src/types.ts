@@ -116,6 +116,10 @@ export interface Task {
   /** Decisions an AI agent made here on its own and nobody has reviewed yet (Task-A03-19). Not
    * a field of task.json: worked out from the history and added when the taskbag is opened. */
   ai_decisions?: AiDecision[];
+  /** Its risk as an agent recorded it, `low`, `medium` or `high` (Task-A01-garden385, decision
+   * 0027); missing: not classified. Not a field of task.json: read from the history and added
+   * when the taskbag is opened. */
+  risk?: string | null;
   /** Its approvals, with where each stands now (Task-A01-coach782). Not a field of task.json:
    * worked out from the history and added when the taskbag is opened. */
   approvals?: ApprovalRecord[];
@@ -330,6 +334,9 @@ export interface Opened {
   ai_decisions?: Record<string, AiDecision[]>;
   /** Each task's approvals, by task ID (Task-A01-coach782). */
   approvals?: Record<string, ApprovalRecord[]>;
+  /** Each classified task's change type, risk and what it touches, by task ID (Task-A01-garden385);
+   * a task that is not classified is left out. */
+  classifications?: Record<string, { change_type?: string; risk?: string; touches?: string[] }>;
   /** Each task's outside effects, by task ID (Task-A01-job650). */
   effects?: Record<string, EffectRecord[]>;
   /** Each task's links to code and releases, by task ID (Task-A01-mint242). */

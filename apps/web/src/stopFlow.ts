@@ -233,19 +233,21 @@ export function decisionDetails(task: Task): AiDecision[] {
 
 /** The opened taskbag with each task's AI decisions to review (Task-A03-19), its approvals
  * (Task-A01-coach782), its outside effects (Task-A01-job650) and its links to code and releases
- * (Task-A01-mint242) put on the task. */
+ * (Task-A01-mint242) put on the task, and its risk as recorded (Task-A01-garden385). */
 export function withDecisions(opened: Opened): Opened {
   const box = opened.loaded.taskbag;
   const all = opened.ai_decisions ?? {};
   const approvals = opened.approvals ?? {};
   const effects = opened.effects ?? {};
   const links = opened.links ?? {};
+  const classes = opened.classifications ?? {};
   if (!box) return opened;
   const tasks = box.tasks.map((task) => {
     let out = all[task.id] ? { ...task, ai_decisions: all[task.id] } : task;
     if (approvals[task.id]) out = { ...out, approvals: approvals[task.id] };
     if (effects[task.id]) out = { ...out, effects: effects[task.id] };
     if (links[task.id]) out = { ...out, links: links[task.id] };
+    if (classes[task.id]?.risk) out = { ...out, risk: classes[task.id].risk };
     return out;
   });
   return { ...opened, loaded: { ...opened.loaded, taskbag: { ...box, tasks } } };

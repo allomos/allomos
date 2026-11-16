@@ -3585,6 +3585,29 @@ mod tests {
         .unwrap();
         let opened = open_taskbag(root.clone());
         assert_eq!(opened.ai_decisions["A01-01"][0].text, "Names: alm note");
+        // Task-A01-garden385: the risk an agent recorded comes along when the taskbag opens; a
+        // task that is not classified is left out (the window shows it as "Not classified").
+        assert!(opened.classifications.is_empty());
+        allomos_store::classify::set(
+            &root,
+            allomos_store::Actor::alm(Some("claude/x")),
+            LOCK_WAIT,
+            "A01-01",
+            &allomos_core::classify::Given {
+                risk: Some("high"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let opened = open_taskbag(root.clone());
+        assert_eq!(
+            opened.classifications["A01-01"].risk.as_deref(),
+            Some("high")
+        );
+        assert_eq!(
+            serde_json::to_value(&opened).unwrap()["classifications"]["A01-01"]["risk"],
+            "high"
+        );
         assert_eq!(
             review_as(&root, None, "A01-01"),
             Err(Problem::HolderMissing)
