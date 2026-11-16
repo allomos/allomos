@@ -33,7 +33,8 @@ pub fn home() -> PathBuf {
 }
 
 /// Folders where command-line tools usually live. A macOS app does not get the person's shell
-/// path, so these are searched besides `PATH`.
+/// `PATH`; npm-installed commands use `#!/usr/bin/env node`, so their Node folders are searched
+/// after `PATH` and the existing common tool folders.
 pub fn tool_dirs(home: &Path) -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
         .map(|p| std::env::split_paths(&p).collect())
@@ -67,7 +68,182 @@ pub fn tool_dirs(home: &Path) -> Vec<PathBuf> {
         dirs.push("/opt/homebrew/bin".into());
         dirs.push("/usr/local/bin".into());
     }
+    let prefixes = [PathBuf::from("/opt/homebrew"), PathBuf::from("/usr/local")];
+    for dir in node_dirs(home, &prefixes) {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
     dirs
+}
+
+/// Node folders to add when checking npm-installed terminal agents. A macOS app does not inherit
+/// the shell's `PATH`, and those commands rely on `#!/usr/bin/env node`; only folders with an
+/// executable `node` are included. `prefixes` keeps Homebrew discovery testable without reading the
+/// computer's real installations. Windows leaves this to `PATH`, where npm's `.cmd` and Node live.
+#[cfg(windows)]
+pub fn node_dirs(_home: &Path, _prefixes: &[PathBuf]) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+#[cfg(not(windows))]
+pub fn node_dirs(home: &Path, prefixes: &[PathBuf]) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    for prefix in prefixes {
+        let opt = prefix.join("opt");
+        push_node_dir(&mut dirs, opt.join("node").join("bin"));
+
+        let mut versioned = std::fs::read_dir(&opt)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name();
+                let version = name
+                    .to_str()?
+                    .strip_prefix("node@")
+                    .and_then(version_parts)?;
+                let bin = entry.path().join("bin");
+                Some((version, bin))
+            })
+            .collect::<Vec<_>>();
+        versioned.sort_by(|(a_version, a_path), (b_version, b_path)| {
+            b_version.cmp(a_version).then_with(|| a_path.cmp(b_path))
+        });
+        for (_, bin) in versioned {
+            push_node_dir(&mut dirs, bin);
+        }
+    }
+
+    push_node_dir(&mut dirs, home.join(".volta/bin"));
+
+    let nvm = home.join(".nvm");
+    let versions = nvm_versions(&nvm);
+    let default = std::fs::read_to_string(nvm.join("alias/default")).ok();
+    let selected_nvm = default
+        .as_deref()
+        .and_then(|alias| matching_nvm_version(alias, &nvm, &versions))
+        .or_else(|| versions.first().map(|(_, bin)| bin.clone()));
+    if let Some(bin) = selected_nvm {
+        push_node_dir(&mut dirs, bin);
+    }
+
+    for bin in [
+        home.join(".local/share/fnm/aliases/default/bin"),
+        home.join("Library/Application Support/fnm/aliases/default/bin"),
+        home.join(".asdf/shims"),
+        home.join(".local/share/mise/shims"),
+    ] {
+        push_node_dir(&mut dirs, bin);
+    }
+
+    dirs
+}
+
+#[cfg(not(windows))]
+fn nvm_versions(nvm: &Path) -> Vec<(Vec<u64>, PathBuf)> {
+    let mut versions = std::fs::read_dir(nvm.join("versions/node"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name();
+            let version = name.to_str()?.strip_prefix('v').and_then(version_parts)?;
+            let bin = entry.path().join("bin");
+            Some((version, bin))
+        })
+        .filter(|(_, bin)| has_executable_node(bin))
+        .collect::<Vec<_>>();
+    versions.sort_by(|(a_version, a_path), (b_version, b_path)| {
+        b_version.cmp(a_version).then_with(|| a_path.cmp(b_path))
+    });
+    versions
+}
+
+#[cfg(not(windows))]
+fn matching_nvm_version(
+    alias: &str,
+    nvm: &Path,
+    versions: &[(Vec<u64>, PathBuf)],
+) -> Option<PathBuf> {
+    let alias = alias.trim();
+    if alias == "lts/*" {
+        return std::fs::read_dir(nvm.join("alias/lts"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+            .filter_map(|alias| matching_nvm_version_value(&alias, versions))
+            .max_by_key(|bin| {
+                versions
+                    .iter()
+                    .find(|(_, version_bin)| version_bin == bin)
+                    .map(|(version, _)| version.clone())
+            });
+    }
+
+    if let Some(name) = alias.strip_prefix("lts/") {
+        if name.is_empty() || name.contains('/') {
+            return None;
+        }
+        let target = std::fs::read_to_string(nvm.join("alias/lts").join(name)).ok()?;
+        return matching_nvm_version_value(&target, versions);
+    }
+
+    matching_nvm_version_value(alias, versions)
+}
+
+#[cfg(not(windows))]
+fn matching_nvm_version_value(alias: &str, versions: &[(Vec<u64>, PathBuf)]) -> Option<PathBuf> {
+    let alias = alias.trim();
+    let requested = alias.strip_prefix('v').unwrap_or(alias);
+    let requested = version_parts(requested)?;
+    versions
+        .iter()
+        .find(|(version, _)| {
+            requested.len() <= version.len()
+                && requested
+                    .iter()
+                    .zip(version)
+                    .all(|(wanted, installed)| wanted == installed)
+        })
+        .map(|(_, bin)| bin.clone())
+}
+
+#[cfg(not(windows))]
+fn version_parts(version: &str) -> Option<Vec<u64>> {
+    let parts = version.split('.').collect::<Vec<_>>();
+    if parts.is_empty() || parts.iter().any(|part| part.is_empty()) {
+        return None;
+    }
+    parts
+        .into_iter()
+        .map(str::parse::<u64>)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()
+}
+
+#[cfg(not(windows))]
+fn push_node_dir(dirs: &mut Vec<PathBuf>, bin: PathBuf) {
+    if has_executable_node(&bin) && !dirs.contains(&bin) {
+        dirs.push(bin);
+    }
+}
+
+#[cfg(not(windows))]
+fn has_executable_node(bin: &Path) -> bool {
+    let node = bin.join("node");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        node.metadata()
+            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    }
+    #[cfg(not(unix))]
+    {
+        node.is_file()
+    }
 }
 
 /// The file names a command called `name` may have: on Windows a program (`claude.exe`) or the
@@ -86,16 +262,18 @@ pub fn tool_names(name: &str, windows: bool) -> Vec<String> {
 /// The first `name` executable in `dirs` that answers `--version` (so a broken install is not offered).
 pub fn find_tool(name: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
     let names = tool_names(name, cfg!(windows));
+    let path = std::env::join_paths(dirs).ok()?;
     dirs.iter()
         .flat_map(|d| names.iter().map(move |n| d.join(n)))
         .filter(|p| p.is_file())
         // Asked twice: a tool updating itself can fail its first answer (seen once with `claude`).
-        .find(|p| runs(p) || runs(p))
+        .find(|p| runs(p, &path) || runs(p, &path))
 }
 
-fn runs(program: &Path) -> bool {
+fn runs(program: &Path, path: &OsStr) -> bool {
     let Ok(mut child) = command(program)
         .arg("--version")
+        .env("PATH", path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -358,6 +536,47 @@ pub fn find_terminal_agents() -> Vec<(String, PathBuf)> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+    #[cfg(unix)]
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[cfg(unix)]
+    struct TempDir(PathBuf);
+
+    #[cfg(unix)]
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            static NEXT: AtomicUsize = AtomicUsize::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "allomos-terminal-{name}-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[cfg(unix)]
+    fn executable(path: &Path, contents: &str) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
     #[test]
     fn quoting_survives_quotes() {
         assert_eq!(shell_quote("it's"), r"'it'\''s'");
@@ -485,5 +704,68 @@ mod tests {
             ["codex.exe", "codex.cmd", "codex.bat"]
         );
         assert_eq!(tool_names("codex", false), ["codex"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn node_dirs_sort_homebrew_versions_numerically_and_skip_missing_nodes() {
+        let home = TempDir::new("brew-home");
+        let prefix = TempDir::new("brew-prefix");
+        let node20 = prefix.path().join("opt/node@20/bin");
+        let node22 = prefix.path().join("opt/node@22/bin");
+        let missing = prefix.path().join("opt/node@99/bin");
+        executable(&node20.join("node"), "#!/bin/sh\nexit 0\n");
+        executable(&node22.join("node"), "#!/bin/sh\nexit 0\n");
+        std::fs::create_dir_all(&missing).unwrap();
+
+        assert_eq!(
+            node_dirs(home.path(), &[prefix.path().to_path_buf()]),
+            [node22, node20]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nvm_default_alias_selects_that_version_and_missing_alias_uses_the_highest() {
+        let home = TempDir::new("nvm-home");
+        let nvm = home.path().join(".nvm");
+        let node20 = nvm.join("versions/node/v20.1.0/bin");
+        let node22 = nvm.join("versions/node/v22.3.0/bin");
+        let node23 = nvm.join("versions/node/v23.0.0/bin");
+        executable(&node20.join("node"), "#!/bin/sh\nexit 0\n");
+        executable(&node22.join("node"), "#!/bin/sh\nexit 0\n");
+        executable(&node23.join("node"), "#!/bin/sh\nexit 0\n");
+
+        let default = nvm.join("alias/default");
+        std::fs::create_dir_all(default.parent().unwrap()).unwrap();
+        std::fs::write(&default, "20\n").unwrap();
+        assert_eq!(node_dirs(home.path(), &[]), [node20]);
+
+        let lts = nvm.join("alias/lts");
+        std::fs::create_dir_all(&lts).unwrap();
+        std::fs::write(lts.join("iron"), "v20.1.0\n").unwrap();
+        std::fs::write(lts.join("jod"), "v22.3.0\n").unwrap();
+        std::fs::write(&default, "lts/*\n").unwrap();
+        assert_eq!(node_dirs(home.path(), &[]), [node22]);
+
+        std::fs::remove_file(default).unwrap();
+        assert_eq!(node_dirs(home.path(), &[]), [node23]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn find_tool_gives_the_probe_the_candidate_path_for_env_node() {
+        let dir = TempDir::new("probe-path");
+        executable(
+            &dir.path().join("allomos-node-probe"),
+            "#!/bin/sh\nexit 0\n",
+        );
+        let tool = dir.path().join("allomos-tool-probe");
+        executable(&tool, "#!/usr/bin/env allomos-node-probe\nexit 0\n");
+
+        assert_eq!(
+            find_tool("allomos-tool-probe", &[dir.path().to_path_buf()]),
+            Some(tool)
+        );
     }
 }

@@ -5310,17 +5310,17 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
     assert_eq!(e["actor"]["session"], "t-9", "{e}");
     // The text says what is missing and how to give it.
     let mut c = alm_command();
-    c.current_dir(&repo).args(["--as", "s3", "claim", "A02-01"]);
+    c.current_dir(&repo)
+        .args(["--as", "s3", "claim", "A02-01", "--branch", "main"]);
     c.env("ALLOMOS_SETTINGS_DIR", &settings)
         .env("CLAUDECODE", "1")
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("ALLOMOS_MODEL");
     let text = String::from_utf8(c.output().unwrap().stdout).unwrap();
     assert!(
-        text.contains("which model ran it") && text.contains("alm --model"),
+        text.contains("no session is recorded") && text.contains("alm session A02-01"),
         "{text}"
     );
-    assert!(text.contains("which agent session ran it"), "{text}");
     // Old and new events read together without issues.
     let v = ok(&repo, &["list"]);
     assert_eq!(v["issues"], json!([]), "{v}");
