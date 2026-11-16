@@ -80,6 +80,9 @@ about the project's tasks.
 - **Handoff note**: what the next holder needs to know: where the work stopped, the one next
   step, who it waits on. Written with `alm handoff` (or left when a task is released); a handoff
   lives in the task itself, not in a file of its own.
+- **Written for a person first**: the order of every handoff note, AI decision and set of check
+  steps: one sentence a person can act on, then what the person has to do, the technical detail
+  (commit IDs, commands, IDs) last. See `alm guide workflow`, step 5.
 - **Task language**: the language new and changed tasks are written in (titles, descriptions,
   notes). `alm task-language` tells you which; by default it follows the language the person
   uses Allomos in.
@@ -293,8 +296,9 @@ Work a task:
   when it should not wait for them after all. Its state stays as it is.
 - `alm release <id> --note \"<what the next one needs>\"`: stop short of done.
 - `alm done <id> [--without-human-check \"<why>\" --steps <file.md> --accepted-by <who>]`: finished (see
-  `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: the test folder, what to
-  open, what to click, what they should see. On a task already done, it only records its human
+  `alm guide workflow`, step 7). The steps are Markdown for the person who checks it: first one sentence saying what
+  they are checking, about how many minutes it takes and which step matters most; then the test folder, what to
+  open, what to click, what they should see; commands and IDs last. On a task already done, it only records its human
   check again (the old `--without-owner` still works). `--accepted-by` names who accepted
   finishing without the human check (an exception, `alm exceptions`).
 - `alm checked <id> [--deployed|--locally] [--result pass|partly] [--words \"<their words>\"]
@@ -316,6 +320,8 @@ Work a task:
   under To review: AI decisions; `detail` (sizes, limits, parameters, names in the code) is kept
   with the task (`alm show`) but not listed for review. Unsure between principle and detail:
   principle. One with no kind waits for review. Any task, any state; the history keeps it.
+  Start the line with what the person sees or what changes for them, then why; names in the
+  code, commit IDs and commands come last (`alm guide workflow`, step 5).
 - `alm reviewed <id>`: the person has reviewed the task's AI decisions: they leave To review; the
   history keeps them. Run it only when the person says so.
 - `alm approve <id>… --words \"<the person's exact words>\"`: record the person's approval in
@@ -454,7 +460,9 @@ Handoffs (what a session leaves in each task so whoever continues does not start
   `--quota <n> --context <n> [--write-when \"<text>\"] [--agent <name>] [--clear]` change them.
 - `alm handoff <id> --as <your session name> --text \"<handoff>\"` (or `--from <file.md>`)
   `[--evidence \"<what>\"]`: hand the task off. The text replaces its handoff note (where it
-  stopped, the one next step, who it waits on); `--evidence` adds, dated and signed, what was done
+  stopped, the one next step, who it waits on), written for a person first: one sentence a person
+  can act on, then what the person has to do, then commit IDs, commands and IDs
+  (`alm guide workflow`, step 5); `--evidence` adds, dated and signed, what was done
   that must not run twice (an outside effect) under its description's **Evidence**; its history
   records who handed it off. Several tasks: once for each. It reminds you to update
   `project-notes.md` if what is running or a pitfall changed. `alm next` and `alm show <id>` show
@@ -745,6 +753,20 @@ const WORKFLOW: &str = "# How to work the tasks
    handoff note, so write the whole of it each time. Each operation with an outside effect that
    must not run twice goes in with `--evidence \"<what>\"` (under the description's
    **Evidence**); other evidence with `alm describe`.
+   **Write for a person first.** A person reads every handoff note, every AI decision and every
+   set of check steps, often on the go and without your conversation. Each keeps one order:
+   1. One sentence in plain words that a person can act on: where the work stands, or what was
+      decided, as they would see it. \"Done and merged: the list now shows who holds each
+      task\", not \"Merged 079bbb5b, cargo test passes\".
+   2. What the person has to do, or that there is nothing to do: the question to answer, the
+      check to make, the approval to give. Check steps say here about how many minutes they
+      take and which step matters most (the one to do when there is time for only one).
+   3. The technical detail last: commit IDs, commands, task IDs, file names, test counts, the
+      run mode line.
+   Never open with a commit ID, a command or a file name. For a handoff note, what the next
+   agent needs (where it stopped, the one next step, the working branch) follows what the
+   person needs. An AI decision is one line: what the person sees or what changes for them,
+   then why, then names in the code. The order is how you write; the data format is the same.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
 7. Finished: once the task has a \"by human\" label (a person has checked it: the human check),
@@ -753,7 +775,9 @@ const WORKFLOW: &str = "# How to work the tasks
    `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
    Do not leave such a task waiting: `alm wait` is only for a real question, an approval or an
    outside effect (step 4). Write the steps so a person can pick it up and test
-   it: the test folder, what to open, what to click, what they should see. The task keeps its
+   it, in the order of step 5: first one sentence saying what they are checking, about how many
+   minutes it takes and which step matters most; then the steps: the test folder, what to open,
+   what to click, what they should see; commands and IDs last. The task keeps its
    label, the note and the steps, so a person finds it with `alm human`; once they have checked
    it, `alm checked <id>`. When a finished task needs more work on the same outcome (it failed
    its check, or the person asks for more), reopen it instead of adding a task:
@@ -818,7 +842,7 @@ Rules:
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\" --kind visible|principle|detail`, so
-  the approver can review it with `alm human` (a `detail` is kept, not listed for review). Wording and look (what users see) are reviewed before release, not before the
+  the approver can review it with `alm human` (a `detail` is kept, not listed for review). Start each with what the person sees, then why (step 5). Wording and look (what users see) are reviewed before release, not before the
   work (step 8). Data formats, removing things, permissions and security, anything that changes
   the plan or another task, and anything with a cost or an outside effect go to the approver
   first (`alm wait`). In a goal run (step 9) the plan was approved in advance; outside effects
@@ -2135,6 +2159,22 @@ mod tests {
             assert!(text.contains("go on with the next ready task"), "{text}");
             assert!(text.contains("it would wait until it times out"), "{text}");
             assert!(text.contains("changes the plan or another task"), "{text}");
+        }
+        // Handoff notes, AI decisions and check steps are written for a person first (decision
+        // 0025 § 1, Task-A00-cane350).
+        for text in [guide(Some("workflow")).unwrap(), crate::agent_section()] {
+            let text = flat(text);
+            assert!(text.contains("Write for a person first"), "{text}");
+            assert!(text.contains("that a person can act on"), "{text}");
+            assert!(text.contains("which step matters most"), "{text}");
+            assert!(
+                text.contains("Never open with a commit ID, a command or a file name"),
+                "{text}"
+            );
+        }
+        for text in [guide(None).unwrap(), guide(Some("terms")).unwrap()] {
+            let text = flat(text);
+            assert!(text.contains("ritten for a person first"), "{text}");
         }
         let tasks = flat(guide(Some("tasks")).unwrap());
         assert!(

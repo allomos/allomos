@@ -111,7 +111,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 38: blocked is not a state: `alm block` keeps the task's state, the task is blocked while a
 /// blocker has not finished, and nothing changes in it when they finish; `alm unblock` takes
 /// blockers off (decision 0026, Task-A01-house696).
-pub const SECTION_VERSION: u32 = 38;
+/// 39: handoff notes, AI decisions and check steps are written for a person first: one sentence a
+/// person can act on, then what the person has to do, the technical detail last (decision 0025
+/// § 1, Task-A00-cane350).
+pub const SECTION_VERSION: u32 = 39;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
