@@ -2059,9 +2059,9 @@ closely, once the work is done; it changes nothing in what needs the approver be
 ";
 
 const RISK_RULES_TAIL: &str = "\
-- Rules the project added (its settings, Risk management; kept in the taskbag's `project.json`)
-  are sentences written for you, one rule each: read them and apply them the same way. A project
-  can add rules; it cannot take H1–H7 away.
+- Rules the project added (its settings, Risk management; kept in the taskbag's `project.json`,
+  under `risk`, `rules`) are sentences written for you, one rule each: read them and apply them
+  the same way. A project can add rules; it cannot take H1–H7 away.
 - A task done before with no risk recorded can still get one: `alm classify` works on done
   tasks too.
 ";

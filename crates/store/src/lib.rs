@@ -369,9 +369,10 @@ the project notes (below).
   production|others-data|none --why \"<one sentence: which rules apply, and what in the work
   makes them apply>\"`. You judge; alm records what you say and checks nothing, and the
   approver may change it when reviewing. When several rules apply, the highest one counts:
-{risk_rules}  Read the rules this project added too (its settings, Risk management; kept in the taskbag's
-  `project.json`) and apply them the same way. This is about what is reviewed first once the
-  work is done; what needs the approver before the work (below) stays as it is.
+{risk_rules}  Read the rules this project added too (its settings, Risk management; kept in the
+  taskbag's `project.json`, under `risk`, `rules`) and apply them the same way. This is about
+  what is reviewed first once the work is done; what needs the approver before the work (below)
+  stays as it is.
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason \"<what changed>\"`.

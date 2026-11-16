@@ -18,8 +18,7 @@ use crate::lock_for_change;
 /// `alm guide workflow` (Task-A00-nectar077). H1–H7 are fixed for every project; a project adds
 /// rules of its own in its settings and cannot take these away. alm only tells them: the agent
 /// judges, and alm compares nothing with them.
-pub const RISK_RULES: &str = "\
-  - High: H1 an outside effect (a hosted resource, SQL on a real target, a deployment, a secret,
+pub const RISK_RULES: &str = "  - High: H1 an outside effect (a hosted resource, SQL on a real target, a deployment, a secret,
     sending email, creating a repository, adding or changing a remote, other people's data);
     H2 a release; H3 a change of data format (the format of the files of tasks, events or the
     taskbag; a migration); H4 removing something (a feature, a command, data, files);
