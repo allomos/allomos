@@ -1,7 +1,7 @@
 // Opening a task from the All monitors list (Task-A03-jazz112): the request reaches this window
 // at once, another window through storage, or waits until the matching project opens.
 
-import { projectKey } from "./iterationJumpFlow";
+import { projectKey } from "./iterationJumpFlow.ts";
 
 export const TASK_JUMP_KEY = "allomos.jumpTask";
 export const TASK_JUMP_EVENT = "allomos:jump-task";
