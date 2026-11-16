@@ -22,6 +22,7 @@ coverage/
 .vscode/
 
 # Agent worktrees
+.claude/
 .claude/worktrees/
 
 # Rust and Tauri build output
