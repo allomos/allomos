@@ -13,6 +13,25 @@ use allomos_core::{Issue, Problem, Task, ops};
 use crate::events::{self, Actor};
 use crate::lock_for_change;
 
+/// What counts as high, medium and low risk (decision 0027 § 1), as an agent reads it before it
+/// records a task's risk with `alm classify`: in the AGENTS.md section and in
+/// `alm guide workflow` (Task-A00-nectar077). H1–H7 are fixed for every project; a project adds
+/// rules of its own in its settings and cannot take these away. alm only tells them: the agent
+/// judges, and alm compares nothing with them.
+pub const RISK_RULES: &str = "\
+  - High: H1 an outside effect (a hosted resource, SQL on a real target, a deployment, a secret,
+    sending email, creating a repository, adding or changing a remote, other people's data);
+    H2 a release; H3 a change of data format (the format of the files of tasks, events or the
+    taskbag; a migration); H4 removing something (a feature, a command, data, files);
+    H5 permissions and security (credentials, pairing, sign-in, signing, who may do what);
+    H6 a change of shared rules (AGENTS.md, `alm guide`); H7 making `alm` do one more check of
+    its own.
+  - Medium: M1 a large change (say 500 lines or more, or 3 modules or more); M2 a check that
+    was not run, or finishing with `--without-human-check`; M3 words and look that users see;
+    M4 the principle of how something is built (the kind of AI decision the approver reviews).
+  - Low: everything else: only documents, internal tidying or tests, with every check passed.
+";
+
 /// Today in UTC, `YYYY-MM-DD` (`ALLOMOS_NOW` fixes it in tests).
 fn today() -> String {
     events::now_utc().chars().take(10).collect()

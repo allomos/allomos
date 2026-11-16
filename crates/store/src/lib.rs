@@ -364,6 +364,14 @@ the project notes (below).
   with `alm ai-decided` for review. A question about something cheap to undo, still unanswered
   when the run ends, is settled by your proposal, recorded with `alm ai-decided`. Details:
   `alm guide workflow`, step 8.
+- Risk: before you finish a task (before `alm done`), record its risk yourself, with one
+  sentence of why: `alm classify <id> --risk low|medium|high --touches
+  production|others-data|none --why \"<one sentence: which rules apply, and what in the work
+  makes them apply>\"`. You judge; alm records what you say and checks nothing, and the
+  approver may change it when reviewing. When several rules apply, the highest one counts:
+{risk_rules}  Read the rules this project added too (its settings, Risk management; kept in the taskbag's
+  `project.json`) and apply them the same way. This is about what is reviewed first once the
+  work is done; what needs the approver before the work (below) stays as it is.
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason \"<what changed>\"`.
@@ -462,7 +470,8 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 `alm guide goal` (the goal prompt: build an app from a description, release by release),
 `alm guide github-release` (publish a GitHub release and install it, when the approver asks),
 `alm guide move-cards` (card files: moving them in beside their tasks).
-"
+",
+        risk_rules = classify::RISK_RULES
     )
 }
 
@@ -1944,7 +1953,11 @@ struct BeforeBlocked {
 fn state_before_blocked(history: &[allomos_core::event::Event], task: &Task) -> BeforeBlocked {
     use allomos_core::State;
     let held = task.holder.is_some();
-    let fallback = if held { State::InProgress } else { State::Ready };
+    let fallback = if held {
+        State::InProgress
+    } else {
+        State::Ready
+    };
     let text = |v: &Option<serde_json::Value>| {
         v.as_ref()
             .and_then(|v| v.as_str())
@@ -1955,9 +1968,9 @@ fn state_before_blocked(history: &[allomos_core::event::Event], task: &Task) -> 
         .iter()
         .filter(|e| e.kind == Kind::Task && e.id.as_deref() == Some(task.id.as_str()))
         .filter(|e| {
-            e.changes
-                .iter()
-                .any(|c| c.field == "state" && c.to.as_ref().and_then(|v| v.as_str()) == Some("blocked"))
+            e.changes.iter().any(|c| {
+                c.field == "state" && c.to.as_ref().and_then(|v| v.as_str()) == Some("blocked")
+            })
         })
         .max_by(|a, b| a.at.cmp(&b.at));
     let Some(event) = found else {
@@ -3118,14 +3131,13 @@ mod tests {
         // 02: backlog before. 03: waiting on Ann before. 04: no history. 05: held, no history.
         // 06: ready before, blocked twice (the later change counts).
         let actor = Actor::alm(Some("s"));
-        let change_of = |field: &str, from: Option<&str>, to: Option<&str>| {
-            allomos_core::event::Change {
+        let change_of =
+            |field: &str, from: Option<&str>, to: Option<&str>| allomos_core::event::Change {
                 extra: Default::default(),
                 field: field.into(),
                 from: from.map(|v| serde_json::json!(v)),
                 to: to.map(|v| serde_json::json!(v)),
-            }
-        };
+            };
         let mut bag = lock.load().taskbag.unwrap();
         for t in bag.tasks.iter_mut().filter(|t| t.id != "A01-01") {
             let changes = match t.id.as_str() {
@@ -3187,7 +3199,10 @@ mod tests {
         let bag = loaded.taskbag.unwrap();
         let t = |id: &str| bag.tasks.iter().find(|t| t.id == id).unwrap().clone();
         assert_eq!(
-            (t("A01-03").waiting_on.as_deref(), t("A01-03").who.as_deref()),
+            (
+                t("A01-03").waiting_on.as_deref(),
+                t("A01-03").who.as_deref()
+            ),
             (Some("the licence"), Some("Ann"))
         );
         for id in &ids[1..] {
@@ -3197,7 +3212,11 @@ mod tests {
         }
         let e = &events::history(&root, "A01-02").events[0];
         assert_eq!(e.command, "upgrade");
-        assert!(allomos_core::event::reason(e).unwrap().starts_with("upgrade:"));
+        assert!(
+            allomos_core::event::reason(e)
+                .unwrap()
+                .starts_with("upgrade:")
+        );
         // Up to date now: nothing more to upgrade.
         assert!(
             upgrade(&root, Actor::alm(Some("s")), Duration::ZERO)

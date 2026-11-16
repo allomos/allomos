@@ -111,7 +111,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 38: blocked is not a state: `alm block` keeps the task's state, the task is blocked while a
 /// blocker has not finished, and nothing changes in it when they finish; `alm unblock` takes
 /// blockers off (decision 0026, Task-A01-house696).
-pub const SECTION_VERSION: u32 = 38;
+/// 39: before finishing a task the agent records its risk with `alm classify`, with one sentence
+/// of why, by the rules H1–H7 (high), M1–M4 (medium), the rest low, the highest one counting, and
+/// by the rules the project added (decision 0027 § 1, 2, Task-A00-nectar077).
+pub const SECTION_VERSION: u32 = 39;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

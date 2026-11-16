@@ -349,7 +349,9 @@ Work a task:
   its history; done tasks too. An emergency's approval is due by `--due` (three days after it is
   marked, by default). `alm human` lists, under To approve afterwards, every emergency without an
   approval recorded after it was marked (`alm approve`), and which are past due; `alm show` lists
-  a task's. Without options it shows what is recorded.
+  a task's. Without options it shows what is recorded. Before you finish a task, record its
+  risk with `--risk` and `--touches`, and one sentence of why with `--why` (decision 0027; the
+  rules: `alm guide workflow`, Risk rules).
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
   `--reason \"<why>\"` change it; account and sso need a cloud project.
@@ -747,7 +749,13 @@ const WORKFLOW: &str = "# How to work the tasks
    **Evidence**); other evidence with `alm describe`.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
-7. Finished: once the task has a \"by human\" label (a person has checked it: the human check),
+7. Before you finish a task, record its risk yourself, with one sentence of why (decision
+   0027): `alm classify <id> --risk low|medium|high --touches production|others-data|none --why
+   \"<one sentence: which rules apply, and what in the work makes them apply>\"`. The rules are
+   under **Risk rules** below; when several apply, the highest one counts, and the rules the
+   project added count too. You judge: alm records what you say and checks nothing, and the
+   approver may change it when reviewing.
+   Finished: once the task has a \"by human\" label (a person has checked it: the human check),
    `alm done <id>`. When the work is finished and only a
    person's hands-on check is left, finish it without that label, in quiet and normal mode alike (step 8):
    `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
@@ -2016,6 +2024,24 @@ fn written_in(language: &str) -> Option<&'static str> {
 }
 
 /// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
+/// Around the risk rules at the end of `alm guide workflow` (decision 0027, Task-A00-nectar077).
+const RISK_RULES_HEAD: &str = "
+Risk rules (step 7; decision 0027). The risk says what the approver reviews first, and how
+closely, once the work is done; it changes nothing in what needs the approver before the work.
+- Record it before `alm done`, with `--why`: one sentence naming the rules that apply (H3, M2…)
+  and what in the work makes them apply. Say what the work touches with `--touches`:
+  `production`, `others-data` (other people's data), or `none`.
+- When several rules apply, the highest one counts:
+";
+
+const RISK_RULES_TAIL: &str = "\
+- Rules the project added (its settings, Risk management; kept in the taskbag's `project.json`)
+  are sentences written for you, one rule each: read them and apply them the same way. A project
+  can add rules; it cannot take H1–H7 away.
+- A task done before with no risk recorded can still get one: `alm classify` works on done
+  tasks too.
+";
+
 pub fn guide(topic: Option<&str>) -> Option<String> {
     let text = |t: &str| match t {
         "terms" => Some(TERMS),
@@ -2038,6 +2064,11 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
                 "{x}\nThe file (version {}):\n\n```\n{}```\n",
                 crate::codex_rules::VERSION,
                 crate::codex_rules::text()
+            ),
+            // The risk rules, the same text as in the AGENTS.md section (Task-A00-nectar077).
+            "workflow" => format!(
+                "{x}{RISK_RULES_HEAD}{}{RISK_RULES_TAIL}",
+                crate::classify::RISK_RULES
             ),
             _ => x.to_string(),
         })
@@ -2086,11 +2117,7 @@ mod tests {
         let all = guide(None).unwrap();
         assert!(all.contains("# Allomos terms") && all.contains("# How to work the tasks"));
         // The fixed parts are said plainly.
-        assert!(
-            guide(Some("customize"))
-                .unwrap()
-                .contains("The six states")
-        );
+        assert!(guide(Some("customize")).unwrap().contains("The six states"));
         for text in [guide(Some("commands")).unwrap(), crate::agent_section()] {
             assert!(text.contains("alm block <id> --by"), "{text}");
             assert!(text.contains("alm unblock <id>"), "{text}");
@@ -2828,5 +2855,32 @@ mod tests {
             assert!(check > prompt.find("## 3.").unwrap(), "{language}");
             assert!(check < prompt.find("## 4.").unwrap(), "{language}");
         }
+    }
+    /// The risk rules are in `alm guide workflow` and in the AGENTS.md section, the same text in
+    /// both (decision 0027, Task-A00-nectar077).
+    #[test]
+    fn the_workflow_guide_and_the_section_tell_the_risk_rules() {
+        let workflow = guide(Some("workflow")).unwrap();
+        let section = crate::agent_section();
+        for text in [&workflow, &section] {
+            assert!(text.contains(crate::classify::RISK_RULES), "{text}");
+            for words in [
+                "alm classify <id> --risk low|medium|high --touches",
+                "--why",
+                "the highest one counts",
+                "H1 an outside effect",
+                "H7 making `alm` do one more check",
+                "M4 the principle",
+                "Low: everything else",
+                "Risk management",
+            ] {
+                assert!(text.contains(words), "{words}");
+            }
+        }
+        assert!(
+            guide(Some("commands"))
+                .unwrap()
+                .contains("one sentence of why with `--why`")
+        );
     }
 }
