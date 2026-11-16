@@ -282,9 +282,9 @@ enum Command {
         #[arg(long, value_name = "RANGE", value_parser = difficulty_range)]
         difficulty: Option<allomos_core::difficulty::Range>,
     },
-    /// What needs a person: To check (done tasks with neither "by human" label, each with why),
-    /// To answer (tasks waiting on a person, each with what) and To review (tasks with the label
-    /// AI decisions to review). Backlog tasks are not listed.
+    /// What needs a person, one task at a time, in the order to take them (decision 0028): first
+    /// the tasks an agent is waiting on (to answer, to approve afterwards), then the finished ones
+    /// (to check, AI decisions to review) by risk and by how long they wait.
     Human {
         /// Only tasks planned in this iteration.
         #[arg(long)]
@@ -2313,7 +2313,7 @@ fn task_json(t: &Task) -> Value {
 
 /// A task for `--json` reading commands: whether it is blocked (worked out, decision 0026), and
 /// each blocker's current state when it has blockers.
-fn task_json_in(bag: &Taskbag, t: &Task) -> Value {
+pub(crate) fn task_json_in(bag: &Taskbag, t: &Task) -> Value {
     let mut v = task_json(t);
     v["blocked"] = json!(ops::is_blocked(bag, t));
     if !t.blocked_by.is_empty() {
@@ -2351,7 +2351,7 @@ const READ_BLOCKERS_FIRST: &str = "before starting, read their AI decisions and 
 /// What holds a task back, one line each: "waiting for you: approve the card", "waiting for
 /// Ann: …", "blocked by A01-17 (in progress)" (a task can be both, decision 0026); or that its
 /// blockers have finished.
-fn stop_lines(bag: &Taskbag, t: &Task) -> Vec<String> {
+pub(crate) fn stop_lines(bag: &Taskbag, t: &Task) -> Vec<String> {
     let mut lines = Vec::new();
     if t.state == State::Waiting {
         lines.push(format!(
@@ -2499,7 +2499,7 @@ fn event_lines(e: &event::Event) -> String {
 }
 
 /// Text indented by four spaces, ending with a new line.
-fn indent(text: &str) -> String {
+pub(crate) fn indent(text: &str) -> String {
     text.trim_end()
         .lines()
         .map(|l| {
@@ -2512,159 +2512,8 @@ fn indent(text: &str) -> String {
         .collect()
 }
 
-/// `alm human` (Task-A03-18): the tasks that need a person. **To check**: finished without the
-/// human check and not checked since, each with why (and with `--steps`, how). **To answer**:
-/// waiting on a person, each with what and who. Backlog tasks are not listed. `--json` always
-/// carries the steps.
-fn human(
-    root: &Path,
-    bag: &Taskbag,
-    iteration: Option<&str>,
-    area: Option<&str>,
-    steps: bool,
-) -> Result<Done, Problem> {
-    if let Some(a) = area {
-        if !bag.areas.iter().any(|x| x.id == a) {
-            return Err(Problem::UnknownArea { area: a.into() });
-        }
-    }
-    if let Some(i) = iteration {
-        if !bag.iterations.iter().any(|x| x.id == i) {
-            return Err(Problem::UnknownIteration {
-                iteration: i.into(),
-            });
-        }
-    }
-    let tasks: Vec<&Task> = bag
-        .tasks
-        .iter()
-        .filter(|t| {
-            area.is_none_or(|a| t.area == a)
-                && iteration.is_none_or(|i| t.iteration.as_deref() == Some(i))
-        })
-        .collect();
-    let to_check: Vec<&Task> = tasks.iter().copied().filter(|t| t.to_check()).collect();
-    let to_answer: Vec<&Task> = tasks
-        .iter()
-        .copied()
-        .filter(|t| t.state == State::Waiting)
-        .collect();
-    // Task-A03-19, decision 0020: tasks carrying `AI decisions to review`, in any state, each
-    // with its decisions from the history.
-    let decisions = allomos_store::ai_decisions(root);
-    let none = Vec::new();
-    let to_review: Vec<(&Task, Vec<Decision>)> = tasks
-        .iter()
-        .filter(|t| t.has_label(allomos_core::labels::AI_DECISIONS))
-        .map(|t| {
-            let all = decisions.get(&t.id).unwrap_or(&none);
-            (*t, allomos_core::decision::to_review(all))
-        })
-        .collect();
-    let system: Vec<String> = sys_locale::get_locales().collect();
-    let language = pick_ui_language(&[task_language(&bag.project, &system).language]);
-    // Task-A01-garden385 (decision 0027): every task's risk as the agent recorded it, on a line
-    // under the task; one with none reads "not classified". Shown only, never judged.
-    let classes = allomos_store::classify::by_task(root);
-    let risk_of = |t: &Task| classes.get(&t.id).and_then(|c| c.risk.as_deref());
-    let risk_line = |t: &Task| {
-        format!(
-            "      {}\n",
-            classify::human_risk_line(risk_of(t), language)
-        )
-    };
-    let mut text = String::new();
-    text.push_str(&format!("To check ({})\n", to_check.len()));
-    if to_check.is_empty() {
-        text.push_str("  Nothing to check.\n");
-    }
-    for t in &to_check {
-        text.push_str(&format!("  {}\n", human_task_line(t, language)));
-        text.push_str(&risk_line(t));
-        let why = t
-            .without_human_check
-            .as_deref()
-            .unwrap_or("no reason recorded (finished before alm done --without-human-check)");
-        text.push_str(&format!("      not human-checked: {why}\n"));
-        if steps {
-            match &t.human_check_steps {
-                Some(s) => {
-                    text.push_str("      steps:\n");
-                    for line in indent(s).lines() {
-                        text.push_str(&format!("      {line}\n"));
-                    }
-                }
-                None => text.push_str("      steps: none written\n"),
-            }
-        }
-    }
-    text.push_str(&format!("\nTo answer ({})\n", to_answer.len()));
-    if to_answer.is_empty() {
-        text.push_str("  Nothing to answer.\n");
-    }
-    for t in &to_answer {
-        text.push_str(&format!("  {}\n", human_task_line(t, language)));
-        text.push_str(&risk_line(t));
-        for line in stop_lines(bag, t) {
-            text.push_str(&format!("      {line}\n"));
-        }
-    }
-    text.push_str(&format!(
-        "\nTo review: AI decisions ({})\n",
-        to_review.len()
-    ));
-    if to_review.is_empty() {
-        text.push_str("  Nothing to review.\n");
-    }
-    for (t, d) in &to_review {
-        text.push_str(&format!("  {}\n", human_task_line(t, language)));
-        text.push_str(&risk_line(t));
-        for line in decision_lines(d).lines() {
-            text.push_str(&format!("    {line}\n"));
-        }
-    }
-    // Task-A01-palm011: emergency changes not approved afterwards.
-    let emergencies = allomos_store::classify::unapproved(root);
-    text.push_str(&classify::human_section(
-        bag,
-        &tasks,
-        &emergencies,
-        &classes,
-        language,
-    ));
-    let emergencies: Vec<&allomos_core::classify::Unapproved> = emergencies
-        .iter()
-        .filter(|u| tasks.iter().any(|t| t.id == u.task))
-        .collect();
-    if !to_check.is_empty() {
-        text.push_str("\nOnce a person has checked a task: `alm checked <id>`.\n");
-    }
-    if !to_review.is_empty() {
-        text.push_str("Once a person has reviewed a task's AI decisions: `alm reviewed <id>`.\n");
-    }
-    // The risk in `--json` too: null when the task is not classified.
-    let with_risk = |t: &Task| {
-        let mut v = task_json_in(bag, t);
-        v["risk"] = json!(risk_of(t));
-        v
-    };
-    let list = |members: &[&Task]| members.iter().map(|t| with_risk(t)).collect::<Vec<_>>();
-    let review: Vec<Value> = to_review
-        .iter()
-        .map(|(t, d)| {
-            let mut v = with_risk(t);
-            v["ai_decisions"] = json!(d);
-            v
-        })
-        .collect();
-    Ok(Done::new(
-        json!({ "taskbag": root, "to_check": list(&to_check), "to_answer": list(&to_answer), "to_review": review, "to_approve_afterwards": emergencies }),
-        text,
-    ))
-}
-
 /// A task's AI decisions to review, one per line: "  - <text> (<by>, <at>)" (Task-A03-19).
-fn decision_lines(decisions: &[Decision]) -> String {
+pub(crate) fn decision_lines(decisions: &[Decision]) -> String {
     decisions
         .iter()
         .map(|d| match &d.by {
@@ -2689,6 +2538,7 @@ mod effects;
 mod exceptions;
 mod folders;
 mod heartbeat;
+mod human;
 mod links;
 mod monitor;
 mod race;
@@ -4778,7 +4628,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
-            human(&root, &bag, iteration.as_deref(), area.as_deref(), *steps).map(|mut done| {
+            human::human(&root, &bag, iteration.as_deref(), area.as_deref(), *steps).map(|mut done| {
                 done.issues = issues;
                 done
             })

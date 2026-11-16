@@ -45,6 +45,7 @@ pub mod identity;
 pub mod links;
 pub mod missing;
 pub mod progress;
+pub mod queue;
 mod quota;
 pub mod redact;
 mod settings;

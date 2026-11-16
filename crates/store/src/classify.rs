@@ -14,7 +14,7 @@ use crate::events::{self, Actor};
 use crate::lock_for_change;
 
 /// Today in UTC, `YYYY-MM-DD` (`ALLOMOS_NOW` fixes it in tests).
-fn today() -> String {
+pub(crate) fn today() -> String {
     events::now_utc().chars().take(10).collect()
 }
 
