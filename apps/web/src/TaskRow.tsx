@@ -24,6 +24,7 @@ import { riskClass, riskText } from "./taskRiskFlow";
 import type { TreeRow } from "./depTreeFlow";
 import type { Edit, Task } from "./types";
 import { StateMenu } from "./StateMenu";
+import { DifficultyMenu } from "./DifficultyMenu";
 
 /** A row's place in the dependency tree (Task-A01-alpine458). */
 export interface TreeMark {
@@ -51,8 +52,8 @@ export function TaskRow({
   onError,
   stateMenu,
 }: {
-  /** The state menu in the row (Task-A01-frost005): the person's name and the change to make;
-   * left out, the state is plain text. */
+  /** The state menu and the difficulty menu in the row (Task-A01-frost005, Task-A01-pewter675): the
+   * person's name and the change to make; left out, the state and the difficulty are plain text. */
   stateMenu?: { ownerName: string | null; onSaveName: (name: string) => Promise<void>; onEdit: (id: string, edit: Edit) => Promise<void> };
   /** Its place in the dependency tree, when the tree is on. */
   tree?: TreeMark;
@@ -95,7 +96,12 @@ export function TaskRow({
   // Task-A01-actor813: how hard it is; a task with none counts as 3, shown greyed as the default.
   facts.push([
     t("pane.difficulty"),
-    <span className={difficultyOf(task).isDefault ? "muted" : undefined}>{difficultyText(task, t)}</span>,
+    // Task-A01-pewter675: the difficulty opens the list of levels, as the state word opens the states.
+    stateMenu ? (
+      <DifficultyMenu task={task} ownerName={stateMenu.ownerName} onSaveName={stateMenu.onSaveName} onEdit={(edit) => stateMenu.onEdit(task.id, edit)} />
+    ) : (
+      <span className={difficultyOf(task).isDefault ? "muted" : undefined}>{difficultyText(task, t)}</span>
+    ),
     t("pane.difficulty_title"),
   ]);
   // Task-A01-garden385 (decision 0027): the risk an agent recorded; none reads "Not classified".
