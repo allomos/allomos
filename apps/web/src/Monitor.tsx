@@ -23,7 +23,6 @@ import {
   isRun,
   keptFolds,
   lastRunCounts,
-  lastOfGoneRun,
   lastRunFromFile,
   levelsOf,
   levelsText,
@@ -102,17 +101,6 @@ export function useMonitor({
         const summary: LastRun = { ended: new Date().toISOString(), scope: r.scope, taken: r.taken, takenBy: r.takenBy };
         saveLast(root, summary);
         setLast(summary);
-        // The run's own file says whether it stopped on its own, and why (Task-A03-raven398).
-        void messenger
-          .monitorLast(root)
-          .then((v) => {
-            const last = lastOfGoneRun(summary, lastRunFromFile(v), r.started);
-            if (last !== summary) {
-              saveLast(root, last);
-              setLast(last);
-            }
-          })
-          .catch(() => undefined);
       }
     }
     seen.current = new Map(found.map((r) => [r.id, r]));
@@ -382,12 +370,6 @@ export function MonitorControl({
             {split
               ? t("monitor.last_run_split", { time: localTime(last.ended), scope: scopeName(last.scope, t), done: counts.done, split })
               : t("monitor.last_run", { time: localTime(last.ended), scope: scopeName(last.scope, t), done: counts.done })}
-            {last.stopped && (
-              <>
-                {" · "}
-                <span className="monitor-last-stopped">{t(`monitor.last_stopped_${last.stopped}`)}</span>
-              </>
-            )}
             {counts.needYou > 0 && (
               <>
                 {" · "}
@@ -517,6 +499,8 @@ function RunPanel({
           {badge && <span className={`monitor-badge ${state}`}>{badge}</span>}
           {!open && <span className="muted small monitor-summary">{runSummary(run, now, t, true)}</span>}
         </button>
+        {/* Shown folded or open, until the taskbag reads again (Task-A03-raven398). */}
+        {run.unreadable && <span className="small monitor-unreadable">{t(`monitor.unreadable_${run.unreadable}`)}</span>}
         <span className="monitor-actions">
           {open && !run.stopping && (
             <button type="button" className="small" onClick={onEdit}>

@@ -1,21 +1,23 @@
-//! When the taskbag cannot be read (Task-A03-raven398). A run reads its taskbag every few
-//! seconds; before this task a read that failed was logged and tried again, without end, so a run
-//! whose `alm` was older than the taskbag's format went on for hours, alive but doing nothing, and
-//! its log grew by a line every five seconds.
+//! When the taskbag cannot be read (Task-A03-raven398; approver, 2026-11-16: tell, do not stop).
+//! A run reads its taskbag every few seconds; before this task a read that failed was logged and
+//! tried again without a word to the person, so a run whose `alm` was older than the taskbag's
+//! format went on for hours, alive but doing nothing, and its log grew by a line every five
+//! seconds.
 //!
-//! Now a failure that only the person can fix (the taskbag is newer than this `alm`, or must be
-//! upgraded or moved in first) stops the run at once; any other failure (a file half written, a
-//! folder briefly away) is tried again, and stops the run only when it has lasted
-//! [`UNREADABLE_FOR`]. The log names a failure once, and again only when it changes, and says when
-//! the taskbag can be read again.
+//! Now the run goes on trying, and tells the person once: at once when only a person can fix it
+//! (the taskbag is newer than this `alm`, or must be upgraded or moved in first), and after
+//! [`UNREADABLE_FOR`] for any other failure (a file half written, a folder briefly away), which
+//! may pass by itself. The status bar shows it until the taskbag can be read again. The log names
+//! a failure once, and again only when it changes, and says when the taskbag reads again.
 
 use allomos_core::Problem;
 
-/// How long an ordinary failure may last before the run stops (ms): two minutes, about 24 reads.
+/// How long an ordinary failure may last before the person is told (ms): two minutes, about 24
+/// reads.
 pub const UNREADABLE_FOR: i64 = 2 * 60 * 1000;
 
-/// Why a run stopped, as the app's last-run line names it (the `stopped` field of
-/// [`crate::registry::LastSummary`]).
+/// Why the taskbag cannot be read, as the status bar names it (the `unreadable` field of
+/// [`crate::flow::Run`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Why {
     /// The taskbag is in a format this `alm` cannot read or write: only a person can fix it
@@ -35,15 +37,15 @@ impl Why {
     }
 }
 
-/// What the run does with one failed read.
+/// What the run does with one failed read; it tries again in every case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Step {
-    /// Write this line in the log, and try again.
+    /// Write this line in the log.
     Log(String),
-    /// Try again without a line (the same failure as before).
+    /// Nothing more (the same failure as before, or the person was told already).
     Quiet,
-    /// Stop the run.
-    Stop(Why),
+    /// Tell the person, once, and show it in the status bar.
+    Tell(Why),
 }
 
 /// Whether only a person can fix `problem`: then trying again does not help.
@@ -65,6 +67,8 @@ pub struct Failures {
     last: Option<String>,
     /// How many there were.
     count: u32,
+    /// Whether the person was told.
+    told: bool,
 }
 
 impl Failures {
@@ -72,20 +76,27 @@ impl Failures {
     pub fn failed(&mut self, problem: &Problem, now: i64) -> Step {
         let since = *self.since.get_or_insert(now);
         self.count += 1;
-        if needs_person(problem) {
-            return Step::Stop(Why::Format);
-        }
-        if now - since >= UNREADABLE_FOR {
-            return Step::Stop(Why::Unreadable);
-        }
         let words = problem.english();
-        if self.last.as_deref() == Some(words.as_str()) {
+        let changed = self.last.as_deref() != Some(words.as_str());
+        if changed {
+            self.last = Some(words.clone());
+        }
+        if !self.told {
+            let why = if needs_person(problem) {
+                Some(Why::Format)
+            } else {
+                (now - since >= UNREADABLE_FOR).then_some(Why::Unreadable)
+            };
+            if let Some(why) = why {
+                self.told = true;
+                return Step::Tell(why);
+            }
+        }
+        if !changed {
             return Step::Quiet;
         }
-        self.last = Some(words.clone());
         Step::Log(format!(
-            "could not read the taskbag (trying again for up to {} minutes): {words}",
-            UNREADABLE_FOR / 60_000
+            "could not read the taskbag (trying again): {words}"
         ))
     }
 
@@ -114,16 +125,18 @@ mod tests {
     }
 
     #[test]
-    fn a_newer_taskbag_stops_the_run_at_once() {
+    fn a_newer_taskbag_is_told_at_once_and_only_once() {
         let mut f = Failures::default();
-        assert_eq!(f.failed(&newer(), 1_000), Step::Stop(Why::Format));
+        assert_eq!(f.failed(&newer(), 1_000), Step::Tell(Why::Format));
+        assert_eq!(f.failed(&newer(), 6_000), Step::Quiet);
+        assert_eq!(f.failed(&newer(), 999_000), Step::Quiet);
         let upgrade = Problem::TaskbagToUpgrade {
             found: "allomos/8".into(),
             current: "allomos/9".into(),
         };
         assert_eq!(
             Failures::default().failed(&upgrade, 0),
-            Step::Stop(Why::Format)
+            Step::Tell(Why::Format)
         );
     }
 
@@ -144,14 +157,18 @@ mod tests {
     }
 
     #[test]
-    fn a_failure_that_lasts_two_minutes_stops_the_run() {
+    fn a_failure_that_lasts_two_minutes_is_told_once_and_the_run_goes_on() {
         let mut f = Failures::default();
         f.failed(&busy("eof"), 0);
         assert_eq!(f.failed(&busy("eof"), UNREADABLE_FOR - 1), Step::Quiet);
         assert_eq!(
             f.failed(&busy("eof"), UNREADABLE_FOR),
-            Step::Stop(Why::Unreadable)
+            Step::Tell(Why::Unreadable)
         );
+        assert_eq!(f.failed(&busy("eof"), UNREADABLE_FOR + 5_000), Step::Quiet);
+        // Read again, then a new spell of failures is told again.
+        f.read();
+        assert_eq!(f.failed(&newer(), 0), Step::Tell(Why::Format));
     }
 
     #[test]

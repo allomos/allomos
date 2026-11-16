@@ -15,7 +15,6 @@ import {
   frequencyText,
   isRun,
   lastRunCounts,
-  lastOfGoneRun,
   lastRunFromFile,
   newerLast,
   levelsOf,
@@ -280,20 +279,14 @@ test("a last run kept on this computer reads in the app's shape, and the later o
   assert.equal(newerLast(kept, window), kept);
 });
 
-test("a run that stopped on its own keeps why, and the window takes it from the run's file (A03-raven398)", () => {
-  const file = { ended: Date.UTC(2026, 10, 16, 1, 0), scope: { kind: "all" }, taken: [], stopped: "taskbag_format" };
-  const kept = lastRunFromFile(file);
-  assert.equal(kept?.stopped, "taskbag_format");
-  // A reason a newer alm wrote still reads as stopped on its own.
-  assert.equal(lastRunFromFile({ ...file, stopped: "something_new" })?.stopped, "taskbag_unreadable");
-  // A run that ended as asked has no reason.
-  assert.equal("stopped" in (lastRunFromFile({ ...file, stopped: undefined }) ?? {}), false);
-
-  const own = { ended: "2026-11-16T01:00:05.000Z", scope: { kind: "all" as const }, taken: [] };
-  // The file is this run's when it ended after the run started; an older run's file is not.
-  assert.equal(lastOfGoneRun(own, kept, Date.UTC(2026, 10, 16, 0, 0)), kept);
-  assert.equal(lastOfGoneRun(own, kept, Date.UTC(2026, 10, 16, 2, 0)), own);
-  assert.equal(lastOfGoneRun(own, null, 0), own);
+test("a run that cannot read its taskbag says why, until it reads it again (A03-raven398)", () => {
+  const base = { id: "m-1", pid: 1, record: "present", run: { scope: { kind: "all" }, agents: ["claude_cli"], every: 30, started: 0 } };
+  const at = (unreadable?: string) => readEntry({ ...base, run: { ...base.run, unreadable } }, null) as { unreadable?: string } | null;
+  assert.equal(at("taskbag_format")?.unreadable, "taskbag_format");
+  assert.equal(at("taskbag_unreadable")?.unreadable, "taskbag_unreadable");
+  // A reason a newer alm wrote still says it cannot read the taskbag.
+  assert.equal(at("something_new")?.unreadable, "taskbag_unreadable");
+  assert.equal("unreadable" in (at(undefined) ?? {}), false);
 });
 
 test("a run the app moved to its new alm after an update says which version (A03-cookie729)", () => {

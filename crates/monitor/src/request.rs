@@ -197,26 +197,26 @@ pub fn start_failed(language: &str, agent: &str, id: &str, detail: &str) -> Stri
     }
 }
 
-/// The run stopped on its own because the taskbag could not be read (Task-A03-raven398).
-/// `detail` is the failure in English, as the log has it: named only for an ordinary failure (a
-/// format problem is said in the person's words, and its English is written for agents).
-pub fn stopped_unreadable(language: &str, why: crate::unreadable::Why, detail: &str) -> String {
+/// The taskbag cannot be read; the run goes on trying (Task-A03-raven398). `detail` is the
+/// failure in English, as the log has it: named only for an ordinary failure (a format problem is
+/// said in the person's words, and its English is written for agents).
+pub fn unreadable(language: &str, why: crate::unreadable::Why, detail: &str) -> String {
     use crate::unreadable::Why;
     match (lang(language), why) {
-        ("zh-CN", Why::Format) => "自动监测已停止：这个「换肩」读不了任务包，因为它的格式需要你先处理（多半是任务包比这个「换肩」新）。请更新「换肩」，再重新开始监测。已开的会话照常做完各自的任务。"
+        ("zh-CN", Why::Format) => "自动监测读不了任务包：它的格式需要你先处理（多半是任务包比这个「换肩」新），请更新「换肩」。监测会继续运行，任务包能读了就接着做。"
             .to_string(),
         ("zh-CN", Why::Unreadable) => format!(
-            "自动监测已停止：任务包有 2 分钟读不了。请检查任务包，再重新开始监测。已开的会话照常做完各自的任务。{detail}"
+            "自动监测已有 2 分钟读不了任务包，请检查任务包。监测会继续运行，任务包能读了就接着做。{detail}"
         ),
-        ("ja", Why::Format) => "自動監視を停止しました：タスクバッグの形式のため、この「肩代」では読めません（多くの場合、タスクバッグがこの「肩代」より新しい形式です）。「肩代」を更新してから、監視をもう一度始めてください。開いているセッションは、それぞれのタスクをいつも通り最後まで進めます。"
+        ("ja", Why::Format) => "自動監視がタスクバッグを読めません：その形式のため、先に対応が必要です（多くの場合、タスクバッグがこの「肩代」より新しい形式です）。「肩代」を更新してください。監視は動き続け、読めるようになれば続きを進めます。"
             .to_string(),
         ("ja", Why::Unreadable) => format!(
-            "自動監視を停止しました：タスクバッグを 2 分間読めませんでした。タスクバッグを確認してから、監視をもう一度始めてください。開いているセッションは、それぞれのタスクをいつも通り最後まで進めます。{detail}"
+            "自動監視がタスクバッグを 2 分間読めていません。タスクバッグを確認してください。監視は動き続け、読めるようになれば続きを進めます。{detail}"
         ),
-        (_, Why::Format) => "Monitoring stopped: this Allomos cannot read the taskbag because of its format (most often, the taskbag is newer than this Allomos). Update Allomos, then start monitoring again. The open sessions finish their tasks as usual."
+        (_, Why::Format) => "Monitoring cannot read the taskbag: its format needs you first (most often, the taskbag is newer than this Allomos). Update Allomos. Monitoring keeps running and carries on once the taskbag can be read."
             .to_string(),
         (_, Why::Unreadable) => format!(
-            "Monitoring stopped: the taskbag could not be read for 2 minutes. Check it, then start monitoring again. The open sessions finish their tasks as usual. {detail}"
+            "Monitoring has not been able to read the taskbag for 2 minutes. Check it. Monitoring keeps running and carries on once the taskbag can be read. {detail}"
         ),
     }
 }
@@ -241,14 +241,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_stop_for_an_unreadable_taskbag_says_what_to_do_in_each_language() {
+    fn an_unreadable_taskbag_says_what_to_do_and_that_monitoring_goes_on() {
         use crate::unreadable::Why;
-        assert!(stopped_unreadable("zh-CN", Why::Format, "x").contains("请更新「换肩」"));
-        assert!(stopped_unreadable("ja", Why::Format, "x").contains("「肩代」を更新"));
-        assert!(stopped_unreadable("en", Why::Format, "x").contains("Update Allomos"));
-        assert!(stopped_unreadable("en", Why::Unreadable, "x").contains("2 minutes"));
-        assert!(stopped_unreadable("zh-CN", Why::Unreadable, "x").ends_with('x'));
-        assert!(!stopped_unreadable("zh-CN", Why::Format, "x").contains('x'));
+        assert!(unreadable("zh-CN", Why::Format, "x").contains("请更新「换肩」。监测会继续运行"));
+        assert!(unreadable("ja", Why::Format, "x").contains("監視は動き続け"));
+        assert!(unreadable("en", Why::Format, "x").contains("Monitoring keeps running"));
+        assert!(unreadable("en", Why::Unreadable, "x").contains("2 minutes"));
+        assert!(unreadable("zh-CN", Why::Unreadable, "x").ends_with('x'));
+        assert!(!unreadable("zh-CN", Why::Format, "x").contains('x'));
     }
 
     #[test]

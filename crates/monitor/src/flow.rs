@@ -89,6 +89,10 @@ pub struct Run {
     /// (A03-pocket537).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub closing: Vec<Closing>,
+    /// The taskbag cannot be read now and the person has been told (Task-A03-raven398): a
+    /// [`crate::unreadable::Why`] code. The run goes on and clears it when it reads it again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unreadable: Option<String>,
 }
 
 /// A finished task's tab waiting to be closed (see [`Run::closing`]).
@@ -133,6 +137,7 @@ impl Run {
             stopping: false,
             checked: now - i64::from(every) * 60_000,
             closing: Vec::new(),
+            unreadable: None,
         }
     }
 

@@ -13,7 +13,7 @@ use allomos_core::{Problem, Task, Taskbag};
 
 use crate::flow::{Closing, Run, Stuck, tab_to_close, waiting_alert};
 use crate::registry::{self, Held, Record, Request};
-use crate::unreadable::{Failures, Step, Why};
+use crate::unreadable::{Failures, Step};
 use crate::{accounts, notify, request, session_tab, terminal};
 
 /// How often requests are looked for.
@@ -474,9 +474,8 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
     }
     lp.write();
     let mut last_read: Option<Instant> = None;
-    // Reads that failed in a row, and why the run stopped on its own (Task-A03-raven398).
+    // Reads that failed in a row (Task-A03-raven398).
     let mut failures = Failures::default();
-    let mut stopped: Option<Why> = None;
     loop {
         let mut changed = false;
         let mut read_now = false;
@@ -491,31 +490,38 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
                     if let Some(line) = failures.read() {
                         log(&line);
                     }
+                    changed |= lp.record.run.unreadable.take().is_some();
                     let (c, over) = lp.pass(&bag);
                     changed |= c;
                     if over {
                         break;
                     }
                 }
-                Err(p) => match failures.failed(&p, now_ms()) {
-                    Step::Log(line) => log(&line),
-                    Step::Quiet => {}
-                    Step::Stop(why) => {
-                        // The sessions at work go on by themselves; this run cannot follow them
-                        // without the taskbag, so it ends now and says why.
-                        let body =
-                            request::stopped_unreadable(&lp.record.language, why, &p.english());
-                        log(&format!("stopped: {body}"));
-                        notify::show(
-                            &lp.dir,
-                            &lp.id,
-                            request::notify_title(&lp.record.language),
-                            &body,
-                        );
-                        stopped = Some(why);
+                Err(p) => {
+                    match failures.failed(&p, now_ms()) {
+                        Step::Log(line) => log(&line),
+                        Step::Quiet => {}
+                        Step::Tell(why) => {
+                            // The run goes on trying (approver, 2026-11-16); the person is told
+                            // once and the status bar shows it until the taskbag reads again.
+                            let body = request::unreadable(&lp.record.language, why, &p.english());
+                            log(&format!("told the person: {body} ({})", p.english()));
+                            notify::show(
+                                &lp.dir,
+                                &lp.id,
+                                request::notify_title(&lp.record.language),
+                                &body,
+                            );
+                            lp.record.run.unreadable = Some(why.code().to_string());
+                            changed = true;
+                        }
+                    }
+                    // A stop asked while the taskbag cannot be read: the sessions at work cannot be
+                    // followed, so the run ends now; they finish their tasks by themselves.
+                    if lp.record.run.stopping {
                         break;
                     }
-                },
+                }
             }
         }
         if changed || lp.last_written.elapsed() >= ALIVE_EVERY {
@@ -537,7 +543,6 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         scope: lp.record.run.scope.clone(),
         taken: lp.record.run.taken.clone(),
         taken_by: lp.record.run.taken_by.clone(),
-        stopped: stopped.map(|w| w.code().to_string()),
     };
     if let Err(e) = registry::write_last(dir, &root, &last) {
         log(&format!("could not write the last run: {e}"));
@@ -549,12 +554,9 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
     }
     let _ = std::fs::remove_file(registry::record_path(dir, id));
     // Only what finding and controlling a running run needs stays on this computer (approver,
-    // 2026-11-09): the log of a run that ended as asked goes too. A run that could not start, was
-    // ended from outside, or stopped on its own (Task-A03-raven398) leaves its log for the person
-    // to read.
-    if stopped.is_none() {
-        let _ = std::fs::remove_file(registry::log_path(dir, id));
-    }
+    // 2026-11-09): the log of a run that ended as asked goes too. A run that could not start, or
+    // was ended from outside, leaves its log for the person to read.
+    let _ = std::fs::remove_file(registry::log_path(dir, id));
     registry::remove_resume(dir, id);
     lp.held.release();
     Ok(())

@@ -953,8 +953,8 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 .filter-preset-ticks { color: var(--muted); font-size: 12px; line-height: 1.35; }
 .filter-preset-count { flex: none; color: var(--muted); font-size: 12px; white-space: nowrap; padding-top: 1px; }
 .monitor-last button.link { align-self: baseline; font-size: inherit; line-height: inherit; }
-/* A run that stopped on its own says why (Task-A03-raven398). */
-.monitor-last .monitor-last-stopped { color: var(--warn); }
+/* A run that cannot read its taskbag says why, and goes on (Task-A03-raven398). */
+.monitor-panel-head .monitor-unreadable { color: var(--warn); }
 /* A phone (Task-A04-02-03): one column, the ID before the title on the first line. */
 @media (max-width: 720px) {
   .task { display: block; }

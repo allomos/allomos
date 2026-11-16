@@ -639,11 +639,6 @@ pub struct LastSummary {
     pub taken: Vec<String>,
     #[serde(default)]
     pub taken_by: std::collections::BTreeMap<String, String>,
-    /// Why the run stopped on its own, when it did (Task-A03-raven398): a
-    /// [`crate::unreadable::Why`] code. Left out when it ended as asked, so older apps read the
-    /// file as before.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stopped: Option<String>,
 }
 
 /// The file of the last run of the taskbag at `root`: a name made from its folder's path.
@@ -786,7 +781,6 @@ mod tests {
                 "A1".to_string(),
                 "claude_cli".to_string(),
             )]),
-            stopped: None,
         };
         write_last(&d, &root, &last).unwrap();
         assert_eq!(read_last(&d, &root), Some(last.clone()));
@@ -794,20 +788,6 @@ mod tests {
             serde_json::to_value(&last).unwrap()["takenBy"]["A1"],
             "claude_cli"
         );
-        // A run that ended as asked has no `stopped`, as before (Task-A03-raven398); one that
-        // stopped on its own says why, and reads back the same.
-        assert!(
-            serde_json::to_value(&last)
-                .unwrap()
-                .get("stopped")
-                .is_none()
-        );
-        let stopped = LastSummary {
-            stopped: Some("taskbag_format".to_string()),
-            ..last.clone()
-        };
-        write_last(&d, &root, &stopped).unwrap();
-        assert_eq!(read_last(&d, &root), Some(stopped));
         assert!(read_last(&d, &d.join("other")).is_none());
         fs::remove_dir_all(&d).unwrap();
     }
