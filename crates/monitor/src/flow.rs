@@ -46,7 +46,28 @@ pub struct Working {
     /// The task as last seen (what changes when the session works it), and since when (ms).
     pub seen: String,
     pub changed: i64,
+    /// The holder's name once the task was seen held by this session (A03-cart761): a later
+    /// holder of another name is another session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holder: Option<String>,
 }
+
+/// A task the run stopped following because another session holds it (A03-cart761): its row is
+/// gone and its slot is free; the panel says why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LetGo {
+    /// The task.
+    pub id: String,
+    /// The agent whose session the run had started for it.
+    pub agent: String,
+    /// Who holds it now (the other session's `--as` name).
+    pub holder: String,
+    /// When the run let it go (ms).
+    pub at: i64,
+}
+
+/// How many let-go tasks a run keeps to show: the latest ones.
+pub const LET_GO_KEPT: usize = 5;
 
 /// One monitoring run, kept on this computer only, never in the taskbag.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,6 +114,10 @@ pub struct Run {
     /// [`crate::unreadable::Why`] code. The run goes on and clears it when it reads it again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unreadable: Option<String>,
+    /// The tasks it let go because another session holds them, the latest [`LET_GO_KEPT`]
+    /// (A03-cart761). They stay in `taken`, so the run does not start a session for them again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub let_go: Vec<LetGo>,
 }
 
 /// A finished task's tab waiting to be closed (see [`Run::closing`]).
@@ -138,6 +163,7 @@ impl Run {
             checked: now - i64::from(every) * 60_000,
             closing: Vec::new(),
             unreadable: None,
+            let_go: Vec::new(),
         }
     }
 
@@ -220,15 +246,26 @@ impl Run {
     }
 
     /// Follow every session's task in the taskbag as it is now; returns the sessions whose
-    /// tasks are finished, in the order they were started.
+    /// tasks are finished, in the order they were started. A task another session holds is let
+    /// go instead (A03-cart761): it leaves the sessions at work, which frees its slot, and is
+    /// noted in [`Run::let_go`]; it is not among the finished ones (its tab stays open).
     pub fn follow(&mut self, tasks: &[Task], now: i64) -> Vec<Working> {
         let mut finished = Vec::new();
         let mut working = Vec::new();
         for cur in self.working.drain(..) {
             match follow_one(&cur, tasks, now) {
-                Some(next) => working.push(next),
-                None => finished.push(cur),
+                Followed::Working(next) => working.push(next),
+                Followed::Finished => finished.push(cur),
+                Followed::Others(holder) => self.let_go.push(LetGo {
+                    id: cur.id,
+                    agent: cur.agent,
+                    holder,
+                    at: now,
+                }),
             }
+        }
+        if self.let_go.len() > LET_GO_KEPT {
+            self.let_go.drain(..self.let_go.len() - LET_GO_KEPT);
         }
         self.working = working;
         finished
@@ -315,6 +352,7 @@ impl Run {
             seen_held: task.holder.is_some(),
             seen: seen_of(Some(task)),
             changed: now,
+            holder: None,
         });
         self.checked = now;
     }
@@ -343,9 +381,44 @@ fn seen_of(task: Option<&Task>) -> String {
     .unwrap_or_default()
 }
 
-/// One session's task as it is now: none when it is finished (done, dropped or waiting; held by no one after being claimed; left `ready` without ever being held; gone).
-fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Option<Working> {
+/// What following one session's task found.
+enum Followed {
+    /// Still its session's: the session as it is now.
+    Working(Working),
+    /// Finished: done, dropped or waiting; held by no one after being claimed; left `ready`
+    /// without ever being held; gone.
+    Finished,
+    /// Held by another session, of this name (A03-cart761).
+    Others(String),
+}
+
+/// The holder's name when the task is held by a session that is not `cur`'s (A03-cart761). Told
+/// by what the holder passed at `alm claim`, in this order: its session ID against the one
+/// Allomos gave this session (the same ID is this session, whatever else says); its agent
+/// against this session's; its name against the holder this session was seen as before. A holder
+/// that passed nothing to tell by counts as this session.
+fn others(cur: &Working, task: &Task) -> Option<String> {
+    let holder = task.holder.as_ref()?;
+    // The recorded session may be a former holder's: only the present holder's counts.
+    let session = task
+        .session
+        .as_ref()
+        .filter(|s| s.by.as_ref().is_none_or(|by| by == holder));
+    if let (Some(mine), Some(theirs)) = (&cur.session_id, session.and_then(|s| s.id.as_ref())) {
+        return (mine != theirs).then(|| holder.clone());
+    }
+    let agent = session.and_then(|s| s.agent.as_deref());
+    let other = agent.is_some_and(|a| a != crate::request::session_agent(&cur.agent))
+        || cur.holder.as_ref().is_some_and(|own| own != holder);
+    other.then(|| holder.clone())
+}
+
+/// One session's task as it is now (see [`Followed`]).
+fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Followed {
     let task = tasks.iter().find(|t| t.id == cur.id);
+    if let Some(holder) = task.and_then(|t| others(cur, t)) {
+        return Followed::Others(holder);
+    }
     let seen = seen_of(task);
     let seen_held = cur.seen_held || task.is_some_and(|t| t.holder.is_some());
     let finished = match task {
@@ -356,7 +429,7 @@ fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Option<Working> {
         }
     };
     if finished {
-        return None;
+        return Followed::Finished;
     }
     let mut next = cur.clone();
     if seen != cur.seen {
@@ -364,7 +437,10 @@ fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Option<Working> {
     }
     next.seen = seen;
     next.seen_held = seen_held;
-    Some(next)
+    if let Some(holder) = task.and_then(|t| t.holder.clone()) {
+        next.holder = Some(holder);
+    }
+    Followed::Working(next)
 }
 
 /// The tab to close now that a session's task is finished: only when the task is **done**
@@ -428,6 +504,209 @@ mod tests {
         assert_eq!(quiet.len(), 1);
         assert_eq!(quiet[0].1.id, "A01-9");
         assert!(r.share(&bag, beat + 5 * 60).is_empty());
+    }
+
+    /// A task held by `holder`, with what its session passed at `alm claim`.
+    fn claimed(id: &str, holder: &str, agent: Option<&str>, session_id: Option<&str>) -> Task {
+        let mut t = task(id, State::InProgress, Some(holder));
+        t.session = Some(allomos_core::AgentSession {
+            by: Some(holder.to_string()),
+            agent: agent.map(String::from),
+            id: session_id.map(String::from),
+            ..Default::default()
+        });
+        t
+    }
+
+    /// A03-cart761 (the approver's screenshot): the Claude Code session never claimed its task;
+    /// a Codex session claims it. The run lets it go at the next check: the row is gone, the
+    /// slot is free, the reason is noted, and the task is not given to this run again.
+    #[test]
+    fn a_task_another_session_claims_is_let_go_and_its_slot_freed() {
+        let mut r = run(&["claude_cli"]);
+        r.set_sessions("claude_cli", 3);
+        let sid = Some("mine-1".to_string());
+        r.take(
+            "claude_cli",
+            &task("A01-1", State::Ready, None),
+            sid.clone(),
+            None,
+            10,
+        );
+        r.take(
+            "claude_cli",
+            &task("A01-2", State::Ready, None),
+            sid,
+            None,
+            10,
+        );
+        assert_eq!(r.free_agents().len(), 1);
+        // Never claimed, still ready: both stay.
+        let ready = [
+            task("A01-1", State::Ready, None),
+            task("A01-2", State::Ready, None),
+        ];
+        assert!(r.follow(&ready, 20).is_empty());
+        assert_eq!(r.working.len(), 2);
+        // Codex sessions claim both (another agent, another session ID).
+        let tasks = [
+            claimed("A01-1", "codex-a01-1", Some("codex"), Some("theirs-1")),
+            claimed("A01-2", "codex-a01-2", Some("codex"), None),
+        ];
+        let finished = r.follow(&tasks, 30);
+        assert!(
+            finished.is_empty(),
+            "let go, not finished: no tab is closed"
+        );
+        assert!(r.working.is_empty());
+        assert_eq!(r.free_agents().len(), 3);
+        let noted: Vec<(&str, &str, i64)> = r
+            .let_go
+            .iter()
+            .map(|l| (l.id.as_str(), l.holder.as_str(), l.at))
+            .collect();
+        assert_eq!(
+            noted,
+            [("A01-1", "codex-a01-1", 30), ("A01-2", "codex-a01-2", 30)]
+        );
+        // Still taken: not given to this run again, ready or lost.
+        assert!(r.share(&bag_of(ready.to_vec()), 0).is_empty());
+        let lost = bag_of(vec![held_since(
+            "A01-1",
+            "codex-a01-1",
+            "2026-11-09T10:00:00Z",
+        )]);
+        let later = heartbeat::parse_utc("2026-11-09T10:00:00Z").unwrap() + 2 * 3600;
+        assert!(r.share(&lost, later).is_empty());
+    }
+
+    /// The run's own session's task stays and is timed as before: the same session ID is this
+    /// session whatever name it claims under; a holder that passed nothing counts as this one.
+    #[test]
+    fn a_task_its_own_session_claims_is_kept() {
+        let mut r = run(&["claude_cli:work", "codex_cli"]);
+        let sid = Some("mine-1".to_string());
+        r.take(
+            "claude_cli:work",
+            &task("A01-1", State::Ready, None),
+            sid,
+            None,
+            10,
+        );
+        r.take(
+            "codex_cli",
+            &task("A01-2", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        r.take(
+            "codex_cli",
+            &task("A01-3", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        let tasks = [
+            claimed("A01-1", "claude-a01-1", Some("claude-code"), Some("mine-1")),
+            // Codex picks its own session ID: its agent is what tells.
+            claimed("A01-2", "codex-a01-2", Some("codex"), Some("its-own")),
+            task("A01-3", State::InProgress, Some("someone")),
+        ];
+        assert!(r.follow(&tasks, 20).is_empty());
+        assert_eq!(r.working.len(), 3);
+        assert!(r.let_go.is_empty());
+        assert_eq!(r.working[0].changed, 20);
+        assert_eq!(r.working[0].holder.as_deref(), Some("claude-a01-1"));
+        // Nothing changes: the time since the last sign of life goes on.
+        assert!(r.follow(&tasks, 30).is_empty());
+        assert_eq!(r.working[0].changed, 20);
+        // Released after the claim: finished as before, not let go.
+        let finished = r.follow(&[task("A01-1", State::Ready, None)], 40);
+        assert_eq!(finished.len(), 3);
+        assert!(r.let_go.is_empty());
+    }
+
+    /// A task taken over from the run's session is let go the same way, by each sign: another
+    /// session ID, another agent, or (when the new holder passed nothing) another holder name.
+    #[test]
+    fn a_task_taken_over_is_let_go() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        r.set_sessions("codex_cli", 2);
+        let sid = Some("mine-1".to_string());
+        r.take(
+            "claude_cli",
+            &task("A01-1", State::Ready, None),
+            sid,
+            None,
+            10,
+        );
+        r.take(
+            "codex_cli",
+            &task("A01-2", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        r.take(
+            "codex_cli",
+            &task("A01-3", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        let own = [
+            claimed("A01-1", "claude-a01-1", Some("claude-code"), Some("mine-1")),
+            claimed("A01-2", "codex-a01-2", Some("codex"), Some("c-1")),
+            claimed("A01-3", "codex-a01-3", Some("codex"), Some("c-2")),
+        ];
+        assert!(r.follow(&own, 20).is_empty());
+        assert_eq!(r.working.len(), 3);
+        // A01-1: another Claude Code session (another ID). A01-2: taken with nothing passed, so
+        // the record still shows the former holder's session. A01-3: the same name, still held.
+        let mut bare = own[1].clone();
+        bare.holder = Some("a-person".into());
+        let taken = [
+            claimed("A01-1", "claude-other", Some("claude-code"), Some("theirs")),
+            bare,
+            own[2].clone(),
+        ];
+        assert!(r.follow(&taken, 30).is_empty());
+        let ids: Vec<&str> = r.working.iter().map(|w| w.id.as_str()).collect();
+        assert_eq!(ids, ["A01-3"]);
+        let noted: Vec<(&str, &str)> = r
+            .let_go
+            .iter()
+            .map(|l| (l.id.as_str(), l.holder.as_str()))
+            .collect();
+        assert_eq!(noted, [("A01-1", "claude-other"), ("A01-2", "a-person")]);
+        // Done by the other session: still let go (the tab of this run's session stays open).
+        let mut r = run(&["claude_cli"]);
+        r.take(
+            "claude_cli",
+            &task("A01-9", State::Ready, None),
+            None,
+            None,
+            10,
+        );
+        let mut done = claimed("A01-9", "codex-a01-9", Some("codex"), None);
+        done.state = State::Done;
+        assert!(r.follow(&[done], 20).is_empty());
+        assert_eq!(r.let_go.len(), 1);
+    }
+
+    /// Only the latest let-go tasks are kept to show.
+    #[test]
+    fn the_run_keeps_the_latest_let_go_tasks() {
+        let mut r = run(&["claude_cli"]);
+        for n in 0..LET_GO_KEPT + 2 {
+            let id = format!("A01-{n}");
+            r.take("claude_cli", &task(&id, State::Ready, None), None, None, 10);
+            r.follow(&[claimed(&id, "codex-x", Some("codex"), None)], 20);
+        }
+        assert_eq!(r.let_go.len(), LET_GO_KEPT);
+        assert_eq!(r.let_go[0].id, "A01-2");
+        assert_eq!(r.taken.len(), LET_GO_KEPT + 2);
     }
 
     #[test]
