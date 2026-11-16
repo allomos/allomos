@@ -1138,6 +1138,7 @@
   "monitor.last_run_need_tip": "Show the tasks that need you (the Needs you preset)",
   "monitor.unreadable_taskbag_format": "Cannot read the taskbag: its format needs you (update Allomos). Still running.",
   "monitor.unreadable_taskbag_unreadable": "Cannot read the taskbag for 2 minutes or more: check it. Still running.",
+  "monitor.unreadable_icon": "The taskbag cannot be read",
   "monitor.updated": "Allomos was updated: this monitor carries on with the new version ({version}) and the same settings.",
   "monitor.start_failed": "Monitoring stopped: {agent} could not be started for {id}. {detail}",
   "monitor.close_prompt": "Allomos: the task is done. This tab closes in 30 seconds; press any key to keep it.",

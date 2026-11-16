@@ -1138,6 +1138,7 @@
   "monitor.last_run_need_tip": "対応が必要なタスクを表示（プリセット「あなたの対応が必要」）",
   "monitor.unreadable_taskbag_format": "タスクバッグを読めません：形式への対応が必要です（「肩代」を更新してください）。監視は動いています。",
   "monitor.unreadable_taskbag_unreadable": "タスクバッグを 2 分以上読めていません：確認してください。監視は動いています。",
+  "monitor.unreadable_icon": "タスクバッグを読めません",
   "monitor.updated": "「肩代」を更新しました：この監視は新しいバージョン（{version}）で、同じ設定のまま続いています。",
   "monitor.start_failed": "監視を止めました：{id} のために {agent} を起動できませんでした。{detail}",
   "monitor.close_prompt": "「肩代」：タスクが完了しました。このタブは 30 秒後に閉じます。残すには何かキーを押してください。",

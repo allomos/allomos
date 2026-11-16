@@ -389,6 +389,7 @@ export function MonitorControl({
   }
 
   const states = runs.map((r) => runState(r, tasks, now));
+  const unreadable = runs.find((r) => r.unreadable);
   const counts = stateCounts(states);
   const atWork = runs.reduce((n, r) => n + r.working.length, 0);
   // Folded with one monitor, the summary says what it does; otherwise how many sessions work.
@@ -409,6 +410,12 @@ export function MonitorControl({
             </span>
           ))}
           {lost.length > 0 && <span className="monitor-badge stopping">{t("monitor.count_stopping", { n: lost.length })}</span>}
+          {/* A run cannot read its taskbag (Task-A03-raven398): seen even with the section folded. */}
+          {unreadable?.unreadable && (
+            <span className="monitor-warn-icon" role="img" aria-label={t("monitor.unreadable_icon")} title={t(`monitor.unreadable_${unreadable.unreadable}`)}>
+              ⚠
+            </span>
+          )}
           <span className="muted small monitor-summary">{summary}</span>
         </button>
       </div>

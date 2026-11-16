@@ -1138,6 +1138,7 @@
   "monitor.last_run_need_tip": "显示需要你的任务（预设“需要你”）",
   "monitor.unreadable_taskbag_format": "读不了任务包：它的格式需要你处理（请更新「换肩」）。监测仍在运行。",
   "monitor.unreadable_taskbag_unreadable": "已有 2 分钟以上读不了任务包：请检查任务包。监测仍在运行。",
+  "monitor.unreadable_icon": "读不了任务包",
   "monitor.updated": "「换肩」已更新：这个监测换成新版（{version}）继续运行，设置不变。",
   "monitor.start_failed": "监测已停止：没能为 {id} 启动 {agent}。{detail}",
   "monitor.close_prompt": "「换肩」：任务已完成。这个标签页 30 秒后关闭；按任意键保留。",
