@@ -228,11 +228,16 @@ See:
   `--by iteration` lists every iteration, empty ones too, each starting with its place in the
   plan (1, 2, 3…, as the app shows it; `place` in `--json`), counted from the plan's order, so it
   changes after `alm move iteration`, and stays the same with `--iteration <id>`.
-- `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person: **To check**
-  (finished without the human check, each with why; `--steps` adds how to check it) and **To
-  answer** (waiting on a person, each with what; backlog tasks are not listed), then
-  **To review: AI decisions** (tasks in any state with decisions not reviewed yet, each listed).
-  `--json`: `to_check`, `to_answer`, `to_review` (each task with its `ai_decisions`).
+- `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person, one task at a
+  time with everything to do about it (answer, approve afterwards, check, review its AI
+  decisions), in the order to take them (decision 0028): first the tasks an agent is waiting on
+  (the one holding back more tasks first, then the longer wait), then finished work by the
+  recorded risk (high, medium, low, not classified; the longer wait first), last the earlier
+  iteration. Under a task: why it is to check (`--steps` adds how), what it waits on, and
+  **To review: AI decisions**, each listed. Backlog tasks with nothing to review are not listed.
+  `--json`: `queue` (one task each, in order, with `todo`, `risk`, `waiting_since`, `blocks`,
+  `agent_waiting`, `ai_decisions`), and the same tasks by kind: `to_check`, `to_answer`,
+  `to_review`, `to_approve_afterwards`.
 - `alm show <id>`: one task in full, with its description.
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
@@ -355,7 +360,9 @@ Work a task:
   its history; done tasks too. An emergency's approval is due by `--due` (three days after it is
   marked, by default). `alm human` lists, under To approve afterwards, every emergency without an
   approval recorded after it was marked (`alm approve`), and which are past due; `alm show` lists
-  a task's. Without options it shows what is recorded.
+  a task's. Without options it shows what is recorded. Before you finish a task, record its
+  risk with `--risk` and `--touches`, and one sentence of why with `--why` (decision 0027; the
+  rules: `alm guide workflow`, Risk rules).
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
   `--reason \"<why>\"` change it; account and sso need a cloud project.
@@ -769,7 +776,13 @@ const WORKFLOW: &str = "# How to work the tasks
    then why, then names in the code. The order is how you write; the data format is the same.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
-7. Finished: once the task has a \"by human\" label (a person has checked it: the human check),
+7. Before you finish a task, record its risk yourself, with one sentence of why (decision
+   0027): `alm classify <id> --risk low|medium|high --touches production|others-data|none --why
+   \"<one sentence: which rules apply, and what in the work makes them apply>\"`. The rules are
+   under **Risk rules** below; when several apply, the highest one counts, and the rules the
+   project added count too. You judge: alm records what you say and checks nothing, and the
+   approver may change it when reviewing.
+   Finished: once the task has a \"by human\" label (a person has checked it: the human check),
    `alm done <id>`. When the work is finished and only a
    person's hands-on check is left, finish it without that label, in quiet and normal mode alike (step 8):
    `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
@@ -2039,6 +2052,24 @@ fn written_in(language: &str) -> Option<&'static str> {
     }
 }
 
+/// Around the risk rules at the end of `alm guide workflow` (decision 0027, Task-A00-nectar077).
+const RISK_RULES_HEAD: &str = "
+Risk rules (step 7; decision 0027). The risk says what the approver reviews first, and how
+closely, once the work is done; it changes nothing in what needs the approver before the work.
+- Record it before `alm done`, with `--why`: one sentence naming the rules that apply (H3, M2…)
+  and what in the work makes them apply. Say what the work touches with `--touches`:
+  `production`, `others-data` (other people's data), or `none`.
+- When several rules apply, the highest one counts:
+";
+
+const RISK_RULES_TAIL: &str = "\
+- Rules the project added (its settings, Risk management; kept in the taskbag's `project.json`,
+  under `risk`, `rules`) are sentences written for you, one rule each: read them and apply them
+  the same way. A project can add rules; it cannot take H1–H7 away.
+- A task done before with no risk recorded can still get one: `alm classify` works on done
+  tasks too.
+";
+
 /// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
 pub fn guide(topic: Option<&str>) -> Option<String> {
     let text = |t: &str| match t {
@@ -2062,6 +2093,11 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
                 "{x}\nThe file (version {}):\n\n```\n{}```\n",
                 crate::codex_rules::VERSION,
                 crate::codex_rules::text()
+            ),
+            // The risk rules, the same text as in the AGENTS.md section (Task-A00-nectar077).
+            "workflow" => format!(
+                "{x}{RISK_RULES_HEAD}{}{RISK_RULES_TAIL}",
+                crate::classify::RISK_RULES
             ),
             _ => x.to_string(),
         })
@@ -2864,5 +2900,33 @@ mod tests {
             assert!(check > prompt.find("## 3.").unwrap(), "{language}");
             assert!(check < prompt.find("## 4.").unwrap(), "{language}");
         }
+    }
+
+    /// The risk rules are in `alm guide workflow` and in the AGENTS.md section, the same text in
+    /// both (decision 0027, Task-A00-nectar077).
+    #[test]
+    fn the_workflow_guide_and_the_section_tell_the_risk_rules() {
+        let workflow = guide(Some("workflow")).unwrap();
+        let section = crate::agent_section();
+        for text in [&workflow, &section] {
+            assert!(text.contains(crate::classify::RISK_RULES), "{text}");
+            for words in [
+                "alm classify <id> --risk low|medium|high --touches",
+                "--why",
+                "the highest one counts",
+                "H1 an outside effect",
+                "H7 making `alm` do one more check",
+                "M4 the principle",
+                "Low: everything else",
+                "Risk management",
+            ] {
+                assert!(text.contains(words), "{words}");
+            }
+        }
+        assert!(
+            guide(Some("commands"))
+                .unwrap()
+                .contains("one sentence of why with `--why`")
+        );
     }
 }

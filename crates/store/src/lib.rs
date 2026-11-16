@@ -45,6 +45,7 @@ pub mod identity;
 pub mod links;
 pub mod missing;
 pub mod progress;
+pub mod queue;
 mod quota;
 pub mod redact;
 mod settings;
@@ -364,6 +365,15 @@ the project notes (below).
   with `alm ai-decided` for review. A question about something cheap to undo, still unanswered
   when the run ends, is settled by your proposal, recorded with `alm ai-decided`. Details:
   `alm guide workflow`, step 8.
+- Risk: before you finish a task (before `alm done`), record its risk yourself, with one
+  sentence of why: `alm classify <id> --risk low|medium|high --touches
+  production|others-data|none --why \"<one sentence: which rules apply, and what in the work
+  makes them apply>\"`. You judge; alm records what you say and checks nothing, and the
+  approver may change it when reviewing. When several rules apply, the highest one counts:
+{risk_rules}  Read the rules this project added too (its settings, Risk management; kept in the
+  taskbag's `project.json`, under `risk`, `rules`) and apply them the same way. This is about
+  what is reviewed first once the work is done; what needs the approver before the work (below)
+  stays as it is.
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason \"<what changed>\"`.
@@ -469,7 +479,8 @@ you need more, ask `alm` rather than guessing: `alm guide terms` (what they mean
 `alm guide goal` (the goal prompt: build an app from a description, release by release),
 `alm guide github-release` (publish a GitHub release and install it, when the approver asks),
 `alm guide move-cards` (card files: moving them in beside their tasks).
-"
+",
+        risk_rules = classify::RISK_RULES
     )
 }
 
