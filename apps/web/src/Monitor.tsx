@@ -331,6 +331,7 @@ export function MonitorControl({
   onOpen,
   onEdit,
   onOpenSession,
+  onOpenTask,
   onError,
   onNeedYou,
 }: {
@@ -344,6 +345,8 @@ export function MonitorControl({
   /** Opens Edit monitor… for a run (A03-yolk481). */
   onEdit: (run: Run) => void;
   onOpenSession: (id: string) => Promise<void>;
+  /** Opens the task pane for a task listed in a monitored session. */
+  onOpenTask: (id: string) => void;
   onError: (e: unknown) => void;
   /** Picks the Show filter's "Needs you" preset (Task-A01-wigwam308): "K need you" is then a link. */
   onNeedYou?: () => void;
@@ -433,6 +436,7 @@ export function MonitorControl({
               onToggle={() => folds.toggle(run.id)}
               onEdit={() => onEdit(run)}
               onOpenSession={onOpenSession}
+              onOpenTask={onOpenTask}
               onError={onError}
             />
           ))}
@@ -468,6 +472,7 @@ function RunPanel({
   onToggle,
   onEdit,
   onOpenSession,
+  onOpenTask,
   onError,
 }: {
   run: Run;
@@ -479,6 +484,7 @@ function RunPanel({
   onToggle: () => void;
   onEdit: () => void;
   onOpenSession: (id: string) => Promise<void>;
+  onOpenTask: (id: string) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
@@ -548,7 +554,7 @@ function RunPanel({
                 {g.working.length ? (
                   <ul className="monitor-rows">
                     {g.working.map((w) => (
-                      <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={g.removed} inGroup onOpenSession={onOpenSession} onError={onError} />
+                      <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={g.removed} inGroup onOpenSession={onOpenSession} onOpenTask={onOpenTask} onError={onError} />
                     ))}
                   </ul>
                 ) : (
@@ -559,7 +565,7 @@ function RunPanel({
           ) : run.working.length ? (
             <ul className="monitor-rows">
               {run.working.map((w) => (
-                <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={false} onOpenSession={onOpenSession} onError={onError} />
+                <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={false} onOpenSession={onOpenSession} onOpenTask={onOpenTask} onError={onError} />
               ))}
             </ul>
           ) : (
@@ -585,6 +591,7 @@ function SessionRow({
   finishing,
   inGroup,
   onOpenSession,
+  onOpenTask,
   onError,
 }: {
   cur: Current;
@@ -593,6 +600,7 @@ function SessionRow({
   finishing: boolean;
   inGroup?: boolean;
   onOpenSession: (id: string) => Promise<void>;
+  onOpenTask: (id: string) => void;
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
@@ -603,7 +611,7 @@ function SessionRow({
   return (
     <li className={`monitor-row${quiet ? " stalled" : ""}`}>
       <span className="monitor-row-text">
-        <strong>{cur.id}</strong>
+        <button type="button" className="monitor-task-id" onClick={() => onOpenTask(cur.id)}>{cur.id}</button>
         {!inGroup && <span className="muted"> · {monitorAgentName(cur.agent, t)}</span>}
         <span className="muted small"> · {t(finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
         {quiet && <span className="monitor-stalled small"> · {t("monitor.session_stalled")}</span>}

@@ -18,6 +18,7 @@ import type { AppSettingsMessenger, Messenger, TabsMessenger } from "./messenger
 import { projectFolder } from "./paths";
 import { TabActive } from "./tabActive";
 import { MonitorsButton, MonitorsList, useListedRuns } from "./MonitorsList";
+import { TASK_JUMP_EVENT, TASK_JUMP_KEY, readTaskJump, taskJumpIsFor, type TaskJump } from "./taskJumpFlow";
 import { frontAfterClose, insertAt, landAt, moveTab, othersOf, shiftFor, startEntries, tabShowing, tearsOff, type TabEntry, type TabStart } from "./tabsFlow";
 
 /** What a tab's view needs from its window. */
@@ -99,6 +100,23 @@ export function WindowTabs({ messenger, tabs: api, settings }: { messenger: Mess
   }, [messenger]);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+  useEffect(() => {
+    const focusProject = (jump: TaskJump | null) => {
+      if (!jump) return;
+      const tab = tabsRef.current.find((item) => item.root && taskJumpIsFor(jump, item.root));
+      if (tab) setFront(tab.id);
+    };
+    const onEvent = (event: Event) => focusProject((event as CustomEvent<TaskJump>).detail);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === TASK_JUMP_KEY) focusProject(readTaskJump(event.newValue));
+    };
+    window.addEventListener(TASK_JUMP_EVENT, onEvent);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(TASK_JUMP_EVENT, onEvent);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
   const frontRef = useRef(front);
   frontRef.current = front;
   const nextId = useRef(1);

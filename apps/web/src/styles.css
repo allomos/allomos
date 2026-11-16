@@ -1173,6 +1173,9 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 .monitor-rows { list-style: none; margin: 0; padding: 0; }
 .monitor-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 2px 0; }
 .monitor-row-text { flex: 1 1 auto; min-width: 0; }
+.monitor-task-id { border: 0; background: none; padding: 0; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.monitor-task-id:hover { text-decoration: underline; }
+.monitor-task-id:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .monitor-row.stalled { color: var(--err); }
 .monitor-row.stalled .muted { color: var(--err); }
 .monitor-group .monitor-rows { padding-left: 12px; }

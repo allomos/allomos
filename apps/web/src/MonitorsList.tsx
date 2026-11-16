@@ -7,12 +7,13 @@
 // (Task-A03-spider528).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
 import { monitorAgentName } from "./AgentPicker";
 import { freeAgents, listedRuns, nextCheck, type ListedRun, type Run } from "./monitorFlow";
 import { askJump } from "./iterationJumpFlow";
+import { askTaskJump } from "./taskJumpFlow";
 import { isProblem } from "./types";
 import { useAgentAccounts } from "./useAgentAccounts";
 
@@ -172,7 +173,15 @@ export function MonitorsList({
           {rows.map((row) => (
             <li key={row.key} className={`monitors-row${row.run?.stopping ? " stopping" : ""}${row.lost ? " lost" : ""}`}>
               {row.run ? (
-                <RunRow run={row.run} name={row.name} now={now} onIteration={row.root ? (id) => askJump({ root: row.root!, id }, () => messenger.monitorOpen(row.root ?? "")).then(onClose).catch(fail) : undefined} onCheck={() => ask(row.run!.id, { action: "check" })} onStop={() => ask(row.run!.id, { action: row.run!.stopping ? "undo_stop" : "stop" })} />
+                <RunRow
+                  run={row.run}
+                  name={row.name}
+                  now={now}
+                  onIteration={row.root ? (id) => askJump({ root: row.root!, id }, () => messenger.monitorOpen(row.root ?? "")).then(onClose).catch(fail) : undefined}
+                  onOpenTask={row.root ? (id) => askTaskJump({ root: row.root!, id }, () => messenger.monitorOpen(row.root!)).then(onClose).catch(fail) : undefined}
+                  onCheck={() => ask(row.run!.id, { action: "check" })}
+                  onStop={() => ask(row.run!.id, { action: row.run!.stopping ? "undo_stop" : "stop" })}
+                />
               ) : (
                 <div className="monitors-lines">
                   <strong>{t("monitors.missing", { pid: row.lost?.pid ?? 0 })}</strong>
@@ -202,12 +211,14 @@ function RunRow({
   name,
   now,
   onIteration,
+  onOpenTask,
   onCheck,
   onStop,
 }: {
   run: Run;
   name: string | null;
   now: number;
+  onOpenTask?: (id: string) => void;
   /** Shows the run's iteration in its project; not given when the project is not known. */
   onIteration?: (iteration: string) => void;
   onCheck: () => void;
@@ -216,16 +227,20 @@ function RunRow({
   const { t } = useI18n();
   const free = freeAgents(run);
   const iterationName = run.scope.kind === "iteration" ? run.scope.id : null;
-  const lines: string[] = [];
+  const lines: ReactNode[] = [];
+  const taskLink = (id: string) => onOpenTask ? <button type="button" className="link monitors-task" onClick={() => onOpenTask(id)}>{id}</button> : id;
   if (run.stopping && run.working.length) {
-    lines.push(t("monitor.stopping", { id: run.working.map((w) => w.id).join(", ") }));
+    const ids = run.working.map((w) => w.id);
+    const phrase = t("monitor.stopping", { id: "__TASK_IDS__" });
+    const [before, after] = phrase.split("__TASK_IDS__");
+    lines.push(<span key="stopping">{before}{ids.map((id, index) => <span key={id}>{index > 0 && ", "}{taskLink(id)}</span>)}{after}</span>);
   } else {
     for (const a of run.agents) {
       const w = run.working.find((x) => x.agent === a);
       const agent = monitorAgentName(a, t);
-      if (w) lines.push(`${agent} · ${w.id}`);
-      else if (nextCheck(run) <= now) lines.push(`${agent}：${t("monitors.checking")}`);
-      else lines.push(`${agent}：${t("monitors.waiting", { time: timeOf(nextCheck(run)) })}`);
+      if (w) lines.push(<span key={a}>{agent} · {taskLink(w.id)}</span>);
+      else if (nextCheck(run) <= now) lines.push(<span key={a}>{agent}：{t("monitors.checking")}</span>);
+      else lines.push(<span key={a}>{agent}：{t("monitors.waiting", { time: timeOf(nextCheck(run)) })}</span>);
     }
   }
   return (
@@ -247,8 +262,8 @@ function RunRow({
             ))}
         </span>
       </div>
-      {lines.map((line) => (
-        <div key={line} className="muted small">
+      {lines.map((line, index) => (
+        <div key={index} className="muted small">
           {line}
         </div>
       ))}

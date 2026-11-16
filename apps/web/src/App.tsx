@@ -23,6 +23,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { LanDialog } from "./LanDialog";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
 import { JUMP_EVENT, JUMP_KEY, jumpIsFor, takeJump, type IterationJump } from "./iterationJumpFlow";
+import { TASK_JUMP_EVENT, TASK_JUMP_KEY, taskJumpIsFor, takeTaskJump, type TaskJump } from "./taskJumpFlow";
 import { groupCount } from "./groupCountFlow";
 import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
@@ -1630,6 +1631,30 @@ function TaskbagView({
 
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    const root = opened.root;
+    const take = () => {
+      if (!box) return;
+      const jump = takeTaskJump(root);
+      if (jump && box.tasks.some((task) => task.id === jump.id)) setSelectedId(jump.id);
+    };
+    const onEvent = (event: Event) => {
+      const jump = (event as CustomEvent<TaskJump>).detail;
+      if (!taskJumpIsFor(jump, root)) return;
+      takeTaskJump(root);
+      if (box?.tasks.some((task) => task.id === jump.id)) setSelectedId(jump.id);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === TASK_JUMP_KEY) take();
+    };
+    take();
+    window.addEventListener(TASK_JUMP_EVENT, onEvent);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(TASK_JUMP_EVENT, onEvent);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [opened.root, box?.tasks]);
   const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
   // The selected task's history (Task-A01-17), read again whenever the taskbag reloads. Kept with
   // its task's ID, so another task never shows it and a reload does not blank it while reading.
@@ -1848,6 +1873,7 @@ function TaskbagView({
         onOpen={() => setMonitorFrom(from)}
         onEdit={(run) => setEditingRun(run.id)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
+        onOpenTask={(id) => setSelectedId((now) => afterClick(now, id))}
         onError={onError}
         onNeedYou={() => chooseFilter(presetFilter("needs_you", ladder))}
       />
