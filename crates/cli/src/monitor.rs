@@ -468,12 +468,21 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
             let working: Vec<String> = run
                 .working
                 .iter()
-                .map(|w| format!("{} ({})", w.id, agent_word(&w.agent)))
+                .map(|w| {
+                    format!(
+                        "{} ({}{})",
+                        w.id,
+                        agent_word(&w.agent),
+                        if w.seen_held { "" } else { ", not claimed yet" }
+                    )
+                })
                 .collect();
             let state = if run.stopping {
                 "stopping: finishing the tasks at work".to_string()
-            } else if run.free_agents().is_empty() {
+            } else if run.free_agents().is_empty() && run.paused.is_empty() {
                 "every agent at work".to_string()
+            } else if run.free_agents().is_empty() {
+                "no agent free now".to_string()
             } else {
                 format!(
                     "next check {}",
@@ -503,6 +512,46 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                 text.push_str(&format!(
                     "  no ready task in the levels of: {} (no session starts for them)\n",
                     words.join(", ")
+                ));
+            }
+            // A03-otter944: agents given no session for now, and sessions that did not start.
+            for (agent, p) in &run.paused {
+                let why = match p.why {
+                    allomos_monitor::flow::PauseWhy::Quota => format!(
+                        "quota used up{}; read again at {}",
+                        p.resets
+                            .as_deref()
+                            .map(|r| format!(", back at {r}"))
+                            .unwrap_or_default(),
+                        runner::local_hhmm(p.until)
+                    ),
+                    allomos_monitor::flow::PauseWhy::NoClaim => format!(
+                        "its last session did not start; tried again at {}",
+                        runner::local_hhmm(p.until)
+                    ),
+                };
+                text.push_str(&format!("  paused: {} ({why})\n", agent_word(agent)));
+            }
+            if !run.not_started.is_empty() {
+                let list: Vec<String> = run
+                    .not_started
+                    .iter()
+                    .map(|n| {
+                        format!(
+                            "{} ({}, {} at {})",
+                            n.id,
+                            agent_word(&n.agent),
+                            match n.why {
+                                allomos_monitor::flow::PauseWhy::Quota => "quota used up",
+                                allomos_monitor::flow::PauseWhy::NoClaim => "never claimed",
+                            },
+                            runner::local_hhmm(n.found)
+                        )
+                    })
+                    .collect();
+                text.push_str(&format!(
+                    "  did not start (given out again): {}\n",
+                    list.join(", ")
                 ));
             }
             if !run.taken.is_empty() {

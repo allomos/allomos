@@ -1111,6 +1111,7 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 .monitor-sessions { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .monitor-sessions input { width: 4.5em; font-size: 13px; }
 .monitor-stalled { color: var(--warn); font-weight: 600; }
+.monitor-paused { color: var(--warn); }
 /* The Monitors list (Task-A03-motor529): the tab bar's button at the right end, and the panel it opens. */
 .tabbar-monitors { flex: none; margin: 0 4px 6px auto; display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line)); background: var(--ok-bg); color: var(--ok); border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .tabbar-monitors .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }

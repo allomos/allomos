@@ -36,8 +36,9 @@ import {
   stalled,
   stateCounts,
   workedFor,
+  notStartedShown,
 } from "./monitorFlow";
-import type { Current, Frequency, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
+import type { Current, Frequency, Pause, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -551,9 +552,10 @@ function RunPanel({
                       <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={g.removed} inGroup onOpenSession={onOpenSession} onError={onError} />
                     ))}
                   </ul>
-                ) : (
+                ) : g.paused ? null : (
                   <p className="muted small monitor-group-note">{t(g.noTask ? "monitor.group_no_task" : "monitor.group_idle")}</p>
                 )}
+                {g.paused && <PauseNote pause={g.paused} />}
               </div>
             ))
           ) : run.working.length ? (
@@ -562,8 +564,33 @@ function RunPanel({
                 <SessionRow key={w.id} cur={w} tasks={tasks} now={now} finishing={false} onOpenSession={onOpenSession} onError={onError} />
               ))}
             </ul>
-          ) : (
+          ) : run.paused.length ? null : (
             <p className="muted small monitor-group-note">{t(run.noTask.length ? "monitor.group_no_task" : "monitor.sessions_none")}</p>
+          )}
+          {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
+          {notStartedShown(run).length > 0 && (
+            <>
+              <h4 className="monitor-sessions-title small">{t("monitor.not_started_title")}</h4>
+              <ul className="monitor-rows">
+                {notStartedShown(run).map((n) => (
+                  <li key={`${n.id}-${n.found}`} className="monitor-row not-started">
+                    <span className="monitor-row-text">
+                      <strong>{n.id}</strong>
+                      <span className="muted"> · {monitorAgentName(n.agent, t)}</span>
+                      <span className="monitor-stalled small">
+                        {" · "}
+                        {n.why === "quota"
+                          ? n.resets
+                            ? t("monitor.not_started_quota_at", { resets: n.resets })
+                            : t("monitor.not_started_quota")
+                          : t("monitor.not_started_no_claim")}
+                      </span>
+                      <span className="muted small"> · {t("monitor.not_started_again", { time: timeOf(n.found) })}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
           {free.length > 0 && !run.stopping && (
             <p className="muted small monitor-next">
@@ -574,6 +601,20 @@ function RunPanel({
       )}
     </div>
   );
+}
+
+/** Why an agent gets no session for now (A03-otter944): its quota is used up (and when it comes
+ * back, and when it is read again), or its last session did not start. */
+function PauseNote({ pause }: { pause: Pause }) {
+  const { t } = useI18n();
+  const time = timeOf(pause.until);
+  const text =
+    pause.why === "quota"
+      ? pause.resets
+        ? t("monitor.paused_quota_at", { resets: pause.resets, time })
+        : t("monitor.paused_quota", { time })
+      : t("monitor.paused_no_claim", { time });
+  return <p className="small monitor-group-note monitor-paused">{text}</p>;
 }
 
 /** One session the monitor opened: its task, its agent (when not grouped), how long it has
@@ -605,7 +646,7 @@ function SessionRow({
       <span className="monitor-row-text">
         <strong>{cur.id}</strong>
         {!inGroup && <span className="muted"> · {monitorAgentName(cur.agent, t)}</span>}
-        <span className="muted small"> · {t(finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
+        <span className="muted small"> · {t(!cur.claimed ? "monitor.session_starting" : finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
         {quiet && <span className="monitor-stalled small"> · {t("monitor.session_stalled")}</span>}
       </span>
       {place && (
