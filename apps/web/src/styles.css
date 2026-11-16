@@ -861,7 +861,6 @@ button.state-menu-button:hover { text-decoration: underline; text-underline-offs
 /* The difficulty menu (Task-A01-pewter675): the same list; its button reads as the plain text it replaces. */
 button.difficulty-menu-button { background: none; padding: 0; border-radius: 0; font-weight: inherit; text-align: left; }
 button.difficulty-menu-button.muted { color: var(--muted); }
-.state-popover.difficulty-popover { min-width: 170px; }
 .state-popover { min-width: 220px; max-width: 320px; cursor: default; }
 .state-popover .state-item { display: flex; flex-direction: column; }
 .state-popover button:disabled, .state-popover button:disabled span { color: var(--muted); cursor: not-allowed; background: none; }
