@@ -67,6 +67,9 @@ struct Opened {
     /// Each task's approvals, by task ID, with where each stands now (Task-A01-coach782), from
     /// the history.
     approvals: std::collections::BTreeMap<String, Vec<allomos_core::approval::Recorded>>,
+    /// Each task's change type, risk and what it touches as an agent recorded them, by task ID
+    /// (Task-A01-garden385, decision 0027), from the history; a task with none is left out.
+    classifications: std::collections::BTreeMap<String, allomos_core::classify::Classification>,
     /// Each task's outside effects, by task ID (Task-A01-job650), from the history.
     effects: std::collections::BTreeMap<String, Vec<allomos_core::effect::Recorded>>,
     /// Each task's links to code and releases, by task ID (Task-A01-mint242), from the history.
@@ -162,6 +165,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
         versions,
         ai_decisions: allomos_store::ai_decisions(&root),
         approvals: allomos_store::approvals::approvals(&root),
+        classifications: allomos_store::classify::by_task(&root),
         effects: allomos_store::effects::by_task(&root),
         links: allomos_store::links::by_task(&root),
         branches: allomos_store::branches(&root),
@@ -202,6 +206,7 @@ fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opene
         loaded: load(&root),
         ai_decisions: Default::default(),
         approvals: Default::default(),
+        classifications: Default::default(),
         effects: Default::default(),
         links: Default::default(),
         branches: Default::default(),
@@ -1145,6 +1150,7 @@ fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         loaded: load(&root),
         ai_decisions: Default::default(),
         approvals: Default::default(),
+        classifications: Default::default(),
         effects: Default::default(),
         links: Default::default(),
         branches: Default::default(),
@@ -3582,6 +3588,29 @@ mod tests {
         .unwrap();
         let opened = open_taskbag(root.clone());
         assert_eq!(opened.ai_decisions["A01-01"][0].text, "Names: alm note");
+        // Task-A01-garden385: the risk an agent recorded comes along when the taskbag opens; a
+        // task that is not classified is left out (the window shows it as "Not classified").
+        assert!(opened.classifications.is_empty());
+        allomos_store::classify::set(
+            &root,
+            allomos_store::Actor::alm(Some("claude/x")),
+            LOCK_WAIT,
+            "A01-01",
+            &allomos_core::classify::Given {
+                risk: Some("high"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let opened = open_taskbag(root.clone());
+        assert_eq!(
+            opened.classifications["A01-01"].risk.as_deref(),
+            Some("high")
+        );
+        assert_eq!(
+            serde_json::to_value(&opened).unwrap()["classifications"]["A01-01"]["risk"],
+            "high"
+        );
         assert_eq!(
             review_as(&root, None, "A01-01"),
             Err(Problem::HolderMissing)
