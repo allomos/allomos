@@ -140,7 +140,7 @@ pub fn look(places: &[PathBuf], working: &str) -> Option<FormerWorktree> {
 /// **Take over…**: the former holder's worktree for the task in the taskbag at `taskbag`, on its
 /// working branch `working`; `folder` is where its claim ran, relative to the folder holding
 /// `.allomos/` (the task's session). `None`: not on this computer.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn former_worktree(
     taskbag: PathBuf,
     folder: Option<String>,

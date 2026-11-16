@@ -42,7 +42,7 @@ fn of(path: &Path) -> CodexRules {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn codex_rules_status() -> Result<CodexRules, Problem> {
     Ok(of(&path()?))
 }
@@ -51,7 +51,7 @@ pub(crate) fn codex_rules_status() -> Result<CodexRules, Problem> {
 /// file), `remove` takes Allomos's file away. A newer version's file is left alone. The change is
 /// recorded in the taskbag at `root` (command `codex-rules`, field `codex_rules`: the version
 /// before and after; `changed` for a file somebody edited), made as the person's saved name.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn codex_rules_apply(root: PathBuf, action: String) -> Result<CodexRules, Problem> {
     apply(&root, &path()?, &action)
 }

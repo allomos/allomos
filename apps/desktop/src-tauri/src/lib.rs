@@ -134,7 +134,7 @@ fn startup_folder() -> Result<Option<PathBuf>, Problem> {
 }
 
 /// What is this folder? Changes nothing.
-#[tauri::command]
+#[tauri::command(async)]
 fn inspect_folder(path: PathBuf) -> FolderInfo {
     FolderInfo {
         inspection: inspect(&path),
@@ -142,7 +142,7 @@ fn inspect_folder(path: PathBuf) -> FolderInfo {
 }
 
 /// Load the taskbag at `root`.
-#[tauri::command]
+#[tauri::command(async)]
 fn open_taskbag(root: PathBuf) -> Opened {
     let loaded = load(&root);
     // Read from the tasks' Card: links and agents' reports (Task-A01-51), so the notice shows
@@ -177,7 +177,7 @@ fn open_taskbag(root: PathBuf) -> Opened {
 /// changed (`taskbag_watch`), and once a minute in case a notice was missed, and reloads when it
 /// changed, so changes made by `alm` show without reopening the folder.
 /// Sent as text: a 64-bit number does not fit a JavaScript number.
-#[tauri::command]
+#[tauri::command(async)]
 fn taskbag_stamp(root: PathBuf) -> String {
     stamp(&root).to_string()
 }
@@ -188,7 +188,7 @@ fn taskbag_stamp(root: PathBuf) -> String {
 /// When the picked folder looks empty, also write `README-allomos.md` there, in the
 /// interface's `language`; a README that cannot be written does not undo the taskbag.
 /// (Connecting AI agents with the project is a separate step: `connect_agents`.)
-#[tauri::command]
+#[tauri::command(async)]
 fn create_taskbag(root: PathBuf, name: String, language: String) -> Result<Opened, Problem> {
     init(&root, &id_from_name(&name), &name).map_err(|p| match p {
         Problem::TaskbagExists { path } => Problem::FolderNotEmpty { path },
@@ -254,7 +254,7 @@ fn opener() -> Command {
 /// Open a link from a task's description: a web page in the browser, or a text file inside the
 /// project (such as the task's card) in the user's editor. Anything else is refused by
 /// `resolve_task_link` (Task-A01-16).
-#[tauri::command]
+#[tauri::command(async)]
 fn open_task_link(root: PathBuf, task: String, link: String) -> Result<(), Problem> {
     let mut command = opener();
     match resolve_task_link(&root, &task, &link)? {
@@ -269,7 +269,7 @@ fn open_task_link(root: PathBuf, task: String, link: String) -> Result<(), Probl
 
 /// Reopen the session task `task` records (Task-A03-hive049): the Claude app's link, or
 /// `claude --resume` in a terminal. Read from the task itself, never from the window's copy.
-#[tauri::command]
+#[tauri::command(async)]
 fn open_agent_session(root: PathBuf, task: String) -> Result<(), Problem> {
     let (bag, _) = allomos_store::taskbag_of(&root, load(&root))?;
     let found = allomos_core::ops::find_task(&bag, &task)?;
@@ -302,13 +302,13 @@ fn save_ui_language(language: String) {
 }
 
 /// The person's name the app records its task changes under (Task-A01-18); null until asked.
-#[tauri::command]
+#[tauri::command(async)]
 fn owner_name() -> Option<String> {
     allomos_store::saved_owner_name()
 }
 
 /// Keep the person's name in the app's settings, asked once (owner, 2026-10-14).
-#[tauri::command]
+#[tauri::command(async)]
 fn save_owner_name(name: String) -> Result<(), Problem> {
     if name.trim().is_empty() {
         return Err(Problem::HolderMissing);
@@ -349,7 +349,7 @@ fn edit_task_as(
 
 /// The person has reviewed task `id`'s AI decisions (Task-A03-19): the same change as
 /// `alm reviewed`, made as the person's saved name.
-#[tauri::command]
+#[tauri::command(async)]
 fn review_ai_decisions(root: PathBuf, id: String) -> Result<(), Problem> {
     review_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
 }
@@ -366,7 +366,7 @@ fn review_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Problem> {
 /// `ready` (Approve and make ready, only offered on a backlog task) then makes the change
 /// `alm ready` makes, as a second step the person chose. The approver chose to record, not block,
 /// an approval clicked by an agent operating the app (2026-11-08): the event shows it.
-#[tauri::command]
+#[tauri::command(async)]
 fn approve_task(
     root: PathBuf,
     id: String,
@@ -427,7 +427,7 @@ fn approve_as(
 /// The task pane's Withdraw (Task-A01-baker800): the same change as `alm withdraw <approval ID>
 /// --why "<reason>"`, made as the person's saved name. The reason is required here
 /// (`withdraw_reason_missing`). Withdrawing stops nothing (approver, 2026-11-08).
-#[tauri::command]
+#[tauri::command(async)]
 fn withdraw_approval(root: PathBuf, id: String, reason: String) -> Result<(), Problem> {
     withdraw_as(
         &root,
@@ -446,7 +446,7 @@ fn withdraw_as(root: &Path, name: Option<&str>, id: &str, reason: &str) -> Resul
     allomos_store::approvals::withdraw(root, actor, LOCK_WAIT, id, Some(reason)).map(|_| ())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn edit_task(
     root: PathBuf,
     id: String,
@@ -565,7 +565,7 @@ struct NextIds {
     tasks: std::collections::BTreeMap<String, String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn next_ids(root: PathBuf) -> Result<NextIds, Problem> {
     let (bag, _) = allomos_store::taskbag_of(&root, load(&root))?;
     let tasks = bag
@@ -602,7 +602,7 @@ fn add_area_as(
         .map(|a| a.item)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn add_area(
     root: PathBuf,
     id: Option<String>,
@@ -655,7 +655,7 @@ fn add_iteration_as(
     .map(|i| i.item)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn add_iteration(
     root: PathBuf,
     iteration: NewIteration,
@@ -694,7 +694,7 @@ fn add_iteration_and_plan_as(
     .map(|(_, changed)| changed.task)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn add_iteration_and_plan(
     root: PathBuf,
     task: String,
@@ -722,7 +722,7 @@ fn add_task_as(
     allomos_store::add_task(root, app_actor(name)?, LOCK_WAIT, &new).map(|t| t.item)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn add_task(root: PathBuf, task: allomos_store::NewTask) -> Result<allomos_core::Task, Problem> {
     add_task_as(&root, allomos_store::saved_owner_name().as_deref(), task)
 }
@@ -738,7 +738,7 @@ fn rename_area_as(
     allomos_store::rename_area(root, app_actor(name)?, LOCK_WAIT, id, new_name).map(|a| a.item)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn rename_area(root: PathBuf, id: String, name: String) -> Result<allomos_core::Area, Problem> {
     rename_area_as(
         &root,
@@ -759,7 +759,7 @@ fn change_iteration_as(
     allomos_store::change_iteration(root, app_actor(name)?, LOCK_WAIT, id, change).map(|i| i.item)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn change_iteration(
     root: PathBuf,
     id: String,
@@ -779,7 +779,7 @@ fn delete_area_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Probl
     allomos_store::delete_area(root, app_actor(name)?, LOCK_WAIT, id).map(|_| ())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn delete_area(root: PathBuf, id: String) -> Result<(), Problem> {
     delete_area_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
 }
@@ -790,7 +790,7 @@ fn delete_iteration_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), 
     allomos_store::delete_iteration(root, app_actor(name)?, LOCK_WAIT, id).map(|_| ())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn delete_iteration(root: PathBuf, id: String) -> Result<(), Problem> {
     delete_iteration_as(&root, allomos_store::saved_owner_name().as_deref(), &id)
 }
@@ -1129,7 +1129,7 @@ async fn copy_text(text: String) -> Result<(), Problem> {
 /// Is the project up to date with this Allomos (Task-A01-25)? `None` until an agent is connected
 /// with it. The window asks when a folder is opened and every few seconds while it is open, so
 /// an agent's update shows without reopening.
-#[tauri::command]
+#[tauri::command(async)]
 fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
     versions::check_connected(&root)
 }
@@ -1138,7 +1138,7 @@ fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
 /// (`taskbag-allomos-<n>`) and create a new, empty taskbag in its place, then load that; the same
 /// dialog then asks the chosen agent to move the tasks across ([`move_tasks_in`]). Nothing in the
 /// old folder is changed.
-#[tauri::command]
+#[tauri::command(async)]
 fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
     versions::move_aside(&root)?;
     Ok(Opened {
@@ -1183,7 +1183,7 @@ fn handoff_settings_of(root: &Path) -> Result<HandoffSettings, Problem> {
 
 /// Set the language tasks are written in, as `alm task-language` does (`ui` follows the interface;
 /// Task-A05-yeti951).
-#[tauri::command]
+#[tauri::command(async)]
 fn set_task_language(root: PathBuf, value: String) -> Result<(), Problem> {
     let lock = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))?;
     let loaded = lock.load();
@@ -1213,7 +1213,7 @@ struct LadderStep {
 /// `alm rename label` (on every task that carries it), then the labels in their new order, added
 /// and removed. Checked first, so nothing changes when any of it is refused: removing a label
 /// tasks still carry names those tasks. Returns the whole table's names, built-in first.
-#[tauri::command]
+#[tauri::command(async)]
 fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, Problem> {
     let loaded = allomos_store::load(&root);
     let bag = loaded
@@ -1291,14 +1291,14 @@ fn change_ladder(root: PathBuf, steps: Vec<LadderStep>) -> Result<Vec<String>, P
 
 /// The taskbag's project folders (decision 0019), each with whether it is found here and how many
 /// tasks name it, for the task pane's Folders and the task list (Task-A01-sketch327).
-#[tauri::command]
+#[tauri::command(async)]
 fn project_folders(root: PathBuf) -> Result<Vec<allomos_store::folders::FolderInfo>, Problem> {
     allomos_store::folders::list(&root)
 }
 
 /// Bind a project folder, as `alm folder add` does: recorded in `project.json` and Allomos's
 /// section written into its AGENTS.md (Task-A05-plaza078). Returns the folders after.
-#[tauri::command]
+#[tauri::command(async)]
 fn bind_folder(
     root: PathBuf,
     path: PathBuf,
@@ -1309,7 +1309,7 @@ fn bind_folder(
 }
 
 /// Give a folder a new short name, as `alm folder rename` does; the folder on disk keeps its name.
-#[tauri::command]
+#[tauri::command(async)]
 fn rename_folder(
     root: PathBuf,
     name: String,
@@ -1321,7 +1321,7 @@ fn rename_folder(
 }
 
 /// Record where a folder that is not found is now, as `alm folder locate` does; no files move.
-#[tauri::command]
+#[tauri::command(async)]
 fn locate_folder(
     root: PathBuf,
     name: String,
@@ -1334,7 +1334,7 @@ fn locate_folder(
 
 /// Unbind a folder, as `alm folder remove --confirm` does: its tasks stay, its files stay, and only
 /// Allomos's section leaves its AGENTS.md. The dialog asks first.
-#[tauri::command]
+#[tauri::command(async)]
 fn unbind_folder(
     root: PathBuf,
     name: String,
@@ -1372,7 +1372,7 @@ fn show_folder_in_file_manager(root: PathBuf, name: String) -> Result<(), Proble
 
 /// Rename the project, as `alm project --name` does (Task-A05-camera758's settings, General;
 /// Task-A05-chalk937). The ID stays. Returns the name as saved.
-#[tauri::command]
+#[tauri::command(async)]
 fn rename_project(root: PathBuf, name: String) -> Result<String, Problem> {
     let lock = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))?;
     let loaded = lock.load();
@@ -1390,14 +1390,14 @@ fn rename_project(root: PathBuf, name: String) -> Result<String, Problem> {
     Ok(project.name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn handoff_settings(root: PathBuf) -> Result<HandoffSettings, Problem> {
     handoff_settings_of(&root)
 }
 
 /// Change the handoff rules, as `alm handoff-rules` does: the project's own (no `agent`), or one
 /// agent's or account's override. Returns the settings as saved.
-#[tauri::command]
+#[tauri::command(async)]
 fn set_handoff_rules(
     root: PathBuf,
     quota: Option<String>,
@@ -1611,7 +1611,7 @@ fn remove_paired_device(app: AppHandle, lan: tauri::State<Lan>, id: String) -> p
 }
 
 /// One task's history, newest first, and when the taskbag started recording (Task-A01-17).
-#[tauri::command]
+#[tauri::command(async)]
 fn task_history(root: PathBuf, id: String) -> allomos_store::events::History {
     allomos_store::events::history(&root, &id)
 }
@@ -1752,7 +1752,7 @@ struct TaskbagFormat {
     current: &'static str,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn taskbag_format(root: PathBuf) -> TaskbagFormat {
     TaskbagFormat {
         format: versions::format_state(&root),
@@ -1769,7 +1769,7 @@ struct InstructionFiles {
     claude_md: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn instruction_files(project: PathBuf) -> InstructionFiles {
     InstructionFiles {
         agents_md: project.join("AGENTS.md").is_file(),
@@ -1780,7 +1780,7 @@ fn instruction_files(project: PathBuf) -> InstructionFiles {
 /// The entries under `## Agents set up` in the taskbag's project notes (Task-A03-24): whether the
 /// agent used last is registered decides which agents **Update the taskbag…** offers
 /// (Task-A03-27). Only that section is read; nothing else is checked.
-#[tauri::command]
+#[tauri::command(async)]
 fn agents_set_up(taskbag: PathBuf) -> Vec<String> {
     allomos_store::handoff::agents_set_up(&taskbag)
 }
@@ -1788,13 +1788,13 @@ fn agents_set_up(taskbag: PathBuf) -> Vec<String> {
 /// Steps 2 to 4 of the open-folder flow for the taskbag at `root`: its project folder (recorded
 /// here when AGENTS.md or CLAUDE.md sits beside `.allomos/`), whether that folder's agent
 /// instructions mention Allomos, and whether the taskbag has tasks.
-#[tauri::command]
+#[tauri::command(async)]
 fn project_setup(root: PathBuf) -> Result<SetupState, Problem> {
     setup_state(&root)
 }
 
 /// Record `folder` as the project folder of the taskbag at `root`; then the flow's new state.
-#[tauri::command]
+#[tauri::command(async)]
 fn set_project_folder(root: PathBuf, folder: PathBuf) -> Result<SetupState, Problem> {
     record_project_folder(&root, &folder)?;
     setup_state(&root)
@@ -1850,7 +1850,7 @@ async fn move_tasks_in(
 
 /// **Update the taskbag…** with Manual: the same request, as an agent opened through a link gets
 /// it, for the person to copy.
-#[tauri::command]
+#[tauri::command(async)]
 fn move_tasks_in_request(
     taskbag: PathBuf,
     language: String,
@@ -1931,7 +1931,7 @@ async fn translate_taskbag(
 }
 
 /// **Translate the taskbag…** with Manual: the same request, for the person to copy.
-#[tauri::command]
+#[tauri::command(async)]
 fn translate_request(
     taskbag: PathBuf,
     language: String,
@@ -1994,33 +1994,33 @@ fn proceed_manual_request(request: String) -> String {
 
 /// The agent `alm` last ran under for a task in the taskbag at `root`, from its events
 /// (Task-A03-27); none when no event records one.
-#[tauri::command]
+#[tauri::command(async)]
 fn last_agent(root: PathBuf) -> Option<allomos_store::events::LastAgent> {
     allomos_store::events::last_agent(&root)
 }
 
 /// What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08), the
 /// earliest started first.
-#[tauri::command]
+#[tauri::command(async)]
 fn progress_reports(project: PathBuf) -> Vec<allomos_store::progress::Progress> {
     allomos_store::progress::reports(&project)
 }
 
 /// The person closed a finished (or silent) report: remove it.
-#[tauri::command]
+#[tauri::command(async)]
 fn dismiss_progress(project: PathBuf, id: String) {
     allomos_store::progress::dismiss(&project, &id)
 }
 
 /// Questions an agent is asking about `project` with `alm confirm`, oldest first. Listing them
 /// marks them seen, so `alm` knows this window shows them.
-#[tauri::command]
+#[tauri::command(async)]
 fn confirm_requests(project: PathBuf) -> Vec<ConfirmRequest> {
     pending_confirms(&project)
 }
 
 /// The person's answer to question `id`: go ahead (`yes`) or cancel.
-#[tauri::command]
+#[tauri::command(async)]
 fn answer_confirm_request(
     project: PathBuf,
     id: String,
@@ -2055,14 +2055,14 @@ async fn agent_status(root: PathBuf) -> AgentStatus {
 
 /// Which agents a folder's instruction files tell about Allomos, for the Agents section of the
 /// taskbag's settings (Task-A05-bag963): asked once for each project folder.
-#[tauri::command]
+#[tauri::command(async)]
 fn agent_setup_of(project: PathBuf) -> allomos_store::AgentSetup {
     agent_setup(&project)
 }
 
 /// Write Allomos's section into `project`'s AGENTS.md and CLAUDE.md directly, for when no
 /// agent is available. Returns the files changed.
-#[tauri::command]
+#[tauri::command(async)]
 fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem> {
     add_agent_instructions(&project).map_err(|e| Problem::WriteFailed {
         path: project.join("AGENTS.md").display().to_string(),

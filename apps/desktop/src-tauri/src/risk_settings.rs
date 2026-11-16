@@ -31,7 +31,7 @@ fn of_project(project: &allomos_core::Project) -> RiskSettings {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn risk_settings(root: PathBuf) -> Result<RiskSettings, Problem> {
     let loaded = allomos_store::load(&root);
     let Some(bag) = loaded.taskbag else {
@@ -47,7 +47,7 @@ pub(crate) fn risk_settings(root: PathBuf) -> Result<RiskSettings, Problem> {
 /// Change the risk settings: `rules` replaces the project's own rules (an empty sentence and a
 /// repeated one are left out), each limit given is turned on or off. Returns the settings as
 /// saved; nothing is written when they already say that.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_risk_settings(
     root: PathBuf,
     rules: Option<Vec<String>>,
