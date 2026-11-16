@@ -2842,6 +2842,108 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// Task-A01-nacho373: the commands that read or write the taskbag run off the main thread, so
+    /// two can run at the same moment. Changes sent together each take the lock in turn: every
+    /// one lands, with one event each, while another thread keeps reading the taskbag.
+    #[test]
+    fn changes_sent_at_the_same_moment_all_land() {
+        let dir =
+            std::env::temp_dir().join(format!("allomos-desktop-together-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "p", "P").unwrap();
+        let by = "Will (Phone)";
+        let area = companion_change(
+            &root,
+            by,
+            "add_area",
+            serde_json::json!({ "id": null, "name": "Core" }),
+        )
+        .unwrap();
+        let ids: Vec<String> = (0..8)
+            .map(|i| {
+                let task = companion_change(
+                    &root,
+                    by,
+                    "add_task",
+                    serde_json::json!({ "task": { "area": area["id"], "title": format!("Task {i}") } }),
+                )
+                .unwrap();
+                task["id"].as_str().unwrap().to_string()
+            })
+            .collect();
+        std::thread::scope(|scope| {
+            for id in &ids {
+                let root = &root;
+                scope.spawn(move || {
+                    companion_change(
+                        root,
+                        by,
+                        "edit_task",
+                        serde_json::json!({ "id": id, "edit": { "field": "state", "state": "ready" } }),
+                    )
+                    .unwrap();
+                });
+            }
+            // A reader at the same time, as the window's reload is.
+            let root = &root;
+            scope.spawn(move || {
+                for _ in 0..8 {
+                    assert!(open_taskbag(root.clone()).loaded.taskbag.is_some());
+                }
+            });
+        });
+        let bag = allomos_store::load(&root).taskbag.unwrap();
+        assert_eq!(bag.tasks.len(), 8);
+        assert!(
+            bag.tasks
+                .iter()
+                .all(|t| t.state == allomos_core::State::Ready)
+        );
+        for id in &ids {
+            assert_eq!(allomos_store::events::history(&root, id).events.len(), 2);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Task-A01-nacho373: how long the window's commands take on a real taskbag, which is how
+    /// long the window stood still while they ran on the main thread. Not run with the others:
+    /// `ALLOMOS_TIMING_TASKBAG=<a copy of a taskbag> ALLOMOS_TIMING_TASK=<a backlog task's id>
+    /// cargo test -p allomos-desktop timing -- --ignored --nocapture`. It changes that task, so
+    /// give it a copy.
+    #[test]
+    #[ignore]
+    fn timing_of_the_windows_commands_on_a_taskbag() {
+        let root = PathBuf::from(std::env::var_os("ALLOMOS_TIMING_TASKBAG").unwrap());
+        let id = std::env::var("ALLOMOS_TIMING_TASK").unwrap();
+        let timed = |what: &str, run: &mut dyn FnMut()| {
+            let start = std::time::Instant::now();
+            run();
+            println!("{what}: {} ms", start.elapsed().as_millis());
+        };
+        timed("open_taskbag", &mut || {
+            open_taskbag(root.clone());
+        });
+        timed("taskbag_stamp", &mut || {
+            taskbag_stamp(root.clone());
+        });
+        timed("task_history", &mut || {
+            task_history(root.clone(), id.clone());
+        });
+        timed("edit_task (state: ready)", &mut || {
+            let edit =
+                serde_json::from_value(serde_json::json!({ "field": "state", "state": "ready" }))
+                    .unwrap();
+            edit_task_as(&root, Some("Will"), &id, &edit).unwrap();
+        });
+        timed(
+            "open_taskbag again (the reload after the change)",
+            &mut || {
+                open_taskbag(root.clone());
+            },
+        );
+    }
+
     /// The Tasks section's ladder (Task-A05-yeti951): renames reach the tasks, order and new steps
     /// are saved, and removing a step tasks carry is refused, naming them, with nothing changed.
     #[test]
